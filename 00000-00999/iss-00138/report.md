@@ -172,6 +172,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S04 | none | worker / spec-reviewer | recorded | tc-004 | no | S04 review returned `review_status: pass` with no findings |
 | S05 | `_MANAGED_SKILL_NAMES` registration required for fail-sensitive managed ownership tests | code-reviewer | amended plan/report and kept equality assertion | tc-005 | yes | first S05 `code-reviewer` failed until scope amendment was recorded; diff limited to one-line managed skill registration |
 | S06 | repo-local `spec-dock update .` used published package and did not apply current checkout provider changes | implementation | targeted provider-to-dogfooding refresh with `rsync`; recorded command behavior | tc-007 | no | update command succeeded but left worktree clean; targeted parity refresh then produced expected five-file drift |
+| S99 | checked-in dogfooding `.meta.json` snapshot must include new issue metadata files | PR CI / local full suite | updated checked-in dogfooding path and `depends_on` snapshots for newly tracked issue metadata | tc-008 | no | old head `provider-tests` failed on `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`; focused 7-test bundle then passed after snapshot update |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
@@ -193,6 +194,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | tc-005 | S05 | yes | red-required | existing routing contract expected old execution-only wording; managed skill inventory lacked `spec-dock-issue-planning` | focused 6-test unittest command | pass | `_MANAGED_SKILL_NAMES` equality preserved after one-line registration |
 | tc-006 | S05 | yes | red-required | planning skill authority boundary and execution prerequisite / gap return wording were not asserted | focused bundled routing / installed structure assertions | pass | assertions cover main orchestrator ownership, fresh reviewer gate, non-canonical delegated output, and planning/clarification return |
 | tc-007 | S06 | yes | manual-required | dogfooding planning skill missing and workflow docs drifted from provider | targeted provider-to-dogfooding refresh; five `git diff --no-index` parity checks; `./spec-dock/scripts/spec-dock validate` | pass | checked-in dogfooding parity update required and applied |
+| tc-008 | S99 | yes | red-required | checked-in dogfooding metadata snapshot missed newly tracked `iss-00137` / `iss-00138` `.meta.json` files | `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`; focused 7-test bundle | pass | closes PR CI failure observed on the pre-fix head |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -206,6 +208,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | tc-005 | S05 | managed skill inventory / routing / docs / installed output focused unittest bundle + S05 code-reviewer re-review | pass | AC-001/AC-004/AC-005/EC-004 S05 slice closed |
 | tc-006 | S05 | authority boundary focused assertions + S05 code-reviewer re-review | pass | AC-002/AC-006/EC-003 S05 slice closed |
 | tc-007 | S06 | dogfooding parity diff inspection + validate + S06 spec-reviewer re-review | pass | AC-005/EC-004 S06 slice closed |
+| tc-008 | S99 | checked-in dogfooding metadata snapshot focused unittest + focused 7-test bundle | pass | PR CI red closed by metadata snapshot update |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -272,6 +275,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S04 | committed | `src/spec_dock/assets/spec_dock/docs/README.md`; `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`; S04 report evidence | b9853ea | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 | S05 | committed | `src/spec_dock/cli.py`; `tests/test_init_update.py`; `tests/cli_runtime/harness.py`; `tests/cli_runtime/test_wrappers.py`; S05 plan/report evidence | 57122d3 | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 | S06 | committed | `.agents/skills/spec-dock-issue-planning/SKILL.md`; `.agents/skills/spec-dock-issue-execution/SKILL.md`; `.agents/skills/spec-driven-tdd-workflow/SKILL.md`; `spec-dock/docs/README.md`; `spec-dock/docs/workflow_issue.md`; S06 report evidence | 497cae8 | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
+| S99 | pending commit | `tests/test_init_update.py`; S99 report evidence | pending | pending | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` - Issue planning leaf skillを追加
@@ -281,6 +285,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - Issue planning / executionの対応leaf skillとroutingを明確化
 - `src/spec_dock/cli.py` - managed skill listにIssue planning skillを登録
 - `tests/test_init_update.py` - managed asset / routing / docs / authority-boundary assertionsを更新
+- `tests/test_init_update.py` - checked-in dogfooding `.meta.json` snapshotに新規issue metadataを追加
 - `tests/cli_runtime/harness.py` - expected managed skill namesにIssue planning skillを追加
 - `tests/cli_runtime/test_wrappers.py` - installed wrapper docs/skill checksにIssue planning skillを追加
 - `.agents/skills/spec-dock-issue-planning/SKILL.md` - dogfooding側にIssue planning leaf skillを反映
@@ -311,6 +316,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
 | qa-reviewer | whole issue obligation coverage | added | focused 6-test unittest command -> OK; `./spec-dock/scripts/spec-dock validate` -> OK; `./spec-dock/scripts/spec-dock sync` -> OK; final QA review pass with P2 report wording cleanup applied | pass |
+| parent orchestrator | PR CI follow-up | added | `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` -> OK; focused 7-test unittest bundle -> OK; `git diff --check` -> OK; `./spec-dock/scripts/spec-dock validate` -> OK | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
