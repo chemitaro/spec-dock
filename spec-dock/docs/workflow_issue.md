@@ -5,7 +5,8 @@ Issue は実装の最小単位です。
 この workflow の品質ゲートは scope 固有の additive gate であり、`phase_*.md` の shared minimum gate 通過を前提とします。
 
 対応 leaf skill:
-- `.agents/skills/spec-dock-issue-execution/SKILL.md`
+- `.agents/skills/spec-dock-issue-planning/SKILL.md`: Issue の requirement / design / plan planning、review readiness、未解決 gap の spec authoring / clarification への戻し。
+- `.agents/skills/spec-dock-issue-execution/SKILL.md`: 承認済み planning artifacts を前提にした implementation、report evidence、issue execution gate / completion gate。
 
 関連:
 - 総合: [guide.md](guide.md)
@@ -72,6 +73,8 @@ Issue は実装の最小単位です。
 
 ## 仕様 authoring（spec authoring）
 
+- Issue planning は `.agents/skills/spec-dock-issue-planning/SKILL.md` を入口にし、仕様作成の正本は `workflow_spec_authoring.md`、未解決の曖昧さは `workflow_clarification.md` に route する
+- Issue execution は `.agents/skills/spec-dock-issue-execution/SKILL.md` を入口にし、承認済み / reviewer-pass 済みの `requirement.md` / `design.md` / `plan.md` と executable `plan.md` を前提に、この workflow の execution gate / report gate / completion gate に route する
 - active issue 配下の `requirement.md` / `design.md` / `plan.md` を埋める
 - Requirement / design / plan の phase promotion は `workflow_spec_authoring.md` を正本にし、各 artifact ごとに fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
 - Requirement / design / plan に未解決の仕様 gap、用語衝突、責務境界の曖昧さがある場合は、実装で仮定せず [workflow_clarification.md](workflow_clarification.md) へ戻す。

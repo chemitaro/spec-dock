@@ -22,8 +22,9 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 
 - `spec-dock-initiative-planning`: initiative-level requirement/design/plan planning.
 - `spec-dock-epic-planning`: epic-level requirement/design/plan planning.
-- `spec-dock-issue-execution`: issue-level TDD execution and report updates.
-- `spec-dock-clarification`: first-class docs-aware clarification workflow for source-grounded read, one-question-at-a-time user clarification through the orchestrator, and analysis-only / authoring handoff.
+- `spec-dock-issue-planning`: issue-level requirement/design/plan planning, review readiness, and implementation handoff readiness.
+- `spec-dock-issue-execution`: issue-level TDD execution and report updates after approved / reviewer-pass planning artifacts and an executable `plan.md` are ready.
+- `spec-dock-clarification`: first-class docs-aware clarification companion for planning, source-grounded ambiguity, one-question-at-a-time user clarification through the orchestrator, and analysis-only / authoring handoff.
 - `spec-dock-system-architect`: delegated architecture analysis and draft design evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only.
 - `spec-dock-implementation-planner`: delegated planning analysis and draft plan evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only.
 - `spec-dock-adr-facilitation`: ADR drafting/decision facilitation linked to the current workflow.
@@ -35,6 +36,8 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 - `spec-dock/docs/reference_sync.md`
 - `spec-dock/docs/reference_naming.md`
 - `spec-dock/docs/workflow_spec_authoring.md`
+- `spec-dock/docs/workflow_clarification.md`
+- `spec-dock/docs/workflow_issue.md`
 - `spec-dock/docs/phase_design.md`
 - `spec-dock/docs/phase_plan_issue.md`
 
@@ -45,6 +48,8 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 - Put interview and investigation notes under `discussions/` in the active node. Important questions use unanswered `interview` first; lightweight chat questions stay one-at-a-time and return to `interview` if they become specification decisions.
 - Sub-agent authoring outputs may be direct-written under the target scope `discussions/` direct child, but they do not become canonical authority until the main orchestrator adopts them in canonical docs and records the adoption in `report.md`.
 - Record `Spec Authoring Gate` evidence in the active node's `report.md` for each requirement / design / plan promotion.
+- For issue work, route requirement/design/plan authoring and unresolved source-grounded ambiguity to `spec-dock-issue-planning` with `spec-dock-clarification` as needed before execution.
+- If issue planning and execution are both requested, complete planning artifacts, fresh reviewer gates, and handoff readiness evidence before routing to `spec-dock-issue-execution`.
 - `spec-dock/active/context-pack.md` is the execution entrypoint for active issue work.
 - Discussion doc example: `./spec-dock/scripts/spec-dock new doc adr --issue iss-00123 --title "..."`
 - Runtime path guardrail: use only `./spec-dock/scripts/spec-dock ...` and avoid legacy command aliases.
