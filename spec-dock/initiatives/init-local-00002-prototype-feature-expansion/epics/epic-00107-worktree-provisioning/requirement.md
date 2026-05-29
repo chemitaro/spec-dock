@@ -21,6 +21,7 @@ ID: "epic-00107"
   - 作成先は main checkout の中ではなく、`SPEC_DOCK_WORKTREE_ROOT` で指定した central root 配下の `<repo-basename>/` namespace へ集約できる。
   - worktree directory name / initial branch name は、既に実用している `taikyohiyou_project` の naming UX を踏襲して自動合成できる。
   - worktree 作成後に、project-local bootstrap interface として worktree root の `make init` を optional / non-fatal に呼び出せる。
+  - central root namespace 配下の linked worktree を agent が JSON で列挙・詳細確認・削除できる。
   - Codex app が管理する短命 worktree とは別に、開発者が自分で管理する長命 worktree を作る導線を提供する。
 
 ## ユースケース
@@ -72,6 +73,16 @@ ID: "epic-00107"
 - E-RQ-010:
   - provider-side source of truth は `src/spec_dock/assets/spec_dock/...` とし、dogfooding workspace `spec-dock/...` は検証・反映対象として扱うこと。
   - command 追加は既存 layered runtime architecture に沿い、monolithic shell script への逆戻りを避けること。
+- E-RQ-011:
+  - SpecDock は repo-local runtime command として `worktree list` / `worktree show` / `worktree remove` を提供し、agent が central root namespace 配下の linked worktree を安定して把握・選択・削除できること。
+  - `list` / `show` / `remove` は `SPEC_DOCK_WORKTREE_ROOT` を必須とし、missing / invalid root では fail-fast すること。
+  - `list` / `show` は Git が認識する linked worktree を扱い、central root namespace 配下を managed、それ以外を unmanaged として分類できること。
+  - `remove` は managed worktree だけを対象とし、main checkout、current checkout、unmanaged worktree は `--force` でも削除しないこと。
+  - `remove` は関連 local branch を削除しないこと。
+- E-RQ-012:
+  - `worktree list` / `worktree show` / `worktree remove` は agent-first interface として `--json` を提供すること。
+  - JSON は stable target id、path、branch、managed/current/main 判定、remove 可否 diagnostic、operation result を machine-readable に表すこと。
+  - stale record repair、orphan directory cleanup、`worktree prune` は diagnostic / future extension に留め、この epic の削除 command では実行しないこと。
 
 ## Epic 受け入れ条件
 - E-AC-001:
@@ -204,10 +215,39 @@ ID: "epic-00107"
   - 観測点:
     - provider / dogfooding parity check
     - final spec review
+- E-AC-012:
+  - 前提:
+    - `SPEC_DOCK_WORKTREE_ROOT` が valid absolute directory を指す
+    - Git repo に main checkout、managed linked worktree、unmanaged linked worktree がある
+  - 操作:
+    - agent が `spec-dock worktree list --json` と `spec-dock worktree show <target> --json` を実行する
+  - 期待結果:
+    - JSON から stable id、path、branch、managed/current/main 判定、remove 可否 diagnostic を判定できる
+    - managed worktree と unmanaged worktree が区別できる
+  - 観測点:
+    - CLI / runtime test
+    - JSON payload assertion
+- E-AC-013:
+  - 前提:
+    - target は central root namespace 配下の managed linked worktree である
+    - target directory に Git 管理外 cache / generated files がある
+  - 操作:
+    - agent が `spec-dock worktree remove <target>` を実行する
+  - 期待結果:
+    - Git worktree record が削除される
+    - target の個別 worktree directory は Git 管理外 file / cache を含めて残らない
+    - 関連 local branch は削除されない
+    - main checkout、current checkout、unmanaged worktree は `--force` でも削除されない
+  - 観測点:
+    - CLI / runtime test
+    - `git worktree list --porcelain`
+    - filesystem assertion
+    - branch existence assertion
 
 ## スコープ
 - 必須:
   - SpecDock runtime worktree creation command
+  - agent-first worktree inventory / detail / remove commands
   - required `SPEC_DOCK_WORKTREE_ROOT` central root placement
   - taikyohiyou_project 由来の id / directory / branch naming
   - label validation
@@ -225,8 +265,10 @@ ID: "epic-00107"
   - unknown `git worktree add` failure を retryable collision として握りつぶすこと
   - provider-side source of truth を飛ばして dogfooding workspace だけを編集すること
 - 対象外:
-  - worktree remove / prune / repair command
+  - worktree prune / repair command
   - worktree status dashboard / all-worktree diff summary
+  - branch deletion option
+  - orphan directory cleanup
   - Codex app Handoff integration
   - Codex local environment `.codex` setup scripts の設計
   - project-specific secret / env projection の実装
@@ -241,6 +283,7 @@ ID: "epic-00107"
   - Git が管理する linked worktree として作成する
   - `make init` は project-local bootstrap interface として扱い、存在しない / 失敗する場合でも作成済み worktree を残す
   - operator が path / branch / bootstrap 状態を読める output を出す
+  - agent が JSON で worktree inventory / detail / remove result を読める output を出す
   - provider-side runtime architecture の layer 境界に沿って実装する
 - 判断が必要:
   - `make init` target existence をどの方法で判定するか
@@ -248,6 +291,7 @@ ID: "epic-00107"
 - 行わない:
   - nested checkout を repo 内に作らない
   - cleanup / remove を作成 command の副作用として実行しない
+  - `remove` の一部として `git worktree prune` や branch deletion を実行しない
   - detached HEAD から branch 名を推測して作成しない
   - secret-bearing env file を新 worktree へ copy しない
   - Codex-managed `$CODEX_HOME/worktrees` をこの command の管理対象にしない
@@ -300,12 +344,14 @@ ID: "epic-00107"
       - 参照プロダクトの `make worktree <optional-label>` に最も近く、作成専用 command として短い。
     - B:
       - `spec-dock worktree create [LABEL]`
-      - 将来 `list` / `remove` / `status` を同じ family に足しやすい。
+      - `list` / `show` / `remove` を同じ family に足しやすい。
   - 推奨案:
-    - B。今回の epic は create のみだが、command family として予約しておく方が将来拡張と help 構造が自然である。
+    - B。初期 tranche では create を先に実装し、後続 tranche で `list` / `show` / `remove` を同じ command family に追加する構造が自然である。
   - 決定:
     - B を採用する。
     - worktree 作成 command の CLI shape は `spec-dock worktree create [LABEL]` を基本とする。
+    - 現在の epic scope では `worktree list` / `show` / `remove` も同じ family に含める。
+    - `worktree status` / `prune` / `repair` は future extension / out of scope として残す。
   - 影響範囲:
     - CLI parser
     - docs
