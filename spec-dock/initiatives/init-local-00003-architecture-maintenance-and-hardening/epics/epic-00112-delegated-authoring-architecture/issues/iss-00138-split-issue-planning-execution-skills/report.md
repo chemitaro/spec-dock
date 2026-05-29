@@ -327,5 +327,15 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 |---|---|---|---|
 | focused tests, validate, sync, S01-S06 step reviews, final QA/code/spec pass recorded | final report update after QA/code/spec pass; post-commit clean check and PR/merge-prep evidence remain external/follow-on | final response / PR | ready for final report commit |
 
+### PR Delivery Gate
+| PR URL | base | base resolution source | draft/ready | head branch | head SHA | issue linkage | creation / reuse decision |
+|---|---|---|---|---|---|---|---|
+| https://github.com/chemitaro/spec-dock/pull/139 | `main` | `gh repo view --json defaultBranchRef,nameWithOwner`; `git fetch origin main`; `git merge-base --is-ancestor origin/main HEAD` | ready (`isDraft=false`) | `iss-00138-split-issue-planning-execution-skills` | 063c2988d0d032ef0a0305b0c459721aeab9ade4 | Closes #138 | no existing PR found by `gh pr list --head ... --base main`; created new PR #139 |
+
+### Merge Preparation Gate
+| PR state | monitor status | latest monitored head SHA | fix loop count / history | required check status | non-required check status / waiver | blocking review status | merge conflict / visible blocker status | unresolved review-thread limitation status | unresolved blockers | final merge-prepared decision |
+|---|---|---|---|---|---|---|---|---|---|---|
+| open | initial monitor: checks in progress | 063c2988d0d032ef0a0305b0c459721aeab9ade4 | 0 | pending: `provider-tests`, `validate` in progress at initial monitor | N/A | no blocking review decision reported | `mergeable=MERGEABLE` | unresolved thread state not checked by flat PR view | CI pending at initial monitor | pending latest-head CI completion |
+
 ## 省略/例外メモ (必須)
 - 該当なし
