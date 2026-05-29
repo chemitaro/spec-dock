@@ -70,7 +70,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-002 | adopted | research | orchestrator | Current assets/docs/tests have Initiative/Epic planning skills but no Issue planning skill; Issue execution is the only Issue leaf skill. | `requirement.md` | background / scope / AC | Source-grounded read confirmed the existing asymmetry and affected shipped asset/test surfaces. | source-grounded local repo evidence | `discussions/20260529t012153z-01-research-issue-planning-execution-split-source-grounding.md`; `requirement.md` | main orchestrator | `spec-reviewer` pass for requirement phase | no | design phase |
 | EAL-003 | adopted | interview | user | Preserve existing workflow, split planning/execution, keep delegated draft flow, and keep main orchestrator canonical ownership. | `requirement.md` | scope / constraints / AC / EC | User answer resolved the authority boundary and ruled out new direct canonical authoring authority. | direct user answer | `discussions/20260529t012153z-interview-issue-planning-skill-authority-boundary.md`; `requirement.md` | main orchestrator | `spec-reviewer` pass for requirement phase | no | design phase |
 | EAL-004 | rejected | delegated design draft | `system-architect` | Proposed design analysis for skill split implementation. | N/A: not adopted into canonical artifact | N/A: not adopted | Post-run diff guard was blocked by pre-existing dirty discussion files, so this draft is adoption-ineligible and was explicitly rejected as delegated evidence. Canonical design was written through main orchestrator manual authoring path from approved requirement and source docs. | rejected delegated evidence; not used for phase promotion | `discussions/20260529t015038z-disc-issue-planning-execution-split-design-analysis.md`; `delegated-authoring diff-guard` blocked output; `design.md` | main orchestrator | `spec-reviewer` pass for design phase | no: rejected evidence is resolved and cannot promote or block design | design review passed; proceed with plan review |
-| EAL-005 | rejected | delegated plan draft | `implementation-planner` | Proposed implementation plan slices, test strategy, review gates, docs impact, and final quality gate. | N/A: not adopted into canonical artifact | N/A: not adopted | Post-run diff guard was blocked by pre-existing dirty discussion files, so this draft is adoption-ineligible and was explicitly rejected as delegated evidence. Canonical plan is written through main orchestrator manual authoring path from reviewer-pass requirement/design and source docs. | rejected delegated evidence; not used for phase promotion | `discussions/20260529t020902z-disc-issue-planning-execution-split-plan-draft.md`; `delegated-authoring diff-guard` blocked output; `plan.md` | main orchestrator | pending `spec-reviewer` for plan phase | no: rejected evidence is resolved and cannot promote or block plan | run plan review on manual canonical plan |
+| EAL-005 | rejected | delegated plan draft | `implementation-planner` | Proposed implementation plan slices, test strategy, review gates, docs impact, and final quality gate. | N/A: not adopted into canonical artifact | N/A: not adopted | Post-run diff guard was blocked by pre-existing dirty discussion files, so this draft is adoption-ineligible and was explicitly rejected as delegated evidence. Canonical plan is written through main orchestrator manual authoring path from reviewer-pass requirement/design and source docs. | rejected delegated evidence; not used for phase promotion | `discussions/20260529t020902z-disc-issue-planning-execution-split-plan-draft.md`; `delegated-authoring diff-guard` blocked output; `plan.md` | main orchestrator | `spec-reviewer` pass for plan phase | no: rejected evidence is resolved and cannot promote or block plan | implementation completed through approved canonical plan |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -117,7 +117,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | `spec-dock-system-architect` | iss-00138 | `discussions/20260529t015038z-disc-issue-planning-execution-split-design-analysis.md` | active context; active issue requirement/design/plan/report; issue discussions; workflow docs; provider skills; docs README; tests | `design.md`; `report.md`; `plan.md` | rejected | [] | failed: `dirty_baseline_discussion` | not integrated as delegated evidence; main orchestrator manual authoring path used for `design.md` | entire draft is adoption-ineligible as delegated evidence due diff guard block | resolved by rejection in EAL-004; pre-existing dirty discussion files in baseline: `20260529t012153z-01-research...md`, `20260529t012153z-interview...md` | design `spec-reviewer` passed | no delegated draft promotion; canonical design passed fresh `spec-reviewer` |
-| `spec-dock-implementation-planner` | iss-00138 | `discussions/20260529t020902z-disc-issue-planning-execution-split-plan-draft.md` | active context; active issue requirement/design/plan/report; workflow docs; provider skills; provider docs; tests | `plan.md`; `report.md` | rejected | [] | failed: `dirty_baseline_discussion` | not integrated as delegated evidence; main orchestrator manual authoring path used for `plan.md` | entire draft is adoption-ineligible as delegated evidence due diff guard block | resolved by rejection in EAL-005; pre-existing dirty discussion files in baseline include research/interview/design draft discussion files | pending plan `spec-reviewer` | no delegated draft promotion; canonical plan still requires fresh `spec-reviewer` |
+| `spec-dock-implementation-planner` | iss-00138 | `discussions/20260529t020902z-disc-issue-planning-execution-split-plan-draft.md` | active context; active issue requirement/design/plan/report; workflow docs; provider skills; provider docs; tests | `plan.md`; `report.md` | rejected | [] | failed: `dirty_baseline_discussion` | not integrated as delegated evidence; main orchestrator manual authoring path used for `plan.md` | entire draft is adoption-ineligible as delegated evidence due diff guard block | resolved by rejection in EAL-005; pre-existing dirty discussion files in baseline include research/interview/design draft discussion files | plan `spec-reviewer` passed | no delegated draft promotion; canonical plan passed fresh `spec-reviewer` |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -134,35 +134,16 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- Issue planning leaf skill を追加し、Issue execution skill を承認済み planning artifacts 前提の実行入口に限定した。
+- Provider asset、tests、dogfooding parity、workflow docs を更新し、focused tests / validate / sync / reviewer gates で確認した。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-05-29 HH:MM - HH:MM）
-
-#### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
-
-#### 実施内容
-- ...
-
-#### 実行コマンド / 結果
-```bash
-<command>
-
-<result>
-```
+### セッションログ（2026-05-29）
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
 | S01 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only: provider skill file existence / required refs / authority boundary | provider-side `spec-dock-issue-planning/SKILL.md` was absent before S01; S05 will add automated inventory assertions | docs inspection / worker handoff | pass | S01 is docs-only; automated regression is assigned to S05 |
 | S01 | 緑フェーズ（Green） | skill file inspection | new provider-side skill exists and references required workflow docs plus `authoring/issue-plan.md` | docs inspection / `sed` / `rg` | pass | Worker output confirmed only allowed path changed |
 | S01 | リファクタリング（Refactor） | no broad policy duplication | concise leaf skill follows Initiative/Epic planning style | diff inspection | pass | no refactor needed |
@@ -185,7 +166,6 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
 | S01 | none | worker / spec-reviewer | recorded | tc-001 | no | S01 review returned `review_status: pass` with no findings |
 | S02 | none | worker / spec-reviewer | recorded | tc-002 | no | S02 review returned `review_status: pass` with no findings |
 | S03 | none | worker / spec-reviewer | recorded | tc-003 | no | S03 review returned `review_status: pass` with no findings |
@@ -196,7 +176,6 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
 | S01 | tc-001 | skill file exists, required source refs present, no authority expansion | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md`; S01 `spec-reviewer` pass | pass | S05 will add automated asset/routing assertions |
 | S02 | tc-002 | hub route / sequencing / clarification companion are correctly documented | `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md`; S02 `spec-reviewer` pass | pass | S05 will add automated routing assertions |
 | S03 | tc-003 | prerequisite / gap stop condition / execution-only boundary are documented | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md`; S03 `spec-reviewer` pass | pass | S05 will add automated execution-boundary assertions |
@@ -207,7 +186,6 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
 | tc-001 | S01 | yes | inspect-only | provider-side Issue planning skill was absent before S01 | docs inspection; S01 `spec-reviewer` pass | pass | Red-required automated coverage deferred to S05 per plan |
 | tc-002 | S02 | yes | inspect-only | hub route previously fixed Issue route to execution skill only | docs inspection; S02 `spec-reviewer` pass | pass | Red-required automated coverage deferred to S05 per plan |
 | tc-003 | S03 | yes | inspect-only | execution skill did not explicitly require reviewer-pass planning artifacts | docs inspection; S03 `spec-reviewer` pass | pass | Red-required automated coverage deferred to S05 per plan |
@@ -221,7 +199,6 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
 | tc-001 | S01 | provider skill file inspection + S01 `spec-reviewer` pass | pass | AC-001/AC-002/EC-003 S01 slice closed |
 | tc-002 | S02 | hub routing inspection + S02 `spec-reviewer` pass | pass | AC-002/AC-004/AC-006/EC-002/EC-003 S02 slice closed |
 | tc-003 | S03 | execution boundary inspection + S03 `spec-reviewer` pass | pass | AC-003/AC-006/EC-001 S03 slice closed |
@@ -233,7 +210,6 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
 | none | tc-001 | tc-s01-001 / tc-s01-002 | tc-001 | closure unchanged | no | no |
 | none | tc-002 | tc-s02-001 / tc-s02-002 | tc-002 | closure unchanged | no | no |
 | none | tc-003 | tc-s03-001 / tc-s03-002 | tc-003 | closure unchanged | no | no |
@@ -255,7 +231,6 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
 | S01 | delegated | shipped skill asset / workflow text | doc-writer | S01 provider-side planning skill asset only | `requirement.md`; `design.md`; `plan.md`; workflow docs; existing Initiative/Epic planning skill style | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` | canonical specs; tests; runtime code; dogfooding output; Permission Profile; direct canonical authority | docs-only inspection | source docs conflict; allowed path outside scope; ambiguous authority wording | changed files; inspection result; unresolved risks; `Ledger Note` or no-decision statement | pass |
 | S02 | delegated | shipped hub skill / workflow routing text | doc-writer | S02 hub routing text only | `requirement.md`; `design.md`; `plan.md`; `workflow_spec_authoring.md`; `workflow_clarification.md`; `workflow_issue.md` | `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md` | S01/S03/S04/S05/S06 targets; runtime command policy duplication | docs-only inspection | route wording bypasses planning gates; allowed path outside scope | changed files; routing evidence; unresolved risks; `Ledger Note` or no-decision statement | pass |
 | S03 | delegated | shipped issue execution skill boundary text | doc-writer | S03 issue execution skill boundary wording only | `requirement.md`; `design.md`; `plan.md`; `workflow_issue.md`; `authoring/issue-plan.md` | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md` | runtime code; tests; provider docs; dogfooding output; PR/completion policy redesign | docs-only inspection | approved/reviewer-pass prerequisite cannot be stated; allowed path outside scope | changed files; boundary evidence; unresolved risks; `Ledger Note` or no-decision statement | pass |
@@ -266,24 +241,21 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
-| S01 | doc-writer | Added provider-side `spec-dock-issue-planning` leaf skill with required source references and authority boundary. Worker stated `No material implementation decisions beyond the approved plan.` | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` | docs-only inspection -> pass | pass | S05 assertions still pending by plan | accepted |
-| S02 | doc-writer | Split hub Issue routing into planning and execution routes, preserved clarification companion, and required reviewer gates / handoff readiness before execution. Worker stated `No material implementation decisions beyond the approved plan.` | `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md` | docs-only inspection -> pass | pass | S05 assertions still pending by plan | accepted |
-| S03 | doc-writer | Added execution readiness prerequisites and gap stop wording to issue execution skill while preserving runtime command reminders and PR delivery / issue finish references. Worker stated `No material implementation decisions beyond the approved plan.` | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md` | docs-only inspection -> pass | pass | S05 assertions still pending by plan | accepted |
-| S04 | doc-writer | Split provider README Issue skill listing and `workflow_issue.md` corresponding leaf skill guidance into Issue planning and Issue execution routes. Worker stated `No material implementation decisions beyond the approved plan.` | `src/spec_dock/assets/spec_dock/docs/README.md`; `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` | docs-only inspection -> pass | pass | S05 assertions still pending by plan | accepted |
+| S01 | doc-writer | Added provider-side `spec-dock-issue-planning` leaf skill with required source references and authority boundary. Worker stated `No material implementation decisions beyond the approved plan.` | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` | docs-only inspection -> pass | pass | S05 assertions completed | accepted |
+| S02 | doc-writer | Split hub Issue routing into planning and execution routes, preserved clarification companion, and required reviewer gates / handoff readiness before execution. Worker stated `No material implementation decisions beyond the approved plan.` | `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md` | docs-only inspection -> pass | pass | S05 assertions completed | accepted |
+| S03 | doc-writer | Added execution readiness prerequisites and gap stop wording to issue execution skill while preserving runtime command reminders and PR delivery / issue finish references. Worker stated `No material implementation decisions beyond the approved plan.` | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md` | docs-only inspection -> pass | pass | S05 assertions completed | accepted |
+| S04 | doc-writer | Split provider README Issue skill listing and `workflow_issue.md` corresponding leaf skill guidance into Issue planning and Issue execution routes. Worker stated `No material implementation decisions beyond the approved plan.` | `src/spec_dock/assets/spec_dock/docs/README.md`; `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` | docs-only inspection -> pass | pass | S05 assertions completed | accepted |
 | S05 | dev-coder | Updated managed skill inventories, installed docs checks, wrapper checks, routing contract assertions, and authority-boundary assertions for `spec-dock-issue-planning`. Worker stated `No material implementation decisions beyond the approved plan.` | `tests/test_init_update.py`; `tests/cli_runtime/harness.py`; `tests/cli_runtime/test_wrappers.py` | focused unittest bundle -> pass | pass | parent added `_MANAGED_SKILL_NAMES` registration and amended plan/report | accepted with parent exception |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
 | S05 | `dev-coder` correctly identified `_MANAGED_SKILL_NAMES` as outside original S05 allowed paths; parent integration determined the one-line registration is required to keep installer managed ownership assertions fail-sensitive | approved by amended `plan.md`; no risk waiver | `src/spec_dock/cli.py` | add `spec-dock-issue-planning` to `_MANAGED_SKILL_NAMES` only | remove the one-line registration and restore test-only scope if re-review rejects the amendment | focused 6-test unittest command -> OK | first `code-reviewer` failed pending amendment; re-review passed after amendment | no denied/unavailable host conflict; handled as parent implementation exception with plan/report amendment |
 | S06 | repo-local update command could not refresh current checkout provider changes because it installed the published package; parent orchestrator applied mechanical provider-to-dogfooding parity refresh for the five approved S06 targets | approved by S06 plan contract; no risk waiver | `.agents/skills/spec-dock-issue-planning/SKILL.md`; `.agents/skills/spec-dock-issue-execution/SKILL.md`; `.agents/skills/spec-driven-tdd-workflow/SKILL.md`; `spec-dock/docs/README.md`; `spec-dock/docs/workflow_issue.md` | targeted `rsync` refresh from provider source to dogfooding outputs only | restore target files from HEAD and rerun parity decision if re-review rejects the exception | five `git diff --no-index` provider/dogfooding checks -> no output; `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=70`; `git diff --check` -> pass | first S06 `spec-reviewer` failed pending Parent Implementation Exception; re-review passed after exception row | no denied/unavailable host conflict; handled as parent implementation exception for approved-local-execution |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
 | S01 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed | no findings; `review_status: pass` |
 | S02 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed | no findings; `review_status: pass` |
 | S03 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed | no findings; `review_status: pass` |
@@ -294,17 +266,14 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
 | S01 | committed | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md`; S01 report evidence | db0beb1 | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 | S02 | committed | `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md`; S02 report evidence | 9c5bffe | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 | S03 | committed | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md`; S03 report evidence | bbf0242 | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 | S04 | committed | `src/spec_dock/assets/spec_dock/docs/README.md`; `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`; S04 report evidence | b9853ea | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 | S05 | committed | `src/spec_dock/cli.py`; `tests/test_init_update.py`; `tests/cli_runtime/harness.py`; `tests/cli_runtime/test_wrappers.py`; S05 plan/report evidence | 57122d3 | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
-| S06 | pending commit | `.agents/skills/spec-dock-issue-planning/SKILL.md`; `.agents/skills/spec-dock-issue-execution/SKILL.md`; `.agents/skills/spec-driven-tdd-workflow/SKILL.md`; `spec-dock/docs/README.md`; `spec-dock/docs/workflow_issue.md`; S06 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S06 | committed | `.agents/skills/spec-dock-issue-planning/SKILL.md`; `.agents/skills/spec-dock-issue-execution/SKILL.md`; `.agents/skills/spec-driven-tdd-workflow/SKILL.md`; `spec-dock/docs/README.md`; `spec-dock/docs/workflow_issue.md`; S06 report evidence | 497cae8 | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
 - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` - Issue planning leaf skillを追加
 - `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md` - Issue planning / execution routingを分離
 - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md` - Execution前提とgap stop conditionを明確化
@@ -322,21 +291,12 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - `spec-dock/active/issue/report.md` - S01 implementation / review / closure evidenceを記録
 
 #### コミット
-- <hash> <message>
-
-#### メモ
-- ...
-
----
-
-### セッションログ（2026-05-29 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
+- db0beb1 feat(issue-planning): Issue planning leaf skillを追加
+- 9c5bffe feat(issue-planning): Issue planning routeをhubに追加
+- bbf0242 feat(issue-execution): 実装開始前のplanning gateを明確化
+- b9853ea docs(issue-workflow): Issue planningとexecutionの案内を分離
+- 57122d3 test(issue-planning): managed asset expectationsにplanning skillを追加
+- 497cae8 docs(dogfooding): Issue planning skillのparityを反映
 
 ---
 
@@ -345,37 +305,27 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / README / workflow / skill / migration notes | yes | doc-writer / parent orchestrator | S01-S04 updated provider skills/docs; S06 refreshed dogfooding docs/skills; focused tests, five provider/dogfooding parity checks, `validate`, and `sync` passed | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | added | focused 6-test unittest command -> OK; `./spec-dock/scripts/spec-dock validate` -> OK; `./spec-dock/scripts/spec-dock sync` -> OK; final QA review pass with P2 report wording cleanup applied | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | S05 step code-reviewer passed after scope amendment; final issue-wide review pass with P2 final QA row cleanup applied | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | S01-S04/S06 step spec-reviewers passed; final issue-wide spec review pass; P2/P3 report-ledger cleanup applied | 2 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
-
-## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
-
-## 学んだこと (任意)
-- ...
-
-## 今後の推奨事項 (任意)
-- ...
+| focused tests, validate, sync, S01-S06 step reviews, final QA/code/spec pass recorded | final report update after QA/code/spec pass; post-commit clean check and PR/merge-prep evidence remain external/follow-on | final response / PR | ready for final report commit |
 
 ## 省略/例外メモ (必須)
 - 該当なし
