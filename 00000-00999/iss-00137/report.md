@@ -59,6 +59,11 @@ Disposition ごとの必須証跡:
 | D-008 | resolved | implementation | spec-reviewer | Design review found namespace derivation and containment ordering remained ambiguous | derive namespace before Git list; validate root first then derive namespace from Git main record; only guard cleanup | Design now splits central root env/path validation before Git listing from namespace derivation after Git main record discovery. Canonical containment is required both before Git remove and again before post-Git filesystem cleanup. | This preserves fail-fast env behavior while still using Git main worktree as the source for repo basename, and prevents destructive Git remove before containment checks. | applied | `spec-dock/active/issue/design.md` | rerun fresh design spec-reviewer |
 | D-009 | resolved | test-strategy | spec-reviewer | Plan review found final delivery gates and remove branch/env failure cases were under-specified | leave to implementation discretion; add explicit plan obligations | Plan now adds remove branch-only and remove invalid-root JSON/side-effect tests, plus issue-wide code-reviewer, PR Delivery Gate, and Merge Preparation Gate obligations in S99 / Final Exit Contract. | These are workflow and destructive-safety requirements, so implementation handoff must make them explicit. | applied | `spec-dock/active/issue/plan.md` | rerun fresh plan spec-reviewer |
 | D-010 | resolved | test-strategy | spec-reviewer | Plan review found delegated handoffs missing step-local source-of-truth, S01 allowed commit batching, and locked-worktree remove coverage was not concrete enough | rely on global source-of-truth note; allow batching with evidence; add step-local source-of-truth fields and concrete locked test | Plan now gives S01/S02/S03/S90/S99 explicit source-of-truth fields, removes the S01 batching escape hatch, and adds a `git worktree lock`-based locked remove case. | `workflow_issue.md` requires delegated worker handoffs to include source of truth and one step = one review scope = one commit. Locked worktrees are part of the approved dirty/locked force semantics, so they need executable evidence or a recorded Git-version skip. | applied | `spec-dock/active/issue/plan.md` | rerun fresh plan spec-reviewer |
+| D-011 | resolved | implementation | code-reviewer / spec-reviewer | Runtime review found remove containment derived the namespace from `main.path.parent`, which rejects valid central-root worktrees outside the main checkout parent | use main checkout parent; use target's managed namespace parent | Containment now checks the resolved target against the individual managed worktree's namespace parent, while managed classification still derives from `SPEC_DOCK_WORKTREE_ROOT/<main-worktree-basename>`. | The destructive guard must check the same central-root namespace used for managed classification, not the filesystem parent of the main checkout. | applied | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py`; `tests/cli_runtime/test_worktree.py` | rerun fresh code/spec reviewers |
+| D-012 | resolved | implementation | test evidence | Git reported that locked worktrees require double force (`remove -f -f`) for removal | leave locked force unsupported; map SpecDock `--force` to Git double force | `spec-dock worktree remove --force` now passes `git worktree remove --force --force` so the single SpecDock force option satisfies the approved dirty/locked force semantics. | The user-facing interface has one `--force`, while Git requires a deeper force level for locked worktrees; this is an adapter detail and does not bypass SpecDock non-bypassable guards. | applied | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py`; `tests/cli_runtime/test_worktree.py` | rerun fresh code/QA reviewers |
+| D-013 | resolved | implementation | code-reviewer | Runtime review found namespace symlink escape risk if `$SPEC_DOCK_WORKTREE_ROOT/<repo-basename>` itself is a symlink outside the central root | rely only on canonical containment; reject symlink namespace while preserving canonical path normalization for macOS `/var` paths | Managed classification and containment now reject a symlink namespace directly, while still using canonical containment for normal paths so `/var` / `/private/var` normalization does not misclassify valid temp worktrees. | The intended managed namespace is the central-root namespace, and a symlink at that namespace boundary can redirect cleanup outside the intended tree. | applied | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py`; `tests/cli_runtime/test_worktree.py` | rerun fresh code/spec reviewers |
+| D-014 | resolved | implementation | code-reviewer | Stable id target for the first duplicate raw id could become ambiguous because resolver matched basename and id at the same priority | keep ambiguity behavior; prioritize exact stable id before basename/path matching | Target resolution now resolves an exact stable `id` before evaluating basename/path forms, so both unsuffixed and suffixed stable ids are selectable. | `list --json` exposes stable ids for agent selection; those ids must be usable as primary target handles even when basename collisions exist. | applied | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py`; `tests/cli_runtime/test_worktree.py` | rerun fresh code reviewers |
+| D-015 | resolved | scope | spec-reviewer | Dogfooding docs advertised list/show/remove while dogfooding runtime still exposed only create | remove dogfooding docs; sync dogfooding runtime parity with provider runtime | Dogfooding runtime files under `spec-dock/scripts/spec_dock_runtime/...` now mirror the provider runtime worktree command surface for list/show/remove. | Dogfooding docs are user-facing in this repo, so advertised commands must exist in the checked-in dogfooding runtime. | applied | `spec-dock/scripts/spec_dock_runtime/...`; `spec-dock/docs/reference_worktree.md`; `spec-dock/docs/guide.md` | rerun fresh spec-reviewer |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -145,152 +150,220 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-05-29 HH:MM - HH:MM）
+### セッションログ（2026-05-29 実装フェーズ）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01, S02, S03, S90
+- AC/EC: AC-001..AC-013, EC-001..EC-005
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` S01/S02/S03/S90
+  - closure ids: tc-001..tc-007
 
 #### 実施内容
-- ...
+- `worktree list` / `show` / `remove` の application contracts、ports、use cases、CLI parser/command、Git/filesystem adapters、text/JSON renderer を実装した。
+- `remove` は Git-first semantics とし、SpecDock guard は managed / main / current / unmanaged / containment を `--force` でも bypass しない。
+- `--json` の expected failure は command layer で捕捉し、global dispatch fallback に落とさない。
+- provider docs と dogfooding docs に create/list/show/remove の現行 scope、JSON、remove safety、future status/prune/repair boundary を反映した。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+python -m unittest tests.cli_runtime.test_worktree -v
+# Ran 37 tests in 17.255s
+# OK
 
-<result>
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v
+# Ran 1 test in 0.032s
+# OK
+
+python -m unittest discover -v
+# Ran 976 tests in 512.945s
+# OK
+
+python -m unittest discover -v
+# Ran 976 tests in 531.235s
+# FAILED (failures=1)
+# failure: checked-in dogfooding .meta.json path set diverged from cutover snapshot after adding iss-00137.
+# Follow-up targeted test and the final full discover run passed after updating the cutover snapshot.
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=69
+
+git diff --check
+# pass (no output)
+
+./spec-dock/scripts/spec-dock sync
+# spec-dock: sync: active unchanged (matched id in branch: iss-00137)
+# spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+
+rg -n "worktree (list|show|remove)|future extension|delete alias|branch_deleted|remove_blockers" \
+  src/spec_dock/assets/spec_dock/docs/reference_worktree.md \
+  spec-dock/docs/reference_worktree.md \
+  src/spec_dock/assets/spec_dock/docs/guide.md \
+  spec-dock/docs/guide.md
+# pass: provider and dogfooding docs include list/show/remove, JSON/remove safety, no delete alias, and future status/prune/repair boundary.
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | Existing tests lacked list/show/remove contracts; new tests fail without new command/use case helpers. | test additions in `tests/cli_runtime/test_worktree.py` | pass | Characterization is represented by newly added focused runtime assertions. |
+| S01 | 緑フェーズ（Green） | focused runtime/unit tests | Shared contracts and model support root validation, namespace derivation, stable ids, duplicate disambiguation, stale diagnostics, and blockers. | `python -m unittest tests.cli_runtime.test_worktree -v` | pass | tc-001 covered through list/show/remove runtime paths. |
+| S02 | 緑フェーズ（Green） | runtime tests | list/show text/JSON command wiring, JSON fields, id/path/basename target resolution, branch-only JSON error. | `python -m unittest tests.cli_runtime.test_worktree -v` | pass | tc-002/tc-003 covered. |
+| S03 | 緑フェーズ（Green） | destructive safety runtime tests | clean remove with central root outside repo parent, post-Git leftover cleanup and cleanup failure, dirty default refusal, force remove, locked default/force, main/current/unmanaged/ambiguous guards, ambiguous basename before Git remove, branch-target/env fail-fast, invalid-root matrix and Git short-circuit, containment guard including namespace symlink escape, no delete alias. | `python -m unittest tests.cli_runtime.test_worktree -v` | pass | tc-004/tc-005/tc-006 covered. |
+| S90 | docs inspection | inspect-only | provider and dogfooding docs describe create/list/show/remove and future scope boundary. | targeted `rg`; `./spec-dock/scripts/spec-dock validate` | pass | tc-007 covered. |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S03 | Git locked worktree required double force for removal. | runtime test | Git adapter maps SpecDock `--force` to `git worktree remove --force --force`; locked default refusal and force success are covered. | tc-005, tc-006 | no | `python -m unittest tests.cli_runtime.test_worktree -v` -> pass |
+| S03 | Containment namespace was initially derived from main checkout parent instead of managed namespace. | code-reviewer / spec-reviewer | Guard now uses target managed namespace parent; central-root-outside-repo-parent and fake containment tests were added. | tc-004, tc-006 | no | `python -m unittest tests.cli_runtime.test_worktree -v` -> pass |
+| S02 | QA reviewer found unique basename `show --json` success coverage was lost while adding ambiguous basename coverage. | qa-reviewer | Added a unique basename `show --json` assertion before creating the duplicate basename fixture. | tc-002, tc-003 | no | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_list_and_show_json_resolve_agent_targets -v` -> pass |
+| S99 | Full unittest discovered the checked-in dogfooding `.meta.json` snapshot did not include the new active issue `iss-00137`. | full regression run | Added the `iss-00137` `.meta.json` path and empty `depends_on` entry to the cutover snapshot fixture. | tc-008 | no | `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v` -> pass |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | tc-001 | Shared model and helper tests pass. | `python -m unittest tests.cli_runtime.test_worktree -v` -> OK | pass | root validation, namespace/main record derivation, stable ids, blockers |
+| S02 | tc-002, tc-003 | list/show runtime tests pass and JSON schema assertions cover expected success/failure. | `python -m unittest tests.cli_runtime.test_worktree -v` -> OK | pass | list/show JSON and target failure assertions |
+| S03 | tc-004, tc-005, tc-006 | destructive remove tests pass in temp fixtures and no unsafe behavior is left untested. | `python -m unittest tests.cli_runtime.test_worktree -v` -> OK, 37 tests | pass | branch deletion remains false; live checkout untouched |
+| S90 | tc-007 | docs updated and inspected. | targeted docs `rg`; validate -> OK | pass | provider and dogfooding docs updated |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | yes | red-required | absent before implementation | `python -m unittest tests.cli_runtime.test_worktree -v` | pass | shared model prerequisites covered through runtime tests |
+| tc-002 | S02 | yes | red-required | absent before implementation | `python -m unittest tests.cli_runtime.test_worktree -v` | pass | list/show success JSON including id, absolute path, and unique basename selectors |
+| tc-003 | S02 | yes | red-required | absent before implementation | `python -m unittest tests.cli_runtime.test_worktree -v` | pass | branch-only, stale record, duplicate id, and invalid root JSON errors |
+| tc-004 | S03 | yes | red-required | absent before implementation | `python -m unittest tests.cli_runtime.test_worktree -v` | pass | clean remove leaves branch; post-Git leftover directory cleanup and cleanup failure paths covered |
+| tc-005 | S03 | yes | red-required | absent before implementation | `python -m unittest tests.cli_runtime.test_worktree -v` | pass | dirty/locked default failure, main/current/unmanaged/ambiguous guards, full invalid-root matrix, branch/env remove failures, no delete alias |
+| tc-006 | S03 | yes | red-required | absent before implementation | `python -m unittest tests.cli_runtime.test_worktree -v` | pass | force removes dirty/untracked/locked managed targets; containment guard blocks namespace parent, symlink target escape, and symlink namespace escape before Git remove |
+| tc-007 | S90 | yes | inspect-only | stale create-only docs | targeted docs `rg`; validate | pass | provider/dogfooding docs parity |
+| tc-008 | S99 | yes | regression | cutover snapshot did not include newly checked-in `iss-00137` metadata | `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v` | pass | full discover found the snapshot delta; targeted regression passed after snapshot update |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | focused runtime tests | pass | no persistent registry added |
+| tc-002 | S02 | focused runtime tests | pass | JSON inventory includes required fields |
+| tc-003 | S02 | focused runtime tests | pass | expected JSON errors do not fall through dispatch fallback |
+| tc-004 | S03 | focused runtime tests | pass | branch remains after remove |
+| tc-005 | S03 | focused runtime tests | pass | default dirty/locked refusal leaves directory; non-bypassable guards covered |
+| tc-006 | S03 | focused runtime tests | pass | `--force` maps to Git force; containment guard covered |
+| tc-007 | S90 | docs inspection | pass | future status/prune/repair boundary retained |
+| tc-008 | S99 | focused snapshot regression | pass | checked-in dogfooding metadata snapshot includes `iss-00137` |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| added closure evidence | tc-008 | N/A | tc-008 | full regression surfaced dogfooding cutover snapshot evidence needed for the newly checked-in active issue metadata | no | no; targeted regression passed |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00137 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction | this worktree | iss-00137 | current session | spec-reviewer / code-reviewer / qa-reviewer | same repo, active issue, read-only reviewer gates; implementation retained by parent due integrated step coupling | issue complete / session end / scope change | none | proceed |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01-S03 | approved-local-execution | tightly coupled runtime contracts, command wiring, and tests needed one integrated diff for safe iteration | N/A | parent implementation | `requirement.md`, `design.md`, `plan.md`, provider runtime files | S01-S03 target files | scope expansion, GitHub/active tree mutation, branch deletion | focused runtime tests, diff check, reviewer gates | unresolved spec gap or destructive live target need | changed files, verification, risks | pass |
+| S90 | approved-local-execution | docs parity was small and directly tied to implemented command surface | N/A | parent docs update | provider docs authoritative; dogfooding docs parity target | reference/guide docs | runtime changes | docs grep, validate, spec-reviewer | runtime behavior differs from design | changed docs, inspection result | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01-S03 | N/A | parent implemented integrated runtime slice | provider runtime files, `tests/cli_runtime/test_worktree.py` | `python -m unittest tests.cli_runtime.test_worktree -v` -> pass | code-reviewer pass; qa-reviewer pass with non-blocking P2 fixed | locked Git behavior remains Git-version-sensitive | accepted |
+| S90 | N/A | parent updated provider/dogfooding docs | provider and dogfooding guide/reference docs | targeted docs `rg`; validate -> pass | spec-reviewer pass | none known | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01-S03/S90 | implementation was tightly coupled across shared contracts, CLI, presentation, tests, and docs; parent kept direct ownership and will use independent reviewers for gates | user requested orchestration and PR completion; no risk waiver | plan target files only | implement approved plan | revert this diff before commit if reviewers fail | focused tests, validate, diff check | code-reviewer pass; qa-reviewer pass; spec-reviewer pass | no waiver |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01-S03 | final code review | code-reviewer | fresh | pass | no | complete | `019e71e4-a827-77f0-a84e-c35ee4c2188b` reported no findings after containment, force, and parity fixes. |
+| S99 | final QA | qa-reviewer | fresh | pass | no | complete | `019e71f3-c86c-7561-bbb6-913b89905102` passed; non-blocking P2 unique basename show coverage was fixed. |
+| S90/S99 | final spec review | spec-reviewer | fresh | pass | no | complete | `019e71e9-7a2a-7d41-ade1-9d4ee55ff630` passed; non-blocking report/parent wording findings were fixed. |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01-S03/S90 | ready for final commit | integrated runtime/docs/test/report slice | pending | pending | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - worktree list/show/remove contracts and expected error model.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - Git remove and filesystem gateway ports.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py` - inventory, target resolution, remove guards, Git-first remove.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - new gateway/use case wiring.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py` - list/show/remove parser bindings.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/worktree.py` - typed args, JSON/text expected-error handling.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py` - `git worktree remove` adapter and locked porcelain parsing.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_cli.py` - post-Git directory cleanup adapter.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - text/JSON renderers.
+- `spec-dock/scripts/spec_dock_runtime/application/contracts.py`, `ports.py`, `worktree.py` - dogfooding runtime mirror of provider worktree contracts/use cases.
+- `spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py`, `parser.py` - dogfooding runtime mirror of command wiring.
+- `spec-dock/scripts/spec_dock_runtime/commands/worktree.py` - dogfooding runtime mirror of typed args and render dispatch.
+- `spec-dock/scripts/spec_dock_runtime/infra/git_cli.py`, `infra/fs_cli.py`, `presentation/cli_text.py` - dogfooding runtime mirror of adapters/renderers.
+- `tests/cli_runtime/test_worktree.py` - focused runtime and destructive safety tests.
+- `tests/test_init_update.py` - checked-in dogfooding metadata snapshot entry for `iss-00137`.
+- `src/spec_dock/assets/spec_dock/docs/reference_worktree.md`, `src/spec_dock/assets/spec_dock/docs/guide.md` - shipped docs.
+- `spec-dock/docs/reference_worktree.md`, `spec-dock/docs/guide.md` - dogfooding docs parity.
 
 #### コミット
-- <hash> <message>
+- pending
 
 #### メモ
-- ...
-
----
-
-### セッションログ（2026-05-29 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
-
----
+- No unresolved material implementation decisions remain. Material implementation-time decisions are recorded as resolved/applied in D-011, D-012, and D-013.
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| provider and dogfooding worktree guide/reference docs | yes | parent implementation; final spec-reviewer gate | targeted docs `rg`; `./spec-dock/scripts/spec-dock validate` -> pass | pass; `019e71e9-7a2a-7d41-ade1-9d4ee55ff630` |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | added focused runtime/destructive tests and fixed non-blocking P2 unique basename coverage | `python -m unittest tests.cli_runtime.test_worktree -v` -> Ran 37 tests, OK; validate/sync/diff check pass | pass; `019e71f3-c86c-7561-bbb6-913b89905102` |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | Initial P1 containment bug fixed; destructive guard coverage added. | 3 | pass; `019e71e4-a827-77f0-a84e-c35ee4c2188b` |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | Initial P1 containment/report/test evidence findings fixed; non-blocking parent report and dogfooding runtime mirror findings fixed. | 2 | pass; `019e71e9-7a2a-7d41-ade1-9d4ee55ff630` |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| implementation evidence recorded through tc-001..tc-008; final full discover passed | runtime/docs/tests/report slice | PR body and final response | pending commit, push, PR, merge-preparation evidence |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: remove containment initially used main checkout parent instead of the managed central namespace.
+  - 解決: containment now uses the target worktree namespace parent, and central-root-outside-repo-parent plus namespace/symlink escape tests cover the behavior.
+- 問題: locked worktree removal required stronger Git force than dirty/untracked removal.
+  - 解決: SpecDock `--force` maps to `git worktree remove --force --force`, while SpecDock non-bypassable guards still run before Git.
+- 問題: symlink namespace at `$SPEC_DOCK_WORKTREE_ROOT/<repo-basename>` could redirect a managed-looking path outside the intended namespace.
+  - 解決: managed classification and containment reject a symlink namespace, with regression coverage for namespace parent, symlink target escape, and symlink namespace escape.
+- 問題: dogfooding docs advertised list/show/remove before the checked-in dogfooding runtime exposed those commands.
+  - 解決: dogfooding runtime files were refreshed to mirror the provider runtime worktree command surface.
 
 ## 学んだこと (任意)
-- ...
+- Git locked worktree removal can require double force; the SpecDock interface should keep one user-facing `--force` and hide Git force-depth differences in the adapter.
 
 ## 今後の推奨事項 (任意)
-- ...
+- none
 
 ## 省略/例外メモ (必須)
 - 該当なし
