@@ -162,21 +162,27 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
 | S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
 | S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only: provider skill file existence / required refs / authority boundary | provider-side `spec-dock-issue-planning/SKILL.md` was absent before S01; S05 will add automated inventory assertions | docs inspection / worker handoff | pass | S01 is docs-only; automated regression is assigned to S05 |
+| S01 | 緑フェーズ（Green） | skill file inspection | new provider-side skill exists and references required workflow docs plus `authoring/issue-plan.md` | docs inspection / `sed` / `rg` | pass | Worker output confirmed only allowed path changed |
+| S01 | リファクタリング（Refactor） | no broad policy duplication | concise leaf skill follows Initiative/Epic planning style | diff inspection | pass | no refactor needed |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
 | S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | none | worker / spec-reviewer | recorded | tc-001 | no | S01 review returned `review_status: pass` with no findings |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
 | S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | tc-001 | skill file exists, required source refs present, no authority expansion | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md`; S01 `spec-reviewer` pass | pass | S05 will add automated asset/routing assertions |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | yes | inspect-only | provider-side Issue planning skill was absent before S01 | docs inspection; S01 `spec-reviewer` pass | pass | Red-required automated coverage deferred to S05 per plan |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -184,11 +190,13 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
 | tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | provider skill file inspection + S01 `spec-reviewer` pass | pass | AC-001/AC-002/EC-003 S01 slice closed |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
 | none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| none | tc-001 | tc-s01-001 / tc-s01-002 | tc-001 | closure unchanged | no | no |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
@@ -196,6 +204,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
 | user instruction | `/Users/iwasawayuuta/workspace/worktrees/spec-dock/spec-dock-issue-planning-execution-split` | iss-00138 | current session, 2026-05-29 | `spec-reviewer`, `system-architect`, `implementation-planner` | Create requirement/design/plan through existing spec-dock authoring workflow; use `spec-reviewer` until pass; use `system-architect` for design draft evidence and `implementation-planner` for plan draft evidence; canonical docs remain main-orchestrator-owned. No implementation edits, destructive action, GitHub mutation, publishing, credentialed access, scope expansion, or direct canonical write by delegated authors. | implementation readiness report to user / session end / scope change / host policy conflict / user revocation | none | proceed with requirement review, then delegated design draft, design integration/review, delegated plan draft, plan integration/review |
+| user instruction | `/Users/iwasawayuuta/workspace/worktrees/spec-dock/spec-dock-issue-planning-execution-split` | iss-00138 | current session, 2026-05-29 | `doc-writer`, `dev-coder`, `spec-reviewer`, `code-reviewer`, `qa-reviewer`, `github-pr-merge-preparer` | Execute approved `plan.md` through delegated implementation/review/PR preparation workflow. Parent orchestrator owns integration and report evidence. No destructive action or scope expansion. | issue completion / session end / scope change / host policy conflict / user revocation | none | execute S01-S06, S90, S99 and create merge-prepared PR |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
@@ -203,11 +212,13 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | shipped skill asset / workflow text | doc-writer | S01 provider-side planning skill asset only | `requirement.md`; `design.md`; `plan.md`; workflow docs; existing Initiative/Epic planning skill style | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` | canonical specs; tests; runtime code; dogfooding output; Permission Profile; direct canonical authority | docs-only inspection | source docs conflict; allowed path outside scope; ambiguous authority wording | changed files; inspection result; unresolved risks; `Ledger Note` or no-decision statement | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
 | S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | doc-writer | Added provider-side `spec-dock-issue-planning` leaf skill with required source references and authority boundary. Worker stated `No material implementation decisions beyond the approved plan.` | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` | docs-only inspection -> pass | pass | S05 assertions still pending by plan | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -218,15 +229,19 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed | no findings; `review_status: pass` |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | pending commit | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md`; S01 report evidence | pending | pending | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `path/to/file1` - ...
 - `path/to/file2` - ...
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` - Issue planning leaf skillを追加
+- `spec-dock/active/issue/report.md` - S01 implementation / review / closure evidenceを記録
 
 #### コミット
 - <hash> <message>
