@@ -7,10 +7,16 @@ Codex app が `$CODEX_HOME/worktrees` 配下に作る短命 worktree は、こ�
 
 ```bash
 ./spec-dock/scripts/spec-dock worktree create [LABEL]
+./spec-dock/scripts/spec-dock worktree list [--json]
+./spec-dock/scripts/spec-dock worktree show <target> [--json]
+./spec-dock/scripts/spec-dock worktree remove <target> [--force] [--json]
 ```
 
 `LABEL` は任意です。指定する場合は lowercase letters、digits、hyphen のみを使います。
 underscore、dot、space、slash、uppercase、shell metacharacters は拒否されます。
+
+`target` は `worktree list --json` が返す stable `id`、absolute path、または directory basename です。
+branch name は target として扱いません。
 
 ## ディレクトリ構成（directory layout）
 
@@ -81,13 +87,20 @@ bootstrap の detection / execution failure は worktree 作成成功を取り�
 
 ## 出力（output）
 
-成功時は absolute worktree path、id、branch、bootstrap status を出力します。
+`worktree create` 成功時は absolute worktree path、id、branch、bootstrap status を出力します。
 bootstrap warning は既存 CLI warning path に流れます。
 
 ```text
 spec-dock: ok (worktree create) id=wt1 branch=main-wt1 path=/abs/path/worktrees/spec-dock/spec-dock-wt1
 spec-dock: worktree bootstrap status=skipped command=-
 ```
+
+`worktree list --json` は agent-first inventory を返します。各 record は少なくとも `id`、`path`、`basename`、`branch`、`managed`、`main`、`current`、`path_exists`、`record_exists`、`removable`、`remove_blockers` を含みます。
+
+`worktree show <target> --json` は単一 worktree record を返します。target が複数候補に一致する場合は `status=error`、`error.code=ambiguous_target`、`candidates[]` を返します。
+
+`worktree remove <target> --json` は `resolved_target`、`removed_record`、`removed_directory`、`branch_deleted=false` を返します。
+expected failure も JSON 指定時は stdout に `status=error` と `error.code` を返します。
 
 ## 失敗条件（failure）
 
@@ -101,8 +114,24 @@ spec-dock: worktree bootstrap status=skipped command=-
 - central root / namespace directory の作成失敗。
 - non-retryable `git worktree add` failure。
 - candidate retry ceiling exhaustion。
+- `list` / `show` / `remove` で Git worktree list が失敗した場合。
+- `show` / `remove` target が見つからない、曖昧、または branch-only target の場合。
+- `remove` target が unmanaged、main、current、bare、missing path、または containment guard 違反の場合。
+- `remove` target に dirty / untracked / locked state があり、Git が `git worktree remove` を拒否した場合。
+
+## 削除（remove）
+
+`worktree remove` は SpecDock managed namespace 配下の linked worktree だけを対象にします。
+main checkout、current checkout、unmanaged worktree は `--force` を付けても削除しません。
+
+削除は Git-first です。まず `git worktree remove` を実行し、Git が成功した後だけ、残った individual worktree directory を filesystem cleanup します。
+Git が dirty / untracked / locked state を理由に通常 remove を拒否した場合、SpecDock はその Git error を表示し、filesystem cleanup は行いません。
+`--force` は Git force removal にだけ対応します。locked worktree など Git がより強い force depth を要求する場合の具体的な Git flag depth は adapter 内部詳細です。SpecDock の managed/current/main/unmanaged guard は bypass しません。
+
+branch は削除しません。成功 JSON の `branch_deleted` は常に `false` です。
+`worktree delete` alias はありません。
 
 ## スコープ境界（scope boundary）
 
-この command は create のみを扱います。
-`worktree list`、`status`、`remove`、`prune`、Codex-managed worktree cleanup は future extension です。
+この command family は create / list / show / remove のみを扱います。
+`worktree status`、`prune`、`repair`、Codex-managed worktree cleanup は future extension です。

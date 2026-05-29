@@ -71,7 +71,7 @@ ID: "iss-00137"
   - `worktree list` / `show` / `remove` を existing `worktree create` family に追加する。
   - `delete` alias は実装しない。
 - D-002 Git-first remove:
-  - `remove` は SpecDock guard を通過した後、通常は `git worktree remove <path>`、`--force` 付きでは `git worktree remove --force <path>` を実行する。
+  - `remove` は SpecDock guard を通過した後、通常は `git worktree remove <path>` を実行する。`--force` は Git force removal に対応するが、locked worktree など Git がより強い force depth を要求する場合の具体的な Git flag depth は adapter 内部詳細として扱う。
   - Git が dirty / locked / untracked file を理由に拒否した場合は Git error を返し、filesystem cleanup は行わない。
   - Git 成功後に個別 worktree directory が残る場合だけ、cache / generated files ごと directory cleanup する。
   - cleanup 直前にも canonical path containment を確認し、resolved path が managed namespace 配下の個別 directory であることを再検証する。
