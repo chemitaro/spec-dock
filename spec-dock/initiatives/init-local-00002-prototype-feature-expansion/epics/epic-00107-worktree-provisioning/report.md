@@ -100,7 +100,8 @@ ID: "epic-00107"
 
 ## フォローアップ（別Issue化） (必須)
 - Future extension:
-  - `worktree list` / `status` / `remove` / `prune` remain out of scope.
+  - `worktree list` / `show` / `remove` are implemented in the current epic scope through E-AC-012 / E-AC-013 and `iss-00137`.
+  - `worktree status` / `prune` / `repair` remain out of scope.
   - Codex-managed worktree cleanup remains out of scope.
 
 ## 省略/例外メモ (必須)

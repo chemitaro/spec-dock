@@ -130,6 +130,9 @@ spec-dock/
 ./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>
 ./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>
 ./spec-dock/scripts/spec-dock worktree create [label]
+./spec-dock/scripts/spec-dock worktree list --json
+./spec-dock/scripts/spec-dock worktree show <target> --json
+./spec-dock/scripts/spec-dock worktree remove <target> [--force] [--json]
 ./spec-dock/scripts/spec-dock validate
 ./spec-dock/scripts/spec-dock sync
 ```

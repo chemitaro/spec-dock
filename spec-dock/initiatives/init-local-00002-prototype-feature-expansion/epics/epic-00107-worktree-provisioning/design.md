@@ -199,7 +199,7 @@ presentation --> application : result dataclasses only
     - branch は削除しない
   - remove execution:
     - 通常は Git `worktree remove <path>` を実行する
-    - `--force` 指定時だけ Git `worktree remove --force <path>` を実行する
+    - `--force` 指定時は Git force removal に対応するが、locked worktree などで必要になる具体的な Git flag depth は adapter 内部詳細とする
     - Git が dirty / locked / untracked file などを理由に拒否した場合は、Git の拒否理由を surfaced error とし、filesystem cleanup を実行しない
     - Git remove 成功後に target directory が残る場合は、cache / generated files を含めて directory cleanup を行う
   - JSON:
