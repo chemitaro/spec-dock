@@ -1,99 +1,352 @@
 ---
 種別: 要件定義書（Issue）
 ID: "iss-00137"
-タイトル: "Worktree list show delete commands"
+タイトル: "Worktree list show remove commands"
 関連GitHub: ["#137"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-05-29"
 親: ["epic-00107", "init-local-00002"]
 ---
 
-# iss-00137 Worktree list show delete commands — 要件定義（何を、なぜ行うか）
+# iss-00137 Worktree list show remove commands — 要件定義（何を、なぜ行うか）
 
 ## 目的
-- （1〜3行）...
+- `spec-dock worktree create` で作成する central root 配下の長命 Git linked worktree を、agent が JSON で把握し、安全に詳細確認・削除できるようにする。
+- `worktree list` / `worktree show` / `worktree remove` を追加し、issue lifecycle とほぼ同じ短命 worktree lifecycle の後片付けを軽くする。
+- Git worktree の terminology に合わせ、削除 command は `delete` ではなく `remove` とする。
 
 ## 背景・現状
 - 現状の挙動:
-  - ...
+  - `spec-dock worktree create [LABEL]` は `SPEC_DOCK_WORKTREE_ROOT/<repo-basename>/` 配下に `<repo-basename>-<id>` の Git linked worktree を作成する。
+  - 既存 docs では `worktree list`、`status`、`remove`、`prune` は future extension とされている。
+  - `git worktree list --porcelain` adapter は既にあり、path、HEAD、branch、detached、bare を取得できる。
 - 現状の課題:
-  - ...
-- 再現手順:
-  1. ...
-  2. ...
-- 観測点:
-  - UI:
-  - HTTP:
-  - DB:
-  - ログ:
+  - 作成済み worktree を agent が安定して列挙・選択する command がない。
+  - target worktree の managed / unmanaged、削除可否、削除拒否理由を machine-readable に確認できない。
+  - issue 完了後に個別 worktree directory と cache / generated files をまとめて片付ける first-class command がない。
 - 情報源:
-  - ...
+  - `spec-dock/active/epic/requirement.md`
+  - `spec-dock/active/epic/design.md`
+  - `spec-dock/active/issue/discussions/20260529t000036z-disc-worktree-list-show-delete-command-scope-memo.md`
+  - `spec-dock/active/issue/discussions/20260529t002625z-research-worktree-list-show-delete-existing-contract-research.md`
+  - `spec-dock/active/issue/discussions/20260529t002625z-01-interview-worktree-delete-scope-interview.md`
+  - `spec-dock/active/issue/discussions/20260529t012008z-interview-worktree-managed-scope-and-target-resolution-interview.md`
+  - `spec-dock/active/issue/discussions/20260529t012346z-interview-worktree-delete-dirty-guard-interview.md`
+  - `spec-dock/active/issue/discussions/20260529t013126z-interview-worktree-delete-confirmation-interview.md`
+  - `spec-dock/active/issue/discussions/20260529t013748z-interview-worktree-output-contract-interview.md`
+  - `spec-dock/active/issue/discussions/20260529t014129z-interview-worktree-target-resolution-interview.md`
+  - `spec-dock/active/issue/discussions/20260529t014506z-interview-worktree-deletable-status-json-interview.md`
+  - `spec-dock/active/issue/discussions/20260529t014700z-interview-worktree-delete-remove-naming-interview.md`
+  - `spec-dock/active/issue/discussions/20260529t014953z-interview-worktree-root-env-behavior-interview.md`
+  - `spec-dock/active/issue/discussions/20260529t015346z-interview-worktree-stale-record-handling-interview.md`
 
-## 対象ユーザー / 利用シナリオ（必要時）
+## 対象ユーザー / 利用シナリオ
 - 主な利用者:
-  - ...
+  - `spec-dock` を使って issue ごとに短命 worktree を作成・削除する agent。
+  - dogfooding repo / consumer repo で central root 配下の linked worktree を管理する maintainer。
 - 代表シナリオ:
-  - ...
+  - agent が `worktree list --json` で worktree inventory を取得し、stable `id` と `removable` / `remove_blockers` を使って削除候補を選ぶ。
+  - agent が `worktree show <target> --json` で target の詳細と削除可否を確認する。
+  - issue 完了後、agent が `worktree remove <target>` で managed worktree の個別 directory を cache / generated files ごと削除する。
 
 ## スコープ
 - 必須:
-  - ...
+  - `spec-dock worktree list`
+  - `spec-dock worktree show <target>`
+  - `spec-dock worktree remove <target>`
+  - `list` / `show` / `remove` すべての `--json` output
+  - `SPEC_DOCK_WORKTREE_ROOT` 必須化と `worktree create` と同じ root validation
+  - Git linked worktree records の managed / unmanaged classification
+  - `list/show --json` の `removable` / `remove_blockers` diagnostic
+  - `remove` 実行時の managed / main / current / dirty / locked guard 再検証
+  - Git remove 成功後に残った managed worktree の個別 directory cleanup
+  - temp Git repo / temp worktree root を使う runtime tests
 - 禁止:
-  - ...
+  - `worktree delete` alias を追加しない。
+  - `remove` で関連 local branch を削除しない。
+  - `--force` で main checkout、current checkout、unmanaged worktree を削除可能にしない。
+  - `SPEC_DOCK_WORKTREE_ROOT` 未設定時に partial inventory を返さない。
+  - Codex-managed `$CODEX_HOME/worktrees` の cleanup を扱わない。
 - 対象外:
-  - ...
+  - `worktree prune`
+  - stale worktree record の修復
+  - orphan directory cleanup
+  - branch deletion option
+  - interactive confirmation prompt
+  - GitHub issue / active pointer / SpecDock tree mutation
 
 ## 境界
 - 常に行う:
-  - ...
+  - `list/show/remove` は command 開始時に `SPEC_DOCK_WORKTREE_ROOT` を検証する。
+  - `list/show` は Git が認識する全 linked worktree を扱い、central root namespace 配下を `managed`、それ以外を `unmanaged` と分類する。
+  - `remove` は target 解決後に削除可否を再検証する。
+  - `remove` は Git `worktree remove` を先に実行し、Git が通常 remove を拒否した場合は directory cleanup を行わない。
+  - Git `worktree remove` 成功後は、個別 worktree directory が cache / generated files を含めて残らない状態にする。
+  - `list/show --json` の `removable` は planning hint として扱い、final authority は `remove` 実行時の再検証とする。
 - 判断が必要:
-  - ...
+  - `design.md` で、`remove_blockers` の具体 code 名と JSON schema を固定する。
 - 行わない:
-  - ...
+  - stale record / orphan directory をこの issue で修復しない。
+  - `remove` の一部として `git worktree prune` を実行しない。
+  - Git branch を削除しない。
 
 ## 非交渉制約
-- ...
+- provider-side source of truth は `src/spec_dock/assets/spec_dock/...` とし、dogfooding workspace `spec-dock/...` は確認・反映対象とする。
+- 既存 layered runtime architecture を維持し、monolithic command に戻さない。
+- destructive operation は temp repo / temp central root の hermetic tests で検証し、live checkout を破壊しない。
+- `remove --force` は Git `worktree remove --force` の意味に合わせ、dirty / locked / Git が通常 remove を拒否する untracked file を明示的に削除するために使う。
 
 ## 前提
-- ...
+- `SPEC_DOCK_WORKTREE_ROOT` は absolute directory または directory を指す symlink として設定されている。
+- central root namespace は `$SPEC_DOCK_WORKTREE_ROOT/<repo-basename>/` である。
+- managed worktree path は原則として `$SPEC_DOCK_WORKTREE_ROOT/<repo-basename>/<repo-basename>-<id>` である。
+- agent は JSON output を primary interface として利用する。
+- `remove` の通常削除でいう clean managed worktree は、Git が `git worktree remove <path>` を許可する状態である。
+- Git が untracked file、modified tracked file、locked worktree などを理由に通常 remove を拒否する場合、その worktree は `removable=false` または remove 実行時 failure として扱い、`--force` なしでは filesystem cleanup しない。
 
 ## 受け入れ条件
-- AC-001:
+- AC-001 list text:
   - アクター:
+    - agent / maintainer
   - 前提:
+    - `SPEC_DOCK_WORKTREE_ROOT` が valid absolute directory を指す。
+    - Git repo に main checkout、managed linked worktree、unmanaged linked worktree がある。
   - 操作:
+    - `spec-dock worktree list`
   - 期待結果:
+    - command は exit code `0` を返す。
+    - output は各 worktree の stable `id`、path、branch、managed/unmanaged、removable summary を人間が読める形で表示する。
   - 観測点:
-- AC-002:
-  - ...
+    - CLI runtime test
+- AC-002 list json:
+  - アクター:
+    - agent
+  - 前提:
+    - AC-001 と同じ。
+  - 操作:
+    - `spec-dock worktree list --json`
+  - 期待結果:
+    - JSON は worktree records の配列を含む。
+    - 各 record は stable `id`、`path`、`basename`、`branch`、`managed`、`main`、`current`、`path_exists`、`record_exists`、`removable`、`remove_blockers` を含む。
+    - managed worktree と unmanaged worktree が区別できる。
+  - 観測点:
+    - JSON payload assertion
+- AC-003 show target:
+  - アクター:
+    - agent
+  - 前提:
+    - `worktree list --json` で stable `id` が取得できている。
+  - 操作:
+    - `spec-dock worktree show <id> --json`
+    - `spec-dock worktree show <absolute-path> --json`
+    - `spec-dock worktree show <directory-basename> --json`
+  - 期待結果:
+    - いずれも同じ worktree を解決できる。
+    - JSON は list record より詳細な single worktree payload を返す。
+  - 観測点:
+    - target resolver tests
+- AC-004 ambiguous target:
+  - アクター:
+    - agent
+  - 前提:
+    - target string が複数 worktree に一致する。
+  - 操作:
+    - `spec-dock worktree show <target>`
+    - `spec-dock worktree remove <target>`
+  - 期待結果:
+    - command は fatal error になり、削除は行われない。
+    - error / JSON error は一致候補を示し、agent が stable `id` を選び直せる。
+  - 観測点:
+    - ambiguity tests
+- AC-005 unsupported branch target:
+  - アクター:
+    - agent
+  - 前提:
+    - target が branch name としてのみ一致し、stable `id` / absolute path / directory basename には一致しない。
+  - 操作:
+    - `spec-dock worktree show <branch-name>`
+    - `spec-dock worktree remove <branch-name>`
+  - 期待結果:
+    - branch name target は解決されない。
+    - command は target not found として失敗する。
+  - 観測点:
+    - target resolver tests
+- AC-006 remove clean managed worktree:
+  - アクター:
+    - agent
+  - 前提:
+    - target は managed worktree である。
+    - target は main checkout でも current checkout でもない。
+    - Git が通常 `git worktree remove <worktree>` を許可する状態である。
+    - Git remove 成功後に target directory または Git 管理外 cache / generated files が残り得る。
+  - 操作:
+    - `spec-dock worktree remove <target>`
+  - 期待結果:
+    - command は exit code `0` を返す。
+    - Git worktree record が削除される。
+    - target の個別 worktree directory は Git 管理外 file / cache を含めて残らない。
+    - 関連 local branch は削除されない。
+  - 観測点:
+    - CLI runtime test
+    - `git worktree list --porcelain`
+    - filesystem assertion
+    - branch existence assertion
+- AC-007 remove json:
+  - アクター:
+    - agent
+  - 前提:
+    - AC-006 と同じ。
+  - 操作:
+    - `spec-dock worktree remove <target> --json`
+  - 期待結果:
+    - JSON は operation status、resolved target id、path、branch、managed、removed record、removed directory、branch_deleted=false を判定できる field を含む。
+  - 観測点:
+    - JSON payload assertion
+- AC-008 remove dirty or locked:
+  - アクター:
+    - agent
+  - 前提:
+    - target は managed worktree である。
+    - Git が dirty / locked / untracked file などを理由に通常 `git worktree remove <worktree>` を拒否する状態である。
+  - 操作:
+    - `spec-dock worktree remove <target>`
+  - 期待結果:
+    - command は失敗する。
+    - Git の拒否理由が観測できる。
+    - target directory は削除されない。
+    - `--force` が必要であることが分かる。
+  - 観測点:
+    - CLI runtime test
+- AC-009 force remove dirty or locked:
+  - アクター:
+    - agent
+  - 前提:
+    - target は managed worktree である。
+    - target は main checkout でも current checkout でも unmanaged worktree でもない。
+    - Git が `git worktree remove --force <worktree>` で削除可能な状態である。
+    - target directory に Git 管理外 cache / generated files がある。
+  - 操作:
+    - `spec-dock worktree remove <target> --force`
+  - 期待結果:
+    - command は Git force remove semantics に従って削除する。
+    - target の個別 worktree directory は残らない。
+    - 関連 local branch は削除されない。
+  - 観測点:
+    - CLI runtime test
+- AC-010 non-removable guards:
+  - アクター:
+    - agent
+  - 前提:
+    - target が main checkout、current checkout、または unmanaged worktree である。
+  - 操作:
+    - `spec-dock worktree remove <target>`
+    - `spec-dock worktree remove <target> --force`
+  - 期待結果:
+    - command は削除を拒否する。
+    - `--force` でも拒否は bypass されない。
+    - JSON / text は拒否理由を示す。
+  - 観測点:
+    - guard tests
+- AC-011 env fail-fast:
+  - アクター:
+    - agent
+  - 前提:
+    - `SPEC_DOCK_WORKTREE_ROOT` が未設定、blank、relative path、file、壊れた symlink のいずれかである。
+  - 操作:
+    - `spec-dock worktree list`
+    - `spec-dock worktree show <target>`
+    - `spec-dock worktree remove <target>`
+  - 期待結果:
+    - command は fail-fast する。
+    - Git worktree listing / removal や filesystem cleanup は行われない。
+    - error は `worktree create` と同じ root validation contract に揃う。
+  - 観測点:
+    - env validation tests
+- AC-012 stale diagnostics:
+  - アクター:
+    - agent
+  - 前提:
+    - Git record はあるが path が存在しない、または診断可能な stale state がある。
+  - 操作:
+    - `spec-dock worktree list --json`
+    - `spec-dock worktree show <target> --json`
+  - 期待結果:
+    - JSON は `path_exists` / `record_exists` / `remove_blockers` などで状態を診断表示する。
+    - command は prune / repair を実行しない。
+  - 観測点:
+    - diagnostic tests
+- AC-013 no delete alias:
+  - アクター:
+    - agent
+  - 前提:
+    - runtime parser が利用可能である。
+  - 操作:
+    - `spec-dock worktree delete <target>`
+  - 期待結果:
+    - command は存在しない。
+    - 正規 command は `worktree remove` である。
+  - 観測点:
+    - parser / help test
 
 ## 例外・エッジケース
 - EC-001:
   - 条件:
+    - `removable=true` を返した後に target state が変わる。
   - 期待:
+    - `worktree remove` は削除直前に再検証し、現在の状態で削除可否を判断する。
   - 観測点:
+    - stale planning hint / revalidation test
 - EC-002:
-  - ...
+  - 条件:
+    - target が central root namespace 外の unmanaged worktree である。
+  - 期待:
+    - `list/show` は表示するが、`remove` は拒否する。
+  - 観測点:
+    - managed/unmanaged tests
+- EC-003:
+  - 条件:
+    - target が main checkout または current checkout である。
+  - 期待:
+    - `remove` は `--force` 付きでも拒否する。
+  - 観測点:
+    - guard tests
+- EC-004:
+  - 条件:
+    - target string が複数一致する。
+  - 期待:
+    - 削除せず、候補一覧付き fatal error を返す。
+  - 観測点:
+    - ambiguity tests
+- EC-005:
+  - 条件:
+    - stale record / orphan directory がある。
+  - 期待:
+    - 初回実装では修復・prune・orphan cleanup を行わない。
+  - 観測点:
+    - diagnostic tests
 
-## 入力→出力例（必要時）
-- EX-001:
+## 入力→出力例
+- EX-001 list json:
   - 入力:
+    - `spec-dock worktree list --json`
   - 出力:
+    - `worktrees[]` に `id`、`path`、`basename`、`branch`、`managed`、`main`、`current`、`path_exists`、`record_exists`、`removable`、`remove_blockers` を含む JSON。
+- EX-002 remove:
+  - 入力:
+    - `spec-dock worktree remove wt1 --json`
+  - 出力:
+    - 削除結果、resolved target、directory cleanup 結果、branch_deleted=false を含む JSON。
 
 ## 用語（ドメイン語彙）
-- TERM-001:
-  - ...
+- managed worktree:
+  - Git worktree record があり、path が `SPEC_DOCK_WORKTREE_ROOT/<repo-basename>/` namespace 配下にある worktree。
+- unmanaged worktree:
+  - Git worktree record はあるが、SpecDock central root namespace 外にある worktree。
+- stable id:
+  - `worktree list --json` が返し、`show/remove <target>` の主 target として使える id。managed worktree では `<repo-basename>-<id>` path basename から導出した id を使う。
+- remove blockers:
+  - `remove` を許可しない理由の machine-readable list。例: unmanaged、main checkout、current checkout、path missing、record missing、dirty/locked の事前診断。
 
 ## 未確定事項
-- Q-001:
-  - 質問:
-  - 選択肢:
-    - A:
-      - ...
-    - B:
-      - ...
-  - 推奨案:
-    - ...
-  - 影響範囲:
-    - ...
+- なし。

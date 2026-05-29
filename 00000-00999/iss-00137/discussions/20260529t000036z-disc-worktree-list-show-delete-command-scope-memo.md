@@ -9,7 +9,8 @@ ID: "20260529t000036z-disc"
 関連: []
 authority: "proposed"
 derived_from: []
-reflected_to: []
+reflected_to:
+  - "spec-dock/active/issue/requirement.md"
 ---
 
 # 20260529t000036z-disc Worktree list show delete command scope memo
