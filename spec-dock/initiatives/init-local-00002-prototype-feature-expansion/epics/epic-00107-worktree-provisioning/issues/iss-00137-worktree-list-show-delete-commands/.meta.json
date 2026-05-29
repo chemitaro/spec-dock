@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00137",
+  "title": "Worktree list show delete commands",
+  "slug": "worktree-list-show-delete-commands",
+  "created_at": "2026-05-29T09:00:30+09:00",
+  "updated_at": "2026-05-29T09:00:30+09:00",
+  "parent_id": "epic-00107",
+  "initiative_id": "init-local-00002",
+  "epic_id": "epic-00107",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 137,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}

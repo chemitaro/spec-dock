@@ -33,6 +33,7 @@ _EXPECTED_MANAGED_SKILL_NAMES = (
     "spec-driven-tdd-workflow",
     "spec-dock-initiative-planning",
     "spec-dock-epic-planning",
+    "spec-dock-issue-planning",
     "spec-dock-issue-execution",
     "spec-dock-clarification",
     "spec-dock-system-architect",
