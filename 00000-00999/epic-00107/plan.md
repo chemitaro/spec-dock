@@ -39,7 +39,7 @@ ID: "epic-00107"
   - E-AC-010: detached/outside repo failure
   - E-AC-011: provider / dogfooding / docs parity
   - E-AC-012: list / show JSON inventory and detail
-  - E-AC-013: managed worktree remove and cleanup
+  - E-AC-013: all-linked-worktree remove and cleanup
 
 ## Issue 分割方針
 - 分割原則:
@@ -105,7 +105,7 @@ ID: "epic-00107"
     - iss-00108
 - iss-00137-worktree-list-show-delete-commands:
   - 目的:
-    - `spec-dock worktree list` / `show` / `remove` を agent-first command として公開し、central root namespace 配下の worktree inventory / detail / cleanup を JSON で扱えるようにする。
+    - `spec-dock worktree list` / `show` / `remove` を agent-first command として公開し、central root namespace 配下の worktree inventory / detail / cleanup を JSON で扱えるようにした初期実装。
   - 成果物:
     - `worktree list` / `show` / `remove` CLI wiring
     - target resolver for stable id / absolute path / directory basename
@@ -120,6 +120,21 @@ ID: "epic-00107"
     - E-AC-012, E-AC-013
   - 依存:
     - iss-00109
+- iss-00143-manage-external-git-worktrees:
+  - 目的:
+    - `worktree list` / `show` / `remove` を SpecDock-created managed worktree 前提から同一 repository の Git linked worktree 全体へ拡張し、external worktree を inspect / cleanup できるようにする。
+  - 成果物:
+    - `list` / `show` / `remove` の `SPEC_DOCK_WORKTREE_ROOT` 必須解除
+    - managed / unmanaged を削除可否 blocker ではなく classification diagnostic として扱う JSON / text contract
+    - external linked worktree remove と post-remove target-only cleanup
+    - provider-side docs、dogfooding docs、runtime tests
+  - tranche:
+    - T4 amendment / external cleanup command surface
+  - closes:
+    - E-RQ-011, E-RQ-012
+    - E-AC-012, E-AC-013
+  - 依存:
+    - iss-00137
 
 ## 統合チェックポイント
 - G1 分解レビュー:
@@ -137,6 +152,9 @@ ID: "epic-00107"
 - G10 Worktree inventory / cleanup spec review:
   - `iss-00137` で E-AC-012..E-AC-013 の evidence を report に集約する。
   - `worktree status` / `prune` / `repair` が future extension として残り、`list` / `show` / `remove` と混ざっていないことを確認する。
+- G11 External worktree management amendment review:
+  - `iss-00143` で、`list` / `show` / `remove` が同一 repository の全 linked worktree を扱い、`create` の central root contract を壊していないことを確認する。
+  - Codex Desktop は背景に留め、Codex-specific Handoff / environment setup / metadata cleanup が runtime scope に混ざっていないことを確認する。
 
 ## 品質ゲート
 - test:
@@ -160,7 +178,7 @@ ID: "epic-00107"
   3. Docs / dogfooding parity / final verification.
 - 契約 / docs 更新:
   - Add a worktree command section to shipped workflow/reference docs.
-  - Mention required `SPEC_DOCK_WORKTREE_ROOT`, central root namespace placement, legacy sibling boundary, and no nested `.worktrees/`.
+  - Mention required `SPEC_DOCK_WORKTREE_ROOT` for `worktree create`, central root namespace placement, legacy sibling boundary, no nested `.worktrees/`, and root-optional `list` / `show` / `remove`.
   - Mention optional / non-fatal `make init`.
   - Mention agent-first list/show/remove JSON contracts.
   - Mention future extensions: status/prune/repair are out of scope.
