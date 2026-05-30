@@ -597,7 +597,8 @@ def _guard_remove_containment(
     if target_path == Path(_canonical_path(main.path)):
         blocked.append("main_worktree")
     for protected_path in _protected_cleanup_paths(ports, main=main):
-        if target_path == Path(_canonical_path(protected_path)):
+        protected_target = Path(_canonical_path(protected_path))
+        if target_path == protected_target or _is_relative_to(protected_target, target_path):
             blocked.append("protected_cleanup_path")
         if protected_path.is_symlink() and _is_relative_to(Path(worktree.path), protected_path):
             blocked.append("protected_cleanup_path")
