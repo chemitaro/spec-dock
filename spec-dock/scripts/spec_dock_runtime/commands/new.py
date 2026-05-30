@@ -30,7 +30,6 @@ _discussion_doc_types = (
 class NewInitiativeArgs(CommandArgs):
     title: str
     slug: str | None
-    node_id: str | None
     create_github_issue: bool
     github_issue_number: int | None
 
@@ -40,7 +39,6 @@ class NewEpicArgs(CommandArgs):
     initiative_id: str
     title: str
     slug: str | None
-    node_id: str | None
     create_github_issue: bool
     github_issue_number: int | None
 
@@ -50,7 +48,6 @@ class NewIssueArgs(CommandArgs):
     epic_id: str
     title: str
     slug: str | None
-    node_id: str | None
     create_github_issue: bool
     github_issue_number: int | None
 
@@ -92,7 +89,6 @@ def command_specs() -> dict[str, CommandSpec]:
 def _add_new_initiative_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--title", required=True)
     parser.add_argument("--slug")
-    parser.add_argument("--id")
     github_group = parser.add_mutually_exclusive_group()
     github_group.add_argument(
         "--create-github-issue",
@@ -114,7 +110,6 @@ def _add_new_epic_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--title", required=True)
     parser.add_argument("--slug")
-    parser.add_argument("--id")
     github_group = parser.add_mutually_exclusive_group()
     github_group.add_argument(
         "--create-github-issue",
@@ -136,7 +131,6 @@ def _add_new_issue_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--title", required=True)
     parser.add_argument("--slug")
-    parser.add_argument("--id")
     github_group = parser.add_mutually_exclusive_group()
     github_group.add_argument(
         "--create-github-issue",
@@ -172,7 +166,6 @@ def _new_initiative_args(ns: argparse.Namespace) -> CommandArgs:
     return NewInitiativeArgs(
         title=str(ns.title),
         slug=getattr(ns, "slug", None),
-        node_id=getattr(ns, "id", None),
         create_github_issue=bool(getattr(ns, "create_github_issue", False)),
         github_issue_number=getattr(ns, "github_issue", None),
     )
@@ -183,7 +176,6 @@ def _new_epic_args(ns: argparse.Namespace) -> CommandArgs:
         initiative_id=str(ns.initiative),
         title=str(ns.title),
         slug=getattr(ns, "slug", None),
-        node_id=getattr(ns, "id", None),
         create_github_issue=bool(getattr(ns, "create_github_issue", False)),
         github_issue_number=getattr(ns, "github_issue", None),
     )
@@ -194,7 +186,6 @@ def _new_issue_args(ns: argparse.Namespace) -> CommandArgs:
         epic_id=str(ns.epic),
         title=str(ns.title),
         slug=getattr(ns, "slug", None),
-        node_id=getattr(ns, "id", None),
         create_github_issue=bool(getattr(ns, "create_github_issue", False)),
         github_issue_number=getattr(ns, "github_issue", None),
     )
@@ -232,7 +223,6 @@ def _run_new_initiative(args: CommandArgs, use_cases: UseCases) -> CommandOutcom
             title=typed.title,
             slug=typed.slug,
             parent_id=None,
-            requested_node_id=typed.node_id,
             github_mode="link_existing" if typed.github_issue_number is not None else "create",
             github_issue_number=typed.github_issue_number,
         )
@@ -254,7 +244,6 @@ def _run_new_epic(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
             title=typed.title,
             slug=typed.slug,
             parent_id=typed.initiative_id,
-            requested_node_id=typed.node_id,
             github_mode="link_existing" if typed.github_issue_number is not None else "create",
             github_issue_number=typed.github_issue_number,
         )
@@ -276,7 +265,6 @@ def _run_new_issue(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
             title=typed.title,
             slug=typed.slug,
             parent_id=typed.epic_id,
-            requested_node_id=typed.node_id,
             github_mode="link_existing" if typed.github_issue_number is not None else "create",
             github_issue_number=typed.github_issue_number,
         )

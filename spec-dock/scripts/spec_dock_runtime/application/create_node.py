@@ -845,8 +845,6 @@ def plan_node_creation(
     prefix = _prefix_for_kind(kind)
     requested_repo_slug = _resolve_requested_repo_slug(req, current_repo_slug=current_repo_slug)
 
-    if req.requested_node_id is not None:
-        raise RuntimeError("Cannot combine '--id' with GitHub-backed node creation.")
     if req.github_issue_number is None:
         raise RuntimeError("github_issue_number is required for github mode")
     node_id = format_id(prefix, int(req.github_issue_number), local=False)
@@ -1280,9 +1278,6 @@ def _validate_pre_github_create_inputs(
     kind: Literal["initiative", "epic", "issue"],
     mode: Literal["create", "link_existing"],
 ) -> None:
-    if req.requested_node_id is not None:
-        raise RuntimeError("Cannot combine '--id' with GitHub-backed node creation.")
-
     if kind == "epic" and req.parent_id is None:
         raise RuntimeError("--initiative is required")
 

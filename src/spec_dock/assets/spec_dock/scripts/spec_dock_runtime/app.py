@@ -243,53 +243,6 @@ def _ensure_no_legacy_meta_json(specdock_dir: Path) -> None:
     )
 
 
-def _next_id(
-    specdock_dir: Path,
-    prefix: str,
-    *,
-    local: bool = False,
-    nodes: dict[str, _Node] | None = None,
-) -> str:
-    """Compute the next available id for a prefix by scanning existing nodes.
-
-    Notes:
-    - When `local=True`, only ids in the `*-local-*` namespace are considered.
-    - When `local=False`, only ids without `-local-` are considered.
-    """
-    if nodes is None:
-        nodes = _scan_nodes(specdock_dir)
-
-    max_num = 0
-    for node in nodes.values():
-        node_id = node.id
-        try:
-            parsed_prefix, is_local, num = _parse_id(node_id)
-        except RuntimeError:
-            continue
-        if parsed_prefix != prefix:
-            continue
-        if is_local != local:
-            continue
-        max_num = max(max_num, num)
-
-    if prefix == "adr":
-        initiatives_root = _initiatives_root(specdock_dir)
-        # ADRs are files, not nodes with `.meta.json`. Scan filenames as a fallback.
-        for adr_path in initiatives_root.rglob("discussions/adr-*.md"):
-            m = re.search(r"\b(adr(?:-local)?-[0-9]+)\b", adr_path.stem)
-            if not m:
-                continue
-            try:
-                _, is_local, num = _parse_id(m.group(1))
-            except RuntimeError:
-                continue
-            if is_local != local:
-                continue
-            max_num = max(max_num, num)
-
-    return _format_id(prefix, max_num + 1, local=local)
-
-
 def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
     """Scan node meta into an id→node map based on canonical `.meta.json` only."""
     initiatives_root = _initiatives_root(specdock_dir)

@@ -160,7 +160,7 @@ OK
 rg -n -- "no_github|--no-github|local_only|Cannot combine" <S01 target files>
 
 pass: node creation runtime plumbing hit none for no_github/local_only/--no-github.
-allowed hits: '--id' GitHub-backed error, cache/local sync --no-github hints, tests for parser-level unsupported option, existing local-only projection test name.
+allowed hits: cache/local sync --no-github hints, tests for parser-level unsupported option, existing local-only projection test name.
 
 ./spec-dock/scripts/spec-dock validate
 
@@ -176,7 +176,7 @@ pass: no output
 |---|---|---|---|---|---|---|
 | S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required for help absence and parser-level unsupported option; inspect-only for internal plumbing | tests updated to assert parser-level unsupported option and help absence; source inspection target fixed | test update and targeted source inspection | pass | Exact pre-change red run was not preserved because the delegated worker produced the first patch before returning; existing pre-change behavior was captured in requirement/design and prior tests expected dedicated contract errors. |
 | S01 | 緑フェーズ（Green） | `python -m unittest tests.cli_runtime.test_new -v` | 43 tests passed | command | pass | Runtime behavior tests cover help absence, parser-level unsupported option, no fake gh invocation, and mutual-exclusion regression. |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / orphan cleanup only | removed orphan `no_github`, `_github_mandatory_error`, `_next_id`, local-only mode branch; no non-scope command option removed | diff inspection / targeted `rg` | pass | Remaining `--no-github` hits are state/cache hints or tests. |
+| S01 | リファクタリング（Refactor） | guardrail satisfied / orphan cleanup only | removed orphan `no_github`, `_github_mandatory_error`, `_next_id`, local-only mode branch, and stale manual node id creation surface | diff inspection / targeted `rg` | pass | Remaining `--no-github` hits are state/cache hints or tests. |
 | S90 | 赤フェーズ / 代替証跡（Red / alternative） | wrapper/init tests and targeted docs search expose stale wording before docs change | `tests.cli_runtime.test_wrappers` assertion updated; reviewer search found extra stale top-level docs and checked-in wrappers | affected tests plus reviewer-guided targeted `rg` | pass | Exact pre-change docs red was represented by existing expected string and reviewer findings. |
 | S90 | 緑フェーズ（Green） | wrapper/init tests and docs classification pass | `tests.cli_runtime.test_wrappers` passed; `tests.test_init_update` full suite passed; targeted search/validate/diff-check passed | command | pass | One mistyped nonexistent unittest target failed and is not counted as product regression. |
 | S90 | リファクタリング（Refactor） | stale wording cleanup only | root README scope-local wrapper guidance removed; stale top-level GitHub integration/sync docs updated; checked-in stale dogfooding wrappers deleted; provider/dogfooding docs kept aligned | diff inspection / targeted `rg` | pass | State/cache `--no-github` docs/tests preserved. |
@@ -330,6 +330,8 @@ pass: no output
 ## 遭遇した問題と解決 (任意)
 - 問題: PR #144 作成後の provider CI で、`NewInitiativeArgs` / `NewIssueArgs` の direct construction テストに削除済み `no_github` 引数が残っていた。
   - 解決: `tests/cli_runtime/test_runtime_new_s08.py` と `tests/presentation_runtime/test_runtime_sync_s07.py` から stale `no_github=False` を削除し、focused 2 tests、`python -m unittest discover -v`、`./spec-dock/scripts/spec-dock validate`、`git diff --check` が pass することを確認した。
+- 問題: second opinion で、shipped runtime の dead `_next_id(..., local=True)` allocator と、常に失敗する `new initiative|epic|issue --id` surface が残置候補として指摘された。
+  - 解決: provider / dogfooding mirror から active runtime `_next_id`、`new` command args の `node_id`、`CreateNodeRequest.requested_node_id`、`--id` parser surface と旧エラーケースを削除し、`python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08 tests.presentation_runtime.test_runtime_sync_s07 -v`、`python -m unittest tests.test_init_update -v`、`./spec-dock/scripts/spec-dock validate`、`git diff --check` が pass することを確認した。
 
 ## 学んだこと (任意)
 - Runtime command surface から option を削除する場合、parser/handler だけでなく command args を直接組み立てる smoke / post-sync guidance 系テストも contract 対象として確認する必要がある。
