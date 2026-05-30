@@ -49,7 +49,7 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | dev-coder / orchestrator | S04 の許可変更 path には `cli/bootstrap.py` が明示されていなかったが、実 CLI の `_FilesystemGateway` adapter は同ファイルにあるため、`remove_target(path)` port 追加だけでは runtime CLI 経路が実装されない。 | A: `cli/bootstrap.py` に薄い delegation を追加する; B: application で旧 `remove_tree` fallback を持つ; C: port だけ追加して実 CLI adapter は後続に回す | A を採用し、`_FilesystemGateway.remove_target()` を `infra_fs_cli.remove_target()` へ委譲する薄い adapter として追加した。 | `remove_target(path)` contract を実 CLI 経路まで貫通させるための最小変更であり、cleanup behavior の責務は `infra/fs_cli.py` に残る。B は新旧 port 混在、C は実 CLI で S04 契約未充足になる。 | applied | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py`; code-reviewer `019e799b-01c9-7a01-a091-cf76bb73dba2` は adapter 方針を妥当と確認 | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -130,117 +130,704 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- S01 で `WorktreeRecordView` に classification diagnostics を additive field として追加し、JSON payload helper が同じ diagnostics を返すようにした。
+- `managed` は boolean のまま維持し、root unavailable 時の default origin は `classification_unavailable` へ補完する。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-05-30 HH:MM - HH:MM）
+### セッションログ（2026-05-31 S01）
 
 #### 対象
 - Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- AC/EC: AC-006
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: 実装ステップ S01 — Contract Fields and Compatibility
+  - closure ids: tc-001
 
 #### 実施内容
-- ...
+- `WorktreeRecordView` に `managed_classification_available`、`classification_reason`、`origin` を追加した。
+- `_worktree_payload` に同じ diagnostics を additive field として追加し、実 JSON payload path で tc-001 を固定した。
+- `managed_classification_available=False` かつ origin 未指定の場合は `classification_unavailable` を補完するようにした。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_record_payload_includes_classification_diagnostics -v
 
-<result>
+OK
+
+python -m unittest tests.cli_runtime.test_worktree -v
+
+Ran 38 tests in 17.276s
+OK
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | 赤フェーズ / 代替証跡（Red / alternative） | `red-required`: classification fields を期待する focused test を先に追加し、現行 model / payload で失敗すること。 | dev-coder reported constructor Red: `TypeError: WorktreeRecordView.__init__() got an unexpected keyword argument 'managed_classification_available'`; follow-up reported payload-helper Red: `KeyError: 'managed_classification_available'`。 | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_record_payload_includes_classification_diagnostics -v` | pass | Red evidence accepted as worker evidence; parent observed Green after follow-up。 |
+| S01 | 緑フェーズ（Green） | focused test と `tests.cli_runtime.test_worktree` 全体が pass すること。 | focused test OK; `tests.cli_runtime.test_worktree` OK, 38 tests。 | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_record_payload_includes_classification_diagnostics -v`; `python -m unittest tests.cli_runtime.test_worktree -v` | pass | `_worktree_payload` の実 payload path で diagnostics を確認。 |
+| S01 | リファクタリング（Refactor） | contract field / payload helper / focused test に限定し、application behavior は変えない。 | S01 changed files are `application/contracts.py`, `presentation/cli_text.py`, `tests/cli_runtime/test_worktree.py`; no `application/worktree.py` behavior change。 | 差分点検 | pass | code-reviewer pass。 |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | payload helper path を通さない test では tc-001 を閉じられない | code-reviewer | `_worktree_payload` に additive fields を追加し、test を payload helper 経由へ修正した。 | tc-001 | no | code-reviewer fail `019e7975-c88a-7f00-b225-742d15867cbf`; follow-up pass `019e797b-82ae-7d50-99e3-ddbd24c2e20e` |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | tc-001 | `managed` は boolean のまま、classification fields が model / JSON source model に存在する。Red/Green evidence と code-reviewer pass が必要。 | `WorktreeRecordView` fields added; `_worktree_payload` returns `managed_classification_available`, `classification_reason`, `origin`; focused/full worktree tests pass; code-reviewer pass。 | pass | S02 で inventory classification values を配線する。 |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | yes | red-required | constructor Red and payload-helper Red reported by dev-coder | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_record_payload_includes_classification_diagnostics -v`; `python -m unittest tests.cli_runtime.test_worktree -v` | pass | focused test uses `_worktree_payload` rather than dataclass serialization. |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | focused test OK; worktree runtime test module OK; code-reviewer pass `019e797b-82ae-7d50-99e3-ddbd24c2e20e` | pass | S01 complete. |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| changed | tc-001 | `test_worktree_record_payload_includes_classification_diagnostics` | tc-001 | code-reviewer found dataclass serialization did not prove shipped JSON payload path; test was changed to `_worktree_payload` and payload helper was updated. | no | yes, completed with pass |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00143 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction | current repo / current worktree | iss-00143 | current session | spec-reviewer / code-reviewer / qa-reviewer / dev-coder / doc-review specialist | same repo, active issue, session, named role; no destructive action / publishing before final PR workflow | issue complete / session end / scope change / host policy conflict / user revocation | none observed | proceed |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | plan requires implementation via dev-coder for runtime/test slice | dev-coder | `WorktreeRecordView` diagnostics and focused test | `plan.md` S01; `requirement.md`; `design.md` | `application/contracts.py`; focused tests; bounded payload helper follow-up in `presentation/cli_text.py` after code-reviewer finding | `application/worktree.py` behavior; docs; CLI text/help; canonical spec docs | focused test; `python -m unittest tests.cli_runtime.test_worktree -v`; code-reviewer pass | field naming conflict; JSON compatibility breakage | changed files, Red/Green, closure status, Ledger Note | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | dev-coder | Added classification diagnostics to `WorktreeRecordView`, added payload helper fields after review finding, and added focused payload test. Ledger Note: No material implementation decisions beyond the approved plan except the bounded S01 payload-helper fix required by code review. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py`; `tests/cli_runtime/test_worktree.py` | focused test OK; `python -m unittest tests.cli_runtime.test_worktree -v` -> OK, 38 tests | pass by code-reviewer `019e797b-82ae-7d50-99e3-ddbd24c2e20e` | S02 must wire actual inventory classification values. | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01 | not applicable | N/A | N/A | N/A | N/A | N/A | code-reviewer passed | no exception used |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step reviewer | code-reviewer | fresh | failed | no | follow-up required | Initial review `019e7975-c88a-7f00-b225-742d15867cbf` failed on payload helper test path and report evidence. |
+| S01 | step reviewer | code-reviewer | fresh | passed | no | proceed | Re-review `019e797b-82ae-7d50-99e3-ddbd24c2e20e` passed after bounded payload-helper fix; report evidence recorded here. |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | pending commit | S01 runtime/test slice | pending | pending | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `WorktreeRecordView` classification diagnostics
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - worktree JSON payload additive diagnostics
+- `tests/cli_runtime/test_worktree.py` - focused payload diagnostic test
 
 #### コミット
-- <hash> <message>
+- pending
 
 #### メモ
-- ...
+- S01 commit は後続 step とまとめるか、step boundary commit とするかを最終 commit gate で判断する。
 
 ---
 
-### セッションログ（2026-05-30 HH:MM - HH:MM）
+### セッションログ（2026-05-31 S02）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S02
+- AC/EC: AC-001, AC-002, AC-003, EC-004
+- 計画上の出典（Planned source）:
+  - `plan.md` section: 実装ステップ S02 — Root-Optional List / Show / Remove Inventory
+  - closure ids: tc-002, tc-003
 
 #### 実施内容
-- ...
+- `list` / `show` / `remove` inventory 構築を Git records 正本へ移し、root missing / blank / invalid / namespace symlink を fatal error ではなく classification unavailable diagnostic として扱うようにした。
+- create path は strict root resolver を維持し、既存 root-required no-side-effect tests が継続 pass することを確認した。
+- `_WorktreeClassificationContext` を追加し、valid root では `spec_dock_managed` / `external`、unavailable root では `classification_unavailable` を設定するようにした。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_list_and_show_json_succeed_when_root_is_missing tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_json_commands_report_unavailable_classification_for_invalid_root_variants -v
+
+OK
+
+python -m unittest tests.cli_runtime.test_worktree -v
+
+Ran 38 tests in 17.771s
+OK
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ / 代替証跡（Red / alternative） | `red-required`: root missing / invalid で list/show JSON が現行実装では root-required / invalid-root error になることを固定する。 | dev-coder reported Red: root missing / blank -> `worktree_root_required`; root relative/file -> `invalid_worktree_root`; namespace symlink -> classification unavailable にならず `managed_classification_available=True`; focused command failed with `FAILED (failures=13)`。 | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_list_and_show_json_succeed_when_root_is_missing tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_json_commands_report_unavailable_classification_for_invalid_root_variants -v` | pass | Red evidence accepted as worker evidence. |
+| S02 | 緑フェーズ（Green） | root missing / blank / invalid / namespace symlink diagnostics と create root-required regression が pass すること。 | focused tests OK; `tests.cli_runtime.test_worktree` OK, 38 tests。 | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_list_and_show_json_succeed_when_root_is_missing tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_json_commands_report_unavailable_classification_for_invalid_root_variants -v`; `python -m unittest tests.cli_runtime.test_worktree -v` | pass | Parent observed focused/full module Green. |
+| S02 | リファクタリング（Refactor） | strict root resolver は create path に残し、optional classification helper は list/show/remove inventory だけで使う。 | `_WorktreeClassificationContext` を追加。`worktree_create` の `_resolve_worktree_root` は維持。remove execution / cleanup behavior は未変更。 | 差分点検 / test module | pass | S03 で external remove blocker を扱う。 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | `test_worktree_invalid_root_short_circuits_git_gateway` は Git records 正本化後の契約に反する | implementation | `test_worktree_invalid_root_reads_git_records_before_classification` に更新し、invalid root でも Git records を読んで classification diagnostic にすることを確認した。 | tc-002 | no | `tests/cli_runtime/test_worktree.py` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | tc-002, tc-003 | tc-002 と tc-003 が pass し、root optional inventory と create root-required regression が report に記録される。 | root missing / blank / invalid / namespace symlink diagnostics tests pass; full worktree module pass; create root-required tests remain pass。 | pass | code-reviewer initially failed only because report evidence was missing; evidence recorded here. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-002 | S02 | yes | red-required | focused Red reported as `FAILED (failures=13)` before implementation | focused S02 tests; `python -m unittest tests.cli_runtime.test_worktree -v` | pass | Missing/blank/invalid/namespace symlink all return classification unavailable diagnostics. |
+| tc-003 | S02 | yes | covered-existing + targeted regression | existing create root-required tests already covered missing / blank / invalid root no-side-effect cases | `python -m unittest tests.cli_runtime.test_worktree -v` | pass | create strict root resolver preserved. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-002 | S02 | focused S02 diagnostics tests; full worktree module | pass | Root optional list/show/remove inventory complete for S02 scope. |
+| tc-003 | S02 | existing create root-required tests in full worktree module | pass | No create behavior relaxation observed. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| changed | tc-002 | `test_worktree_invalid_root_short_circuits_git_gateway` | tc-002 | S02 requires Git records as source of truth before optional classification, so invalid-root short-circuit test was inverted to assert Git records are read before classification. | no | yes, completed with pass |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | runtime behavior slice with focused tests | dev-coder | root optional inventory and create regression | `plan.md` S02; `requirement.md`; `design.md` | `application/worktree.py`; `tests/cli_runtime/test_worktree.py` | remove execution / cleanup behavior; docs; CLI text/help; canonical spec docs | focused S02 tests; `python -m unittest tests.cli_runtime.test_worktree -v`; code-reviewer | create contract weakened; root invalid remains fatal for inventory | changed files, root matrix, Red/Green, closure status, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Split optional classification context from strict create resolver; root unavailable states now produce classification diagnostics. Ledger Note: No material implementation decisions beyond the approved plan. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py`; `tests/cli_runtime/test_worktree.py` | focused S02 tests OK; `python -m unittest tests.cli_runtime.test_worktree -v` -> OK, 38 tests | initial fail due report evidence missing `019e7984-2793-7840-b9b9-1b9fb4b4c8b3`; re-review pass `019e7987-e88d-7e31-a249-33b48bd4012c` | S03 still required to remove `unmanaged` blocker and enable external remove. | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | failed | no | follow-up required | Initial S02 review `019e7984-2793-7840-b9b9-1b9fb4b4c8b3` found report evidence missing only. |
+| S02 | step reviewer | code-reviewer | fresh | passed | no | proceed | Re-review `019e7987-e88d-7e31-a249-33b48bd4012c` passed after S02 report evidence was recorded. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | pending commit | S02 runtime/test slice | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py` - optional classification context for inventory
+- `tests/cli_runtime/test_worktree.py` - root unavailable diagnostics and create regression coverage
+
+#### コミット
+- pending
+
+#### メモ
+- S02 commit は step boundary commit かまとめ commit かを final commit gate で判断する。
+
+---
+
+### セッションログ（2026-05-31 S03）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-004, AC-005, EC-001, EC-002
+- 計画上の出典（Planned source）:
+  - `plan.md` section: 実装ステップ S03 — External Remove and Hard Blockers
+  - closure ids: tc-004, tc-005, tc-006
+
+#### 実施内容
+- `unmanaged` を remove blocker / non-bypassable blocker から外し、external linked worktree を remove 可能にした。
+- main/current/bare/path_missing/record_missing の hard blocker と、ambiguous target / branch-only target の拒否を維持した。
+- managed namespace containment による external path 拒否をやめ、Git record identity と hard blockers を remove safety の境界にした。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_json_commands_report_unavailable_classification_for_invalid_root_variants tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_list_json_classifies_unmanaged_worktree tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_rejects_current_unmanaged_and_ambiguous_targets tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_hard_blockers_stop_before_git_remove_even_with_force tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_ambiguous_basename_stops_before_git_remove tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_rejects_branch_target_and_invalid_root_without_side_effects -v
+
+OK
+
+python -m unittest tests.cli_runtime.test_worktree -v
+
+Ran 39 tests in 17.891s
+OK
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ / 代替証跡（Red / alternative） | `red-required`: external/unmanaged remove が現行実装では `remove_blocked` + `unmanaged` になることを固定する。 | dev-coder reported Red: unmanaged inventory was `removable=False`; external remove returned code 1. | focused S03 command | pass | Worker evidence accepted. |
+| S03 | 緑フェーズ（Green） | external remove, hard blockers, ambiguous / branch target regressions が pass すること。 | focused S03 tests OK; `tests.cli_runtime.test_worktree` OK, 39 tests。 | focused command; `python -m unittest tests.cli_runtime.test_worktree -v` | pass | Parent observed focused/full module Green. |
+| S03 | リファクタリング（Refactor） | blocker matrix の変更に限定し、filesystem cleanup/docs は触らない。 | `_remove_blockers`, `_non_bypassable_remove_blockers`, containment guard の external blocker を調整。cleanup implementation は未変更。 | 差分点検 / code-reviewer | pass | code-reviewer pass。 |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | tc-004, tc-005, tc-006 | external remove と hard blockers / target resolution regressions が pass し、code-reviewer pass が必要。 | external remove succeeds and branch remains; hard blockers stop before Git remove; ambiguous / branch-only targets reject before Git remove; code-reviewer pass `019e7990-2952-7023-96c0-600dde620ffd`。 | pass | S04 cleanup detail remains separate. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-004 | S03 | yes | red-required | unmanaged blocker Red reported by dev-coder | focused S03 tests; full worktree module | pass | external remove succeeds, branch remains, `branch_deleted=false`。 |
+| tc-005 | S03 | yes | red-required | existing hard blocker coverage retained | focused S03 tests; full worktree module | pass | main/current/bare/path_missing/record_missing are non-bypassable. |
+| tc-006 | S03 | yes | covered-existing + targeted regression | existing ambiguous / branch-only coverage retained | focused S03 tests; full worktree module | pass | rejected before Git remove. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-004 | S03 | external remove focused test; code-reviewer pass | pass | external/unmanaged no longer blocker. |
+| tc-005 | S03 | hard blocker matrix test; code-reviewer pass | pass | Git remove / cleanup not called for hard blockers. |
+| tc-006 | S03 | ambiguous / branch target tests; code-reviewer pass | pass | target resolution guard maintained. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| changed | tc-004 | invalid-root remove preflight behavior | tc-004 | S03 allows external remove after S02 root diagnostics, so invalid-root remove path now succeeds when no hard blocker remains. | no | yes, completed with pass |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | runtime behavior slice with safety matrix | dev-coder | external remove / hard blockers | `plan.md` S03; `requirement.md`; `design.md` | `application/worktree.py`; `tests/cli_runtime/test_worktree.py` | cleanup implementation; docs; CLI text/help; canonical spec docs | focused S03 tests; full worktree module; code-reviewer pass | external remove without record refresh; branch deletion | changed files, blocker matrix, Red/Green, closure status, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | Removed unmanaged as remove blocker and preserved hard blocker matrix. Ledger Note: No material implementation decisions beyond the approved plan. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py`; `tests/cli_runtime/test_worktree.py` | focused S03 tests OK; `python -m unittest tests.cli_runtime.test_worktree -v` -> OK, 39 tests | pass by code-reviewer `019e7990-2952-7023-96c0-600dde620ffd` | S04 target-only cleanup remains. | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | fresh | passed | no | proceed | Review `019e7990-2952-7023-96c0-600dde620ffd` passed. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | pending commit | S03 runtime/test slice | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py` - external remove blocker changes
+- `tests/cli_runtime/test_worktree.py` - external remove and hard blocker tests
+
+#### コミット
+- pending
+
+#### メモ
+- S04 で target-only cleanup semantics を実装する。
+
+---
+
+### セッションログ（2026-05-31 S04）
+
+#### 対象
+- Step: S04
+- AC/EC: AC-004, EC-003, EC-005
+- 計画上の出典（Planned source）:
+  - `plan.md` section: 実装ステップ S04 — Git-First Target-Only Cleanup
+  - closure ids: tc-007, tc-008, tc-009
+
+#### 実施内容
+- filesystem port を target-only cleanup 用の `remove_target(path)` contract に変更した。
+- `worktree_remove` は Git remove 成功後だけ resolved target path の存在を lstat 相当で確認し、残存 target だけを cleanup するようにした。
+- `infra/fs_cli.py` は symlink / broken symlink / regular file を unlink、directory を `rmtree`、unsupported type / `lstat` / `unlink` / `rmtree` failure を `RuntimeError` として application の `post_remove_cleanup_failed` に伝播できるようにした。
+- 実 CLI の `_FilesystemGateway` adapter に `remove_target()` delegation を追加した。この scope delta は D-001 に記録した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_git_failure_does_not_cleanup_target tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_uses_target_only_cleanup_for_remaining_directory tests.cli_runtime.test_worktree.TestCliWorktree.test_fs_remove_target_unlinks_symlink_broken_symlink_and_regular_file tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_reports_target_cleanup_failure -v
+
+OK
+
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_reports_target_cleanup_failures tests.cli_runtime.test_worktree.TestCliWorktree.test_fs_remove_target_unlinks_symlink_broken_symlink_and_regular_file tests.cli_runtime.test_worktree.TestCliWorktree.test_fs_remove_target_reports_lstat_unlink_rmtree_and_unsupported_failures -v
+
+Ran 3 tests in 0.028s
+OK
+
+python -m unittest tests.cli_runtime.test_worktree -v
+
+Ran 44 tests in 17.872s
+OK
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | 赤フェーズ / 代替証跡（Red / alternative） | `red-required`: current `remove_tree` directory-only cleanup では symlink/broken symlink/file/unsupported failure contract を閉じられないこと。 | dev-coder reported Red: application called `remove_tree` rather than `remove_target`; broken symlink cleanup was not detected by `Path.exists()`; cleanup failure coverage was generic only。 | focused S04 command before implementation / reviewer finding `019e799b-01c9-7a01-a091-cf76bb73dba2` | pass | Red evidence accepted as worker + reviewer evidence. |
+| S04 | 緑フェーズ（Green） | Git failure no cleanup、remaining directory、symlink / broken symlink / regular file、unsupported / race failure が pass すること。 | focused S04 tests OK; follow-up cleanup failure tests OK; `tests.cli_runtime.test_worktree` OK, 44 tests。 | focused commands; `python -m unittest tests.cli_runtime.test_worktree -v` | pass | broken symlink は `os.path.lexists()` で symlink 自体の削除を確認。 |
+| S04 | リファクタリング（Refactor） | filesystem port change は target-only cleanup に限定し、general-purpose deletion framework にしない。 | `remove_target(path)` は symlink/file unlink と directory rmtree だけを扱い、parent/root/namespace cleanup や branch deletion、prune/repair は追加していない。 | 差分点検 / code-reviewer | pass | CLI adapter 追加は D-001 に記録。 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | broken symlink は `Path.exists()` だと削除前から false になり得る | code-reviewer | `os.path.lexists()` で symlink 自体が unlink されたことを確認する test に修正した。 | tc-008 | no | code-reviewer fail `019e799b-01c9-7a01-a091-cf76bb73dba2`; `test_fs_remove_target_unlinks_symlink_broken_symlink_and_regular_file` |
+| S04 | cleanup failure coverage が generic RuntimeError だけでは unsupported / lstat / unlink / rmtree / race を閉じきれない | code-reviewer | application wrapping test を mode matrix にし、infra direct test で missing/lstat、unlink、rmtree、unsupported FIFO を確認した。 | tc-009 | no | `test_worktree_remove_reports_target_cleanup_failures`; `test_fs_remove_target_reports_lstat_unlink_rmtree_and_unsupported_failures` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | tc-007, tc-008, tc-009 | tc-007..tc-009 が pass し、cleanup boundary と failure behavior が report に記録されること。 | Git failure no cleanup; target-only remaining directory cleanup; symlink / broken symlink / regular file unlink; unsupported / lstat / unlink / rmtree / race failure -> `post_remove_cleanup_failed`; full worktree module pass; code-reviewer re-review pass `019e79a1-5fab-7972-91c0-79eb72858238`。 | pass | code-reviewer initial fail の P2 は bounded follow-up で解消。 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-007 | S04 | yes | red-required | Git failure path cleanup assertion added before behavior confirmation | `test_worktree_remove_git_failure_does_not_cleanup_target`; full worktree module | pass | Git failure returns `git_worktree_remove_failed` and cleanup gateway is not called. |
+| tc-008 | S04 | yes | red-required | directory-only cleanup could not satisfy symlink / broken symlink / file contract | `test_worktree_remove_uses_target_only_cleanup_for_remaining_directory`; `test_fs_remove_target_unlinks_symlink_broken_symlink_and_regular_file`; full worktree module | pass | parent/root/namespace sentinels remain; symlink itself is unlinked without following target. |
+| tc-009 | S04 | yes | red-required | generic cleanup failure coverage was insufficient per code-reviewer | `test_worktree_remove_reports_target_cleanup_failures`; `test_fs_remove_target_reports_lstat_unlink_rmtree_and_unsupported_failures`; full worktree module | pass | unsupported / lstat / unlink / rmtree / race all surface as cleanup failure path. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-007 | S04 | focused test; full worktree module | pass | Git-first boundary preserved. |
+| tc-008 | S04 | focused cleanup tests; full worktree module | pass | target-only cleanup covers directory, symlink, broken symlink, regular file. |
+| tc-009 | S04 | application failure matrix; infra failure matrix; full worktree module | pass | cleanup failures are fail-closed as `post_remove_cleanup_failed`. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | tc-008 | `test_fs_remove_target_unlinks_symlink_broken_symlink_and_regular_file` lexists assertion | tc-008 | `Path.exists()` は broken symlink 自体の削除証跡にならないため。 | no | yes, completed with pass |
+| added | tc-009 | `test_worktree_remove_reports_target_cleanup_failures`; `test_fs_remove_target_reports_lstat_unlink_rmtree_and_unsupported_failures` | tc-009 | unsupported / lstat / unlink / rmtree / race failure modesを closure に含めるため。 | no | yes, completed with pass |
+| added | S04 | `cli/bootstrap.py` adapter | D-001 | 実 CLI adapter に `remove_target()` delegation が必要だったため。 | no | yes, completed with pass |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | delegated | runtime cleanup behavior slice with cleanup boundary matrix | dev-coder | Git-first target-only cleanup | `plan.md` S04; `requirement.md`; `design.md` | `application/ports.py`; `application/worktree.py`; `infra/fs_cli.py`; `tests/cli_runtime/test_worktree.py`; thin CLI adapter delta recorded in D-001 | broad filesystem refactor; parent cleanup; branch deletion; `git worktree prune`; docs | focused S04 tests; full worktree module; code-reviewer pass | cleanup boundary cannot satisfy fixed design contract | changed files, cleanup boundary matrix, Red/Green, closure id status, report evidence note, platform-specific risk | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 | dev-coder | Replaced cleanup port with `remove_target(path)`, implemented symlink non-following target cleanup, and added cleanup tests. Ledger Note: `cli/bootstrap.py` thin adapter was needed for actual CLI wiring and is recorded in D-001. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_cli.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py`; `tests/cli_runtime/test_worktree.py` | focused S04 tests OK; `python -m unittest tests.cli_runtime.test_worktree -v` -> OK, 44 tests after follow-up | pass by code-reviewer `019e79a1-5fab-7972-91c0-79eb72858238` | S05 still required for text/help presentation. | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | code-reviewer | fresh | failed | no | follow-up required | Review `019e799b-01c9-7a01-a091-cf76bb73dba2` found report evidence missing, cleanup failure matrix incomplete, and broken symlink assertion weak. |
+| S04 | step reviewer | code-reviewer | fresh | passed | no | proceed | Re-review `019e79a1-5fab-7972-91c0-79eb72858238` passed after report evidence and P2 tests were added. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | pending commit | S04 runtime/test cleanup slice | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - filesystem cleanup port を `remove_target(path)` に変更
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py` - Git-first target-only cleanup orchestration
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_cli.py` - symlink non-following target cleanup and fail-closed errors
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - runtime adapter delegation for `remove_target(path)`
+- `tests/cli_runtime/test_worktree.py` - S04 cleanup boundary and failure matrix tests
+
+#### コミット
+- pending
+
+#### メモ
+- S05 で text/help presentation と JSON error payload の最終表示契約を閉じる。
+
+---
+
+### セッションログ（2026-05-31 S05）
+
+#### 対象
+- Step: S05
+- AC/EC: AC-006
+- 計画上の出典（Planned source）:
+  - `plan.md` section: 実装ステップ S05 — Presentation, CLI Text, and Help
+  - closure ids: tc-010
+
+#### 実施内容
+- `worktree list` / `show` / `remove` text output に `origin` と `classification_reason` を追加し、`managed` / `remove_blockers` と合わせて scan できるようにした。
+- `worktree remove` の parser help / target help から managed-only wording を除去した。
+- error JSON の embedded `candidates` / `worktree` に `_worktree_payload` の classification diagnostics が含まれることを focused tests で確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_clean_managed_target_keeps_branch tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_help_uses_all_worktree_wording tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_list_and_show_json_resolve_agent_targets tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_list_json_classifies_unmanaged_worktree tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_rejects_current_unmanaged_and_ambiguous_targets -v
+
+Ran 5 tests in 4.230s
+OK
+
+python -m unittest tests.cli_runtime.test_worktree -v
+
+Ran 45 tests in 18.894s
+OK
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S05 | 赤フェーズ / 代替証跡（Red / alternative） | `red-required`: current JSON/text/help に classification fields または all-linked wording がないことを output test で固定する。 | 実装前 inspection: text output は `managed` と `remove_blockers` のみで `origin` / `classification_reason` がない。help は `Remove a managed Git worktree` と `Managed worktree id...` を含む。error JSON は `_worktree_payload` 経由だが embedded path の focused assertion が不足。 | source inspection; focused tests added before Green | pass | Red は stale wording / missing text diagnostics の inspection evidence として採用。 |
+| S05 | 緑フェーズ（Green） | JSON diagnostics、help wording、text diagnostics が pass すること。 | focused S05 tests OK after bounded follow-up for remove success text; `tests.cli_runtime.test_worktree` OK, 45 tests。 | focused command; full worktree module | pass | Embedded candidates / worktree diagnostics assertions included; remove success text includes `managed` / `origin` / `classification_reason` / `remove_blockers`. |
+| S05 | リファクタリング（Refactor） | rendering / help wording に限定し、application behavior は変更しない。 | Changed files are `presentation/cli_text.py`, `commands/worktree.py`, `cli/parser.py`, `tests/cli_runtime/test_worktree.py`; no application behavior files changed by S05。 | 差分点検 | pass | code-reviewer re-review pass `019e79aa-6896-7d82-bd73-c7e0a08d894f`. |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S05 | tc-010 | tc-010 が pass し、JSON/text/help の output evidence が report に記録されること。 | list/show/remove text output includes `managed`, `origin`, `classification_reason`, `remove_blockers`; remove help no longer uses managed-only wording; error JSON embedded candidates/worktree includes diagnostics; full worktree module pass; code-reviewer re-review pass `019e79aa-6896-7d82-bd73-c7e0a08d894f`。 | pass | initial code-reviewer fail fixed. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-010 | S05 | yes | red-required | text/help inspection showed missing diagnostics and managed-only wording | focused S05 tests; `python -m unittest tests.cli_runtime.test_worktree -v` | pass | JSON success path remains additive; embedded error paths asserted via candidates/worktree; remove success text coverage added after reviewer finding. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-010 | S05 | focused S05 tests; full worktree module; code-reviewer re-review pass `019e79aa-6896-7d82-bd73-c7e0a08d894f` | pass | Presentation/help surface complete. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | tc-010 | `test_worktree_remove_clean_managed_target_keeps_branch` text remove assertions | tc-010 | code-reviewer found remove success text omitted `managed` / `remove_blockers`; test now asserts full diagnostics. | no | yes, completed with pass |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S05 | sub-agent thread limit reached when spawning dev-coder | no waiver; parent executed same bounded S05 contract and used code-reviewer gate | `presentation/cli_text.py`; `commands/worktree.py`; `cli/parser.py`; `tests/cli_runtime/test_worktree.py` | rendering/help/tests only | revert S05 patch if reviewer finds blocking issue | focused S05 tests OK; full worktree module OK | code-reviewer re-review pass `019e79aa-6896-7d82-bd73-c7e0a08d894f` | parent implementation exception recorded; no workflow waiver requested |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S05 | step reviewer | code-reviewer | fresh | failed | no | follow-up required | Review `019e79a6-d280-7721-8a5e-8f41e9430e46` found remove success text omitted `managed` and `remove_blockers`. |
+| S05 | step reviewer | code-reviewer | fresh | passed | no | proceed | Re-review `019e79aa-6896-7d82-bd73-c7e0a08d894f` passed after remove success text diagnostics and focused test were added. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S05 | pending commit | S05 output/help slice | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - text output diagnostics
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/worktree.py` - remove target help wording
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py` - remove subcommand help wording
+- `tests/cli_runtime/test_worktree.py` - S05 focused output/help/error JSON assertions
+
+#### コミット
+- pending
+
+#### メモ
+- Ledger Note: No material implementation decisions beyond approved plan.
+
+---
+
+### セッションログ（2026-05-31 S90）
+
+#### 対象
+- Step: S90
+- AC/EC: AC-007
+- 計画上の出典（Planned source）:
+  - `plan.md` section: ドキュメント影響の解消ステップ S90
+  - closure ids: tc-011
+
+#### 実施内容
+- provider-side shipped doc `src/spec_dock/assets/spec_dock/docs/reference_worktree.md` を更新し、dogfooding doc `spec-dock/docs/reference_worktree.md` に同内容を反映した。
+- `worktree create` は `SPEC_DOCK_WORKTREE_ROOT` 必須、`list` / `show` / `remove` は Git records 正本で root optional classification context として扱うことを明記した。
+- classification diagnostics、external linked worktree remove、branch non-deletion、Git-first target-only cleanup、scope 外の prune/repair/orphan/Codex lifecycle を明記した。
+- managed-only remove wording と root-required list/show/remove wording を削除した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n 'Remove a managed Git worktree|Managed worktree id|SpecDock managed namespace 配下の linked worktree だけ|directory-only' src/spec_dock/assets/spec_dock/docs/reference_worktree.md spec-dock/docs/reference_worktree.md src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/worktree.py tests/cli_runtime/test_worktree.py
+
+Only negative assertions in tests matched.
+
+rg -n 'unmanaged.*(refus|拒否|削除しません|blocker)|remove.*unmanaged' src/spec_dock/assets/spec_dock/docs/reference_worktree.md spec-dock/docs/reference_worktree.md src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime tests/cli_runtime/test_worktree.py
+
+Only positive external remove test names/assertions matched.
+
+rg -n 'Codex app.*管理対象ではありません|Codex-managed worktree cleanup|Codex-managed|Codex 固有|Codex Desktop|Codex app' src/spec_dock/assets/spec_dock/docs/reference_worktree.md spec-dock/docs/reference_worktree.md spec-dock/active/issue/report.md
+
+Docs state Codex app same-repository Git linked worktrees are `list` / `show` / `remove` targets; only Codex-specific lifecycle / metadata / cleanup remains out of scope.
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=73
+
+git diff --check
+
+pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S90 | inspect-only / 赤相当（Red / alternative） | root-required / managed-only / unmanaged blocker / directory-only cleanup の stale wording を検索する。 | 既存 docs inspection で `remove` は managed namespace only、unmanaged は force でも削除しない、root missing / invalid は fatal と書かれていた。 | `sed` inspection of provider and dogfooding `reference_worktree.md` | pass | docs-only step のため failing code test は不要。 |
+| S90 | 緑フェーズ（Green） | provider docs と dogfooding docs が root optional list/show/remove、create root-required、classification diagnostics、external remove、target-only cleanup、branch non-deletion を説明する。 | docs updated; stale wording search shows no docs/runtime stale matches after Codex app wording follow-up; validate and diff check pass。 | `rg`; `./spec-dock/scripts/spec-dock validate`; `git diff --check` | pass | docs are duplicated by design for provider asset and local dogfooding workspace. |
+| S90 | リファクタリング（Refactor） | docs のみ変更し、runtime behavior は変更しない。 | Changed files are provider and dogfooding `reference_worktree.md`; no runtime files changed by S90。 | 差分点検 | pass | spec-reviewer re-review pass `019e79b3-03a3-7ed2-a95c-9f6840562283`. |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | tc-011 | provider docs と dogfooding docs が root optional list/show/remove、create root-required、external remove、target-only cleanup を説明する。 | `reference_worktree.md` updated in both source and dogfooding docs; stale wording search clean; Codex app same-repository Git linked worktrees clarified as valid list/show/remove targets; validate pass; spec-reviewer re-review pass `019e79b3-03a3-7ed2-a95c-9f6840562283`。 | pass | initial spec-reviewer fail fixed. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-011 | S90 | yes | inspect-only | docs inspection found stale managed-only/root-required remove wording | stale wording `rg`; `./spec-dock/scripts/spec-dock validate`; `git diff --check` | pass | code test not required for docs-only step. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-011 | S90 | provider/dogfooding docs inspection; stale wording search; validate; spec-reviewer re-review pass `019e79b3-03a3-7ed2-a95c-9f6840562283` | pass | Docs complete. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| changed | tc-011 | Codex app wording | tc-011 | spec-reviewer found intro wording could imply Codex-created same-repository Git linked worktrees were not list/show/remove targets. Docs now exclude only Codex-specific lifecycle/metadata/cleanup. | no | yes, completed with pass |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | sub-agent thread limit had been reached during S05; parent performed bounded docs sync after source inspection | no waiver; reviewer gate completed | provider and dogfooding `reference_worktree.md` | docs-only update | revert S90 doc patch if reviewer finds blocking issue | stale wording search; validate; diff check | spec-reviewer pass `019e79b3-03a3-7ed2-a95c-9f6840562283` | parent implementation exception recorded; no workflow waiver requested |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | step reviewer | spec-reviewer | fresh | failed | no | follow-up required | Review `019e79af-690f-7ae0-83a4-1b0632ab5d7e` found Codex app intro wording could conflict with all-linked-worktree external management contract. |
+| S90 | step reviewer | spec-reviewer | fresh | passed | no | proceed | Re-review `019e79b3-03a3-7ed2-a95c-9f6840562283` passed after same-repository Codex app Git linked worktrees were clarified as list/show/remove targets while Codex-specific lifecycle/metadata/cleanup remains out of scope. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | pending commit | S90 docs slice | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/reference_worktree.md` - provider shipped worktree reference
+- `spec-dock/docs/reference_worktree.md` - dogfooding worktree reference
+
+#### コミット
+- pending
+
+#### メモ
+- Ledger Note: No material implementation decisions beyond approved plan.
+
+---
+
+### セッションログ（2026-05-31 S99）
+
+#### 対象
+- Step: S99
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007
+- 計画上の出典（Planned source）:
+  - `plan.md` section: 最終 QA / Review / Commit / PR ステップ S99
+
+#### 実施内容
+- local `main` 更新後に現在ブランチへ merge した状態を前提に、S01-S90 の統合差分を確認した。
+- provider runtime と dogfooding runtime mirror の差分、および checked-in dogfooding `.meta.json` cutover snapshot の差分をフル unittest で検出し、provider / dogfooding parity と snapshot を修正した。
+- 修正後、focused tests、`spec-dock validate`、`git diff --check`、フル unittest を再実行した。
+- final QA / spec review で検出された remove final refresh の再解決不足と protected cleanup path の境界テスト不足を修正し、provider / dogfooding runtime mirror を再同期した。
+
+#### 実行コマンド / 結果
+```bash
+git status --short --branch
+
+## iss-00143-manage-external-git-worktrees
+M ... issue implementation/report/docs/test files
+
+git diff --check
+
+pass
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=73
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets -v
+
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v
+
+OK
+
+python -m unittest discover -v
+
+Ran 985 tests in 544.103s
+OK
+
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_external_paths_are_not_blocked_by_managed_namespace_containment tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_re_resolves_target_after_final_git_refresh -v
+
+Ran 2 tests in 0.038s
+OK
+
+python -m unittest tests.cli_runtime.test_worktree -v
+
+Ran 46 tests in 20.012s
+OK
+
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_treats_broken_symlink_target_as_existing -v
+
+Ran 1 test in 0.026s
+OK
+
+python -m unittest discover -v
+
+Ran 986 tests in 536.707s
+OK
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=73
+
+git diff --check
+
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S99 | 統合赤相当（Red / integration regression） | フル suite で provider / dogfooding parity と cutover snapshot 退行を検出する。 | Initial full run failed 2 tests: dogfooding runtime mirror mismatch and checked-in dogfooding `.meta.json` snapshot drift. | `python -m unittest discover -v` | fail observed and fixed | Failures were not behavioral regressions in worktree runtime; they exposed required dogfooding sync/snapshot updates after main merge and provider changes. |
+| S99 | final reviewer 赤相当（Red / reviewer finding） | final reviewers が destructive remove path と closure ledger を点検する。 | QA reviewer `019e79c9-fc6c-79b0-8d21-c8e643b4fac4` failed: AC ledger mapping mismatch and protected cleanup path test weakness. Spec reviewer `019e79ca-6092-7192-8662-24ed720e1760` failed: final Git refresh did not re-resolve target/hard blockers. Code reviewer `019e79ca-4d91-7112-98ec-b7dadbcf43c6` failed after follow-up: broken symlink path existence coverage. | qa-reviewer; code-reviewer; spec-reviewer | fail observed and follow-up applied | Closure mapping corrected; protected cleanup tests added; final refresh re-resolution added; broken symlink `lstat()` existence path and test confirmed. |
+| S99 | 緑フェーズ（Green） | focused parity/snapshot tests、worktree tests、validate、diff check、full suite が通る。 | Focused tests OK; worktree module 46 tests OK locally and 47 tests OK by code-reviewer; broken symlink focused test OK; `spec-dock validate` nodes=73; `git diff --check` pass; full suite 986 tests OK after follow-up. | focused unittest; `python -m unittest tests.cli_runtime.test_worktree -v`; mirror/snapshot focused tests; `./spec-dock/scripts/spec-dock validate`; `git diff --check`; `python -m unittest discover -v` | pass | QA/code/spec final re-reviews passed. |
+| S99 | リファクタリング（Refactor） | final reviewer findings の範囲に限定する。 | `worktree_remove` final refresh rebuilds inventory, re-resolves target, re-checks non-bypassable blockers, protects central root / namespace cleanup targets, and uses lstat-style path existence for broken symlink records; report closure mapping corrected. | diff inspection | pass | Dogfooding runtime mirror synced from provider runtime. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-001 | S01-S99 | `WorktreeRecordView` diagnostics tests; JSON/text payload assertions; full unittest | pass | `managed_classification_available`, `classification_reason`, `origin` covered while `managed` remains boolean. |
+| tc-002 | S02-S99 | root missing/blank/invalid/namespace symlink tests; full unittest | pass | list/show/remove classification context is optional outside create. |
+| tc-003 | S02-S99 | create root-required no-side-effect tests; full unittest | pass | `worktree create` still requires valid `SPEC_DOCK_WORKTREE_ROOT`. |
+| tc-004 | S03-S99 | external remove tests; branch retention assertion; `git worktree list --porcelain` assertion; full unittest | pass | external linked worktrees are removable and related local branches are not deleted. |
+| tc-005 | S03-S99 | main/current/bare/path_missing/record_missing hard blocker tests; final refresh hard blocker re-resolution test; full unittest | pass | hard blockers remain non-bypassable and are recomputed after final Git refresh. |
+| tc-006 | S03-S99 | ambiguous target test; branch-only target test; final refresh target change test; full unittest | pass | target resolution remains fail-closed before Git remove. |
+| tc-007 | S04-S99 | Git failure no-cleanup test; target-only cleanup tests; full unittest | pass | cleanup runs only after successful Git remove. |
+| tc-008 | S04-S99 | directory / symlink / broken symlink / regular file cleanup tests; full unittest | pass | cleanup is target-only and does not follow symlink targets. |
+| tc-009 | S04-S99 | cleanup failure matrix tests; protected central root / namespace / namespace symlink tests; full unittest | pass | post-remove target cleanup failures are surfaced without claiming directory removal; protected cleanup paths are rejected before Git remove. |
+| tc-010 | S05-S99 | CLI help/text/JSON assertions; full unittest | pass | managed-only wording removed; diagnostics are visible in outputs and embedded error payloads. |
+| tc-011 | S90-S99 | provider/dogfooding `reference_worktree.md`; stale wording search; spec-reviewer re-review pass; validate | pass | docs describe create root requirement, optional classification for other commands, external remove, target-only cleanup. |
+| tc-012 | S99 | focused parity/snapshot tests; worktree focused tests; full unittest; validate; diff check; final reviewer gates | pass | Full suite passed after follow-up; QA/code/spec final re-reviews passed. |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S99 | final QA | qa-reviewer | fresh | passed | no | proceed | QA reviewer `019e79c9-eda3-7652-81d4-35f8c531a50e` passed; P2 closure mapping fixed, P3 symlink-only CLI test split recorded as non-blocking residual risk. |
+| S99 | final code review | code-reviewer | fresh | passed | no | proceed | Code reviewer `019e79ca-4d91-7112-98ec-b7dadbcf43c6` found broken symlink path existence gap after earlier pass; follow-up added `lstat()` path existence and focused test; re-review passed with no findings. |
+| S99 | final spec review | spec-reviewer | fresh | passed | no | proceed | Spec reviewer `019e79ca-6092-7192-8662-24ed720e1760` found final gate contradictions and missing post-follow-up full-suite evidence; report updated with 986-test full-suite pass; re-review passed with no findings. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S99 | ready for commit | integrated issue diff | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/test_init_update.py` - checked-in dogfooding snapshot parity update
+- `spec-dock/scripts/spec_dock_runtime/**` - dogfooding runtime mirror sync
+- `spec-dock/active/issue/report.md` - final QA evidence ledger
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py` - final refresh re-resolution and protected cleanup path guard
+- `tests/cli_runtime/test_worktree.py` - final refresh and protected cleanup path regression tests
+
+#### コミット
+- pending
+
+#### メモ
+- Ledger Note: S99 full suite pass observed after final reviewer follow-up fixes.
 
 ---
 
@@ -249,37 +836,38 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / README / workflow / skill / migration notes | yes | parent docs update + spec-reviewer | provider/dogfooding `reference_worktree.md`; stale wording search; `./spec-dock/scripts/spec-dock validate`; re-review `019e79b3-03a3-7ed2-a95c-9f6840562283` | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer `019e79c9-fc6c-79b0-8d21-c8e643b4fac4` | whole issue obligation coverage | added | `python -m unittest discover -v` -> Ran 986 tests in 536.707s OK; `./spec-dock/scripts/spec-dock validate` -> nodes=73; `git diff --check` -> pass | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer `019e79ca-4d91-7112-98ec-b7dadbcf43c6` | issue-wide integrated diff | prior P1 findings fixed; re-review passed with no findings | 2 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer `019e79ca-6092-7192-8662-24ed720e1760` | requirement / design / plan / report / implementation / tests / docs alignment | final gate contradictions and missing post-follow-up full-suite evidence fixed; re-review passed with no findings | 2 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S99 evidence recorded; QA/code/spec pass | integrated issue diff for `iss-00143` plus reviewer follow-ups | final response + PR | ready for commit |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: local `main` 取り込み後の current tree と、checked-in dogfooding snapshot / runtime mirror が一時的にずれ、初回 full suite で parity / snapshot failure が出た。
+  - 解決: dogfooding runtime mirror を provider runtime と同期し、現在チェックインされている `.meta.json` snapshot を `tests/test_init_update.py` に反映した。再実行した focused tests と full suite は pass。
 
 ## 学んだこと (任意)
-- ...
+- `worktree create` と `list` / `show` / `remove` の root contract を分離したことで、外部 Git linked worktree の管理対象化と既存 create safety を両立できた。
+- dogfooding repo では provider asset 更新だけでなく、checked-in dogfooding mirror と snapshot fixture の整合確認が final gate で必要になる。
 
 ## 今後の推奨事項 (任意)
-- ...
+- 後続で `worktree prune` / orphan repair / Codex-specific metadata cleanup を扱う場合は、本 issue の scope 外として独立 issue に切り出す。
 
 ## 省略/例外メモ (必須)
 - 該当なし
