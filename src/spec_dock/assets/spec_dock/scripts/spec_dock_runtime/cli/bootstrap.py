@@ -218,6 +218,9 @@ class _FilesystemGateway:
     def remove_tree(self, path: Path) -> None:
         infra_fs_cli.remove_tree(path)
 
+    def remove_target(self, path: Path) -> None:
+        infra_fs_cli.remove_target(path)
+
 
 @dataclass(frozen=True)
 class _EnvironmentGateway:
