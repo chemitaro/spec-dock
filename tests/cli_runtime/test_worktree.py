@@ -1155,6 +1155,38 @@ class TestCliWorktree(CliRuntimeHarness):
                 self.assertTrue(central_sentinel.exists())
                 self.assertTrue(namespace_sentinel.exists())
 
+            ancestor_worktree = Path(tmp) / "ancestor-worktree"
+            nested_central_root = ancestor_worktree / "worktrees"
+            nested_namespace = nested_central_root / "repo"
+            ancestor_worktree.mkdir()
+            nested_namespace.mkdir(parents=True)
+            nested_sentinel = nested_namespace / "sentinel"
+            nested_sentinel.write_text("keep\n", encoding="utf-8")
+            git_gateway = FakeGitGateway(
+                [
+                    app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
+                    app_contracts.GitWorktreeRecord(path=ancestor_worktree, head="def", branch="main-ancestor"),
+                ]
+            )
+            ports = app_ports.Ports(
+                node_reader=object(),
+                repo_root=repo_root,
+                git_gateway=git_gateway,
+                environment_gateway=FakeEnvironmentGateway(nested_central_root),
+                filesystem_gateway=FakeFilesystemGateway(),
+            )
+
+            with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
+                app_worktree.worktree_remove(
+                    app_contracts.WorktreeRemoveRequest(target=str(ancestor_worktree), force=True),
+                    ports,
+                )
+
+            self.assertEqual(raised.exception.code, "remove_blocked")
+            self.assertIn("protected_cleanup_path", raised.exception.remove_blockers)
+            self.assertEqual(git_gateway.remove_calls, [])
+            self.assertTrue(nested_sentinel.exists())
+
             symlink_root = Path(tmp) / "central-with-symlink-namespace"
             symlink_root.mkdir()
             namespace_symlink = symlink_root / "repo"
