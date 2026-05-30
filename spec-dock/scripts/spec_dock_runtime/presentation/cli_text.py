@@ -383,6 +383,7 @@ def render_worktree_list_text(result: WorktreeListResult) -> CliText:
             f"id={item.id} path={item.path} branch={item.branch or '-'} "
             f"managed={_bool_text(item.managed)} main={_bool_text(item.main)} "
             f"current={_bool_text(item.current)} removable={_bool_text(item.removable)} "
+            f"origin={item.origin} classification_reason={item.classification_reason} "
             f"remove_blockers={blockers}"
         )
     return CliText(stdout_lines=lines, stderr_lines=[], warnings=list(result.warnings))
@@ -398,6 +399,7 @@ def render_worktree_show_text(result: WorktreeShowResult) -> CliText:
                 f"id={item.id} path={item.path} branch={item.branch or '-'} "
                 f"managed={_bool_text(item.managed)} main={_bool_text(item.main)} "
                 f"current={_bool_text(item.current)} removable={_bool_text(item.removable)} "
+                f"origin={item.origin} classification_reason={item.classification_reason} "
                 f"remove_blockers={blockers}"
             )
         ],
@@ -407,12 +409,17 @@ def render_worktree_show_text(result: WorktreeShowResult) -> CliText:
 
 
 def render_worktree_remove_text(result: WorktreeRemoveResult) -> CliText:
+    blockers = ",".join(result.resolved_target.remove_blockers) if result.resolved_target.remove_blockers else "-"
     return CliText(
         stdout_lines=[
             (
                 "spec-dock: ok (worktree remove) "
                 f"id={result.resolved_target.id} path={result.resolved_target.path} "
                 f"branch={result.resolved_target.branch or '-'} "
+                f"managed={_bool_text(result.resolved_target.managed)} "
+                f"origin={result.resolved_target.origin} "
+                f"classification_reason={result.resolved_target.classification_reason} "
+                f"remove_blockers={blockers} "
                 f"removed_record={_bool_text(result.removed_record)} "
                 f"removed_directory={_bool_text(result.removed_directory)} "
                 f"branch_deleted={_bool_text(result.branch_deleted)}"
@@ -504,6 +511,9 @@ def _worktree_payload(item: WorktreeRecordView) -> dict[str, object]:
         "branch": item.branch,
         "head": item.head,
         "managed": item.managed,
+        "managed_classification_available": item.managed_classification_available,
+        "classification_reason": item.classification_reason,
+        "origin": item.origin,
         "main": item.main,
         "current": item.current,
         "path_exists": item.path_exists,
