@@ -22,6 +22,26 @@ from ..infra.contracts import StoredMetaRecord
 
 POST_MUTATION_FATAL_WARNING_CODES: tuple[str, ...] = ("gh_fetch_failed",)
 BootstrapStatus = Literal["skipped", "succeeded", "failed", "detection_failed"]
+WorktreeClassificationReason = Literal[
+    "root_valid",
+    "root_missing",
+    "root_blank",
+    "root_invalid",
+    "namespace_symlink",
+]
+WorktreeOrigin = Literal["spec_dock_managed", "external", "classification_unavailable"]
+WORKTREE_CLASSIFICATION_REASONS: tuple[WorktreeClassificationReason, ...] = (
+    "root_valid",
+    "root_missing",
+    "root_blank",
+    "root_invalid",
+    "namespace_symlink",
+)
+WORKTREE_ORIGINS: tuple[WorktreeOrigin, ...] = (
+    "spec_dock_managed",
+    "external",
+    "classification_unavailable",
+)
 
 
 @dataclass(frozen=True)
@@ -129,6 +149,22 @@ class WorktreeRecordView:
     record_exists: bool
     removable: bool
     remove_blockers: list[str]
+    managed_classification_available: bool = True
+    classification_reason: WorktreeClassificationReason = "root_valid"
+    origin: WorktreeOrigin | str = ""
+
+    def __post_init__(self) -> None:
+        if self.classification_reason not in WORKTREE_CLASSIFICATION_REASONS:
+            raise ValueError(f"unsupported worktree classification reason: {self.classification_reason}")
+        origin = self.origin
+        if not origin:
+            if not self.managed_classification_available:
+                origin = "classification_unavailable"
+            else:
+                origin = "spec_dock_managed" if self.managed else "external"
+            object.__setattr__(self, "origin", origin)
+        if origin not in WORKTREE_ORIGINS:
+            raise ValueError(f"unsupported worktree origin: {origin}")
 
 
 @dataclass(frozen=True)

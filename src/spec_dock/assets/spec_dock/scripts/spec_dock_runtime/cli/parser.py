@@ -89,7 +89,7 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
     _bind_leaf(worktree_sub.add_parser("list", help="List Git worktrees for this repo"), registry, "worktree_list")
     _bind_leaf(worktree_sub.add_parser("show", help="Show one Git worktree by id, path, or basename"), registry, "worktree_show")
     _bind_leaf(
-        worktree_sub.add_parser("remove", help="Remove a managed Git worktree without deleting its branch"),
+        worktree_sub.add_parser("remove", help="Remove a Git worktree without deleting its branch"),
         registry,
         "worktree_remove",
     )
