@@ -10069,8 +10069,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "deletion test",
                 "locality",
                 "leverage",
-                "Do not create, depend on, or imply",
-                "CONTEXT.md",
+                "small, testable, and easy to change",
+                "Do not edit canonical docs or expand the scope",
             ),
         }
 

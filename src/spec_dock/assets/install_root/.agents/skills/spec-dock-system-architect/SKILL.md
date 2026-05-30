@@ -24,7 +24,7 @@ If the active context is missing, stale, contradictory, or insufficient, return 
 
 ## Architecture Heuristics
 
-Use architecture heuristics only as source-grounded analysis lenses. Keep the source of truth in active docs, accepted ADRs, scope-local `discussions/` evidence, repository source, and tests. Do not create, depend on, or imply `CONTEXT.md` authority.
+Use architecture heuristics to keep designs small, testable, and easy to change within the active spec-dock scope.
 
 When reviewing boundaries, dependencies, or interface shape, check:
 
@@ -34,7 +34,7 @@ When reviewing boundaries, dependencies, or interface shape, check:
 - locality: prefer designs where related changes stay close to the owning module, doc, test, or workflow boundary
 - leverage: prefer changes whose boundary or abstraction reduces repeated coordination, duplicated policy, or future migration cost without expanding authority or scope
 
-Record these as evidence-backed observations, tradeoffs, risks, or ADR candidates for the orchestrator. They are not permission to edit canonical docs or introduce a new architecture source of record.
+Record these as evidence-backed observations, tradeoffs, risks, or ADR candidates for the orchestrator. Do not edit canonical docs or expand the scope.
 
 ## Operating Boundary
 
