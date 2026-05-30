@@ -104,24 +104,6 @@ def normalize_id_input(value: str, *, prefix: str, field: str) -> str:
     return format_id(prefix, num, local=is_local)
 
 
-def normalize_local_id_input(value: str, *, prefix: str, field: str) -> str:
-    """Normalize an id into the canonical local form: `<prefix>-local-NNNNN`."""
-    raw = value.strip()
-    if not raw:
-        raise RuntimeError(f"{field} is required")
-
-    raw = raw.lower()
-    if NUM_RE.fullmatch(raw):
-        return format_id(prefix, int(raw), local=True)
-
-    parsed_prefix, is_local, num = parse_id(raw)
-    if parsed_prefix != prefix:
-        raise RuntimeError(f"{field} must be '{prefix}-local-NNNN' or 'NNNN' when using --no-github: {value}")
-    if not is_local:
-        raise RuntimeError(f"{field} must be '{prefix}-local-NNNN' (not '{prefix}-NNNN') when using --no-github: {value}")
-    return format_id(prefix, num, local=True)
-
-
 def find_existing_id_by_num(nodes: dict[str, Any], *, prefix: str, num: int, local: bool) -> str | None:
     """Find an existing node id by `(prefix, num, local)` in `nodes`."""
     for node_id in nodes.keys():
@@ -208,4 +190,3 @@ def deps_node_sort_key(node_id: str) -> tuple[int, int, str]:
     """Deterministic sort key for dependency-related outputs."""
     _, is_local, num = parse_id(node_id)
     return (1 if is_local else 0, num, node_id)
-

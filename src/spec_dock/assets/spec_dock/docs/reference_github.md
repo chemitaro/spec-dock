@@ -35,7 +35,7 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
 - `new initiative` / `new epic` / `new issue`（デフォルト）は GitHub Issue を作ります（`gh issue create`）
   - `--create-github-issue` は同じ意味の explicit alias です
   - `initiative / epic / issue` では GitHub linkage が mandatory です
-  - `--no-github` は compatibility option として残っていますが、contract error で reject されます
+  - `--no-github` は node creation option ではありません。既存 Issue に紐づける場合は `--github-issue <n>` を使います
 - `close` は linked GitHub Issue をクローズします（`gh issue close`）
   - top-level command として `./spec-dock/scripts/spec-dock close <target>` / `--id <node-id>` / `--github-issue <n>` を受け付けます
   - close 対象は target node 自身の linked GitHub issue のみです
