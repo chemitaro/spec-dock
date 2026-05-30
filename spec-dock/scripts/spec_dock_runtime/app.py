@@ -62,7 +62,6 @@ from .ids import (
     _deps_node_sort_key,
     _find_existing_id_by_num,
     _format_id,
-    _normalize_local_id_input,
     _parse_id,
     _resolve_id_input,
     _resolve_input_title_and_slug,

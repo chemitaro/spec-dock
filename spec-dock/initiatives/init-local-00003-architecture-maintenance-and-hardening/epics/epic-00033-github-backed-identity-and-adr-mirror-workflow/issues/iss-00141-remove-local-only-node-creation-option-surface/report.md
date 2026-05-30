@@ -187,6 +187,7 @@ pass: no output
 | S01 | delegated worker did not return final summary before shutdown, but left S01 target changes in working tree | orchestration | parent inspected and completed S01 within approved target scope; Parent Implementation Exception recorded | tc-001..tc-007 | no | git diff and targeted tests |
 | S90 | initial reviewer pass failed because report lacked S90 closure traceability | spec-reviewer | added S90 gate/closure/test evidence rows and reran reviewer | tc-005..tc-007 | no | spec-reviewer `019e7853-b2f1-7543-9113-a6f9add9ea01` P1 |
 | S90 | stale user-facing docs and checked-in dogfooding wrappers still taught or executed node creation `--no-github` | code-reviewer | updated `docs/github-issue-integration.md`, removed README wrapper guidance, deleted stale checked-in dogfooding `new-epic` wrappers | tc-005..tc-007 | no | code-reviewer `019e7853-c806-7392-8ae4-60312d098e39` P1 |
+| S99 | residual local-id creation helper remained in `domain/ids.py` and legacy shim | final code-reviewer | removed provider/mirror `normalize_local_id_input`, removed legacy shim export/import, narrowed domain test to title/slug helper | tc-004 | no | code-reviewer `019e7862-9b80-70b3-9dd8-f294353cb7c5` P2; `python -m unittest tests.domain_runtime.test_runtime_domain_s01 tests.cli_runtime.test_new -v` -> pass |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
@@ -263,7 +264,7 @@ pass: no output
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed | S01 runtime provider/mirror, `tests/cli_runtime/test_new.py`, S01 report evidence | `323e6725eaa932c8ed2eec71a9f65cef4970875c` | `git status --short` -> clean before S90 changes | N/A | N/A | N/A | N/A |
-| S90 | ready to commit | S90 docs/scaffold/tests/report evidence | final ledger before commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S90 | committed | S90 docs/scaffold/tests/report evidence | `e11220a` | `git status --short` -> clean before S99 final fixes | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py` - node creation `--no-github` parser/args/handler removal
