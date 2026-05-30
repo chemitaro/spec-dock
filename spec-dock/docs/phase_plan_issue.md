@@ -29,9 +29,15 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / executio
 - `workflow_issue.md` が所有する `1 step = 1 observable behavior` invariant を behavior slice 設計へ落とす
 - `block` は optional concern group とし、単純な step では最小 wrapper 1 個でよい
 - `behavior slice` は 1 つの観測可能な振る舞いを実装・検証・レビューできる単位とする
+- Epic から Issue へ切る場合、各 Issue は `vertical behavior slice` として、利用者価値または運用上観測できる 1 つの振る舞いを thin end-to-end に閉じる。DB / API / UI / docs のような層別作業だけで切る `horizontal batching` は避け、層別作業が必要な場合も最初に薄い縦の完了点を置く
+- Issue の `dependency order` は、設計上の prerequisite、public contract、データ / runtime 互換性、review gate を根拠に upstream から downstream へ並べる。依存関係が循環する場合は、先に `vertical tracer bullet` を置いて interface と verification path を確かめてから後続 Issue に広げる
+- 複数 Issue にまたがる Epic では、各 vertical slice の後または依存境界の節目に `integration checkpoint` を置き、provider asset、dogfooding workspace、tests / manual evidence、docs impact のどれで統合状態を確認するかを plan または Epic plan に明記する
+- `HITL` / `AFK` は Issue slicing の annotation として、人間判断が必要な境界、または agent が自律実行しやすい範囲を示す。これは approval、reviewer pass、plan readiness、GitHub label readiness の代替ではない
 - 完成版 Issue plan には仕様固定クロージャ索引（`Spec-Locked Closure Index`）を置き、仕様由来の `spec link`、`locked expectation`、`observable input/state`、`bug class guarded`、`required`、`evidence level`、closure owner step を固定する
 - 仕様固定クロージャ索引（`Spec-Locked Closure Index`）は Issue 全体のテスト実装詳細ではなく、behavior slice / step が満たすべき仕様ロックと closure traceability を固定する coverage ledger とする
 - テスト十分性は raw count ではなく、AC / EC、changed contract、negative / error path、regression、invariant、manual / integration risk に基づく risk-calibrated obligation coverage で判断する
+- TDD step は private method や内部分解ではなく、`public interface / observable behavior` を固定する first test、または docs-only なら first inspection target から始める。実装は `one test -> minimal implementation` の小さな cycle で進め、最初の Green は `vertical tracer bullet` として end-to-end の観測点を通す
+- TDD plan は完全な test inventory ではなく、step-local concrete seeds と verification path を固定する。層ごとの作業をまとめてから最後に検証する `horizontal batching` に見える場合は、behavior slice、test obligation、integration checkpoint を分割し直す
 - public CLI behavior、shipped scaffold / runtime contract、template / system docs の互換性、installer / update / migration、filesystem / GitHub / active store、negative path、既存 regression、複数 Agent 並列実装の領域では、step-local obligation と planned verification evidence を厚くする
 - 低リスク docs-only / inspect-only step は code test を義務化しないが、inspection、structural assertion、manual evidence、docs diff などの代替 evidence path と rationale を step-local に固定する
 - required row の削除、`locked expectation` の変更、`required` の変更、`spec link` の意味変更は plan amendment と re-review を必須にする
@@ -83,9 +89,11 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / executio
 - `レビュー / QA ゲート方針` を置く
 - 仕様固定クロージャ索引（`Spec-Locked Closure Index`）を置く
 - `実装ステップ` を step / block / behavior slice で書く
+- Epic -> Issue slicing が必要な場合は、各 Issue の `vertical behavior slice`、`dependency order`、`integration checkpoint`、`HITL` / `AFK` annotation を plan 上で追跡できるようにする
 - 各 behavior slice の planned obligation、pre-implementation evidence、bounded implementation batch、verification evidence path、report evidence destination、amendment trigger を置く
 - 各 implementation step に `delegation contract` を置き、`workflow_issue.md` の execution policy を再定義せずに worker handoff へ必要な入力、許可範囲、禁止範囲、検証、reviewer focus、停止条件、出力を具体化する
 - 各 implementation step に `具体テストケース一覧` を置く。これは完全な test inventory ではなく、step-local obligation と concrete red / characterization / inspect / manual seeds を実装前に固定する欄である
+- `具体テストケース一覧` の first case は `public interface / observable behavior` を観測するものにし、必要なら `vertical tracer bullet` として最小の end-to-end Green を先に置く。private method 先行や `horizontal batching` だけの plan になっていないか確認する
 - `refactor / tidy` には `目的` と `guardrail` を置き、具体的な refactor 内容は `report.md` へ送る
 - 各 step gate に `step reviewer gate`、`commit gate`、`no-op gate`、`report update` を置き、reviewer は `workflow_issue.md` の mapping に従って選ぶ
 - `S90 docs 影響解決 / docs 更新（S90 docs impact resolution / docs refresh）` を必須で置く

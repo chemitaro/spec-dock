@@ -86,6 +86,9 @@ Sxx behavior slice
 ```
 
 - `test obligation` は raw test count ではなく、AC / EC、changed contract、negative / error path、regression、invariant、manual / integration risk に基づく risk-calibrated obligation coverage として書く。
+- TDD の first case は private method や内部構造ではなく、`public interface / observable behavior` を観測する。最初の Green は、必要最小限の `vertical tracer bullet` として interface、実装、verification path を薄く通し、その後に `one test -> minimal implementation` で広げる。
+- 具体テストケースは Issue 全体の test inventory ではなく step-local seeds として置く。DB / API / UI / docs などの層を先にまとめて作る `horizontal batching` に見える場合は、behavior slice、test obligation、verification evidence を縦に切り直す。
+- Epic -> Issue slicing を plan に落とす step では、各 Issue または step の `vertical behavior slice`、`dependency order`、`integration checkpoint`、`HITL` / `AFK` annotation を concrete field か本文で追跡できるようにする。`HITL` / `AFK` は補助 annotation であり、approval、reviewer pass、plan readiness の代替ではない。
 - `red or alternative evidence requirement` は `red-required`、`covered-existing`、`inspect-only`、`manual-required` のいずれかを使い、failing-first を完全要求できない場合も test sensitivity または代替 evidence path を固定する。
 - docs-only / template-only / skill-text-only step は code test を無理に作らず、inspection、structural assertion、manual evidence、docs diff、spec-review evidence を planned verification として書く。
 - `report evidence destination` は、実行結果を `report.md` のどの ledger に残すかを明示する。`plan.md` へ observed evidence を戻して正本を二重化しない。
