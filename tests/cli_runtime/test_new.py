@@ -1070,6 +1070,19 @@ class TestCliNew(CliRuntimeHarness):
             self.assertNotIn("--id", p_doc.stdout)
             self.assertNotIn("--seq", p_doc.stdout)
 
+    def test_new_node_help_does_not_expose_no_github(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            for kind in ("initiative", "epic", "issue"):
+                with self.subTest(kind=kind):
+                    p = self._run_runtime_capture(target, ["new", kind, "--help"])
+                    self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertIn("--create-github-issue", p.stdout)
+                    self.assertIn("--github-issue", p.stdout)
+                    self.assertNotIn("--no-github", p.stdout)
+
     def test_internal_issue_status_resolution_marks_cached_source(self) -> None:
         runtime_scripts_dir = (
             Path(__file__).resolve().parents[2]
@@ -1127,7 +1140,7 @@ class TestCliNew(CliRuntimeHarness):
             readmes = list(init_dir.rglob("README.md"))
             self.assertEqual(readmes, [])
 
-    def test_new_no_github_is_contract_error_and_does_not_invoke_gh(self) -> None:
+    def test_new_no_github_is_parser_error_and_does_not_invoke_gh(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
 
@@ -1154,25 +1167,28 @@ class TestCliNew(CliRuntimeHarness):
                 ["new", "initiative", "--no-github", "--title", "Auth platform"],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("'--no-github' is not supported for initiative", p.stderr)
+            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+            self.assertIn("unrecognized arguments: --no-github", p.stderr)
+            self.assertNotIn("'--no-github' is not supported", p.stderr)
+            self.assertNotIn("gh should not be invoked", p.stderr)
 
-    def test_new_no_github_is_rejected_for_initiative_epic_and_issue(self) -> None:
+    def test_new_no_github_is_parser_error_for_initiative_epic_and_issue(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
             self._create_same_repo_linked_hierarchy(target)
 
             cases = [
-                (["new", "initiative", "--no-github", "--title", "Another initiative"], "initiative"),
-                (["new", "epic", "--no-github", "--initiative", "1", "--title", "Another epic"], "epic"),
-                (["new", "issue", "--no-github", "--epic", "2", "--title", "Another issue"], "issue"),
+                ["new", "initiative", "--no-github", "--title", "Another initiative"],
+                ["new", "epic", "--no-github", "--initiative", "1", "--title", "Another epic"],
+                ["new", "issue", "--no-github", "--epic", "2", "--title", "Another issue"],
             ]
-            for argv, kind in cases:
-                with self.subTest(kind=kind):
+            for argv in cases:
+                with self.subTest(argv=argv):
                     p = self._run_runtime_capture(target, argv)
-                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-                    self.assertIn(f"'--no-github' is not supported for {kind}", p.stderr)
+                    self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+                    self.assertIn("unrecognized arguments: --no-github", p.stderr)
+                    self.assertNotIn("'--no-github' is not supported", p.stderr)
 
     def test_new_rejects_invalid_title_before_gh_issue_create(self) -> None:
         if os.name == "nt":
@@ -1364,7 +1380,8 @@ class TestCliNew(CliRuntimeHarness):
                 ],
             )
             self.assertEqual(p2.returncode, 2, p2.stdout + p2.stderr)
-            self.assertIn("not allowed with argument", p2.stderr)
+            self.assertIn("unrecognized arguments: --no-github", p2.stderr)
+            self.assertNotIn("not allowed with argument", p2.stderr)
 
             p3 = self._run_runtime_capture(
                 target,
@@ -1379,7 +1396,8 @@ class TestCliNew(CliRuntimeHarness):
                 ],
             )
             self.assertEqual(p3.returncode, 2, p3.stdout + p3.stderr)
-            self.assertIn("not allowed with argument", p3.stderr)
+            self.assertIn("unrecognized arguments: --no-github", p3.stderr)
+            self.assertNotIn("not allowed with argument", p3.stderr)
 
             p4 = self._run_runtime_capture(
                 target,
@@ -1396,7 +1414,8 @@ class TestCliNew(CliRuntimeHarness):
                 ],
             )
             self.assertEqual(p4.returncode, 2, p4.stdout + p4.stderr)
-            self.assertIn("not allowed with argument", p4.stderr)
+            self.assertIn("unrecognized arguments: --no-github", p4.stderr)
+            self.assertNotIn("not allowed with argument", p4.stderr)
 
             p5 = self._run_runtime_capture(
                 target,
@@ -1429,7 +1448,8 @@ class TestCliNew(CliRuntimeHarness):
                 ],
             )
             self.assertEqual(p6.returncode, 2, p6.stdout + p6.stderr)
-            self.assertIn("not allowed with argument", p6.stderr)
+            self.assertIn("unrecognized arguments: --no-github", p6.stderr)
+            self.assertNotIn("not allowed with argument", p6.stderr)
 
     def test_new_issue_create_github_issue_flag_alias_is_accepted(self) -> None:
         if os.name == "nt":

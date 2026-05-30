@@ -14,7 +14,6 @@ from typing import cast
 from ..domain.ids import (
     find_existing_id_by_num,
     format_id,
-    normalize_local_id_input,
     parse_id,
     resolve_id_input,
     resolve_input_title_and_slug,
@@ -471,29 +470,12 @@ def _prefix_for_kind(kind: Literal["initiative", "epic", "issue"]) -> str:
 
 def _resolve_github_mode(
     req: CreateNodeRequest, kind: Literal["initiative", "epic", "issue"]
-) -> Literal["create", "link_existing", "local_only"]:
+) -> Literal["create", "link_existing"]:
     if req.github_mode is None:
         return "create"
-    if req.github_mode not in ("create", "link_existing", "local_only"):
+    if req.github_mode not in ("create", "link_existing"):
         raise RuntimeError(f"Unsupported github mode: {req.github_mode}")
-    if req.github_mode == "local_only":
-        raise RuntimeError(f"GitHub linkage is mandatory for {kind}; local_only is not supported.")
     return req.github_mode
-
-
-def _next_id(graph: SpecGraph, prefix: str, *, local: bool) -> str:
-    max_num = 0
-    for node_id in graph.nodes_by_id:
-        try:
-            parsed_prefix, is_local, num = parse_id(str(node_id))
-        except RuntimeError:
-            continue
-        if parsed_prefix != prefix:
-            continue
-        if is_local != local:
-            continue
-        max_num = max(max_num, num)
-    return format_id(prefix, max_num + 1, local=local)
 
 
 def resolve_parent_for_create(
@@ -863,26 +845,18 @@ def plan_node_creation(
     prefix = _prefix_for_kind(kind)
     requested_repo_slug = _resolve_requested_repo_slug(req, current_repo_slug=current_repo_slug)
 
-    if mode in ("create", "link_existing"):
-        if req.requested_node_id is not None:
-            raise RuntimeError("Cannot combine '--id' with GitHub-backed node creation.")
-        if req.github_issue_number is None:
-            raise RuntimeError("github_issue_number is required for github mode")
-        node_id = format_id(prefix, int(req.github_issue_number), local=False)
-        guard_github_issue_uniqueness(
-            graph,
-            int(req.github_issue_number),
-            github_repo_owner=req.github_repo_owner,
-            github_repo_name=req.github_repo_name,
-            current_repo_slug=current_repo_slug,
-        )
-    else:
-        if req.github_issue_number is not None:
-            raise RuntimeError("Cannot combine '--no-github' with '--github-issue'.")
-        if req.requested_node_id is None:
-            node_id = _next_id(graph, prefix, local=True)
-        else:
-            node_id = normalize_local_id_input(str(req.requested_node_id), prefix=prefix, field="id")
+    if req.requested_node_id is not None:
+        raise RuntimeError("Cannot combine '--id' with GitHub-backed node creation.")
+    if req.github_issue_number is None:
+        raise RuntimeError("github_issue_number is required for github mode")
+    node_id = format_id(prefix, int(req.github_issue_number), local=False)
+    guard_github_issue_uniqueness(
+        graph,
+        int(req.github_issue_number),
+        github_repo_owner=req.github_repo_owner,
+        github_repo_name=req.github_repo_name,
+        current_repo_slug=current_repo_slug,
+    )
 
     parsed_prefix, is_local, num = parse_id(node_id)
     existing_id = find_existing_id_by_num(graph.nodes_by_id, prefix=parsed_prefix, num=num, local=is_local)
@@ -1304,11 +1278,8 @@ def _validate_pre_github_create_inputs(
     req: CreateNodeRequest,
     *,
     kind: Literal["initiative", "epic", "issue"],
-    mode: Literal["create", "link_existing", "local_only"],
+    mode: Literal["create", "link_existing"],
 ) -> None:
-    if mode not in ("create", "link_existing"):
-        return
-
     if req.requested_node_id is not None:
         raise RuntimeError("Cannot combine '--id' with GitHub-backed node creation.")
 
