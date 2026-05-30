@@ -39,10 +39,6 @@ def _normalize_id_input(value: str, *, prefix: str, field: str) -> str:
     return _domain_ids.normalize_id_input(value, prefix=prefix, field=field)
 
 
-def _normalize_local_id_input(value: str, *, prefix: str, field: str) -> str:
-    return _domain_ids.normalize_local_id_input(value, prefix=prefix, field=field)
-
-
 def _find_existing_id_by_num(nodes: dict[str, Any], *, prefix: str, num: int, local: bool) -> str | None:
     return _domain_ids.find_existing_id_by_num(nodes, prefix=prefix, num=num, local=local)
 
