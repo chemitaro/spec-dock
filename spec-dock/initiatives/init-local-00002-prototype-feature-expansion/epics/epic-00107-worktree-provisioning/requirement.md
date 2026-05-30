@@ -21,7 +21,7 @@ ID: "epic-00107"
   - 作成先は main checkout の中ではなく、`SPEC_DOCK_WORKTREE_ROOT` で指定した central root 配下の `<repo-basename>/` namespace へ集約できる。
   - worktree directory name / initial branch name は、既に実用している `taikyohiyou_project` の naming UX を踏襲して自動合成できる。
   - worktree 作成後に、project-local bootstrap interface として worktree root の `make init` を optional / non-fatal に呼び出せる。
-  - central root namespace 配下の linked worktree を agent が JSON で列挙・詳細確認・削除できる。
+  - agent が同一 repository の linked worktree を JSON で列挙・詳細確認・削除でき、central root namespace 配下かどうかを diagnostic として判別できる。
   - Codex app が管理する短命 worktree とは別に、開発者が自分で管理する長命 worktree を作る導線を提供する。
 
 ## ユースケース
@@ -74,14 +74,14 @@ ID: "epic-00107"
   - provider-side source of truth は `src/spec_dock/assets/spec_dock/...` とし、dogfooding workspace `spec-dock/...` は検証・反映対象として扱うこと。
   - command 追加は既存 layered runtime architecture に沿い、monolithic shell script への逆戻りを避けること。
 - E-RQ-011:
-  - SpecDock は repo-local runtime command として `worktree list` / `worktree show` / `worktree remove` を提供し、agent が central root namespace 配下の linked worktree を安定して把握・選択・削除できること。
-  - `list` / `show` / `remove` は `SPEC_DOCK_WORKTREE_ROOT` を必須とし、missing / invalid root では fail-fast すること。
-  - `list` / `show` は Git が認識する linked worktree を扱い、central root namespace 配下を managed、それ以外を unmanaged として分類できること。
-  - `remove` は managed worktree だけを対象とし、main checkout、current checkout、unmanaged worktree は `--force` でも削除しないこと。
+  - SpecDock は repo-local runtime command として `worktree list` / `worktree show` / `worktree remove` を提供し、agent が同一 repository の Git linked worktree を安定して把握・選択・削除できること。
+  - `worktree create` は引き続き `SPEC_DOCK_WORKTREE_ROOT` を必須とするが、`list` / `show` / `remove` は Git worktree records を正本とし、`SPEC_DOCK_WORKTREE_ROOT` 未設定でも動作すること。
+  - `list` / `show` は Git が認識する linked worktree を扱い、valid `SPEC_DOCK_WORKTREE_ROOT` がある場合は central root namespace 配下を managed、それ以外を unmanaged として分類できること。root がない場合は classification unavailable を diagnostic として表すこと。
+  - `remove` は同一 repository の linked worktree を対象とし、main checkout、current checkout、bare worktree、stale record は `--force` でも削除しないこと。unmanaged は remove blocker ではなく diagnostic として扱うこと。
   - `remove` は関連 local branch を削除しないこと。
 - E-RQ-012:
   - `worktree list` / `worktree show` / `worktree remove` は agent-first interface として `--json` を提供すること。
-  - JSON は stable target id、path、branch、managed/current/main 判定、remove 可否 diagnostic、operation result を machine-readable に表すこと。
+  - JSON は stable target id、path、branch、managed/current/main 判定、classification availability / origin diagnostic、remove 可否 diagnostic、operation result を machine-readable に表すこと。
   - stale record repair、orphan directory cleanup、`worktree prune` は diagnostic / future extension に留め、この epic の削除 command では実行しないこと。
 
 ## Epic 受け入れ条件
@@ -217,19 +217,19 @@ ID: "epic-00107"
     - final spec review
 - E-AC-012:
   - 前提:
-    - `SPEC_DOCK_WORKTREE_ROOT` が valid absolute directory を指す
     - Git repo に main checkout、managed linked worktree、unmanaged linked worktree がある
   - 操作:
     - agent が `spec-dock worktree list --json` と `spec-dock worktree show <target> --json` を実行する
   - 期待結果:
-    - JSON から stable id、path、branch、managed/current/main 判定、remove 可否 diagnostic を判定できる
-    - managed worktree と unmanaged worktree が区別できる
+    - JSON から stable id、path、branch、managed/current/main 判定、classification availability / origin diagnostic、remove 可否 diagnostic を判定できる
+    - valid `SPEC_DOCK_WORKTREE_ROOT` がある場合は managed worktree と unmanaged worktree が区別できる
+    - `SPEC_DOCK_WORKTREE_ROOT` が未設定でも list / show は Git worktree records に基づいて動作し、classification unavailable を diagnostic として返す
   - 観測点:
     - CLI / runtime test
     - JSON payload assertion
 - E-AC-013:
   - 前提:
-    - target は central root namespace 配下の managed linked worktree である
+    - target は同一 repository の linked worktree であり、main checkout、current checkout、bare worktree、stale record ではない
     - target directory に Git 管理外 cache / generated files がある
   - 操作:
     - agent が `spec-dock worktree remove <target>` を実行する
@@ -237,7 +237,7 @@ ID: "epic-00107"
     - Git worktree record が削除される
     - target の個別 worktree directory は Git 管理外 file / cache を含めて残らない
     - 関連 local branch は削除されない
-    - main checkout、current checkout、unmanaged worktree は `--force` でも削除されない
+    - main checkout、current checkout、bare worktree、stale record は `--force` でも削除されない
   - 観測点:
     - CLI / runtime test
     - `git worktree list --porcelain`
