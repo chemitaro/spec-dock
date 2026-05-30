@@ -43,7 +43,7 @@
 
 重要なフィールド（概念）:
 
-- `id`: `init-00123`（GitHub #123）/ `init-local-00001`（`--no-github`）のような小文字 ID
+- `id`: `init-00123`（GitHub #123）/ `init-local-00001`（grandfathered legacy local ID）のような小文字 ID
 - `type`: `initiative | epic | issue`
 - `parent_id`: 親ノード（epic→initiative / issue→epic）
 - `initiative_id`, `epic_id`: issue が所属する上位（集計に使用）
@@ -126,7 +126,7 @@ FS --> Script: nodes{id->node}
 alt --github specified
   Script -> GH: gh issue list --state all --limit N --json ...
   GH --> Script: issues[number->state/labels/...]
-else local-only
+else cache/local
   note right of Script: no network / no gh call\nstatus=unknown
 end
 

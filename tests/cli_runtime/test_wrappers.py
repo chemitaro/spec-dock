@@ -135,7 +135,7 @@ class TestCliRulesContract(CliRuntimeHarness):
 
             self.assertIn("`spec-dock/docs/rules/**`", reference_github)
             self.assertIn(
-                "`--no-github` は compatibility option として残っていますが、contract error で reject されます",
+                "`--no-github` は node creation option ではありません",
                 reference_github,
             )
             self.assertIn("`--create-github-issue`", reference_github)
