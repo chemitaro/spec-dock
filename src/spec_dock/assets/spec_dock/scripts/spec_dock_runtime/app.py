@@ -14,8 +14,8 @@ It performs day-to-day operations without requiring `uvx` at runtime:
 
 Design goals:
 - Keep dependencies minimal (stdlib only).
-- Use local-only by default for `new initiative`/`new epic`.
-- Keep GitHub-default behavior for `new issue` (opt out with `--no-github`).
+- Use GitHub-backed creation for `new initiative`/`new epic`/`new issue`.
+- Link existing GitHub issues with `--github-issue` when needed.
 - `sync` reads GitHub issue state by default; use `sync --no-github` only for cache/local opt-out.
 """
 from __future__ import annotations

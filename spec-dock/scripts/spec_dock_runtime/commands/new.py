@@ -33,7 +33,6 @@ class NewInitiativeArgs(CommandArgs):
     node_id: str | None
     create_github_issue: bool
     github_issue_number: int | None
-    no_github: bool
 
 
 @dataclass(frozen=True)
@@ -44,7 +43,6 @@ class NewEpicArgs(CommandArgs):
     node_id: str | None
     create_github_issue: bool
     github_issue_number: int | None
-    no_github: bool
 
 
 @dataclass(frozen=True)
@@ -55,7 +53,6 @@ class NewIssueArgs(CommandArgs):
     node_id: str | None
     create_github_issue: bool
     github_issue_number: int | None
-    no_github: bool
 
 
 @dataclass(frozen=True)
@@ -107,11 +104,6 @@ def _add_new_initiative_arguments(parser: argparse.ArgumentParser) -> None:
         type=int,
         help="Existing GitHub issue number to link (id becomes init-NNNN)",
     )
-    github_group.add_argument(
-        "--no-github",
-        action="store_true",
-        help="Rejected contract: local-only initiative creation is no longer supported",
-    )
 
 
 def _add_new_epic_arguments(parser: argparse.ArgumentParser) -> None:
@@ -134,11 +126,6 @@ def _add_new_epic_arguments(parser: argparse.ArgumentParser) -> None:
         type=int,
         help="Existing GitHub issue number to link (id becomes epic-NNNN)",
     )
-    github_group.add_argument(
-        "--no-github",
-        action="store_true",
-        help="Rejected contract: local-only epic creation is no longer supported",
-    )
 
 
 def _add_new_issue_arguments(parser: argparse.ArgumentParser) -> None:
@@ -160,11 +147,6 @@ def _add_new_issue_arguments(parser: argparse.ArgumentParser) -> None:
         "--github-issue",
         type=int,
         help="Existing GitHub issue number to link (id becomes iss-NNNN)",
-    )
-    github_group.add_argument(
-        "--no-github",
-        action="store_true",
-        help="Rejected contract: local-only issue creation is no longer supported",
     )
 
 
@@ -193,7 +175,6 @@ def _new_initiative_args(ns: argparse.Namespace) -> CommandArgs:
         node_id=getattr(ns, "id", None),
         create_github_issue=bool(getattr(ns, "create_github_issue", False)),
         github_issue_number=getattr(ns, "github_issue", None),
-        no_github=bool(getattr(ns, "no_github", False)),
     )
 
 
@@ -205,7 +186,6 @@ def _new_epic_args(ns: argparse.Namespace) -> CommandArgs:
         node_id=getattr(ns, "id", None),
         create_github_issue=bool(getattr(ns, "create_github_issue", False)),
         github_issue_number=getattr(ns, "github_issue", None),
-        no_github=bool(getattr(ns, "no_github", False)),
     )
 
 
@@ -217,7 +197,6 @@ def _new_issue_args(ns: argparse.Namespace) -> CommandArgs:
         node_id=getattr(ns, "id", None),
         create_github_issue=bool(getattr(ns, "create_github_issue", False)),
         github_issue_number=getattr(ns, "github_issue", None),
-        no_github=bool(getattr(ns, "no_github", False)),
     )
 
 
@@ -247,9 +226,6 @@ def _new_doc_args(ns: argparse.Namespace) -> CommandArgs:
 
 def _run_new_initiative(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     typed = _expect_new_initiative_args(args)
-    if typed.no_github:
-        return _github_mandatory_error("initiative")
-    use_github = True
 
     result = use_cases.create_initiative(
         CreateNodeRequest(
@@ -262,7 +238,7 @@ def _run_new_initiative(args: CommandArgs, use_cases: UseCases) -> CommandOutcom
         )
     )
     text = render_new_node_text(result)
-    if use_github and typed.github_issue_number is None:
+    if typed.github_issue_number is None:
         text = _prepend_stderr(
             text,
             "spec-dock: (info) creating GitHub issue via gh",
@@ -272,9 +248,6 @@ def _run_new_initiative(args: CommandArgs, use_cases: UseCases) -> CommandOutcom
 
 def _run_new_epic(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     typed = _expect_new_epic_args(args)
-    if typed.no_github:
-        return _github_mandatory_error("epic")
-    use_github = True
 
     result = use_cases.create_epic(
         CreateNodeRequest(
@@ -287,7 +260,7 @@ def _run_new_epic(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
         )
     )
     text = render_new_node_text(result)
-    if use_github and typed.github_issue_number is None:
+    if typed.github_issue_number is None:
         text = _prepend_stderr(
             text,
             "spec-dock: (info) creating GitHub issue via gh",
@@ -297,8 +270,6 @@ def _run_new_epic(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
 
 def _run_new_issue(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     typed = _expect_new_issue_args(args)
-    if typed.no_github:
-        return _github_mandatory_error("issue")
 
     result = use_cases.create_issue(
         CreateNodeRequest(
@@ -343,19 +314,6 @@ def _prepend_stderr(text: CliText, line: str) -> CliText:
 
 def _post_sync_exit_code(result: CreateNodeResult) -> int:
     return 1 if result.post_sync is not None and result.post_sync.failed else 0
-
-
-def _command_error(message: str) -> CommandOutcome:
-    return CommandOutcome(
-        exit_code=1,
-        text=CliText(stdout_lines=[], stderr_lines=[f"error: {message}"], warnings=[]),
-    )
-
-
-def _github_mandatory_error(kind: Literal["initiative", "epic", "issue"]) -> CommandOutcome:
-    return _command_error(
-        f"'--no-github' is not supported for {kind}; GitHub linkage is mandatory."
-    )
 
 
 def _expect_new_initiative_args(args: CommandArgs) -> NewInitiativeArgs:
