@@ -264,7 +264,9 @@ pass: no output
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed | S01 runtime provider/mirror, `tests/cli_runtime/test_new.py`, S01 report evidence | `323e6725eaa932c8ed2eec71a9f65cef4970875c` | `git status --short` -> clean before S90 changes | N/A | N/A | N/A | N/A |
-| S90 | committed | S90 docs/scaffold/tests/report evidence | `e11220a` | `git status --short` -> clean before S99 final fixes | N/A | N/A | N/A | N/A |
+| S90 | committed | S90 docs/scaffold/tests/report evidence | `e11220a129b2940a4e13061b92a4e9dd55949ba5` | `git status --short` -> clean before S99 final fixes | N/A | N/A | N/A | N/A |
+| S99 | committed | residual local-id helper cleanup | `fb4fcdae4bebc0406bce9b78174fe43241355728` | `git status --short` -> clean after helper cleanup, before final report ledger update | N/A | N/A | N/A | N/A |
+| S99-final-report | pending commit | final reviewer/verification ledger update | final ledger before commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py` - node creation `--no-github` parser/args/handler removal
@@ -308,22 +310,22 @@ pass: no output
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer `019e7862-7823-7081-ba23-9269ee76ac30` | whole issue obligation coverage | already sufficient | `python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_wrappers -v` -> 49 OK; `python -m unittest tests.test_init_update -v` -> 177 OK; `./spec-dock/scripts/spec-dock validate` -> pass; `git diff --check` -> pass; focused post-P2 `tests.domain_runtime.test_runtime_domain_s01 tests.cli_runtime.test_new` -> 52 OK | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer `019e7862-9b80-70b3-9dd8-f294353cb7c5` / re-review `019e7868-d4fc-7881-b3e8-ddaad8fae4e2` | issue-wide integrated diff | P1: S90 commit evidence stale -> fixed in report; P2: residual local-id helper -> fixed in `fb4fcdae4bebc0406bce9b78174fe43241355728`; re-review found no remaining blockers | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer `019e7862-c1ba-7481-9168-f4e034f9706f` / re-review `019e786c-8c99-7fd1-8462-1fe4115ff440` | requirement / design / plan / report / implementation / tests / docs alignment | P1: S90 commit evidence stale and S99 final gate placeholders -> fixed in report; final code-reviewer P2 also fixed in `fb4fcdae4bebc0406bce9b78174fe43241355728`; re-review found no remaining blockers | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S01/S90/S99 commits and final reviewer/verification ledger recorded; final report-only commit pending | final report ledger update only | PR body and final response | ready to commit |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
@@ -336,4 +338,4 @@ pass: no output
 - ...
 
 ## 省略/例外メモ (必須)
-- 該当なし
+- delegated dev-coder / doc-writer が final output を返さなかったため、S01 / S90 は Parent Implementation Exception として記録した。
