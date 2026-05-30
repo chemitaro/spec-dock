@@ -22,6 +22,20 @@ Read the current active context first:
 
 If the active context is missing, stale, contradictory, or insufficient, return a blocker to the main orchestrator. Do not ask the user directly.
 
+## Architecture Heuristics
+
+Use architecture heuristics only as source-grounded analysis lenses. Keep the source of truth in active docs, accepted ADRs, scope-local `discussions/` evidence, repository source, and tests. Do not create, depend on, or imply `CONTEXT.md` authority.
+
+When reviewing boundaries, dependencies, or interface shape, check:
+
+- deep module: prefer boundaries where a small, stable interface hides meaningful internal complexity, and call out shallow wrappers that add coupling without leverage
+- interface as test surface: treat the public contract, observable behavior, CLI/API shape, or persisted artifact as the primary test surface instead of private implementation details
+- deletion test: ask what can be removed if the module, adapter, workflow, or dependency goes away, and use unclear deletion paths as evidence of hidden coupling
+- locality: prefer designs where related changes stay close to the owning module, doc, test, or workflow boundary
+- leverage: prefer changes whose boundary or abstraction reduces repeated coordination, duplicated policy, or future migration cost without expanding authority or scope
+
+Record these as evidence-backed observations, tradeoffs, risks, or ADR candidates for the orchestrator. They are not permission to edit canonical docs or introduce a new architecture source of record.
+
 ## Operating Boundary
 
 You may:
