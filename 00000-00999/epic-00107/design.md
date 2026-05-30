@@ -177,9 +177,9 @@ presentation --> application : result dataclasses only
   - success:
     - exit code `0`
     - text output は id、path、branch、managed、removable summary を表示する
-    - JSON output は `worktrees[]` に stable id、path、basename、branch、managed/main/current/path_exists/record_exists/removable/remove_blockers を含める
+    - JSON output は `worktrees[]` に stable id、path、basename、branch、managed/main/current/path_exists/record_exists/removable/remove_blockers と classification availability / origin diagnostic を含める
   - fatal error:
-    - missing / invalid `SPEC_DOCK_WORKTREE_ROOT` は Git listing 前に fail-fast する
+    - Git worktree list failure は fatal error とする。missing / invalid `SPEC_DOCK_WORKTREE_ROOT` は `list` / `show` / `remove` の availability blocker にせず、classification diagnostic として表す
 - CLI-003:
   - command:
     - `spec-dock worktree show <target> [--json]`
@@ -194,14 +194,15 @@ presentation --> application : result dataclasses only
   - command:
     - `spec-dock worktree remove <target> [--force] [--json]`
   - safety:
-    - managed worktree のみ許可する
-    - main checkout、current checkout、unmanaged worktree は `--force` でも拒否する
+    - 同一 repository の linked worktree を対象にする
+    - main checkout、current checkout、bare worktree、stale record は `--force` でも拒否する
+    - unmanaged worktree は remove blocker ではなく classification diagnostic として扱う
     - branch は削除しない
   - remove execution:
     - 通常は Git `worktree remove <path>` を実行する
     - `--force` 指定時は Git force removal に対応するが、locked worktree などで必要になる具体的な Git flag depth は adapter 内部詳細とする
     - Git が dirty / locked / untracked file などを理由に拒否した場合は、Git の拒否理由を surfaced error とし、filesystem cleanup を実行しない
-    - Git remove 成功後に target directory が残る場合は、cache / generated files を含めて directory cleanup を行う
+    - Git remove 成功後に resolved target path が残る場合は target-only cleanup を行う。directory は tree を削除し、symlink / broken symlink / regular file は target 自体を unlink し、parent/root/namespace は削除しない
   - JSON:
     - operation status、resolved target、removed_record、removed_directory、branch_deleted=false を返す
 
@@ -227,6 +228,9 @@ presentation --> application : result dataclasses only
   - `branch: str | None`
   - `head: str | None`
   - `managed: bool`
+  - `managed_classification_available: bool`
+  - `classification_reason: str`
+  - `origin: str`
   - `main: bool`
   - `current: bool`
   - `path_exists: bool`
@@ -269,13 +273,13 @@ presentation --> application : result dataclasses only
   - Git creates a new branch.
   - Files are checked out into `$SPEC_DOCK_WORKTREE_ROOT/<repo-basename>/<repo-basename>-<id>`.
   - Optional `make init` may create project-specific untracked files, but SpecDock does not define those files.
-  - Worktree remove may delete the target worktree directory after Git remove succeeds; it must not delete the namespace parent directory.
+  - Worktree remove may delete the target worktree directory after Git remove succeeds; it must not delete the target parent directory, central root, or namespace directory.
 - 不変条件:
   - SpecDock must not create nested worktrees inside the main checkout.
   - SpecDock must not copy secret-bearing env files.
   - SpecDock must not mutate active selection.
   - SpecDock must not delete branches as a side effect of worktree removal.
-  - SpecDock must not remove unmanaged, main, or current worktrees, even with `--force`.
+  - SpecDock must not remove main, current, bare, or stale worktrees, even with `--force`.
 
 ### UML（data model）
 - N/A:
@@ -430,8 +434,10 @@ endif
 - 失敗モード:
   - invalid label:
     - before Git mutation; exit `1`.
-  - missing / invalid `SPEC_DOCK_WORKTREE_ROOT`:
+  - missing / invalid `SPEC_DOCK_WORKTREE_ROOT` for `worktree create`:
     - before Git mutation; exit `1`; output names the variable, path/cause when available, and an absolute-path setup example.
+  - missing / invalid `SPEC_DOCK_WORKTREE_ROOT` for `worktree list` / `show` / `remove`:
+    - command continues from Git worktree records and marks managed classification unavailable through JSON/text diagnostics.
   - Git repo 外 / detached HEAD:
     - before Git mutation; exit `1`.
   - no candidate after retry ceiling:
@@ -521,7 +527,7 @@ endif
   - E-AC-010 -> detached/outside repo tests.
   - E-AC-011 -> provider/dogfooding parity and docs/help checks.
   - E-AC-012 -> list/show JSON inventory/detail tests with managed and unmanaged worktrees.
-  - E-AC-013 -> managed remove runtime tests for Git record deletion, individual directory cleanup, branch retention, and main/current/unmanaged refusal.
+  - E-AC-013 -> all-linked-worktree remove runtime tests for Git record deletion, individual directory cleanup, branch retention, and main/current/bare/stale refusal.
 
 ## 関連 ADR
 - ADR なし。
