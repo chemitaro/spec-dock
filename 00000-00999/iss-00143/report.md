@@ -784,8 +784,8 @@ git diff --check
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
 | S99 | 統合赤相当（Red / integration regression） | フル suite で provider / dogfooding parity と cutover snapshot 退行を検出する。 | Initial full run failed 2 tests: dogfooding runtime mirror mismatch and checked-in dogfooding `.meta.json` snapshot drift. | `python -m unittest discover -v` | fail observed and fixed | Failures were not behavioral regressions in worktree runtime; they exposed required dogfooding sync/snapshot updates after main merge and provider changes. |
-| S99 | final reviewer 赤相当（Red / reviewer finding） | final reviewers が destructive remove path と closure ledger を点検する。 | QA reviewer `019e79c9-fc6c-79b0-8d21-c8e643b4fac4` failed: AC ledger mapping mismatch and protected cleanup path test weakness. Spec reviewer `019e79ca-6092-7192-8662-24ed720e1760` failed: final Git refresh did not re-resolve target/hard blockers. Code reviewer `019e79ca-4d91-7112-98ec-b7dadbcf43c6` failed after follow-up: broken symlink path existence coverage. | qa-reviewer; code-reviewer; spec-reviewer | fail observed and follow-up applied | Closure mapping corrected; protected cleanup tests added; final refresh re-resolution added; broken symlink `lstat()` existence path and test confirmed. |
-| S99 | 緑フェーズ（Green） | focused parity/snapshot tests、worktree tests、validate、diff check、full suite が通る。 | Focused tests OK; worktree module 46 tests OK locally and 47 tests OK by code-reviewer; broken symlink focused test OK; `spec-dock validate` nodes=73; `git diff --check` pass; full suite 986 tests OK after follow-up. | focused unittest; `python -m unittest tests.cli_runtime.test_worktree -v`; mirror/snapshot focused tests; `./spec-dock/scripts/spec-dock validate`; `git diff --check`; `python -m unittest discover -v` | pass | QA/code/spec final re-reviews passed. |
+| S99 | final reviewer 赤相当（Red / reviewer finding） | final reviewers が destructive remove path と closure ledger を点検する。 | QA reviewer `019e79c9-fc6c-79b0-8d21-c8e643b4fac4` failed: AC ledger mapping mismatch and protected cleanup path test weakness. Spec reviewer `019e79ca-6092-7192-8662-24ed720e1760` failed: final Git refresh did not re-resolve target/hard blockers. Code reviewer `019e79ca-4d91-7112-98ec-b7dadbcf43c6` failed after follow-up: broken symlink path existence coverage. PR Codex Review found P1 protected cleanup ancestor removal risk. | qa-reviewer; code-reviewer; spec-reviewer; Codex PR review | fail observed and follow-up applied | Closure mapping corrected; protected cleanup tests added; final refresh re-resolution added; broken symlink `lstat()` existence path and test confirmed; target containing managed root/namespace now blocks before Git remove. |
+| S99 | 緑フェーズ（Green） | focused parity/snapshot tests、worktree tests、validate、diff check、full suite が通る。 | Focused tests OK; worktree module 47 tests OK after PR Codex P1 follow-up; mirror parity focused test OK; broken symlink focused test OK; `spec-dock validate` nodes=73; `git diff --check` pass; full suite 986 tests OK before PR Codex P1 follow-up. | focused unittest; `python -m unittest tests.cli_runtime.test_worktree -v`; mirror/snapshot focused tests; `./spec-dock/scripts/spec-dock validate`; `git diff --check`; `python -m unittest discover -v` | pass | QA/code/spec final re-reviews passed; PR CI is the post-push full integration gate for the final P1 follow-up. |
 | S99 | リファクタリング（Refactor） | final reviewer findings の範囲に限定する。 | `worktree_remove` final refresh rebuilds inventory, re-resolves target, re-checks non-bypassable blockers, protects central root / namespace cleanup targets, and uses lstat-style path existence for broken symlink records; report closure mapping corrected. | diff inspection | pass | Dogfooding runtime mirror synced from provider runtime. |
 
 #### クロージャ網羅（Closure Coverage）
@@ -814,7 +814,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S99 | ready for commit | integrated issue diff | pending | pending | N/A | N/A | N/A | N/A |
+| S99 | committed | integrated issue diff | `9ebe10855132d545e3c7b298bddb6e0264588388` | clean before PR follow-up | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `tests/test_init_update.py` - checked-in dogfooding snapshot parity update
@@ -824,10 +824,92 @@ git diff --check
 - `tests/cli_runtime/test_worktree.py` - final refresh and protected cleanup path regression tests
 
 #### コミット
-- pending
+- `9ebe10855132d545e3c7b298bddb6e0264588388`
 
 #### メモ
 - Ledger Note: S99 full suite pass observed after final reviewer follow-up fixes.
+
+---
+
+### セッションログ（2026-05-31 S99 PR review follow-up）
+
+#### 対象
+- Step: S99
+- AC/EC: AC-007
+- 計画上の出典（Planned source）:
+  - `plan.md` section: 最終 QA / Review / Commit / PR ステップ S99
+
+#### 実施内容
+- PR #146 作成後の GitHub Codex review で、external worktree が `SPEC_DOCK_WORKTREE_ROOT` または namespace の祖先パスである場合、`git worktree remove --force` により protected cleanup path を内包して削除し得る P1 指摘を確認した。
+- `_guard_remove_containment` を、削除対象が protected cleanup path と一致する場合だけでなく、protected cleanup path を内包する祖先パスの場合も `protected_cleanup_path` として停止するよう修正した。
+- provider runtime を source of truth とし、dogfooding runtime mirror を同期した。
+- `tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_external_paths_are_not_blocked_by_managed_namespace_containment` に nested managed root 祖先 worktree の回帰ケースを追加した。
+
+#### 実行コマンド / 結果
+```bash
+./.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh --repo chemitaro/spec-dock --pr 146 --out /private/tmp/spec-dock-pr146-codex-review
+
+inline review comments: 1
+P1: Block removal when it contains the managed root
+
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_external_paths_are_not_blocked_by_managed_namespace_containment -v
+
+Ran 1 test in 0.033s
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets -v
+
+Ran 1 test in 0.007s
+OK
+
+python -m unittest tests.cli_runtime.test_worktree -v
+
+Ran 47 tests in 18.889s
+OK
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=73
+
+git diff --check
+
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S99 | PR review 赤相当（Red / PR review finding） | destructive remove path の PR review 指摘を blocking として扱う。 | Codex review inline #3329061709: external worktree が managed root / namespace を内包する祖先の場合に protected path を削除し得る。 | Codex review fetch report | fail observed and fixed | GitHub review feedback is treated as post-PR S99 review evidence. |
+| S99 | 緑フェーズ（Green） | ancestor target を `protected_cleanup_path` で Git remove 前に停止する。 | focused regression test passed; worktree module passed; dogfooding mirror parity passed; validate and diff check passed. | focused unittest; `python -m unittest tests.cli_runtime.test_worktree -v`; mirror focused test; `./spec-dock/scripts/spec-dock validate`; `git diff --check` | pass | Broadened existing protected cleanup path test. |
+| S99 | リファクタリング（Refactor） | P1 指摘の範囲に限定する。 | `_guard_remove_containment` now blocks targets that contain central root / namespace protected paths. | diff inspection | pass | Dogfooding runtime mirror synced from provider runtime. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-009 | S04-S99 | protected cleanup path ancestor regression test; worktree module test run | pass | External worktree paths that contain managed root / namespace are rejected before Git remove. |
+| tc-012 | S99 | PR review fetch + focused regression test; mirror focused test; validate; diff check | pass | PR review P1 addressed before merge-prepared judgment. |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S99 | PR Codex review | chatgpt-codex-connector | fresh | failed then fixed locally | no | push follow-up and re-monitor PR | Inline P1 #3329061709 fixed by ancestor protected cleanup path guard. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S99 PR follow-up | committed | bounded PR review fix | current follow-up commit on PR head | clean after amend | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py` - protected cleanup path ancestor guard
+- `spec-dock/scripts/spec_dock_runtime/application/worktree.py` - dogfooding runtime mirror sync
+- `tests/cli_runtime/test_worktree.py` - protected cleanup path ancestor regression
+- `spec-dock/active/issue/report.md` - PR review follow-up evidence ledger
+
+#### コミット
+- current follow-up commit on PR head
+
+#### メモ
+- Ledger Note: PR review P1 follow-up is bounded to remove containment safety and does not change external worktree support scope.
 
 ---
 
@@ -856,7 +938,7 @@ git diff --check
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| S99 evidence recorded; QA/code/spec pass | integrated issue diff for `iss-00143` plus reviewer follow-ups | final response + PR | ready for commit |
+| S99 evidence recorded; QA/code/spec pass; PR review P1 follow-up recorded | integrated issue diff for `iss-00143` plus reviewer follow-ups | final response + PR #146 | committed and pending PR re-monitor |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: local `main` 取り込み後の current tree と、checked-in dogfooding snapshot / runtime mirror が一時的にずれ、初回 full suite で parity / snapshot failure が出た。
