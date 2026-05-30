@@ -176,7 +176,7 @@ class FilesystemGateway(Protocol):
     def path_exists(self, path: Path) -> bool:
         ...
 
-    def remove_tree(self, path: Path) -> None:
+    def remove_target(self, path: Path) -> None:
         ...
 
 
