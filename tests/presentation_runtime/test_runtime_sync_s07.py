@@ -3418,10 +3418,8 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 epic_id="epic-local-00001",
                 title="Automatic sync",
                 slug=None,
-                node_id=None,
                 create_github_issue=False,
                 github_issue_number=93,
-                no_github=False,
             ),
             _UseCases(),
         )

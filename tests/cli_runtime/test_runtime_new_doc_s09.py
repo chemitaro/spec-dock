@@ -903,7 +903,6 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                     title="Refresh token",
                     slug=None,
                     parent_id="epic-local-00001",
-                    requested_node_id=None,
                     github_mode="create",
                     github_issue_number=None,
                 ),
