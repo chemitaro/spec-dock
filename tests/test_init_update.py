@@ -1048,6 +1048,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00103-agentic-tdd-report-decision-ledger/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00105-pr-creation-and-merge-ready-monitoring-skill/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00134-matt-pocock-grill-skill-review-patterns/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00142-matt-pocock-skill-adoption-analysis/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json",
@@ -1146,6 +1147,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00103-agentic-tdd-report-decision-ledger/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00105-pr-creation-and-merge-ready-monitoring-skill/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00134-matt-pocock-grill-skill-review-patterns/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00142-matt-pocock-skill-adoption-analysis/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json": [],
@@ -10021,6 +10023,81 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "proposed decision",
             ),
         }
+        for label, fragments in expected_fragments.items():
+            text = texts[label]
+            for fragment in fragments:
+                with self.subTest(asset=label, fragment=fragment):
+                    self.assertIn(fragment, text)
+
+    def test_issue_142_matt_pocock_phase_discipline_contract_assets(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            spec_dock_assets = assets_dir / "spec_dock"
+            install_root = assets_dir / "install_root"
+            asset_paths = {
+                "phase issue plan docs": spec_dock_assets / "docs" / "phase_plan_issue.md",
+                "issue plan authoring docs": spec_dock_assets / "docs" / "authoring" / "issue-plan.md",
+                "workflow issue docs": spec_dock_assets / "docs" / "workflow_issue.md",
+                "issue execution skill": install_root
+                / ".agents"
+                / "skills"
+                / "spec-dock-issue-execution"
+                / "SKILL.md",
+                "system architect skill": install_root
+                / ".agents"
+                / "skills"
+                / "spec-dock-system-architect"
+                / "SKILL.md",
+            }
+            texts = {label: path.read_text(encoding="utf-8") for label, path in asset_paths.items()}
+
+        expected_fragments = {
+            "phase issue plan docs": (
+                "vertical behavior slice",
+                "dependency order",
+                "integration checkpoint",
+                "HITL",
+                "AFK",
+                "public interface / observable behavior",
+                "vertical tracer bullet",
+                "horizontal batching",
+            ),
+            "issue plan authoring docs": (
+                "vertical behavior slice",
+                "dependency order",
+                "integration checkpoint",
+                "HITL",
+                "AFK",
+                "public interface / observable behavior",
+                "vertical tracer bullet",
+                "horizontal batching",
+            ),
+            "workflow issue docs": (
+                "feedback loop",
+                "reproduction",
+                "hypotheses",
+                "instrumentation cleanup",
+                "regression evidence",
+                "`report.md`",
+            ),
+            "issue execution skill": (
+                "feedback loop",
+                "public interface / observable behavior",
+                "approved",
+                "`plan.md`",
+            ),
+            "system architect skill": (
+                "deep module",
+                "interface as test surface",
+                "deletion test",
+                "locality",
+                "leverage",
+                "Do not create, depend on, or imply",
+                "CONTEXT.md",
+            ),
+        }
+
         for label, fragments in expected_fragments.items():
             text = texts[label]
             for fragment in fragments:
