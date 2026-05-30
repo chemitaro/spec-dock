@@ -325,17 +325,17 @@ pass: no output
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| S01/S90/S99 commits and final reviewer/verification ledger recorded; final report-only commit pending | final report ledger update only | PR body and final response | ready to commit |
+| S01/S90/S99 commits and final reviewer/verification ledger recorded; final report-only commit completed in `c2b84a1f3c549bd31f4b0fe33d2bf9e370cd7f2d` | final report ledger update only | PR body and final response | committed |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: PR #144 作成後の provider CI で、`NewInitiativeArgs` / `NewIssueArgs` の direct construction テストに削除済み `no_github` 引数が残っていた。
+  - 解決: `tests/cli_runtime/test_runtime_new_s08.py` と `tests/presentation_runtime/test_runtime_sync_s07.py` から stale `no_github=False` を削除し、focused 2 tests、`python -m unittest discover -v`、`./spec-dock/scripts/spec-dock validate`、`git diff --check` が pass することを確認した。
 
 ## 学んだこと (任意)
-- ...
+- Runtime command surface から option を削除する場合、parser/handler だけでなく command args を直接組み立てる smoke / post-sync guidance 系テストも contract 対象として確認する必要がある。
 
 ## 今後の推奨事項 (任意)
-- ...
+- CI 失敗時は PR monitor のログを local full test と突き合わせ、修正後に provider CI と同じ `python -m unittest discover -v` をローカルで通してから再 push する。
 
 ## 省略/例外メモ (必須)
 - delegated dev-coder / doc-writer が final output を返さなかったため、S01 / S90 は Parent Implementation Exception として記録した。

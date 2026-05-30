@@ -3421,7 +3421,6 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 node_id=None,
                 create_github_issue=False,
                 github_issue_number=93,
-                no_github=False,
             ),
             _UseCases(),
         )
