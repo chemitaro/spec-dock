@@ -177,16 +177,22 @@ pass: no output
 | S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required for help absence and parser-level unsupported option; inspect-only for internal plumbing | tests updated to assert parser-level unsupported option and help absence; source inspection target fixed | test update and targeted source inspection | pass | Exact pre-change red run was not preserved because the delegated worker produced the first patch before returning; existing pre-change behavior was captured in requirement/design and prior tests expected dedicated contract errors. |
 | S01 | 緑フェーズ（Green） | `python -m unittest tests.cli_runtime.test_new -v` | 43 tests passed | command | pass | Runtime behavior tests cover help absence, parser-level unsupported option, no fake gh invocation, and mutual-exclusion regression. |
 | S01 | リファクタリング（Refactor） | guardrail satisfied / orphan cleanup only | removed orphan `no_github`, `_github_mandatory_error`, `_next_id`, local-only mode branch; no non-scope command option removed | diff inspection / targeted `rg` | pass | Remaining `--no-github` hits are state/cache hints or tests. |
+| S90 | 赤フェーズ / 代替証跡（Red / alternative） | wrapper/init tests and targeted docs search expose stale wording before docs change | `tests.cli_runtime.test_wrappers` assertion updated; reviewer search found extra stale top-level docs and checked-in wrappers | affected tests plus reviewer-guided targeted `rg` | pass | Exact pre-change docs red was represented by existing expected string and reviewer findings. |
+| S90 | 緑フェーズ（Green） | wrapper/init tests and docs classification pass | `tests.cli_runtime.test_wrappers` passed; `tests.test_init_update` full suite passed; targeted search/validate/diff-check passed | command | pass | One mistyped nonexistent unittest target failed and is not counted as product regression. |
+| S90 | リファクタリング（Refactor） | stale wording cleanup only | root README scope-local wrapper guidance removed; stale top-level GitHub integration/sync docs updated; checked-in stale dogfooding wrappers deleted; provider/dogfooding docs kept aligned | diff inspection / targeted `rg` | pass | State/cache `--no-github` docs/tests preserved. |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
 | S01 | delegated worker did not return final summary before shutdown, but left S01 target changes in working tree | orchestration | parent inspected and completed S01 within approved target scope; Parent Implementation Exception recorded | tc-001..tc-007 | no | git diff and targeted tests |
+| S90 | initial reviewer pass failed because report lacked S90 closure traceability | spec-reviewer | added S90 gate/closure/test evidence rows and reran reviewer | tc-005..tc-007 | no | spec-reviewer `019e7853-b2f1-7543-9113-a6f9add9ea01` P1 |
+| S90 | stale user-facing docs and checked-in dogfooding wrappers still taught or executed node creation `--no-github` | code-reviewer | updated `docs/github-issue-integration.md`, removed README wrapper guidance, deleted stale checked-in dogfooding `new-epic` wrappers | tc-005..tc-007 | no | code-reviewer `019e7853-c806-7392-8ae4-60312d098e39` P1 |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
 | S01 | tc-001, tc-002, tc-003, tc-004, tc-007 | public parser/help tests pass; internal cleanup inspection pass; provider/mirror runtime target files aligned; code-reviewer fresh pass | tests pass; inspection pass; fresh code-reviewer pass | pass | code-reviewer `019e7846-ea5e-7250-b101-91ab72483acf` returned `review_status: pass`. |
+| S90 | tc-005, tc-006, tc-007 | affected docs/tests pass; targeted search classifies remaining `--no-github` / local-only / compatibility wording; provider and dogfooding docs aligned; fresh reviewers pass | wrapper tests pass; full init/update tests pass; stale docs/wrappers fixed after reviewer findings; fresh spec/code reviewer reruns passed | pass | spec-reviewer `019e785d-cb70-76b3-8f01-78d87b34570f` and code-reviewer `019e785e-22a5-7243-917f-88292e9548ba` returned `review_status: pass`. |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -196,6 +202,9 @@ pass: no output
 | tc-003 | S01 | yes | red-required | prior tests expected mutually exclusive error | `python -m unittest tests.cli_runtime.test_new -v` | pass | parser-level `unrecognized arguments: --no-github` |
 | tc-004 | S01 | yes | inspect-only | known source hits in `commands/new.py`, `contracts.py`, `create_node.py` | targeted `rg` across S01 target files | pass | no node creation runtime `no_github` / `local_only` plumbing remains |
 | tc-007 | S01 | yes | inspect-only | provider and mirror previously diverged during partial patch | provider/mirror files copied after provider patch; targeted `rg` hit classification | pass | runtime provider/mirror share same removal contract |
+| tc-005 | S90 | yes | inspect-only / regression | valid state/cache `--no-github` contexts must remain | `python -m unittest tests.cli_runtime.test_wrappers -v`; targeted docs/search classification | pass | state/cache contexts intentionally preserved in docs/tests. |
+| tc-006 | S90 | yes | inspect-only / docs regression | stale docs/tests expected node creation `--no-github` compatibility wording | targeted `rg`; `tests.cli_runtime.test_wrappers` | pass | reviewer-found stale `docs/github-issue-integration.md` and checked-in wrappers fixed. |
+| tc-007 | S90 | yes | inspect-only / scaffold parity | provider/dogfooding docs and checked-in dogfooding metadata must align | `python -m unittest tests.test_init_update -v` | pass | provider/dogfooding docs parity and dogfooding metadata snapshot passed after S90 fixes. |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -207,6 +216,9 @@ pass: no output
 | tc-003 | S01 | `python -m unittest tests.cli_runtime.test_new -v` | pass | no mutually exclusive error for `--create-github-issue --no-github` |
 | tc-004 | S01 | targeted `rg` across S01 target files | pass | no `no_github` or `local_only` node creation runtime plumbing |
 | tc-007 | S01 | provider/mirror file sync and targeted `rg` | pass | S90 still owns docs parity |
+| tc-005 | S90 | wrapper tests and targeted docs/search classification | pass | preserve sync/deps/active cache/local `--no-github` semantics |
+| tc-006 | S90 | targeted docs/search classification and reviewer-guided stale-doc cleanup | pass | no node creation compatibility option / dedicated rejection docs outside accepted historical issue records |
+| tc-007 | S90 | provider/dogfooding docs parity tests and full init/update run | pass | includes checked-in dogfooding metadata snapshot and stale wrapper deletion |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -226,26 +238,32 @@ pass: no output
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated, then parent implementation exception | runtime / CLI / shipped scaffold mirror / tests | dev-coder | S01 allowed paths | `plan.md` S01 | S01 runtime provider/mirror and `tests/cli_runtime/test_new.py` | S90 docs, state/cache `--no-github`, migration, GitHub redesign | `python -m unittest tests.cli_runtime.test_new -v`; targeted `rg`; `validate`; `diff --check` | requirement/design conflict, allowed path expansion, parser-level unsupported option impossible | worker summary, changed files, verification, risks, Ledger Note | worker unavailable before final output; parent integrated observed S01 diff and recorded exception |
+| S90 | delegated, then parent implementation exception | shipped docs / README / dogfooding docs / scaffold expectations | doc-writer | S90 allowed paths plus reviewer-found stale docs/wrappers | `plan.md` S90 | S90 docs/tests/scaffold evidence only | runtime code, state/cache `--no-github` semantics, workflow redesign | `python -m unittest tests.cli_runtime.test_wrappers -v`; `python -m unittest tests.test_init_update -v`; targeted `rg`; `validate`; `diff --check` | stale node creation local-only guidance remains, state/cache option removal required, allowed path expansion | worker summary, changed files, docs/search classification, tests, risks, Ledger Note | worker did not produce final output; parent completed bounded docs/scaffold refresh and responded to reviewer findings |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
 | S01 | dev-coder | worker was started for S01 but did not return final output before shutdown; partial working-tree changes were present | S01 target runtime files and `tests/cli_runtime/test_new.py` | not reported by worker | unavailable | no worker-provided Ledger Note | accepted after parent inspection, mirror sync, tests, and pending code-reviewer gate |
+| S90 | doc-writer | worker was started for S90 but did not return final output before shutdown; no usable final summary was produced | none reported by worker | not reported by worker | unavailable | no worker-provided Ledger Note | accepted only after parent implementation, targeted tests/search, and fresh reviewer reruns |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | delegated worker did not provide final output after progress check and was shut down; parent had enough observed S01 diff to complete bounded integration | user requested issue execution with named worker/reviewer workflow; no extra risk waiver beyond executing approved S01 scope | S01 allowed paths from `plan.md` only | inspect, complete mirror sync, run tests, update report | revert S01 commit or restore files from previous commit if reviewer fails | `python -m unittest tests.cli_runtime.test_new -v` -> pass; targeted `rg` -> pass; `validate` -> pass; `git diff --check` -> pass | code-reviewer `019e7846e...` -> pass | unavailable handled as parent implementation exception, not as reviewer pass |
+| S90 | delegated worker did not provide final output; parent had to address docs/scaffold refresh and reviewer findings directly within S90 scope | user requested issue execution with named worker/reviewer workflow; no extra risk waiver beyond approved S90 scope | S90 allowed paths from `plan.md`, plus stale top-level `docs/github-issue-integration.md` and checked-in dogfooding legacy wrappers discovered by review as user-facing stale node creation surfaces | update stale docs, remove stale dogfooding wrappers, run affected tests/search, update report | revert S90 commit or restore deleted wrappers/docs if reviewer fails | `python -m unittest tests.cli_runtime.test_wrappers -v` -> pass; `python -m unittest tests.test_init_update -v` -> pass; targeted `rg` -> pass; `validate` -> pass; `diff --check` -> pass | pending fresh reviewer reruns | unavailable handled as parent implementation exception, not as reviewer pass |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | S01 | step reviewer | code-reviewer | fresh | passed | no | proceed to S01 commit gate | code-reviewer `019e7846-ea5e-7250-b101-91ab72483acf`; no findings |
+| S90 | step reviewer | spec-reviewer | fresh | passed | no | proceed to S90 commit gate | spec-reviewer `019e785d-cb70-76b3-8f01-78d87b34570f`; no findings |
+| S90 | step reviewer | code-reviewer | fresh | passed | no | proceed to S90 commit gate | code-reviewer `019e785e-22a5-7243-917f-88292e9548ba`; no findings |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed pending hash | S01 runtime provider/mirror, `tests/cli_runtime/test_new.py`, S01 report evidence | final ledger before commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S01 | committed | S01 runtime provider/mirror, `tests/cli_runtime/test_new.py`, S01 report evidence | `323e6725eaa932c8ed2eec71a9f65cef4970875c` | `git status --short` -> clean before S90 changes | N/A | N/A | N/A | N/A |
+| S90 | ready to commit | S90 docs/scaffold/tests/report evidence | final ledger before commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py` - node creation `--no-github` parser/args/handler removal
@@ -254,9 +272,14 @@ pass: no output
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - stale node creation wording update
 - `spec-dock/scripts/spec_dock_runtime/...` - provider runtime mirror sync
 - `tests/cli_runtime/test_new.py` - parser-level unsupported option and help absence expectations
+- `README.md`, `docs/github-issue-integration.md`, `docs/sync-aggregation.md` - user-facing stale node creation local-only guidance removal
+- `src/spec_dock/assets/spec_dock/docs/...`, `src/spec_dock/assets/spec_dock/scripts/README.md` - shipped docs guidance update
+- `spec-dock/docs/...`, `spec-dock/scripts/README.md` - dogfooding docs mirror update
+- `spec-dock/initiatives/.../epics/new-epic` - stale checked-in dogfooding wrappers deleted
+- `tests/cli_runtime/test_wrappers.py`, `tests/test_init_update.py` - docs/scaffold expectation update and checked-in dogfooding metadata snapshot update
 
 #### コミット
-- pending S01 code-reviewer pass
+- S01 committed as `323e6725eaa932c8ed2eec71a9f65cef4970875c`
 
 #### メモ
 - No material implementation decisions beyond the approved plan.
@@ -279,7 +302,7 @@ pass: no output
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / README / workflow / skill / migration notes | yes | doc-writer delegated, then parent implementation exception | root README, top-level docs, provider docs, dogfooding docs, scripts README, stale checked-in wrappers, wrapper/scaffold tests updated; `python -m unittest tests.cli_runtime.test_wrappers -v` -> pass; `python -m unittest tests.test_init_update -v` -> pass; targeted `rg` classified remaining `--no-github` hits as state/cache, explicit unsupported-option guidance, absence assertions, obsolete-fixture tests, or historical issue records; `./spec-dock/scripts/spec-dock validate` -> pass; `git diff --check` -> pass | pass: spec-reviewer `019e785d-cb70-76b3-8f01-78d87b34570f` |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
