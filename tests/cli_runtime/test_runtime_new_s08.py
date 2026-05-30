@@ -3367,7 +3367,6 @@ class TestRuntimeNewS08(unittest.TestCase):
                 node_id=None,
                 create_github_issue=False,
                 github_issue_number=None,
-                no_github=False,
             ),
             use_cases,
         )
