@@ -28,16 +28,12 @@ def _runtime_modules():
 
 
 class TestRuntimeDomainS01(unittest.TestCase):
-    def test_domain_ids_title_local_id_helpers(self) -> None:
+    def test_domain_ids_title_helpers(self) -> None:
         _, _, domain_ids, _, _, _ = _runtime_modules()
 
         title, slug = domain_ids.resolve_input_title_and_slug("Add Refresh Token", None)
         self.assertEqual(title, "Add Refresh Token")
         self.assertEqual(slug, "add-refresh-token")
-        self.assertEqual(
-            domain_ids.normalize_local_id_input("42", prefix="iss", field="id"),
-            "iss-local-00042",
-        )
 
     def test_domain_ids_parse_format_helpers(self) -> None:
         _, _, domain_ids, _, _, _ = _runtime_modules()

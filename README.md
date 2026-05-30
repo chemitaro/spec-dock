@@ -96,11 +96,7 @@ After `init`, day-to-day operations are done via the runtime script installed in
 # Or: link to an existing GitHub issue number (without creating a new one)
 ./spec-dock/scripts/spec-dock new issue --epic epic-00124 --title "Add refresh token" --github-issue 123  # id=iss-00123
 
-# Note: `--no-github` remains only as a compatibility flag and is rejected for node create/import paths.
-
-# Scope-local wrappers created in generated nodes (single title arg)
-<initiative-dir>/epics/new-epic "JWT auth"
-<epic-dir>/issues/new-issue "Add refresh token"
+# Node creation does not accept `--no-github`; use `--github-issue <n>` to link an existing issue.
 
 # ADRs are created via runtime command (no scope-local ADR wrapper)
 ./spec-dock/scripts/spec-dock new doc adr --issue iss-00123 --title "Token rotation strategy"
@@ -169,7 +165,7 @@ See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + 
   - `templates/` (initiative/epic/issue/adr templates)
   - `scripts/` (runtime scripts; local operations)
   - `initiatives/` (spec tree root; always-on)
-    - generated nodes include wrappers (`epics/new-epic`, `issues/new-issue`) and `discussions/` (`rules.md`)
+    - generated nodes include `discussions/` (`rules.md`) and do not include scope-local node creation wrappers
   - `active/` (generated pointers; gitignored)
   - `.agent/` (generated agent state; gitignored)
   - `.gitignore` (ignores `active/` and `.agent/` (and legacy `.work/`))
