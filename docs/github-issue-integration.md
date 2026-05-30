@@ -106,26 +106,21 @@ spec-dock が行うのは次の 1 点だけです:
 
 ---
 
-## 3) 例外（`--no-github`）と ID 衝突回避
-
-GitHub を使わない場合は `--no-github` を明示します。
+## 3) 新規作成しない場合（既存 Issue へのリンク）
 
 ```bash
-./spec-dock/scripts/spec-dock new issue --no-github --epic 1 --title "..."
+./spec-dock/scripts/spec-dock new issue --epic 1 --title "..." --github-issue 123
 ```
 
 このモードでは:
-- `gh` は一切呼びません（GitHub が無い/オフライン/権限無しでも動く）
-- ID は衝突回避のため `*-local-*` 名前空間になります
-  - `iss-local-00001` / `epic-local-00001` / `init-local-00001`
-- ローカル連番は `spec-dock/initiatives/**/meta.json` を走査し、
-  - 同じ prefix（iss/epic/init）の
-  - `*-local-*` の最大値 + 1
-  を採番します
+- GitHub Issue は新規作成しません
+- current repo の既存 GitHub Issue 番号を node ID として使います
+  - `--github-issue 123` -> `iss-00123`
+- `--no-github` は `initiative / epic / issue` の node creation option ではありません
 
 理由:
-- GitHub の Issue 番号（`iss-00123`）とローカル連番（`iss-00001`）が混ざると、後から GitHub と連携したときに **番号衝突**が起こり得るため
-- `*-local-*` なら GitHub 番号と構文上明確に区別でき、衝突しません
+- node creation の identity は GitHub Issue 番号へ統一します
+- ローカル専用 ID を作らないことで、後から GitHub linkage へ移すための rename / migration 経路を持たずに済みます
 
 ---
 
@@ -171,7 +166,7 @@ deactivate Script
 @enduml
 ```
 
-### 4.2 `new issue --no-github`（ローカル）シーケンス
+### 4.2 `new issue --github-issue <n>`（既存 Issue リンク）シーケンス
 
 ```plantuml
 @startuml
@@ -182,7 +177,7 @@ actor User
 participant "spec-dock runtime\n(spec-dock/scripts/spec-dock)" as Script
 participant "Local FS\n(spec-dock/initiatives/**)" as FS
 
-User -> Script: new issue --no-github --epic <id> --title <title>
+User -> Script: new issue --epic <id> --title <title> --github-issue <n>
 activate Script
 
 Script -> FS: scan meta.json\n(_scan_nodes)
@@ -191,11 +186,11 @@ FS --> Script: nodes{id->node}
 Script -> Script: resolve epic id\n(_resolve_id_input)
 Script -> Script: validate epic exists
 
-Script -> Script: next local id\n(_next_id(prefix=iss, local=true))
-Script -> Script: id = iss-local-00001
+Script -> Script: validate/link current-repo issue number
+Script -> Script: id = iss-<n>
 
 Script -> FS: copy templates -> dest\n(_copy_template_tree)
-Script -> FS: write meta.json\n(_write_meta, no github)
+Script -> FS: write meta.json\n(_write_meta, github.issue_number)
 
 deactivate Script
 @enduml
@@ -253,7 +248,7 @@ GH --> API : create/list issues
 - エラー: `'gh' CLI not found...`
 - 対処:
   - GitHub CLI をインストールする
-  - もしくは `--no-github` を付ける
+  - GitHub Issue を新規作成しない場合は、既存 current-repo Issue を `--github-issue <n>` で指定する
 
 ### 6.2 GitHub リポジトリとして解決できない / 認証できない
 
@@ -266,7 +261,7 @@ GH --> API : create/list issues
 
 対処:
 - GitHub リポジトリを正しく設定した上で再実行
-- もしくは `--no-github` でローカル運用に切り替える
+- GitHub Issue を新規作成しない場合は、既存 current-repo Issue を `--github-issue <n>` で指定する
 
 ---
 
@@ -275,5 +270,5 @@ GH --> API : create/list issues
 要望次第で、次の拡張が自然です:
 
 - `new ... --repo owner/repo` を追加し、`gh --repo ... issue create` で明示指定できるようにする
-- `link` コマンドを追加し、`iss-local-00001` を後から `iss-00123` に連携（または GitHub issue number を meta.json に追記）できるようにする
-  - ただし ID/ディレクトリ名の変更が入るので、履歴/リンク/active の扱いは設計が必要
+- `link` コマンドを追加し、既存 node と GitHub Issue の整合を再確認できるようにする
+  - ただし ID/ディレクトリ名の変更を伴う再リンクは、履歴/リンク/active の扱いを別途設計する必要があります
