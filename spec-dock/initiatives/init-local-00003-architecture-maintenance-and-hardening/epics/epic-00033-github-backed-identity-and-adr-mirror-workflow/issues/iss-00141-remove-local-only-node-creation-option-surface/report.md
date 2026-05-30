@@ -3,7 +3,7 @@
 ID: "iss-00141"
 タイトル: "Remove Local Only Node Creation Option Surface"
 関連GitHub: ["#141"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-05-30"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -49,7 +49,7 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | user | node creation `--no-github` を parser-level removal にするか、dedicated contract error として残すかが未確定だった | Option A parser-level removal; Option B hidden dedicated reject; Option C current compatibility option | Option A を採用し、入力 option と内部 `no_github` / `local_only` plumbing を削除 scope に含める | ユーザー回答で Option A が明示され、accepted ADR の GitHub mandatory linkage と整合するため | applied | `discussions/20260530t081243z-interview-node-creation-no-github-surface-policy.md`; `requirement.md` | なし |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -61,9 +61,12 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 - Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
 - Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
 
-| 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
-|---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| ID | adoption_status | source | source_role | claim | target_artifact | target_section | rationale | evidence_strength | evidence_path | adopter | reviewer | blocking | next_action |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| EAL-001 | adopted | research | main-orchestrator | source-grounded read identified node creation `--no-github` runtime / docs / tests / internal contract surface | `requirement.md` | 背景・現状 / スコープ / 受け入れ条件 | 調査結果が親 Epic / ADR / runtime / tests / docs と整合し、requirement の As-Is と scope 固定に必要だったため | strong | `discussions/20260530t081132z-research-local-only-node-creation-option-surface-research.md` | main-orchestrator | spec-reviewer pass on 2026-05-30 | no | design phase |
+| EAL-002 | adopted | interview | user | Option A parser-level removal and internal logic cleanup are required | `requirement.md` | スコープ / 境界 / 前提 / 受け入れ条件 / 例外・エッジケース | ユーザー回答で `--no-github` の扱いと内部ロジック整理 scope が確定したため | strong | `discussions/20260530t081243z-interview-node-creation-no-github-surface-policy.md` | main-orchestrator | spec-reviewer pass on 2026-05-30 | no | design phase |
+| EAL-003 | adopted | system-architect | read-only consultation sub-agent | design recommendations for parser-level removal, `github_mode` narrowing, local-only planning branch cleanup, docs/tests strategy, and `app.py` stale wording classification | `design.md` | 既存実装 / 採用方針 / 依存関係分析 / インターフェース契約 / テスト戦略 / ファイル変更計画 | requirement pass 後の read-only consultation として採用した。scope-local discussion draft は作成しておらず、Delegated Draft Evidence ではなくこの EAL entry と sub-agent final response を consultation provenance とする | strong | sub-agent `019e7803-ecbb-7480-a6f9-4cc68c23a983` final response; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`; `spec-dock/scripts/spec_dock_runtime/app.py` | main-orchestrator | spec-reviewer pass on 2026-05-30 | no | plan phase |
+| EAL-004 | adopted | implementation-planner | read-only consultation sub-agent | plan recommendations for S01 runtime contract cleanup, S90 docs/scaffold refresh, S99 final quality gate, closure index, delegation contracts, and verification commands | `plan.md` | 依存関係から導く実装順序 / ステップ一覧 / 仕様固定クロージャ索引 / 実装ステップ / 最終完了条件 | approved requirement/design 後の read-only consultation として採用した。scope-local discussion draft は作成しておらず、Delegated Draft Evidence ではなくこの EAL entry と sub-agent final response を consultation provenance とする | strong | sub-agent `019e7810-1181-7403-a603-79bfe2d55d2d` final response | main-orchestrator | spec-reviewer pass on 2026-05-30 | no | execution handoff |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +74,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | `requirement.md` は node creation `--no-github` option surface と internal local-only plumbing removal を主要目的にしている | `sync` / `deps` / `active` の cache/local `--no-github` は保護対象として non-scope 化した | low | pass on 2026-05-30 |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,13 +82,15 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | active issue docs, parent initiative/epic docs, accepted ADR, issue scratch, research artifact, interview artifact, `commands/new.py`, `application/create_node.py`, `application/contracts.py`, `tests/cli_runtime/test_new.py`, `tests/cli_runtime/test_wrappers.py`, provider docs | answered: Option A parser-level removal and internal logic cleanup adopted in `20260530t081243z-interview` | adopted into `requirement.md`; reviewer P2 finding about EAL field completeness fixed in report | passed by fresh spec-reviewer on 2026-05-30 | no | promote to design |
+| design | approved `requirement.md`, system-architect read-only consultation, target runtime files including `app.py`, target tests, provider/dogfooding docs, accepted ADR | none | adopted into `design.md`; design reviewer P1 app.py boundary finding fixed; P2 provenance finding fixed by classifying EAL-003 as non-draft consultation | passed by fresh spec-reviewer on 2026-05-30 | no | promote to plan |
+| plan | approved `requirement.md`, approved `design.md`, implementation-planner read-only consultation, issue plan authoring docs, issue workflow docs | none | adopted into `plan.md`; implementation-planner consultation classified as non-draft consultation in EAL-004; reviewer P3 provenance wording finding fixed in Delegated Draft Evidence section | passed by fresh spec-reviewer on 2026-05-30 | no | ready for execution handoff |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
-  - used / not used
+  - not used
 - 未使用の場合:
-  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
+  - `system-architect` と `implementation-planner` は read-only consultation として使用した。scope-local discussion draft は作成していないため、委任ドラフト昇格証跡としては扱わず、EAL-003 / EAL-004 に consultation provenance と採用判断を記録する。
 - lifecycle state（契約値）:
   - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
 - 昇格不可 state:
