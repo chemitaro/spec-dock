@@ -326,7 +326,7 @@ class TestCliNew(CliRuntimeHarness):
                     self.assertEqual(before_artifacts, self._read_create_auto_sync_artifacts(target))
                     self.assertEqual(log_path.read_text(encoding="utf-8"), "")
 
-    def test_new_rejects_duplicate_id_with_flag(self) -> None:
+    def test_new_node_id_option_is_parser_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -347,8 +347,8 @@ class TestCliNew(CliRuntimeHarness):
                     "4",
                 ],
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Cannot combine '--id' with GitHub-backed node creation.", p.stderr)
+            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+            self.assertIn("unrecognized arguments: --id iss-00003", p.stderr)
 
     def test_new_rejects_duplicate_id_width_agnostic(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1070,7 +1070,7 @@ class TestCliNew(CliRuntimeHarness):
             self.assertNotIn("--id", p_doc.stdout)
             self.assertNotIn("--seq", p_doc.stdout)
 
-    def test_new_node_help_does_not_expose_no_github(self) -> None:
+    def test_new_node_help_does_not_expose_local_creation_options(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -1082,6 +1082,7 @@ class TestCliNew(CliRuntimeHarness):
                     self.assertIn("--create-github-issue", p.stdout)
                     self.assertIn("--github-issue", p.stdout)
                     self.assertNotIn("--no-github", p.stdout)
+                    self.assertNotIn("--id", p.stdout)
 
     def test_internal_issue_status_resolution_marks_cached_source(self) -> None:
         runtime_scripts_dir = (

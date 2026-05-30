@@ -132,7 +132,6 @@ def build_linked_create_request(
         title=req.title,
         slug=req.slug,
         parent_id=parent_id,
-        requested_node_id=None,
         github_mode="link_existing",
         github_issue_number=int(req.issue_number),
         github_repo_owner=github_repo_owner,

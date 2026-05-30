@@ -198,7 +198,6 @@ class CreateNodeRequest:
     title: str
     slug: str | None
     parent_id: str | None
-    requested_node_id: str | None
     github_mode: Literal["create", "link_existing"] | None
     github_issue_number: int | None
     github_repo_owner: str | None = None
