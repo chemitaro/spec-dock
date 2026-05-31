@@ -60,6 +60,8 @@ _MANAGED_OBSOLETE_EXACT_PATH_PREFIXES = (
     ".github/agents/",
     ".github/workflows/",
 )
+_UNINSTALL_CLEANUP_BOUNDARY_ROOTS = (Path(".agents"), Path(".codex"), Path(".github"), Path("spec-dock"))
+_UNINSTALL_RETRY_MARKER_REL = Path("spec-dock/.uninstall-retry.json")
 _REQUIRED_MANAGED_NATIVE_SHIM_HOSTS = ("codex", "copilot")
 _HOST_ADAPTER_META_ASSET_REL = Path("install_root") / ".agents" / "host-adapters" / "meta.json"
 _REQUIRED_MANAGED_NATIVE_SHIM_OWNER = "spec-dock"
@@ -128,11 +130,19 @@ def _copy_file(src: Path, dest: Path) -> None:
     shutil.copy2(src, dest)
 
 
+def _is_generated_python_cache_path(path: Path) -> bool:
+    return "__pycache__" in path.parts or path.name.endswith(".pyc")
+
+
+def _ignore_generated_python_caches(_dir: str, names: list[str]) -> set[str]:
+    return {name for name in names if name == "__pycache__" or name.endswith(".pyc")}
+
+
 def _sync_tree(src: Path, dest: Path) -> None:
     """Replace `dest` directory with a full copy of `src`."""
     if dest.exists():
         shutil.rmtree(dest)
-    shutil.copytree(src, dest)
+    shutil.copytree(src, dest, ignore=_ignore_generated_python_caches)
 
 
 def _make_executable(path: Path) -> None:
@@ -720,7 +730,10 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
         # The actual spec tree (`spec-dock/initiatives/**`) must be persistent and is
         # never removed by this installer.
         for src, dest in managed_scaffold_sync_plan:
-            _sync_tree(src, dest) if (dest.exists() or force) else shutil.copytree(src, dest)
+            if dest.exists() or force:
+                _sync_tree(src, dest)
+            else:
+                shutil.copytree(src, dest, ignore=_ignore_generated_python_caches)
 
         src_gitignore = src_spec_dock / ".gitignore"
         if src_gitignore.exists():
@@ -791,13 +804,729 @@ class _ManagedSkillInstallPlan(NamedTuple):
     obsolete_exact_rel_paths: tuple[Path, ...]
 
 
+class _UninstallAction(NamedTuple):
+    rel_path: str
+    category: str
+    status: str
+    reason: str
+    error: str | None = None
+
+
+def _uninstall_specs_mode(ns: argparse.Namespace) -> str | None:
+    if getattr(ns, "keep_specs", False):
+        return "keep"
+    if getattr(ns, "remove_specs", False):
+        return "remove"
+    return None
+
+
+def _require_managed_specdock_for_uninstall(target_root: Path) -> Path:
+    try:
+        specdock_dir = _require_specdock(target_root)
+    except RuntimeError as e:
+        raise RuntimeError(f"target is not a managed SpecDock repo: {e}") from e
+
+    version_file = specdock_dir / "spec-dock.version"
+    if not version_file.is_file() and not _has_valid_uninstall_retry_marker(specdock_dir):
+        raise RuntimeError(
+            "target is not a managed SpecDock repo: missing managed "
+            "'spec-dock/spec-dock.version' state or SpecDock uninstall retry marker"
+        )
+    return specdock_dir
+
+
+def _uninstall_retry_marker_payload() -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "managed_by": "spec-dock",
+        "purpose": "uninstall-rerun",
+    }
+
+
+def _has_valid_uninstall_retry_marker(specdock_dir: Path) -> bool:
+    marker = specdock_dir / _UNINSTALL_RETRY_MARKER_REL.relative_to("spec-dock")
+    if marker.is_symlink():
+        raise RuntimeError(
+            "target contains symlinked SpecDock uninstall retry marker: "
+            f"{_UNINSTALL_RETRY_MARKER_REL.as_posix()}"
+        )
+    if not marker.is_file():
+        return False
+    try:
+        payload = json.loads(marker.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return payload == _uninstall_retry_marker_payload()
+
+
+def _reject_symlinked_uninstall_retry_marker(target_root: Path) -> None:
+    marker = target_root / _UNINSTALL_RETRY_MARKER_REL
+    if marker.is_symlink():
+        raise RuntimeError(
+            "target contains symlinked SpecDock uninstall retry marker: "
+            f"{_UNINSTALL_RETRY_MARKER_REL.as_posix()}"
+        )
+
+
+def _write_uninstall_retry_marker(target_root: Path) -> None:
+    marker = target_root / _UNINSTALL_RETRY_MARKER_REL
+    _reject_symlinked_uninstall_retry_marker(target_root)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(json.dumps(_uninstall_retry_marker_payload(), sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _symlinked_uninstall_boundary_root(target_root: Path) -> Path | None:
+    for boundary_root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS:
+        if (target_root / boundary_root).is_symlink():
+            return boundary_root
+    return None
+
+
+def _path_exists_for_uninstall(path: Path) -> bool:
+    return path.exists() or path.is_symlink()
+
+
+def _compare_uninstall_bytes(target_path: Path, expected: bytes) -> tuple[bool, str | None]:
+    if target_path.is_symlink():
+        return False, "comparison error: symlink requires manual review"
+    if not target_path.is_file():
+        return False, "comparison error: not a regular file; manual review required"
+    try:
+        actual = target_path.read_bytes()
+    except OSError as e:
+        return False, f"comparison error: {e}; manual review required"
+    if actual == expected:
+        return True, None
+    return False, "content mismatch; manual review required"
+
+
+def _add_exact_match_uninstall_action(
+    actions: list[_UninstallAction],
+    target_root: Path,
+    rel_path: Path,
+    *,
+    category: str,
+    expected: bytes,
+    include_missing_removals: bool = False,
+) -> None:
+    target_path = target_root / rel_path
+    if not _path_exists_for_uninstall(target_path):
+        if include_missing_removals:
+            actions.append(
+                _UninstallAction(
+                    rel_path=rel_path.as_posix(),
+                    category=category,
+                    status="would_remove",
+                    reason="current shipped asset exact match",
+                )
+            )
+        return
+
+    is_match, preserve_reason = _compare_uninstall_bytes(target_path, expected)
+    if is_match:
+        actions.append(
+            _UninstallAction(
+                rel_path=rel_path.as_posix(),
+                category=category,
+                status="would_remove",
+                reason="current shipped asset exact match",
+            )
+        )
+    else:
+        actions.append(
+            _UninstallAction(
+                rel_path=rel_path.as_posix(),
+                category=category,
+                status="preserved",
+                reason=preserve_reason or "manual review required",
+            )
+        )
+
+
+def _uninstall_category_for_install_root_path(
+    rel_path: Path,
+    *,
+    bootstrap_only_rel_paths: set[Path],
+) -> str:
+    if rel_path.parts[:2] == (".agents", "skills"):
+        return "agent_skill"
+    if rel_path.parts[:2] in {(".codex", "agents"), (".github", "agents")}:
+        return "native_agent"
+    if rel_path in bootstrap_only_rel_paths:
+        return "bootstrap_only"
+    if rel_path == Path(".agents/host-adapters/meta.json"):
+        return "bootstrap_only"
+    if rel_path.parts[:2] in {
+        (".codex", "prompts"),
+        (".codex", "rules"),
+        (".github", "workflows"),
+    } or rel_path == Path(".codex/AGENTS.md"):
+        return "product_reusable"
+    return "product_reusable"
+
+
+def _is_delete_even_if_mismatch_uninstall_path(rel_path: Path) -> bool:
+    return rel_path.parts[:2] in {
+        (".agents", "skills"),
+        (".codex", "agents"),
+        (".github", "agents"),
+    } or rel_path == Path("spec-dock/spec-dock.version")
+
+
+def _iter_existing_files_or_symlinks(root: Path) -> tuple[Path, ...]:
+    if not root.exists():
+        return ()
+    if root.is_symlink():
+        return (root,)
+    return tuple(sorted((path for path in root.rglob("*") if path.is_file() or path.is_symlink()), key=lambda p: p.as_posix()))
+
+
+def _add_generated_state_uninstall_actions(
+    actions: list[_UninstallAction],
+    target_root: Path,
+    known_rel_paths: set[Path],
+) -> None:
+    for rel_root in (Path("spec-dock/active"), Path("spec-dock/.agent")):
+        for path in _iter_existing_files_or_symlinks(target_root / rel_root):
+            rel_path = path.relative_to(target_root)
+            known_rel_paths.add(rel_path)
+            actions.append(
+                _UninstallAction(
+                    rel_path=rel_path.as_posix(),
+                    category="generated_state",
+                    status="would_remove",
+                    reason="SpecDock generated state",
+                )
+            )
+
+
+def _add_spec_history_uninstall_action(
+    actions: list[_UninstallAction],
+    target_root: Path,
+    *,
+    specs_mode: str | None,
+    include_missing_removals: bool = False,
+) -> None:
+    spec_history_path = Path("spec-dock/initiatives")
+    if not (target_root / spec_history_path).exists() and not (specs_mode == "remove" and include_missing_removals):
+        return
+    if specs_mode == "remove":
+        actions.append(
+            _UninstallAction(
+                rel_path=spec_history_path.as_posix(),
+                category="spec_history",
+                status="would_remove",
+                reason="explicit remove-specs mode",
+            )
+        )
+    else:
+        reason = "keep-specs mode" if specs_mode == "keep" else "dry-run preserves specs unless remove-specs is explicit"
+        actions.append(
+            _UninstallAction(
+                rel_path=spec_history_path.as_posix(),
+                category="spec_history",
+                status="preserved",
+                reason=reason,
+            )
+        )
+
+
+def _add_uninstall_retry_marker_action(actions: list[_UninstallAction], target_root: Path, known_rel_paths: set[Path]) -> None:
+    known_rel_paths.add(_UNINSTALL_RETRY_MARKER_REL)
+    if not _path_exists_for_uninstall(target_root / _UNINSTALL_RETRY_MARKER_REL):
+        return
+    actions.append(
+        _UninstallAction(
+            rel_path=_UNINSTALL_RETRY_MARKER_REL.as_posix(),
+            category="generated_state",
+            status="preserved",
+            reason="SpecDock uninstall retry marker for idempotent rerun",
+        )
+    )
+
+
+def _add_shortcut_uninstall_action(actions: list[_UninstallAction], target_root: Path) -> None:
+    shortcut = target_root / "spec"
+    if not _path_exists_for_uninstall(shortcut):
+        return
+    if shortcut.is_symlink() and os.readlink(shortcut) == f"{_SPEC_DOCK_DIRNAME}/scripts/spec-dock":
+        actions.append(
+            _UninstallAction(
+                rel_path="spec",
+                category="shortcut",
+                status="would_remove",
+                reason="repo-root shortcut targets spec-dock/scripts/spec-dock",
+            )
+        )
+    else:
+        actions.append(
+            _UninstallAction(
+                rel_path="spec",
+                category="shortcut",
+                status="preserved",
+                reason="not spec-dock shortcut; manual review required",
+            )
+        )
+
+
+def _add_unknown_boundary_uninstall_actions(
+    actions: list[_UninstallAction],
+    target_root: Path,
+    known_rel_paths: set[Path],
+) -> None:
+    for boundary_root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS:
+        for path in _iter_existing_files_or_symlinks(target_root / boundary_root):
+            rel_path = path.relative_to(target_root)
+            if rel_path in known_rel_paths:
+                continue
+            if rel_path.parts[:2] == ("spec-dock", "initiatives"):
+                continue
+            if rel_path.parts[:2] in {("spec-dock", "active"), ("spec-dock", ".agent")}:
+                continue
+            actions.append(
+                _UninstallAction(
+                    rel_path=rel_path.as_posix(),
+                    category="unmanaged",
+                    status="preserved",
+                    reason="unmanaged file under managed boundary root",
+                )
+            )
+
+
+def _build_scaffold_uninstall_sources(assets_dir: Path) -> tuple[tuple[Path, bytes], ...]:
+    src_spec_dock = assets_dir / "spec_dock"
+    sources: list[tuple[Path, bytes]] = []
+    for managed_dir in _MANAGED_DIRS:
+        src_root = src_spec_dock / managed_dir
+        if not src_root.is_dir():
+            raise RuntimeError(f"Missing asset directory: {src_root}")
+        for source_path in sorted(
+            (
+                path
+                for path in src_root.rglob("*")
+                if path.is_file() and not _is_generated_python_cache_path(path.relative_to(src_spec_dock))
+            ),
+            key=lambda p: p.as_posix(),
+        ):
+            rel_path = Path("spec-dock") / source_path.relative_to(src_spec_dock)
+            sources.append((rel_path, source_path.read_bytes()))
+
+    src_gitignore = src_spec_dock / ".gitignore"
+    if src_gitignore.exists():
+        gitignore_bytes = src_gitignore.read_bytes()
+    else:
+        gitignore_bytes = _DEFAULT_SPEC_DOCK_GITIGNORE.encode("utf-8")
+    sources.append((Path("spec-dock/.gitignore"), gitignore_bytes))
+    sources.append((Path("spec-dock/spec-dock.version"), f"{_tool_version()}\n".encode("utf-8")))
+    return tuple(sources)
+
+
+def _build_uninstall_plan(
+    target_root: Path,
+    *,
+    specs_mode: str | None,
+    include_missing_removals: bool = False,
+) -> tuple[_UninstallAction, ...]:
+    """Build the S02 dry-run inventory and classification plan."""
+    actions: list[_UninstallAction] = []
+    known_rel_paths: set[Path] = set()
+
+    with _assets_dir() as assets_dir:
+        install_plan = _build_managed_skill_install_plan(assets_dir)
+        bootstrap_only_rel_paths = set(install_plan.bootstrap_only_rel_paths)
+        for mapping in install_plan.current_file_mappings:
+            rel_path = mapping.target_rel
+            known_rel_paths.add(rel_path)
+            target_path = target_root / rel_path
+            if not _path_exists_for_uninstall(target_path):
+                if include_missing_removals:
+                    category = _uninstall_category_for_install_root_path(
+                        rel_path,
+                        bootstrap_only_rel_paths=bootstrap_only_rel_paths,
+                    )
+                    actions.append(
+                        _UninstallAction(
+                            rel_path=rel_path.as_posix(),
+                            category=category,
+                            status="would_remove",
+                            reason=(
+                                "known SpecDock-managed agent/skill asset"
+                                if _is_delete_even_if_mismatch_uninstall_path(rel_path)
+                                else "current shipped asset exact match"
+                            ),
+                        )
+                    )
+                continue
+            category = _uninstall_category_for_install_root_path(
+                rel_path,
+                bootstrap_only_rel_paths=bootstrap_only_rel_paths,
+            )
+            if _is_delete_even_if_mismatch_uninstall_path(rel_path):
+                actions.append(
+                    _UninstallAction(
+                        rel_path=rel_path.as_posix(),
+                        category=category,
+                        status="would_remove",
+                        reason="known SpecDock-managed agent/skill asset",
+                    )
+                )
+                continue
+            _add_exact_match_uninstall_action(
+                actions,
+                target_root,
+                rel_path,
+                category=category,
+                expected=(assets_dir / mapping.source_asset_rel).read_bytes(),
+                include_missing_removals=include_missing_removals,
+            )
+
+        for rel_path in install_plan.obsolete_exact_rel_paths:
+            known_rel_paths.add(rel_path)
+            if not _path_exists_for_uninstall(target_root / rel_path):
+                if include_missing_removals:
+                    actions.append(
+                        _UninstallAction(
+                            rel_path=rel_path.as_posix(),
+                            category="obsolete_managed",
+                            status="would_remove",
+                            reason="known obsolete SpecDock-managed asset",
+                        )
+                    )
+                continue
+            actions.append(
+                _UninstallAction(
+                    rel_path=rel_path.as_posix(),
+                    category="obsolete_managed",
+                    status="would_remove",
+                    reason="known obsolete SpecDock-managed asset",
+                )
+            )
+
+        for rel_path, expected in _build_scaffold_uninstall_sources(assets_dir):
+            known_rel_paths.add(rel_path)
+            if _is_delete_even_if_mismatch_uninstall_path(rel_path):
+                if _path_exists_for_uninstall(target_root / rel_path) or include_missing_removals:
+                    actions.append(
+                        _UninstallAction(
+                            rel_path=rel_path.as_posix(),
+                            category="scaffold_managed",
+                            status="would_remove",
+                            reason="SpecDock managed state",
+                        )
+                    )
+                continue
+            _add_exact_match_uninstall_action(
+                actions,
+                target_root,
+                rel_path,
+                category="scaffold_managed",
+                expected=expected,
+                include_missing_removals=include_missing_removals,
+            )
+
+    _add_generated_state_uninstall_actions(actions, target_root, known_rel_paths)
+    _add_spec_history_uninstall_action(
+        actions,
+        target_root,
+        specs_mode=specs_mode,
+        include_missing_removals=include_missing_removals,
+    )
+    _add_uninstall_retry_marker_action(actions, target_root, known_rel_paths)
+    _add_shortcut_uninstall_action(actions, target_root)
+    known_rel_paths.add(Path("spec"))
+    _add_unknown_boundary_uninstall_actions(actions, target_root, known_rel_paths)
+
+    return tuple(sorted(actions, key=lambda action: action.rel_path))
+
+
+def _summarize_uninstall_actions(actions: tuple[_UninstallAction, ...]) -> dict[str, int]:
+    summary = {
+        "would_remove": 0,
+        "removed": 0,
+        "already_removed": 0,
+        "preserved": 0,
+        "failed": 0,
+        "empty_dir_removed": 0,
+    }
+    for action in actions:
+        if action.status not in summary:
+            summary[action.status] = 0
+        summary[action.status] += 1
+    return summary
+
+
+def _is_safe_uninstall_rel_path(rel_path: Path) -> bool:
+    if rel_path.is_absolute() or ".." in rel_path.parts or rel_path.parts in {(), (".",)}:
+        return False
+    if rel_path.parts[0] == ".git":
+        return False
+    return rel_path.parts[0] in {root.parts[0] for root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS} or rel_path == Path("spec")
+
+
+def _has_symlink_uninstall_container(target_root: Path, rel_path: Path) -> bool:
+    current = target_root
+    last_index = len(rel_path.parts) - 1
+    for index, part in enumerate(rel_path.parts):
+        current = current / part
+        if current.is_symlink():
+            if index == last_index:
+                return False
+            return True
+    return False
+
+
+def _remove_uninstall_path(target_root: Path, action: _UninstallAction) -> _UninstallAction:
+    rel_path = Path(action.rel_path)
+    if not _is_safe_uninstall_rel_path(rel_path):
+        return action._replace(status="failed", error="unsafe uninstall path outside managed boundaries")
+    if _has_symlink_uninstall_container(target_root, rel_path):
+        return action._replace(status="failed", error="unsafe uninstall path through symlink container")
+
+    target_path = target_root / rel_path
+    if not _path_exists_for_uninstall(target_path):
+        return action._replace(status="already_removed", error=None)
+
+    try:
+        if target_path.is_dir() and not target_path.is_symlink():
+            shutil.rmtree(target_path)
+        else:
+            target_path.unlink()
+    except OSError as e:
+        return action._replace(status="failed", error=str(e))
+    return action._replace(status="removed", error=None)
+
+
+def _is_uninstall_cleanup_boundary_path(rel_path: Path) -> bool:
+    if rel_path.is_absolute() or ".." in rel_path.parts or rel_path.parts in {(), (".",)}:
+        return False
+    if rel_path.parts[0] == ".git":
+        return False
+    return rel_path.parts[0] in {root.parts[0] for root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS}
+
+
+def _cleanup_empty_uninstall_dirs(target_root: Path) -> tuple[_UninstallAction, ...]:
+    cleanup_actions: list[_UninstallAction] = []
+    candidates: set[Path] = set()
+    for boundary_root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS:
+        root = target_root / boundary_root
+        if not root.exists() or not root.is_dir() or root.is_symlink():
+            continue
+        candidates.add(boundary_root)
+        for path in root.rglob("*"):
+            if path.is_dir() and not path.is_symlink():
+                candidates.add(path.relative_to(target_root))
+
+    for rel_path in sorted(candidates, key=lambda path: len(path.parts), reverse=True):
+        if not _is_uninstall_cleanup_boundary_path(rel_path):
+            continue
+        target_path = target_root / rel_path
+        if not target_path.exists() or not target_path.is_dir() or target_path.is_symlink():
+            continue
+        try:
+            target_path.rmdir()
+        except OSError:
+            continue
+        cleanup_actions.append(
+            _UninstallAction(
+                rel_path=rel_path.as_posix(),
+                category="empty_dir",
+                status="empty_dir_removed",
+                reason="empty directory cleanup inside uninstall boundary",
+            )
+        )
+    return tuple(cleanup_actions)
+
+
+def _apply_uninstall_plan(target_root: Path, actions: tuple[_UninstallAction, ...]) -> tuple[_UninstallAction, ...]:
+    results: list[_UninstallAction] = []
+    for action in actions:
+        if action.status == "would_remove":
+            results.append(_remove_uninstall_path(target_root, action))
+        else:
+            results.append(action)
+    results.extend(_cleanup_empty_uninstall_dirs(target_root))
+    return tuple(sorted(results, key=lambda action: (action.rel_path, action.status)))
+
+
+def _uninstall_payload(
+    target_root: Path,
+    *,
+    apply: bool,
+    specs_mode: str | None,
+    actions: tuple[_UninstallAction, ...],
+    status: str | None = None,
+    errors: list[str] | None = None,
+) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "target": str(target_root),
+        "mode": "apply" if apply else "dry-run",
+        "apply": apply,
+        "specs_mode": specs_mode,
+        "status": status or ("completed" if apply else "planned"),
+        "summary": _summarize_uninstall_actions(actions),
+        "actions": [
+            {
+                "path": action.rel_path,
+                "category": action.category,
+                "status": action.status,
+                "reason": action.reason,
+                "error": action.error,
+            }
+            for action in actions
+        ],
+        "guidance": [
+            (
+                "dry-run only; pass --apply with exactly one of --keep-specs or --remove-specs to mutate"
+                if not apply
+                else "retry removal with installer CLI: spec-dock uninstall <target> --apply --keep-specs or --remove-specs"
+            ),
+            "reinstall or refresh with installer CLI: spec-dock init <target> or spec-dock update <target>",
+        ],
+        "errors": errors or [],
+    }
+
+
+def _emit_uninstall_preflight_error(
+    target_root: Path,
+    *,
+    apply: bool,
+    specs_mode: str | None,
+    json_requested: bool,
+    message: str,
+) -> int:
+    if json_requested:
+        payload = _uninstall_payload(
+            target_root,
+            apply=apply,
+            specs_mode=specs_mode,
+            actions=(),
+            status="error",
+            errors=[message],
+        )
+        print(json.dumps(payload, sort_keys=True))
+    else:
+        print(f"error: {message}", file=sys.stderr)
+    return 2
+
+
+def _render_uninstall_text(payload: dict[str, Any]) -> str:
+    noun = "result" if payload["apply"] else "plan"
+    lines = [
+        f"spec-dock: uninstall {noun} ({payload['mode']}) -> {payload['target']}",
+        f"specs_mode: {payload['specs_mode'] or 'unspecified'}",
+        "summary:",
+    ]
+    for key, value in payload["summary"].items():
+        lines.append(f"  {key}: {value}")
+    lines.append("actions:")
+    for action in payload["actions"]:
+        lines.append(
+            "  "
+            f"[{action['status']}] {action['path']} "
+            f"category={action['category']} reason={action['reason']}"
+        )
+    lines.append("guidance:")
+    for item in payload["guidance"]:
+        lines.append(f"  - {item}")
+    return "\n".join(lines)
+
+
+def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
+    specs_mode = _uninstall_specs_mode(ns)
+    apply_requested = bool(ns.apply)
+    json_requested = bool(ns.json)
+
+    if not target_root.exists() or not target_root.is_dir():
+        return _emit_uninstall_preflight_error(
+            target_root,
+            apply=apply_requested,
+            specs_mode=specs_mode,
+            json_requested=json_requested,
+            message=f"target path is not a directory: {target_root}",
+        )
+
+    if apply_requested and specs_mode is None:
+        return _emit_uninstall_preflight_error(
+            target_root,
+            apply=apply_requested,
+            specs_mode=specs_mode,
+            json_requested=json_requested,
+            message=(
+                "uninstall --apply requires exactly one specs mode: "
+                "--keep-specs or --remove-specs"
+            ),
+        )
+
+    try:
+        if apply_requested:
+            symlink_boundary = _symlinked_uninstall_boundary_root(target_root)
+            if symlink_boundary is not None:
+                return _emit_uninstall_preflight_error(
+                    target_root,
+                    apply=apply_requested,
+                    specs_mode=specs_mode,
+                    json_requested=json_requested,
+                    message=(
+                        "target contains symlinked SpecDock uninstall boundary root: "
+                        f"{symlink_boundary.as_posix()}"
+                    ),
+                )
+            _reject_symlinked_uninstall_retry_marker(target_root)
+        _require_managed_specdock_for_uninstall(target_root)
+    except (OSError, RuntimeError) as e:
+        return _emit_uninstall_preflight_error(
+            target_root,
+            apply=apply_requested,
+            specs_mode=specs_mode,
+            json_requested=json_requested,
+            message=str(e),
+        )
+
+    try:
+        if apply_requested:
+            _write_uninstall_retry_marker(target_root)
+        actions = _build_uninstall_plan(
+            target_root,
+            specs_mode=specs_mode,
+            include_missing_removals=apply_requested,
+        )
+    except (OSError, RuntimeError) as e:
+        return _emit_uninstall_preflight_error(
+            target_root,
+            apply=apply_requested,
+            specs_mode=specs_mode,
+            json_requested=json_requested,
+            message=str(e),
+        )
+    if apply_requested:
+        actions = _apply_uninstall_plan(target_root, actions)
+    has_failures = any(action.status == "failed" for action in actions)
+    payload = _uninstall_payload(
+        target_root,
+        apply=apply_requested,
+        specs_mode=specs_mode,
+        actions=actions,
+        status="partial_failure" if has_failures else None,
+    )
+    if json_requested:
+        print(json.dumps(payload, sort_keys=True))
+    else:
+        print(_render_uninstall_text(payload))
+    return 1 if has_failures else 0
+
+
 def _iter_install_root_files(assets_dir: Path) -> tuple[Path, ...]:
     install_root = assets_dir / "install_root"
     if not install_root.is_dir():
         raise RuntimeError(f"Missing asset directory: {install_root}")
     return tuple(
         sorted(
-            (candidate for candidate in install_root.rglob("*") if candidate.is_file()),
+            (
+                candidate
+                for candidate in install_root.rglob("*")
+                if candidate.is_file() and not _is_generated_python_cache_path(candidate.relative_to(install_root))
+            ),
             key=lambda candidate: candidate.relative_to(install_root).as_posix(),
         )
     )
@@ -1317,6 +2046,14 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p_update = sub.add_parser("update", help="Update managed files (docs/templates/scripts/skill) in an existing project")
     add_init_update_common(p_update)
 
+    p_uninstall = sub.add_parser("uninstall", help="Plan or remove managed spec-dock artifacts from a project")
+    p_uninstall.add_argument("path", nargs="?", default=".", help="Target project path (default: current directory)")
+    p_uninstall.add_argument("--apply", action="store_true", help="Apply the uninstall plan")
+    specs_group = p_uninstall.add_mutually_exclusive_group()
+    specs_group.add_argument("--keep-specs", action="store_true", help="Preserve spec history under spec-dock/initiatives")
+    specs_group.add_argument("--remove-specs", action="store_true", help="Include spec history in the uninstall plan")
+    p_uninstall.add_argument("--json", action="store_true", help="Emit exactly one JSON object on stdout")
+
     return parser.parse_args(argv)
 
 
@@ -1325,6 +2062,9 @@ def main(argv: list[str] | None = None) -> int:
     ns = _parse_args(sys.argv[1:] if argv is None else argv)
 
     target_root = Path(getattr(ns, "path", ".")).expanduser().resolve()
+    if ns.command == "uninstall":
+        return _run_uninstall(target_root, ns)
+
     if not target_root.exists() or not target_root.is_dir():
         print(f"error: target path is not a directory: {target_root}", file=sys.stderr)
         return 2

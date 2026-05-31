@@ -49,7 +49,16 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | spec-reviewer | parent epic scope did not originally include uninstall command | update parent epic; move issue; stop planning | parent epic requirement/design were extended to include uninstall command scope | user requested uninstall issue under lifecycle command expansion and parent epic already owned repo-local lifecycle commands | applied | parent epic `requirement.md` / `design.md`; requirement review Godel pass | none |
+| D-002 | resolved | test-strategy | spec-reviewer | design test strategy did not explicitly mention scaffold-managed removal coverage | add design coverage; defer to plan only | scaffold-managed exact-match removal and mismatch-preserve coverage added to design test strategy | scaffold-managed runtime/docs files are core repo-local uninstall targets | applied | design review Avicenna pass with P2 finding; `design.md` test strategy | plan closure mapping |
+| D-003 | resolved | scope | user | design Q-001 asked whether `--json` belongs in initial implementation | human-readable only; include `--json` now | initial implementation must include JSON output because agents may execute uninstall | agent execution requires machine-readable plan/result output, so JSON is part of the primary command contract | applied | `discussions/20260531t144040z-interview-uninstall-json-output.md`; requirement/design/plan amendment | fresh spec-reviewer re-review |
+| D-004 | resolved | implementation | code-reviewer / dev-coder | S01 JSON preflight errors needed an explicit payload shape | separate minimal error object; reuse uninstall payload schema with `status: "error"` and empty `actions` | reuse the S01 uninstall payload schema for post-parse semantic/preflight errors | keeps the agent-readable JSON surface stable and avoids a second S01 error schema | applied | Volta P2 finding; `test_uninstall_json_preflight_errors_are_parseable_objects` | none |
+| D-005 | resolved | implementation | code-reviewer / dev-coder | shared target directory validation bypassed uninstall JSON for missing/file targets | leave as non-blocking P2; route uninstall target validation through uninstall preflight | route uninstall command through `_run_uninstall` before the shared init/update directory check | keeps `--json` output parseable for all uninstall preflight failures while preserving non-json stderr behavior | applied | Averroes P2 finding; `test_uninstall_json_missing_target_path_returns_json_error`; `test_uninstall_json_file_target_returns_json_error_without_mutation` | none |
+| D-006 | superseded | implementation | dev-coder / code-reviewer | keep-specs rerun after apply removes `spec-dock/spec-dock.version` but preserves `spec-dock/initiatives` | strict version preflight; relax all apply preflight; accept missing version only when initiatives remains | initiatives-only fallback is unsafe and is replaced by D-007 retry marker semantics | code-reviewer Faraday found initiatives-only fallback allows unmanaged deletion | superseded | Faraday P1; `test_uninstall_apply_rejects_unmanaged_initiatives_only_target_before_mutation` | superseded by D-007 |
+| D-007 | resolved | implementation | dev-coder / code-reviewer | remove-specs rerun needs managed retry evidence after specs and version file are removed | require re-init before rerun; keep initiatives fallback; create preserved retry marker | create and preserve exact non-symlink `spec-dock/.uninstall-retry.json` marker during apply; accept only exact marker content as retry evidence | preserves unmanaged-target rejection while satisfying AC-009 idempotent rerun for keep-specs and remove-specs; marker symlink is rejected before read/write | applied | Euclid Ledger Note; Ampere P1; Planck review_status=pass; `test_uninstall_apply_remove_specs_rerun_reports_already_removed_and_succeeds`; `test_uninstall_apply_rejects_symlinked_retry_marker_without_external_mutation` | none |
+| D-008 | resolved | implementation | dev-coder / full-suite verification | full discover can generate ignored provider-asset `__pycache__/*.pyc` before installer tests, and init/update then copied binary caches into target repos | manual cleanup only; test snapshot binary-aware; installer copy guard | ignore `__pycache__` directories and `*.pyc` files during init/update asset copy and provider asset inventory | generated Python caches are never managed SpecDock artifacts and should not ship into target repos or uninstall inventory | applied | `test_init_does_not_copy_generated_python_caches_from_provider_assets`; `test_update_does_not_copy_generated_python_caches_from_provider_assets`; full discover 1026 OK | none |
+| D-009 | resolved | implementation | code-reviewer / dev-coder | stale `spec-dock/spec-dock.version` was classified as scaffold mismatch and preserved | preserve all version mismatches; special-case version file; broaden scaffold mismatch removal | treat `spec-dock/spec-dock.version` as SpecDock managed state and remove it even when content differs from current tool version | version file is generated installer state, not product-authored content; uninstall should remove stale repo-local managed state while preserving user-edited docs/templates/config | applied | Lorentz P2; Socrates Ledger Note; `test_uninstall_dry_run_removes_stale_specdock_version` | none |
+| D-010 | resolved | test-strategy | qa-reviewer | generated-state cleanup behavior has docs/report coverage but not dedicated dry-run/apply tests for `spec-dock/active/**` and `spec-dock/.agent/**` | add tests now; convert to follow-up; accept as non-blocking | no immediate test addition; record as non-blocking QA P2 for future hardening | final QA found this as P2 only after broad uninstall, full `tests.test_init_update`, full discover, validate, sync, and diff-check passed; the primary destructive safety obligations were covered by S03/S99 tests | no_action | Linnaeus P2; final QA review_status=pass; current implementation includes generated-state inventory and docs boundary | consider future regression test when generated-state cleanup behavior changes |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +72,24 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | discussion | `requirement.md` | repo-local uninstall を primary objective として採用し、package/environment uninstall を対象外にした | `discussions/20260531t133315z-interview-uninstall-command-scope.md` | requirement review |
+| EAL-002 | adopted | discussion | `requirement.md` | specs は開発再開可能性と使い捨て cleanup の両方があるため、実削除時の explicit mode selection として採用した | `discussions/20260531t133616z-interview-uninstall-removal-boundary.md` | requirement review |
+| EAL-003 | adopted | discussion | `requirement.md` | bootstrap-only / user-owned 候補は content match の場合だけ自動削除し、mismatch は preserve + manual review とした | `discussions/20260531t134004z-interview-uninstall-user-owned-asset-boundary.md` | requirement review |
+| EAL-004 | adopted | discussion | `requirement.md` | repo-local wrapper + installer implementation の二層 command surface を採用した | `discussions/20260531t134206z-interview-uninstall-command-surface.md` | requirement review |
+| EAL-005 | adopted | discussion | `requirement.md` | agent / skill assets は mismatch でも削除し、CI / config / prompt / rule は mismatch preserve とする category-based removal を採用した | `discussions/20260531t134650z-interview-uninstall-managed-asset-mismatch.md` | requirement review |
+| EAL-006 | adopted | discussion | `requirement.md` | uninstall 後の empty directory は boundary root 内で bounded cleanup する方針を採用した | `discussions/20260531t135206z-interview-uninstall-empty-directory-cleanup.md` | requirement review |
+| EAL-007 | adopted | discussion synthesis from consultant | `requirement.md` | 削除対象分類、comparison 判定不能時 preserve、partial failure / idempotency を requirement-level safety criteria として補強した | `discussions/20260531t141123z-disc-uninstall-requirement-risk-synthesis.md` | requirement review |
+| EAL-008 | adopted | research synthesis from repo-analyst | `requirement.md` | installer/runtime split、repo-local update wrapper pattern、install_root inventory、repo-root `spec` shortcut、self-removal recovery risk を requirement grounding に採用した | `discussions/20260531t141121z-research-uninstall-repo-analysis-evidence.md` | requirement review |
+| EAL-009 | adopted | reviewer: spec-reviewer | parent epic `requirement.md` / `design.md`, issue `requirement.md`, interview provenance | requirement reviewer fail findingsを採用し、parent epic scope bridge、AC-007 known managed path限定、interview `reflected_to` を修正した | spec-reviewer Hilbert, review_status=fail, 2026-05-31 | re-review |
+| EAL-010 | adopted | delegated draft: system-architect | `design.md` | installer/runtime split、inventory/result model、bounded cleanup、failure/idempotency、test surface を design に採用した | `discussions/20260531t141545z-disc-uninstall-design-draft.md` | design review |
+| EAL-011 | adopted | reviewer: spec-reviewer | `report.md`, `design.md`, design draft | design reviewer fail findings を採用し、delegated draft evidence の矛盾を解消し、docs impact handoff を具体化した | spec-reviewer Bacon, review_status=fail, 2026-05-31 | design re-review |
+| EAL-012 | adopted | delegated draft: implementation-planner | `plan.md` | S01-S04/S90/S99 の実行順、closure index、test obligations、docs impact、final gate を plan に採用した | `discussions/20260531t142649z-disc-uninstall-implementation-plan.md` | plan review |
+| EAL-013 | adopted | reviewer: spec-reviewer | `plan.md` | plan reviewer fail findings を採用し、invalid target closure、comparison-error preservation、runtime-removal recovery guidance、no-op/report-update gates を plan に追加した | spec-reviewer Gibbs, review_status=fail, 2026-05-31 | plan re-review |
+| EAL-014 | adopted | interview | `requirement.md`, `design.md`, `plan.md` | user answer requires JSON output in initial implementation because agents may execute uninstall | `discussions/20260531t144040z-interview-uninstall-json-output.md` | fresh spec-reviewer re-review |
+| EAL-015 | adopted | reviewer: spec-reviewer | `plan.md` | JSON amendment reviewer fail findingを採用し、agent が判別する action-level `status` / `category` / `reason` coverage を tc-023 / tc-024 に追加した | spec-reviewer Zeno, review_status=fail, 2026-05-31 | JSON amendment re-review |
+| EAL-016 | adopted | reviewer: spec-reviewer | `plan.md` | JSON amendment re-review の P2 を採用し、apply-side `actions[]` の `path` / `category` / `status` / `reason` / `error` assertion を tc-s03-007 に追加した | spec-reviewer Heisenberg, review_status=pass, 2026-05-31 | no re-review required; P2 applied |
+| EAL-017 | adopted | reviewer: code-reviewer | S01 implementation | S01 code re-review の P2 を採用し、`--json` semantic/preflight error と scripts-missing recovery target validation を追加した | code-reviewer Volta, review_status=pass with P2, 2026-05-31; focused 9-test command pass | fresh S01 code re-review |
+| EAL-018 | adopted | reviewer: code-reviewer | S01 implementation | S01 final code re-review の P2 を採用し、missing path / file target の `--json` error を JSON payload にした | code-reviewer Averroes, review_status=pass with P2, 2026-05-31; focused 11-test command pass | fresh S01 code re-review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +97,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | agent / skill noise removal を primary objective として `requirement.md` に固定 | specs preservation/removal、user edit protection、runtime recovery、bounded cleanup | medium: user edit protection が強すぎると noise removal が不完全になり、agent/skill mismatch deletion が強すぎると user edit loss risk がある | pending spec-reviewer |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +105,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | active issue scaffold, parent epic requirement/design, installer CLI, install_root metadata, runtime update/delete commands, tests, six interview artifacts, consultant/repo-analyst findings | answered: uninstall scope, specs mode, bootstrap-only boundary, command surface, mismatch category, empty-dir cleanup | adopted into `requirement.md`; parent epic scope bridge added after reviewer finding | passed: spec-reviewer Godel, 2026-05-31 | no | promote to design |
+| design | approved requirement, parent epic requirement/design, repo analysis research, requirement risk synthesis, system-architect design draft, installer/runtime source files, JSON interview answer | no open requirement gaps; `--json` resolved as in scope | adopted system-architect draft into `design.md`; reviewer fixes applied for provenance and docs handoff; P2 scaffold coverage added; JSON output contract added after user answer | passed: spec-reviewer Heisenberg, 2026-05-31; prior Zeno fail fixed | no | approved after JSON amendment |
+| plan | approved requirement/design, phase_plan_issue, authoring/issue-plan, implementation-planner draft, first plan review findings, fresh plan re-review, JSON interview answer | no open design gaps; `--json` in scope | adopted S01-S04/S90/S99 plan structure into `plan.md`; added reviewer-required closure rows and gate evidence requirements; added JSON closure/test obligations | passed: spec-reviewer Heisenberg, 2026-05-31; prior Zeno fail fixed; P2 apply-side field assertion applied | no | promote to implementation readiness |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -107,7 +135,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| spec-dock-system-architect | iss-00147 | `discussions/20260531t141545z-disc-uninstall-design-draft.md` | approved requirement, parent epic docs, repo analysis, requirement synthesis, installer/runtime source, tests | `design.md`, `plan.md`, `report.md` | adopted | `design.md` | manual_orchestrator_check_passed_new_issue_discussion_only | adopted into canonical design by orchestrator | none | none | passed design spec-reviewer Avicenna | canonical design promoted to plan |
+| spec-dock-implementation-planner | iss-00147 | `discussions/20260531t142649z-disc-uninstall-implementation-plan.md` | approved requirement/design, workflow/plan docs, installer/runtime source, tests | `plan.md`, `report.md` | adopted | `plan.md` | manual_orchestrator_check_passed_new_issue_discussion_only_dirty_baseline | adopted into canonical plan by orchestrator | none | none | passed plan spec-reviewer Ptolemy after Gibbs fixes | canonical plan promoted to implementation readiness |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -124,117 +153,468 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- S01 として installer CLI に `uninstall` command surface、dry-run text / JSON plan renderer、target validation、destructive apply preflight を追加した。
+- 実削除、full inventory classification、runtime wrapper は plan に従い S02-S04 へ残している。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-05-31 HH:MM - HH:MM）
+### セッションログ（2026-05-31 S01）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01
+- AC/EC: AC-001, AC-002, AC-010, EC-001, EC-002, EC-008
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: 実装ステップ S01 — Installer uninstall command surface and dry-run contract
+  - closure ids: tc-001, tc-002, tc-003, tc-020, tc-023
 
 #### 実施内容
-- ...
+- `src/spec_dock/cli.py` に installer CLI `uninstall [path] [--apply] [--keep-specs | --remove-specs] [--json]` を追加した。
+- S01 scope として dry-run plan rendering、JSON dry-run payload、managed target validation、`--apply` specs mode preflight、mutually exclusive specs flags を実装した。
+- code-reviewer Bohr の P1 に従い、S01 時点で apply engine が未実装の `--apply --keep-specs` / `--apply --remove-specs` は success として扱わず、mutation なしで exit 2 にした。
+- code-reviewer Volta の P2 に従い、`--json` 指定時の semantic/preflight error を stdout の単一 JSON object にし、`spec-dock/scripts/` が既に削除された recovery target でも `spec-dock/spec-dock.version` があれば managed target として受け入れるようにした。
+- code-reviewer Averroes の P2 に従い、missing path / file target の `--json` preflight error も stdout の単一 JSON object にした。
+- full inventory classification、actual removal、runtime wrapper は S02-S04 のまま残した。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+python -m unittest tests.test_init_update.TestInitUpdate.test_uninstall_dry_run_prints_plan_and_mutates_no_files tests.test_init_update.TestInitUpdate.test_uninstall_apply_without_specs_mode_fails_before_mutation tests.test_init_update.TestInitUpdate.test_uninstall_apply_with_specs_mode_is_deferred_before_mutation tests.test_init_update.TestInitUpdate.test_uninstall_keep_and_remove_specs_are_mutually_exclusive tests.test_init_update.TestInitUpdate.test_uninstall_unmanaged_target_fails_before_mutation tests.test_init_update.TestInitUpdate.test_uninstall_dry_run_json_is_one_parseable_object tests.test_init_update.TestInitUpdate.test_uninstall_json_preflight_errors_are_parseable_objects tests.test_init_update.TestInitUpdate.test_uninstall_json_missing_target_path_returns_json_error tests.test_init_update.TestInitUpdate.test_uninstall_json_file_target_returns_json_error_without_mutation tests.test_init_update.TestInitUpdate.test_uninstall_accepts_recovery_target_when_scripts_are_missing tests.test_init_update.TestInitUpdate.test_uninstall_rejects_target_missing_version_file -v
 
-<result>
+Ran 11 tests in 0.548s
+OK
+
+git diff --check -- src/spec_dock/cli.py tests/test_init_update.py
+
+pass
+
+python -m unittest tests.test_init_update -v
+
+Ran 183 tests in 59.734s
+FAILED (failures=1)
+unrelated observed failure: test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+reason: checked-in dogfooding .meta.json path set diverged from cutover snapshot
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | 赤フェーズ | red-required | S01 5 tests failed before implementation with `invalid choice: 'uninstall' (choose from 'init', 'update')` | delegated dev-coder command | pass | command surface absence was observed |
+| S01 | 赤フェーズ | reviewer-discovered regression | added apply-deferred test failed before fix with `0 != 2` for explicit specs-mode apply | delegated dev-coder command | pass | Bohr P1 reproduced successful no-op apply bug |
+| S01 | 赤フェーズ | reviewer-discovered P2 | JSON semantic/preflight errors were stderr-only, and scripts-missing recovery target was rejected | delegated dev-coder command | pass | Volta P2 reproduced before fix |
+| S01 | 赤フェーズ | reviewer-discovered P2 | missing path / file target with `--json` returned human stderr before uninstall JSON preflight | delegated dev-coder command | pass | Averroes P2 reproduced before fix |
+| S01 | 緑フェーズ | focused S01 command | 11 focused S01 tests passed | `python -m unittest ... -v` | pass | tc-001/tc-002/tc-003/tc-020/tc-023 plus apply-deferred and P2 regression guards covered |
+| S01 | リファクタリング | guardrail satisfied | no broad refactor; S01 skeleton only | diff inspection and `git diff --check -- src/spec_dock/cli.py tests/test_init_update.py` | pass | full apply remains S03 |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | explicit specs-mode apply must not report completed before S03 apply engine exists | code-reviewer Bohr | added `test_uninstall_apply_with_specs_mode_is_deferred_before_mutation` and changed S01 apply path to exit 2 without mutation | S01 regression guard | no | Bohr review_status=fail; follow-up dev-coder pass |
+| S01 | JSON semantic/preflight errors must be parseable under `--json`; recovery target remains valid after `spec-dock/scripts/` removal | code-reviewer Volta | added JSON error and recovery target tests; changed error emitter and managed target validation | S01 P2 regression guards | no | Volta review_status=pass with P2; follow-up dev-coder pass |
+| S01 | missing path / file target must still return parseable JSON under `--json` | code-reviewer Averroes | added missing path and file target JSON error tests; routed uninstall before shared init/update target directory check | S01 P2 regression guards | no | Averroes review_status=pass with P2; follow-up dev-coder pass |
+| S01 | full `tests.test_init_update` has dogfooding `.meta.json` snapshot drift failure | verification | recorded as unrelated to S01 diff; still blocks broad green until resolved later | N/A | no | `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` failure |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | tc-001, tc-002, tc-003, tc-020, tc-023 | tests are red before implementation, green after, code-reviewer pass, report updated | red evidence captured by dev-coder; focused 11-test command pass; report updated with P2 adoption; code-reviewer Herschel pass | pass | S01 ready for step commit |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | yes | red-required | uninstall parser missing before implementation | focused S01 unittest command | pass | dry-run prints plan and mutates no files |
+| tc-002 | S01 | yes | red-required | uninstall parser missing before implementation | focused S01 unittest command | pass | apply without specs mode fails before mutation |
+| tc-003 | S01 | yes | red-required | uninstall parser missing before implementation | focused S01 unittest command | pass | keep/remove specs mutually exclusive |
+| tc-020 | S01 | yes | red-required | uninstall parser missing before implementation; P2 found shared missing/file target check bypassed JSON before follow-up | focused S01 unittest command | pass | unmanaged target and non-directory target fail before mutation |
+| tc-023 | S01 | yes | red-required | uninstall parser missing before implementation; P2 found stderr-only JSON semantic and non-directory errors before follow-up | focused S01 unittest command | pass | dry-run JSON is parseable and action-level fields exist; semantic/preflight errors also return parseable JSON |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | `test_uninstall_dry_run_prints_plan_and_mutates_no_files` | pass | focused command OK |
+| tc-002 | S01 | `test_uninstall_apply_without_specs_mode_fails_before_mutation` | pass | focused command OK |
+| tc-003 | S01 | `test_uninstall_keep_and_remove_specs_are_mutually_exclusive` | pass | focused command OK |
+| tc-020 | S01 | `test_uninstall_unmanaged_target_fails_before_mutation` | pass | focused command OK |
+| tc-023 | S01 | `test_uninstall_dry_run_json_is_one_parseable_object` | pass | focused command OK |
+| tc-023 | S01 | `test_uninstall_json_preflight_errors_are_parseable_objects` | pass | P2 regression guard for agent-readable errors |
+| tc-020 | S01 | `test_uninstall_accepts_recovery_target_when_scripts_are_missing`; `test_uninstall_rejects_target_missing_version_file` | pass | recovery validation accepts version-file target and rejects missing managed state |
+| tc-020, tc-023 | S01 | `test_uninstall_json_missing_target_path_returns_json_error`; `test_uninstall_json_file_target_returns_json_error_without_mutation` | pass | P2 regression guard for non-directory targets under JSON mode |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| added | S01 regression guard | `test_uninstall_apply_with_specs_mode_is_deferred_before_mutation` | S01 step reviewer finding | S01 skeleton must not report successful apply before S03 apply engine | no | yes |
+| added | S01 P2 regression guard | `test_uninstall_json_preflight_errors_are_parseable_objects` | tc-023 | JSON command surface must stay parseable for semantic/preflight errors | no | yes |
+| added | S01 P2 recovery guard | `test_uninstall_accepts_recovery_target_when_scripts_are_missing`; `test_uninstall_rejects_target_missing_version_file` | tc-020 | direct installer recovery must work after repo-local runtime/scripts have been removed while still rejecting unmanaged targets | no | yes |
+| added | S01 P2 target guard | `test_uninstall_json_missing_target_path_returns_json_error`; `test_uninstall_json_file_target_returns_json_error_without_mutation` | tc-020, tc-023 | non-directory target preflight must remain machine-readable under `--json` | no | yes |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00147 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/f413/spec-dock` | iss-00147 | current session | spec-reviewer, system-architect, implementation-planner, consultant, repo-analyst, researcher as needed | same repo, active issue, session, named role; canonical docs remain orchestrator-owned; no destructive action / publishing / credentialed access / scope expansion | issue planning complete / session end / scope change / user revocation | none | proceed with scoped planning and review gates |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | installer CLI and tests change | dev-coder | installer uninstall command surface and S01 tests | `plan.md` S01 | `src/spec_dock/cli.py`, `tests/test_init_update.py` | runtime files, docs, package metadata, actual deletion logic beyond S01 skeleton | focused S01 unittest command; `python -m unittest tests.test_init_update -v`; `git diff --check` | CLI contract conflict, need for S02/S03 behavior, inability to assert no mutation | changed files, tests, Ledger Note | pass with reviewer follow-up applied |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | dev-coder | Added installer `uninstall` parser, S01 dry-run text/JSON skeleton, target validation, specs-mode preflight, explicit apply-deferred guard, JSON preflight errors, recovery target validation, and non-directory target JSON handling after reviewer findings | `src/spec_dock/cli.py`; `tests/test_init_update.py` | focused S01 command -> pass (`Ran 11 tests`); `python -m unittest tests.test_init_update -v` -> fail with unrelated dogfooding `.meta.json` snapshot drift; `git diff --check -- src/spec_dock/cli.py tests/test_init_update.py` -> pass; `./spec-dock/scripts/spec-dock validate` -> pass | Herschel final re-review passed with no findings | full file test has unrelated snapshot drift failure | accepted for S01 step commit |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01 | N/A | no parent implementation exception used | N/A | N/A | N/A | normal delegated path verified by S01 worker/reviewer evidence | code-reviewer Herschel passed | no unavailable / denied / host conflict / waiver path used |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step code review | code-reviewer | fresh | failed | N/A | blocked until fixes and re-review | Bohr: P1 apply skeleton reported completed without mutation; P1 report evidence placeholder |
+| S01 | step code re-review | code-reviewer | fresh | passed | N/A | P2 follow-up adopted before step commit | Volta: review_status=pass; P2 JSON semantic error payload and scripts-missing recovery validation applied |
+| S01 | step code final re-review | code-reviewer | fresh | passed | N/A | P2 follow-up adopted before step commit | Averroes: review_status=pass; P2 missing/file target JSON error applied |
+| S01 | step code final re-review after P2 | code-reviewer | fresh | passed | N/A | proceed to S01 step commit | Herschel: review_status=pass; no findings after all P2 follow-ups |
+| requirement | requirement spec review | spec-reviewer | fresh | passed | N/A | proceed to design | Godel: no findings; parent scope and provenance blockers fixed |
+| design | design spec review | spec-reviewer | fresh | passed | N/A | proceed to plan | Avicenna: no blocking findings; P2 scaffold coverage and decision ledger cleanup applied |
+| plan | plan spec review | spec-reviewer | fresh | failed | N/A | blocked until fixes and re-review | Gibbs: P1 closure gaps for EC-001, EC-006, AC-008/EC-005; P2 no-op/report-update gates |
+| plan | plan spec re-review | spec-reviewer | fresh | passed | N/A | proceed to implementation readiness | Ptolemy: blocking Gibbs findings resolved; P2 stale delegated design draft reviewer state fixed |
+| requirement/design/plan | JSON amendment spec re-review | spec-reviewer | pending | pending | N/A | blocked until fresh pass | `--json` moved into initial scope after user answer |
+| requirement/design/plan | JSON amendment spec review | spec-reviewer | fresh | failed | N/A | blocked until fixes and re-review | Zeno: P1 action-level JSON state coverage gap fixed in tc-023/tc-024 |
+| requirement/design/plan | JSON amendment spec re-review | spec-reviewer | fresh | passed | N/A | proceed to implementation readiness | Heisenberg: Zeno P1 resolved; P2 apply-side category/reason assertions applied |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | committed | `src/spec_dock/cli.py`, `tests/test_init_update.py`, `report.md` S01 evidence | `96a1fa89280e7d2332f41b8e84991bc9d0b90d6d` | `git status --short` after commit -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/cli.py` - installer uninstall S01 command surface and dry-run/JSON skeleton.
+- `tests/test_init_update.py` - S01 command surface, preflight, no-mutation, JSON, and apply-deferred tests.
+- `spec-dock/active/issue/report.md` - S01 observed evidence ledger.
 
 #### コミット
-- <hash> <message>
+- `96a1fa89280e7d2332f41b8e84991bc9d0b90d6d`
+- message: `feat(installer): uninstall のコマンド面を追加`
 
 #### メモ
-- ...
+- Worker reported: No material implementation decisions beyond the approved plan.
 
 ---
 
 ### セッションログ（2026-05-31 HH:MM - HH:MM）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S02
+- AC/EC: AC-005, AC-006, AC-007, EC-006, EC-007
+- closure ids: tc-004, tc-005, tc-006, tc-007, tc-008, tc-009, tc-021
 
 #### 実施内容
-- ...
+- `uninstall` dry-run を S01 skeleton から S02 inventory / category classification / content policy 実装へ差し替えた。
+- `install_root` current assets、obsolete exact paths、scaffold assets、generated state、spec history、repo-root `spec` shortcut、unknown boundary-root files を dry-run action に分類するようにした。
+- agent / native agent は known SpecDock-managed path なら mismatch でも `would_remove`、bootstrap-only / product-reusable / scaffold-managed は exact match のみ `would_remove`、mismatch / comparison error は `preserved` とした。
+- `--apply` は S03 scope のまま deferred で、S02 では filesystem mutation を追加していない。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_init_update.TestInitUpdate -v -k uninstall
+
+Ran 18 tests in 1.613s
+OK
+
+git diff --check -- src/spec_dock/cli.py tests/test_init_update.py
+
+pass
+
+git diff --check
+
+pass
+
+python -m unittest tests.test_init_update -v
+
+Ran 196 tests
+FAILED (failures=1)
+known unrelated observed failure: test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+reason: checked-in dogfooding .meta.json path set diverged from cutover snapshot
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ | red-required | tc-005, tc-006, tc-007, tc-021, tc-008, tc-009 tests failed before implementation because S01 skeleton did not emit those inventory actions | delegated dev-coder command | pass | tc-004 was covered-existing by S01 representative known skill and expanded in S02 |
+| S02 | 緑フェーズ | focused uninstall command | 18 uninstall tests passed | `python -m unittest tests.test_init_update.TestInitUpdate -v -k uninstall` | pass | S01 + S02 uninstall behavior passed |
+| S02 | リファクタリング | guardrail satisfied | dry-run inventory only; apply remains deferred | diff inspection and `git diff --check` | pass | no runtime wrapper/docs/apply changes |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | full `tests.test_init_update` still has dogfooding `.meta.json` snapshot drift failure | verification | recorded as broad-suite blocker to resolve before final S99 | N/A | no | `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` failure |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | tc-004, tc-005, tc-006, tc-007, tc-008, tc-009, tc-021 | classification tests pass, code-reviewer pass, report updated | red evidence captured by dev-coder; focused 18-test command pass; report updated; code-reviewer Darwin pass | pass | S02 ready for step commit |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-004 | S02 | yes | red-required | covered-existing S01 representative known skill; expanded S02 inventory | focused uninstall command | pass | known managed agent/skill mismatch planned for removal |
+| tc-005 | S02 | yes | red-required | S01 skeleton did not emit unknown boundary actions | focused uninstall command | pass | unknown files under managed roots preserved |
+| tc-006 | S02 | yes | red-required | S01 skeleton did not emit bootstrap/product-reusable exact-match actions | focused uninstall command | pass | exact-match bootstrap/product-reusable assets would_remove |
+| tc-007 | S02 | yes | red-required | S01 skeleton did not emit mismatch preservation actions | focused uninstall command | pass | mismatch assets preserved with manual review reason |
+| tc-021 | S02 | yes | red-required | S01 skeleton did not emit comparison-error preservation actions | focused uninstall command | pass | symlink/type mismatch preserve |
+| tc-008 | S02 | yes | red-required | S01 skeleton did not emit scaffold-managed exact/mismatch actions | focused uninstall command | pass | scaffold exact match removes, mismatch preserves |
+| tc-009 | S02 | yes | red-required | S01 skeleton did not inspect repo-root `spec` variants | focused uninstall command | pass | only matching shortcut would_remove |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-004 | S02 | `test_uninstall_dry_run_removes_known_agent_skill_mismatch` | pass | known managed skill mismatch remains removal candidate |
+| tc-005 | S02 | `test_uninstall_dry_run_preserves_unknown_files_under_managed_roots` | pass | unknown files in `.agents`, `.codex`, `.github`, `spec-dock` preserved |
+| tc-006 | S02 | `test_uninstall_dry_run_removes_exact_match_bootstrap_and_product_reusable_assets` | pass | exact-match bootstrap/product-reusable assets would_remove |
+| tc-007 | S02 | `test_uninstall_dry_run_preserves_mismatch_bootstrap_and_product_reusable_assets` | pass | mismatch preserved/manual review |
+| tc-021 | S02 | `test_uninstall_dry_run_preserves_non_core_comparison_errors_for_manual_review` | pass | type/symlink comparison errors preserved/manual review |
+| tc-008 | S02 | `test_uninstall_dry_run_scaffold_managed_exact_match_removes_and_mismatch_preserves` | pass | scaffold exact match vs mismatch policy |
+| tc-009 | S02 | `test_uninstall_dry_run_spec_shortcut_only_removes_matching_symlink` | pass | matching symlink removed, nonmatching/file/directory preserved |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | S02 classification tests | listed S02 uninstall dry-run tests | tc-004 through tc-009 and tc-021 | S02 inventory/category/content policy closure | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | inventory/classification logic and tests change | dev-coder | dry-run inventory/category/content policy | `plan.md` S02 | `src/spec_dock/cli.py`, `tests/test_init_update.py` | actual apply deletion, runtime wrapper, docs | focused uninstall tests; `python -m unittest tests.test_init_update -v`; `git diff --check` | need to delete unknown files, category conflict, comparison impossible to test hermetically | changed files, tests, Ledger Note | pass; reviewer pending |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Replaced S01 skeleton with S02 dry-run inventory/classification for install_root assets, scaffold assets, generated state, specs, shortcut, and unknown boundary files | `src/spec_dock/cli.py`; `tests/test_init_update.py` | focused uninstall command -> pass (`Ran 18 tests`); full `tests.test_init_update` -> fail with known dogfooding `.meta.json` snapshot drift; `git diff --check` -> pass | Darwin final review passed with no findings | apply/delete engine and empty-dir cleanup remain S03; broad suite snapshot drift remains for S99 | accepted for S02 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step code review | code-reviewer | fresh | passed | N/A | proceed to S02 step commit | Darwin: review_status=pass; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | committed | `src/spec_dock/cli.py`, `tests/test_init_update.py`, `report.md` S02 evidence | `b3e9549b7cf4b7da4a4a6c9b12ef975cd3ad9cb6` | `git status --short` after commit -> clean | N/A | N/A | N/A | N/A |
+
+---
+
+### セッションログ（2026-05-31 S03）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-003, AC-004, AC-009, AC-010, EC-003, EC-004, EC-005, EC-008
+- closure ids: tc-010, tc-011, tc-012, tc-013, tc-014, tc-022, tc-024
+
+#### 実施内容
+- `--apply --keep-specs` / `--apply --remove-specs` の apply engine を追加した。
+- S02 action plan の `would_remove` を file / symlink / directory tree 削除へ適用し、`preserved` は untouched result として残すようにした。
+- removal result として `removed` / `already_removed` / `preserved` / `failed` / `empty_dir_removed` を text / JSON に反映した。
+- `.agents`, `.codex`, `.github`, `spec-dock` 内だけで empty directory cleanup を行い、repo root、`.git`、target parent、preserved file を越えないようにした。
+- partial failure は `status: "partial_failure"`、exit `1`、failed action details として返すようにした。
+- repo-local runtime が削除された後の recovery として installer CLI `spec-dock uninstall <target>` / `spec-dock init/update <target>` guidance を apply output に出すようにした。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_init_update.TestInitUpdate -v -k uninstall
+
+Ran 28 tests in 2.477s
+OK
+
+git diff --check -- src/spec_dock/cli.py tests/test_init_update.py
+
+pass
+
+git diff --check
+
+pass
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=74
+
+python -m unittest tests.test_init_update -v
+
+Ran 202 tests
+FAILED (failures=1)
+known unrelated observed failure: test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+reason: checked-in dogfooding .meta.json path set diverged from cutover snapshot
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ | red-required | new apply tests failed before implementation with `uninstall --apply is not implemented in S02; full apply behavior is deferred to S03` | delegated dev-coder command | pass | keep-specs and JSON apply tests reproduced S02 guard |
+| S03 | 緑フェーズ | focused uninstall command | 28 uninstall tests passed | `python -m unittest tests.test_init_update.TestInitUpdate -v -k uninstall` | pass | S01-S03 uninstall behavior plus Faraday/Ampere regression fixes passed |
+| S03 | リファクタリング | guardrail satisfied | apply logic limited to installer CLI and tests | diff inspection and `git diff --check` | pass | runtime wrapper/docs still pending |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | keep-specs rerun after apply loses `spec-dock/spec-dock.version` but preserves spec history | code-reviewer Faraday | initiatives-only fallback rejected; replaced by exact retry marker semantics | tc-013 / D-006 / D-007 | no unless reviewer rejects marker | Faraday review_status=fail; Euclid follow-up |
+| S03 | remove-specs rerun has no durable managed marker after complete cleanup | code-reviewer Faraday | create and preserve exact `spec-dock/.uninstall-retry.json` marker, then require exact marker for rerun eligibility | tc-013 / D-007 | no unless reviewer rejects marker | `test_uninstall_apply_remove_specs_rerun_reports_already_removed_and_succeeds` |
+| S03 | symlinked boundary root can route deletion outside target | code-reviewer Faraday | reject symlinked uninstall boundary roots before apply and guard symlink containers | tc-012 | no | `test_uninstall_apply_rejects_symlinked_boundary_root_without_external_deletion` |
+| S03 | initiatives-only unmanaged target was accepted | code-reviewer Faraday | reject initiatives-only target before mutation; retry marker must match exact payload | tc-020 regression | no | `test_uninstall_apply_rejects_unmanaged_initiatives_only_target_before_mutation` |
+| S03 | symlinked retry marker can route marker write outside target | code-reviewer Ampere | reject symlinked `spec-dock/.uninstall-retry.json` before marker read/write | tc-012 / tc-024 regression | no | `test_uninstall_apply_rejects_symlinked_retry_marker_without_external_mutation` |
+| S03 | full `tests.test_init_update` still has dogfooding `.meta.json` snapshot drift failure | verification | recorded as broad-suite blocker to resolve before final S99 | N/A | no | `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` failure |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | tc-010, tc-011, tc-012, tc-013, tc-014, tc-022, tc-024 | apply behavior tests pass, code-reviewer pass, report updated | red evidence captured by dev-coder; focused 28-test command pass; report updated with Faraday/Ampere fixes; code-reviewer Planck pass | pass | S03 ready for step commit |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-010 | S03 | yes | red-required | S02 apply guard failure before implementation | focused uninstall command | pass | keep-specs preserves `spec-dock/initiatives/**` |
+| tc-011 | S03 | yes | red-required | S02 apply guard failure before implementation | focused uninstall command | pass | remove-specs removes spec history and reports it |
+| tc-012 | S03 | yes | red-required | S02 apply guard failure before implementation; Faraday found symlink boundary external deletion before follow-up | focused uninstall command | pass | bounded cleanup respects preserved files/root boundaries and rejects symlinked boundary roots |
+| tc-013 | S03 | yes | red-required | S02 apply guard failure before implementation; Faraday found remove-specs rerun failure before follow-up | focused uninstall command | pass | keep-specs and remove-specs rerun report already_removed and succeed via exact retry marker |
+| tc-014 | S03 | yes | red-required | S02 apply guard failure before implementation | focused uninstall command | pass | injected `Path.unlink` failure reports failed separately |
+| tc-022 | S03 | yes | red-required | S02 apply guard failure before implementation | focused uninstall command | pass | output provides installer-direct recovery guidance |
+| tc-024 | S03 | yes | red-required | S02 apply guard failure before implementation | focused uninstall command | pass | JSON apply result covers success, rerun, preserved, cleanup, failed |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-010 | S03 | `test_uninstall_apply_keep_specs_removes_tooling_and_preserves_spec_history` | pass | tooling removed, spec marker preserved |
+| tc-011 | S03 | `test_uninstall_apply_remove_specs_removes_spec_history_with_explicit_summary` | pass | spec history action removed and reported |
+| tc-012 | S03 | `test_uninstall_apply_bounded_cleanup_respects_preserved_files_and_roots` | pass | cleanup stayed in boundary roots |
+| tc-013 | S03 | `test_uninstall_apply_rerun_reports_already_removed_and_succeeds` | pass | keep-specs rerun covered |
+| tc-012 | S03 | `test_uninstall_apply_rejects_symlinked_boundary_root_without_external_deletion` | pass | symlinked boundary external deletion regression covered |
+| tc-012, tc-024 | S03 regression | `test_uninstall_apply_rejects_symlinked_retry_marker_without_external_mutation` | pass | retry marker symlink external write regression covered |
+| tc-013 | S03 | `test_uninstall_apply_remove_specs_rerun_reports_already_removed_and_succeeds` | pass | remove-specs rerun covered |
+| tc-020 | S03 regression | `test_uninstall_apply_rejects_unmanaged_initiatives_only_target_before_mutation` | pass | initiatives-only unmanaged target rejected before mutation |
+| tc-014 | S03 | `test_uninstall_apply_partial_unlink_failure_reports_failed_separately` | pass | injected unlink failure covered |
+| tc-022 | S03 | `test_uninstall_apply_output_provides_installer_direct_recovery_guidance` | pass | installer CLI guidance present |
+| tc-024 | S03 | `test_uninstall_apply_json_covers_success_rerun_and_partial_failure_statuses` | pass | completed / partial_failure JSON covered |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | S03 apply tests | listed S03 uninstall apply tests | tc-010 through tc-014, tc-022, tc-024 | S03 apply/idempotency/failure/JSON closure | no | yes |
+| added | S03 reviewer regression tests | symlink boundary, initiatives-only unmanaged, remove-specs rerun, symlink marker tests | tc-012, tc-013, tc-020 regression, tc-024 regression | Faraday/Ampere findings | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | apply engine and tests change | dev-coder | apply engine, idempotency, partial failure, bounded cleanup | `plan.md` S03 | `src/spec_dock/cli.py`, `tests/test_init_update.py` | runtime wrapper, docs, package/environment deletion, GitHub mutation | focused uninstall tests; `python -m unittest tests.test_init_update -v`; `git diff --check` | need to touch repo root/parent, inability to simulate failure, content policy conflict | changed files, tests, failure simulation, Ledger Note | pass; reviewer pending |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | Added apply execution, idempotent rerun via exact non-symlink retry marker, bounded cleanup, symlink boundary/marker rejection, partial failure, JSON apply result, and recovery guidance | `src/spec_dock/cli.py`; `tests/test_init_update.py` | focused uninstall command -> pass (`Ran 28 tests`); full `tests.test_init_update` -> fail with known dogfooding `.meta.json` snapshot drift; `git diff --check` -> pass | Planck final review passed with P2 report-evidence fix applied | broad suite snapshot drift remains for S99 | accepted for S03 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step code review | code-reviewer | fresh | failed | N/A | blocked until fixes and re-review | Faraday: P1 symlink boundary external deletion; P1 initiatives-only unmanaged target; P2 remove-specs rerun |
+| S03 | step code re-review | code-reviewer | fresh | failed | N/A | blocked until fixes and re-review | Ampere: P1 symlinked retry marker external write |
+| S03 | step code second re-review | code-reviewer | fresh | passed | N/A | proceed to S03 step commit | Planck: review_status=pass; P2 report evidence inconsistency fixed |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | committed | `src/spec_dock/cli.py`, `tests/test_init_update.py`, `report.md` S03 evidence | `c39c1c9b0e8b7cae663e1b6156086b79b3e0f285` | `git status --short` after commit -> clean | N/A | N/A | N/A | N/A |
+
+---
+
+### セッションログ（2026-05-31 S04）
+
+#### 対象
+- Step: S04
+- AC/EC: AC-008, AC-010
+- closure ids: tc-015, tc-016, tc-017, tc-025
+
+#### 実施内容
+- repo-local runtime command `uninstall` を追加した。
+- runtime 側に uninstall logic は実装せず、`uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock uninstall <target>` へ委譲する thin wrapper とした。
+- `--apply`, `--keep-specs`, `--remove-specs`, `--json` を installer CLI へ forwarding し、stdout / stderr / exit code をそのまま伝播するようにした。
+- missing `uvx` は exit `127` と PATH/install guidance を返すようにした。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_uninstall -v
+
+Ran 8 tests
+OK
+
+python -m unittest tests.cli_runtime.test_update tests.cli_runtime.test_uninstall -v
+
+Ran 15 tests
+OK
+
+git diff --check -- src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/uninstall.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/registry.py tests/cli_runtime/test_uninstall.py
+
+pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | 赤フェーズ | red-required | `tests.cli_runtime.test_uninstall` failed before implementation with runtime `invalid choice: 'uninstall'` | delegated dev-coder command | pass | command was not registered |
+| S04 | 緑フェーズ | runtime wrapper command | 8 uninstall runtime tests passed | `python -m unittest tests.cli_runtime.test_uninstall -v` | pass | tc-015/tc-016/tc-017/tc-025 covered |
+| S04 | リファクタリング | update wrapper parity | update + uninstall wrapper tests passed | `python -m unittest tests.cli_runtime.test_update tests.cli_runtime.test_uninstall -v` | pass | no wrapper common abstraction added |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | unsupported `--from` / `--cache-dir` must not invoke uvx | test parity with update wrapper | added negative test in runtime uninstall suite | S04 wrapper hardening | no | `test_uninstall_rejects_source_and_cache_overrides_without_invoking_uvx` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | tc-015, tc-016, tc-017, tc-025 | runtime tests pass, code-reviewer pass, report updated | red evidence captured by dev-coder; runtime 8-test command pass; report updated; code-reviewer Sartre pass | pass | S04 ready for step commit |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-015 | S04 | yes | red-required | runtime command not registered | runtime uninstall tests | pass | uvx no-cache upstream uninstall invocation |
+| tc-016 | S04 | yes | red-required | runtime command not registered | runtime uninstall tests | pass | flag and stdout/stderr/exit propagation |
+| tc-017 | S04 | yes | red-required | runtime command not registered | runtime uninstall tests | pass | missing uvx guidance |
+| tc-025 | S04 | yes | red-required | runtime command not registered | runtime uninstall tests | pass | JSON forwarding and stdout preservation |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-015 | S04 | `test_uninstall_runs_uvx_no_cache_with_default_target`; `test_uninstall_passes_explicit_target_to_installer_uninstall` | pass | default and explicit target invocation covered |
+| tc-016 | S04 | `test_uninstall_forwards_apply_keep_specs_and_propagates_failure_output`; `test_uninstall_forwards_remove_specs_flag` | pass | flags and result propagation covered |
+| tc-017 | S04 | `test_uninstall_missing_uvx_fails_with_actionable_error` | pass | exit 127 guidance covered |
+| tc-025 | S04 | `test_uninstall_forwards_json_and_preserves_json_stdout` | pass | JSON forwarding covered |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | S04 runtime wrapper tests | `tests/cli_runtime/test_uninstall.py` | tc-015, tc-016, tc-017, tc-025 | runtime thin wrapper closure | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | delegated | runtime wrapper and tests change | dev-coder | repo-local runtime uninstall wrapper | `plan.md` S04 | runtime uninstall command/parser/registry and runtime tests | installer code, docs, package metadata, arbitrary uvx override options | `python -m unittest tests.cli_runtime.test_uninstall -v`; `git diff --check` | runtime needs to reimplement installer logic, accepted flags diverge from installer CLI | changed files, tests, Ledger Note | pass; reviewer pending |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 | dev-coder | Added repo-local runtime uninstall wrapper, parser/registry binding, and stubbed uvx tests | runtime uninstall command/parser/registry; `tests/cli_runtime/test_uninstall.py` | runtime uninstall tests -> pass (`Ran 8 tests`); update+uninstall wrapper tests -> pass (`Ran 15 tests`); diff check -> pass | Sartre final review passed with no findings | none identified; installer contract assumed stable from S01-S03 | accepted for S04 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step code review | code-reviewer | fresh | passed | N/A | proceed to S04 step commit | Sartre: review_status=pass; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | committed | runtime uninstall command/parser/registry, `tests/cli_runtime/test_uninstall.py`, `report.md` S04 evidence | `f2eb8a82770e41be8a3d3df7f30d89cecd4e7414` | `git status --short` after commit -> clean | N/A | N/A | N/A | N/A |
 
 ---
 
@@ -243,27 +623,170 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| `src/spec_dock/assets/spec_dock/docs/reference_github.md` | yes | doc-writer | `uninstall` is documented as repo-local managed artifacts removal with no GitHub mutation and no package/environment/`uvx` cache uninstall; runtime wrapper delegates through fixed upstream installer via `uvx --no-cache`; retry/reinstall/refresh after self-removal uses installer CLI | pass: spec-reviewer Laplace |
+| `src/spec_dock/assets/spec_dock/docs/reference_sync.md` | yes | doc-writer | generated state cleanup relationship added for `spec-dock/active/**` and `spec-dock/.agent/**`; recovery after runtime self-removal points to installer CLI | pass: spec-reviewer Laplace |
+| templates / README / workflow / skill / migration notes | no | orchestrator inspection | S90 scope and plan only required provider reference docs for GitHub boundary and sync/generated-state cleanup; no issue-local evidence found that required broader persistent docs changes | pass: spec-reviewer Laplace |
+
+#### S90 実行コマンド / 結果
+```bash
+git diff --check -- src/spec_dock/assets/spec_dock/docs/reference_github.md src/spec_dock/assets/spec_dock/docs/reference_sync.md
+
+pass
+
+PYTHONPATH=src python -m spec_dock.cli uninstall --help
+
+pass; help shows `spec-dock uninstall [path] [--apply] [--keep-specs | --remove-specs] [--json]` and does not describe GitHub/package/environment/uvx-cache side effects
+
+PYTHONPATH=src/spec_dock/assets/spec_dock/scripts python -c 'from spec_dock_runtime.cli.parser import build_parser; from spec_dock_runtime.cli.registry import build_registry; build_parser(build_registry()).parse_args(["uninstall", "--help"])'
+
+pass; source runtime help describes `SpecDock-managed repo assets` and the fixed `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock uninstall TARGET` delegation; it does not describe GitHub/package/environment/uvx-cache cleanup
+```
+
+#### S90 クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-018 | S90 | docs diff inspection, installer help output inspection, source runtime help output inspection, and `git diff --check` | pass | docs state no GitHub mutation, no package/environment/`uvx` cache uninstall, repo-local artifact removal, generated-state cleanup, and installer-direct recovery guidance; help output does not imply forbidden side effects |
+
+#### S90 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S90 | doc-writer | Updated provider reference docs for uninstall's repo-local/GitHub/package boundary, runtime delegation, installer-direct recovery, and generated-state cleanup relationship | `src/spec_dock/assets/spec_dock/docs/reference_github.md`; `src/spec_dock/assets/spec_dock/docs/reference_sync.md` | `git diff --check -- src/spec_dock/assets/spec_dock/docs/reference_github.md src/spec_dock/assets/spec_dock/docs/reference_sync.md` -> pass | Laplace final re-review passed with no findings | dogfooding mirror parity remains for S99 | accepted for S90 step commit |
+
+#### S90 レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | docs/spec alignment review | spec-reviewer | fresh | failed | N/A | blocked until help-output evidence was recorded | Mendel: P1 tc-018 report evidence lacked planned help-output inspection |
+| S90 | docs/spec alignment re-review | spec-reviewer | fresh | passed | N/A | proceed to S90/S99 parity and final gates | Laplace: review_status=pass; docs diff plus installer/source-runtime help evidence resolves tc-018 |
+
+#### S99 先行ブロッカー修正（Pre-Final Verification Fixes）
+| 対象（target） | 起票元（source） | 実施した対応 | 証跡（evidence） | 残リスク（remaining risk） |
+|---|---|---|---|---|
+| checked-in dogfooding `.meta.json` snapshot drift for `iss-00147` | broad `tests.test_init_update` failure observed in S01-S03 | updated `tests/test_init_update.py` snapshot baselines for `iss-00147-spec-dock-uninstall-command/.meta.json` path and `depends_on: []` | `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v` -> pass; `git diff --check -- tests/test_init_update.py` -> pass | full `tests.test_init_update` still had provider/dogfooding mirror parity failures to resolve before S99 |
+| dogfooding mirror parity for S04/S90 provider asset changes | full `tests.test_init_update` failure after snapshot fix | synced checked-in dogfooding mirrors for provider reference docs and runtime parser/registry assets | three parity tests -> pass; legacy deps snapshot test -> pass; mirror `git diff --check` -> pass | full suite still pending |
+| dogfooding runtime mirror missing `commands/uninstall.py` | `tests.test_init_update` failed broadly with `ImportError: cannot import name 'uninstall' from 'spec_dock_runtime.commands'` | added checked-in dogfooding mirror `spec-dock/scripts/spec_dock_runtime/commands/uninstall.py` from provider asset; `commands/__init__.py` unchanged because provider and mirror matched | runtime surface test -> pass; runtime mirror parity test -> pass; command file `git diff --check` -> pass | full suite cache-copy blocker discovered next |
+| generated Python cache copy into scaffold targets | `python -m unittest discover -v` failed after runtime tests generated provider-asset `__pycache__/*.pyc`, then uninstall snapshot tests read copied binary `.pyc` as UTF-8 | added generic installer guard to ignore `__pycache__` directories and `*.pyc` files for init/update copy and provider asset inventory; added init/update regression tests | focused cache regression 2 tests -> pass; uninstall 28 tests -> pass; `tests.test_init_update` 208 tests -> pass; full discover 1026 tests -> pass; focused diff check -> pass | local ignored cache files may exist but are no longer copied/inventoried |
+| final QA/code review findings | qa-reviewer Halley P1/P2 and code-reviewer Lorentz P2 | added `shutil.rmtree` failure coverage for `spec-dock/initiatives`, preserved-file content assertion for mismatched `.codex/config.toml`, and stale `spec-dock/spec-dock.version` removal policy/test | stale version focused test -> pass; rmtree failure focused test -> pass; apply JSON focused test -> pass; uninstall focused 30 tests -> pass; `tests.test_init_update` 210 tests -> pass; focused diff check -> pass | final re-review pending |
+
+#### S99 先行 mirror parity 実行コマンド / 結果
+```bash
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets tests.test_init_update.TestInitUpdate.test_reference_sync_doc_matches_bundled_asset -v
+
+Ran 3 tests
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v
+
+Ran 1 test
+OK
+
+git diff --check -- spec-dock/docs/reference_github.md spec-dock/docs/reference_sync.md spec-dock/scripts/spec_dock_runtime/cli/parser.py spec-dock/scripts/spec_dock_runtime/cli/registry.py spec-dock/scripts/spec_dock_runtime/commands/uninstall.py
+
+pass
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint -v
+
+Ran 1 test
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets -v
+
+Ran 1 test
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_init_does_not_copy_generated_python_caches_from_provider_assets tests.test_init_update.TestInitUpdate.test_update_does_not_copy_generated_python_caches_from_provider_assets -v
+
+Ran 2 tests
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate -v -k uninstall
+
+Ran 28 tests
+OK
+
+python -m unittest tests.test_init_update -v
+
+Ran 208 tests
+OK
+
+python -m unittest discover -v
+
+Ran 1026 tests
+OK
+
+git diff --check -- src/spec_dock/cli.py tests/test_init_update.py
+
+pass
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_uninstall_dry_run_removes_stale_specdock_version -v
+
+Ran 1 test
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_uninstall_apply_partial_rmtree_failure_reports_failed_spec_history_separately -v
+
+Ran 1 test
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_uninstall_apply_json_covers_success_rerun_and_partial_failure_statuses -v
+
+Ran 1 test
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate -v -k uninstall
+
+Ran 30 tests
+OK
+
+python -m unittest tests.test_init_update -v
+
+Ran 210 tests
+OK
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=74
+
+./spec-dock/scripts/spec-dock sync --no-github
+
+spec-dock: sync: active unchanged (matched id in branch: iss-00147)
+spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+
+git diff --check
+
+pass
+```
+
+`sync --no-github` opt-out reason: final local artifact consistency was required for PR handoff, while live GitHub enrichment was not required for uninstall implementation correctness and would introduce network-state variability into the final gate.
+
+#### S99 先行 mirror parity クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| discovered | S99 dogfooding mirror parity | `spec-dock/scripts/spec_dock_runtime/cli/registry.py` mirror sync | tc-019 | runtime parser parity fix exposed registry parity drift for the same S04 provider asset change | no | yes, final review gates |
+| discovered | S99 dogfooding mirror parity | `spec-dock/scripts/spec_dock_runtime/commands/uninstall.py` mirror sync | tc-019 | registry mirror imports `commands.uninstall`; dogfooding mirror needed the provider command file to keep runtime subprocess tests importable | no | yes, final review gates |
+| discovered | S99 full-suite cache guard | `test_init_does_not_copy_generated_python_caches_from_provider_assets`; `test_update_does_not_copy_generated_python_caches_from_provider_assets` | tc-019 | full discover can generate ignored provider-asset caches before installer tests; init/update must not copy generated Python caches into target repos | no | yes, final review gates |
+| added | S03/S99 reviewer regression | `test_uninstall_apply_partial_rmtree_failure_reports_failed_spec_history_separately` | tc-014 | destructive directory removal failures must be reported separately, not only file unlink failures | no | yes, final review gates |
+| strengthened | S03/S99 reviewer regression | preserved `.codex/config.toml` content assertion in apply JSON test | tc-024 / AC-006 | apply result must not only report preservation but also leave product-owned mismatch content intact | no | yes, final review gates |
+| added | S02/S99 reviewer regression | `test_uninstall_dry_run_removes_stale_specdock_version` | tc-008 / managed state cleanup | stale version files are generated managed state and should not be preserved as user-edited scaffold content | no | yes, final review gates |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| Halley / Linnaeus | whole issue obligation coverage | added regression coverage for rmtree failure and preserved file content; generated-state cleanup behavior recorded as D-010 non-blocking no_action | initial fail: P1 rmtree failure coverage, P2 preserved content assertion; fixed by Socrates; Linnaeus re-review found only P2 generated-state cleanup coverage recommendation and review_status=pass | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| Lorentz / Huygens | issue-wide integrated diff | Lorentz P2 stale `spec-dock/spec-dock.version` preservation fixed by treating version file as managed state; Huygens re-review found no findings | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| Raman / Nash | requirement / design / plan / report / implementation / tests / docs alignment | Raman P1 final gate/evidence placeholders fixed; Nash re-review passed with non-blocking P2/P3 report-audit recommendations; D-010 and S01 parent-exception row cleanup applied | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S99 evidence updated through final reviewer findings, local validation bundle, D-008/D-010 decisions, final reviewer pass rows, and PR delivery verification | implementation commits through `f03e9a8118881c05d7cb66f6d523520252b1fcfe` plus report-only PR delivery evidence update | PR #148 / final response | committed and PR submitted; PR #148 is open, ready, base `main`, head `iss-00147-spec-dock-uninstall-command` |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...

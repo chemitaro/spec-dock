@@ -55,6 +55,11 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         registry,
         "update",
     )
+    _bind_leaf(
+        sub.add_parser("uninstall", help="Uninstall SpecDock-managed repo assets via the upstream spec-dock package"),
+        registry,
+        "uninstall",
+    )
 
     p_delegated = sub.add_parser("delegated-authoring", help="Check delegated discussion draft output")
     delegated_sub = p_delegated.add_subparsers(dest="delegated_authoring_cmd", required=True)

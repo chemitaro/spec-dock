@@ -17,6 +17,7 @@ ID: "epic-00054"
   - command-side GitHub close
   - local spec node delete
   - repo-local self-update command
+  - repo-local uninstall command
   - destructive guardrail and docs parity
 - impacted area:
   - runtime command surface
@@ -28,7 +29,8 @@ ID: "epic-00054"
   - 現状の create flow は command 側で完結するが、close は GitHub Web UI へ戻っている。
   - local node cleanup も command contract を持たず、directory 削除が手作業運用になっている。
   - managed assets update は installer CLI 側に存在するが、repo-local runtime command から呼び出す導線がない。
-  - 本 epic はこの lifecycle gap を埋めるが、remote delete は事故リスクから除外する。
+  - managed repo から SpecDock の開発用 agent / skill / tooling を取り外す導線もなく、開発完了後の product repo で agent / skill noise が残る。
+  - 本 epic はこの lifecycle gap を埋めるが、remote delete と package/environment uninstall は事故リスクと scope 拡大から除外する。
   - review-only issue は不自然なため採らず、各 implementation issue に review / success verification を埋め込む。
 
 ### UML（推奨: module / context）
@@ -40,15 +42,19 @@ left to right direction
 rectangle "close command" as close
 rectangle "local delete command" as delete
 rectangle "self-update command" as update
+rectangle "uninstall command" as uninstall
 rectangle "local spec tree" as tree
 rectangle "GitHub issues" as gh
 rectangle "upstream package" as pkg
+rectangle "managed repo assets" as assets
 
 close --> gh
 delete --> tree
 delete --> gh : close-only
 update --> pkg : uvx --no-cache
 pkg --> tree : installer update
+uninstall --> assets : remove SpecDock-managed tooling
+uninstall --> tree : keep/remove specs by explicit mode
 @enduml
 ```
 
@@ -85,7 +91,7 @@ pkg --> tree : installer update
   - delete command は local tree を削除するが、remote side は delete せず close-only とする
   - local delete と remote close を同一 success path に置く場合でも、destructive な主操作は local tree delete、remote は lifecycle close として意味を分離する
   - self-update command は installer update の wrapper として扱い、managed assets 更新 semantics 自体は installer 側に委ねる
-  - issue 分割は close command、local delete command、self-update command の capability scope ごとに扱う。epic final close-out evidence は固定の issue number に結びつけず、最後に完了する issue が保持する。
+  - issue 分割は close command、local delete command、self-update command、uninstall command の capability scope ごとに扱う。epic final close-out evidence は固定の issue number に結びつけず、最後に完了する issue が保持する。
 
 ## データモデル
 - model / table changes:
@@ -133,6 +139,12 @@ Node --> "0..*" Node : child
   2. upstream source と no-cache uvx invocation を固定する
   3. installer `spec-dock update <target>` を subprocess として実行する
   4. stdout / stderr / exit code を operator が追える形で返す
+- Flow-E: repo-local uninstall command
+  1. repo-local runtime command は installer CLI の uninstall implementation を subprocess として呼び出す
+  2. installer CLI は target repo の SpecDock-managed assets を inventory 化する
+  3. dry-run / explicit specs mode / category-based removal guardrail に基づいて removal plan を確定する
+  4. agent / skill assets、repo-local runtime / scaffold、repo-root shortcut、仕様履歴の keep/remove mode、product-reusable assets の content mismatch preserve を実行・報告する
+  5. repo-local runtime が削除対象になった後の再実行 / 復旧は installer CLI から行えるようにする
 
 ### UML（任意: sequence / flow）
 ```plantuml
@@ -164,6 +176,9 @@ CLI -> GH: close linked issue(s)
   - `uvx` executable missing
   - upstream package fetch failure
   - installer update failure
+  - uninstall inventory classification failure
+  - content comparison failure
+  - partial uninstall failure
 - retry:
   - close は remote retry 可能
   - delete は destructive なので、実行前 validation と confirmation で partial failure を避ける
@@ -172,9 +187,11 @@ CLI -> GH: close linked issue(s)
   - close は closed issue に対して再実行可能であることが望ましい
   - delete は既に存在しない local path に対して安全に失敗または no-op とできることが望ましい
   - self-update は installer update の idempotency に従う
+  - uninstall は既に削除済みの managed artifact を no-op / already removed として report できることが望ましい
 - partial failure:
   - local delete と remote close を同一 command で扱う場合、順序と rollback guidance を明記する必要がある
   - remote close failure 時に local delete を継続するか止めるかは local delete issue で検証対象とする
+  - uninstall partial failure 時は削除済み、未削除、preserved、failed を分けて report し、installer CLI から再実行できる必要がある
 
 ## 移行戦略
 - migration strategy:
@@ -187,6 +204,7 @@ CLI -> GH: close linked issue(s)
 - observability:
   - close / delete command の CLI evidence
   - self-update subprocess args / stdout / stderr / exit code
+  - uninstall dry-run / execution summary / preserved manual review list / failed list
   - filesystem assertion
   - sync / validate 後の state evidence
 - role / auth:
@@ -205,6 +223,7 @@ CLI -> GH: close linked issue(s)
   - close command end-to-end
   - local delete command end-to-end
   - self-update command help / default target / explicit target / failure propagation
+  - uninstall command help / dry-run / explicit specs mode / category-based removal / idempotency / partial failure summary
   - subtree delete guardrail
 - E2E:
   - docs parity
@@ -215,6 +234,7 @@ CLI -> GH: close linked issue(s)
   - E-AC-003 -> local delete issue: parent scope subtree delete guardrail + integration evidence
   - E-AC-004 -> final close-out owner issue: docs parity + dogfooding validation + final review
   - E-AC-005 -> self-update issue: runtime update command + uvx no-cache subprocess contract + docs/tests/review/success verification
+  - E-AC-006 -> uninstall issue: repo-local wrapper + installer uninstall implementation + managed asset removal guardrails + docs/tests/review/success verification
 
 ## 関連 ADR
 - なし:
