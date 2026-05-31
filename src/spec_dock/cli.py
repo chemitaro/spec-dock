@@ -130,11 +130,19 @@ def _copy_file(src: Path, dest: Path) -> None:
     shutil.copy2(src, dest)
 
 
+def _is_generated_python_cache_path(path: Path) -> bool:
+    return "__pycache__" in path.parts or path.name.endswith(".pyc")
+
+
+def _ignore_generated_python_caches(_dir: str, names: list[str]) -> set[str]:
+    return {name for name in names if name == "__pycache__" or name.endswith(".pyc")}
+
+
 def _sync_tree(src: Path, dest: Path) -> None:
     """Replace `dest` directory with a full copy of `src`."""
     if dest.exists():
         shutil.rmtree(dest)
-    shutil.copytree(src, dest)
+    shutil.copytree(src, dest, ignore=_ignore_generated_python_caches)
 
 
 def _make_executable(path: Path) -> None:
@@ -722,7 +730,10 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
         # The actual spec tree (`spec-dock/initiatives/**`) must be persistent and is
         # never removed by this installer.
         for src, dest in managed_scaffold_sync_plan:
-            _sync_tree(src, dest) if (dest.exists() or force) else shutil.copytree(src, dest)
+            if dest.exists() or force:
+                _sync_tree(src, dest)
+            else:
+                shutil.copytree(src, dest, ignore=_ignore_generated_python_caches)
 
         src_gitignore = src_spec_dock / ".gitignore"
         if src_gitignore.exists():
@@ -959,7 +970,7 @@ def _is_delete_even_if_mismatch_uninstall_path(rel_path: Path) -> bool:
         (".agents", "skills"),
         (".codex", "agents"),
         (".github", "agents"),
-    }
+    } or rel_path == Path("spec-dock/spec-dock.version")
 
 
 def _iter_existing_files_or_symlinks(root: Path) -> tuple[Path, ...]:
@@ -1089,7 +1100,14 @@ def _build_scaffold_uninstall_sources(assets_dir: Path) -> tuple[tuple[Path, byt
         src_root = src_spec_dock / managed_dir
         if not src_root.is_dir():
             raise RuntimeError(f"Missing asset directory: {src_root}")
-        for source_path in sorted((path for path in src_root.rglob("*") if path.is_file()), key=lambda p: p.as_posix()):
+        for source_path in sorted(
+            (
+                path
+                for path in src_root.rglob("*")
+                if path.is_file() and not _is_generated_python_cache_path(path.relative_to(src_spec_dock))
+            ),
+            key=lambda p: p.as_posix(),
+        ):
             rel_path = Path("spec-dock") / source_path.relative_to(src_spec_dock)
             sources.append((rel_path, source_path.read_bytes()))
 
@@ -1186,6 +1204,17 @@ def _build_uninstall_plan(
 
         for rel_path, expected in _build_scaffold_uninstall_sources(assets_dir):
             known_rel_paths.add(rel_path)
+            if _is_delete_even_if_mismatch_uninstall_path(rel_path):
+                if _path_exists_for_uninstall(target_root / rel_path) or include_missing_removals:
+                    actions.append(
+                        _UninstallAction(
+                            rel_path=rel_path.as_posix(),
+                            category="scaffold_managed",
+                            status="would_remove",
+                            reason="SpecDock managed state",
+                        )
+                    )
+                continue
             _add_exact_match_uninstall_action(
                 actions,
                 target_root,
@@ -1493,7 +1522,11 @@ def _iter_install_root_files(assets_dir: Path) -> tuple[Path, ...]:
         raise RuntimeError(f"Missing asset directory: {install_root}")
     return tuple(
         sorted(
-            (candidate for candidate in install_root.rglob("*") if candidate.is_file()),
+            (
+                candidate
+                for candidate in install_root.rglob("*")
+                if candidate.is_file() and not _is_generated_python_cache_path(candidate.relative_to(install_root))
+            ),
             key=lambda candidate: candidate.relative_to(install_root).as_posix(),
         )
     )

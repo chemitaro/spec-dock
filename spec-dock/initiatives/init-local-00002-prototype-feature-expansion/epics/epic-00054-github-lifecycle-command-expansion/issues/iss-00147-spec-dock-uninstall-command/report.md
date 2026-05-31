@@ -56,6 +56,9 @@ Disposition ごとの必須証跡:
 | D-005 | resolved | implementation | code-reviewer / dev-coder | shared target directory validation bypassed uninstall JSON for missing/file targets | leave as non-blocking P2; route uninstall target validation through uninstall preflight | route uninstall command through `_run_uninstall` before the shared init/update directory check | keeps `--json` output parseable for all uninstall preflight failures while preserving non-json stderr behavior | applied | Averroes P2 finding; `test_uninstall_json_missing_target_path_returns_json_error`; `test_uninstall_json_file_target_returns_json_error_without_mutation` | none |
 | D-006 | superseded | implementation | dev-coder / code-reviewer | keep-specs rerun after apply removes `spec-dock/spec-dock.version` but preserves `spec-dock/initiatives` | strict version preflight; relax all apply preflight; accept missing version only when initiatives remains | initiatives-only fallback is unsafe and is replaced by D-007 retry marker semantics | code-reviewer Faraday found initiatives-only fallback allows unmanaged deletion | superseded | Faraday P1; `test_uninstall_apply_rejects_unmanaged_initiatives_only_target_before_mutation` | superseded by D-007 |
 | D-007 | resolved | implementation | dev-coder / code-reviewer | remove-specs rerun needs managed retry evidence after specs and version file are removed | require re-init before rerun; keep initiatives fallback; create preserved retry marker | create and preserve exact non-symlink `spec-dock/.uninstall-retry.json` marker during apply; accept only exact marker content as retry evidence | preserves unmanaged-target rejection while satisfying AC-009 idempotent rerun for keep-specs and remove-specs; marker symlink is rejected before read/write | applied | Euclid Ledger Note; Ampere P1; Planck review_status=pass; `test_uninstall_apply_remove_specs_rerun_reports_already_removed_and_succeeds`; `test_uninstall_apply_rejects_symlinked_retry_marker_without_external_mutation` | none |
+| D-008 | resolved | implementation | dev-coder / full-suite verification | full discover can generate ignored provider-asset `__pycache__/*.pyc` before installer tests, and init/update then copied binary caches into target repos | manual cleanup only; test snapshot binary-aware; installer copy guard | ignore `__pycache__` directories and `*.pyc` files during init/update asset copy and provider asset inventory | generated Python caches are never managed SpecDock artifacts and should not ship into target repos or uninstall inventory | applied | `test_init_does_not_copy_generated_python_caches_from_provider_assets`; `test_update_does_not_copy_generated_python_caches_from_provider_assets`; full discover 1026 OK | none |
+| D-009 | resolved | implementation | code-reviewer / dev-coder | stale `spec-dock/spec-dock.version` was classified as scaffold mismatch and preserved | preserve all version mismatches; special-case version file; broaden scaffold mismatch removal | treat `spec-dock/spec-dock.version` as SpecDock managed state and remove it even when content differs from current tool version | version file is generated installer state, not product-authored content; uninstall should remove stale repo-local managed state while preserving user-edited docs/templates/config | applied | Lorentz P2; Socrates Ledger Note; `test_uninstall_dry_run_removes_stale_specdock_version` | none |
+| D-010 | resolved | test-strategy | qa-reviewer | generated-state cleanup behavior has docs/report coverage but not dedicated dry-run/apply tests for `spec-dock/active/**` and `spec-dock/.agent/**` | add tests now; convert to follow-up; accept as non-blocking | no immediate test addition; record as non-blocking QA P2 for future hardening | final QA found this as P2 only after broad uninstall, full `tests.test_init_update`, full discover, validate, sync, and diff-check passed; the primary destructive safety obligations were covered by S03/S99 tests | no_action | Linnaeus P2; final QA review_status=pass; current implementation includes generated-state inventory and docs boundary | consider future regression test when generated-state cleanup behavior changes |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -267,7 +270,7 @@ reason: checked-in dogfooding .meta.json path set diverged from cutover snapshot
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01 | N/A | no parent implementation exception used | N/A | N/A | N/A | normal delegated path verified by S01 worker/reviewer evidence | code-reviewer Herschel passed | no unavailable / denied / host conflict / waiver path used |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
@@ -611,7 +614,7 @@ pass
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S04 | ready for commit | runtime uninstall command/parser/registry, `tests/cli_runtime/test_uninstall.py`, `report.md` S04 evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
+| S04 | committed | runtime uninstall command/parser/registry, `tests/cli_runtime/test_uninstall.py`, `report.md` S04 evidence | `f2eb8a82770e41be8a3d3df7f30d89cecd4e7414` | `git status --short` after commit -> clean | N/A | N/A | N/A | N/A |
 
 ---
 
@@ -620,27 +623,170 @@ pass
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| `src/spec_dock/assets/spec_dock/docs/reference_github.md` | yes | doc-writer | `uninstall` is documented as repo-local managed artifacts removal with no GitHub mutation and no package/environment/`uvx` cache uninstall; runtime wrapper delegates through fixed upstream installer via `uvx --no-cache`; retry/reinstall/refresh after self-removal uses installer CLI | pass: spec-reviewer Laplace |
+| `src/spec_dock/assets/spec_dock/docs/reference_sync.md` | yes | doc-writer | generated state cleanup relationship added for `spec-dock/active/**` and `spec-dock/.agent/**`; recovery after runtime self-removal points to installer CLI | pass: spec-reviewer Laplace |
+| templates / README / workflow / skill / migration notes | no | orchestrator inspection | S90 scope and plan only required provider reference docs for GitHub boundary and sync/generated-state cleanup; no issue-local evidence found that required broader persistent docs changes | pass: spec-reviewer Laplace |
+
+#### S90 実行コマンド / 結果
+```bash
+git diff --check -- src/spec_dock/assets/spec_dock/docs/reference_github.md src/spec_dock/assets/spec_dock/docs/reference_sync.md
+
+pass
+
+PYTHONPATH=src python -m spec_dock.cli uninstall --help
+
+pass; help shows `spec-dock uninstall [path] [--apply] [--keep-specs | --remove-specs] [--json]` and does not describe GitHub/package/environment/uvx-cache side effects
+
+PYTHONPATH=src/spec_dock/assets/spec_dock/scripts python -c 'from spec_dock_runtime.cli.parser import build_parser; from spec_dock_runtime.cli.registry import build_registry; build_parser(build_registry()).parse_args(["uninstall", "--help"])'
+
+pass; source runtime help describes `SpecDock-managed repo assets` and the fixed `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock uninstall TARGET` delegation; it does not describe GitHub/package/environment/uvx-cache cleanup
+```
+
+#### S90 クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-018 | S90 | docs diff inspection, installer help output inspection, source runtime help output inspection, and `git diff --check` | pass | docs state no GitHub mutation, no package/environment/`uvx` cache uninstall, repo-local artifact removal, generated-state cleanup, and installer-direct recovery guidance; help output does not imply forbidden side effects |
+
+#### S90 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S90 | doc-writer | Updated provider reference docs for uninstall's repo-local/GitHub/package boundary, runtime delegation, installer-direct recovery, and generated-state cleanup relationship | `src/spec_dock/assets/spec_dock/docs/reference_github.md`; `src/spec_dock/assets/spec_dock/docs/reference_sync.md` | `git diff --check -- src/spec_dock/assets/spec_dock/docs/reference_github.md src/spec_dock/assets/spec_dock/docs/reference_sync.md` -> pass | Laplace final re-review passed with no findings | dogfooding mirror parity remains for S99 | accepted for S90 step commit |
+
+#### S90 レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | docs/spec alignment review | spec-reviewer | fresh | failed | N/A | blocked until help-output evidence was recorded | Mendel: P1 tc-018 report evidence lacked planned help-output inspection |
+| S90 | docs/spec alignment re-review | spec-reviewer | fresh | passed | N/A | proceed to S90/S99 parity and final gates | Laplace: review_status=pass; docs diff plus installer/source-runtime help evidence resolves tc-018 |
+
+#### S99 先行ブロッカー修正（Pre-Final Verification Fixes）
+| 対象（target） | 起票元（source） | 実施した対応 | 証跡（evidence） | 残リスク（remaining risk） |
+|---|---|---|---|---|
+| checked-in dogfooding `.meta.json` snapshot drift for `iss-00147` | broad `tests.test_init_update` failure observed in S01-S03 | updated `tests/test_init_update.py` snapshot baselines for `iss-00147-spec-dock-uninstall-command/.meta.json` path and `depends_on: []` | `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v` -> pass; `git diff --check -- tests/test_init_update.py` -> pass | full `tests.test_init_update` still had provider/dogfooding mirror parity failures to resolve before S99 |
+| dogfooding mirror parity for S04/S90 provider asset changes | full `tests.test_init_update` failure after snapshot fix | synced checked-in dogfooding mirrors for provider reference docs and runtime parser/registry assets | three parity tests -> pass; legacy deps snapshot test -> pass; mirror `git diff --check` -> pass | full suite still pending |
+| dogfooding runtime mirror missing `commands/uninstall.py` | `tests.test_init_update` failed broadly with `ImportError: cannot import name 'uninstall' from 'spec_dock_runtime.commands'` | added checked-in dogfooding mirror `spec-dock/scripts/spec_dock_runtime/commands/uninstall.py` from provider asset; `commands/__init__.py` unchanged because provider and mirror matched | runtime surface test -> pass; runtime mirror parity test -> pass; command file `git diff --check` -> pass | full suite cache-copy blocker discovered next |
+| generated Python cache copy into scaffold targets | `python -m unittest discover -v` failed after runtime tests generated provider-asset `__pycache__/*.pyc`, then uninstall snapshot tests read copied binary `.pyc` as UTF-8 | added generic installer guard to ignore `__pycache__` directories and `*.pyc` files for init/update copy and provider asset inventory; added init/update regression tests | focused cache regression 2 tests -> pass; uninstall 28 tests -> pass; `tests.test_init_update` 208 tests -> pass; full discover 1026 tests -> pass; focused diff check -> pass | local ignored cache files may exist but are no longer copied/inventoried |
+| final QA/code review findings | qa-reviewer Halley P1/P2 and code-reviewer Lorentz P2 | added `shutil.rmtree` failure coverage for `spec-dock/initiatives`, preserved-file content assertion for mismatched `.codex/config.toml`, and stale `spec-dock/spec-dock.version` removal policy/test | stale version focused test -> pass; rmtree failure focused test -> pass; apply JSON focused test -> pass; uninstall focused 30 tests -> pass; `tests.test_init_update` 210 tests -> pass; focused diff check -> pass | final re-review pending |
+
+#### S99 先行 mirror parity 実行コマンド / 結果
+```bash
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets tests.test_init_update.TestInitUpdate.test_reference_sync_doc_matches_bundled_asset -v
+
+Ran 3 tests
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v
+
+Ran 1 test
+OK
+
+git diff --check -- spec-dock/docs/reference_github.md spec-dock/docs/reference_sync.md spec-dock/scripts/spec_dock_runtime/cli/parser.py spec-dock/scripts/spec_dock_runtime/cli/registry.py spec-dock/scripts/spec_dock_runtime/commands/uninstall.py
+
+pass
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint -v
+
+Ran 1 test
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets -v
+
+Ran 1 test
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_init_does_not_copy_generated_python_caches_from_provider_assets tests.test_init_update.TestInitUpdate.test_update_does_not_copy_generated_python_caches_from_provider_assets -v
+
+Ran 2 tests
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate -v -k uninstall
+
+Ran 28 tests
+OK
+
+python -m unittest tests.test_init_update -v
+
+Ran 208 tests
+OK
+
+python -m unittest discover -v
+
+Ran 1026 tests
+OK
+
+git diff --check -- src/spec_dock/cli.py tests/test_init_update.py
+
+pass
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_uninstall_dry_run_removes_stale_specdock_version -v
+
+Ran 1 test
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_uninstall_apply_partial_rmtree_failure_reports_failed_spec_history_separately -v
+
+Ran 1 test
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_uninstall_apply_json_covers_success_rerun_and_partial_failure_statuses -v
+
+Ran 1 test
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate -v -k uninstall
+
+Ran 30 tests
+OK
+
+python -m unittest tests.test_init_update -v
+
+Ran 210 tests
+OK
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=74
+
+./spec-dock/scripts/spec-dock sync --no-github
+
+spec-dock: sync: active unchanged (matched id in branch: iss-00147)
+spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+
+git diff --check
+
+pass
+```
+
+`sync --no-github` opt-out reason: final local artifact consistency was required for PR handoff, while live GitHub enrichment was not required for uninstall implementation correctness and would introduce network-state variability into the final gate.
+
+#### S99 先行 mirror parity クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| discovered | S99 dogfooding mirror parity | `spec-dock/scripts/spec_dock_runtime/cli/registry.py` mirror sync | tc-019 | runtime parser parity fix exposed registry parity drift for the same S04 provider asset change | no | yes, final review gates |
+| discovered | S99 dogfooding mirror parity | `spec-dock/scripts/spec_dock_runtime/commands/uninstall.py` mirror sync | tc-019 | registry mirror imports `commands.uninstall`; dogfooding mirror needed the provider command file to keep runtime subprocess tests importable | no | yes, final review gates |
+| discovered | S99 full-suite cache guard | `test_init_does_not_copy_generated_python_caches_from_provider_assets`; `test_update_does_not_copy_generated_python_caches_from_provider_assets` | tc-019 | full discover can generate ignored provider-asset caches before installer tests; init/update must not copy generated Python caches into target repos | no | yes, final review gates |
+| added | S03/S99 reviewer regression | `test_uninstall_apply_partial_rmtree_failure_reports_failed_spec_history_separately` | tc-014 | destructive directory removal failures must be reported separately, not only file unlink failures | no | yes, final review gates |
+| strengthened | S03/S99 reviewer regression | preserved `.codex/config.toml` content assertion in apply JSON test | tc-024 / AC-006 | apply result must not only report preservation but also leave product-owned mismatch content intact | no | yes, final review gates |
+| added | S02/S99 reviewer regression | `test_uninstall_dry_run_removes_stale_specdock_version` | tc-008 / managed state cleanup | stale version files are generated managed state and should not be preserved as user-edited scaffold content | no | yes, final review gates |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| Halley / Linnaeus | whole issue obligation coverage | added regression coverage for rmtree failure and preserved file content; generated-state cleanup behavior recorded as D-010 non-blocking no_action | initial fail: P1 rmtree failure coverage, P2 preserved content assertion; fixed by Socrates; Linnaeus re-review found only P2 generated-state cleanup coverage recommendation and review_status=pass | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| Lorentz / Huygens | issue-wide integrated diff | Lorentz P2 stale `spec-dock/spec-dock.version` preservation fixed by treating version file as managed state; Huygens re-review found no findings | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| Raman / Nash | requirement / design / plan / report / implementation / tests / docs alignment | Raman P1 final gate/evidence placeholders fixed; Nash re-review passed with non-blocking P2/P3 report-audit recommendations; D-010 and S01 parent-exception row cleanup applied | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S99 evidence updated through final reviewer findings, local validation bundle, D-008/D-010 decisions, and final reviewer pass rows | pending final commit after this report update | PR body / final response | ready for commit |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...

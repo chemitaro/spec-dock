@@ -44,6 +44,10 @@ legacy v1 生成物（廃止）:
 
 上記3つは `sync` 実行時に常に削除されます（stale防止）。
 
+uninstall との関係:
+- `spec-dock/active/**` と `spec-dock/.agent/**` は `sync` / active 更新で再生成される状態であり、repo-local uninstall では generated state として cleanup 対象になります
+- uninstall は GitHub state や package/environment/`uvx` cache を変更しません。repo-local runtime が削除済みの場合の再実行や復旧は installer CLI の `spec-dock uninstall <target>` / `spec-dock init <target>` / `spec-dock update <target>` を使います
+
 ## 2. 全体 / TODO 投影（all / todo projection）
 
 `*-all.json` は全件を保持します。
