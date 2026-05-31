@@ -287,6 +287,48 @@ class TestInitUpdate(CliRuntimeHarness):
                     snapshot[rel] = path.read_text(encoding="utf-8")
         return snapshot
 
+    @contextmanager
+    def _temporary_provider_cache_files(self):
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            cache_files = (
+                assets_dir
+                / "spec_dock"
+                / "scripts"
+                / "spec_dock_runtime"
+                / "commands"
+                / "__pycache__"
+                / "generated.cpython-310.pyc",
+                assets_dir
+                / "install_root"
+                / ".agents"
+                / "skills"
+                / "spec-dock-issue-execution"
+                / "__pycache__"
+                / "generated.cpython-310.pyc",
+            )
+            for cache_file in cache_files:
+                cache_file.parent.mkdir(parents=True, exist_ok=True)
+                cache_file.write_bytes(b"\x00\x00\x00\x00pyc-cache-fixture")
+            try:
+                yield
+            finally:
+                for cache_file in cache_files:
+                    cache_file.unlink(missing_ok=True)
+                    try:
+                        cache_file.parent.rmdir()
+                    except OSError:
+                        pass
+
+    def _assert_no_generated_python_caches(self, root: Path) -> None:
+        copied = sorted(
+            path.relative_to(root).as_posix()
+            for path in root.rglob("*")
+            if "__pycache__" in path.parts or path.name.endswith(".pyc")
+        )
+        self.assertEqual(copied, [])
+
     def _uninstall_json_actions(self, target: Path, *args: str) -> dict[str, dict[str, object]]:
         exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json", *args])
         self.assertEqual(exit_code, 0, stderr)
@@ -1059,6 +1101,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00056-delete-local-spec-nodes-with-safeguards-and-epic-final-closeout/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00088-issue-lifecycle-start-and-finish-commands/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00096-self-update-command/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00147-spec-dock-uninstall-command/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/issues/iss-00075-multi-host-agent-and-config-asset-install/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/.meta.json",
@@ -1136,6 +1179,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00056-delete-local-spec-nodes-with-safeguards-and-epic-final-closeout/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00088-issue-lifecycle-start-and-finish-commands/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00096-self-update-command/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00147-spec-dock-uninstall-command/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/issues/iss-00075-multi-host-agent-and-config-asset-install/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/.meta.json": [],
@@ -13152,6 +13196,14 @@ exit 44
             # Second init without --force should fail.
             self.assertNotEqual(main(["init", str(target)]), 0)
 
+    def test_init_does_not_copy_generated_python_caches_from_provider_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp, self._temporary_provider_cache_files():
+            target = Path(tmp)
+
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._assert_no_generated_python_caches(target)
+
     def test_update_keeps_initiatives_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -13181,6 +13233,16 @@ exit 44
             self.assertFalse(legacy_workflow.exists())
             if created_symlink:
                 self.assertFalse(legacy_symlink.is_symlink())
+
+    def test_update_does_not_copy_generated_python_caches_from_provider_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            with self._temporary_provider_cache_files():
+                self.assertEqual(main(["update", str(target)]), 0)
+
+            self._assert_no_generated_python_caches(target)
 
     def test_uninstall_dry_run_prints_plan_and_mutates_no_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -13424,6 +13486,38 @@ exit 44
             self.assertIn("injected unlink failure", failed_action["error"])
             self.assertTrue(failing.is_file())
 
+    def test_uninstall_apply_partial_rmtree_failure_reports_failed_spec_history_separately(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            marker = target / "spec-dock" / "initiatives" / "marker.txt"
+            marker.write_text("remove\n", encoding="utf-8")
+            failing = (target / "spec-dock" / "initiatives").resolve()
+            original_rmtree = shutil.rmtree
+
+            def fail_one(path: Path, *args: object, **kwargs: object) -> object:
+                if Path(path).resolve() == failing:
+                    raise OSError("injected rmtree failure")
+                return original_rmtree(path, *args, **kwargs)
+
+            with patch("src.spec_dock.cli.shutil.rmtree", fail_one):
+                payload = self._uninstall_json_payload(
+                    target,
+                    "--apply",
+                    "--remove-specs",
+                    expected_exit_code=1,
+                )
+
+            actions = self._actions_by_path(payload)
+            failed_action = actions["spec-dock/initiatives"]
+            self.assertEqual(payload["status"], "partial_failure")
+            self.assertGreater(payload["summary"]["failed"], 0)  # type: ignore[index]
+            self.assertGreater(payload["summary"]["removed"], 0)  # type: ignore[index]
+            self.assertEqual(failed_action["category"], "spec_history")
+            self.assertEqual(failed_action["status"], "failed")
+            self.assertIn("injected rmtree failure", failed_action["error"])
+            self.assertTrue(marker.is_file())
+
     def test_uninstall_apply_output_provides_installer_direct_recovery_guidance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -13458,6 +13552,8 @@ exit 44
             self.assertIn("preserved", success_statuses)
             self.assertIn("empty_dir_removed", success_statuses)
             self.assertIn("already_removed", {action["status"] for action in rerun_payload["actions"]})  # type: ignore[index]
+            self.assertTrue(preserved.is_file())
+            self.assertEqual(preserved.read_text(encoding="utf-8"), "product-owned config\n")
             for payload in (success_payload, rerun_payload):
                 for action in payload["actions"]:  # type: ignore[index]
                     for key in ("path", "category", "status", "reason", "error"):
@@ -13792,6 +13888,22 @@ exit 44
             self.assertEqual(edited_action["category"], "scaffold_managed")
             self.assertEqual(edited_action["status"], "preserved")
             self.assertIn("content mismatch", edited_action["reason"])
+            self.assertEqual(self._relative_file_snapshot(target), before)
+
+    def test_uninstall_dry_run_removes_stale_specdock_version(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            version_file = target / "spec-dock" / "spec-dock.version"
+            version_file.write_text("0.0.0\n", encoding="utf-8")
+            before = self._relative_file_snapshot(target)
+
+            actions = self._uninstall_json_actions(target)
+
+            action = actions["spec-dock/spec-dock.version"]
+            self.assertEqual(action["category"], "scaffold_managed")
+            self.assertEqual(action["status"], "would_remove")
+            self.assertIn("managed state", action["reason"])
             self.assertEqual(self._relative_file_snapshot(target), before)
 
     def test_uninstall_dry_run_spec_shortcut_only_removes_matching_symlink(self) -> None:
