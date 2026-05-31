@@ -791,6 +791,248 @@ class _ManagedSkillInstallPlan(NamedTuple):
     obsolete_exact_rel_paths: tuple[Path, ...]
 
 
+class _UninstallAction(NamedTuple):
+    rel_path: str
+    category: str
+    status: str
+    reason: str
+    error: str | None = None
+
+
+def _uninstall_specs_mode(ns: argparse.Namespace) -> str | None:
+    if getattr(ns, "keep_specs", False):
+        return "keep"
+    if getattr(ns, "remove_specs", False):
+        return "remove"
+    return None
+
+
+def _require_managed_specdock_for_uninstall(target_root: Path) -> Path:
+    try:
+        specdock_dir = _require_specdock(target_root)
+    except RuntimeError as e:
+        raise RuntimeError(f"target is not a managed SpecDock repo: {e}") from e
+
+    version_file = specdock_dir / "spec-dock.version"
+    if not version_file.is_file():
+        raise RuntimeError(
+            "target is not a managed SpecDock repo: missing managed "
+            "'spec-dock/spec-dock.version' state"
+        )
+    return specdock_dir
+
+
+def _build_uninstall_plan_skeleton(target_root: Path, *, specs_mode: str | None) -> tuple[_UninstallAction, ...]:
+    """Build the S01 dry-run skeleton without applying full inventory policy."""
+    actions: list[_UninstallAction] = []
+
+    representative_agent_path = Path(".agents/skills/spec-dock-issue-execution/SKILL.md")
+    if (target_root / representative_agent_path).exists():
+        actions.append(
+            _UninstallAction(
+                rel_path=representative_agent_path.as_posix(),
+                category="agent_skill",
+                status="would_remove",
+                reason="known SpecDock-managed agent/skill asset",
+            )
+        )
+
+    spec_history_path = Path("spec-dock/initiatives")
+    if (target_root / spec_history_path).exists():
+        if specs_mode == "remove":
+            actions.append(
+                _UninstallAction(
+                    rel_path=spec_history_path.as_posix(),
+                    category="spec_history",
+                    status="would_remove",
+                    reason="explicit remove-specs mode",
+                )
+            )
+        else:
+            reason = (
+                "keep-specs mode"
+                if specs_mode == "keep"
+                else "dry-run preserves specs unless remove-specs is explicit"
+            )
+            actions.append(
+                _UninstallAction(
+                    rel_path=spec_history_path.as_posix(),
+                    category="spec_history",
+                    status="preserved",
+                    reason=reason,
+                )
+            )
+
+    if not actions:
+        actions.append(
+            _UninstallAction(
+                rel_path=".",
+                category="unmanaged",
+                status="preserved",
+                reason="no S01 uninstall skeleton candidates found",
+            )
+        )
+    return tuple(actions)
+
+
+def _summarize_uninstall_actions(actions: tuple[_UninstallAction, ...]) -> dict[str, int]:
+    summary = {
+        "would_remove": 0,
+        "removed": 0,
+        "already_removed": 0,
+        "preserved": 0,
+        "failed": 0,
+        "empty_dir_removed": 0,
+    }
+    for action in actions:
+        if action.status not in summary:
+            summary[action.status] = 0
+        summary[action.status] += 1
+    return summary
+
+
+def _uninstall_payload(
+    target_root: Path,
+    *,
+    apply: bool,
+    specs_mode: str | None,
+    actions: tuple[_UninstallAction, ...],
+    status: str | None = None,
+    errors: list[str] | None = None,
+) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "target": str(target_root),
+        "mode": "apply" if apply else "dry-run",
+        "apply": apply,
+        "specs_mode": specs_mode,
+        "status": status or ("completed" if apply else "planned"),
+        "summary": _summarize_uninstall_actions(actions),
+        "actions": [
+            {
+                "path": action.rel_path,
+                "category": action.category,
+                "status": action.status,
+                "reason": action.reason,
+                "error": action.error,
+            }
+            for action in actions
+        ],
+        "guidance": [
+            "dry-run only; pass --apply with exactly one of --keep-specs or --remove-specs to mutate",
+            "S01 provides command surface and plan rendering only; full inventory/apply behavior follows in later steps",
+        ],
+        "errors": errors or [],
+    }
+
+
+def _emit_uninstall_preflight_error(
+    target_root: Path,
+    *,
+    apply: bool,
+    specs_mode: str | None,
+    json_requested: bool,
+    message: str,
+) -> int:
+    if json_requested:
+        payload = _uninstall_payload(
+            target_root,
+            apply=apply,
+            specs_mode=specs_mode,
+            actions=(),
+            status="error",
+            errors=[message],
+        )
+        print(json.dumps(payload, sort_keys=True))
+    else:
+        print(f"error: {message}", file=sys.stderr)
+    return 2
+
+
+def _render_uninstall_text(payload: dict[str, Any]) -> str:
+    lines = [
+        f"spec-dock: uninstall plan ({payload['mode']}) -> {payload['target']}",
+        f"specs_mode: {payload['specs_mode'] or 'unspecified'}",
+        "summary:",
+    ]
+    for key, value in payload["summary"].items():
+        lines.append(f"  {key}: {value}")
+    lines.append("actions:")
+    for action in payload["actions"]:
+        lines.append(
+            "  "
+            f"[{action['status']}] {action['path']} "
+            f"category={action['category']} reason={action['reason']}"
+        )
+    lines.append("guidance:")
+    for item in payload["guidance"]:
+        lines.append(f"  - {item}")
+    return "\n".join(lines)
+
+
+def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
+    specs_mode = _uninstall_specs_mode(ns)
+    apply_requested = bool(ns.apply)
+    json_requested = bool(ns.json)
+
+    if not target_root.exists() or not target_root.is_dir():
+        return _emit_uninstall_preflight_error(
+            target_root,
+            apply=apply_requested,
+            specs_mode=specs_mode,
+            json_requested=json_requested,
+            message=f"target path is not a directory: {target_root}",
+        )
+
+    if apply_requested and specs_mode is None:
+        return _emit_uninstall_preflight_error(
+            target_root,
+            apply=apply_requested,
+            specs_mode=specs_mode,
+            json_requested=json_requested,
+            message=(
+                "uninstall --apply requires exactly one specs mode: "
+                "--keep-specs or --remove-specs"
+            ),
+        )
+
+    try:
+        _require_managed_specdock_for_uninstall(target_root)
+    except RuntimeError as e:
+        return _emit_uninstall_preflight_error(
+            target_root,
+            apply=apply_requested,
+            specs_mode=specs_mode,
+            json_requested=json_requested,
+            message=str(e),
+        )
+
+    if apply_requested:
+        return _emit_uninstall_preflight_error(
+            target_root,
+            apply=apply_requested,
+            specs_mode=specs_mode,
+            json_requested=json_requested,
+            message=(
+                "uninstall --apply is not implemented in S01; "
+                "full apply behavior is deferred to S03"
+            ),
+        )
+
+    actions = _build_uninstall_plan_skeleton(target_root, specs_mode=specs_mode)
+    payload = _uninstall_payload(
+        target_root,
+        apply=apply_requested,
+        specs_mode=specs_mode,
+        actions=actions,
+    )
+    if json_requested:
+        print(json.dumps(payload, sort_keys=True))
+    else:
+        print(_render_uninstall_text(payload))
+    return 0
+
+
 def _iter_install_root_files(assets_dir: Path) -> tuple[Path, ...]:
     install_root = assets_dir / "install_root"
     if not install_root.is_dir():
@@ -1317,6 +1559,14 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p_update = sub.add_parser("update", help="Update managed files (docs/templates/scripts/skill) in an existing project")
     add_init_update_common(p_update)
 
+    p_uninstall = sub.add_parser("uninstall", help="Plan or remove managed spec-dock artifacts from a project")
+    p_uninstall.add_argument("path", nargs="?", default=".", help="Target project path (default: current directory)")
+    p_uninstall.add_argument("--apply", action="store_true", help="Apply the uninstall plan")
+    specs_group = p_uninstall.add_mutually_exclusive_group()
+    specs_group.add_argument("--keep-specs", action="store_true", help="Preserve spec history under spec-dock/initiatives")
+    specs_group.add_argument("--remove-specs", action="store_true", help="Include spec history in the uninstall plan")
+    p_uninstall.add_argument("--json", action="store_true", help="Emit exactly one JSON object on stdout")
+
     return parser.parse_args(argv)
 
 
@@ -1325,6 +1575,9 @@ def main(argv: list[str] | None = None) -> int:
     ns = _parse_args(sys.argv[1:] if argv is None else argv)
 
     target_root = Path(getattr(ns, "path", ".")).expanduser().resolve()
+    if ns.command == "uninstall":
+        return _run_uninstall(target_root, ns)
+
     if not target_root.exists() or not target_root.is_dir():
         print(f"error: target path is not a directory: {target_root}", file=sys.stderr)
         return 2
