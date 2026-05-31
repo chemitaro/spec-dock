@@ -21,6 +21,7 @@ ID: "epic-00054"
   - local spec node（issue / epic / initiative）を directory ごと削除できる。
   - destructive な local delete と、より安全な remote close を分離した lifecycle contract を提供する。
   - repo-local runtime command から upstream package 経由の self-update を実行できる。
+  - 導入済み repo から SpecDock の開発用 agent / skill / tooling を取り外す repo-local uninstall を実行できる。
   - review-only issue を分離せず、各 implementation issue の中で review と成功性確認を完結させる。
 
 ## ユースケース
@@ -29,10 +30,12 @@ ID: "epic-00054"
   - maintainer が不要になった issue / epic / initiative を local workspace から削除する際、対象 directory を command 経由で安全に除去できる。
   - issue / epic / initiative の local delete では、remote 側は delete ではなく close に留めることで、GitHub 履歴と事故防止のバランスを保てる。
   - maintainer が managed repo 内で `./spec-dock/scripts/spec-dock update` を実行し、upstream GitHub package から shipped docs / scripts / skills を更新できる。
+  - maintainer が開発完了後の repo 内で `./spec-dock/scripts/spec-dock uninstall` を実行し、product 運用時にノイズになる SpecDock agent / skill / tooling を取り外せる。
 - exception / operation scenario:
   - active target や dependency を持つ node を delete しようとした場合は、事前確認または fail-fast で誤操作を防ぐ。
   - linked GitHub issue を持たない local-only cleanup は local delete だけで完結する。
   - GitHub close が権限不足や `gh` 状態不備で失敗した場合、local delete との整合を崩さない安全境界が必要になる。
+  - uninstall では仕様履歴を残して開発再開可能性を維持する repo と、使い捨てで仕様履歴ごと削除したい repo の両方を扱う必要がある。
 
 ## Epic requirements
 - E-RQ-001:
@@ -48,13 +51,18 @@ ID: "epic-00054"
 - E-RQ-006:
   - GitHub-side issue delete はこの epic の対象外とし、docs / design / plan / acceptance criteria の success path に含めないこと。
 - E-RQ-007:
-  - epic の execution は close command、local delete command、self-update command の各 issue scope に分け、各 issue がそれぞれの scope に対する docs / tests / review / success verification を内包すること。
+  - epic の execution は close command、local delete command、self-update command、uninstall command の各 issue scope に分け、各 issue がそれぞれの scope に対する docs / tests / review / success verification を内包すること。
 - E-RQ-008:
   - epic 全体の final review / final validation / close-out evidence は、最後に完了する issue が保持すること。固定の第2 issue に閉じず、issue 追加時も close-out owner を明示して扱えること。
 - E-RQ-009:
   - SpecDock は repo-local runtime command から installer `spec-dock update [path]` を呼び出す self-update 操作を提供し、maintainer が long-form `uvx` invocation を覚えなくても managed assets を更新できること。
 - E-RQ-010:
   - self-update 操作は uvx cache による stale package 混入を避けるため、upstream GitHub package を `uvx --no-cache` で実行すること。
+- E-RQ-011:
+  - SpecDock は repo-local runtime command と installer CLI の両方から uninstall 操作を提供し、導入済み repo から SpecDock-managed development tooling / agent assets を安全に取り外せること。
+- E-RQ-012:
+  - uninstall 操作は project-wide garbage collection ではなく、SpecDock-managed assets と仕様履歴の明示 mode に限定された lifecycle operation として扱うこと。
+  - user-authored / product-reused files の誤削除を避ける guardrail、dry-run / result summary、再実行可能性を持つこと。
 
 ## Epic acceptance criteria
 - E-AC-001:
@@ -118,25 +126,44 @@ ID: "epic-00054"
     - runtime / CLI tests
     - subprocess args assertion
     - docs contract
+- E-AC-006:
+  - Given:
+    - `spec-dock/` workspace と installer-managed agent / skill assets を持つ managed repo がある
+  - When:
+    - maintainer が repo-local runtime command または installer CLI から uninstall を実行する
+  - Then:
+    - SpecDock の開発用 agent / skill / tooling が operator-visible plan と明示 mode に基づいて取り外される
+    - 仕様履歴を残す / 削除する選択は暗黙 default ではなく明示 mode として扱われる
+    - user-authored / product-reused files は guardrail により preserve / manual review される
+    - repo-local runtime が削除対象になった後も installer CLI から再実行 / 復旧できる
+  - 観測点:
+    - installer CLI tests
+    - runtime wrapper tests
+    - filesystem assertions
+    - docs contract
 
 ## スコープ
 - MUST:
   - command-side GitHub issue close
   - local issue / epic / initiative delete
   - repo-local runtime self-update command
+  - repo-local uninstall command and installer-side uninstall implementation
   - destructive guardrail、confirmation、docs/tests 整備
   - dogfooding での lifecycle completeness gap を埋めること
-  - close / delete / self-update の各 issue scope で進め、各 issue に review と成功性確認を内包すること
+  - close / delete / self-update / uninstall の各 issue scope で進め、各 issue に review と成功性確認を内包すること
 - MUST NOT:
   - remote GitHub issue delete を success path に含めない
   - destructive local delete を silent / implicit に実行しない
   - self-update で uvx cache を標準経路として使わない
+  - uninstall を project-wide garbage collection として扱わない
+  - uninstall で user-authored / product-reused files を silent deletion しない
   - review / validation だけを目的とする standalone issue を作らない
 - OUT OF SCOPE:
   - GitHub-side issue delete
   - GitHub issue 以外の remote artifact 削除
   - project-wide garbage collection の自動化
   - package update availability check / version comparison
+  - package manager / Python environment / global executable の automatic uninstall
   - legacy workspace の自動 migration
 
 ## 境界
@@ -144,6 +171,7 @@ ID: "epic-00054"
   - remote handling は close-only とし、GitHub 履歴保全と事故防止を優先する
   - local delete は directory removal を伴う destructive operation として扱う
   - self-update は upstream GitHub package を `uvx --no-cache` で呼び出し、cache stale による誤更新を避ける
+  - uninstall は repo-local development tooling removal として扱い、package/environment uninstall とは分離する
   - issue / epic / initiative の各階層差を docs / command contract で明示する
 - Ask:
   - active target や dependency を含む node を delete する前に、どの guardrail を必須にするか。

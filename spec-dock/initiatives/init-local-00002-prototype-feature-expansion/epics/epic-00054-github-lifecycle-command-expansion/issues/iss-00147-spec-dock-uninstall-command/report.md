@@ -49,7 +49,9 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | spec-reviewer | parent epic scope did not originally include uninstall command | update parent epic; move issue; stop planning | parent epic requirement/design were extended to include uninstall command scope | user requested uninstall issue under lifecycle command expansion and parent epic already owned repo-local lifecycle commands | applied | parent epic `requirement.md` / `design.md`; requirement review Godel pass | none |
+| D-002 | resolved | test-strategy | spec-reviewer | design test strategy did not explicitly mention scaffold-managed removal coverage | add design coverage; defer to plan only | scaffold-managed exact-match removal and mismatch-preserve coverage added to design test strategy | scaffold-managed runtime/docs files are core repo-local uninstall targets | applied | design review Avicenna pass with P2 finding; `design.md` test strategy | plan closure mapping |
+| D-003 | resolved | scope | user | design Q-001 asked whether `--json` belongs in initial implementation | human-readable only; include `--json` now | initial implementation must include JSON output because agents may execute uninstall | agent execution requires machine-readable plan/result output, so JSON is part of the primary command contract | applied | `discussions/20260531t144040z-interview-uninstall-json-output.md`; requirement/design/plan amendment | fresh spec-reviewer re-review |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +65,22 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | discussion | `requirement.md` | repo-local uninstall を primary objective として採用し、package/environment uninstall を対象外にした | `discussions/20260531t133315z-interview-uninstall-command-scope.md` | requirement review |
+| EAL-002 | adopted | discussion | `requirement.md` | specs は開発再開可能性と使い捨て cleanup の両方があるため、実削除時の explicit mode selection として採用した | `discussions/20260531t133616z-interview-uninstall-removal-boundary.md` | requirement review |
+| EAL-003 | adopted | discussion | `requirement.md` | bootstrap-only / user-owned 候補は content match の場合だけ自動削除し、mismatch は preserve + manual review とした | `discussions/20260531t134004z-interview-uninstall-user-owned-asset-boundary.md` | requirement review |
+| EAL-004 | adopted | discussion | `requirement.md` | repo-local wrapper + installer implementation の二層 command surface を採用した | `discussions/20260531t134206z-interview-uninstall-command-surface.md` | requirement review |
+| EAL-005 | adopted | discussion | `requirement.md` | agent / skill assets は mismatch でも削除し、CI / config / prompt / rule は mismatch preserve とする category-based removal を採用した | `discussions/20260531t134650z-interview-uninstall-managed-asset-mismatch.md` | requirement review |
+| EAL-006 | adopted | discussion | `requirement.md` | uninstall 後の empty directory は boundary root 内で bounded cleanup する方針を採用した | `discussions/20260531t135206z-interview-uninstall-empty-directory-cleanup.md` | requirement review |
+| EAL-007 | adopted | discussion synthesis from consultant | `requirement.md` | 削除対象分類、comparison 判定不能時 preserve、partial failure / idempotency を requirement-level safety criteria として補強した | `discussions/20260531t141123z-disc-uninstall-requirement-risk-synthesis.md` | requirement review |
+| EAL-008 | adopted | research synthesis from repo-analyst | `requirement.md` | installer/runtime split、repo-local update wrapper pattern、install_root inventory、repo-root `spec` shortcut、self-removal recovery risk を requirement grounding に採用した | `discussions/20260531t141121z-research-uninstall-repo-analysis-evidence.md` | requirement review |
+| EAL-009 | adopted | reviewer: spec-reviewer | parent epic `requirement.md` / `design.md`, issue `requirement.md`, interview provenance | requirement reviewer fail findingsを採用し、parent epic scope bridge、AC-007 known managed path限定、interview `reflected_to` を修正した | spec-reviewer Hilbert, review_status=fail, 2026-05-31 | re-review |
+| EAL-010 | adopted | delegated draft: system-architect | `design.md` | installer/runtime split、inventory/result model、bounded cleanup、failure/idempotency、test surface を design に採用した | `discussions/20260531t141545z-disc-uninstall-design-draft.md` | design review |
+| EAL-011 | adopted | reviewer: spec-reviewer | `report.md`, `design.md`, design draft | design reviewer fail findings を採用し、delegated draft evidence の矛盾を解消し、docs impact handoff を具体化した | spec-reviewer Bacon, review_status=fail, 2026-05-31 | design re-review |
+| EAL-012 | adopted | delegated draft: implementation-planner | `plan.md` | S01-S04/S90/S99 の実行順、closure index、test obligations、docs impact、final gate を plan に採用した | `discussions/20260531t142649z-disc-uninstall-implementation-plan.md` | plan review |
+| EAL-013 | adopted | reviewer: spec-reviewer | `plan.md` | plan reviewer fail findings を採用し、invalid target closure、comparison-error preservation、runtime-removal recovery guidance、no-op/report-update gates を plan に追加した | spec-reviewer Gibbs, review_status=fail, 2026-05-31 | plan re-review |
+| EAL-014 | adopted | interview | `requirement.md`, `design.md`, `plan.md` | user answer requires JSON output in initial implementation because agents may execute uninstall | `discussions/20260531t144040z-interview-uninstall-json-output.md` | fresh spec-reviewer re-review |
+| EAL-015 | adopted | reviewer: spec-reviewer | `plan.md` | JSON amendment reviewer fail findingを採用し、agent が判別する action-level `status` / `category` / `reason` coverage を tc-023 / tc-024 に追加した | spec-reviewer Zeno, review_status=fail, 2026-05-31 | JSON amendment re-review |
+| EAL-016 | adopted | reviewer: spec-reviewer | `plan.md` | JSON amendment re-review の P2 を採用し、apply-side `actions[]` の `path` / `category` / `status` / `reason` / `error` assertion を tc-s03-007 に追加した | spec-reviewer Heisenberg, review_status=pass, 2026-05-31 | no re-review required; P2 applied |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +88,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | agent / skill noise removal を primary objective として `requirement.md` に固定 | specs preservation/removal、user edit protection、runtime recovery、bounded cleanup | medium: user edit protection が強すぎると noise removal が不完全になり、agent/skill mismatch deletion が強すぎると user edit loss risk がある | pending spec-reviewer |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +96,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | active issue scaffold, parent epic requirement/design, installer CLI, install_root metadata, runtime update/delete commands, tests, six interview artifacts, consultant/repo-analyst findings | answered: uninstall scope, specs mode, bootstrap-only boundary, command surface, mismatch category, empty-dir cleanup | adopted into `requirement.md`; parent epic scope bridge added after reviewer finding | passed: spec-reviewer Godel, 2026-05-31 | no | promote to design |
+| design | approved requirement, parent epic requirement/design, repo analysis research, requirement risk synthesis, system-architect design draft, installer/runtime source files, JSON interview answer | no open requirement gaps; `--json` resolved as in scope | adopted system-architect draft into `design.md`; reviewer fixes applied for provenance and docs handoff; P2 scaffold coverage added; JSON output contract added after user answer | passed: spec-reviewer Heisenberg, 2026-05-31; prior Zeno fail fixed | no | approved after JSON amendment |
+| plan | approved requirement/design, phase_plan_issue, authoring/issue-plan, implementation-planner draft, first plan review findings, fresh plan re-review, JSON interview answer | no open design gaps; `--json` in scope | adopted S01-S04/S90/S99 plan structure into `plan.md`; added reviewer-required closure rows and gate evidence requirements; added JSON closure/test obligations | passed: spec-reviewer Heisenberg, 2026-05-31; prior Zeno fail fixed; P2 apply-side field assertion applied | no | promote to implementation readiness |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -107,7 +126,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| spec-dock-system-architect | iss-00147 | `discussions/20260531t141545z-disc-uninstall-design-draft.md` | approved requirement, parent epic docs, repo analysis, requirement synthesis, installer/runtime source, tests | `design.md`, `plan.md`, `report.md` | adopted | `design.md` | manual_orchestrator_check_passed_new_issue_discussion_only | adopted into canonical design by orchestrator | none | none | passed design spec-reviewer Avicenna | canonical design promoted to plan |
+| spec-dock-implementation-planner | iss-00147 | `discussions/20260531t142649z-disc-uninstall-implementation-plan.md` | approved requirement/design, workflow/plan docs, installer/runtime source, tests | `plan.md`, `report.md` | adopted | `plan.md` | manual_orchestrator_check_passed_new_issue_discussion_only_dirty_baseline | adopted into canonical plan by orchestrator | none | none | passed plan spec-reviewer Ptolemy after Gibbs fixes | canonical plan promoted to implementation readiness |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -186,7 +206,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00147 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/f413/spec-dock` | iss-00147 | current session | spec-reviewer, system-architect, implementation-planner, consultant, repo-analyst, researcher as needed | same repo, active issue, session, named role; canonical docs remain orchestrator-owned; no destructive action / publishing / credentialed access / scope expansion | issue planning complete / session end / scope change / user revocation | none | proceed with scoped planning and review gates |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
@@ -209,6 +229,13 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| requirement | requirement spec review | spec-reviewer | fresh | passed | N/A | proceed to design | Godel: no findings; parent scope and provenance blockers fixed |
+| design | design spec review | spec-reviewer | fresh | passed | N/A | proceed to plan | Avicenna: no blocking findings; P2 scaffold coverage and decision ledger cleanup applied |
+| plan | plan spec review | spec-reviewer | fresh | failed | N/A | blocked until fixes and re-review | Gibbs: P1 closure gaps for EC-001, EC-006, AC-008/EC-005; P2 no-op/report-update gates |
+| plan | plan spec re-review | spec-reviewer | fresh | passed | N/A | proceed to implementation readiness | Ptolemy: blocking Gibbs findings resolved; P2 stale delegated design draft reviewer state fixed |
+| requirement/design/plan | JSON amendment spec re-review | spec-reviewer | pending | pending | N/A | blocked until fresh pass | `--json` moved into initial scope after user answer |
+| requirement/design/plan | JSON amendment spec review | spec-reviewer | fresh | failed | N/A | blocked until fixes and re-review | Zeno: P1 action-level JSON state coverage gap fixed in tc-023/tc-024 |
+| requirement/design/plan | JSON amendment spec re-review | spec-reviewer | fresh | passed | N/A | proceed to implementation readiness | Heisenberg: Zeno P1 resolved; P2 apply-side category/reason assertions applied |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
