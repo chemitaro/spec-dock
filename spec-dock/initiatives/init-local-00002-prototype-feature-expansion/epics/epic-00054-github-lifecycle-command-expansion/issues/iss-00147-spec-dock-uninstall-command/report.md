@@ -786,7 +786,7 @@ pass
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| S99 evidence updated through final reviewer findings, local validation bundle, D-008/D-010 decisions, and final reviewer pass rows | pending final commit after this report update | PR body / final response | ready for commit |
+| S99 evidence updated through final reviewer findings, local validation bundle, D-008/D-010 decisions, final reviewer pass rows, and PR delivery verification | implementation commits through `f03e9a8118881c05d7cb66f6d523520252b1fcfe` plus report-only PR delivery evidence update | PR #148 / final response | committed and PR submitted; PR #148 is open, ready, base `main`, head `iss-00147-spec-dock-uninstall-command` |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
