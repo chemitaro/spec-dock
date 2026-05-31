@@ -521,7 +521,97 @@ reason: checked-in dogfooding .meta.json path set diverged from cutover snapshot
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S03 | ready for commit | `src/spec_dock/cli.py`, `tests/test_init_update.py`, `report.md` S03 evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
+| S03 | committed | `src/spec_dock/cli.py`, `tests/test_init_update.py`, `report.md` S03 evidence | `c39c1c9b0e8b7cae663e1b6156086b79b3e0f285` | `git status --short` after commit -> clean | N/A | N/A | N/A | N/A |
+
+---
+
+### セッションログ（2026-05-31 S04）
+
+#### 対象
+- Step: S04
+- AC/EC: AC-008, AC-010
+- closure ids: tc-015, tc-016, tc-017, tc-025
+
+#### 実施内容
+- repo-local runtime command `uninstall` を追加した。
+- runtime 側に uninstall logic は実装せず、`uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock uninstall <target>` へ委譲する thin wrapper とした。
+- `--apply`, `--keep-specs`, `--remove-specs`, `--json` を installer CLI へ forwarding し、stdout / stderr / exit code をそのまま伝播するようにした。
+- missing `uvx` は exit `127` と PATH/install guidance を返すようにした。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_uninstall -v
+
+Ran 8 tests
+OK
+
+python -m unittest tests.cli_runtime.test_update tests.cli_runtime.test_uninstall -v
+
+Ran 15 tests
+OK
+
+git diff --check -- src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/uninstall.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/registry.py tests/cli_runtime/test_uninstall.py
+
+pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | 赤フェーズ | red-required | `tests.cli_runtime.test_uninstall` failed before implementation with runtime `invalid choice: 'uninstall'` | delegated dev-coder command | pass | command was not registered |
+| S04 | 緑フェーズ | runtime wrapper command | 8 uninstall runtime tests passed | `python -m unittest tests.cli_runtime.test_uninstall -v` | pass | tc-015/tc-016/tc-017/tc-025 covered |
+| S04 | リファクタリング | update wrapper parity | update + uninstall wrapper tests passed | `python -m unittest tests.cli_runtime.test_update tests.cli_runtime.test_uninstall -v` | pass | no wrapper common abstraction added |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | unsupported `--from` / `--cache-dir` must not invoke uvx | test parity with update wrapper | added negative test in runtime uninstall suite | S04 wrapper hardening | no | `test_uninstall_rejects_source_and_cache_overrides_without_invoking_uvx` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | tc-015, tc-016, tc-017, tc-025 | runtime tests pass, code-reviewer pass, report updated | red evidence captured by dev-coder; runtime 8-test command pass; report updated; code-reviewer Sartre pass | pass | S04 ready for step commit |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-015 | S04 | yes | red-required | runtime command not registered | runtime uninstall tests | pass | uvx no-cache upstream uninstall invocation |
+| tc-016 | S04 | yes | red-required | runtime command not registered | runtime uninstall tests | pass | flag and stdout/stderr/exit propagation |
+| tc-017 | S04 | yes | red-required | runtime command not registered | runtime uninstall tests | pass | missing uvx guidance |
+| tc-025 | S04 | yes | red-required | runtime command not registered | runtime uninstall tests | pass | JSON forwarding and stdout preservation |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-015 | S04 | `test_uninstall_runs_uvx_no_cache_with_default_target`; `test_uninstall_passes_explicit_target_to_installer_uninstall` | pass | default and explicit target invocation covered |
+| tc-016 | S04 | `test_uninstall_forwards_apply_keep_specs_and_propagates_failure_output`; `test_uninstall_forwards_remove_specs_flag` | pass | flags and result propagation covered |
+| tc-017 | S04 | `test_uninstall_missing_uvx_fails_with_actionable_error` | pass | exit 127 guidance covered |
+| tc-025 | S04 | `test_uninstall_forwards_json_and_preserves_json_stdout` | pass | JSON forwarding covered |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | S04 runtime wrapper tests | `tests/cli_runtime/test_uninstall.py` | tc-015, tc-016, tc-017, tc-025 | runtime thin wrapper closure | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | delegated | runtime wrapper and tests change | dev-coder | repo-local runtime uninstall wrapper | `plan.md` S04 | runtime uninstall command/parser/registry and runtime tests | installer code, docs, package metadata, arbitrary uvx override options | `python -m unittest tests.cli_runtime.test_uninstall -v`; `git diff --check` | runtime needs to reimplement installer logic, accepted flags diverge from installer CLI | changed files, tests, Ledger Note | pass; reviewer pending |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 | dev-coder | Added repo-local runtime uninstall wrapper, parser/registry binding, and stubbed uvx tests | runtime uninstall command/parser/registry; `tests/cli_runtime/test_uninstall.py` | runtime uninstall tests -> pass (`Ran 8 tests`); update+uninstall wrapper tests -> pass (`Ran 15 tests`); diff check -> pass | Sartre final review passed with no findings | none identified; installer contract assumed stable from S01-S03 | accepted for S04 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step code review | code-reviewer | fresh | passed | N/A | proceed to S04 step commit | Sartre: review_status=pass; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | ready for commit | runtime uninstall command/parser/registry, `tests/cli_runtime/test_uninstall.py`, `report.md` S04 evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
 
 ---
 
