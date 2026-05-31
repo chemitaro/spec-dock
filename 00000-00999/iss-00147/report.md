@@ -285,7 +285,7 @@ reason: checked-in dogfooding .meta.json path set diverged from cutover snapshot
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | ready for commit | `src/spec_dock/cli.py`, `tests/test_init_update.py`, `report.md` S01 evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
+| S01 | committed | `src/spec_dock/cli.py`, `tests/test_init_update.py`, `report.md` S01 evidence | `96a1fa89280e7d2332f41b8e84991bc9d0b90d6d` | `git status --short` after commit -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/cli.py` - installer uninstall S01 command surface and dry-run/JSON skeleton.
@@ -293,7 +293,8 @@ reason: checked-in dogfooding .meta.json path set diverged from cutover snapshot
 - `spec-dock/active/issue/report.md` - S01 observed evidence ledger.
 
 #### コミット
-- pending S01 step commit.
+- `96a1fa89280e7d2332f41b8e84991bc9d0b90d6d`
+- message: `feat(installer): uninstall のコマンド面を追加`
 
 #### メモ
 - Worker reported: No material implementation decisions beyond the approved plan.
@@ -303,11 +304,102 @@ reason: checked-in dogfooding .meta.json path set diverged from cutover snapshot
 ### セッションログ（2026-05-31 HH:MM - HH:MM）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S02
+- AC/EC: AC-005, AC-006, AC-007, EC-006, EC-007
+- closure ids: tc-004, tc-005, tc-006, tc-007, tc-008, tc-009, tc-021
 
 #### 実施内容
-- ...
+- `uninstall` dry-run を S01 skeleton から S02 inventory / category classification / content policy 実装へ差し替えた。
+- `install_root` current assets、obsolete exact paths、scaffold assets、generated state、spec history、repo-root `spec` shortcut、unknown boundary-root files を dry-run action に分類するようにした。
+- agent / native agent は known SpecDock-managed path なら mismatch でも `would_remove`、bootstrap-only / product-reusable / scaffold-managed は exact match のみ `would_remove`、mismatch / comparison error は `preserved` とした。
+- `--apply` は S03 scope のまま deferred で、S02 では filesystem mutation を追加していない。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_init_update.TestInitUpdate -v -k uninstall
+
+Ran 18 tests in 1.613s
+OK
+
+git diff --check -- src/spec_dock/cli.py tests/test_init_update.py
+
+pass
+
+git diff --check
+
+pass
+
+python -m unittest tests.test_init_update -v
+
+Ran 196 tests
+FAILED (failures=1)
+known unrelated observed failure: test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+reason: checked-in dogfooding .meta.json path set diverged from cutover snapshot
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ | red-required | tc-005, tc-006, tc-007, tc-021, tc-008, tc-009 tests failed before implementation because S01 skeleton did not emit those inventory actions | delegated dev-coder command | pass | tc-004 was covered-existing by S01 representative known skill and expanded in S02 |
+| S02 | 緑フェーズ | focused uninstall command | 18 uninstall tests passed | `python -m unittest tests.test_init_update.TestInitUpdate -v -k uninstall` | pass | S01 + S02 uninstall behavior passed |
+| S02 | リファクタリング | guardrail satisfied | dry-run inventory only; apply remains deferred | diff inspection and `git diff --check` | pass | no runtime wrapper/docs/apply changes |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | full `tests.test_init_update` still has dogfooding `.meta.json` snapshot drift failure | verification | recorded as broad-suite blocker to resolve before final S99 | N/A | no | `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` failure |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | tc-004, tc-005, tc-006, tc-007, tc-008, tc-009, tc-021 | classification tests pass, code-reviewer pass, report updated | red evidence captured by dev-coder; focused 18-test command pass; report updated; code-reviewer Darwin pass | pass | S02 ready for step commit |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-004 | S02 | yes | red-required | covered-existing S01 representative known skill; expanded S02 inventory | focused uninstall command | pass | known managed agent/skill mismatch planned for removal |
+| tc-005 | S02 | yes | red-required | S01 skeleton did not emit unknown boundary actions | focused uninstall command | pass | unknown files under managed roots preserved |
+| tc-006 | S02 | yes | red-required | S01 skeleton did not emit bootstrap/product-reusable exact-match actions | focused uninstall command | pass | exact-match bootstrap/product-reusable assets would_remove |
+| tc-007 | S02 | yes | red-required | S01 skeleton did not emit mismatch preservation actions | focused uninstall command | pass | mismatch assets preserved with manual review reason |
+| tc-021 | S02 | yes | red-required | S01 skeleton did not emit comparison-error preservation actions | focused uninstall command | pass | symlink/type mismatch preserve |
+| tc-008 | S02 | yes | red-required | S01 skeleton did not emit scaffold-managed exact/mismatch actions | focused uninstall command | pass | scaffold exact match removes, mismatch preserves |
+| tc-009 | S02 | yes | red-required | S01 skeleton did not inspect repo-root `spec` variants | focused uninstall command | pass | only matching shortcut would_remove |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-004 | S02 | `test_uninstall_dry_run_removes_known_agent_skill_mismatch` | pass | known managed skill mismatch remains removal candidate |
+| tc-005 | S02 | `test_uninstall_dry_run_preserves_unknown_files_under_managed_roots` | pass | unknown files in `.agents`, `.codex`, `.github`, `spec-dock` preserved |
+| tc-006 | S02 | `test_uninstall_dry_run_removes_exact_match_bootstrap_and_product_reusable_assets` | pass | exact-match bootstrap/product-reusable assets would_remove |
+| tc-007 | S02 | `test_uninstall_dry_run_preserves_mismatch_bootstrap_and_product_reusable_assets` | pass | mismatch preserved/manual review |
+| tc-021 | S02 | `test_uninstall_dry_run_preserves_non_core_comparison_errors_for_manual_review` | pass | type/symlink comparison errors preserved/manual review |
+| tc-008 | S02 | `test_uninstall_dry_run_scaffold_managed_exact_match_removes_and_mismatch_preserves` | pass | scaffold exact match vs mismatch policy |
+| tc-009 | S02 | `test_uninstall_dry_run_spec_shortcut_only_removes_matching_symlink` | pass | matching symlink removed, nonmatching/file/directory preserved |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | S02 classification tests | listed S02 uninstall dry-run tests | tc-004 through tc-009 and tc-021 | S02 inventory/category/content policy closure | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | inventory/classification logic and tests change | dev-coder | dry-run inventory/category/content policy | `plan.md` S02 | `src/spec_dock/cli.py`, `tests/test_init_update.py` | actual apply deletion, runtime wrapper, docs | focused uninstall tests; `python -m unittest tests.test_init_update -v`; `git diff --check` | need to delete unknown files, category conflict, comparison impossible to test hermetically | changed files, tests, Ledger Note | pass; reviewer pending |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Replaced S01 skeleton with S02 dry-run inventory/classification for install_root assets, scaffold assets, generated state, specs, shortcut, and unknown boundary files | `src/spec_dock/cli.py`; `tests/test_init_update.py` | focused uninstall command -> pass (`Ran 18 tests`); full `tests.test_init_update` -> fail with known dogfooding `.meta.json` snapshot drift; `git diff --check` -> pass | Darwin final review passed with no findings | apply/delete engine and empty-dir cleanup remain S03; broad suite snapshot drift remains for S99 | accepted for S02 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step code review | code-reviewer | fresh | passed | N/A | proceed to S02 step commit | Darwin: review_status=pass; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | ready for commit | `src/spec_dock/cli.py`, `tests/test_init_update.py`, `report.md` S02 evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
 
 ---
 
