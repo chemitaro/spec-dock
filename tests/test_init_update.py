@@ -294,6 +294,22 @@ class TestInitUpdate(CliRuntimeHarness):
         payload = json.loads(stdout)
         self.assertEqual(payload["status"], "planned")
         return {action["path"]: action for action in payload["actions"]}
+
+    def _uninstall_json_payload(
+        self,
+        target: Path,
+        *args: str,
+        expected_exit_code: int = 0,
+    ) -> dict[str, object]:
+        exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json", *args])
+        self.assertEqual(exit_code, expected_exit_code, stderr)
+        self.assertEqual(stderr, "")
+        payload = json.loads(stdout)
+        self.assertEqual(stdout.count("\n"), 1)
+        return payload
+
+    def _actions_by_path(self, payload: dict[str, object]) -> dict[str, dict[str, object]]:
+        return {str(action["path"]): action for action in payload["actions"]}  # type: ignore[index]
     _DOGFOODING_MIRROR_PROVIDER_ASSET_MAP = {
         "spec-dock/.gitignore": "src/spec_dock/assets/spec_dock/.gitignore",
         "spec-dock/templates/README.md": "src/spec_dock/assets/spec_dock/templates/README.md",
@@ -13199,26 +13215,278 @@ exit 44
             self.assertIn("--remove-specs", stderr)
             self.assertEqual(self._relative_file_snapshot(target), before)
 
-    def test_uninstall_apply_with_specs_mode_is_deferred_before_mutation(self) -> None:
+    def test_uninstall_apply_keep_specs_removes_tooling_and_preserves_spec_history(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
             marker = target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("keep\n", encoding="utf-8")
+
+            exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--apply", "--keep-specs"])
+
+            self.assertEqual(exit_code, 0, stderr)
+            self.assertEqual(stderr, "")
+            self.assertIn("spec-dock: uninstall result", stdout)
+            self.assertIn("removed", stdout)
+            self.assertIn("preserved", stdout)
+            self.assertFalse((target / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md").exists())
+            self.assertFalse((target / "spec-dock" / "scripts" / "spec-dock").exists())
+            self.assertTrue(marker.is_file())
+            self.assertEqual(marker.read_text(encoding="utf-8"), "keep\n")
+
+    def test_uninstall_apply_remove_specs_removes_spec_history_with_explicit_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            marker = target / "spec-dock" / "initiatives" / "marker.txt"
+            marker.write_text("remove\n", encoding="utf-8")
+
+            payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+            actions = self._actions_by_path(payload)
+
+            self.assertEqual(payload["status"], "completed")
+            self.assertEqual(payload["specs_mode"], "remove")
+            spec_action = actions["spec-dock/initiatives"]
+            self.assertEqual(spec_action["category"], "spec_history")
+            self.assertEqual(spec_action["status"], "removed")
+            self.assertIn("remove-specs", spec_action["reason"])
+            self.assertFalse(marker.exists())
+            self.assertFalse((target / "spec-dock" / "initiatives").exists())
+
+    def test_uninstall_apply_rejects_symlinked_boundary_root_without_external_deletion(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "repo"
+            target.mkdir()
+            self.assertEqual(main(["init", str(target)]), 0)
+            outside_specdock = Path(tmp) / "outside" / "spec-dock"
+            outside_specdock.parent.mkdir()
+            shutil.move(str(target / "spec-dock"), outside_specdock)
+            try:
+                os.symlink("../outside/spec-dock", target / "spec-dock")
+            except OSError:
+                self.skipTest("symlink creation is unavailable")
+            outside_script = outside_specdock / "scripts" / "spec-dock"
+            self.assertTrue(outside_script.is_file())
+
+            payload = self._uninstall_json_payload(
+                target,
+                "--apply",
+                "--keep-specs",
+                expected_exit_code=2,
+            )
+
+            self.assertEqual(payload["status"], "error")
+            self.assertIn("symlink", payload["errors"][0])
+            self.assertTrue((target / "spec-dock").is_symlink())
+            self.assertTrue(outside_script.is_file())
+            self.assertTrue(outside_specdock.is_dir())
+
+    def test_uninstall_apply_rejects_symlinked_retry_marker_without_external_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "repo"
+            target.mkdir()
+            self.assertEqual(main(["init", str(target)]), 0)
+            outside_file = Path(tmp) / "outside-marker.json"
+            outside_file.write_text("outside\n", encoding="utf-8")
+            retry_marker = target / "spec-dock" / ".uninstall-retry.json"
+            try:
+                os.symlink(outside_file, retry_marker)
+            except OSError:
+                self.skipTest("symlink creation is unavailable")
+
+            payload = self._uninstall_json_payload(
+                target,
+                "--apply",
+                "--keep-specs",
+                expected_exit_code=2,
+            )
+
+            self.assertEqual(payload["status"], "error")
+            self.assertIn("symlinked SpecDock uninstall retry marker", payload["errors"][0])
+            self.assertTrue(retry_marker.is_symlink())
+            self.assertEqual(outside_file.read_text(encoding="utf-8"), "outside\n")
+
+    def test_uninstall_apply_rejects_unmanaged_initiatives_only_target_before_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            user_file = target / "spec-dock" / "initiatives" / "user-created" / "notes.md"
+            user_file.parent.mkdir(parents=True)
+            user_file.write_text("user specs\n", encoding="utf-8")
             before = self._relative_file_snapshot(target)
 
-            for specs_flag in ("--keep-specs", "--remove-specs"):
-                with self.subTest(specs_flag=specs_flag):
-                    exit_code, stdout, stderr = self._capture_installer_main(
-                        ["uninstall", str(target), "--apply", specs_flag]
-                    )
+            payload = self._uninstall_json_payload(
+                target,
+                "--apply",
+                "--remove-specs",
+                expected_exit_code=2,
+            )
 
-                    self.assertEqual(exit_code, 2)
-                    self.assertEqual(stdout, "")
-                    self.assertIn("not implemented", stderr)
-                    self.assertIn("S03", stderr)
-                    self.assertNotIn("completed", stdout)
-                    self.assertEqual(self._relative_file_snapshot(target), before)
+            self.assertEqual(payload["status"], "error")
+            self.assertIn("not a managed SpecDock repo", payload["errors"][0])
+            self.assertEqual(self._relative_file_snapshot(target), before)
+            self.assertTrue(user_file.is_file())
+
+    def test_uninstall_apply_bounded_cleanup_respects_preserved_files_and_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "repo"
+            target.mkdir()
+            self.assertEqual(main(["init", str(target)]), 0)
+            (target / ".git").mkdir()
+            (target / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+            parent_sentinel = target.parent / "parent-sentinel.txt"
+            parent_sentinel.write_text("parent\n", encoding="utf-8")
+            preserved = target / ".codex" / "notes" / "product.md"
+            preserved.parent.mkdir(parents=True, exist_ok=True)
+            preserved.write_text("preserve\n", encoding="utf-8")
+
+            payload = self._uninstall_json_payload(target, "--apply", "--keep-specs")
+
+            self.assertEqual(payload["status"], "completed")
+            cleanup_actions = [
+                action
+                for action in payload["actions"]  # type: ignore[index]
+                if action["status"] == "empty_dir_removed"
+            ]
+            self.assertTrue(cleanup_actions)
+            for action in cleanup_actions:
+                self.assertRegex(action["path"], r"^(\.agents|\.codex|\.github|spec-dock)(/|$)")
+                self.assertNotEqual(action["path"], ".git")
+            self.assertTrue(target.is_dir())
+            self.assertTrue((target / ".git" / "HEAD").is_file())
+            self.assertTrue(parent_sentinel.is_file())
+            self.assertTrue(preserved.is_file())
+            self.assertTrue(preserved.parent.is_dir())
+
+    def test_uninstall_apply_rerun_reports_already_removed_and_succeeds(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            marker = target / "spec-dock" / "initiatives" / "marker.txt"
+            marker.write_text("keep\n", encoding="utf-8")
+
+            first_payload = self._uninstall_json_payload(target, "--apply", "--keep-specs")
+            second_payload = self._uninstall_json_payload(target, "--apply", "--keep-specs")
+
+            self.assertEqual(first_payload["status"], "completed")
+            self.assertEqual(second_payload["status"], "completed")
+            self.assertGreater(second_payload["summary"]["already_removed"], 0)  # type: ignore[index]
+            self.assertEqual(second_payload["summary"]["failed"], 0)  # type: ignore[index]
+            self.assertIn(
+                "already_removed",
+                {action["status"] for action in second_payload["actions"]},  # type: ignore[index]
+            )
+
+    def test_uninstall_apply_remove_specs_rerun_reports_already_removed_and_succeeds(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            marker = target / "spec-dock" / "initiatives" / "marker.txt"
+            marker.write_text("remove\n", encoding="utf-8")
+
+            first_payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+            second_payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+
+            self.assertEqual(first_payload["status"], "completed")
+            self.assertEqual(second_payload["status"], "completed")
+            self.assertGreater(second_payload["summary"]["already_removed"], 0)  # type: ignore[index]
+            self.assertEqual(second_payload["summary"]["failed"], 0)  # type: ignore[index]
+            self.assertIn(
+                "already_removed",
+                {action["status"] for action in second_payload["actions"]},  # type: ignore[index]
+            )
+
+    def test_uninstall_apply_partial_unlink_failure_reports_failed_separately(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            failing = (target / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md").resolve()
+            original_unlink = Path.unlink
+
+            def fail_one(path: Path, *args: object, **kwargs: object) -> object:
+                if path.resolve() == failing:
+                    raise OSError("injected unlink failure")
+                return original_unlink(path, *args, **kwargs)
+
+            with patch("src.spec_dock.cli.Path.unlink", fail_one):
+                payload = self._uninstall_json_payload(
+                    target,
+                    "--apply",
+                    "--keep-specs",
+                    expected_exit_code=1,
+                )
+
+            actions = self._actions_by_path(payload)
+            failed_action = actions[".agents/skills/spec-dock-issue-execution/SKILL.md"]
+            self.assertEqual(payload["status"], "partial_failure")
+            self.assertGreater(payload["summary"]["failed"], 0)  # type: ignore[index]
+            self.assertGreater(payload["summary"]["removed"], 0)  # type: ignore[index]
+            self.assertEqual(failed_action["status"], "failed")
+            self.assertIn("injected unlink failure", failed_action["error"])
+            self.assertTrue(failing.is_file())
+
+    def test_uninstall_apply_output_provides_installer_direct_recovery_guidance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--apply", "--keep-specs"])
+
+            self.assertEqual(exit_code, 0, stderr)
+            self.assertEqual(stderr, "")
+            self.assertFalse((target / "spec-dock" / "scripts" / "spec-dock").exists())
+            self.assertIn("spec-dock uninstall", stdout)
+            self.assertIn("spec-dock init", stdout)
+            self.assertIn("spec-dock update", stdout)
+            self.assertNotIn("./spec-dock/scripts/spec-dock uninstall", stdout)
+
+    def test_uninstall_apply_json_covers_success_rerun_and_partial_failure_statuses(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            success_target = Path(tmp) / "success"
+            success_target.mkdir()
+            self.assertEqual(main(["init", str(success_target)]), 0)
+            marker = success_target / "spec-dock" / "initiatives" / "marker.txt"
+            marker.write_text("keep\n", encoding="utf-8")
+            preserved = success_target / ".codex" / "config.toml"
+            preserved.write_text("product-owned config\n", encoding="utf-8")
+
+            success_payload = self._uninstall_json_payload(success_target, "--apply", "--keep-specs")
+            rerun_payload = self._uninstall_json_payload(success_target, "--apply", "--keep-specs")
+
+            self.assertEqual(success_payload["status"], "completed")
+            success_statuses = {action["status"] for action in success_payload["actions"]}  # type: ignore[index]
+            self.assertIn("removed", success_statuses)
+            self.assertIn("preserved", success_statuses)
+            self.assertIn("empty_dir_removed", success_statuses)
+            self.assertIn("already_removed", {action["status"] for action in rerun_payload["actions"]})  # type: ignore[index]
+            for payload in (success_payload, rerun_payload):
+                for action in payload["actions"]:  # type: ignore[index]
+                    for key in ("path", "category", "status", "reason", "error"):
+                        self.assertIn(key, action)
+
+            failure_target = Path(tmp) / "failure"
+            failure_target.mkdir()
+            self.assertEqual(main(["init", str(failure_target)]), 0)
+            failing = (failure_target / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md").resolve()
+            original_unlink = Path.unlink
+
+            def fail_one(path: Path, *args: object, **kwargs: object) -> object:
+                if path.resolve() == failing:
+                    raise OSError("injected unlink failure")
+                return original_unlink(path, *args, **kwargs)
+
+            with patch("src.spec_dock.cli.Path.unlink", fail_one):
+                failure_payload = self._uninstall_json_payload(
+                    failure_target,
+                    "--apply",
+                    "--keep-specs",
+                    expected_exit_code=1,
+                )
+
+            failure_statuses = {action["status"] for action in failure_payload["actions"]}  # type: ignore[index]
+            self.assertEqual(failure_payload["status"], "partial_failure")
+            self.assertIn("failed", failure_statuses)
+            self.assertIn("removed", failure_statuses)
+            self.assertGreater(failure_payload["summary"]["failed"], 0)  # type: ignore[index]
 
     def test_uninstall_keep_and_remove_specs_are_mutually_exclusive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -13289,7 +13557,6 @@ exit 44
 
             cases = (
                 (["uninstall", str(target), "--json", "--apply"], "--keep-specs"),
-                (["uninstall", str(target), "--json", "--apply", "--keep-specs"], "S03"),
             )
             for args, expected_error_text in cases:
                 with self.subTest(args=args):
