@@ -286,6 +286,14 @@ class TestInitUpdate(CliRuntimeHarness):
                 else:
                     snapshot[rel] = path.read_text(encoding="utf-8")
         return snapshot
+
+    def _uninstall_json_actions(self, target: Path, *args: str) -> dict[str, dict[str, object]]:
+        exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json", *args])
+        self.assertEqual(exit_code, 0, stderr)
+        self.assertEqual(stderr, "")
+        payload = json.loads(stdout)
+        self.assertEqual(payload["status"], "planned")
+        return {action["path"]: action for action in payload["actions"]}
     _DOGFOODING_MIRROR_PROVIDER_ASSET_MAP = {
         "spec-dock/.gitignore": "src/spec_dock/assets/spec_dock/.gitignore",
         "spec-dock/templates/README.md": "src/spec_dock/assets/spec_dock/templates/README.md",
@@ -13383,6 +13391,182 @@ exit 44
             self.assertEqual(payload["status"], "error")
             self.assertIn("spec-dock/spec-dock.version", payload["errors"][0])
             self.assertEqual(self._relative_file_snapshot(target), before)
+
+    def test_uninstall_dry_run_removes_known_agent_skill_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            managed_skill = target / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md"
+            managed_skill.write_text("user edited managed skill\n", encoding="utf-8")
+            before = self._relative_file_snapshot(target)
+
+            actions = self._uninstall_json_actions(target)
+
+            action = actions[".agents/skills/spec-dock-issue-execution/SKILL.md"]
+            self.assertEqual(action["category"], "agent_skill")
+            self.assertEqual(action["status"], "would_remove")
+            self.assertIn("agent/skill", action["reason"])
+            self.assertEqual(self._relative_file_snapshot(target), before)
+
+    def test_uninstall_dry_run_preserves_unknown_files_under_managed_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            unknown_paths = [
+                target / ".agents" / "skills" / "custom-product-agent" / "SKILL.md",
+                target / ".codex" / "notes" / "product.md",
+                target / ".github" / "ISSUE_TEMPLATE" / "bug.md",
+                target / "spec-dock" / "custom" / "notes.md",
+            ]
+            for path in unknown_paths:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("user content\n", encoding="utf-8")
+            before = self._relative_file_snapshot(target)
+
+            actions = self._uninstall_json_actions(target)
+
+            for path in unknown_paths:
+                rel = path.relative_to(target).as_posix()
+                with self.subTest(rel=rel):
+                    action = actions[rel]
+                    self.assertEqual(action["category"], "unmanaged")
+                    self.assertEqual(action["status"], "preserved")
+                    self.assertIn("unmanaged", action["reason"])
+            self.assertEqual(self._relative_file_snapshot(target), before)
+
+    def test_uninstall_dry_run_removes_exact_match_bootstrap_and_product_reusable_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._relative_file_snapshot(target)
+
+            actions = self._uninstall_json_actions(target)
+
+            expected = {
+                ".codex/config.toml": "bootstrap_only",
+                ".codex/prompts/execute-issue.md": "product_reusable",
+                ".github/workflows/ci.yml": "product_reusable",
+            }
+            for rel, category in expected.items():
+                with self.subTest(rel=rel):
+                    action = actions[rel]
+                    self.assertEqual(action["category"], category)
+                    self.assertEqual(action["status"], "would_remove")
+                    self.assertIn("exact match", action["reason"])
+            self.assertEqual(self._relative_file_snapshot(target), before)
+
+    def test_uninstall_dry_run_preserves_mismatch_bootstrap_and_product_reusable_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            edited = [
+                target / ".codex" / "config.toml",
+                target / ".github" / "workflows" / "ci.yml",
+            ]
+            for path in edited:
+                path.write_text("product-owned edit\n", encoding="utf-8")
+            before = self._relative_file_snapshot(target)
+
+            actions = self._uninstall_json_actions(target)
+
+            for path in edited:
+                rel = path.relative_to(target).as_posix()
+                with self.subTest(rel=rel):
+                    action = actions[rel]
+                    self.assertEqual(action["status"], "preserved")
+                    self.assertIn("content mismatch", action["reason"])
+                    self.assertIn("manual review", action["reason"])
+            self.assertEqual(self._relative_file_snapshot(target), before)
+
+    def test_uninstall_dry_run_preserves_non_core_comparison_errors_for_manual_review(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            config = target / ".codex" / "config.toml"
+            config.unlink()
+            config.mkdir()
+            workflow = target / ".github" / "workflows" / "ci.yml"
+            workflow.unlink()
+            symlink_created = False
+            try:
+                os.symlink("../product-ci.yml", workflow)
+                symlink_created = True
+            except OSError:
+                workflow.mkdir()
+            before = self._relative_file_snapshot(target)
+
+            actions = self._uninstall_json_actions(target)
+
+            for rel in (".codex/config.toml", ".github/workflows/ci.yml"):
+                with self.subTest(rel=rel):
+                    action = actions[rel]
+                    self.assertEqual(action["status"], "preserved")
+                    self.assertIn("comparison error", action["reason"])
+                    self.assertIn("manual review", action["reason"])
+            if symlink_created:
+                self.assertEqual(os.readlink(workflow), "../product-ci.yml")
+            self.assertEqual(self._relative_file_snapshot(target), before)
+
+    def test_uninstall_dry_run_scaffold_managed_exact_match_removes_and_mismatch_preserves(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            edited_doc = target / "spec-dock" / "docs" / "guide.md"
+            edited_doc.write_text("product docs edit\n", encoding="utf-8")
+            before = self._relative_file_snapshot(target)
+
+            actions = self._uninstall_json_actions(target)
+
+            exact_action = actions["spec-dock/scripts/spec-dock"]
+            self.assertEqual(exact_action["category"], "scaffold_managed")
+            self.assertEqual(exact_action["status"], "would_remove")
+            self.assertIn("exact match", exact_action["reason"])
+            edited_action = actions["spec-dock/docs/guide.md"]
+            self.assertEqual(edited_action["category"], "scaffold_managed")
+            self.assertEqual(edited_action["status"], "preserved")
+            self.assertIn("content mismatch", edited_action["reason"])
+            self.assertEqual(self._relative_file_snapshot(target), before)
+
+    def test_uninstall_dry_run_spec_shortcut_only_removes_matching_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cases = (
+                ("matching", "symlink", "spec-dock/scripts/spec-dock", "would_remove"),
+                ("nonmatching", "symlink", "scripts/spec", "preserved"),
+                ("file", "file", None, "preserved"),
+                ("directory", "directory", None, "preserved"),
+            )
+            for name, kind, link_target, expected_status in cases:
+                with self.subTest(name=name):
+                    target = Path(tmp) / name
+                    target.mkdir()
+                    self.assertEqual(main(["init", str(target)]), 0)
+                    shortcut = target / "spec"
+                    if shortcut.is_symlink() or shortcut.is_file():
+                        shortcut.unlink()
+                    elif shortcut.is_dir():
+                        shutil.rmtree(shortcut)
+
+                    if kind == "symlink":
+                        try:
+                            os.symlink(link_target, shortcut)
+                        except OSError:
+                            self.skipTest("symlink creation is unavailable")
+                    elif kind == "file":
+                        shortcut.write_text("product shortcut\n", encoding="utf-8")
+                    else:
+                        shortcut.mkdir()
+                    before = self._relative_file_snapshot(target)
+
+                    actions = self._uninstall_json_actions(target)
+
+                    action = actions["spec"]
+                    self.assertEqual(action["category"], "shortcut")
+                    self.assertEqual(action["status"], expected_status)
+                    if expected_status == "would_remove":
+                        self.assertIn("spec-dock/scripts/spec-dock", action["reason"])
+                    else:
+                        self.assertIn("not spec-dock shortcut", action["reason"])
+                    self.assertEqual(self._relative_file_snapshot(target), before)
 
     def _clear_active_entrypoints(self, target: Path) -> Path:
         active_dir = target / "spec-dock" / "active"
