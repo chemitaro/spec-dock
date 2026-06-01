@@ -33,6 +33,23 @@ ID: "iss-00151"
   - 成功。
 - [x] `./spec-dock/scripts/spec-dock validate`
   - `spec-dock: ok (validate) nodes=76`
+- [x] CI failure analysis for PR #152
+  - `Provider CI / provider-tests` failed because `tests/test_init_update.py` still expected `spec-manager` to use `gpt-5.4-mini` + `high`.
+  - The same CI run also detected checked-in dogfooding `.meta.json` snapshot drift after adding `iss-00151`.
+- [x] `python -m unittest tests.test_init_update.TestInitUpdate.test_init_generated_native_shims_satisfy_static_delegation_only_contract -v`
+  - 成功。
+- [x] `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v`
+  - 成功。
+- [x] `python -m unittest tests.test_init_update.TestInitUpdate.test_bundled_native_shim_assets_satisfy_static_delegation_only_contract -v`
+  - 成功。
+- [x] `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets -v`
+  - 成功。
+- [x] `git diff --check`
+  - 成功。
+- [x] `./spec-dock/scripts/spec-dock validate`
+  - `spec-dock: ok (validate) nodes=76`
+- [ ] `python -m unittest discover -v`
+  - 未完了。ローカル実行は `test_active_set_blocked_by_deps_refuses_without_force` 付近で長時間進行しなかったため、CI 失敗に対応する focused tests を優先して修正確認した。
 
 ## リスク
 - 設定値のみの変更で runtime code は変更しないため、実装上の退行リスクは低い。
