@@ -1,8 +1,8 @@
 name = "pr-monitor"
 description = "Read-only pull request monitor for checks, statuses, and Codex review outcomes."
 
-model = "gpt-5.4-mini"
-model_reasoning_effort = "medium"
+model = "gpt-5.5"
+model_reasoning_effort = "low"
 web_search = "cached"
 personality = "pragmatic"
 
