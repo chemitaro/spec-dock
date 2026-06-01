@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import cast
 
 from ..domain.active import infer_active_node_from_branch
 from ..domain.authority import (
     GRANT_ISSUE_FINISH,
+    GRANT_REVIEW_INPUT,
+    PROMOTION_DECISION_RUNTIME_ACTIVE_SELECTION,
+    approved_issue_finish_transition_grants,
+    approved_issue_finish_transition_promotion_record,
     evaluate_authority_gate,
     evaluate_evidence_adoption_ledger_gate,
     load_evidence_adoption_ledger_entries,
@@ -29,7 +34,7 @@ from .contracts import (
 from .github_issue_targets import normalize_repo_slug
 from .ports import Ports
 from .repo_context import resolve_current_repo_slug
-from .set_active import clear_active, set_active
+from .set_active import build_context_pack_text, clear_active, commit_active_state, set_active
 from .sync_state import post_mutation_sync
 
 
@@ -221,18 +226,22 @@ def require_lifecycle_authority(
     )
     if result.ok:
         return
-    details = " ".join(result.details)
-    raise RuntimeError(
-        "\n".join(
-            [
-                f"{command_label} blocked: authority gate failed",
-                f"- reason: {result.reason}",
-                f"- required_grant: {required_grant}",
-                f"- details: {details}" if details else "- details: none",
-                "Recovery: obtain a fresh approved promotion record for the active selection.",
-                "Active selection from `active set` / `issue start` is synthetic approval and cannot satisfy lifecycle grants.",
-            ]
-        )
+    raise RuntimeError(_format_lifecycle_authority_error(command_label, result, required_grant=required_grant))
+
+
+def _format_lifecycle_authority_error(command_label: str, result: object, *, required_grant: str) -> str:
+    details_raw = getattr(result, "details", ())
+    details = " ".join(str(detail) for detail in details_raw)
+    reason = getattr(result, "reason", "unknown")
+    return "\n".join(
+        [
+            f"{command_label} blocked: authority gate failed",
+            f"- reason: {reason}",
+            f"- required_grant: {required_grant}",
+            f"- details: {details}" if details else "- details: none",
+            "Recovery: obtain a fresh approved promotion record for the active selection.",
+            "Active selection from `active set` / `issue start` is synthetic approval and cannot satisfy lifecycle grants.",
+        ]
     )
 
 
@@ -329,6 +338,84 @@ def _require_issue_finish_authority(entry: object) -> None:
     )
 
 
+def _evaluate_issue_finish_authority(entry: object):
+    entry_id = getattr(entry, "id", None)
+    expected_revision = f"active:{entry_id}" if isinstance(entry_id, str) and entry_id.strip() else None
+    return evaluate_authority_gate(
+        authority=getattr(entry, "authority", None),
+        grants=getattr(entry, "grants", None),
+        promotion_record=getattr(entry, "promotion_record", None),
+        required_grant=GRANT_ISSUE_FINISH,
+        purpose="issue_finish",
+        expected_revision=expected_revision,
+    )
+
+
+def _require_bound_synthetic_active_issue(entry: object) -> None:
+    entry_id = getattr(entry, "id", None)
+    expected_revision = f"active:{entry_id}" if isinstance(entry_id, str) and entry_id.strip() else None
+    promotion_record = getattr(entry, "promotion_record", None)
+    if not isinstance(promotion_record, dict):
+        _require_issue_finish_authority(entry)
+        return
+    if promotion_record.get("promotion_decision") != PROMOTION_DECISION_RUNTIME_ACTIVE_SELECTION:
+        _require_issue_finish_authority(entry)
+        return
+    result = evaluate_authority_gate(
+        authority=getattr(entry, "authority", None),
+        grants=getattr(entry, "grants", None),
+        promotion_record=promotion_record,
+        required_grant=GRANT_REVIEW_INPUT,
+        purpose="issue_finish_transition_binding",
+        expected_revision=expected_revision,
+    )
+    if not result.ok:
+        raise RuntimeError(
+            _format_lifecycle_authority_error("issue finish", result, required_grant=GRANT_ISSUE_FINISH)
+        )
+
+
+def _manifest_with_issue_finish_transition(manifest: ActiveManifest, issue_id: str) -> ActiveManifest:
+    if manifest.issue is None:
+        raise RuntimeError("issue finish requires an active issue manifest entry.")
+    transitioned_issue = replace(
+        manifest.issue,
+        grants=approved_issue_finish_transition_grants(),
+        promotion_record=approved_issue_finish_transition_promotion_record(node_id=issue_id),
+    )
+    return replace(manifest, issue=transitioned_issue)
+
+
+def _persist_issue_finish_transition(
+    *,
+    manifest: ActiveManifest,
+    active_issue_id: str,
+    ports: Ports,
+) -> ActiveManifest:
+    transitioned_manifest = _manifest_with_issue_finish_transition(manifest, active_issue_id)
+    context_pack_text = build_context_pack_text(transitioned_manifest, repo_root=_resolve_repo_root(ports))
+    try:
+        return commit_active_state(
+            persisted_manifest=transitioned_manifest,
+            patch_manifest=transitioned_manifest,
+            ports=ports,
+            context_pack_text=context_pack_text,
+        )
+    except Exception as error:
+        raise RuntimeError(
+            "\n".join(
+                [
+                    "issue finish failed while persisting finish transition.",
+                    "Active selection was restored; GitHub issue close was not attempted.",
+                    "Recovery:",
+                    "  spec-dock/scripts/spec-dock active show",
+                    "  spec-dock/scripts/spec-dock issue finish",
+                    str(error),
+                ]
+            )
+        ) from error
+
+
 def issue_start(req: IssueStartRequest, ports: Ports) -> IssueStartResult:
     if ports.active_state_store is None:
         raise RuntimeError("active_state_store is required")
@@ -410,8 +497,17 @@ def issue_finish(req: IssueFinishRequest, ports: Ports) -> IssueFinishResult:
         )
     if active_load.manifest is None or active_load.manifest.issue is None:
         raise RuntimeError("issue finish requires an active issue manifest entry.")
-    _require_issue_finish_authority(active_load.manifest.issue)
-    issue_path = getattr(active_load.manifest.issue, "path", None)
+    active_manifest = active_load.manifest
+    active_issue_entry = active_manifest.issue
+    authority_result = _evaluate_issue_finish_authority(active_issue_entry)
+    needs_transition = authority_result.reason == "active_synthetic_approval_not_lifecycle_approval"
+    if not authority_result.ok and not needs_transition:
+        raise RuntimeError(
+            _format_lifecycle_authority_error("issue finish", authority_result, required_grant=GRANT_ISSUE_FINISH)
+        )
+    if needs_transition:
+        _require_bound_synthetic_active_issue(active_issue_entry)
+    issue_path = getattr(active_issue_entry, "path", None)
     if isinstance(issue_path, str) and issue_path.strip():
         issue_dir = _resolve_repo_root(ports) / issue_path
         require_delegated_artifacts_authorized(
@@ -425,6 +521,17 @@ def issue_finish(req: IssueFinishRequest, ports: Ports) -> IssueFinishResult:
             purpose="issue_finish",
             command_label="issue finish",
         )
+    if needs_transition:
+        active_manifest = _persist_issue_finish_transition(
+            manifest=active_manifest,
+            active_issue_id=active_issue_id,
+            ports=ports,
+        )
+        if active_manifest.issue is None:
+            raise RuntimeError("issue finish requires an active issue manifest entry.")
+        _require_issue_finish_authority(active_manifest.issue)
+    else:
+        _require_issue_finish_authority(active_issue_entry)
 
     try:
         close_result = close_node(
