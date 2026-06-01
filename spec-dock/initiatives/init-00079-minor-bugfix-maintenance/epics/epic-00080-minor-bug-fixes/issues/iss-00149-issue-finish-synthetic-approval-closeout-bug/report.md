@@ -585,6 +585,69 @@ OK
 
 ---
 
+### セッションログ（2026-06-01 S99 snapshot maintenance）
+
+#### 対象
+- Step: S99 Final Quality Gate / broad-suite regression fix
+- AC/EC: final verification gate, checked-in dogfooding snapshot parity
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S99 — Final Quality Gate / Issue-wide Review`
+  - closure ids: tc-015 support evidence
+
+#### 実施内容
+- `python -m unittest discover -v` の初回 S99 実行で、checked-in dogfooding `.meta.json` cutover snapshot drift を検出した。
+- 失敗は runtime behavior ではなく、今回 import / active issue として追加された `iss-00149` の `.meta.json` が `tests/test_init_update.py` の cutover snapshot expectation に未追加だったことが原因。
+- dev-coder Darwin に snapshot-only fix を委任し、`tests/test_init_update.py` の `_CHECKED_IN_DOGFOODING_META_JSON_PATHS` と `_CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH` に `iss-00149` entry を追加した。
+- code-reviewer Galileo が snapshot-only diff を review し、`review_status=pass` と判定した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+
+Ran 1032 tests in 614.708s
+FAILED (failures=1)
+failing test: tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+reason: checked-in dogfooding .meta.json path set diverged from cutover snapshot
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v
+
+Ran 1 test in 0.027s
+OK
+
+git diff --check
+
+OK
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S99-snapshot | 赤 / integration regression | full suite catches checked-in dogfooding snapshot drift | full suite failed one test: `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` | `python -m unittest discover -v` | fail observed and fixed | failure was snapshot maintenance, not runtime behavior |
+| S99-snapshot | 緑フェーズ（Green） | focused snapshot regression passes after fixture update | focused snapshot test OK | `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v`; `git diff --check` | pass | full suite rerun remains pending after this commit |
+| S99-snapshot | リファクタリング（Refactor） | no runtime/source/docs behavior change | only `tests/test_init_update.py` snapshot constants changed | diff inspection and code-reviewer Galileo | pass | no implementation behavior changed |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S99-snapshot | checked-in dogfooding `.meta.json` snapshot omitted `iss-00149` | full unittest discover | added `iss-00149` `.meta.json` path and `depends_on: []` snapshot entry | tc-015 support | no | focused snapshot test now passes; code-reviewer Galileo pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S99-snapshot | tc-015 support | Broad final verification blockers discovered by full suite are resolved before final reviewer gates | focused snapshot test -> OK; code-reviewer Galileo -> pass | pass | full suite rerun and final reviewer triad remain pending |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S99-snapshot | dev-coder | Added checked-in dogfooding cutover snapshot entry for `iss-00149` metadata | `tests/test_init_update.py` | focused snapshot test -> pass; `git diff --check` -> pass | pass: code-reviewer Galileo `019e8328-50d3-7440-9b0c-9279d7290a81` | full suite rerun pending | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S99-snapshot | snapshot-only code review | code-reviewer Galileo `019e8328-50d3-7440-9b0c-9279d7290a81` | fresh | passed | N/A | proceed to snapshot commit | no findings |
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
