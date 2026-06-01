@@ -479,6 +479,112 @@ OK
 
 ---
 
+### セッションログ（2026-06-01 S90）
+
+#### 対象
+- Step: S90 Docs Impact Resolution
+- AC/EC: docs/runtime alignment, recovery guidance, lifecycle-only boundary
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `ドキュメント影響の解消ステップ S90（Docs Impact Resolution）`
+  - closure ids: tc-014
+
+#### 実施内容
+- doc-writer Dalton に S90 を委任し、provider workflow docs と dogfooding mirror workflow docs を更新した。
+- `issue finish` が synthetic active selection から finish-only `issue_finish_lifecycle_transition` を内部永続化し得ることを説明した。
+- delegated artifact gate / Evidence Adoption Ledger gate が transition 永続化前かつ GitHub close / active clear 前に fail-closed で通る必要があることを明記した。
+- transition 永続化失敗時は active selection を復元し close を試みないこと、close/view 失敗後は `active show` + retry `issue finish` が recovery であり direct `active.json` editing を標準化しないことを追記した。
+- `issue finish` が PR delivery / tests / review / merge readiness を保証しない lifecycle-only command である既存境界は維持した。
+- spec-reviewer Einstein が docs/spec alignment を review し、`review_status=pass` と判定した。
+
+#### 実行コマンド / 結果
+```bash
+cmp -s src/spec_dock/assets/spec_dock/docs/workflow_issue.md spec-dock/docs/workflow_issue.md
+# exit 0
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=75
+
+git diff --check
+
+OK
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S90 | 赤 / 代替証跡（Red / Alternative） | inspect-only: workflow docs stale guidance identified before edit | pre-edit docs described `issue_finish` grant gate but did not describe finish-only internal transition, local gate ordering, transition persistence failure, or retry-ready close failure state | docs inspection around `issue finish` bullets | pass | S90 is docs-only, so inspection is the alternative evidence |
+| S90 | 緑フェーズ（Green） | provider/mirror docs parity, validate, and spec-reviewer pass | `cmp -s` exit 0; `validate` OK; spec-reviewer Einstein pass | parent rerun and spec-reviewer | pass | docs align with implemented behavior and approved plan |
+| S90 | リファクタリング（Refactor） | minimal docs wording, no broad workflow rewrite | only lifecycle bullets around `issue finish` were updated in provider and mirror docs | diff inspection and spec-reviewer Einstein | pass | no new commands or delivery-completion semantics introduced |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S90 | No unplanned docs risks beyond approved S90 contract | doc-writer / spec-reviewer | recorded | tc-014 | no | Dalton and Einstein reported no behavior expansion |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | tc-014 | Workflow docs describe finish-only internal transition, local gate ordering, recovery path, and lifecycle-only boundary; provider/mirror parity; validate and spec-reviewer pass | docs diff inspection; provider/mirror `cmp -s` -> exit 0; `validate` -> OK; spec-reviewer Einstein -> pass | pass | S99 final gates remain pending |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-014 | S90 | yes | inspect-only + docs parity | docs inspection found stale `issue finish` guidance without transition/retry details | docs diff inspection; `cmp -s`; `./spec-dock/scripts/spec-dock validate`; spec-reviewer | pass | docs remain lifecycle-only and preserve PR delivery gates |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-014 | S90 | docs parity + validate + spec-reviewer | pass | workflow docs aligned with runtime behavior |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-014 | workflow docs inspection | same | S90 docs update implemented as planned | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/e8ee/spec-dock` | iss-00149 | current session | doc-writer, spec-reviewer | same repo, active issue, S90 workflow docs only, no publishing or credentialed mutation | issue complete / session end / scope change / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S90 | delegated | docs impact resolution | doc-writer Dalton `019e8317-fa26-7a50-a1ce-65aa950c58a0` | provider and mirror workflow issue docs | `plan.md` S90 | `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`; `spec-dock/docs/workflow_issue.md` | runtime, tests, canonical issue docs, broad workflow rewrite | provider/mirror `cmp -s`; `validate`; `git diff --check`; spec-reviewer pass | behavior change / new command / lifecycle boundary conflict | changed docs, validation result, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S90 | doc-writer | Updated workflow docs for finish-only transition, local gate ordering, retry recovery, and no direct active.json standard path | `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`; `spec-dock/docs/workflow_issue.md` | provider/mirror `cmp -s` -> exit 0; `./spec-dock/scripts/spec-dock validate` -> OK; `git diff --check` -> pass | pass: spec-reviewer Einstein `019e8319-ef9e-7e10-90c7-767d17436d8f` | S99 final gates remain pending | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | N/A | N/A | N/A | N/A | N/A | N/A | N/A | no parent implementation exception |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | docs/spec alignment | spec-reviewer Einstein `019e8319-ef9e-7e10-90c7-767d17436d8f` | fresh | passed | N/A | proceed to S90 commit | no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | ready_to_commit | workflow docs and S90 report evidence | HEAD at S90 commit (`git log -1 --oneline` after commit) | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - provider workflow docs for finish-only transition and recovery semantics
+- `spec-dock/docs/workflow_issue.md` - dogfooding mirror workflow docs
+- `spec-dock/active/issue/report.md` - S90 observed evidence ledger
+
+#### コミット
+- pending S90 commit
+
+#### メモ
+- No material implementation decisions beyond the approved plan.
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
