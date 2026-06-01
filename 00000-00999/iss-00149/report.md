@@ -688,6 +688,21 @@ OK
 |---|---|---|---|
 | final verification evidence and QA/code/spec reviewer gates recorded; external tc-015 PR Delivery / Merge Preparation remains pending until PR creation and monitoring | `report.md` final ledger only | PR delivery and final response after PR evidence is recorded | ready_for_pr_delivery |
 
+### PR Delivery Gate（tc-015）
+| 項目（item） | 証跡（evidence） | 結果（result） |
+|---|---|---|
+| PR URL | `https://github.com/chemitaro/spec-dock/pull/150` | pass |
+| base / head | base=`main`; head=`iss-00149-issue-finish-synthetic-approval-closeout-bug`; report evidence commit will be pushed after this ledger entry | pass |
+| issue linkage | PR body includes `Closes #149`; `gh pr view 150 --json closingIssuesReferences` reports issue `#149` | pass |
+| initial PR snapshot | `gh pr view 150 --json number,url,state,baseRefName,headRefName,headRefOid,isDraft,mergeable,reviewDecision,statusCheckRollup,closingIssuesReferences` -> state=`OPEN`, isDraft=`false`, mergeable=`MERGEABLE`, headRefOid before PR-evidence report commit=`d1b4e5abc7087fda5bb195f6fed2f900fdb86f91` | pass |
+
+### Merge Preparation Gate（tc-015）
+| 項目（item） | 証跡（evidence） | 結果（result） |
+|---|---|---|
+| local final gates before PR | target tests, full suite, validate, sync, diff-check, provider/mirror parity, QA/code/spec reviewer gates all passed before PR creation | pass |
+| initial remote checks | `gh pr checks 150` observed `validate` success for one run and newer `validate` / `provider-tests` checks pending immediately after PR creation | pending_remote_checks |
+| mergeability | initial PR snapshot reports `mergeable=MERGEABLE`; final remote checks must be re-monitored after PR-evidence report commit is pushed | ready_pending_remote_checks |
+
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
   - 解決: ...
