@@ -137,102 +137,113 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-06-01 HH:MM - HH:MM）
+### セッションログ（2026-06-01 S01）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01 Domain Authority Contract
+- AC/EC: AC-003, EC-002, constraints
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: `実装ステップ S01 — Domain Authority Contract`
+  - closure ids: tc-001, tc-002, tc-003, tc-004
 
 #### 実施内容
-- ...
+- dev-coder Bacon に S01 を委任し、provider authority domain contract と domain tests を実装した。
+- `runtime_active_selection` の lifecycle rejection を維持した。
+- `issue_finish_lifecycle_transition` 用 promotion record / grants helper と finish-only gate を追加した。
+- code-reviewer Hegel が S01 diff を review し、`review_status=pass` と判定した。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+python -m unittest tests.domain_runtime.test_authority -v
 
-<result>
+Ran 32 tests in 0.007s
+OK
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | 赤フェーズ（Red） | red-required: finish transition helper / grants helper and finish-only gate tests | 追加した S01 tests が helper 未実装で失敗し、`approved_issue_finish_transition_promotion_record` / `approved_issue_finish_transition_grants` missing を検出 | dev-coder reported `python -m unittest tests.domain_runtime.test_authority -v` | pass | Red failure was observed before Green implementation |
+| S01 | 緑フェーズ（Green） | `python -m unittest tests.domain_runtime.test_authority -v` | 32 tests OK | `python -m unittest tests.domain_runtime.test_authority -v` | pass | parent rerun also passed |
+| S01 | リファクタリング（Refactor） | guardrail satisfied / no broad refactor | authority constants, scoped helpers, and gate branch only; no application/docs/mirror changes | diff inspection and code-reviewer Hegel | pass | S01 allowed path only |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | No unplanned tests or risks beyond approved S01 contract | dev-coder / code-reviewer | recorded | tc-001, tc-002, tc-003, tc-004 | no | Bacon and Hegel reported no material implementation decisions beyond approved plan |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | tc-001, tc-002, tc-003, tc-004 | Domain helpers exist, gate semantics pass all S01 tests, existing domain tests remain green, and code-reviewer passes | `python -m unittest tests.domain_runtime.test_authority -v` -> OK; code-reviewer Hegel -> pass | pass | S02 application flow remains pending by design |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | yes | red-required | Existing test plus red/green rerun | `python -m unittest tests.domain_runtime.test_authority -v` | pass | synthetic lifecycle rejection preserved |
+| tc-002 | S01 | yes | red-required | missing helper errors before implementation | `python -m unittest tests.domain_runtime.test_authority -v` | pass | helper returns finish token and exact limited grants |
+| tc-003 | S01 | yes | red-required | missing helper errors before implementation | `python -m unittest tests.domain_runtime.test_authority -v` | pass | finish token is finish-only |
+| tc-004 | S01 | yes | red-required | missing helper errors before implementation | `python -m unittest tests.domain_runtime.test_authority -v` | pass | expected active revision mismatch fails closed |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | domain tests + code-reviewer | pass | runtime synthetic rejection unchanged |
+| tc-002 | S01 | domain helper tests + code-reviewer | pass | helper output is active-bound |
+| tc-003 | S01 | domain finish-only token tests + code-reviewer | pass | non-finish lifecycle grants fail |
+| tc-004 | S01 | domain stale binding tests + code-reviewer | pass | stale active binding remains fail-closed |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| none | tc-001, tc-002, tc-003, tc-004 | test names in `tests/domain_runtime/test_authority.py` | same | S01 tests implemented as planned | no | no |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00149 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/e8ee/spec-dock` | iss-00149 | current session | dev-coder, code-reviewer | same repo, active issue, S01 allowed paths only, no publishing or credentialed mutation | issue complete / session end / scope change / user revocation | none | proceed |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | runtime domain and tests | dev-coder Bacon `019e82f8-7641-7bd0-a9e2-2e6cc2440720` | Domain authority contract only | `plan.md` S01 | provider `authority.py`, domain authority tests | application lifecycle, docs, mirror, active state, unrelated refactor | `python -m unittest tests.domain_runtime.test_authority -v` | need design change / new command / synthetic relaxation | changed files, tests, closure ids, risks, ledger note | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | dev-coder | Added finish transition helpers and finish-only gate; preserved synthetic lifecycle rejection | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authority.py`; `tests/domain_runtime/test_authority.py` | `python -m unittest tests.domain_runtime.test_authority -v` -> pass | pass: code-reviewer Hegel `019e82fb-121f-7ea1-9a65-ecf1f2e5561f` | S02 application flow remains pending | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01 | N/A | N/A | N/A | N/A | N/A | N/A | N/A | no parent implementation exception |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step reviewer | code-reviewer Hegel `019e82fb-121f-7ea1-9a65-ecf1f2e5561f` | fresh | passed | N/A | proceed to S01 commit | no findings |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | committed | `authority.py`, `test_authority.py`, S01 report evidence | HEAD at S01 commit (`git log -1 --oneline`) | `git status --short` -> clean after final amend | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authority.py` - finish transition promotion record / grants helper and finish-only gate
+- `tests/domain_runtime/test_authority.py` - S01 domain tests for helper output, finish-only token, and stale binding
+- `spec-dock/active/issue/report.md` - S01 observed evidence ledger
 
 #### コミット
-- <hash> <message>
+- HEAD at S01 commit: `test(authority): issue finish専用transition契約を追加`
 
 #### メモ
-- ...
+- No material implementation decisions beyond the approved plan.
 
 ---
 
