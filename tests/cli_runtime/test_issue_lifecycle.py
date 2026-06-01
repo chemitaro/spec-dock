@@ -36,7 +36,15 @@ class _StubNodeReader:
 
 
 class _StubActiveStateStore:
-    def __init__(self, infra_contracts, *, issue_authority="approved", issue_grants=None, promotion_record=None) -> None:
+    def __init__(
+        self,
+        infra_contracts,
+        *,
+        issue_authority="approved",
+        issue_grants=None,
+        promotion_record=None,
+        fail_write=False,
+    ) -> None:
         self._infra_contracts = infra_contracts
         self.issue_authority = issue_authority
         self.issue_grants = (
@@ -61,6 +69,11 @@ class _StubActiveStateStore:
             "reviewer_target_hash": "active:iss-00101",
             "promotion_decision": "main_orchestrator_promotion",
         }
+        self.fail_write = fail_write
+        self.write_calls = []
+        self.restore_calls = []
+        self.pointer_calls = []
+        self.patch_calls = []
 
     def load_active_manifest(self, specdock_dir: Path):
         del specdock_dir
@@ -79,6 +92,36 @@ class _StubActiveStateStore:
             source="agent.active",
             warnings=[],
         )
+
+    def snapshot_current_state(self, specdock_dir: Path):
+        return self._infra_contracts.ActiveStateSnapshot(
+            manifest=self.load_active_manifest(specdock_dir).manifest,
+            context_pack_text="previous context",
+            active_json_text="{}",
+            managed_agent_state={},
+        )
+
+    def write_active_manifest(self, specdock_dir: Path, manifest):
+        del specdock_dir
+        self.write_calls.append(manifest)
+        if self.fail_write:
+            raise RuntimeError("write active failed")
+        self.issue_authority = manifest.issue.authority if manifest.issue is not None else None
+        self.issue_grants = manifest.issue.grants if manifest.issue is not None else ()
+        self.promotion_record = manifest.issue.promotion_record if manifest.issue is not None else None
+        return manifest
+
+    def apply_active_pointers(self, specdock_dir: Path, manifest, rendered_context_pack: str):
+        del specdock_dir
+        self.pointer_calls.append((manifest, rendered_context_pack))
+
+    def patch_agent_state_active_fields(self, specdock_dir: Path, manifest):
+        del specdock_dir
+        self.patch_calls.append(manifest)
+
+    def restore_previous_state(self, specdock_dir: Path, snapshot) -> None:
+        del specdock_dir
+        self.restore_calls.append(snapshot)
 
 
 class TestIssueLifecycleApplication(unittest.TestCase):
@@ -187,6 +230,15 @@ class TestIssueLifecycleApplication(unittest.TestCase):
         app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
         original_close_node = app_issue_lifecycle.close_node
         close_calls = []
+        runtime_record = {
+            "status": "approved",
+            "authority": "approved",
+            "source_revision": "active:iss-00101",
+            "approved_revision": "active:iss-00101",
+            "approved_hash": "active:iss-00101",
+            "reviewer_target_hash": "active:iss-00101",
+            "promotion_decision": "runtime_active_selection",
+        }
         try:
             def fake_close_node(req, ports):
                 close_calls.append((req, ports))
@@ -212,11 +264,12 @@ class TestIssueLifecycleApplication(unittest.TestCase):
                     + "\n",
                     encoding="utf-8",
                 )
+                store = _StubActiveStateStore(infra_contracts, promotion_record=runtime_record)
                 ports = app_ports.Ports(
                     node_reader=_StubNodeReader(),
                     repo_root=repo_root,
                     specdock_dir=repo_root / "spec-dock",
-                    active_state_store=_StubActiveStateStore(infra_contracts),
+                    active_state_store=store,
                 )
                 with self.assertRaises(RuntimeError) as raised:
                     app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
@@ -226,6 +279,8 @@ class TestIssueLifecycleApplication(unittest.TestCase):
             self.assertIn("blocking_entry_id: EAL-009", message)
             self.assertIn("resolve reviewer evidence", message)
             self.assertEqual(close_calls, [])
+            self.assertEqual(store.write_calls, [])
+            self.assertEqual(store.promotion_record["promotion_decision"], "runtime_active_selection")
         finally:
             app_issue_lifecycle.close_node = original_close_node
 
@@ -280,6 +335,15 @@ class TestIssueLifecycleApplication(unittest.TestCase):
         app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
         original_close_node = app_issue_lifecycle.close_node
         close_calls = []
+        runtime_record = {
+            "status": "approved",
+            "authority": "approved",
+            "source_revision": "active:iss-00101",
+            "approved_revision": "active:iss-00101",
+            "approved_hash": "active:iss-00101",
+            "reviewer_target_hash": "active:iss-00101",
+            "promotion_decision": "runtime_active_selection",
+        }
         try:
             def fake_close_node(req, ports):
                 close_calls.append((req, ports))
@@ -322,11 +386,12 @@ class TestIssueLifecycleApplication(unittest.TestCase):
                         issue_dir = repo_root / "spec-dock" / "initiatives" / "init-00001" / "epics" / "epic-00002" / "issues" / "iss-00101"
                         issue_dir.mkdir(parents=True)
                         (issue_dir / "design.md").write_text(artifact_text, encoding="utf-8")
+                        store = _StubActiveStateStore(infra_contracts, promotion_record=runtime_record)
                         ports = app_ports.Ports(
                             node_reader=_StubNodeReader(),
                             repo_root=repo_root,
                             specdock_dir=repo_root / "spec-dock",
-                            active_state_store=_StubActiveStateStore(infra_contracts),
+                            active_state_store=store,
                         )
                         with self.assertRaises(RuntimeError) as raised:
                             app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
@@ -336,6 +401,8 @@ class TestIssueLifecycleApplication(unittest.TestCase):
                     self.assertIn(expected_reason, message)
                     self.assertIn("design.md", message)
                     self.assertEqual(close_calls, [])
+                    self.assertEqual(store.write_calls, [])
+                    self.assertEqual(store.promotion_record["promotion_decision"], "runtime_active_selection")
         finally:
             app_issue_lifecycle.close_node = original_close_node
 
@@ -385,6 +452,47 @@ class TestIssueLifecycleApplication(unittest.TestCase):
                     self.assertIn(f"{command_label} blocked: Evidence Adoption Ledger", message)
                     self.assertIn("blocking_entry_id: EAL-010", message)
                     self.assertIn("refresh adopted evidence", message)
+
+    def test_issue_finish_transition_persistence_failure_rolls_back_before_close(self) -> None:
+        app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
+        original_close_node = app_issue_lifecycle.close_node
+        close_calls = []
+        runtime_record = {
+            "status": "approved",
+            "authority": "approved",
+            "source_revision": "active:iss-00101",
+            "approved_revision": "active:iss-00101",
+            "approved_hash": "active:iss-00101",
+            "reviewer_target_hash": "active:iss-00101",
+            "promotion_decision": "runtime_active_selection",
+        }
+        try:
+            def fake_close_node(req, ports):
+                close_calls.append((req, ports))
+                raise AssertionError("close_node must not run when transition persistence fails")
+
+            app_issue_lifecycle.close_node = fake_close_node
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                store = _StubActiveStateStore(infra_contracts, promotion_record=runtime_record, fail_write=True)
+                ports = app_ports.Ports(
+                    node_reader=_StubNodeReader(),
+                    repo_root=repo_root,
+                    specdock_dir=repo_root / "spec-dock",
+                    active_state_store=store,
+                )
+                with self.assertRaises(RuntimeError) as raised:
+                    app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
+
+            message = str(raised.exception)
+            self.assertIn("issue finish failed while persisting finish transition", message)
+            self.assertIn("write active failed", message)
+            self.assertEqual(len(store.write_calls), 1)
+            self.assertEqual(len(store.restore_calls), 1)
+            self.assertEqual(close_calls, [])
+            self.assertEqual(store.promotion_record["promotion_decision"], "runtime_active_selection")
+        finally:
+            app_issue_lifecycle.close_node = original_close_node
 
     def test_lifecycle_authority_gate_blocks_non_finish_purposes(self) -> None:
         _app_contracts, app_issue_lifecycle, _app_ports, _domain_models, infra_contracts = _runtime_modules()
@@ -699,12 +807,19 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             return path_file.read_text(encoding="utf-8").strip()
         return ""
 
-    def _promote_active_issue_lifecycle(self, target: Path) -> None:
+    def _active_issue_promotion_decision(self, target: Path) -> str | None:
         active_path = target / "spec-dock" / ".agent" / "active.json"
+        if not active_path.exists():
+            return None
         active = json.loads(active_path.read_text(encoding="utf-8"))
-        issue = active["issue"]
-        issue["promotion_record"]["promotion_decision"] = "main_orchestrator_promotion"
-        self._write_json_force(active_path, active)
+        issue = active.get("issue")
+        if not isinstance(issue, dict):
+            return None
+        promotion_record = issue.get("promotion_record")
+        if not isinstance(promotion_record, dict):
+            return None
+        value = promotion_record.get("promotion_decision")
+        return value if isinstance(value, str) else None
 
     def test_issue_start_sets_active_and_checks_out_issue_branch(self) -> None:
         if os.name == "nt":
@@ -1039,7 +1154,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertIn("issue=iss-00101", started.stdout)
             self.assertIn("spec-dock: ok (issue checkout) branch=iss-00101-first-issue", started.stdout)
             self.assertEqual(self._active_issue_id(target), "iss-00101")
-            self._promote_active_issue_lifecycle(target)
+            self.assertEqual(self._active_issue_promotion_decision(target), "runtime_active_selection")
             started_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(started_branch, "iss-00101-first-issue")
             list_count_before_finish = (bin_dir / "gh-calls.log").read_text(encoding="utf-8").count("issue list")
@@ -1072,7 +1187,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertEqual(main(["init", str(target)]), 0)
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=101, issue_title="First issue")
             self._run_runtime(target, ["active", "set", "--id", "iss-00101", "--force"])
-            self._promote_active_issue_lifecycle(target)
+            self.assertEqual(self._active_issue_promotion_decision(target), "runtime_active_selection")
             bin_dir = Path(bin_tmp)
             state_path = self._make_gh_stub(bin_dir, states={101: "OPEN"})
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -1088,7 +1203,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             state = json.loads(state_path.read_text(encoding="utf-8"))
             self.assertEqual(state["101"]["state"], "CLOSED")
 
-    def test_issue_finish_blocks_normal_active_set_synthetic_approval_before_close(self) -> None:
+    def test_issue_finish_active_set_synthetic_approval_closes_open_issue_and_clears_active(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a python gh stub with shebang; skip on Windows.")
 
@@ -1103,19 +1218,15 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
 
             p = self._run_runtime_capture(target, ["issue", "finish"], env=test_env)
 
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("issue finish blocked: authority gate failed", p.stderr)
-            self.assertIn("active_synthetic_approval_not_lifecycle_approval", p.stderr)
-            self.assertIn("required_grant: issue_finish", p.stderr)
-            self.assertIn("obtain a fresh approved promotion record", p.stderr)
-            self.assertIn("synthetic approval", p.stderr)
-            self.assertNotIn("issue start <issue>", p.stderr)
-            self.assertEqual(self._active_issue_id(target), "iss-00101")
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok (issue finish)", p.stdout)
+            self.assertIn("issue=iss-00101", p.stdout)
+            self.assertIn("github=#101", p.stdout)
+            self.assertIn("active_cleared=true", p.stdout)
+            self.assertIn("already_closed=false", p.stdout)
+            self.assertIsNone(self._active_issue_id(target))
             state = json.loads(state_path.read_text(encoding="utf-8"))
-            self.assertEqual(state["101"]["state"], "OPEN")
-            log_path = bin_dir / "gh-calls.log"
-            if log_path.exists():
-                self.assertNotIn("issue close", log_path.read_text(encoding="utf-8"))
+            self.assertEqual(state["101"]["state"], "CLOSED")
 
     def test_issue_finish_already_closed_clears_active(self) -> None:
         if os.name == "nt":
@@ -1126,7 +1237,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertEqual(main(["init", str(target)]), 0)
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=101, issue_title="First issue")
             self._run_runtime(target, ["active", "set", "--id", "iss-00101", "--force"])
-            self._promote_active_issue_lifecycle(target)
+            self.assertEqual(self._active_issue_promotion_decision(target), "runtime_active_selection")
             bin_dir = Path(bin_tmp)
             self._make_gh_stub(bin_dir, states={101: "CLOSED"})
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -1173,7 +1284,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             unlinked_meta.pop("github", None)
             self._write_json_force(linked_meta_path, unlinked_meta)
             self._run_runtime(target, ["active", "set", "--id", "iss-00101", "--force"])
-            self._promote_active_issue_lifecycle(target)
+            self.assertEqual(self._active_issue_promotion_decision(target), "runtime_active_selection")
             no_link = self._run_runtime_capture(target, ["issue", "finish"])
             self.assertNotEqual(no_link.returncode, 0, no_link.stdout + no_link.stderr)
             self.assertIn("issue finish failed while closing GitHub issue", no_link.stderr)
@@ -1183,6 +1294,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertIn("spec-dock/scripts/spec-dock active show", no_link.stderr)
             self.assertIn("Node is not linked to a GitHub issue", no_link.stderr)
             self.assertEqual(self._active_issue_id(target), "iss-00101")
+            self.assertEqual(self._active_issue_promotion_decision(target), "issue_finish_lifecycle_transition")
 
             active_path = target / "spec-dock" / ".agent" / "active.json"
             stale_active = json.loads(active_path.read_text(encoding="utf-8"))
@@ -1195,14 +1307,13 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertIn("required_grant: issue_finish", node_not_found.stderr)
             self.assertIn("Recovery:", node_not_found.stderr)
             self.assertIn("obtain a fresh approved promotion record", node_not_found.stderr)
-            self.assertIn("synthetic approval", node_not_found.stderr)
             self.assertNotIn("issue start <issue>", node_not_found.stderr)
             self.assertIn("expected_revision=active:iss-00999", node_not_found.stderr)
             self.assertEqual(self._active_issue_id(target), "iss-00999")
 
             self._write_json_force(linked_meta_path, linked_meta)
             self._run_runtime(target, ["active", "set", "--id", "iss-00101", "--force"])
-            self._promote_active_issue_lifecycle(target)
+            self.assertEqual(self._active_issue_promotion_decision(target), "runtime_active_selection")
             bin_dir = Path(bin_tmp)
             self._make_gh_stub(bin_dir, states={101: "OPEN"}, fail_view_numbers={101})
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -1215,6 +1326,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertIn("spec-dock/scripts/spec-dock active show", close_failure.stderr)
             self.assertIn("view failed: 101", close_failure.stderr)
             self.assertEqual(self._active_issue_id(target), "iss-00101")
+            self.assertEqual(self._active_issue_promotion_decision(target), "issue_finish_lifecycle_transition")
             self.assertNotIn("issue list", (bin_dir / "gh-calls.log").read_text(encoding="utf-8"))
 
             self._make_gh_stub(bin_dir, states={101: "OPEN"}, fail_close_numbers={101})
@@ -1227,4 +1339,5 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertIn("spec-dock/scripts/spec-dock active show", close_command_failure.stderr)
             self.assertIn("close failed: 101", close_command_failure.stderr)
             self.assertEqual(self._active_issue_id(target), "iss-00101")
+            self.assertEqual(self._active_issue_promotion_decision(target), "issue_finish_lifecycle_transition")
             self.assertNotIn("issue list", (bin_dir / "gh-calls.log").read_text(encoding="utf-8"))
