@@ -71,6 +71,51 @@ class TestAuthorityGate(unittest.TestCase):
                 self.assertTrue(result.ok)
                 self.assertEqual(result.reason, "ok")
 
+    def test_issue_finish_transition_helpers_are_finish_scoped_and_bound(self) -> None:
+        authority = _authority_module()
+
+        record = authority.approved_issue_finish_transition_promotion_record(node_id="iss-00101")
+
+        self.assertEqual(record["status"], "approved")
+        self.assertEqual(record["authority"], "approved")
+        self.assertEqual(record["promotion_decision"], "issue_finish_lifecycle_transition")
+        for field in ("source_revision", "approved_revision", "approved_hash", "reviewer_target_hash"):
+            with self.subTest(field=field):
+                self.assertEqual(record[field], "active:iss-00101")
+        self.assertEqual(
+            authority.approved_issue_finish_transition_grants(),
+            ("review_input", "planning_input", "design_baseline", "issue_finish"),
+        )
+
+    def test_issue_finish_transition_token_only_satisfies_issue_finish(self) -> None:
+        authority = _authority_module()
+
+        finish_result = authority.evaluate_authority_gate(
+            authority="approved",
+            grants=authority.approved_issue_finish_transition_grants(),
+            promotion_record=authority.approved_issue_finish_transition_promotion_record(node_id="iss-00101"),
+            required_grant="issue_finish",
+            purpose="issue_finish",
+        )
+
+        self.assertTrue(finish_result.ok)
+        self.assertEqual(finish_result.reason, "ok")
+
+        for grant in ("implementation_start", "issue_ready", "phase_completion"):
+            with self.subTest(grant=grant):
+                result = authority.evaluate_authority_gate(
+                    authority="approved",
+                    grants=authority.approved_issue_finish_transition_grants(),
+                    promotion_record=authority.approved_issue_finish_transition_promotion_record(node_id="iss-00101"),
+                    required_grant=grant,
+                    purpose=grant,
+                )
+                self.assertFalse(result.ok)
+                self.assertIn(
+                    result.reason,
+                    ("finish_transition_not_valid_for_required_grant", "missing_required_grant"),
+                )
+
     def test_missing_authority_metadata_fails_closed(self) -> None:
         authority = _authority_module()
         result = authority.evaluate_authority_gate(
@@ -174,6 +219,34 @@ class TestAuthorityGate(unittest.TestCase):
         )
         self.assertFalse(result.ok)
         self.assertEqual(result.reason, "promotion_record_not_bound_to_active_entry")
+
+    def test_issue_finish_transition_record_must_match_expected_active_revision(self) -> None:
+        authority = _authority_module()
+
+        revision_result = authority.evaluate_authority_gate(
+            authority="approved",
+            grants=authority.approved_issue_finish_transition_grants(),
+            promotion_record=authority.approved_issue_finish_transition_promotion_record(node_id="iss-00101"),
+            required_grant="issue_finish",
+            purpose="issue_finish",
+            expected_revision="active:iss-00999",
+        )
+        self.assertFalse(revision_result.ok)
+        self.assertEqual(revision_result.reason, "promotion_record_not_bound_to_active_entry")
+
+        record = authority.approved_issue_finish_transition_promotion_record(node_id="iss-00101")
+        record["approved_hash"] = "active:iss-00999"
+        record["reviewer_target_hash"] = "active:iss-00999"
+        hash_result = authority.evaluate_authority_gate(
+            authority="approved",
+            grants=authority.approved_issue_finish_transition_grants(),
+            promotion_record=record,
+            required_grant="issue_finish",
+            purpose="issue_finish",
+            expected_revision="active:iss-00101",
+        )
+        self.assertFalse(hash_result.ok)
+        self.assertEqual(hash_result.reason, "promotion_hash_not_bound_to_active_entry")
 
     def test_draft_artifact_metadata_requires_all_delegated_authoring_fields(self) -> None:
         authority = _authority_module()
