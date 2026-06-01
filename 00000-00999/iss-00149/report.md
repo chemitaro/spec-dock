@@ -250,11 +250,124 @@ OK
 ### セッションログ（2026-06-01 HH:MM - HH:MM）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S02 Application Lifecycle Transition
+- AC/EC: AC-001, AC-002, AC-004, AC-005, AC-006, EC-001, EC-003, EC-004
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S02 — Application Lifecycle Transition`
+  - closure ids: tc-005, tc-006, tc-007, tc-007b, tc-008, tc-009, tc-010, tc-011, tc-012
 
 #### 実施内容
-- ...
+- dev-coder Euclid に S02 を委任し、`issue finish` の synthetic active selection から finish-scoped lifecycle transition への内部遷移を provider runtime に実装した。
+- `issue finish` は delegated artifact gate と Evidence Adoption Ledger gate を遷移永続化前に評価し、gate failure 時は GitHub close を試行しない。
+- 遷移永続化は既存 active state snapshot / rollback path を使い、永続化失敗時は close を試行しない。
+- close / view failure 後は active issue を `issue_finish_lifecycle_transition` の finish-ready state として残し、retry 可能にした。
+- code-reviewer Carver が S02 diff を review し、`review_status=pass` と判定した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_issue_lifecycle -v
+
+Ran 27 tests in 33.285s
+OK
+
+python -m unittest tests.domain_runtime.test_authority tests.cli_runtime.test_issue_lifecycle -v
+
+Ran 59 tests in 33.490s
+OK
+
+git diff --check
+
+OK
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ（Red） | red-required: application lifecycle tests for synthetic finish transition and failure ordering | tests updated before implementation failed with existing `active_synthetic_approval_not_lifecycle_approval` closeout path | dev-coder reported `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` -> 9 failures before implementation | pass | failure matched planned missing transition behavior |
+| S02 | 緑フェーズ（Green） | targeted lifecycle and authority/lifecycle tests | 27 lifecycle tests OK; 59 combined authority/lifecycle tests OK | parent rerun: `python -m unittest tests.cli_runtime.test_issue_lifecycle -v`; `python -m unittest tests.domain_runtime.test_authority tests.cli_runtime.test_issue_lifecycle -v`; `git diff --check` | pass | same commands also passed in dev-coder workspace |
+| S02 | リファクタリング（Refactor） | guardrail satisfied / no broad refactor | application lifecycle helpers only; reused existing `commit_active_state` and `build_context_pack_text`; no active store API addition | diff inspection and code-reviewer Carver | pass | implementation stayed inside S02 provider runtime and tests |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | No unplanned tests or risks beyond approved S02 contract | dev-coder / code-reviewer | recorded | tc-005, tc-006, tc-007, tc-007b, tc-008, tc-009, tc-010, tc-011, tc-012 | no | Euclid and Carver reported no material implementation decisions beyond approved plan |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | tc-005, tc-006, tc-007, tc-007b, tc-008, tc-009, tc-010, tc-011, tc-012 | Application flow handles synthetic active issue finish, local gate ordering, transition persistence / rollback, close failure retry state, non-synthetic path, and targeted lifecycle tests; code-reviewer passes | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` -> OK; combined authority/lifecycle tests -> OK; code-reviewer Carver -> pass | pass | S03 mirror parity remains pending by design |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-005 | S02 | yes | red-required | synthetic finish test failed before implementation | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | `issue start` / `active set` synthetic active can finish without manual active edit |
+| tc-006 | S02 | yes | red-required | existing behavior used manual lifecycle promotion helper | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | transition persists before close and clear |
+| tc-007 | S02 | yes | red-required | unresolved EAL path confirmed before close | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | EAL failure leaves synthetic active untransitioned |
+| tc-007b | S02 | yes | red-required | delegated artifact gate path confirmed before close | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | delegated artifact failure leaves synthetic active untransitioned |
+| tc-008 | S02 | yes | red-required | no persistence rollback behavior existed for transition | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | write failure restores previous active state and skips close |
+| tc-009 | S02 | yes | red-required | close failure path previously kept synthetic active | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | close/view failures leave finish-ready transition state |
+| tc-010 | S02 | yes | red-required | stale active binding still fails closed | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | stale id mismatch reports `promotion_record_not_bound_to_active_entry` |
+| tc-011 | S02 | yes | regression | non-finish lifecycle gate remains separate | `python -m unittest tests.domain_runtime.test_authority tests.cli_runtime.test_issue_lifecycle -v` | pass | finish transition is not accepted for other lifecycle purposes |
+| tc-012 | S02 | yes | regression | lifecycle-approved finish path covered by existing cases | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | non-synthetic approved issue finish continues |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-005 | S02 | lifecycle CLI tests + code-reviewer | pass | active set and issue start synthetic closeout paths pass |
+| tc-006 | S02 | diff inspection + lifecycle tests | pass | transition uses active-state commit path before close |
+| tc-007 | S02 | application EAL gate test | pass | no close and no transition on EAL block |
+| tc-007b | S02 | delegated artifact gate test | pass | no close and no transition on delegated artifact block |
+| tc-008 | S02 | persistence failure rollback test | pass | close skipped after write failure |
+| tc-009 | S02 | close/view/close-command failure tests | pass | active remains retry-ready |
+| tc-010 | S02 | stale active id test | pass | stale transition fails closed |
+| tc-011 | S02 | non-finish lifecycle tests | pass | finish transition does not broaden lifecycle grants |
+| tc-012 | S02 | existing finish path tests | pass | approved lifecycle finish still works |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-005, tc-006, tc-007, tc-007b, tc-008, tc-009, tc-010, tc-011, tc-012 | test names in `tests/cli_runtime/test_issue_lifecycle.py` | same | S02 tests implemented as planned | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/e8ee/spec-dock` | iss-00149 | current session | dev-coder, code-reviewer | same repo, active issue, S02 allowed paths only, no publishing or credentialed mutation | issue complete / session end / scope change / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | application lifecycle and tests | dev-coder Euclid `019e8301-3a03-7d50-b44c-826592768ec0` | Application issue finish transition only | `plan.md` S02 | provider `issue_lifecycle.py`, CLI lifecycle tests | domain helper changes, docs, mirror, active store API, unrelated refactor | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v`; combined authority/lifecycle tests; `git diff --check` | need design change / new command / synthetic relaxation outside issue finish | changed files, tests, closure ids, risks, ledger note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Added issue finish internal transition after local gates and before close; reused active-state commit rollback; preserved retry state after close failure | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_lifecycle.py`; `tests/cli_runtime/test_issue_lifecycle.py` | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` -> pass; combined authority/lifecycle tests -> pass; `git diff --check` -> pass | pass: code-reviewer Carver `019e830a-dc07-77c2-894c-470de65e77a6` | S03 mirror parity remains pending | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | N/A | N/A | N/A | N/A | N/A | N/A | N/A | no parent implementation exception |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer Carver `019e830a-dc07-77c2-894c-470de65e77a6` | fresh | passed | N/A | proceed to S02 commit | no findings; reviewer relied on parent rerun for tests |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | ready_to_commit | `issue_lifecycle.py`, `test_issue_lifecycle.py`, S02 report evidence | HEAD at S02 commit (`git log -1 --oneline` after commit) | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_lifecycle.py` - `issue finish` synthetic active transition persistence and retry semantics
+- `tests/cli_runtime/test_issue_lifecycle.py` - S02 lifecycle tests for transition, local gate ordering, rollback, retry, and regression paths
+- `spec-dock/active/issue/report.md` - S02 observed evidence ledger
+
+#### コミット
+- pending S02 commit
+
+#### メモ
+- No material implementation decisions beyond the approved plan.
 
 ---
 
