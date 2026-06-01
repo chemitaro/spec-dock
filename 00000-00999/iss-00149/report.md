@@ -371,6 +371,114 @@ OK
 
 ---
 
+### セッションログ（2026-06-01 S03）
+
+#### 対象
+- Step: S03 Mirror Runtime Output / Dogfooding Parity
+- AC/EC: constraints, docs/runtime parity guard
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S03 — Mirror Runtime Output / Dogfooding Parity`
+  - closure ids: tc-013
+
+#### 実施内容
+- dev-coder Banach に S03 を委任し、S01/S02 で変更された provider runtime files を dogfooding mirror runtime へ exact parity で反映した。
+- 対象 mirror は `spec-dock/scripts/spec_dock_runtime/domain/authority.py` と `spec-dock/scripts/spec_dock_runtime/application/issue_lifecycle.py` の 2 ファイルのみ。
+- provider files、tests、docs、canonical issue docs は S03 実装 worker では変更していない。
+- code-reviewer Ramanujan が S03 diff を review し、`review_status=pass` と判定した。
+
+#### 実行コマンド / 結果
+```bash
+cmp -s src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authority.py spec-dock/scripts/spec_dock_runtime/domain/authority.py
+# exit 0
+
+cmp -s src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_lifecycle.py spec-dock/scripts/spec_dock_runtime/application/issue_lifecycle.py
+# exit 0
+
+python -m unittest tests.domain_runtime.test_authority tests.cli_runtime.test_issue_lifecycle -v
+
+Ran 59 tests in 30.250s
+OK
+
+git diff --check
+
+OK
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤 / 代替証跡（Red / Alternative） | inspect-only: provider/mirror diff identifies stale mirror guidance/runtime | S03 前の provider/mirror `cmp -s` は `authority.py` と `issue_lifecycle.py` の双方で exit 1 | parent pre-check and dev-coder pre-check | pass | S03 is parity-only, so mismatch inspection is the red/alternative evidence |
+| S03 | 緑フェーズ（Green） | provider/mirror runtime files byte-identical and targeted tests green | both `cmp -s` checks exit 0; combined authority/lifecycle tests OK | parent rerun and dev-coder rerun | pass | dogfooding mirror now matches provider runtime |
+| S03 | リファクタリング（Refactor） | guardrail satisfied / no broad refactor | exact copy only; no provider/test/doc changes by S03 worker | diff inspection and code-reviewer Ramanujan | pass | S03 changed only two mirror runtime files |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | No unplanned tests or risks beyond approved S03 contract | dev-coder / code-reviewer | recorded | tc-013 | no | Banach and Ramanujan reported no scope expansion |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | tc-013 | Every S01/S02-changed provider runtime file has matching dogfooding mirror file, targeted tests pass, and code-reviewer passes | provider/mirror `cmp -s` -> exit 0 for both changed files; combined authority/lifecycle tests -> OK; code-reviewer Ramanujan -> pass | pass | S90 workflow docs remain pending |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-013 | S03 | yes | inspect-only + parity | both provider/mirror cmp checks returned exit 1 before S03 | `cmp -s` for authority and issue_lifecycle provider/mirror files; combined authority/lifecycle tests | pass | no optional S02 `set_active.py` / `active_store.py` mirror was needed because S02 did not change those provider files |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-013 | S03 | provider/mirror cmp + combined tests + code-reviewer | pass | runtime mirror parity restored |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-013 | provider/mirror file pairs | same | S03 parity implemented as planned | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/e8ee/spec-dock` | iss-00149 | current session | dev-coder, code-reviewer | same repo, active issue, S03 mirror runtime paths only, no publishing or credentialed mutation | issue complete / session end / scope change / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | dogfooding mirror runtime parity | dev-coder Banach `019e8310-545f-7f00-a7ce-d357bcf5ef43` | Mirror provider runtime changes into dogfooding runtime | `plan.md` S03 | `spec-dock/scripts/spec_dock_runtime/domain/authority.py`; `spec-dock/scripts/spec_dock_runtime/application/issue_lifecycle.py` | provider files, tests, docs, canonical issue docs, unrelated refactor | provider/mirror `cmp -s`; combined authority/lifecycle tests; `git diff --check` | missing provider/mirror parity or unexpected provider/test/doc diff | changed files, commands/results, no-op state, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | Mirrored S01/S02 provider runtime files into dogfooding runtime with byte parity | `spec-dock/scripts/spec_dock_runtime/domain/authority.py`; `spec-dock/scripts/spec_dock_runtime/application/issue_lifecycle.py` | provider/mirror `cmp -s` -> exit 0 for both; `python -m unittest tests.domain_runtime.test_authority tests.cli_runtime.test_issue_lifecycle -v` -> pass; `git diff --check` -> pass | pass: code-reviewer Ramanujan `019e8312-c7e8-7980-9832-3bb2bb6acf4b` | S90 workflow docs remain pending | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | N/A | N/A | N/A | N/A | N/A | N/A | N/A | no parent implementation exception |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer Ramanujan `019e8312-c7e8-7980-9832-3bb2bb6acf4b` | fresh | passed | N/A | proceed to S03 commit | no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | ready_to_commit | mirror `authority.py`, mirror `issue_lifecycle.py`, S03 report evidence | HEAD at S03 commit (`git log -1 --oneline` after commit) | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `spec-dock/scripts/spec_dock_runtime/domain/authority.py` - dogfooding mirror for S01 provider authority changes
+- `spec-dock/scripts/spec_dock_runtime/application/issue_lifecycle.py` - dogfooding mirror for S02 provider lifecycle changes
+- `spec-dock/active/issue/report.md` - S03 observed evidence ledger
+
+#### コミット
+- pending S03 commit
+
+#### メモ
+- No material implementation decisions beyond the approved plan.
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
