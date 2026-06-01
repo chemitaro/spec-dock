@@ -304,9 +304,9 @@ OK
 | tc-006 | S02 | yes | red-required | existing behavior used manual lifecycle promotion helper | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | transition persists before close and clear |
 | tc-007 | S02 | yes | red-required | unresolved EAL path confirmed before close | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | EAL failure leaves synthetic active untransitioned |
 | tc-007b | S02 | yes | red-required | delegated artifact gate path confirmed before close | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | delegated artifact failure leaves synthetic active untransitioned |
-| tc-008 | S02 | yes | red-required | no persistence rollback behavior existed for transition | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | write failure restores previous active state and skips close |
-| tc-009 | S02 | yes | red-required | close failure path previously kept synthetic active | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | close/view failures leave finish-ready transition state |
-| tc-010 | S02 | yes | red-required | stale active binding still fails closed | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | stale id mismatch reports `promotion_record_not_bound_to_active_entry` |
+| tc-008 | S02 | yes | red-required | stale active binding still fails closed | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | stale id mismatch reports `promotion_record_not_bound_to_active_entry` before transition and close |
+| tc-009 | S02 | yes | red-required | no persistence rollback behavior existed for transition | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | write failure restores previous active state and skips close |
+| tc-010 | S02 | yes | red-required | close failure path previously kept synthetic active | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | close/view failures leave finish-ready transition state |
 | tc-011 | S02 | yes | regression | non-finish lifecycle gate remains separate | `python -m unittest tests.domain_runtime.test_authority tests.cli_runtime.test_issue_lifecycle -v` | pass | finish transition is not accepted for other lifecycle purposes |
 | tc-012 | S02 | yes | regression | lifecycle-approved finish path covered by existing cases | `python -m unittest tests.cli_runtime.test_issue_lifecycle -v` | pass | non-synthetic approved issue finish continues |
 
@@ -317,9 +317,9 @@ OK
 | tc-006 | S02 | diff inspection + lifecycle tests | pass | transition uses active-state commit path before close |
 | tc-007 | S02 | application EAL gate test | pass | no close and no transition on EAL block |
 | tc-007b | S02 | delegated artifact gate test | pass | no close and no transition on delegated artifact block |
-| tc-008 | S02 | persistence failure rollback test | pass | close skipped after write failure |
-| tc-009 | S02 | close/view/close-command failure tests | pass | active remains retry-ready |
-| tc-010 | S02 | stale active id test | pass | stale transition fails closed |
+| tc-008 | S02 | stale active id test | pass | stale synthetic record fails before transition and close |
+| tc-009 | S02 | persistence failure rollback test | pass | close skipped after write failure |
+| tc-010 | S02 | close/view/close-command failure tests | pass | active remains retry-ready |
 | tc-011 | S02 | non-finish lifecycle tests | pass | finish transition does not broaden lifecycle grants |
 | tc-012 | S02 | existing finish path tests | pass | approved lifecycle finish still works |
 
@@ -356,7 +356,7 @@ OK
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S02 | ready_to_commit | `issue_lifecycle.py`, `test_issue_lifecycle.py`, S02 report evidence | HEAD at S02 commit (`git log -1 --oneline` after commit) | pending | N/A | N/A | N/A | N/A |
+| S02 | committed | `issue_lifecycle.py`, `test_issue_lifecycle.py`, S02 report evidence | `8d7a9119` `fix(issue-finish): synthetic activeをfinish transitionへ昇格` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_lifecycle.py` - `issue finish` synthetic active transition persistence and retry semantics
@@ -364,7 +364,7 @@ OK
 - `spec-dock/active/issue/report.md` - S02 observed evidence ledger
 
 #### コミット
-- pending S02 commit
+- `8d7a9119` `fix(issue-finish): synthetic activeをfinish transitionへ昇格`
 
 #### メモ
 - No material implementation decisions beyond the approved plan.
@@ -464,7 +464,7 @@ OK
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S03 | ready_to_commit | mirror `authority.py`, mirror `issue_lifecycle.py`, S03 report evidence | HEAD at S03 commit (`git log -1 --oneline` after commit) | pending | N/A | N/A | N/A | N/A |
+| S03 | committed | mirror `authority.py`, mirror `issue_lifecycle.py`, S03 report evidence | `7859eed4` `chore(runtime): dogfooding mirrorを同期` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `spec-dock/scripts/spec_dock_runtime/domain/authority.py` - dogfooding mirror for S01 provider authority changes
@@ -472,7 +472,7 @@ OK
 - `spec-dock/active/issue/report.md` - S03 observed evidence ledger
 
 #### コミット
-- pending S03 commit
+- `7859eed4` `chore(runtime): dogfooding mirrorを同期`
 
 #### メモ
 - No material implementation decisions beyond the approved plan.
@@ -570,7 +570,7 @@ OK
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S90 | ready_to_commit | workflow docs and S90 report evidence | HEAD at S90 commit (`git log -1 --oneline` after commit) | pending | N/A | N/A | N/A | N/A |
+| S90 | committed | workflow docs and S90 report evidence | `e9abf22e` `docs(workflow): issue finish transitionを明記` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - provider workflow docs for finish-only transition and recovery semantics
@@ -578,7 +578,7 @@ OK
 - `spec-dock/active/issue/report.md` - S90 observed evidence ledger
 
 #### コミット
-- pending S90 commit
+- `e9abf22e` `docs(workflow): issue finish transitionを明記`
 
 #### メモ
 - No material implementation decisions beyond the approved plan.
@@ -623,7 +623,7 @@ OK
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
 | S99-snapshot | 赤 / integration regression | full suite catches checked-in dogfooding snapshot drift | full suite failed one test: `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` | `python -m unittest discover -v` | fail observed and fixed | failure was snapshot maintenance, not runtime behavior |
-| S99-snapshot | 緑フェーズ（Green） | focused snapshot regression passes after fixture update | focused snapshot test OK | `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v`; `git diff --check` | pass | full suite rerun remains pending after this commit |
+| S99-snapshot | 緑フェーズ（Green） | focused snapshot regression passes after fixture update | focused snapshot test OK; final full suite rerun OK | `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v`; `python -m unittest discover -v`; `git diff --check` | pass | full suite rerun passed during final verification |
 | S99-snapshot | リファクタリング（Refactor） | no runtime/source/docs behavior change | only `tests/test_init_update.py` snapshot constants changed | diff inspection and code-reviewer Galileo | pass | no implementation behavior changed |
 
 #### 発見されたテスト / リスク（Discovered Tests）
@@ -634,12 +634,12 @@ OK
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S99-snapshot | tc-015 support | Broad final verification blockers discovered by full suite are resolved before final reviewer gates | focused snapshot test -> OK; code-reviewer Galileo -> pass | pass | full suite rerun and final reviewer triad remain pending |
+| S99-snapshot | tc-014 support; tc-015 prerequisite support | Broad final verification blockers discovered by full suite are resolved before final reviewer gates; PR Delivery / Merge Preparation remains an external gate after PR creation | focused snapshot test -> OK; final `python -m unittest discover -v` -> 1032 OK; code-reviewer Galileo -> pass | pass | external tc-015 PR evidence remains pending until PR URL/base/head/linkage and merge-preparation monitoring are recorded |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S99-snapshot | dev-coder | Added checked-in dogfooding cutover snapshot entry for `iss-00149` metadata | `tests/test_init_update.py` | focused snapshot test -> pass; `git diff --check` -> pass | pass: code-reviewer Galileo `019e8328-50d3-7440-9b0c-9279d7290a81` | full suite rerun pending | accepted |
+| S99-snapshot | dev-coder | Added checked-in dogfooding cutover snapshot entry for `iss-00149` metadata | `tests/test_init_update.py` | focused snapshot test -> pass; final full suite -> pass; `git diff --check` -> pass | pass: code-reviewer Galileo `019e8328-50d3-7440-9b0c-9279d7290a81` | none | accepted |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
@@ -653,27 +653,40 @@ OK
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| provider workflow docs and dogfooding mirror workflow docs | yes | doc-writer Dalton `019e8317-fa26-7a50-a1ce-65aa950c58a0` | `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`; `spec-dock/docs/workflow_issue.md`; provider/mirror `cmp -s` -> exit 0; `./spec-dock/scripts/spec-dock validate` -> `nodes=75`; `git diff --check` -> pass | pass: spec-reviewer Einstein `019e8319-ef9e-7e10-90c7-767d17436d8f` |
+
+### 最終検証（Final Verification Evidence）
+| 検証（verification） | コマンド / 方法 | 観測結果（observed result） | 結果（result） |
+|---|---|---|---|
+| target authority + lifecycle regression | `python -m unittest tests.domain_runtime.test_authority tests.cli_runtime.test_issue_lifecycle -v` | Ran 59 tests in 29.755s, OK | pass |
+| broad unittest discovery | `python -m unittest discover -v` | Ran 1032 tests in 606.549s, OK | pass |
+| checked-in dogfooding snapshot regression | `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v` | Ran 1 test in 0.027s, OK | pass |
+| spec-dock validate | `./spec-dock/scripts/spec-dock validate` | `spec-dock: ok (validate) nodes=75` | pass |
+| spec-dock sync | `./spec-dock/scripts/spec-dock sync` | `active unchanged (matched id in branch: iss-00149)`; generated artifacts rewritten without dirty diff | pass |
+| whitespace / conflict check | `git diff --check` | no output, exit 0 | pass |
+| provider / dogfooding runtime mirror parity | `cmp -s` for `authority.py` and `issue_lifecycle.py` provider/mirror pairs | no output, exit 0 | pass |
+| provider / dogfooding workflow docs parity | `cmp -s src/spec_dock/assets/spec_dock/docs/workflow_issue.md spec-dock/docs/workflow_issue.md` | no output, exit 0 | pass |
+| worktree cleanliness | `git status --short` | no output | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer Lovelace `019e8347-dbdc-73d1-89a3-01d213bb8c54` | whole issue obligation coverage | already sufficient for implementation QA; P2 report mapping correction applied before final spec review | final verification evidence above; S01/S02/S03/S90/S99 ledgers; closure ids tc-001 through tc-014 plus tc-015 prerequisites; external tc-015 PR Delivery / Merge Preparation evidence remains pending until PR creation/monitoring; reviewer reported no P0/P1 QA blockers and `review_status=pass` | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer Mill `019e8348-3b54-78d3-8bdb-26de24d72e2c` | issue-wide integrated diff | P2 stale report commit evidence corrected for S02/S03 before final spec review; no P0/P1 runtime/code blockers | 0 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer Maxwell `019e834d-0d8d-7df0-8fea-0626fdbadf8c` | requirement / design / plan / report / implementation / tests / docs alignment | P2 tc-015 ledger clarification applied: implementation gates are pass, while PR Delivery / Merge Preparation remains a pending external gate after PR creation | 0 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| final verification evidence and QA/code/spec reviewer gates recorded; external tc-015 PR Delivery / Merge Preparation remains pending until PR creation and monitoring | `report.md` final ledger only | PR delivery and final response after PR evidence is recorded | ready_for_pr_delivery |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
