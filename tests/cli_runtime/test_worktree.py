@@ -866,7 +866,7 @@ class TestCliWorktree(CliRuntimeHarness):
             self.assertIn("classification_reason=root_valid", text_removed.stdout)
             self.assertIn("remove_blockers=-", text_removed.stdout)
 
-    def test_worktree_remove_dirty_default_fails_and_force_removes_directory(self) -> None:
+    def test_worktree_remove_untracked_default_removes_directory_and_keeps_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "sample-repo"
             central_root = Path(tmp) / "central-worktrees"
@@ -876,28 +876,23 @@ class TestCliWorktree(CliRuntimeHarness):
             created = self._run_runtime_capture(target, ["worktree", "create", "dirty"], env=self._worktree_env(central_root))
             self.assertEqual(created.returncode, 0, created.stderr)
             worktree_path = central_root / "sample-repo" / "sample-repo-dirty"
+            branch = self._run_git(target, ["branch", "--list", "*-dirty", "--format=%(refname:short)"]).stdout.strip()
             (worktree_path / "cache.tmp").write_text("dirty\n", encoding="utf-8")
 
-            failed = self._run_runtime_capture(
+            removed = self._run_runtime_capture(
                 target,
                 ["worktree", "remove", "dirty", "--json"],
                 env=self._worktree_env(central_root),
             )
-            self.assertNotEqual(failed.returncode, 0)
-            failed_payload = json.loads(failed.stdout)
-            self.assertEqual(failed_payload["error"]["code"], "git_worktree_remove_failed")
-            self.assertTrue(worktree_path.exists())
-
-            forced = self._run_runtime_capture(
-                target,
-                ["worktree", "remove", "dirty", "--force", "--json"],
-                env=self._worktree_env(central_root),
-            )
-            self.assertEqual(forced.returncode, 0, forced.stderr)
-            forced_payload = json.loads(forced.stdout)
-            self.assertTrue(forced_payload["removed_record"])
-            self.assertTrue(forced_payload["removed_directory"])
+            self.assertEqual(removed.returncode, 0, removed.stderr or removed.stdout)
+            payload = json.loads(removed.stdout)
+            self.assertEqual(payload["status"], "ok")
+            self.assertTrue(payload["removed_record"])
+            self.assertTrue(payload["removed_directory"])
+            self.assertFalse(payload["branch_deleted"])
             self.assertFalse(worktree_path.exists())
+            self.assertNotIn(str(worktree_path), self._run_git(target, ["worktree", "list", "--porcelain"]).stdout)
+            self.assertIn(branch, self._run_git(target, ["branch", "--list", branch]).stdout)
 
     def test_worktree_remove_locked_default_fails_and_force_follows_git(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1284,7 +1279,7 @@ class TestCliWorktree(CliRuntimeHarness):
 
             self.assertTrue(result.removed_record)
             self.assertTrue(result.removed_directory)
-            self.assertEqual(git_gateway.remove_calls, [(worktree_path, False)])
+            self.assertEqual(git_gateway.remove_calls, [(worktree_path, True)])
             self.assertEqual(filesystem_gateway.remove_calls, [worktree_path])
 
             failing_fs = FakeFilesystemGateway(fail=True)

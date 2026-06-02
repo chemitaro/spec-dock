@@ -214,8 +214,9 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
         )
     _guard_remove_containment(refreshed_worktree, refreshed_inventory, ports, command="remove", target=req.target)
 
+    remove_force = req.force or "locked" not in refreshed_worktree.remove_blockers
     try:
-        ports.git_gateway.remove_worktree(ports.repo_root, path=refreshed_worktree.path, force=req.force)
+        ports.git_gateway.remove_worktree(ports.repo_root, path=refreshed_worktree.path, force=remove_force)
     except RuntimeError as exc:
         raise WorktreeCommandError(
             code="git_worktree_remove_failed",
