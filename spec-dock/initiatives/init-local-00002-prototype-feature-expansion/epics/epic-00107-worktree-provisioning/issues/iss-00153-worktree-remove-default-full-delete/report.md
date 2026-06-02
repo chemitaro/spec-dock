@@ -339,6 +339,103 @@ git diff --check
 
 ---
 
+### セッションログ（2026-06-02 HH:MM - HH:MM）
+
+#### 対象
+- Step: S02
+- AC/EC: AC-002, AC-003, AC-002/AC-003 invariant subset via ci-009
+
+#### 実施内容
+- `dev-coder` に S02 を委任し、tracked modification の default full delete と `--force` compatibility を runtime tests で固定した。
+- S01 実装で tracked modification default success は既に満たされていたため、Red は covered-by-implementation / characterization として扱った。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_tracked_modification_default_removes_directory_and_keeps_branch tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_force_compatibility_removes_dirty_directory tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_untracked_default_removes_directory_and_keeps_branch -v
+
+test_worktree_remove_tracked_modification_default_removes_directory_and_keeps_branch ... ok
+test_worktree_remove_force_compatibility_removes_dirty_directory ... ok
+test_worktree_remove_untracked_default_removes_directory_and_keeps_branch ... ok
+Ran 3 tests ... OK
+```
+
+```bash
+git diff --check
+
+<no output; pass>
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ / 代替証跡（Red / alternative） | red-required for tracked modification; characterization-update for `--force` | tracked modification default success test passed against S01 implementation, so the behavior was covered by the S01 runtime change and fixed as characterization evidence | delegated worker focused test run | approved-no-op | Test remains sensitive because removing force-equivalent default would return Git refusal for tracked dirty state |
+| S02 | 緑フェーズ（Green） | tracked modification default test and `--force` compatibility test | Focused S02 tests plus S01 untracked regression test passed | `python -m unittest ...tracked_modification... ...force_compatibility... ...untracked_default... -v` | pass | Parent reran focused verification |
+| S02 | 緑フェーズ（Green follow-up） | branch retention assertion strength | Focused S02 tests plus S01 untracked regression test passed after adding non-empty branch assertions | `python -m unittest ...tracked_modification... ...force_compatibility... ...untracked_default... -v` | pass | Addressed code-reviewer P2 test-strength finding |
+| S02 | リファクタリング（Refactor） | no parser/API/behavior broadening | Diff limited to tests; no production change needed | diff inspection; `git diff --check` | pass | No refactor performed |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | none | dev-coder / parent verification | no action | ci-002, ci-003, ci-009 | no | S03 risks remain planned later work |
+| S02 | branch retention assertion could pass with empty branch string | code-reviewer | added non-empty branch assertions to S02 tests and same-pattern S01 regression test | ci-009 | no | focused tests passed after assertion-strength follow-up |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | ci-002, ci-003, S02-owned ci-009 | Red/alternative evidence, focused tests pass, step `code-reviewer` pass, step commit evidence | Characterization/Green captured; code review passed with P2; P2 fixed; commit pending | blocked | Commit S02 scope after reviewer pass and P2 follow-up |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| ci-002 | S02 | yes | red-required / covered-by-implementation | tracked modification test passed against S01 implementation | focused S02 tracked modification test | pass | tracked dirty state removes by default |
+| ci-003 | S02 | yes | characterization-update | `--force` compatibility retained by parser/runtime | focused `--force` compatibility test | pass | `--force` remains accepted and same success schema |
+| ci-009 | S02 | yes | focused assertions | success schema and branch retention asserted | focused S02 tests | pass | `branch_deleted=false`; branch remains |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| ci-002 | S02 | focused tracked modification test | pass | tracked dirty default remove |
+| ci-003 | S02 | focused `--force` compatibility test | pass | compatibility input |
+| ci-009 | S02 | focused S02 assertions | pass | branch retention and output schema subset |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | ci-002 | test_worktree_remove_tracked_modification_default_removes_directory_and_keeps_branch | ci-002 | planned S02 test | no | no |
+| none | ci-003 | test_worktree_remove_force_compatibility_removes_dirty_directory | ci-003 | planned S02 test | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | test coverage / compatibility coverage | dev-coder | tracked modification default success and `--force` compatibility tests | approved requirement/design/plan; provider-side runtime tests | `tests/cli_runtime/test_worktree.py`; necessary application change only | `--force` parser removal, GitGateway signature change, branch deletion, docs/help, canonical issue docs, S03 early work | focused S02 tests; `git diff --check` | `--force` compatibility cannot be retained or tracked fixture cannot be represented | changed files, Red/characterization, Green, closure ids, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Added tracked modification default remove and `--force` compatibility tests | `tests/cli_runtime/test_worktree.py` | Focused S02 tests plus S01 untracked regression passed; `git diff --check` pass | pending | none for S02 | accepted pending code-reviewer |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | passed | no | proceed | Fresh review passed with P2; branch-retention assertion-strength follow-up applied |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | pending | S02 changed files plus S02 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/cli_runtime/test_worktree.py` - tracked modification default success / `--force` compatibility tests を追加
+- `spec-dock/active/issue/report.md` - S02 observed evidence を記録
+
+#### コミット
+- pending S02 code-reviewer pass
+
+#### メモ
+- Ledger Note: No material implementation decisions beyond the approved plan.
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
