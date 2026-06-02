@@ -48,7 +48,7 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | resolved | compatibility | orchestrator + user | `worktree remove` の完全削除 default 化で、既存 `--force` option を廃止するか互換入力として残すかが requirement / design / tests に影響した | Option A: `--force` 廃止; Option B: `--force` を互換入力として受け付け default と同じ削除強度にする; Option C: locked worktree 用の追加強度として残す | Option B を採用する。`worktree remove <target>` は引数なしで完全削除 default とし、`--force` は互換入力として同じ contract を満たす | ユーザーが Option B を明示採用した。親 Epic の backward compatibility gate を維持しながら、引数なし cleanup の friction を解消できる | applied | `discussions/20260602t062811z-interview-worktree-remove-force-compatibility-question.md`; `requirement.md` | design phase で parser / adapter / docs の具体扱いを決める |
+| D-001 | resolved | compatibility | orchestrator + user | `worktree remove` の完全削除 default 化で、既存 `--force` option を廃止するか互換入力として残すかが requirement / design / tests に影響した | Option A: `--force` 廃止; Option B: `--force` を互換入力として受け付け default と同じ削除強度にする; Option C: locked worktree 用の追加強度として残す | Option B を採用する。`worktree remove <target>` は引数なしで完全削除 default とし、`--force` は互換入力として同じ contract を満たす | ユーザーが Option B を明示採用した。親 Epic の backward compatibility gate を維持しながら、引数なし cleanup の friction を解消できる | applied | `discussions/20260602t062811z-interview-worktree-remove-force-compatibility-question.md`; `requirement.md`; `design.md`; `plan.md`; S90 evidence | none |
 | D-002 | resolved | test-strategy | spec-reviewer | Requirement wording covered dirty / untracked file removal, while AC-001 only made untracked residue explicit | Narrow wording to untracked only; add tracked modification AC | Add a separate tracked modification acceptance criterion so both dirty meanings are externally verifiable | `worktree remove` must cover both untracked residue and tracked modifications when hard blockers are absent | applied | `requirement.md`; spec-reviewer finding 2026-06-02 | none |
 | D-003 | resolved | operation | spec-reviewer | Initial design report ledger marked diff-guardless delegated draft as adopted evidence | Keep draft adopted; reject draft as promotion evidence and rely on primary source manual authoring | Reject the delegated draft for promotion evidence because `diff_guard_result=not_run`; keep canonical design as manual source-based authoring | `phase_design.md` requires delegated drafts to have diff guard before adoption. Rejected draft removes the promotion blocker while preserving the fact that a draft was produced | applied | `report.md`; design spec-reviewer findings 2026-06-02 | none |
 | D-004 | resolved | test-strategy | spec-reviewer | Plan S90 allowed CLI help source / test changes while making `code-reviewer` conditional, and delegation contracts lacked explicit source-of-truth fields | Split S90; make code-reviewer mandatory when code/test files change; add source-of-truth fields | Keep S90 as one docs/help step but require `spec-reviewer` for docs/spec alignment and `code-reviewer` whenever `commands/worktree.py` or `tests/cli_runtime/test_worktree.py` changes. Add source-of-truth lines to S01/S02/S03/S90 delegation contracts | `workflow_issue.md` requires code/runtime/tests changes to receive code-reviewer pass, and source-of-truth must be explicit for delegated worker handoff | applied | `plan.md`; plan spec-reviewer findings 2026-06-02 | none |
@@ -131,108 +131,10 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- `worktree remove <target>` を default force-equivalent delete contract に更新し、`--force` は互換入力として同じ contract を維持した。
+- locked state は remove の hard blocker 診断から外し、Git が remove を拒否した場合のみ `git_worktree_remove_failed` として扱う。
 
 ## 実装記録（セッションログ） (必須)
-
-### セッションログ（2026-06-02 HH:MM - HH:MM）
-
-#### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
-
-#### 実施内容
-- ...
-
-#### 実行コマンド / 結果
-```bash
-<command>
-
-<result>
-```
-
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
-
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
-
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
-
-#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
-`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
-
-| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
-|---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00153 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
-
-#### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
-
-| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
-
-#### 委任 worker 証跡（Delegated Worker Evidence）
-| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
-|---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
-
-#### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
-
-#### レビューゲート状態（Reviewer Gate Status）
-| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
-
-#### ステップ commit ゲート（Step Commit Gate）
-| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
-
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
-
-#### コミット
-- <hash> <message>
-
-#### メモ
-- ...
-
----
 
 ### セッションログ（2026-06-02 HH:MM - HH:MM）
 
@@ -640,37 +542,48 @@ git diff --check
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| CLI help / provider reference docs / dogfooding reference docs | yes | doc-writer | S90 session log; help test pass; docs parity pass; old wording search | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | sufficient | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree -v` -> 50 tests OK after final-review follow-up; `./spec-dock/scripts/spec-dock validate` -> ok; `./spec-dock/scripts/spec-dock sync --no-github` -> ok; provider/dogfooding runtime parity checks pass | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | initial pass with P2 findings for locked compatibility and dogfooding runtime parity; follow-up and P2 diagnostics cleanup applied; fresh re-review passed with no findings | 2 | pass |
+| code-reviewer | final re-review P2 cleanup | P2: list/show/success diagnostics still reported locked as a remove blocker; fixed by removing `locked` from public `remove_blockers` / `removable` blocker model while keeping Git refusal as `git_worktree_remove_failed` | 2 | pending re-review |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | initial fail: final gate rows pending and locked semantics mismatch; follow-up applied; second pass had P3 stale follow-up text; P3 fixed | 2 | pass |
+| spec-reviewer | final re-review P2 cleanup | P2: unfilled template placeholder blocks remained in `report.md`; removed the scaffold session block and replaced optional summary/follow-up placeholders with concrete values | 2 | pending re-review |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| final verification evidence and final-review follow-up evidence recorded; final reviewer re-gates passed | final report updates, P2/P3 cleanup, provider/dogfooding parity updates | PR body / final response / issue lifecycle evidence | ready |
+
+### Final Review Follow-up Evidence
+| 指摘元 | 指摘 | 対応 | 検証 | 結果 |
+|---|---|---|---|---|
+| final `spec-reviewer` / final `code-reviewer` | locked worktree で default と `--force` の contract が分岐しうる | provider runtime を eligible target では常に force-equivalent remove に戻し、locked tests を default / `--force` same contract に更新 | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree -v` -> 50 tests OK | pending re-review |
+| final `code-reviewer` | dogfooding runtime/help が provider と不一致 | `spec-dock/scripts/spec_dock_runtime/application/worktree.py` と `spec-dock/scripts/spec_dock_runtime/commands/worktree.py` を provider と parity 更新 | `cmp -s` for touched runtime/help files -> pass | pending re-review |
+| final `code-reviewer` | locked diagnostics could still report `remove_blockers=locked` / `removable=false` after successful force-equivalent removal | removed `locked` from public remove blockers under the new default contract and updated diagnostics tests | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree -v` -> 50 tests OK | pass |
+| final `spec-reviewer` | stale D-001 follow-up text implied remaining design work | D-001 follow-up updated to `none` with design/plan/S90 evidence | report inspection | pass |
+| final re-review `code-reviewer` | locked target removal diagnostics may still report `remove_blockers=locked` / `removable=false` under force-equivalent default | `locked` を remove の hard blocker 診断から外し、list/show/success JSON が `removable=true` / `remove_blockers=[]` を返す focused assertions を追加 | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_locked_default_and_force_share_contract tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_locked_default_uses_force_equivalent_git_call -v` -> 2 tests OK; `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree -v` -> 50 tests OK; provider/dogfooding `cmp -s` -> pass | fixed; pending re-review |
+| final re-review `spec-reviewer` | `report.md` に未記入 template placeholder blocks が残っている | `## 実装記録` 直下の scaffold session block を削除し、任意 placeholder sections を concrete `該当なし` に更新 | placeholder search for template tokens -> no matches; `git diff --check` -> pass | fixed; pending re-review |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 該当なし
 
 ## 学んだこと (任意)
-- ...
+- 該当なし
 
 ## 今後の推奨事項 (任意)
-- ...
+- 該当なし
 
 ## 省略/例外メモ (必須)
 - 該当なし
