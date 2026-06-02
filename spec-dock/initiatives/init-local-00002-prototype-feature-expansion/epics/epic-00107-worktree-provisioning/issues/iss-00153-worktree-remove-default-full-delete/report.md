@@ -436,6 +436,106 @@ git diff --check
 
 ---
 
+### セッションログ（2026-06-02 HH:MM - HH:MM）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-004, EC-001, EC-002, EC-003, remaining ci-009
+
+#### 実施内容
+- `dev-coder` に S03 を委任し、hard blocker、Git failure no cleanup、post-remove cleanup failure、target-only cleanup、unmanaged diagnostic default removal を runtime tests で固定した。
+- 実装変更は不要で、既存 tests を S01/S02 の default full delete contract に合わせて targeted update した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree -v
+
+Ran 49 tests ... OK
+```
+
+```bash
+git diff --check
+
+<no output; pass>
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ / 代替証跡（Red / alternative） | covered-existing plus targeted update | Existing tests required update for unmanaged default remove, hard blocker default/force no-call, Git refusal force assertion, and target-only cleanup force assertion | delegated worker inspection and targeted updates | approved-no-op | No production change needed |
+| S03 | 緑フェーズ（Green） | affected tests and `TestCliWorktree` suite | Full `TestCliWorktree` suite passed | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree -v` | pass | Parent reran suite: 49 tests OK |
+| S03 | リファクタリング（Refactor） | no production refactor; guardrails unchanged | Diff limited to tests; no cleanup scope or API changes | diff inspection; `git diff --check` | pass | No refactor performed |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | unmanaged default remove previously covered only via `--force` | dev-coder | updated unmanaged removal test to default remove and asserted diagnostic fields | ci-008, ci-009 | no | `TestCliWorktree` pass |
+| S03 | hard blocker tests should prove default and `--force` both stop before Git remove | dev-coder | updated fake gateway cases for both force states | ci-004 | no | `TestCliWorktree` pass |
+| S03 | Git failure / cleanup tests should assert force-equivalent call and no cleanup broadening | dev-coder | added fake gateway force call assertions and target-only cleanup assertions | ci-006, ci-007 | no | `TestCliWorktree` pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | ci-004, ci-006, ci-007, ci-008, remaining ci-009 | Guardrail/error/diagnostic tests pass, step `code-reviewer` pass, step commit evidence | Green captured; code review passed; commit pending | blocked | Commit S03 scope after reviewer pass |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| ci-004 | S03 | yes | covered-existing plus targeted update | hard blocker tests existed, updated for default and `--force` no-call | `TestCliWorktree` suite | pass | hard blockers stop before Git remove |
+| ci-006 | S03 | yes | covered-existing plus assertion update | Git failure test existed, updated to assert force-equivalent call and no cleanup | `TestCliWorktree` suite | pass | Git refusal does not cleanup |
+| ci-007 | S03 | yes | covered-existing plus assertion update | cleanup failure / target-only tests existed, updated for force-equivalent call | `TestCliWorktree` suite | pass | post-remove cleanup failure remains distinguishable |
+| ci-008 | S03 | yes | characterization-update | unmanaged removal existed via `--force`, updated to default remove with diagnostics | `TestCliWorktree` suite | pass | unmanaged diagnostic-only removal |
+| ci-009 | S03 | yes | covered-existing plus focused assertions | branch retention / output schema assertions preserved | `TestCliWorktree` suite | pass | branch_deleted remains false where applicable |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| ci-004 | S03 | hard blocker tests | pass | default and force no-call |
+| ci-006 | S03 | Git failure test | pass | no cleanup after Git refusal |
+| ci-007 | S03 | cleanup failure / target-only tests | pass | removed_record and removed_directory error fields preserved |
+| ci-008 | S03 | unmanaged removal test | pass | default unmanaged removal with diagnostics |
+| ci-009 | S03 | `TestCliWorktree` suite | pass | schema / branch retention invariants |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | ci-004 | hard blocker tests | ci-004 | planned S03 update | no | no |
+| none | ci-006 | test_worktree_remove_git_failure_does_not_cleanup_target | ci-006 | planned S03 update | no | no |
+| none | ci-007 | cleanup failure / target-only cleanup tests | ci-007 | planned S03 update | no | no |
+| none | ci-008 | unmanaged remove test | ci-008 | planned S03 update | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | guardrail/error/diagnostic test coverage | dev-coder | hard blockers, Git failure no cleanup, cleanup failure, unmanaged default remove | approved requirement/design/plan; provider-side runtime tests | `tests/cli_runtime/test_worktree.py`; necessary application change only | docs/help, branch deletion, parent/namespace/root cleanup, canonical issue docs, new options, GitGateway signature change | affected tests, `TestCliWorktree`, `git diff --check` | test cannot distinguish blockers, locked behavior unstable beyond guarded skip, API change required | changed files, alternative evidence, Green, closure ids, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | Updated tests for guardrail/error/diagnostic preservation under default full delete | `tests/cli_runtime/test_worktree.py` | Focused affected tests passed; `TestCliWorktree` 49 tests passed; `git diff --check` pass | pending | locked behavior remains guarded by existing Git-version tolerant test | accepted pending code-reviewer |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | fresh | passed | no | proceed | Fresh review passed with no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | pending | S03 changed files plus S03 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/cli_runtime/test_worktree.py` - S03 guardrail/error/diagnostic tests を default full delete contract に合わせて更新
+- `spec-dock/active/issue/report.md` - S03 observed evidence を記録
+
+#### コミット
+- pending S03 code-reviewer pass
+
+#### メモ
+- Ledger Note: No material implementation decisions beyond the approved plan.
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）

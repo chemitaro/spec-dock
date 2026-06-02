@@ -1076,7 +1076,7 @@ class TestCliWorktree(CliRuntimeHarness):
             self._run_git(target, ["worktree", "add", "-b", "manual", str(unmanaged)])
             unmanaged_remove = self._run_runtime_capture(
                 target,
-                ["worktree", "remove", unmanaged.name, "--force", "--json"],
+                ["worktree", "remove", unmanaged.name, "--json"],
                 env=self._worktree_env(central_root),
             )
             self.assertEqual(unmanaged_remove.returncode, 0, unmanaged_remove.stderr)
@@ -1085,6 +1085,10 @@ class TestCliWorktree(CliRuntimeHarness):
             self.assertTrue(unmanaged_payload["removed_record"])
             self.assertTrue(unmanaged_payload["removed_directory"])
             self.assertFalse(unmanaged_payload["branch_deleted"])
+            self.assertFalse(unmanaged_payload["resolved_target"]["managed"])
+            self.assertTrue(unmanaged_payload["resolved_target"]["managed_classification_available"])
+            self.assertEqual(unmanaged_payload["resolved_target"]["classification_reason"], "root_valid")
+            self.assertEqual(unmanaged_payload["resolved_target"]["origin"], "external")
             self.assertFalse(unmanaged.exists())
             self.assertNotIn(str(unmanaged), self._run_git(target, ["worktree", "list", "--porcelain"]).stdout)
             self.assertIn("manual", self._run_git(target, ["branch", "--list", "manual"]).stdout)
@@ -1137,13 +1141,13 @@ class TestCliWorktree(CliRuntimeHarness):
             class FakeGitGateway:
                 def __init__(self, records):
                     self.records = records
-                    self.remove_calls: list[Path] = []
+                    self.remove_calls: list[tuple[Path, bool]] = []
 
                 def worktree_list(self, repo_root_arg):
                     return self.records
 
                 def remove_worktree(self, repo_root_arg, *, path, force):
-                    self.remove_calls.append(path)
+                    self.remove_calls.append((path, force))
 
             class FakeEnvironmentGateway:
                 def __init__(self, root):
@@ -1182,15 +1186,17 @@ class TestCliWorktree(CliRuntimeHarness):
             )
 
             self.assertTrue(result.removed_record)
-            self.assertEqual(git_gateway.remove_calls, [symlink_path])
+            self.assertEqual(git_gateway.remove_calls, [(symlink_path, True)])
             self.assertFalse(os.path.lexists(symlink_path))
             self.assertTrue(escaped.exists())
             self.assertTrue(central_sentinel.exists())
             self.assertTrue(namespace_sentinel.exists())
 
-            for target, record_path in (
-                (str(central_root), central_root),
-                (str(namespace), namespace),
+            for target, record_path, force in (
+                (str(central_root), central_root, False),
+                (str(central_root), central_root, True),
+                (str(namespace), namespace, False),
+                (str(namespace), namespace, True),
             ):
                 git_gateway = FakeGitGateway(
                     [
@@ -1207,7 +1213,7 @@ class TestCliWorktree(CliRuntimeHarness):
                 )
 
                 with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
-                    app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target=target, force=True), ports)
+                    app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target=target, force=force), ports)
 
                 self.assertEqual(raised.exception.code, "remove_blocked")
                 self.assertIn("protected_cleanup_path", raised.exception.remove_blockers)
@@ -1237,16 +1243,18 @@ class TestCliWorktree(CliRuntimeHarness):
                 filesystem_gateway=FakeFilesystemGateway(),
             )
 
-            with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
-                app_worktree.worktree_remove(
-                    app_contracts.WorktreeRemoveRequest(target=str(ancestor_worktree), force=True),
-                    ports,
-                )
+            for force in (False, True):
+                with self.subTest(target="ancestor_worktree", force=force):
+                    with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
+                        app_worktree.worktree_remove(
+                            app_contracts.WorktreeRemoveRequest(target=str(ancestor_worktree), force=force),
+                            ports,
+                        )
 
-            self.assertEqual(raised.exception.code, "remove_blocked")
-            self.assertIn("protected_cleanup_path", raised.exception.remove_blockers)
-            self.assertEqual(git_gateway.remove_calls, [])
-            self.assertTrue(nested_sentinel.exists())
+                    self.assertEqual(raised.exception.code, "remove_blocked")
+                    self.assertIn("protected_cleanup_path", raised.exception.remove_blockers)
+                    self.assertEqual(git_gateway.remove_calls, [])
+                    self.assertTrue(nested_sentinel.exists())
 
             symlink_root = Path(tmp) / "central-with-symlink-namespace"
             symlink_root.mkdir()
@@ -1268,16 +1276,18 @@ class TestCliWorktree(CliRuntimeHarness):
                 filesystem_gateway=FakeFilesystemGateway(),
             )
 
-            with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
-                app_worktree.worktree_remove(
-                    app_contracts.WorktreeRemoveRequest(target=str(namespace_symlink_record), force=True),
-                    ports,
-                )
+            for force in (False, True):
+                with self.subTest(target="namespace_symlink_record", force=force):
+                    with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
+                        app_worktree.worktree_remove(
+                            app_contracts.WorktreeRemoveRequest(target=str(namespace_symlink_record), force=force),
+                            ports,
+                        )
 
-            self.assertEqual(raised.exception.code, "remove_blocked")
-            self.assertIn("protected_cleanup_path", raised.exception.remove_blockers)
-            self.assertEqual(git_gateway.remove_calls, [])
-            self.assertTrue(namespace_symlink_record.exists())
+                    self.assertEqual(raised.exception.code, "remove_blocked")
+                    self.assertIn("protected_cleanup_path", raised.exception.remove_blockers)
+                    self.assertEqual(git_gateway.remove_calls, [])
+                    self.assertTrue(namespace_symlink_record.exists())
 
     def test_worktree_remove_cleans_leftover_directory_and_reports_cleanup_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1331,8 +1341,8 @@ class TestCliWorktree(CliRuntimeHarness):
                     if self.fail:
                         raise RuntimeError("cleanup denied")
 
-            git_gateway = FakeGitGateway()
             filesystem_gateway = FakeFilesystemGateway()
+            git_gateway = FakeGitGateway()
             ports = app_ports.Ports(
                 node_reader=object(),
                 repo_root=repo_root,
@@ -1388,6 +1398,9 @@ class TestCliWorktree(CliRuntimeHarness):
             worktree_path.mkdir(parents=True)
 
             class FakeGitGateway:
+                def __init__(self) -> None:
+                    self.remove_calls: list[tuple[Path, bool]] = []
+
                 def worktree_list(self, repo_root_arg):
                     return [
                         app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
@@ -1395,6 +1408,7 @@ class TestCliWorktree(CliRuntimeHarness):
                     ]
 
                 def remove_worktree(self, repo_root_arg, *, path, force):
+                    self.remove_calls.append((path, force))
                     raise RuntimeError("git refused")
 
             class FakeEnvironmentGateway:
@@ -1408,10 +1422,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 def remove_target(self, path):
                     raise AssertionError("cleanup must not be called")
 
+            git_gateway = FakeGitGateway()
             ports = app_ports.Ports(
                 node_reader=object(),
                 repo_root=repo_root,
-                git_gateway=FakeGitGateway(),
+                git_gateway=git_gateway,
                 environment_gateway=FakeEnvironmentGateway(),
                 filesystem_gateway=CleanupMustNotRun(),
             )
@@ -1420,6 +1435,7 @@ class TestCliWorktree(CliRuntimeHarness):
                 app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), ports)
 
             self.assertEqual(raised.exception.code, "git_worktree_remove_failed")
+            self.assertEqual(git_gateway.remove_calls, [(worktree_path, True)])
 
     def test_worktree_remove_uses_target_only_cleanup_for_remaining_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1450,6 +1466,9 @@ class TestCliWorktree(CliRuntimeHarness):
                 sentinel.write_text("keep\n", encoding="utf-8")
 
             class FakeGitGateway:
+                def __init__(self) -> None:
+                    self.remove_calls: list[tuple[Path, bool]] = []
+
                 def worktree_list(self, repo_root_arg):
                     return [
                         app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
@@ -1457,6 +1476,7 @@ class TestCliWorktree(CliRuntimeHarness):
                     ]
 
                 def remove_worktree(self, repo_root_arg, *, path, force):
+                    self.remove_calls.append((path, force))
                     return None
 
             class FakeEnvironmentGateway:
@@ -1475,10 +1495,11 @@ class TestCliWorktree(CliRuntimeHarness):
                     shutil.rmtree(path)
 
             filesystem_gateway = FakeFilesystemGateway()
+            git_gateway = FakeGitGateway()
             ports = app_ports.Ports(
                 node_reader=object(),
                 repo_root=repo_root,
-                git_gateway=FakeGitGateway(),
+                git_gateway=git_gateway,
                 environment_gateway=FakeEnvironmentGateway(),
                 filesystem_gateway=filesystem_gateway,
             )
@@ -1487,6 +1508,7 @@ class TestCliWorktree(CliRuntimeHarness):
 
             self.assertTrue(result.removed_record)
             self.assertTrue(result.removed_directory)
+            self.assertEqual(git_gateway.remove_calls, [(worktree_path, True)])
             self.assertEqual(filesystem_gateway.remove_calls, [worktree_path])
             self.assertFalse(worktree_path.exists())
             for sentinel in (parent_sentinel, root_sentinel, namespace_sentinel):
@@ -1905,26 +1927,27 @@ class TestCliWorktree(CliRuntimeHarness):
                 ),
             )
             for label, target, records_by_call, expected_blocker in cases:
-                with self.subTest(label=label):
-                    git_gateway = FakeGitGateway(records_by_call)
-                    repo_for_case = managed if label == "current" else repo_root
-                    ports = app_ports.Ports(
-                        node_reader=object(),
-                        repo_root=repo_for_case,
-                        git_gateway=git_gateway,
-                        environment_gateway=FakeEnvironmentGateway(),
-                        filesystem_gateway=FakeFilesystemGateway(),
-                    )
-
-                    with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
-                        app_worktree.worktree_remove(
-                            app_contracts.WorktreeRemoveRequest(target=target, force=True),
-                            ports,
+                for force in (False, True):
+                    with self.subTest(label=label, force=force):
+                        git_gateway = FakeGitGateway(records_by_call)
+                        repo_for_case = managed if label == "current" else repo_root
+                        ports = app_ports.Ports(
+                            node_reader=object(),
+                            repo_root=repo_for_case,
+                            git_gateway=git_gateway,
+                            environment_gateway=FakeEnvironmentGateway(),
+                            filesystem_gateway=FakeFilesystemGateway(),
                         )
 
-                    self.assertEqual(raised.exception.code, "remove_blocked")
-                    self.assertIn(expected_blocker, raised.exception.remove_blockers)
-                    self.assertEqual(git_gateway.remove_calls, [])
+                        with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
+                            app_worktree.worktree_remove(
+                                app_contracts.WorktreeRemoveRequest(target=target, force=force),
+                                ports,
+                            )
+
+                        self.assertEqual(raised.exception.code, "remove_blocked")
+                        self.assertIn(expected_blocker, raised.exception.remove_blockers)
+                        self.assertEqual(git_gateway.remove_calls, [])
 
     def test_worktree_remove_treats_broken_symlink_target_as_existing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
