@@ -536,6 +536,105 @@ git diff --check
 
 ---
 
+### セッションログ（2026-06-02 HH:MM - HH:MM）
+
+#### 対象
+- Step: S90
+- AC/EC: AC-005
+
+#### 実施内容
+- `doc-writer` に S90 を委任し、CLI help、provider docs、dogfooding docs を default full delete / `--force` compatibility contract に更新した。
+- `commands/worktree.py` と help assertion を変更したため、`spec-reviewer` と `code-reviewer` の両方を実施した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_help_uses_all_worktree_wording -v
+
+test_worktree_remove_help_uses_all_worktree_wording ... ok
+Ran 1 test ... OK
+```
+
+```bash
+cmp -s src/spec_dock/assets/spec_dock/docs/reference_worktree.md spec-dock/docs/reference_worktree.md
+
+<no output; pass>
+```
+
+```bash
+git diff --check
+
+<no output; pass>
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S90 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only plus help assertion | Old help wording existed before update; docs had old dirty/untracked failure wording | doc-writer inspection and parent `rg` old wording check | pass | Old wording remains only in negative assertion |
+| S90 | 緑フェーズ（Green） | help assertion / inspection; provider-dogfooding parity | focused help test passed; docs parity passed | help unittest; `cmp -s`; `rg`; docs inspection | pass | `--force` described as compatibility input |
+| S90 | リファクタリング（Refactor） | docs/help only; no runtime behavior change | Diff limited to docs/help/help assertion; no parser/runtime path change beyond help text | diff inspection; `git diff --check` | pass | No refactor performed |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S90 | old `--force` required wording could remain in help/docs | doc-writer / parent verification | updated help and docs; added negative assertion | ci-005 | no | help test and `rg` check |
+| S90 | provider/dogfooding docs could drift | plan | verified byte-level parity | ci-005 | no | `cmp -s` pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | ci-005 | docs/help evidence, docs/spec review pass, code-reviewer pass if command/test touched, step commit evidence | Help/docs updated; help test, parity, diff check passed; spec-reviewer and code-reviewer passed; commit pending | blocked | Commit S90 scope after reviewer pass |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| ci-005 | S90 | yes | inspect-only plus help assertion | old help/docs wording existed | focused help test; docs parity inspection | pass | docs/help describe default full delete and `--force` compatibility |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| ci-005 | S90 | help test; docs parity; old wording search; reviewers | pass | provider and dogfooding docs match |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | ci-005 | test_worktree_remove_help_uses_all_worktree_wording | ci-005 | planned S90 help assertion | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S90 | delegated | shipped docs/help update | doc-writer | CLI help and provider/dogfooding reference docs | approved requirement/design/plan; provider-side docs/help source | `commands/worktree.py`; provider reference docs; dogfooding reference docs; help assertion | application/infra logic, new options, canonical issue docs, branch/delete/prune/status expansion | help test; docs parity; `git diff --check` | wording requires new option or contradicts EC-001 | changed docs/help paths, verification, wording risks, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S90 | doc-writer | Updated help/docs wording for default full delete and `--force` compatibility | `commands/worktree.py`; provider/dogfooding `reference_worktree.md`; `tests/cli_runtime/test_worktree.py` | help test pass; docs parity pass; `git diff --check` pass | spec-reviewer pass; code-reviewer pass | locked wording limited to Git refusal / adapter depth caveat | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | docs/spec reviewer | spec-reviewer | fresh | passed | no | proceed | Fresh review passed with no findings |
+| S90 | code/runtime reviewer | code-reviewer | fresh | passed | no | proceed | Fresh review passed with no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | pending | S90 docs/help/test files plus S90 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/worktree.py` - `--force` help を compatibility wording に更新
+- `src/spec_dock/assets/spec_dock/docs/reference_worktree.md` - provider docs remove section を更新
+- `spec-dock/docs/reference_worktree.md` - dogfooding docs parity 更新
+- `tests/cli_runtime/test_worktree.py` - help assertion を更新
+- `spec-dock/active/issue/report.md` - S90 observed evidence を記録
+
+#### コミット
+- pending S90 commit
+
+#### メモ
+- Ledger Note: No material implementation decisions beyond the approved plan.
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
