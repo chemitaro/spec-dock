@@ -382,7 +382,7 @@ git diff --check
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S02 | ci-002, ci-003, S02-owned ci-009 | Red/alternative evidence, focused tests pass, step `code-reviewer` pass, step commit evidence | Characterization/Green captured; code review passed with P2; P2 fixed; commit pending | blocked | Commit S02 scope after reviewer pass and P2 follow-up |
+| S02 | ci-002, ci-003, S02-owned ci-009 | Red/alternative evidence, focused tests pass, step `code-reviewer` pass, step commit evidence | Characterization/Green captured; code review passed with P2; P2 fixed; S02 committed | pass | S02 closed |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -422,14 +422,14 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S02 | pending | S02 changed files plus S02 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S02 | committed | S02 changed files plus S02 report evidence | `307b81c0` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `tests/cli_runtime/test_worktree.py` - tracked modification default success / `--force` compatibility tests を追加
 - `spec-dock/active/issue/report.md` - S02 observed evidence を記録
 
 #### コミット
-- pending S02 code-reviewer pass
+- `307b81c0` `test(worktree): tracked dirty と force 互換を固定`
 
 #### メモ
 - Ledger Note: No material implementation decisions beyond the approved plan.
