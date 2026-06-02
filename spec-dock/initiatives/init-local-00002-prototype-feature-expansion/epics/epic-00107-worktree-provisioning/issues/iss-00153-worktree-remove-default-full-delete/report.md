@@ -476,7 +476,7 @@ git diff --check
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S03 | ci-004, ci-006, ci-007, ci-008, remaining ci-009 | Guardrail/error/diagnostic tests pass, step `code-reviewer` pass, step commit evidence | Green captured; code review passed; commit pending | blocked | Commit S03 scope after reviewer pass |
+| S03 | ci-004, ci-006, ci-007, ci-008, remaining ci-009 | Guardrail/error/diagnostic tests pass, step `code-reviewer` pass, step commit evidence | Green captured; code review passed; S03 committed | pass | S03 closed |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -522,14 +522,14 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S03 | pending | S03 changed files plus S03 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S03 | committed | S03 changed files plus S03 report evidence | `9dda8bb5` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `tests/cli_runtime/test_worktree.py` - S03 guardrail/error/diagnostic tests を default full delete contract に合わせて更新
 - `spec-dock/active/issue/report.md` - S03 observed evidence を記録
 
 #### コミット
-- pending S03 code-reviewer pass
+- `9dda8bb5` `test(worktree): remove の安全境界を固定`
 
 #### メモ
 - Ledger Note: No material implementation decisions beyond the approved plan.
