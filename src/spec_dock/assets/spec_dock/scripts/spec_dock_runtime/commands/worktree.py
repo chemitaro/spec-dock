@@ -96,7 +96,11 @@ def _add_worktree_show_arguments(parser: argparse.ArgumentParser) -> None:
 
 def _add_worktree_remove_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("target", help="Worktree id, absolute path, or directory basename.")
-    parser.add_argument("--force", action="store_true", help="Pass --force to git worktree remove.")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Compatibility input; eligible targets are fully deleted by default.",
+    )
     _add_worktree_json_arguments(parser)
 
 
