@@ -277,7 +277,7 @@ git diff --check
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | ci-001, S01-owned ci-009 | Red / Green evidence, focused test pass, step `code-reviewer` pass, step commit evidence | Red/Green captured; first code review failed on locked default scope expansion; follow-up verification passed; fresh code review passed; commit pending | blocked | Commit S01 scope after reviewer pass |
+| S01 | ci-001, S01-owned ci-009 | Red / Green evidence, focused test pass, step `code-reviewer` pass, step commit evidence | Red/Green captured; first code review failed on locked default scope expansion; follow-up verification passed; fresh code review passed; S01 committed | pass | S01 closed |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -324,7 +324,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | pending | S01 changed files plus S01 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S01 | committed | S01 changed files plus S01 report evidence | `0421ce7566bb11d2ec10b4f73642b8087de2c16a` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py` - eligible remove を force-equivalent default に変更
@@ -332,7 +332,7 @@ git diff --check
 - `spec-dock/active/issue/report.md` - S01 observed evidence を記録
 
 #### コミット
-- pending S01 code-reviewer pass
+- `0421ce7566bb11d2ec10b4f73642b8087de2c16a` `fix(worktree): untracked residue を既定削除にする`
 
 #### メモ
 - Ledger Note: No material implementation decisions beyond the approved plan.
