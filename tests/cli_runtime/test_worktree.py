@@ -363,6 +363,10 @@ class TestCliWorktree(CliRuntimeHarness):
             self.assertIn("Remove a Git worktree without deleting its branch", top.stdout)
             self.assertNotIn("Remove a managed Git worktree", top.stdout)
             self.assertIn("Worktree id, absolute path, or directory basename", leaf.stdout)
+            self.assertIn("Compatibility input", leaf.stdout)
+            self.assertIn("fully deleted by", leaf.stdout)
+            self.assertIn("default.", leaf.stdout)
+            self.assertNotIn("Pass --force to git worktree remove", leaf.stdout)
             self.assertNotIn("Managed worktree id", leaf.stdout)
 
     def test_worktree_create_uses_current_branch_with_slash_for_branch_prefix(self) -> None:

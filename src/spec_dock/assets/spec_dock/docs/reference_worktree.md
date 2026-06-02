@@ -124,7 +124,7 @@ expected failure も JSON 指定時は stdout に `status=error` と `error.code
 - `list` / `show` / `remove` で Git worktree list が失敗した場合。
 - `show` / `remove` target が見つからない、曖昧、または branch-only target の場合。
 - `remove` target が main、current、bare、missing path、または record missing の場合。
-- `remove` target に dirty / untracked / locked state があり、Git が `git worktree remove` を拒否した場合。
+- `remove` target が locked state などで Git の force-equivalent remove に拒否された場合。
 - Git remove 成功後の target cleanup が unsupported type、permission、race、`lstat` / `unlink` / `rmtree` failure になった場合。
 
 ## 削除（remove）
@@ -132,12 +132,14 @@ expected failure も JSON 指定時は stdout に `status=error` と `error.code
 `worktree remove` は Git worktree records に存在する linked worktree を対象にします。
 SpecDock が `worktree create` で作った managed worktree だけでなく、external linked worktree も削除できます。
 main checkout、current checkout、bare worktree、missing path、record missing は `--force` を付けても削除しません。
+containment guard により protected cleanup path と判定された target も削除しません。
 
 削除は Git-first です。まず `git worktree remove` を実行し、Git が成功した後だけ、resolved target path に残った target を filesystem cleanup します。
 cleanup は target-only です。parent directory、central root、namespace directory、repo root は削除しません。
 directory は tree removal、symlink / broken symlink / regular file は symlink target を follow せず target 自体を unlink します。
-Git が dirty / untracked / locked state を理由に通常 remove を拒否した場合、SpecDock はその Git error を表示し、filesystem cleanup は行いません。
-`--force` は Git force removal にだけ対応します。locked worktree など Git がより強い force depth を要求する場合の具体的な Git flag depth は adapter 内部詳細です。SpecDock の current/main/bare/missing guard は bypass しません。
+eligible linked worktree は option なしで完全削除 default として扱われ、dirty / untracked file / tracked modification を含んでいても Git worktree record と resolved target path を削除します。
+`--force` は後方互換のため受け付ける入力です。完全削除を有効にする必須 option ではなく、default remove と同じ成功条件・失敗条件・出力契約を満たします。
+locked worktree などで Git が force-equivalent remove を拒否した場合、SpecDock はその Git error を表示し、filesystem cleanup は行いません。具体的な Git flag depth は adapter 内部詳細です。
 
 branch は削除しません。成功 JSON の `branch_deleted` は常に `false` です。
 `worktree delete` alias はありません。
