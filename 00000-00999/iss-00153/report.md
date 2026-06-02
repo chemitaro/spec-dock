@@ -237,11 +237,105 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ### セッションログ（2026-06-02 HH:MM - HH:MM）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S01
+- AC/EC: AC-001, AC-003 invariant subset via ci-009
 
 #### 実施内容
-- ...
+- `dev-coder` に S01 を委任し、untracked residue を含む eligible linked worktree が option なしで削除されるように実装した。
+- `application/worktree.py` の GitGateway remove call を eligible target では force-equivalent default に更新した。
+- `tests/cli_runtime/test_worktree.py` の untracked default remove test を default success / branch retention / record removal / path deletion を固定するテストへ更新した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_untracked_default_removes_directory_and_keeps_branch tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_cleans_leftover_directory_and_reports_cleanup_failure -v
+
+test_worktree_remove_untracked_default_removes_directory_and_keeps_branch ... ok
+test_worktree_remove_cleans_leftover_directory_and_reports_cleanup_failure ... ok
+Ran 2 tests ... OK
+```
+
+```bash
+git diff --check
+
+<no output; pass>
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | Updated focused test failed before implementation with `git_worktree_remove_failed` for default untracked remove | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_untracked_default_removes_directory_and_keeps_branch -v` by delegated worker | pass | Red confirmed old contract required `--force` for untracked residue |
+| S01 | 緑フェーズ（Green） | focused updated dirty/untracked test | Focused S01 CLI test and application cleanup assertion passed | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_untracked_default_removes_directory_and_keeps_branch tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_cleans_leftover_directory_and_reports_cleanup_failure -v` | pass | Parent reran the focused green verification |
+| S01 | 緑フェーズ（Green follow-up） | focused updated dirty/untracked test plus locked scope guard | Focused S01 test, locked default failure / `--force` compatibility test, and application cleanup assertion passed | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_untracked_default_removes_directory_and_keeps_branch tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_locked_default_fails_and_force_follows_git tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_cleans_leftover_directory_and_reports_cleanup_failure -v` | pass | Follow-up addressed first code-reviewer P1 by keeping locked default failure out of S01 |
+| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | Diff limited to allowed S01 files; no schema rename, GitGateway signature change, branch deletion, or cleanup range expansion | diff inspection; `git diff --check` | pass | No refactor performed |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S01 | none | dev-coder / parent verification | no action | ci-001, ci-009 | no | S02/S03 risks remain planned later work |
+| S01 | locked default became removable on Git versions supporting double force | code-reviewer | bounded follow-up kept locked default on old non-force path while retaining untracked default force-equivalent behavior | ci-001, ci-006 planned later | no | fresh code-reviewer required after follow-up |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S01 | ci-001, S01-owned ci-009 | Red / Green evidence, focused test pass, step `code-reviewer` pass, step commit evidence | Red/Green captured; first code review failed on locked default scope expansion; follow-up verification passed; fresh code review passed; commit pending | blocked | Commit S01 scope after reviewer pass |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| ci-001 | S01 | yes | red-required | focused test failed with `git_worktree_remove_failed` before implementation | focused S01 CLI test | pass | default remove now removes untracked residue |
+| ci-009 | S01 | yes | covered-existing plus focused assertions | old dirty test asserted failure then forced success | focused S01 CLI test | pass | success schema stable; `branch_deleted=false`; branch remains |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| ci-001 | S01 | focused CLI test | pass | untracked residue default remove |
+| ci-009 | S01 | focused CLI test | pass | branch retention and output schema subset |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | ci-001 | test_worktree_remove_untracked_default_removes_directory_and_keeps_branch | ci-001 | planned S01 test | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/ff1d/spec-dock` | iss-00153 | current session | dev-coder, code-reviewer | same repo, active issue, S01 allowed paths only | issue complete / session end / scope change / user revocation | none | proceed to S01 review |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated | runtime behavior / tests change | dev-coder | untracked residue default full delete | approved requirement/design/plan; provider-side runtime source | `application/worktree.py`; `tests/cli_runtime/test_worktree.py` | docs/help, `git_cli.py` signature, branch deletion, cleanup outside target, canonical issue docs | focused Red/Green; `git diff --check` | force-equivalent remove cannot satisfy untracked default, schema/API change required | changed files, Red/Green, closure ids, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S01 | dev-coder | Implemented default force-equivalent remove for eligible target and updated untracked default remove test | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py`; `tests/cli_runtime/test_worktree.py` | Red focused test failed before implementation; Green focused S01 tests passed; `git diff --check` pass | pending | S02/S03 remaining planned work | accepted pending code-reviewer |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S01 | N/A | N/A | N/A | N/A | N/A | N/A | code-reviewer pending | N/A |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S01 | step reviewer | code-reviewer | fresh | passed | no | proceed | Fresh re-review passed after locked default follow-up; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S01 | pending | S01 changed files plus S01 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py` - eligible remove を force-equivalent default に変更
+- `tests/cli_runtime/test_worktree.py` - untracked default remove success / branch retention test に更新
+- `spec-dock/active/issue/report.md` - S01 observed evidence を記録
+
+#### コミット
+- pending S01 code-reviewer pass
+
+#### メモ
+- Ledger Note: No material implementation decisions beyond the approved plan.
 
 ---
 
