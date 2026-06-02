@@ -964,43 +964,59 @@ class TestCliWorktree(CliRuntimeHarness):
             self.assertNotIn(str(worktree_path), self._run_git(target, ["worktree", "list", "--porcelain"]).stdout)
             self.assertIn(branch, self._run_git(target, ["branch", "--list", branch]).stdout)
 
-    def test_worktree_remove_locked_default_fails_and_force_follows_git(self) -> None:
+    def test_worktree_remove_locked_default_and_force_share_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "sample-repo"
             central_root = Path(tmp) / "central-worktrees"
             target.mkdir()
             self._prepare_git_repo(target)
 
-            created = self._run_runtime_capture(target, ["worktree", "create", "locked"], env=self._worktree_env(central_root))
-            self.assertEqual(created.returncode, 0, created.stderr)
-            worktree_path = central_root / "sample-repo" / "sample-repo-locked"
-            lock = self._run_git(target, ["worktree", "lock", str(worktree_path)], check=False)
-            if lock.returncode != 0:
-                self.skipTest(f"git worktree lock unavailable: {lock.stderr}")
+            cases = (("locked-default", []), ("locked-force", ["--force"]))
+            results: list[tuple[str, Path, subprocess.CompletedProcess[str], dict[str, object]]] = []
+            for label, extra_args in cases:
+                created = self._run_runtime_capture(target, ["worktree", "create", label], env=self._worktree_env(central_root))
+                self.assertEqual(created.returncode, 0, created.stderr)
+                worktree_path = central_root / "sample-repo" / f"sample-repo-{label}"
+                lock = self._run_git(target, ["worktree", "lock", str(worktree_path)], check=False)
+                if lock.returncode != 0:
+                    self.skipTest(f"git worktree lock unavailable: {lock.stderr}")
 
-            failed = self._run_runtime_capture(
-                target,
-                ["worktree", "remove", "locked", "--json"],
-                env=self._worktree_env(central_root),
-            )
-            self.assertNotEqual(failed.returncode, 0)
-            self.assertTrue(worktree_path.exists())
-            failed_payload = json.loads(failed.stdout)
-            self.assertEqual(failed_payload["error"]["code"], "git_worktree_remove_failed")
+                listed = self._run_runtime_capture(target, ["worktree", "list", "--json"], env=self._worktree_env(central_root))
+                self.assertEqual(listed.returncode, 0, listed.stderr)
+                listed_payload = json.loads(listed.stdout)
+                listed_record = next(item for item in listed_payload["worktrees"] if item["id"] == label)
+                self.assertTrue(listed_record["removable"])
+                self.assertEqual(listed_record["remove_blockers"], [])
 
-            forced = self._run_runtime_capture(
-                target,
-                ["worktree", "remove", "locked", "--force", "--json"],
-                env=self._worktree_env(central_root),
-            )
-            if forced.returncode != 0:
-                unlock = self._run_git(target, ["worktree", "unlock", str(worktree_path)], check=False)
-                self.assertEqual(unlock.returncode, 0, unlock.stderr)
-                self.skipTest(f"git worktree remove --force did not remove locked worktree: {forced.stderr or forced.stdout}")
-            forced_payload = json.loads(forced.stdout)
-            self.assertTrue(forced_payload["removed_record"])
-            self.assertTrue(forced_payload["removed_directory"])
-            self.assertFalse(worktree_path.exists())
+                shown = self._run_runtime_capture(target, ["worktree", "show", label, "--json"], env=self._worktree_env(central_root))
+                self.assertEqual(shown.returncode, 0, shown.stderr)
+                shown_record = json.loads(shown.stdout)["worktree"]
+                self.assertTrue(shown_record["removable"])
+                self.assertEqual(shown_record["remove_blockers"], [])
+
+                removed = self._run_runtime_capture(
+                    target,
+                    ["worktree", "remove", label, *extra_args, "--json"],
+                    env=self._worktree_env(central_root),
+                )
+                results.append((label, worktree_path, removed, json.loads(removed.stdout)))
+
+            default_result = results[0][2]
+            force_result = results[1][2]
+            self.assertEqual(default_result.returncode == 0, force_result.returncode == 0)
+
+            if default_result.returncode == 0:
+                for _label, worktree_path, _removed, payload in results:
+                    self.assertEqual(payload["status"], "ok")
+                    self.assertTrue(payload["removed_record"])
+                    self.assertTrue(payload["removed_directory"])
+                    self.assertTrue(payload["resolved_target"]["removable"])
+                    self.assertEqual(payload["resolved_target"]["remove_blockers"], [])
+                    self.assertFalse(worktree_path.exists())
+            else:
+                for _label, worktree_path, _removed, payload in results:
+                    self.assertTrue(worktree_path.exists())
+                    self.assertEqual(payload["error"]["code"], "git_worktree_remove_failed")
 
     def test_worktree_remove_rejects_branch_target_and_invalid_root_without_side_effects(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1439,6 +1455,68 @@ class TestCliWorktree(CliRuntimeHarness):
                 app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), ports)
 
             self.assertEqual(raised.exception.code, "git_worktree_remove_failed")
+            self.assertEqual(git_gateway.remove_calls, [(worktree_path, True)])
+
+    def test_worktree_remove_locked_default_uses_force_equivalent_git_call(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            sys_path_inserted = False
+
+            if str(runtime_scripts_dir) not in sys.path:
+                sys.path.insert(0, str(runtime_scripts_dir))
+                sys_path_inserted = True
+            try:
+                from spec_dock_runtime.application import contracts as app_contracts
+                from spec_dock_runtime.application import ports as app_ports
+                from spec_dock_runtime.application import worktree as app_worktree
+            finally:
+                if sys_path_inserted:
+                    sys.path.pop(0)
+
+            repo_root = Path(tmp) / "repo"
+            central_root = Path(tmp) / "central"
+            worktree_path = central_root / "repo" / "repo-locked"
+            repo_root.mkdir()
+            worktree_path.mkdir(parents=True)
+
+            class FakeGitGateway:
+                def __init__(self) -> None:
+                    self.remove_calls: list[tuple[Path, bool]] = []
+
+                def worktree_list(self, repo_root_arg):
+                    return [
+                        app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
+                        app_contracts.GitWorktreeRecord(path=worktree_path, head="def", branch="main-locked", locked=True),
+                    ]
+
+                def remove_worktree(self, repo_root_arg, *, path, force):
+                    self.remove_calls.append((path, force))
+
+            class FakeEnvironmentGateway:
+                def getenv(self, name):
+                    return str(central_root)
+
+            class FakeFilesystemGateway:
+                def path_exists(self, path):
+                    return False
+
+                def remove_target(self, path):
+                    raise AssertionError("cleanup should not run when path is already gone")
+
+            git_gateway = FakeGitGateway()
+            ports = app_ports.Ports(
+                node_reader=object(),
+                repo_root=repo_root,
+                git_gateway=git_gateway,
+                environment_gateway=FakeEnvironmentGateway(),
+                filesystem_gateway=FakeFilesystemGateway(),
+            )
+
+            result = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="locked"), ports)
+
+            self.assertTrue(result.removed_record)
+            self.assertTrue(result.resolved_target.removable)
+            self.assertEqual(result.resolved_target.remove_blockers, [])
             self.assertEqual(git_gateway.remove_calls, [(worktree_path, True)])
 
     def test_worktree_remove_uses_target_only_cleanup_for_remaining_directory(self) -> None:
