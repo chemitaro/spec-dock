@@ -582,7 +582,7 @@ git diff --check
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S90 | ci-005 | docs/help evidence, docs/spec review pass, code-reviewer pass if command/test touched, step commit evidence | Help/docs updated; help test, parity, diff check passed; spec-reviewer and code-reviewer passed; commit pending | blocked | Commit S90 scope after reviewer pass |
+| S90 | ci-005 | docs/help evidence, docs/spec review pass, code-reviewer pass if command/test touched, step commit evidence | Help/docs updated; help test, parity, diff check passed; spec-reviewer and code-reviewer passed; S90 committed | pass | S90 closed |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -618,7 +618,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S90 | pending | S90 docs/help/test files plus S90 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S90 | committed | S90 docs/help/test files plus S90 report evidence | `a6479bee` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/worktree.py` - `--force` help を compatibility wording に更新
@@ -628,7 +628,7 @@ git diff --check
 - `spec-dock/active/issue/report.md` - S90 observed evidence を記録
 
 #### コミット
-- pending S90 commit
+- `a6479bee` `docs(worktree): remove の既定削除を案内する`
 
 #### メモ
 - Ledger Note: No material implementation decisions beyond the approved plan.
