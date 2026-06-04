@@ -20,8 +20,7 @@ ID: "iss-00153"
 
 Material な判断がない場合もこの section は残し、次を明示する。
 
-- No material interpretation changes.
-- No decision entries.
+- Material decision entries exist in this issue; see D-001.
 
 Ledger entry は次の契約値を使う。
 
@@ -49,7 +48,10 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | compatibility | orchestrator + user | `worktree remove` の完全削除 default 化で、既存 `--force` option を廃止するか互換入力として残すかが requirement / design / tests に影響した | Option A: `--force` 廃止; Option B: `--force` を互換入力として受け付け default と同じ削除強度にする; Option C: locked worktree 用の追加強度として残す | Option B を採用する。`worktree remove <target>` は引数なしで完全削除 default とし、`--force` は互換入力として同じ contract を満たす | ユーザーが Option B を明示採用した。親 Epic の backward compatibility gate を維持しながら、引数なし cleanup の friction を解消できる | applied | `discussions/20260602t062811z-interview-worktree-remove-force-compatibility-question.md`; `requirement.md`; `design.md`; `plan.md`; S90 evidence | none |
+| D-002 | resolved | test-strategy | spec-reviewer | Requirement wording covered dirty / untracked file removal, while AC-001 only made untracked residue explicit | Narrow wording to untracked only; add tracked modification AC | Add a separate tracked modification acceptance criterion so both dirty meanings are externally verifiable | `worktree remove` must cover both untracked residue and tracked modifications when hard blockers are absent | applied | `requirement.md`; spec-reviewer finding 2026-06-02 | none |
+| D-003 | resolved | operation | spec-reviewer | Initial design report ledger marked diff-guardless delegated draft as adopted evidence | Keep draft adopted; reject draft as promotion evidence and rely on primary source manual authoring | Reject the delegated draft for promotion evidence because `diff_guard_result=not_run`; keep canonical design as manual source-based authoring | `phase_design.md` requires delegated drafts to have diff guard before adoption. Rejected draft removes the promotion blocker while preserving the fact that a draft was produced | applied | `report.md`; design spec-reviewer findings 2026-06-02 | none |
+| D-004 | resolved | test-strategy | spec-reviewer | Plan S90 allowed CLI help source / test changes while making `code-reviewer` conditional, and delegation contracts lacked explicit source-of-truth fields | Split S90; make code-reviewer mandatory when code/test files change; add source-of-truth fields | Keep S90 as one docs/help step but require `spec-reviewer` for docs/spec alignment and `code-reviewer` whenever `commands/worktree.py` or `tests/cli_runtime/test_worktree.py` changes. Add source-of-truth lines to S01/S02/S03/S90 delegation contracts | `workflow_issue.md` requires code/runtime/tests changes to receive code-reviewer pass, and source-of-truth must be explicit for delegated worker handoff | applied | `plan.md`; plan spec-reviewer findings 2026-06-02 | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +65,9 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | user interview | `requirement.md` | `--force` compatibility はユーザー回答で Option B 採用済み。requirement の scope / non-scope / AC に反映する必要がある | `discussions/20260602t062811z-interview-worktree-remove-force-compatibility-question.md` | complete for requirement; proceed to design |
+| EAL-002 | rejected | delegated draft by `system-architect` | `design.md` | draft は参考情報として読んだが、事前 baseline がなく `diff_guard_result=not_run` のため、phase_design の delegated draft adoption gate を満たさない。canonical design の promotion evidence には採用せず、main orchestrator が primary docs / code / tests を直接確認して手動 authoring した | `discussions/20260602t065859z-disc-design-draft-worktree-remove-default-full-delete.md`; `design.md` | no delegated draft promotion; design reviewer to assess canonical artifact against primary sources |
+| EAL-003 | rejected | delegated draft by `implementation-planner` | `plan.md` | draft は参考情報として読んだが、diff guard が `dirty_baseline_discussion` で blocked したため、phase_plan_issue の delegated draft adoption evidence としては使わない。canonical plan は approved requirement/design と primary source reads から main orchestrator が手動 authoring した | `discussions/20260602t071130z-disc-plan-draft-worktree-remove-default-full-delete.md`; `plan.md`; `delegated-authoring diff-guard` blocked output | no delegated draft promotion; plan reviewer to assess canonical artifact against approved requirement/design |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +75,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | `requirement.md` は `worktree remove <target>` の引数なし完全削除 default を primary objective として固定した | `--force` は backward compatibility の副次要件として維持し、新しい必須 option や追加機能として扱わない | low | pass |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,13 +83,14 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | `spec-dock/active/epic/requirement.md`; `spec-dock/active/epic/plan.md`; `spec-dock/docs/reference_worktree.md`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/worktree.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py`; `tests/cli_runtime/test_worktree.py`; user request | `discussions/20260602t062811z-interview-worktree-remove-force-compatibility-question.md` answered: Option B adopted | adopted | passed: fresh `spec-reviewer` returned no findings after P2 fixes | no | promote requirement to design phase |
+| design | `requirement.md`; `spec-dock/active/epic/requirement.md`; `spec-dock/active/epic/design.md`; `spec-dock/active/epic/plan.md`; `spec-dock/docs/reference_worktree.md`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/worktree.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py`; `tests/cli_runtime/test_worktree.py` | none | manual canonical authoring from primary sources; delegated design draft rejected as promotion evidence because diff guard was not run | passed: fresh `spec-reviewer` returned `review_status: pass`; P2 ledger clarification applied | no | promote design to plan phase |
+| plan | `requirement.md`; `design.md`; `spec-dock/docs/phase_plan_issue.md`; `spec-dock/docs/authoring/issue-plan.md`; `spec-dock/docs/workflow_issue.md`; worktree runtime source; worktree tests; provider/dogfooding docs | none | manual canonical authoring from approved requirement/design; delegated plan draft rejected as promotion evidence because diff guard was blocked by dirty baseline discussions | passed: fresh `spec-reviewer` returned `review_status: pass` after S90 reviewer-gate contradiction fix | no | promote plan to implementation handoff |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
-  - used / not used
-- 未使用の場合:
-  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
+  - requirement: not used; manual authoring path.
+  - design: used for one `system-architect` discussion draft, then rejected as promotion evidence because diff guard was not run. Canonical design relies on manual source-based authoring by the main orchestrator.
 - lifecycle state（契約値）:
   - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
 - 昇格不可 state:
@@ -107,7 +112,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| 該当なし | iss-00153 requirement | 該当なし | `requirement.md`; parent epic docs; worktree runtime source; worktree tests; user interview | `requirement.md`; `report.md` | not_used | [] | not_run | Requirement phase used manual authoring only | 該当なし | none | passed fresh `spec-reviewer` | requirement promoted without delegated draft evidence |
+| system-architect | iss-00153 | `discussions/20260602t065859z-disc-design-draft-worktree-remove-default-full-delete.md` | `requirement.md`; parent epic docs; worktree runtime source; worktree tests; reference docs | `design.md`; `plan.md`; `report.md` | rejected | [] | not_run: no pre-run baseline was captured because the issue node was already untracked in this worktree | Not integrated as delegated draft evidence; canonical design relies on manual authoring from primary source reads | all delegated-draft adoption claims | none | design review pass after ledger correction; draft remains ineligible for promotion evidence | ineligible for promotion evidence |
+| implementation-planner | iss-00153 | `discussions/20260602t071130z-disc-plan-draft-worktree-remove-default-full-delete.md` | `requirement.md`; `design.md`; `phase_plan_issue.md`; `authoring/issue-plan.md`; `workflow_issue.md`; worktree runtime source/tests/docs | `plan.md`; `report.md` | rejected | [] | blocked: `delegated-authoring diff-guard` returned `dirty_baseline_discussion` for pre-existing issue discussion files | Not integrated as delegated draft evidence; canonical plan relies on manual authoring from approved requirement/design and primary source reads | all delegated-draft adoption claims | none | plan review pass after S90 gate correction; draft remains ineligible for promotion evidence | ineligible for promotion evidence |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -124,117 +131,409 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- `worktree remove <target>` を default force-equivalent delete contract に更新し、`--force` は互換入力として同じ contract を維持した。
+- locked state は remove の hard blocker 診断から外し、Git が remove を拒否した場合のみ `git_worktree_remove_failed` として扱う。
 
 ## 実装記録（セッションログ） (必須)
 
 ### セッションログ（2026-06-02 HH:MM - HH:MM）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+- Step: S01
+- AC/EC: AC-001, AC-003 invariant subset via ci-009
 
 #### 実施内容
-- ...
+- `dev-coder` に S01 を委任し、untracked residue を含む eligible linked worktree が option なしで削除されるように実装した。
+- `application/worktree.py` の GitGateway remove call を eligible target では force-equivalent default に更新した。
+- `tests/cli_runtime/test_worktree.py` の untracked default remove test を default success / branch retention / record removal / path deletion を固定するテストへ更新した。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_untracked_default_removes_directory_and_keeps_branch tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_cleans_leftover_directory_and_reports_cleanup_failure -v
 
-<result>
+test_worktree_remove_untracked_default_removes_directory_and_keeps_branch ... ok
+test_worktree_remove_cleans_leftover_directory_and_reports_cleanup_failure ... ok
+Ran 2 tests ... OK
+```
+
+```bash
+git diff --check
+
+<no output; pass>
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | Updated focused test failed before implementation with `git_worktree_remove_failed` for default untracked remove | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_untracked_default_removes_directory_and_keeps_branch -v` by delegated worker | pass | Red confirmed old contract required `--force` for untracked residue |
+| S01 | 緑フェーズ（Green） | focused updated dirty/untracked test | Focused S01 CLI test and application cleanup assertion passed | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_untracked_default_removes_directory_and_keeps_branch tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_cleans_leftover_directory_and_reports_cleanup_failure -v` | pass | Parent reran the focused green verification |
+| S01 | 緑フェーズ（Green follow-up） | focused updated dirty/untracked test plus locked scope guard | Focused S01 test, locked default failure / `--force` compatibility test, and application cleanup assertion passed | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_untracked_default_removes_directory_and_keeps_branch tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_locked_default_fails_and_force_follows_git tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_cleans_leftover_directory_and_reports_cleanup_failure -v` | pass | Follow-up addressed first code-reviewer P1 by keeping locked default failure out of S01 |
+| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | Diff limited to allowed S01 files; no schema rename, GitGateway signature change, branch deletion, or cleanup range expansion | diff inspection; `git diff --check` | pass | No refactor performed |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | none | dev-coder / parent verification | no action | ci-001, ci-009 | no | S02/S03 risks remain planned later work |
+| S01 | locked default became removable on Git versions supporting double force | code-reviewer | bounded follow-up kept locked default on old non-force path while retaining untracked default force-equivalent behavior | ci-001, ci-006 planned later | no | fresh code-reviewer required after follow-up |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | ci-001, S01-owned ci-009 | Red / Green evidence, focused test pass, step `code-reviewer` pass, step commit evidence | Red/Green captured; first code review failed on locked default scope expansion; follow-up verification passed; fresh code review passed; S01 committed | pass | S01 closed |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
+| ci-001 | S01 | yes | red-required | focused test failed with `git_worktree_remove_failed` before implementation | focused S01 CLI test | pass | default remove now removes untracked residue |
+| ci-009 | S01 | yes | covered-existing plus focused assertions | old dirty test asserted failure then forced success | focused S01 CLI test | pass | success schema stable; `branch_deleted=false`; branch remains |
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| ci-001 | S01 | focused CLI test | pass | untracked residue default remove |
+| ci-009 | S01 | focused CLI test | pass | branch retention and output schema subset |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| none | ci-001 | test_worktree_remove_untracked_default_removes_directory_and_keeps_branch | ci-001 | planned S01 test | no | no |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
-`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
-
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00153 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/ff1d/spec-dock` | iss-00153 | current session | dev-coder, code-reviewer | same repo, active issue, S01 allowed paths only | issue complete / session end / scope change / user revocation | none | proceed to S01 review |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
-
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | runtime behavior / tests change | dev-coder | untracked residue default full delete | approved requirement/design/plan; provider-side runtime source | `application/worktree.py`; `tests/cli_runtime/test_worktree.py` | docs/help, `git_cli.py` signature, branch deletion, cleanup outside target, canonical issue docs | focused Red/Green; `git diff --check` | force-equivalent remove cannot satisfy untracked default, schema/API change required | changed files, Red/Green, closure ids, Ledger Note | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | dev-coder | Implemented default force-equivalent remove for eligible target and updated untracked default remove test | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py`; `tests/cli_runtime/test_worktree.py` | Red focused test failed before implementation; Green focused S01 tests passed; `git diff --check` pass | pending | S02/S03 remaining planned work | accepted pending code-reviewer |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01 | N/A | N/A | N/A | N/A | N/A | N/A | code-reviewer pending | N/A |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step reviewer | code-reviewer | fresh | passed | no | proceed | Fresh re-review passed after locked default follow-up; no findings |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | committed | S01 changed files plus S01 report evidence | `0421ce7566bb11d2ec10b4f73642b8087de2c16a` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py` - eligible remove を force-equivalent default に変更
+- `tests/cli_runtime/test_worktree.py` - untracked default remove success / branch retention test に更新
+- `spec-dock/active/issue/report.md` - S01 observed evidence を記録
 
 #### コミット
-- <hash> <message>
+- `0421ce7566bb11d2ec10b4f73642b8087de2c16a` `fix(worktree): untracked residue を既定削除にする`
 
 #### メモ
-- ...
+- Ledger Note: No material implementation decisions beyond the approved plan.
 
 ---
 
 ### セッションログ（2026-06-02 HH:MM - HH:MM）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S02
+- AC/EC: AC-002, AC-003, AC-002/AC-003 invariant subset via ci-009
 
 #### 実施内容
-- ...
+- `dev-coder` に S02 を委任し、tracked modification の default full delete と `--force` compatibility を runtime tests で固定した。
+- S01 実装で tracked modification default success は既に満たされていたため、Red は covered-by-implementation / characterization として扱った。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_tracked_modification_default_removes_directory_and_keeps_branch tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_force_compatibility_removes_dirty_directory tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_untracked_default_removes_directory_and_keeps_branch -v
+
+test_worktree_remove_tracked_modification_default_removes_directory_and_keeps_branch ... ok
+test_worktree_remove_force_compatibility_removes_dirty_directory ... ok
+test_worktree_remove_untracked_default_removes_directory_and_keeps_branch ... ok
+Ran 3 tests ... OK
+```
+
+```bash
+git diff --check
+
+<no output; pass>
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ / 代替証跡（Red / alternative） | red-required for tracked modification; characterization-update for `--force` | tracked modification default success test passed against S01 implementation, so the behavior was covered by the S01 runtime change and fixed as characterization evidence | delegated worker focused test run | approved-no-op | Test remains sensitive because removing force-equivalent default would return Git refusal for tracked dirty state |
+| S02 | 緑フェーズ（Green） | tracked modification default test and `--force` compatibility test | Focused S02 tests plus S01 untracked regression test passed | `python -m unittest ...tracked_modification... ...force_compatibility... ...untracked_default... -v` | pass | Parent reran focused verification |
+| S02 | 緑フェーズ（Green follow-up） | branch retention assertion strength | Focused S02 tests plus S01 untracked regression test passed after adding non-empty branch assertions | `python -m unittest ...tracked_modification... ...force_compatibility... ...untracked_default... -v` | pass | Addressed code-reviewer P2 test-strength finding |
+| S02 | リファクタリング（Refactor） | no parser/API/behavior broadening | Diff limited to tests; no production change needed | diff inspection; `git diff --check` | pass | No refactor performed |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | none | dev-coder / parent verification | no action | ci-002, ci-003, ci-009 | no | S03 risks remain planned later work |
+| S02 | branch retention assertion could pass with empty branch string | code-reviewer | added non-empty branch assertions to S02 tests and same-pattern S01 regression test | ci-009 | no | focused tests passed after assertion-strength follow-up |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | ci-002, ci-003, S02-owned ci-009 | Red/alternative evidence, focused tests pass, step `code-reviewer` pass, step commit evidence | Characterization/Green captured; code review passed with P2; P2 fixed; S02 committed | pass | S02 closed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| ci-002 | S02 | yes | red-required / covered-by-implementation | tracked modification test passed against S01 implementation | focused S02 tracked modification test | pass | tracked dirty state removes by default |
+| ci-003 | S02 | yes | characterization-update | `--force` compatibility retained by parser/runtime | focused `--force` compatibility test | pass | `--force` remains accepted and same success schema |
+| ci-009 | S02 | yes | focused assertions | success schema and branch retention asserted | focused S02 tests | pass | `branch_deleted=false`; branch remains |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| ci-002 | S02 | focused tracked modification test | pass | tracked dirty default remove |
+| ci-003 | S02 | focused `--force` compatibility test | pass | compatibility input |
+| ci-009 | S02 | focused S02 assertions | pass | branch retention and output schema subset |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | ci-002 | test_worktree_remove_tracked_modification_default_removes_directory_and_keeps_branch | ci-002 | planned S02 test | no | no |
+| none | ci-003 | test_worktree_remove_force_compatibility_removes_dirty_directory | ci-003 | planned S02 test | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | test coverage / compatibility coverage | dev-coder | tracked modification default success and `--force` compatibility tests | approved requirement/design/plan; provider-side runtime tests | `tests/cli_runtime/test_worktree.py`; necessary application change only | `--force` parser removal, GitGateway signature change, branch deletion, docs/help, canonical issue docs, S03 early work | focused S02 tests; `git diff --check` | `--force` compatibility cannot be retained or tracked fixture cannot be represented | changed files, Red/characterization, Green, closure ids, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Added tracked modification default remove and `--force` compatibility tests | `tests/cli_runtime/test_worktree.py` | Focused S02 tests plus S01 untracked regression passed; `git diff --check` pass | pending | none for S02 | accepted pending code-reviewer |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | passed | no | proceed | Fresh review passed with P2; branch-retention assertion-strength follow-up applied |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | committed | S02 changed files plus S02 report evidence | `307b81c0` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/cli_runtime/test_worktree.py` - tracked modification default success / `--force` compatibility tests を追加
+- `spec-dock/active/issue/report.md` - S02 observed evidence を記録
+
+#### コミット
+- `307b81c0` `test(worktree): tracked dirty と force 互換を固定`
+
+#### メモ
+- Ledger Note: No material implementation decisions beyond the approved plan.
+
+---
+
+### セッションログ（2026-06-02 HH:MM - HH:MM）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-004, EC-001, EC-002, EC-003, remaining ci-009
+
+#### 実施内容
+- `dev-coder` に S03 を委任し、hard blocker、Git failure no cleanup、post-remove cleanup failure、target-only cleanup、unmanaged diagnostic default removal を runtime tests で固定した。
+- 実装変更は不要で、既存 tests を S01/S02 の default full delete contract に合わせて targeted update した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree -v
+
+Ran 49 tests ... OK
+```
+
+```bash
+git diff --check
+
+<no output; pass>
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ / 代替証跡（Red / alternative） | covered-existing plus targeted update | Existing tests required update for unmanaged default remove, hard blocker default/force no-call, Git refusal force assertion, and target-only cleanup force assertion | delegated worker inspection and targeted updates | approved-no-op | No production change needed |
+| S03 | 緑フェーズ（Green） | affected tests and `TestCliWorktree` suite | Full `TestCliWorktree` suite passed | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree -v` | pass | Parent reran suite: 49 tests OK |
+| S03 | リファクタリング（Refactor） | no production refactor; guardrails unchanged | Diff limited to tests; no cleanup scope or API changes | diff inspection; `git diff --check` | pass | No refactor performed |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | unmanaged default remove previously covered only via `--force` | dev-coder | updated unmanaged removal test to default remove and asserted diagnostic fields | ci-008, ci-009 | no | `TestCliWorktree` pass |
+| S03 | hard blocker tests should prove default and `--force` both stop before Git remove | dev-coder | updated fake gateway cases for both force states | ci-004 | no | `TestCliWorktree` pass |
+| S03 | Git failure / cleanup tests should assert force-equivalent call and no cleanup broadening | dev-coder | added fake gateway force call assertions and target-only cleanup assertions | ci-006, ci-007 | no | `TestCliWorktree` pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | ci-004, ci-006, ci-007, ci-008, remaining ci-009 | Guardrail/error/diagnostic tests pass, step `code-reviewer` pass, step commit evidence | Green captured; code review passed; S03 committed | pass | S03 closed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| ci-004 | S03 | yes | covered-existing plus targeted update | hard blocker tests existed, updated for default and `--force` no-call | `TestCliWorktree` suite | pass | hard blockers stop before Git remove |
+| ci-006 | S03 | yes | covered-existing plus assertion update | Git failure test existed, updated to assert force-equivalent call and no cleanup | `TestCliWorktree` suite | pass | Git refusal does not cleanup |
+| ci-007 | S03 | yes | covered-existing plus assertion update | cleanup failure / target-only tests existed, updated for force-equivalent call | `TestCliWorktree` suite | pass | post-remove cleanup failure remains distinguishable |
+| ci-008 | S03 | yes | characterization-update | unmanaged removal existed via `--force`, updated to default remove with diagnostics | `TestCliWorktree` suite | pass | unmanaged diagnostic-only removal |
+| ci-009 | S03 | yes | covered-existing plus focused assertions | branch retention / output schema assertions preserved | `TestCliWorktree` suite | pass | branch_deleted remains false where applicable |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| ci-004 | S03 | hard blocker tests | pass | default and force no-call |
+| ci-006 | S03 | Git failure test | pass | no cleanup after Git refusal |
+| ci-007 | S03 | cleanup failure / target-only tests | pass | removed_record and removed_directory error fields preserved |
+| ci-008 | S03 | unmanaged removal test | pass | default unmanaged removal with diagnostics |
+| ci-009 | S03 | `TestCliWorktree` suite | pass | schema / branch retention invariants |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | ci-004 | hard blocker tests | ci-004 | planned S03 update | no | no |
+| none | ci-006 | test_worktree_remove_git_failure_does_not_cleanup_target | ci-006 | planned S03 update | no | no |
+| none | ci-007 | cleanup failure / target-only cleanup tests | ci-007 | planned S03 update | no | no |
+| none | ci-008 | unmanaged remove test | ci-008 | planned S03 update | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | guardrail/error/diagnostic test coverage | dev-coder | hard blockers, Git failure no cleanup, cleanup failure, unmanaged default remove | approved requirement/design/plan; provider-side runtime tests | `tests/cli_runtime/test_worktree.py`; necessary application change only | docs/help, branch deletion, parent/namespace/root cleanup, canonical issue docs, new options, GitGateway signature change | affected tests, `TestCliWorktree`, `git diff --check` | test cannot distinguish blockers, locked behavior unstable beyond guarded skip, API change required | changed files, alternative evidence, Green, closure ids, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | Updated tests for guardrail/error/diagnostic preservation under default full delete | `tests/cli_runtime/test_worktree.py` | Focused affected tests passed; `TestCliWorktree` 49 tests passed; `git diff --check` pass | pending | locked behavior remains guarded by existing Git-version tolerant test | accepted pending code-reviewer |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | fresh | passed | no | proceed | Fresh review passed with no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | committed | S03 changed files plus S03 report evidence | `9dda8bb5` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/cli_runtime/test_worktree.py` - S03 guardrail/error/diagnostic tests を default full delete contract に合わせて更新
+- `spec-dock/active/issue/report.md` - S03 observed evidence を記録
+
+#### コミット
+- `9dda8bb5` `test(worktree): remove の安全境界を固定`
+
+#### メモ
+- Ledger Note: No material implementation decisions beyond the approved plan.
+
+---
+
+### セッションログ（2026-06-02 HH:MM - HH:MM）
+
+#### 対象
+- Step: S90
+- AC/EC: AC-005
+
+#### 実施内容
+- `doc-writer` に S90 を委任し、CLI help、provider docs、dogfooding docs を default full delete / `--force` compatibility contract に更新した。
+- `commands/worktree.py` と help assertion を変更したため、`spec-reviewer` と `code-reviewer` の両方を実施した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_help_uses_all_worktree_wording -v
+
+test_worktree_remove_help_uses_all_worktree_wording ... ok
+Ran 1 test ... OK
+```
+
+```bash
+cmp -s src/spec_dock/assets/spec_dock/docs/reference_worktree.md spec-dock/docs/reference_worktree.md
+
+<no output; pass>
+```
+
+```bash
+git diff --check
+
+<no output; pass>
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S90 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only plus help assertion | Old help wording existed before update; docs had old dirty/untracked failure wording | doc-writer inspection and parent `rg` old wording check | pass | Old wording remains only in negative assertion |
+| S90 | 緑フェーズ（Green） | help assertion / inspection; provider-dogfooding parity | focused help test passed; docs parity passed | help unittest; `cmp -s`; `rg`; docs inspection | pass | `--force` described as compatibility input |
+| S90 | リファクタリング（Refactor） | docs/help only; no runtime behavior change | Diff limited to docs/help/help assertion; no parser/runtime path change beyond help text | diff inspection; `git diff --check` | pass | No refactor performed |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S90 | old `--force` required wording could remain in help/docs | doc-writer / parent verification | updated help and docs; added negative assertion | ci-005 | no | help test and `rg` check |
+| S90 | provider/dogfooding docs could drift | plan | verified byte-level parity | ci-005 | no | `cmp -s` pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | ci-005 | docs/help evidence, docs/spec review pass, code-reviewer pass if command/test touched, step commit evidence | Help/docs updated; help test, parity, diff check passed; spec-reviewer and code-reviewer passed; S90 committed | pass | S90 closed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| ci-005 | S90 | yes | inspect-only plus help assertion | old help/docs wording existed | focused help test; docs parity inspection | pass | docs/help describe default full delete and `--force` compatibility |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| ci-005 | S90 | help test; docs parity; old wording search; reviewers | pass | provider and dogfooding docs match |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | ci-005 | test_worktree_remove_help_uses_all_worktree_wording | ci-005 | planned S90 help assertion | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S90 | delegated | shipped docs/help update | doc-writer | CLI help and provider/dogfooding reference docs | approved requirement/design/plan; provider-side docs/help source | `commands/worktree.py`; provider reference docs; dogfooding reference docs; help assertion | application/infra logic, new options, canonical issue docs, branch/delete/prune/status expansion | help test; docs parity; `git diff --check` | wording requires new option or contradicts EC-001 | changed docs/help paths, verification, wording risks, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S90 | doc-writer | Updated help/docs wording for default full delete and `--force` compatibility | `commands/worktree.py`; provider/dogfooding `reference_worktree.md`; `tests/cli_runtime/test_worktree.py` | help test pass; docs parity pass; `git diff --check` pass | spec-reviewer pass; code-reviewer pass | locked wording limited to Git refusal / adapter depth caveat | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | docs/spec reviewer | spec-reviewer | fresh | passed | no | proceed | Fresh review passed with no findings |
+| S90 | code/runtime reviewer | code-reviewer | fresh | passed | no | proceed | Fresh review passed with no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | committed | S90 docs/help/test files plus S90 report evidence | `a6479bee` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/worktree.py` - `--force` help を compatibility wording に更新
+- `src/spec_dock/assets/spec_dock/docs/reference_worktree.md` - provider docs remove section を更新
+- `spec-dock/docs/reference_worktree.md` - dogfooding docs parity 更新
+- `tests/cli_runtime/test_worktree.py` - help assertion を更新
+- `spec-dock/active/issue/report.md` - S90 observed evidence を記録
+
+#### コミット
+- `a6479bee` `docs(worktree): remove の既定削除を案内する`
+
+#### メモ
+- Ledger Note: No material implementation decisions beyond the approved plan.
 
 ---
 
@@ -243,37 +542,48 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| CLI help / provider reference docs / dogfooding reference docs | yes | doc-writer | S90 session log; help test pass; docs parity pass; old wording search | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | sufficient | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree -v` -> 50 tests OK after final-review follow-up; `./spec-dock/scripts/spec-dock validate` -> ok; `./spec-dock/scripts/spec-dock sync --no-github` -> ok; provider/dogfooding runtime parity checks pass | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | initial pass with P2 findings for locked compatibility and dogfooding runtime parity; follow-up and P2 diagnostics cleanup applied; fresh re-review passed with no findings | 2 | pass |
+| code-reviewer | final re-review P2 cleanup | P2: list/show/success diagnostics still reported locked as a remove blocker; fixed by removing `locked` from public `remove_blockers` / `removable` blocker model while keeping Git refusal as `git_worktree_remove_failed` | 2 | pending re-review |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | initial fail: final gate rows pending and locked semantics mismatch; follow-up applied; second pass had P3 stale follow-up text; P3 fixed | 2 | pass |
+| spec-reviewer | final re-review P2 cleanup | P2: unfilled template placeholder blocks remained in `report.md`; removed the scaffold session block and replaced optional summary/follow-up placeholders with concrete values | 2 | pending re-review |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| final verification evidence and final-review follow-up evidence recorded; final reviewer re-gates passed | final report updates, P2/P3 cleanup, provider/dogfooding parity updates | PR body / final response / issue lifecycle evidence | ready |
+
+### Final Review Follow-up Evidence
+| 指摘元 | 指摘 | 対応 | 検証 | 結果 |
+|---|---|---|---|---|
+| final `spec-reviewer` / final `code-reviewer` | locked worktree で default と `--force` の contract が分岐しうる | provider runtime を eligible target では常に force-equivalent remove に戻し、locked tests を default / `--force` same contract に更新 | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree -v` -> 50 tests OK | pending re-review |
+| final `code-reviewer` | dogfooding runtime/help が provider と不一致 | `spec-dock/scripts/spec_dock_runtime/application/worktree.py` と `spec-dock/scripts/spec_dock_runtime/commands/worktree.py` を provider と parity 更新 | `cmp -s` for touched runtime/help files -> pass | pending re-review |
+| final `code-reviewer` | locked diagnostics could still report `remove_blockers=locked` / `removable=false` after successful force-equivalent removal | removed `locked` from public remove blockers under the new default contract and updated diagnostics tests | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree -v` -> 50 tests OK | pass |
+| final `spec-reviewer` | stale D-001 follow-up text implied remaining design work | D-001 follow-up updated to `none` with design/plan/S90 evidence | report inspection | pass |
+| final re-review `code-reviewer` | locked target removal diagnostics may still report `remove_blockers=locked` / `removable=false` under force-equivalent default | `locked` を remove の hard blocker 診断から外し、list/show/success JSON が `removable=true` / `remove_blockers=[]` を返す focused assertions を追加 | `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_locked_default_and_force_share_contract tests.cli_runtime.test_worktree.TestCliWorktree.test_worktree_remove_locked_default_uses_force_equivalent_git_call -v` -> 2 tests OK; `python -m unittest tests.cli_runtime.test_worktree.TestCliWorktree -v` -> 50 tests OK; provider/dogfooding `cmp -s` -> pass | fixed; pending re-review |
+| final re-review `spec-reviewer` | `report.md` に未記入 template placeholder blocks が残っている | `## 実装記録` 直下の scaffold session block を削除し、任意 placeholder sections を concrete `該当なし` に更新 | placeholder search for template tokens -> no matches; `git diff --check` -> pass | fixed; pending re-review |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 該当なし
 
 ## 学んだこと (任意)
-- ...
+- 該当なし
 
 ## 今後の推奨事項 (任意)
-- ...
+- 該当なし
 
 ## 省略/例外メモ (必須)
 - 該当なし
