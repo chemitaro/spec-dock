@@ -6,7 +6,7 @@ from pathlib import Path
 
 def _runtime_modules():
     runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
+        Path(__file__).resolve().parents[3]
         / "src"
         / "spec_dock"
         / "assets"
@@ -27,7 +27,7 @@ def _runtime_modules():
 
 def _application_diff_guard_modules():
     runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
+        Path(__file__).resolve().parents[3]
         / "src"
         / "spec_dock"
         / "assets"

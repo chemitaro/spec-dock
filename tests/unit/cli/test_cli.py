@@ -5,9 +5,9 @@ from pathlib import Path
 
 class TestCliTestTreeSplitS12(unittest.TestCase):
     def test_test_module_inventory_exists(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         expected = [
-            repo_root / "tests" / "test_init_update.py",
+            repo_root / "tests" / "unit" / "infra" / "test_init_update.py",
             repo_root / "tests" / "cli_runtime" / "harness.py",
             repo_root / "tests" / "cli_runtime" / "test_wrappers.py",
             repo_root / "tests" / "cli_runtime" / "test_new.py",
@@ -21,20 +21,20 @@ class TestCliTestTreeSplitS12(unittest.TestCase):
             repo_root / "tests" / "cli_runtime" / "test_runtime_active_s05.py",
             repo_root / "tests" / "cli_runtime" / "test_runtime_new_s08.py",
             repo_root / "tests" / "cli_runtime" / "test_runtime_new_doc_s09.py",
-            repo_root / "tests" / "domain_runtime" / "test_runtime_domain_s01.py",
-            repo_root / "tests" / "domain_runtime" / "test_runtime_domain_s03.py",
-            repo_root / "tests" / "presentation_runtime" / "test_runtime_sync_s07.py",
+            repo_root / "tests" / "unit" / "domain" / "test_runtime_domain_s01.py",
+            repo_root / "tests" / "unit" / "domain" / "test_runtime_domain_s03.py",
+            repo_root / "tests" / "unit" / "presentation" / "test_runtime_sync_s07.py",
         ]
         for path in expected:
             self.assertTrue(path.is_file(), f"missing test module: {path}")
 
     def test_regular_package_discovery_contract(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         package_inits = [
             repo_root / "tests" / "__init__.py",
             repo_root / "tests" / "cli_runtime" / "__init__.py",
-            repo_root / "tests" / "domain_runtime" / "__init__.py",
-            repo_root / "tests" / "presentation_runtime" / "__init__.py",
+            repo_root / "tests" / "unit" / "domain" / "__init__.py",
+            repo_root / "tests" / "unit" / "presentation" / "__init__.py",
         ]
         for path in package_inits:
             self.assertTrue(path.is_file(), f"missing package init: {path}")
@@ -63,7 +63,7 @@ class TestCliTestTreeSplitS12(unittest.TestCase):
             test_sync,
             test_validate,
         )
-        from tests.presentation_runtime import test_runtime_sync_s07
+        from tests.unit.presentation import test_runtime_sync_s07
 
         groups = {
             test_active.TestCliActive: ["test_active_set_force_overrides_deps_guard"],

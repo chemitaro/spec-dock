@@ -646,7 +646,7 @@ class TestInitUpdate(CliRuntimeHarness):
     )
 
     def test_provider_discussion_interview_template_contains_required_labels(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         interview_text = (
             repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "templates" / "discussions" / "interview.md"
         ).read_text(encoding="utf-8")
@@ -861,7 +861,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
     }
     _ISSUE_68_RETIRED_LEGACY_ROOT = (
-        Path(__file__).resolve().parents[1] / "src" / "spec_dock" / "assets" / "codex_skills"
+        Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "codex_skills"
     )
     _ISSUE_68_PROVIDER_DUPLICATE_BOUNDARY = {
         "spec-driven-tdd-workflow skill": {
@@ -1091,6 +1091,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/.meta.json",
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00082-fail-fast-on-malformed-node-metadata/.meta.json",
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00149-issue-finish-synthetic-approval-closeout-bug/.meta.json",
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00160-reduce-test-runtime-followup/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json",
@@ -1164,12 +1165,14 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00127-scoped-discussion-draft-authoring-correction/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00131-debug-codex-subagent-permission-profile-callability/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00138-split-issue-planning-execution-skills/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00082-fail-fast-on-malformed-node-metadata/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00149-issue-finish-synthetic-approval-closeout-bug/.meta.json": [],
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00160-reduce-test-runtime-followup/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json": [],
@@ -1304,6 +1307,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00127-scoped-discussion-draft-authoring-correction/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00131-debug-codex-subagent-permission-profile-callability/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00138-split-issue-planning-execution-skills/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -1364,7 +1368,7 @@ class TestInitUpdate(CliRuntimeHarness):
         repo_root: Path | None = None,
     ) -> None:
         if repo_root is None:
-            repo_root = Path(__file__).resolve().parents[1]
+            repo_root = Path(__file__).resolve().parents[3]
         for installed_rel_path, asset_rel_path in self._CANONICAL_RULES_PROVIDER_ASSET_MAP.items():
             installed_path = installed_base / installed_rel_path
             asset_path = repo_root / asset_rel_path
@@ -1938,7 +1942,7 @@ class TestInitUpdate(CliRuntimeHarness):
         repo_root: Path | None = None,
     ) -> None:
         if repo_root is None:
-            repo_root = Path(__file__).resolve().parents[1]
+            repo_root = Path(__file__).resolve().parents[3]
         mirror_root = installed_base / "spec-dock" / "templates"
         asset_root = repo_root / "src/spec_dock/assets/spec_dock/templates"
 
@@ -1997,7 +2001,7 @@ class TestInitUpdate(CliRuntimeHarness):
         target: Path,
         mutate_assets: object,
     ) -> tuple[int, str]:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         source_assets_root = repo_root / "src" / "spec_dock" / "assets"
 
         with tempfile.TemporaryDirectory() as tmp_assets:
@@ -2896,7 +2900,7 @@ class TestInitUpdate(CliRuntimeHarness):
         }
 
     def _issue_69_collect_install_root_artifact_surfaces(self) -> dict[str, set[str]]:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         source_inventory = self._issue_69_collect_source_install_root_inventory(repo_root)
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -3695,7 +3699,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 self.assertEqual(artifact_path.read_text(encoding="utf-8"), artifact_text)
 
     def test_current_guidance_documents_match_discussion_numbering_contract(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         guidance_paths = [
             "src/spec_dock/assets/spec_dock/templates/README.md",
             "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md",
@@ -3721,7 +3725,7 @@ class TestInitUpdate(CliRuntimeHarness):
         self._assert_discussion_guidance_contract(text_map)
 
     def test_pyproject_excludes_deleted_wrapper_era_assets_from_package_data(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
 
         for package_data_pattern in _ISS_00031_EXCLUDE_PATTERNS:
@@ -3732,7 +3736,7 @@ class TestInitUpdate(CliRuntimeHarness):
             )
 
     def test_built_wheel_excludes_deleted_wrapper_era_assets_from_stale_build_outputs(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
 
         with tempfile.TemporaryDirectory() as tmp:
             temp_root = Path(tmp)
@@ -3779,7 +3783,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 )
 
     def test_issue_69_package_data_includes_hidden_install_root_subtrees(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
         section_header = "[tool.setuptools.package-data]"
         next_section_header = "[tool.setuptools.exclude-package-data]"
@@ -3830,7 +3834,7 @@ class TestInitUpdate(CliRuntimeHarness):
             )
 
     def test_issue_69_isolated_wheel_install_exposes_install_root_handoff_surface(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
 
         with tempfile.TemporaryDirectory() as tmp:
             temp_root = Path(tmp)
@@ -3871,7 +3875,7 @@ class TestInitUpdate(CliRuntimeHarness):
             )
 
     def test_issue_69_isolated_wheel_install_runs_init_update_without_checkout_fallback(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
 
         with tempfile.TemporaryDirectory() as tmp:
             temp_root = Path(tmp)
@@ -3939,7 +3943,7 @@ class TestInitUpdate(CliRuntimeHarness):
             spec_dock_cmd = scripts_dir / "spec-dock.cmd"
             spec_dock_cmd.write_text("@echo off\r\n", encoding="utf-8")
 
-            with patch("tests.test_init_update.os.name", "nt"):
+            with patch("tests.unit.infra.test_init_update.os.name", "nt"):
                 resolved = self._issue_69_venv_spec_dock(venv_python)
                 ensured = self._issue_69_ensure_spec_dock_wrapper(venv_python)
 
@@ -3957,7 +3961,7 @@ class TestInitUpdate(CliRuntimeHarness):
             spec_dock_cmd = scripts_dir / "spec-dock.cmd"
             spec_dock_cmd.write_text("@echo off\r\nrem existing\r\n", encoding="utf-8")
 
-            with patch("tests.test_init_update.os.name", "nt"):
+            with patch("tests.unit.infra.test_init_update.os.name", "nt"):
                 resolved = self._issue_69_venv_spec_dock(venv_python)
                 ensured = self._issue_69_ensure_spec_dock_wrapper(venv_python)
 
@@ -3978,7 +3982,7 @@ class TestInitUpdate(CliRuntimeHarness):
             venv_python.write_text("", encoding="utf-8")
             expected_wrapper = scripts_dir / "spec-dock.cmd"
 
-            with patch("tests.test_init_update.os.name", "nt"):
+            with patch("tests.unit.infra.test_init_update.os.name", "nt"):
                 resolved = self._issue_69_venv_spec_dock(venv_python)
                 ensured = self._issue_69_ensure_spec_dock_wrapper(venv_python)
 
@@ -3992,7 +3996,7 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertFalse((scripts_dir / "spec-dock.exe").exists())
 
     def test_issue_69_local_and_installed_handoff_surface_inventories_match(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         source_inventory = self._issue_69_collect_source_install_root_inventory(repo_root)
         expected_handoff_surface = set(self._ISSUE_69_HANDOFF_SURFACE_ARTIFACT_RELATIVE_PATHS)
         source_handoff_surface = source_inventory & expected_handoff_surface
@@ -4036,7 +4040,7 @@ class TestInitUpdate(CliRuntimeHarness):
             )
 
     def test_issue_69_wheel_build_prunes_seeded_stale_wrapper_era_outputs(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
 
         with tempfile.TemporaryDirectory() as tmp:
             temp_root = Path(tmp)
@@ -4087,7 +4091,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 )
 
     def test_issue_69_sdist_build_excludes_seeded_stale_wrapper_era_outputs(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
 
         with tempfile.TemporaryDirectory() as tmp:
             temp_root = Path(tmp)
@@ -4123,7 +4127,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 )
 
     def test_issue_69_stale_exclusion_patterns_are_aligned_between_pyproject_and_setup(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
         setup_text = (repo_root / "setup.py").read_text(encoding="utf-8")
 
@@ -4146,7 +4150,7 @@ class TestInitUpdate(CliRuntimeHarness):
         )
 
     def test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_script = repo_root / "spec-dock" / "scripts" / "spec-dock"
         self.assertTrue(runtime_script.is_file(), f"dogfooding runtime script missing: {runtime_script}")
 
@@ -4178,19 +4182,19 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("active set --id <node-id>", legacy_active.stderr)
 
     def test_checked_in_dogfooding_mirror_docs_match_provider_assets(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         self._assert_checked_in_dogfooding_mirror_docs_match_provider_assets(repo_root)
 
     def test_checked_in_dogfooding_mirror_templates_match_provider_assets(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         self._assert_installed_templates_match_provider_assets(repo_root, repo_root=repo_root)
 
     def test_checked_in_dogfooding_active_none_reports_match_provider_assets(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         self._assert_checked_in_dogfooding_active_none_reports_match_provider_assets(repo_root)
 
     def test_spec_document_templates_keep_policy_out_of_scaffold(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         template_root = repo_root / "src/spec_dock/assets/spec_dock/templates"
 
         self._assert_user_facing_markdown_labels_use_japanese_primary(
@@ -4765,7 +4769,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 )
 
     def test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         initiatives_root = repo_root / "spec-dock" / "initiatives"
         self.assertTrue(
             initiatives_root.is_dir(),
@@ -4816,7 +4820,7 @@ class TestInitUpdate(CliRuntimeHarness):
         )
 
     def test_checked_in_dogfooding_runtime_subprocess_validate_and_sync_on_cutover_snapshot(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         checked_in_initiatives_root = repo_root / "spec-dock" / "initiatives"
         self.assertTrue(
             checked_in_initiatives_root.is_dir(),
@@ -4909,7 +4913,7 @@ assert observed_non_empty == expected_non_empty, json.dumps(
             )
 
     def test_checked_in_dogfooding_runtime_subprocess_deps_mutation_on_cutover_snapshot(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         checked_in_initiatives_root = repo_root / "spec-dock" / "initiatives"
         self.assertTrue(
             checked_in_initiatives_root.is_dir(),
@@ -5005,11 +5009,11 @@ assert observed_non_empty == expected_non_empty, json.dumps(
             self.assertIn("spec-dock: ok (sync)", sync_result.stdout)
 
     def test_checked_in_dogfooding_runtime_mirror_match_provider_assets(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         self._assert_checked_in_dogfooding_runtime_mirror_match_provider_assets(repo_root)
 
     def test_checked_in_dogfooding_runtime_keeps_repo_scoped_import_uniqueness_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""
 import json
@@ -5232,7 +5236,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_import_release_lock_backward_compat_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""
 import sys
@@ -5282,7 +5286,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_import_import_race_revalidation_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""
 import json
@@ -5525,7 +5529,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_import_new_race_revalidation_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""
 import json
@@ -5775,7 +5779,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_no_write_preflight_collision_with_active_parent_fallback_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""
 import json
@@ -6028,7 +6032,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_parent_fallback_reresolve_inside_lock_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""
 import json
@@ -6285,7 +6289,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_keeps_repo_scoped_sync_snapshot_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""
 import json
@@ -6496,7 +6500,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_keeps_repo_scoped_active_deps_status_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""
 import sys
@@ -6712,7 +6716,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_non_issue_deps_target_status_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""
 import json
@@ -6870,7 +6874,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = """
 import os
@@ -7762,7 +7766,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_issue_create_pre_github_validation_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = """
 import sys
@@ -7974,7 +7978,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = """
 import os
@@ -8189,7 +8193,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_create_mode_graph_preflight_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = """
 import sys
@@ -8340,7 +8344,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_keeps_same_repo_index_missing_view_fallback_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""
 import sys
@@ -8543,7 +8547,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_keeps_unscoped_current_repo_fallback_sync_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""
 import sys
@@ -8737,7 +8741,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_keeps_unscoped_current_repo_fallback_active_deps_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""
 import sys
@@ -8948,7 +8952,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_keeps_repo_scoped_validation_doctor_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""
 import json
@@ -9108,7 +9112,7 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_keeps_numeric_branch_current_repo_overlap_parity(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""
 import sys
@@ -9395,7 +9399,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         old_file = getattr(cli, "__file__", None)
         try:
             cli.__version__ = "0.0.0+unknown"
-            repo_root = Path(__file__).resolve().parents[1]
+            repo_root = Path(__file__).resolve().parents[3]
             cli.__file__ = str(repo_root / "src" / "spec_dock" / "cli.py")
             self.assertEqual(cli._tool_version(), expected)
         finally:
@@ -9567,7 +9571,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
 
     def test_issue_68_authority_inventory_disallows_unlisted_provider_duplicates(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         provider_assets_root = repo_root / "src/spec_dock/assets"
 
         for asset_label, duplicate_boundary in self._ISSUE_68_PROVIDER_DUPLICATE_BOUNDARY.items():
@@ -9709,7 +9713,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     )
 
                 with self.subTest(adapter=label, surface="dogfooding"):
-                    checked_in_path = Path(__file__).resolve().parents[1] / expected["path"]
+                    checked_in_path = Path(__file__).resolve().parents[3] / expected["path"]
                     self.assertTrue(checked_in_path.is_file(), f"missing dogfooding Codex adapter: {checked_in_path}")
                     self.assertEqual(
                         checked_in_path.read_bytes(),
@@ -10474,7 +10478,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     self.assertIn(fragment, text)
 
     def test_issue_127_removed_scoped_context_contract_stays_removed(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         forbidden_terms = (
             "scoped" + "-context",
             "--discussion" + "-file",
@@ -10491,7 +10495,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".agents",
             repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".codex",
             repo_root / "tests" / "cli_runtime",
-            repo_root / "tests" / "domain_runtime",
+            repo_root / "tests" / "unit" / "domain",
             repo_root / "spec-dock" / "scripts" / "spec_dock_runtime",
             repo_root / "spec-dock" / "docs",
             repo_root / ".agents",
@@ -11283,7 +11287,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            repo_root = Path(__file__).resolve().parents[1]
+            repo_root = Path(__file__).resolve().parents[3]
             expected_workflow = (
                 repo_root
                 / "src"
@@ -11358,7 +11362,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            repo_root = Path(__file__).resolve().parents[1]
+            repo_root = Path(__file__).resolve().parents[3]
             expected_adapter_skill = (
                 repo_root
                 / "src"
@@ -11431,7 +11435,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             )
 
     def test_issue_70_provider_transition_detects_removed_current_paths_without_obsolete_coverage(self) -> None:
-        repo_assets_root = Path(__file__).resolve().parents[1] / "src" / "spec_dock" / "assets"
+        repo_assets_root = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets"
         previous_plan = self._build_managed_skill_install_plan_from_assets_root(repo_assets_root)
 
         with tempfile.TemporaryDirectory() as tmp_assets:
@@ -11453,7 +11457,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
 
     def test_issue_70_provider_transition_accepts_removed_current_paths_with_obsolete_coverage(self) -> None:
-        repo_assets_root = Path(__file__).resolve().parents[1] / "src" / "spec_dock" / "assets"
+        repo_assets_root = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets"
         previous_plan = self._build_managed_skill_install_plan_from_assets_root(repo_assets_root)
 
         with tempfile.TemporaryDirectory() as tmp_assets:
@@ -11483,7 +11487,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertEqual(missing_coverage, set())
 
     def test_issue_70_isolated_wheel_install_reflects_cutover_contract_without_legacy_fallback(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
 
         with tempfile.TemporaryDirectory() as tmp:
             temp_root = Path(tmp)
@@ -11687,7 +11691,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 )
 
     def test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         install_root = repo_root / "src" / "spec_dock" / "assets" / "install_root"
         mirrored_prefixes = (
             Path(".agents/host-adapters/meta.json"),
@@ -11773,7 +11777,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 )
 
     def test_issue_105_pr_merge_preparer_content_regression_contract(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         merge_preparer = (
             repo_root
             / "src"
@@ -11853,7 +11857,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertIn(phrase, issue_execution)
 
     def test_issue_93_execute_prompts_contract(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         prompt_contracts = {
             "execute-epic.md": (
                 "$spec-dock-epic-planning",
@@ -11960,7 +11964,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                         self.assertNotIn(fragment, prompt_text)
 
     def test_issue_75_pr_monitor_guidance_uses_repo_relative_helper_path(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         expected_helper_path = (
             "./.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"
         )
@@ -12006,7 +12010,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     )
 
     def test_issue_75_pr_review_wrapper_uses_fixed_read_only_gh_api_endpoints(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
             / "src/spec_dock/assets/install_root/.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"
@@ -12093,7 +12097,7 @@ esac
             self.assertIn("inline review comments: 1", (out_dir / "codex_report.md").read_text(encoding="utf-8"))
 
     def test_issue_75_pr_review_wrapper_rejects_unsafe_inputs_before_gh_api(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
             / "src/spec_dock/assets/install_root/.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"
@@ -12141,7 +12145,7 @@ exit 44
                     self.assertFalse(gh_log.exists(), "unsafe input reached fake gh api")
 
     def test_issue_71_upstream_handoff_reports_expose_evidence_bearing_sections(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         issue_69_report = (
             repo_root
             / "spec-dock"
@@ -12245,7 +12249,7 @@ exit 44
         )
 
     def test_issue_71_isolated_wheel_install_final_smoke_closure_surface_without_fallback(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
 
         with tempfile.TemporaryDirectory() as tmp:
             temp_root = Path(tmp)
@@ -12357,7 +12361,7 @@ exit 44
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            repo_root = Path(__file__).resolve().parents[1]
+            repo_root = Path(__file__).resolve().parents[3]
             expected_codex_bytes = (
                 repo_root
                 / "src"
@@ -12464,7 +12468,7 @@ exit 44
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            repo_root = Path(__file__).resolve().parents[1]
+            repo_root = Path(__file__).resolve().parents[3]
             source_assets_root = repo_root / "src" / "spec_dock" / "assets"
 
             with tempfile.TemporaryDirectory() as tmp_assets:
@@ -12502,7 +12506,7 @@ exit 44
             target = Path(tmp) / "repo"
             target.mkdir(parents=True, exist_ok=True)
 
-            repo_root = Path(__file__).resolve().parents[1]
+            repo_root = Path(__file__).resolve().parents[3]
             source_assets_root = repo_root / "src" / "spec_dock" / "assets"
 
             with tempfile.TemporaryDirectory() as tmp_assets:
@@ -12540,7 +12544,7 @@ exit 44
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            repo_root = Path(__file__).resolve().parents[1]
+            repo_root = Path(__file__).resolve().parents[3]
             source_assets_root = repo_root / "src" / "spec_dock" / "assets"
 
             with tempfile.TemporaryDirectory() as tmp_assets:
@@ -12593,7 +12597,7 @@ exit 44
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            repo_root = Path(__file__).resolve().parents[1]
+            repo_root = Path(__file__).resolve().parents[3]
             codex_shim_asset = (
                 repo_root
                 / "src"
@@ -13165,7 +13169,7 @@ exit 44
             bundled = (assets_dir / "spec_dock" / "docs" / "reference_sync.md").read_text(encoding="utf-8")
 
         repo_copy = (
-            Path(__file__).resolve().parents[1] / "spec-dock" / "docs" / "reference_sync.md"
+            Path(__file__).resolve().parents[3] / "spec-dock" / "docs" / "reference_sync.md"
         ).read_text(encoding="utf-8")
 
         self.assertEqual(repo_copy, bundled)
@@ -13177,7 +13181,7 @@ exit 44
             bundled = (assets_dir / "spec_dock" / "docs" / "reference_deps.md").read_text(encoding="utf-8")
 
         repo_copy = (
-            Path(__file__).resolve().parents[1] / "spec-dock" / "docs" / "reference_deps.md"
+            Path(__file__).resolve().parents[3] / "spec-dock" / "docs" / "reference_deps.md"
         ).read_text(encoding="utf-8")
 
         self.assertEqual(repo_copy, bundled)
@@ -13189,7 +13193,7 @@ exit 44
             bundled = (assets_dir / "spec_dock" / "docs" / "workflow_issue.md").read_text(encoding="utf-8")
 
         repo_copy = (
-            Path(__file__).resolve().parents[1] / "spec-dock" / "docs" / "workflow_issue.md"
+            Path(__file__).resolve().parents[3] / "spec-dock" / "docs" / "workflow_issue.md"
         ).read_text(encoding="utf-8")
 
         self.assertEqual(repo_copy, bundled)
@@ -13965,7 +13969,7 @@ exit 44
         return active_dir
 
     def _overlay_checked_in_dogfooding_runtime(self, target: Path) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[3]
         checked_in_scripts_dir = repo_root / "spec-dock" / "scripts"
         target_scripts_dir = target / "spec-dock" / "scripts"
         self.assertTrue(checked_in_scripts_dir.is_dir(), f"checked-in scripts dir missing: {checked_in_scripts_dir}")
