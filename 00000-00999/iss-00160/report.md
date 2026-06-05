@@ -54,6 +54,7 @@ Disposition ごとの必須証跡:
 | D-003 | resolved | implementation | dev-coder + orchestrator | S01 で空の `tests/unit` / `tests/integration` package だけを置くと Python 3.12 `unittest discover` が `NO TESTS RAN` で exit 5 になり、S01 の valid command 条件を満たせない | 空 package のまま exit 5 を許容する; S01 内の最小 discovery smoke test を追加する | `tests/unit/test_discovery.py` と `tests/integration/test_discovery.py` に package marker 存在確認だけの最小 smoke test を置く | S01 の目的は suite boundary と discovery command を有効化すること。production behavior や S02+ の実装には触れず、exit 0 の客観証跡を作れる | applied | `python -m unittest discover -s tests/unit`; `python -m unittest discover -s tests/integration`; code-reviewer `019e977f-71c7-7232-8bed-6e15b2fcf9f5` | なし |
 | D-004 | resolved | implementation | dev-coder | S02 で `UNKNOWN` GitHub state を minimal fixture に含めたとき、既存 domain behavior は non-`CLOSED` GitHub state を effective `open` として扱う | Production status semantics を変更する; S02 では既存 semantics を明示して fixture contract だけを固定する | S02 では production behavior を変えず、`UNKNOWN` snapshot は `source=github` / `effective_status=open`、missing issue は `source=unknown` / `effective_status=unknown` としてテストに固定する | S02 は fake `gh` fixture contract の step であり、status semantics 変更はスコープ外。既存 behavior を明示することで coverage loss を防ぐ | applied | `tests/unit/infra/test_fake_gh_harness.py::TestFakeGhHarness.test_state_variations_use_minimal_fixture` | なし |
 | D-005 | resolved | implementation | dev-coder + orchestrator | S03 で `tests/test_init_update.py` を `tests/unit/infra/test_init_update.py` に移動した後、既知の checked-in dogfooding `.meta.json` snapshot divergence が unit/infra failure として表面化した | failure を EC-004 として残す; assertion を弱める; 現行 checked-in dogfooding tree に snapshot baseline を同期する | `tests/unit/infra/test_init_update.py` の fixed snapshot だけを現行 checked-in dogfooding `.meta.json` path set / `depends_on` baseline に同期する | AC-002 で unit suite を 120 秒以内に pass させる必要があり、snapshot同期は既存 contract を弱めず現物と baseline を一致させる最小修正 | applied | `python -m unittest tests.unit.infra.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`; `python -m unittest discover -s tests/unit` | なし |
+| D-006 | resolved | test-strategy | code-reviewer + orchestrator | S05 の初回レビューで、一部 CLI tests が direct unit replacement より広い integration semantics を持つまま skip されていた | Unit coverage を増やして skip を維持する; 該当 CLI tests を smoke として残す | semantic coverage が unit replacement だけで同等でない 18 件の CLI skip を解除し、該当 behavior は retained CLI smoke として残す | S05 の目的は heavy coverage split であり、coverage loss は許容しない。重いが意味的に固有な CLI behavior は削らず、明確に smoke として維持する | applied | code-reviewer initial fail / re-review pass; `python -m unittest tests.cli_runtime.test_delegated_authoring tests.cli_runtime.test_active` -> OK, skipped=53 | S06 以降も overbroad skip を避ける |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -607,6 +608,122 @@ $ ./spec-dock/scripts/spec-dock validate
 #### メモ
 - No production behavior changes.
 - S04 は code-reviewer pass 後に最終確認コマンドを再実行済み。
+
+---
+
+### セッションログ（2026-06-05 S05）
+
+#### 対象
+- Step: S05 - delegated authoring / active Heavy Coverage Split
+- AC/EC: AC-001, AC-002, AC-003, AC-004, EC-001, EC-002
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S05 - delegated authoring / active Heavy Coverage Split`
+  - closure ids: `tc-s05-001`, `tc-s05-002`
+
+#### 実施内容
+- `active set` の branch-heavy CLI tests を application / domain / infra direct unit coverage へ分割した。
+- `delegated-authoring diff-guard` の branch-heavy CLI tests を domain direct unit coverage へ分割した。
+- 初回 code-reviewer で 14 件の overbroad skip が指摘されたため、該当 CLI tests を smoke として復帰した。
+- 再レビュー前に追加で 4 件の overbroad skip が指摘されたため、該当 CLI tests も smoke として復帰した。
+- New unit tests:
+  - `tests/unit/application/test_set_active.py`
+  - `tests/unit/domain/test_active.py`
+  - `tests/unit/infra/test_active_store.py`
+- Production code changes: none.
+
+#### 実行コマンド / 結果
+```bash
+$ git diff --check
+# pass
+
+$ python -m unittest tests.cli_runtime.test_delegated_authoring tests.cli_runtime.test_active
+# Ran 86 tests in 29.674s
+# OK (skipped=53)
+
+$ python -m unittest tests.unit.application.test_set_active tests.unit.domain.test_active tests.unit.infra.test_active_store tests.unit.domain.test_delegated_authoring tests.unit.domain.test_deps
+# Ran 35 tests in 0.094s
+# OK
+
+$ python -m unittest discover -s tests/unit
+# Ran 372 tests in 58.635s
+# OK
+
+$ ./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=79
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S05 | 赤フェーズ / 代替証跡（Red / alternative） | covered-existing | split 前の active / delegated-authoring CLI characterization が存在 | diff / test file inspection | pass | 既存 CLI tests を heavy behavior の characterization として使用 |
+| S05 | 緑フェーズ（Green） | `tc-s05-001`, `tc-s05-002` | direct unit coverage and retained CLI smoke pass | targeted unittest commands | pass | focused unit 35 tests 0.094s; CLI 86 tests 29.674s skipped=53 |
+| S05 | リファクタリング（Refactor） | guardrail satisfied | production code change なし; overbroad skips restored to CLI smoke | code-reviewer fail then pass; `git diff --check` | pass | D-006: coverage loss prevention |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S05 | Some skipped CLI tests had broader semantics than the cited direct unit replacement | code-reviewer | 18 件の skip を解除し、該当 behavior を CLI smoke として保持 | `tc-s05-001`, `tc-s05-002`, D-006 | no | initial review fail; re-review pass |
+| S05 | Remaining skip refs require semantic review, not only existence check | code-reviewer | remaining skips を code-reviewer が semantic adequacy review し pass | `tc-s05-001`, `tc-s05-002` | no | re-review pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S05 | `tc-s05-001`, `tc-s05-002` | branch-heavy active / delegated-authoring behavior covered below CLI while representative CLI contract remains | direct unit tests pass; retained CLI smoke suite pass with 53 explicit skips; code-reviewer pass | pass | production unchanged |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-s05-001` | S05 | yes | covered-existing + direct unit | existing active CLI characterization | `python -m unittest tests.unit.application.test_set_active tests.unit.domain.test_active tests.unit.infra.test_active_store`; `python -m unittest tests.cli_runtime.test_active` | pass | active target resolution, deps guard, branch decision, active store coverage moved below CLI; unique CLI semantics retained |
+| `tc-s05-002` | S05 | yes | covered-existing + direct unit | existing delegated-authoring CLI characterization | `python -m unittest tests.unit.domain.test_delegated_authoring`; `python -m unittest tests.cli_runtime.test_delegated_authoring` | pass | diff-guard domain coverage moved below CLI; unique CLI/baseline semantics retained |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| `tc-s05-001` | S05 | `tests/unit/application/test_set_active.py`; `tests/unit/domain/test_active.py`; `tests/unit/infra/test_active_store.py`; retained `tests/cli_runtime/test_active.py` smoke | pass | overbroad active skips restored |
+| `tc-s05-002` | S05 | `tests/unit/domain/test_delegated_authoring.py`; retained `tests/cli_runtime/test_delegated_authoring.py` smoke | pass | overbroad delegated-authoring skips restored |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | `tc-s05-001` | active direct unit coverage + retained CLI smoke | `tc-s05-001` | S05 計画通りの active heavy coverage split | no | yes, completed |
+| none | `tc-s05-002` | delegated-authoring direct domain coverage + retained CLI smoke | `tc-s05-002` | S05 計画通りの delegated-authoring heavy coverage split | no | yes, completed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S05 | delegated | test restructure and coverage split | dev-coder | S05 only | `plan.md` S05 | listed test files only | production code, S06+ changes, removing CLI smoke without replacement | targeted unit, targeted CLI, unit discover, diff check, validate | missing replacement coverage or reviewer fail | changed files, commands, closure evidence, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S05 | dev-coder | active / delegated-authoring branch-heavy CLI tests を lower-layer direct tests へ分割し、semantic gap がある CLI tests は smoke として復帰 | `tests/cli_runtime/test_active.py`; `tests/cli_runtime/test_delegated_authoring.py`; `tests/unit/application/test_set_active.py`; `tests/unit/domain/test_active.py`; `tests/unit/infra/test_active_store.py` | focused unit, targeted CLI, unit discover, diff check, validate -> pass | code-reviewer pass after initial fail | none | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S05 | step reviewer | code-reviewer | fresh | failed | no | fix overbroad skips | initial review found 14 overbroad skips |
+| S05 | step reviewer re-review | code-reviewer | fresh | failed | no | fix remaining overbroad skips | second review found 4 additional overbroad skips |
+| S05 | step reviewer final re-review | code-reviewer | fresh | passed | N/A | proceed to commit | Findings none; production unchanged; remaining skips semantically adequate |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S05 | ready-to-commit | active/delegated-authoring test split and `report.md` S05 evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/cli_runtime/test_active.py` - replacement-aware skip を追加し、semantic gap のある active CLI tests は smoke として保持。
+- `tests/cli_runtime/test_delegated_authoring.py` - replacement-aware skip を追加し、semantic gap のある delegated-authoring CLI tests は smoke として保持。
+- `tests/unit/application/test_set_active.py` - active set application direct coverage を追加。
+- `tests/unit/domain/test_active.py` - active domain direct coverage を追加。
+- `tests/unit/infra/test_active_store.py` - active store direct coverage を追加。
+- `report.md` - S05 evidence ledger。
+
+#### コミット
+- pending
+
+#### メモ
+- No production behavior changes.
+- S05 は code-reviewer pass 後に最終確認コマンドを再実行済み。
 
 ---
 
