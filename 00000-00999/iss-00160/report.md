@@ -498,6 +498,118 @@ git diff --check
 
 ---
 
+### セッションログ（2026-06-05 S04）
+
+#### 対象
+- Step: S04 - `deps` / `validate` Heavy Coverage Split
+- AC/EC: AC-001, AC-002, AC-003, AC-004, EC-001, EC-002
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S04 - deps / validate Heavy Coverage Split`
+  - closure ids: `tc-s04-001`, `tc-s04-002`
+
+#### 実施内容
+- `deps check` の branch-heavy CLI tests 10 件を、application direct unit coverage へ移し、CLI 側は `@skip("S04: covered by Class.method")` で根拠先を明示した。
+- `validate` の branch-heavy CLI tests 6 件を、application / domain / presentation direct unit coverage へ移し、CLI 側は `@skip("S04: covered by Class.method")` で根拠先を明示した。
+- New unit tests:
+  - `tests/unit/application/test_check_deps.py`
+  - `tests/unit/application/test_validate.py`
+  - `tests/unit/domain/test_deps.py`
+- Production code changes: none.
+
+#### 実行コマンド / 結果
+```bash
+$ git diff --check
+# pass
+
+$ python -m unittest tests.unit.application.test_check_deps tests.unit.application.test_validate tests.unit.domain.test_deps tests.unit.domain.test_runtime_domain_s03
+# Ran 31 tests in 0.084s
+# OK
+
+$ python -m unittest tests.cli_runtime.test_deps tests.cli_runtime.test_validate
+# Ran 127 tests in 144.560s
+# OK (skipped=16)
+
+$ python -m unittest discover -s tests/unit
+# Ran 362 tests in 58.125s
+# OK
+
+$ ./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=79
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | 赤フェーズ / 代替証跡（Red / alternative） | covered-existing | split 前の `deps` / `validate` CLI characterization が存在 | diff / test file inspection | pass | 既存 CLI tests を heavy behavior の characterization として使用 |
+| S04 | 緑フェーズ（Green） | `tc-s04-001`, `tc-s04-002` | direct unit coverage and retained CLI smoke pass | targeted unittest commands | pass | focused unit 31 tests 0.084s; CLI 127 tests 144.560s skipped=16 |
+| S04 | リファクタリング（Refactor） | guardrail satisfied | production code change なし; skip refs all resolve | code-reviewer; mechanical skip reference check; `git diff --check` | pass | previous conditional_pass finding fixed |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | skipped CLI tests require explicit replacement traceability | code-reviewer | each skip reason now uses `Class.method` and all 16 refs resolve to real tests | `tc-s04-001`, `tc-s04-002` | no | mechanical skip reference check 16/16 OK |
+| S04 | `deps effective_depends_on` skip needed application-level coverage, not only domain coverage | code-reviewer | added application direct tests for issue/epic/initiative effective deps merge | `tc-s04-001` | no | `TestCheckDepsApplication.test_effective_depends_on_*` pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | `tc-s04-001`, `tc-s04-002` | branch-heavy `deps` / `validate` behavior covered below CLI while representative CLI contract remains | direct unit tests pass; CLI smoke suite pass with 16 explicit skips; code-reviewer pass | pass | production unchanged |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-s04-001` | S04 | yes | covered-existing + direct unit | existing `deps` CLI characterization | `python -m unittest tests.unit.application.test_check_deps tests.unit.domain.test_deps`; `python -m unittest tests.cli_runtime.test_deps tests.cli_runtime.test_validate` | pass | cache, github warning, status, blockers, effective deps coverage moved below CLI |
+| `tc-s04-002` | S04 | yes | covered-existing + direct unit | existing `validate` CLI characterization | `python -m unittest tests.unit.application.test_validate tests.unit.domain.test_runtime_domain_s03`; `python -m unittest tests.cli_runtime.test_deps tests.cli_runtime.test_validate` | pass | artifact/meta/linkage validation coverage moved below CLI |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| `tc-s04-001` | S04 | `tests/unit/application/test_check_deps.py`; `tests/unit/domain/test_deps.py`; retained `tests/cli_runtime/test_deps.py` smoke | pass | CLI skip refs point to `TestCheckDepsApplication.*` |
+| `tc-s04-002` | S04 | `tests/unit/application/test_validate.py`; `tests/unit/domain/test_runtime_domain_s03.py`; `tests/unit/presentation/test_runtime_sync_s07.py`; retained `tests/cli_runtime/test_validate.py` smoke | pass | CLI skip refs point to real `Class.method` tests |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | `tc-s04-001` | deps direct unit coverage | `tc-s04-001` | S04 計画通りの deps heavy coverage split | no | yes, completed |
+| none | `tc-s04-002` | validate direct unit coverage | `tc-s04-002` | S04 計画通りの validate heavy coverage split | no | yes, completed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | delegated | test restructure and coverage split | dev-coder | S04 only | `plan.md` S04 | listed test files only | production code, S05+ changes, removing CLI smoke without replacement | targeted unit, targeted CLI, unit discover, diff check, validate | missing replacement coverage or reviewer fail | changed files, commands, closure evidence, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 | dev-coder | deps/validate branch-heavy CLI tests を lower-layer direct tests へ分割し、skip reason で置換先を明示 | `tests/cli_runtime/test_deps.py`; `tests/cli_runtime/test_validate.py`; `tests/unit/application/test_check_deps.py`; `tests/unit/application/test_validate.py`; `tests/unit/domain/test_deps.py` | focused unit, targeted CLI, unit discover, diff check, validate -> pass | code-reviewer pass | none | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to commit | Findings none; skip references 16/16 OK; production unchanged |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | ready-to-commit | deps/validate test split and `report.md` S04 evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/cli_runtime/test_deps.py` - heavy branch tests 10 件に replacement-aware skip を追加。
+- `tests/cli_runtime/test_validate.py` - heavy branch tests 6 件に replacement-aware skip を追加。
+- `tests/unit/application/test_check_deps.py` - deps check application direct coverage を追加。
+- `tests/unit/application/test_validate.py` - validate tree / graph application direct coverage を追加。
+- `tests/unit/domain/test_deps.py` - dependency domain direct coverage を追加。
+- `report.md` - S04 evidence ledger。
+
+#### コミット
+- pending
+
+#### メモ
+- No production behavior changes.
+- S04 は code-reviewer pass 後に最終確認コマンドを再実行済み。
+
+---
+
 ### セッションログ（2026-06-05 HH:MM - HH:MM）
 
 #### 対象
