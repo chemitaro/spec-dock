@@ -1,6 +1,6 @@
 ---
 type: research
-status: rate_limited
+status: completed
 created_at: "2026-06-05T04:14:38Z"
 source: "deep-research-use task package"
 epic: "epic-00158"
@@ -102,16 +102,16 @@ Explicitly distinguish:
 - project_url: `https://chatgpt.com/g/g-p-69fd45693ed48191a7defd8273c37115-for-codex-app/project`
 - thread_or_report_url: `https://chatgpt.com/g/g-p-69fd45693ed48191a7defd8273c37115-for-codex-app/c/6a2251dd-5dc4-83ab-bb3a-58b6e43744de`
 - current_url: `https://chatgpt.com/g/g-p-69fd45693ed48191a7defd8273c37115-for-codex-app/c/6a2251dd-5dc4-83ab-bb3a-58b6e43744de`
-- report_file: `pending`
-- download_file: `pending`
-- state: `rate_limited_before_research_start`
+- report_file: `20260605t055403z-research-branch-h-agent-harness-security-observability-deep-research-report.md`
+- download_file: `/Users/iwasawayuuta/Downloads/deep-research-report (8).md`
+- state: `completed`
 - source_scope: `public web; official security/tool/tracing docs, standards, research papers, official repositories, and maintainer-authored implementation docs preferred; no private local data`
 - registered_at: `2026-06-05T04:14:38Z`
 - submitted_at: `2026-06-05T04:35:26Z`
-- started_at: `pending`
-- completed_at: `pending`
-- last_checked_at: `2026-06-05T04:35:26Z`
-- exported_at: `pending`
+- started_at: `2026-06-05T05:43:05Z`
+- completed_at: `2026-06-05T06:09:23Z`
+- last_checked_at: `2026-06-05T06:09:23Z`
+- exported_at: `2026-06-05T06:09:23Z`
 - visible_plan: `pending`
-- visible_state: `Project conversation exists and contains the Branch H prompt, but ChatGPT displayed a rate-limit modal before Deep Research started: "リクエストが多すぎます ... 数分待ってから、もう一度お試しください。" No stop button, export control, completed report, or active research state was visible.`
-- handoff: `Retry inside the same Project conversation after the rate limit cools down. Keep this tab for handoff, avoid duplicate Project threads unless this one becomes unusable, and do not use "今すぐ回答" as evidence.`
+- visible_state: `Deep Research completed in the Codex-only Project. Visual report card showed completion with about 17m runtime, 28 citations, and 165 searches. Markdown export produced /Users/iwasawayuuta/Downloads/deep-research-report (8).md, which was stable at 52205 bytes after a 60-second recheck.`
+- handoff: `Completed and imported as 20260605t055403z-research-branch-h-agent-harness-security-observability-deep-research-report.md. Treat report claims as Deep Research output until cited sources are independently verified before issue planning.`
