@@ -240,7 +240,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | ready-to-commit | `tests/unit/**`, `tests/integration/**`, `report.md` S01 evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S01 | committed | `tests/unit/**`, `tests/integration/**`, `report.md` S01 evidence | `94334fba7057bb5bd7eeb0476858cd6874af48af` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `tests/unit/__init__.py` - Unit suite package marker。
@@ -252,7 +252,7 @@ git diff --check
 - `report.md` - S01 evidence ledger。
 
 #### コミット
-- pending
+- `94334fba7057bb5bd7eeb0476858cd6874af48af` `test(spec): テスト境界の計画とS01足場を追加`
 
 #### メモ
 - No material implementation decisions beyond D-003.
@@ -363,7 +363,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S02 | ready-to-commit | `tests/cli_runtime/harness.py`, `tests/cli_runtime/test_sync.py`, `tests/unit/infra/test_fake_gh_harness.py`, `report.md` S02 evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S02 | committed | `tests/cli_runtime/harness.py`, `tests/cli_runtime/test_sync.py`, `tests/unit/infra/test_fake_gh_harness.py`, `report.md` S02 evidence | `e4e95547c630ca77cef5a0da3dd39414ec970328` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `tests/cli_runtime/harness.py` - default fake `gh issue list` を small fixture 化。
@@ -372,7 +372,7 @@ git diff --check
 - `report.md` - S02 evidence ledger。
 
 #### コミット
-- pending
+- `e4e95547c630ca77cef5a0da3dd39414ec970328` `test(runtime): fake gh fixtureを軽量化`
 
 #### メモ
 - No material implementation decisions beyond D-004.
@@ -482,7 +482,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S03 | ready-to-commit | moved test files and `report.md` S03 evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S03 | committed | moved test files and `report.md` S03 evidence | `16d97a2dcbcc54ae87baa5ab0af14e985047d292` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `tests/unit/domain/**` - domain runtime tests moved from `tests/domain_runtime/**`。
@@ -492,7 +492,7 @@ git diff --check
 - `report.md` - S03 evidence ledger。
 
 #### コミット
-- pending
+- `16d97a2dcbcc54ae87baa5ab0af14e985047d292` `test(runtime): unit配下へ低リスクテストを配置`
 
 #### メモ
 - No material implementation decisions beyond D-005.
@@ -592,7 +592,7 @@ $ ./spec-dock/scripts/spec-dock validate
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S04 | ready-to-commit | deps/validate test split and `report.md` S04 evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S04 | committed | deps/validate test split and `report.md` S04 evidence | `c0c3fd5904f8cfc5fa0ef91d9ac481af47554cf9` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `tests/cli_runtime/test_deps.py` - heavy branch tests 10 件に replacement-aware skip を追加。
@@ -603,7 +603,7 @@ $ ./spec-dock/scripts/spec-dock validate
 - `report.md` - S04 evidence ledger。
 
 #### コミット
-- pending
+- `c0c3fd5904f8cfc5fa0ef91d9ac481af47554cf9` `test(runtime): depsとvalidateのheavy coverageを分割`
 
 #### メモ
 - No production behavior changes.
@@ -708,7 +708,7 @@ $ ./spec-dock/scripts/spec-dock validate
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S05 | ready-to-commit | active/delegated-authoring test split and `report.md` S05 evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S05 | committed | active/delegated-authoring test split and `report.md` S05 evidence | `67e0bae10bebf57cdade446961f38a1ffb5efd34` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `tests/cli_runtime/test_active.py` - replacement-aware skip を追加し、semantic gap のある active CLI tests は smoke として保持。
@@ -719,7 +719,7 @@ $ ./spec-dock/scripts/spec-dock validate
 - `report.md` - S05 evidence ledger。
 
 #### コミット
-- pending
+- `67e0bae10bebf57cdade446961f38a1ffb5efd34` `test(runtime): activeとdelegated authoringのheavy coverageを分割`
 
 #### メモ
 - No production behavior changes.
@@ -855,7 +855,7 @@ $ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S06 | ready-to-commit | sync/new test split and `report.md` S06 evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S06 | committed | sync/new test split and `report.md` S06 evidence | `bde4c597c87c3eaae86831c73f24ee43aa24b3e7` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `tests/cli_runtime/test_new.py` - replacement-aware skip 5 件を追加し、代表 CLI smoke は保持。
@@ -866,7 +866,7 @@ $ git diff --check
 - `report.md` - S06 evidence ledger。
 
 #### コミット
-- pending
+- `bde4c597c87c3eaae86831c73f24ee43aa24b3e7` `test(runtime): syncとnewのheavy coverageを分割`
 
 #### メモ
 - No production behavior changes.
@@ -972,7 +972,7 @@ $ python -m unittest tests.unit.infra.test_init_update.TestInitUpdate.test_issue
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S90 | ready-to-commit | README/workflow command updates, workflow assertion update, and `report.md` S90 evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S90 | committed | README/workflow command updates, workflow assertion update, and `report.md` S90 evidence | `cf4115dcc270a99702b0b423c4c8405fc1fed75c` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `README.md` - Testing 節に daily unit / optional integration / full fallback commands を記載。
@@ -981,121 +981,52 @@ $ python -m unittest tests.unit.infra.test_init_update.TestInitUpdate.test_issue
 - `report.md` - S90 evidence ledger。
 
 #### コミット
-- pending
+- `cf4115dcc270a99702b0b423c4c8405fc1fed75c` `docs(test): unit実行コマンドの案内を更新`
 
 #### メモ
 - Production code changes none; one workflow assertion test was updated to match the S90 workflow command.
 - Historical issue records の過去コマンド証跡は更新対象外。
 
----
-
-### セッションログ（2026-06-05 HH:MM - HH:MM）
+### セッションログ（2026-06-05 S99）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+- Step: S99
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, EC-001, EC-002, EC-003, EC-004
 
 #### 実施内容
-- ...
+- 最終品質ゲートとして whitespace / SpecDock validate / unit suite / full fallback discover を実行した。
+- final QA / code / spec review は validation evidence 記録後に fresh reviewer で実施する。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+git diff --check
+# OK
 
-<result>
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=79
+
+/usr/bin/time -p python -m unittest discover -s tests/unit
+# Ran 419 tests in 57.922s
+# OK
+# real 57.98
+# user 24.89
+# sys 22.89
+
+python -m unittest tests.unit.cli.test_cli_smoke
+# Ran 2 tests in 1.019s
+# OK
+
+python -m unittest discover -s tests/unit
+# Ran 421 tests in 60.045s
+# OK
+
+/usr/bin/time -p python -m unittest discover
+# Ran 1063 tests in 402.264s
+# OK (skipped=76)
+# real 402.35
+# user 207.70
+# sys 113.01
 ```
-
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
-
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
-
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
-
-#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
-`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
-
-| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
-|---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00160 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
-
-#### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
-
-| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
-
-#### 委任 worker 証跡（Delegated Worker Evidence）
-| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
-|---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
-
-#### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
-
-#### レビューゲート状態（Reviewer Gate Status）
-| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
-
-#### ステップ commit ゲート（Step Commit Gate）
-| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
-
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
-
-#### コミット
-- <hash> <message>
-
-#### メモ
-- ...
-
----
-
-### セッションログ（2026-06-05 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
 
 ---
 
@@ -1104,37 +1035,63 @@ $ python -m unittest tests.unit.infra.test_init_update.TestInitUpdate.test_issue
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| README / workflow / workflow assertion test | yes | doc-writer + dev-coder | `README.md` Testing section updated; `.github/workflows/provider-ci.yml` uses `python -m unittest discover -s tests/unit`; `tests/unit/infra/test_init_update.py` assertion updated; workflow-inclusive `rg` confirmed no stale default `discover -v` guidance | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | already sufficient; additional CLI smoke improves daily unit gate | QA reviewer pass; S99 validation: unit 419 tests / 57.98s; post-fix unit 421 tests / 60.045s; QA independent unit 419 tests / 62.96s; QA delta `tests.unit.cli.test_cli_smoke` 2 tests / 0.989s; full fallback 1063 tests / 427.542s; validate OK; diff check OK | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | initial fail: provider CI daily run executes `tests/unit`, while retained representative CLI subprocess smoke assertions remained only under `tests/cli_runtime`; fixed by adding focused `tests/unit/cli/test_cli_smoke.py` with argparse stderr/exit and successful runtime subprocess behavior using temp repo + stubbed `gh`; re-review findings none | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | findings none; non-blocking residual: `tests/cli_runtime` wording can be refined in a later cleanup issue | 0 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S99 validation evidence recorded; final reviewer evidence recorded | `tests/unit/cli/test_cli_smoke.py` and report final evidence | final response / PR | committed in final S99 commit |
+
+### S99 Code Review Fail Fix Evidence
+- 変更:
+  - `tests/unit/cli/test_cli_smoke.py` を追加し、`CliRuntimeHarness` 経由で runtime subprocess smoke を `tests/unit` 配下から実行可能にした。
+  - production code / README / CI workflow は変更していない。
+- 検証:
+  - `python -m unittest tests.unit.cli.test_cli_smoke` -> OK, 2 tests, 1.019s。
+  - `python -m unittest discover -s tests/unit` -> OK, 421 tests, 60.045s。
+  - `git diff --check` -> OK。
+- 残リスク:
+  - code-reviewer re-review pass。qa-reviewer delta re-review pass。spec-reviewer final pass。
+
+### S99 Final Spec Review Evidence
+- 判定:
+  - spec-reviewer final review -> PASS。
+- spec-reviewer 実行確認:
+  - `git diff --check` -> OK。
+  - `./spec-dock/scripts/spec-dock validate` -> OK, nodes=79。
+  - `python -m unittest tests.unit.cli.test_cli_smoke` -> OK, 2 tests。
+  - `/usr/bin/time -p python -m unittest discover -s tests/unit` -> OK, 421 tests, real 60.31s。
+  - `python -m unittest discover -s tests/integration` -> OK, 1 test。
+  - `/usr/bin/time -p python -m unittest discover` -> OK, 1065 tests, real 425.69s, skipped=76。
+- 残リスク:
+  - `design.md` には `tests/cli_runtime` 退役方向の文言が残る一方、実際には full fallback / retained CLI smoke として残っている。受け入れ条件上の blocker ではなく、次の整理 issue で文書表現を現運用へ寄せる候補。
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: final code-review で、provider CI の daily unit gate が `tests/unit` のみを実行する一方、代表的な CLI subprocess smoke が `tests/cli_runtime` に残っていると指摘された。
+  - 解決: `tests/unit/cli/test_cli_smoke.py` を追加し、argparse error contract と successful runtime subprocess contract を unit discovery で検証できるようにした。
+- 問題: S90 spec-review で README と provider CI workflow の案内が不一致と指摘された。
+  - 解決: `.github/workflows/provider-ci.yml` と対応 assertion を更新し、`README.md` の Testing 節と整合させた。
 
 ## 学んだこと (任意)
-- ...
+- daily unit gate を高速化する場合でも、CLI の代表 smoke は inventory/import だけではなく subprocess contract として unit 側に残す必要がある。
 
 ## 今後の推奨事項 (任意)
-- ...
+- full fallback は 6-7 分台まで短縮されたが、integration candidate の isolation と追加分割は別 issue で継続検討する。
 
 ## 省略/例外メモ (必須)
 - 該当なし
