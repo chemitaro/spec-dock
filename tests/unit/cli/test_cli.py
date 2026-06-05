@@ -19,8 +19,8 @@ class TestCliTestTreeSplitS12(unittest.TestCase):
             repo_root / "tests" / "cli_runtime" / "test_runtime_validate_s02.py",
             repo_root / "tests" / "cli_runtime" / "test_runtime_deps_s04.py",
             repo_root / "tests" / "cli_runtime" / "test_runtime_active_s05.py",
-            repo_root / "tests" / "cli_runtime" / "test_runtime_new_s08.py",
             repo_root / "tests" / "cli_runtime" / "test_runtime_new_doc_s09.py",
+            repo_root / "tests" / "unit" / "commands" / "test_runtime_new_s08.py",
             repo_root / "tests" / "unit" / "domain" / "test_runtime_domain_s01.py",
             repo_root / "tests" / "unit" / "domain" / "test_runtime_domain_s03.py",
             repo_root / "tests" / "unit" / "presentation" / "test_runtime_sync_s07.py",
@@ -57,12 +57,12 @@ class TestCliTestTreeSplitS12(unittest.TestCase):
             test_runtime_deps_s04,
             test_runtime_import_s10,
             test_runtime_new_doc_s09,
-            test_runtime_new_s08,
             test_runtime_shell_s11,
             test_runtime_validate_s02,
             test_sync,
             test_validate,
         )
+        from tests.unit.commands import test_runtime_new_s08
         from tests.unit.presentation import test_runtime_sync_s07
 
         groups = {

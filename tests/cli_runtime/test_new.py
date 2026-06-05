@@ -483,6 +483,9 @@ class TestCliNew(CliRuntimeHarness):
             self.assertEqual(meta["slug"], "add-refresh-token")
 
     def test_new_rejects_invalid_slug_before_gh_issue_create(self) -> None:
+        self.skipTest(
+            "S06 replacement: tests.unit.commands.test_runtime_new_s08 covers pre-GitHub input validation."
+        )
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
 
@@ -530,6 +533,9 @@ class TestCliNew(CliRuntimeHarness):
             self.assertEqual(list((target / "spec-dock" / "initiatives").glob("*")), [])
 
     def test_new_missing_rules_source_fails_before_gh_issue_create(self) -> None:
+        self.skipTest(
+            "S06 replacement: tests.unit.commands.test_runtime_new_s08 covers missing-rules preflight before GitHub create."
+        )
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
 
@@ -578,6 +584,9 @@ class TestCliNew(CliRuntimeHarness):
             self.assertEqual(list((target / "spec-dock" / "initiatives").glob("*")), [])
 
     def test_new_nodes_create_rules_symlinks_without_wrappers(self) -> None:
+        self.skipTest(
+            "S06 replacement: tests.unit.commands.test_runtime_new_s08 covers create-plan rules symlink materialization."
+        )
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -1231,6 +1240,9 @@ class TestCliNew(CliRuntimeHarness):
             self.assertEqual(list((target / "spec-dock" / "initiatives").glob("*")), [])
 
     def test_new_initiative_and_epic_default_to_github_create_when_gh_is_available(self) -> None:
+        self.skipTest(
+            "S06 replacement: tests.unit.commands.test_runtime_new_s08 covers default GitHub create mode matrix."
+        )
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
 
@@ -1296,6 +1308,9 @@ class TestCliNew(CliRuntimeHarness):
             self._assert_readonly_on_posix(epic_dir / ".meta.json")
 
     def test_new_initiative_warns_and_continues_when_readonly_lock_fails(self) -> None:
+        self.skipTest(
+            "S06 replacement: tests.unit.commands.test_runtime_new_s08 covers create-lock failure guidance."
+        )
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
 
