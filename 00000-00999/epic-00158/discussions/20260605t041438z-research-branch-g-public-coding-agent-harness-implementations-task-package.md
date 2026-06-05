@@ -1,6 +1,6 @@
 ---
 type: research
-status: rate_limited
+status: completed
 created_at: "2026-06-05T04:14:38Z"
 source: "deep-research-use task package"
 epic: "epic-00158"
@@ -101,16 +101,16 @@ Explicitly distinguish:
 - project_url: `https://chatgpt.com/g/g-p-69fd45693ed48191a7defd8273c37115-for-codex-app/project`
 - thread_or_report_url: `https://chatgpt.com/g/g-p-69fd45693ed48191a7defd8273c37115-for-codex-app/c/6a224f59-7314-83a9-9769-20b6d59ffb93`
 - current_url: `https://chatgpt.com/g/g-p-69fd45693ed48191a7defd8273c37115-for-codex-app/c/6a224f59-7314-83a9-9769-20b6d59ffb93`
-- report_file: `pending`
-- download_file: `pending`
-- state: `rate_limited_before_research_start`
+- report_file: `20260605t052320z-research-branch-g-public-coding-agent-harness-implementations-deep-research-report.md`
+- download_file: `/Users/iwasawayuuta/Downloads/deep-research-report (7).md`
+- state: `completed`
 - source_scope: `public web; official docs, official repositories, release notes, engineering blogs, benchmark papers, and maintainer-authored implementation docs preferred; no private local data`
 - registered_at: `2026-06-05T04:14:38Z`
 - submitted_at: `2026-06-05T04:17:38Z`
-- started_at: `pending`
-- completed_at: `pending`
-- last_checked_at: `2026-06-05T04:36:27Z`
-- exported_at: `pending`
+- started_at: `2026-06-05T05:11:49Z`
+- completed_at: `2026-06-05T05:41:20Z`
+- last_checked_at: `2026-06-05T05:41:20Z`
+- exported_at: `2026-06-05T05:41:20Z`
 - visible_plan: `pending`
-- visible_state: `Project conversation exists and contains the Branch G prompt plus a retry message asking ChatGPT to run the prior prompt as Deep Research. A transient "回答を停止" appeared after retry, but final status check showed the same rate-limit modal again: "リクエストが多すぎます ... 数分待ってから、もう一度お試しください。" No export control, completed report, or active research state was visible.`
-- handoff: `Retry inside the same Project conversation after a longer cooldown. Avoid duplicate Project threads unless this one becomes unusable. When a report completes, export Markdown from the UI and import the downloaded .md into this epic discussion folder. Do not use "今すぐ回答" as evidence.`
+- visible_state: `Deep Research completed in the Codex-only Project. Visual report card showed completion with about 15m runtime, 68 citations, and 319 searches. Markdown export produced /Users/iwasawayuuta/Downloads/deep-research-report (7).md, which was stable at 52063 bytes after a 60-second recheck.`
+- handoff: `Completed and imported as 20260605t052320z-research-branch-g-public-coding-agent-harness-implementations-deep-research-report.md. Treat report claims as Deep Research output until cited sources are independently verified before issue planning.`
