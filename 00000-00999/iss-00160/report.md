@@ -874,6 +874,121 @@ $ git diff --check
 
 ---
 
+### セッションログ（2026-06-05 S90）
+
+#### 対象
+- Step: S90 - docs impact resolution / docs refresh
+- AC/EC: AC-001, AC-005
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `ドキュメント影響の解消ステップ S90（docs impact resolution / docs refresh）`
+  - closure ids: `tc-s90-001`
+
+#### 実施内容
+- `rg -n "unittest discover|tests/unit|tests/integration|python -m unittest" README.md docs src spec-dock tests` と reviewer follow-up の workflow-inclusive search を実行し、永続的な command guidance、workflow、履歴 issue records を分類した。
+- 履歴 `spec-dock/initiatives/**/{requirement,design,plan,report,discussions}.md` の過去コマンド証跡は S90 更新対象外と判断した。
+- 永続的な Testing guidance として `README.md` が stale で、旧 `python -m unittest discover -v` だけを案内していた。
+- doc-writer に S90 限定で `README.md` Testing 節の最小更新を委任し、daily unit command、optional integration command、full regression fallback を記載した。
+- 初回 spec-reviewer で `.github/workflows/provider-ci.yml` の stale provider CI command が指摘されたため、provider CI を daily unit command に合わせ、既存 assertion を更新した。
+- Production code changes: none.
+
+#### 実行コマンド / 結果
+```bash
+$ rg -n "unittest discover|tests/unit|tests/integration|python -m unittest" README.md docs src spec-dock tests
+# README.md:182 had only `python -m unittest discover -v`
+# historical spec-dock issue records also matched; classified as past evidence, not persistent command guidance
+
+$ rg -n "python -m unittest discover -v|python -m unittest discover -s tests/unit|python -m unittest discover(\s|$)" README.md .github/workflows/provider-ci.yml docs src tests
+# README.md:183:python -m unittest discover -s tests/unit
+# README.md:186:python -m unittest discover -s tests/integration
+# README.md:189:python -m unittest discover
+# .github/workflows/provider-ci.yml:20:run: python -m unittest discover -s tests/unit
+# tests/unit/infra/test_init_update.py:9564 asserts the same workflow command
+
+$ rg -n "Testing|python -m unittest discover|tests/unit|tests/integration" README.md
+# README.md:179:## Testing
+# README.md:183:python -m unittest discover -s tests/unit
+# README.md:186:python -m unittest discover -s tests/integration
+# README.md:189:python -m unittest discover
+
+$ git diff --check
+# pass
+
+$ python -m unittest tests.unit.infra.test_init_update.TestInitUpdate.test_issue_68_provider_only_workflow_is_not_shipped_via_install_root
+# Ran 1 test in 0.000s
+# OK
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S90 | 赤フェーズ / 代替証跡（Red / alternative） | `tc-s90-001` inspect-only | README Testing が full fallback 旧コマンドのみを案内 | `rg` inspection | pass | stale persistent docs found |
+| S90 | 緑フェーズ（Green） | `tc-s90-001` | README Testing が unit / integration / full fallback を案内し、provider CI が unit command を実行する | README / workflow diff; `rg` inspection | pass | doc-writer updated README; dev-coder fixed workflow command |
+| S90 | リファクタリング（Refactor） | guardrail satisfied | historical issue records は未変更; workflow assertion updated only for changed command | diff inspection; `git diff --check`; targeted unittest | pass | production source code changes none |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S90 | `rg` scope は historical issue records の古い commands を大量に検出する | orchestrator | 履歴 issue records は past evidence として分類し、永続 guidance の更新対象外とした | `tc-s90-001` | no | `rg` output classification |
+| S90 | `.github/workflows/provider-ci.yml` が provider CI で旧 full discover command を使っていた | spec-reviewer | provider CI を `python -m unittest discover -s tests/unit` に更新し、既存 workflow assertion を同じ文字列に更新 | `tc-s90-001` | no | initial spec-review fail; targeted unittest pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | `tc-s90-001` | docs/templates/workflow files mentioning test commands are consistent or no update needed | README updated; provider CI workflow updated; docs/src/spec-dock/templates command guidance had no stale persistent hits requiring change | pass | historical issue records left unchanged |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-s90-001` | S90 | yes | inspect-only | README Testing and provider CI used old full discover guidance | `rg` inspection; README/workflow diff; targeted workflow assertion test; `git diff --check` | pass | README documents daily unit, optional integration, and full fallback; provider CI uses daily unit |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| `tc-s90-001` | S90 | `README.md` Testing update; `.github/workflows/provider-ci.yml` update; `rg` verification; targeted workflow assertion test | pass | docs/workflow changed, spec-reviewer re-review required |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | `tc-s90-001` | README Testing and provider CI command guidance | `tc-s90-001` | S90 計画通りの docs/workflow command consistency | no | yes, completed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S90 | delegated | persistent non-issue docs update | doc-writer | S90 only | `plan.md` S90 | README Testing command guidance | source code, tests, issue docs, historical issue records | README `rg`; `git diff --check` | stale docs require broader scope | changed files, validation, risks | pass |
+| S90 | delegated | workflow reviewer fix | dev-coder | S90 reviewer fix only | `plan.md` S90 + spec-reviewer finding | `.github/workflows/provider-ci.yml`; one matching assertion in `tests/unit/infra/test_init_update.py` | README/report/source code/historical records/unrelated tests | targeted unittest; workflow-inclusive `rg`; `git diff --check` | stale workflow command remains | changed files, validation, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S90 | doc-writer | README Testing 節に daily unit / optional integration / full fallback commands を最小追記 | `README.md` | `rg` README command check; `git diff --check` -> pass | spec-reviewer re-review pass | none | accepted |
+| S90 | dev-coder | provider CI の stale full discover command を daily unit command に更新し、既存 assertion を同期 | `.github/workflows/provider-ci.yml`; `tests/unit/infra/test_init_update.py` | targeted workflow assertion test; workflow-inclusive `rg`; `git diff --check` -> pass | spec-reviewer re-review pass | none | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | docs reviewer | spec-reviewer | fresh | failed | no | fix workflow command guidance | initial review found stale `.github/workflows/provider-ci.yml` command and incomplete report inspection scope |
+| S90 | docs reviewer re-review | spec-reviewer | fresh | passed | N/A | proceed to commit | findings none; previous workflow command finding fixed |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | ready-to-commit | README/workflow command updates, workflow assertion update, and `report.md` S90 evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `README.md` - Testing 節に daily unit / optional integration / full fallback commands を記載。
+- `.github/workflows/provider-ci.yml` - provider CI を daily unit command に更新。
+- `tests/unit/infra/test_init_update.py` - provider CI command assertion を更新。
+- `report.md` - S90 evidence ledger。
+
+#### コミット
+- pending
+
+#### メモ
+- Production code changes none; one workflow assertion test was updated to match the S90 workflow command.
+- Historical issue records の過去コマンド証跡は更新対象外。
+
+---
+
 ### セッションログ（2026-06-05 HH:MM - HH:MM）
 
 #### 対象
