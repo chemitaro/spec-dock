@@ -727,6 +727,153 @@ $ ./spec-dock/scripts/spec-dock validate
 
 ---
 
+### セッションログ（2026-06-05 S06）
+
+#### 対象
+- Step: S06 - sync / new Split and 120 Second Measurement
+- AC/EC: AC-001, AC-002, AC-004, EC-001
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S06 - sync / new Split and 120 Second Measurement`
+  - closure ids: `tc-s06-001`, `tc-s06-002`, `tc-s06-003`, `tc-s06-004`
+
+#### 実施内容
+- `tests/cli_runtime/test_runtime_new_s08.py` を `tests/unit/commands/test_runtime_new_s08.py` へ移動し、移動先に合わせて runtime module root 計算を `parents[3]` に更新した。
+- `tests/unit/cli/test_cli.py` の critical inventory / import を、移動後の `tests.unit.commands.test_runtime_new_s08` に合わせた。
+- `tests/cli_runtime/test_new.py` の重い CLI runtime tests 5 件を replacement-aware skip に変更し、pre-GitHub validation / missing rules preflight / rules symlink materialization / default GitHub create mode / create-lock guidance は移動後 S08 の direct tests で受けた。
+- `tests/cli_runtime/test_sync.py` の重い sync CLI runtime tests 2 件を replacement-aware skip に変更し、ADR mirror rebuild / artifact projection は既存 `tests/unit/presentation/test_runtime_sync_s07.py` で受けた。
+- CLI parser / subprocess / filesystem 固有の代表 smoke、`new doc` 系、sync deps/status/GitHub stub/active integration smoke は CLI runtime 側に残した。
+- Production code changes: none.
+
+#### 実装前 / 実装後の測定
+```bash
+$ python -m unittest tests.cli_runtime.test_sync
+# before S06: Ran 26 tests in 35.113s
+# OK
+
+$ python -m unittest tests.cli_runtime.test_new
+# before S06: Ran 43 tests in 30.744s
+# OK
+
+$ python -m unittest tests.cli_runtime.test_runtime_new_s08
+# before S06: Ran 47 tests in 0.769s
+# OK
+
+$ python -m unittest tests.unit.presentation.test_runtime_sync_s07
+# before S06: Ran 49 tests in 0.302s
+# OK
+```
+
+#### 実行コマンド / 結果
+```bash
+$ python -m unittest tests.unit.commands.test_runtime_new_s08 tests.unit.presentation.test_runtime_sync_s07 tests.unit.cli.test_cli
+# Ran 99 tests in 1.129s
+# OK
+
+$ python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_sync
+# Ran 69 tests in 53.177s
+# OK (skipped=7)
+
+$ /usr/bin/time -p python -m unittest discover -s tests/unit
+# Ran 419 tests in 58.374s
+# OK
+# real 58.44
+# user 25.33
+# sys 23.52
+
+$ rg -n "requests|urllib|httpx|socket|git fetch|git pull|git push|git ls-remote|ls-remote|gh issue (list|view|create)|subprocess\.|Popen|check_call|check_output|os\.system" tests/unit
+# hits: existing local subprocess / fake gh harness tests only
+# no real GitHub, remote git, auth, or network requirement found
+
+$ ./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=79
+
+$ git diff --check
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S06 | 赤フェーズ / 代替証跡（Red / alternative） | covered-existing + measurement | split 前の `test_sync` / `test_new` runtime を測定 | targeted unittest measurement | pass | sync 35.113s; new 30.744s |
+| S06 | 緑フェーズ（Green） | `tc-s06-001`, `tc-s06-002` | new S08 moved to unit/commands; sync S07 lower-layer coverage retained; CLI smoke pass | targeted unit + CLI commands | pass | lower-layer 99 tests 1.129s; CLI 69 tests 53.177s skipped=7 |
+| S06 | 緑フェーズ（Green） | `tc-s06-003` | `tests/unit` local runtime <= 120s | `/usr/bin/time -p python -m unittest discover -s tests/unit` | pass | 419 tests, real 58.44s |
+| S06 | リファクタリング（Refactor） | `tc-s06-004`, guardrail satisfied | production code change なし; unit external-boundary grep reviewed | diff inspection; `rg`; code-reviewer pass | pass | subprocess hits are local/unit-allowed tests |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S06 | `test_runtime_new_s08.py` は CLI runtime path にあったが、実体は fake ports / stub gateways による command/application direct coverage だった | dev-coder / code-reviewer | `tests/unit/commands/test_runtime_new_s08.py` へ移動し、path root のみ更新 | `tc-s06-002`, `tc-s06-004` | no | old/new diff は `parents[2]` -> `parents[3]` のみ |
+| S06 | unit external-boundary grep は `subprocess.run` を検出する | orchestrator | Unit 定義上許可された CLI/local harness subprocess であり、real GitHub / remote git / auth / network の直接要求ではないことを確認 | `tc-s06-004` | no | `rg` inspection; code-reviewer pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S06 | `tc-s06-001` | sync split with representative CLI smoke retained | `tests/cli_runtime/test_sync.py` skip 2 件; `tests/unit/presentation/test_runtime_sync_s07.py` pass; `tests.cli_runtime.test_sync` included in CLI smoke pass | pass | ADR mirror / artifact projection moved below CLI |
+| S06 | `tc-s06-002` | new split with representative CLI smoke retained | `tests/unit/commands/test_runtime_new_s08.py` pass; `tests.cli_runtime.test_new` included in CLI smoke pass | pass | preflight / default mode / lock guidance moved below CLI |
+| S06 | `tc-s06-003` | unit runtime <= 120 seconds | `python -m unittest discover -s tests/unit` -> 419 tests, real 58.44s | pass | threshold 120s |
+| S06 | `tc-s06-004` | no real external operations required by unit suite | `rg` inspection + code-reviewer pass | pass | subprocess hits are local/unit-allowed tests |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-s06-001` | S06 | yes | covered-existing + direct unit | existing sync CLI characterization | `python -m unittest tests.unit.presentation.test_runtime_sync_s07`; `python -m unittest tests.cli_runtime.test_sync` | pass | sync direct coverage remains under unit/presentation; CLI smoke retained |
+| `tc-s06-002` | S06 | yes | covered-existing + direct unit | existing new S08 characterization | `python -m unittest tests.unit.commands.test_runtime_new_s08`; `python -m unittest tests.cli_runtime.test_new` | pass | new S08 moved to unit/commands; CLI smoke retained |
+| `tc-s06-003` | S06 | yes | measurement-required | S05 unit suite was 372 tests / 58.635s | `/usr/bin/time -p python -m unittest discover -s tests/unit` | pass | 419 tests / real 58.44s |
+| `tc-s06-004` | S06 | yes | inspect-only + reviewer | unit suite boundary from requirement | `rg` inspection; code-reviewer review | pass | no real GitHub / remote git / auth / network requirement found |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| `tc-s06-001` | S06 | `tests/unit/presentation/test_runtime_sync_s07.py`; retained `tests/cli_runtime/test_sync.py` smoke | pass | skipped CLI tests cite replacement-aware coverage |
+| `tc-s06-002` | S06 | `tests/unit/commands/test_runtime_new_s08.py`; retained `tests/cli_runtime/test_new.py` smoke | pass | moved file is otherwise unchanged except path root |
+| `tc-s06-003` | S06 | timed unit discover | pass | real 58.44s |
+| `tc-s06-004` | S06 | external-boundary grep and code-reviewer pass | pass | subprocess usage is local/unit-allowed |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | `tc-s06-001` | sync lower-layer coverage + retained CLI smoke | `tc-s06-001` | S06 計画通りの sync split | no | yes, completed |
+| none | `tc-s06-002` | new S08 moved unit coverage + retained CLI smoke | `tc-s06-002` | S06 計画通りの new split | no | yes, completed |
+| none | `tc-s06-003` | timed unit discover | `tc-s06-003` | S06 計画通りの 120 秒測定 | no | yes, completed |
+| none | `tc-s06-004` | external-boundary grep | `tc-s06-004` | Unit boundary check completed | no | yes, completed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S06 | delegated | test restructure and runtime measurement | dev-coder | S06 only | `plan.md` S06 | sync/new tests and remaining hotspots | production code, S90/S99 changes, moving real external tests into unit | targeted unit, targeted CLI, unit discover timing, external-boundary grep, diff check, validate | missing replacement coverage, runtime > 120s, reviewer fail | changed files, commands, closure evidence, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S06 | dev-coder | new S08 を unit/commands へ移動し、sync/new の重い CLI tests を replacement-aware skip に整理 | `tests/cli_runtime/test_new.py`; `tests/cli_runtime/test_sync.py`; `tests/cli_runtime/test_runtime_new_s08.py`; `tests/unit/commands/test_runtime_new_s08.py`; `tests/unit/cli/test_cli.py` | targeted unit, targeted CLI, unit discover timing, external-boundary grep, diff check -> pass | code-reviewer pass | full discovery fallback は S99 で実行予定 | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S06 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to commit | findings none; production unchanged; unit runtime 58.26s in reviewer run |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S06 | ready-to-commit | sync/new test split and `report.md` S06 evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/cli_runtime/test_new.py` - replacement-aware skip 5 件を追加し、代表 CLI smoke は保持。
+- `tests/cli_runtime/test_sync.py` - replacement-aware skip 2 件を追加し、代表 CLI smoke は保持。
+- `tests/cli_runtime/test_runtime_new_s08.py` - unit/commands へ移動。
+- `tests/unit/commands/test_runtime_new_s08.py` - 移動後の runtime root 計算を更新。
+- `tests/unit/cli/test_cli.py` - critical inventory / import を移動後 path に更新。
+- `report.md` - S06 evidence ledger。
+
+#### コミット
+- pending
+
+#### メモ
+- No production behavior changes.
+- S06 は code-reviewer pass 後に最終確認コマンドを再実行済み。
+
+---
+
 ### セッションログ（2026-06-05 HH:MM - HH:MM）
 
 #### 対象

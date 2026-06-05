@@ -119,6 +119,9 @@ class TestCliSync(CliRuntimeHarness):
             self._run_runtime(target, ["validate"])
 
     def test_sync_builds_flat_adr_mirror_and_clears_stale_entries_after_rename_and_delete(self) -> None:
+        self.skipTest(
+            "S06 replacement: tests.unit.presentation.test_runtime_sync_s07 covers ADR mirror rebuild and symlink semantics."
+        )
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -173,6 +176,9 @@ class TestCliSync(CliRuntimeHarness):
             self.assertFalse(renamed_link.exists())
 
     def test_sync_emits_all_and_todo_json_views(self) -> None:
+        self.skipTest(
+            "S06 replacement: tests.unit.presentation.test_runtime_sync_s07 covers sync artifact paths and projections."
+        )
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
