@@ -53,6 +53,7 @@ Disposition ごとの必須証跡:
 | D-002 | resolved | test-strategy | user-shared external-agent discussion + ADR | Unit / integration 境界と heavy fixture 扱いを durable decision にする必要があった | Unit を純粋 in-process test のみに狭める; Unit を local/no external-service tests と定義する | Unit は local subprocess、tempdir、local git、stub `gh` を含む local/no external-service suite とし、real GitHub / remote git / network/auth は integration とする | ユーザー共有方針と ADR で採用済み。現状の遅延要因は外部通信ではなく local heavy fixture に集中している | promoted_to_adr | `discussions/20260605t075347z-01-adr-test-suite-boundary-and-fixture-strategy.md`; `requirement.md` | なし |
 | D-003 | resolved | implementation | dev-coder + orchestrator | S01 で空の `tests/unit` / `tests/integration` package だけを置くと Python 3.12 `unittest discover` が `NO TESTS RAN` で exit 5 になり、S01 の valid command 条件を満たせない | 空 package のまま exit 5 を許容する; S01 内の最小 discovery smoke test を追加する | `tests/unit/test_discovery.py` と `tests/integration/test_discovery.py` に package marker 存在確認だけの最小 smoke test を置く | S01 の目的は suite boundary と discovery command を有効化すること。production behavior や S02+ の実装には触れず、exit 0 の客観証跡を作れる | applied | `python -m unittest discover -s tests/unit`; `python -m unittest discover -s tests/integration`; code-reviewer `019e977f-71c7-7232-8bed-6e15b2fcf9f5` | なし |
 | D-004 | resolved | implementation | dev-coder | S02 で `UNKNOWN` GitHub state を minimal fixture に含めたとき、既存 domain behavior は non-`CLOSED` GitHub state を effective `open` として扱う | Production status semantics を変更する; S02 では既存 semantics を明示して fixture contract だけを固定する | S02 では production behavior を変えず、`UNKNOWN` snapshot は `source=github` / `effective_status=open`、missing issue は `source=unknown` / `effective_status=unknown` としてテストに固定する | S02 は fake `gh` fixture contract の step であり、status semantics 変更はスコープ外。既存 behavior を明示することで coverage loss を防ぐ | applied | `tests/unit/infra/test_fake_gh_harness.py::TestFakeGhHarness.test_state_variations_use_minimal_fixture` | なし |
+| D-005 | resolved | implementation | dev-coder + orchestrator | S03 で `tests/test_init_update.py` を `tests/unit/infra/test_init_update.py` に移動した後、既知の checked-in dogfooding `.meta.json` snapshot divergence が unit/infra failure として表面化した | failure を EC-004 として残す; assertion を弱める; 現行 checked-in dogfooding tree に snapshot baseline を同期する | `tests/unit/infra/test_init_update.py` の fixed snapshot だけを現行 checked-in dogfooding `.meta.json` path set / `depends_on` baseline に同期する | AC-002 で unit suite を 120 秒以内に pass させる必要があり、snapshot同期は既存 contract を弱めず現物と baseline を一致させる最小修正 | applied | `python -m unittest tests.unit.infra.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`; `python -m unittest discover -s tests/unit` | なし |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -375,6 +376,125 @@ git diff --check
 #### メモ
 - No material implementation decisions beyond D-004.
 - Reviewer P2 の Windows portability 指摘は `tests/unit/infra/test_fake_gh_harness.py` の `setUp()` skip で解消し、`python -m unittest discover -s tests/unit/infra`、`python -m unittest discover -s tests/unit`、`git diff --check` が pass。
+
+---
+
+### セッションログ（2026-06-05 S03）
+
+#### 対象
+- Step: S03 — Low-Risk Layer Placement
+- AC/EC: AC-001, AC-005 partial
+- 計画上の出典（Planned source）:
+  - `plan.md` section:
+    - `実装ステップ S03 — Low-Risk Layer Placement`
+  - closure ids:
+    - `tc-s03-001`
+
+#### 実施内容
+- `tests/domain_runtime/**` を `tests/unit/domain/**` へ移動した。
+- `tests/presentation_runtime/**` を `tests/unit/presentation/**` へ移動した。
+- `tests/test_cli.py` を `tests/unit/cli/test_cli.py` へ移動した。
+- `tests/test_init_update.py` を `tests/unit/infra/test_init_update.py` へ移動した。
+- 移動後に表面化した checked-in dogfooding snapshot divergence を、`tests/unit/infra/test_init_update.py` の fixed snapshot 期待値だけ現行 data に同期して解消した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.unit.infra.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+# Ran 1 test in 0.043s
+# OK
+
+python -m unittest discover -s tests/unit/domain
+# Ran 83 tests in 0.150s
+# OK
+
+python -m unittest discover -s tests/unit/presentation
+# Ran 49 tests in 0.323s
+# OK
+
+python -m unittest discover -s tests/unit/cli
+# Ran 3 tests in 0.243s
+# OK
+
+python -m unittest discover -s tests/unit/infra
+# Ran 214 tests in 61.431s
+# OK
+
+python -m unittest discover -s tests/unit
+# Ran 350 tests in 62.253s
+# OK
+
+git diff --check
+# pass
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=79
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ / 代替証跡（Red / alternative） | `tc-s03-001` inspect-only | 低リスク tests は旧配置に存在 | file layout inspection | pass | move 前の配置確認 |
+| S03 | 赤フェーズ / 代替証跡（Red / alternative） | unit infra verification | moved infra suite で dogfooding snapshot divergence が失敗 | targeted unittest before snapshot sync | pass | D-005 として記録 |
+| S03 | 緑フェーズ（Green） | `tc-s03-001` | domain / presentation / cli / infra が unit 配下で pass | unit layer discover commands | pass | `tests/unit` 全体も 62.253s で OK |
+| S03 | リファクタリング（Refactor） | guardrail satisfied | assertion weakening / skip / production change なし | diff inspection; `git diff --check` | pass | snapshot baseline の現行 data 同期のみ |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | moved `test_init_update.py` で checked-in dogfooding snapshot divergence が unit infra failure になる | dev-coder / orchestrator | `tests/unit/infra/test_init_update.py` の snapshot baseline を現行 tree に同期 | `tc-s03-001` | no | +2 paths, -0 paths, +2 `depends_on: []` baseline entries |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | `tc-s03-001` | domain/presentation/installer tests live under mapped Unit paths | `tests/unit/domain`, `tests/unit/presentation`, `tests/unit/cli`, `tests/unit/infra` discover all pass | pass | unit suite 350 tests OK |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-s03-001` | S03 | yes | inspect-only | old paths under `tests/domain_runtime`, `tests/presentation_runtime`, root test files | unit layer discovery commands | pass | placement and behavior preserved |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| `tc-s03-001` | S03 | unit/domain, unit/presentation, unit/cli, unit/infra, unit discover | pass | `tests/unit` 62.253s |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | `tc-s03-001` | unit layer discover commands | `tc-s03-001` | S03 計画通りの placement closure | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | low-risk test placement | dev-coder | S03 only | `plan.md` S03 | listed test moves and import/package fixes | production code, fake gh, S04+ split | unit layer discover, diff check | assertions must be weakened | changed files, commands, closure evidence, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | low-risk tests を unit layer へ移動し、dogfooding snapshot baseline を現行 tree に同期 | `tests/unit/domain/**`; `tests/unit/presentation/**`; `tests/unit/cli/test_cli.py`; `tests/unit/infra/test_init_update.py` | unit layer discover, unit discover, diff check -> pass | code-reviewer `019e979f-f8ee-7080-bf38-d98044fd78ae` pass | none | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to commit | reviewer `019e979f-f8ee-7080-bf38-d98044fd78ae` |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | ready-to-commit | moved test files and `report.md` S03 evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/unit/domain/**` - domain runtime tests moved from `tests/domain_runtime/**`。
+- `tests/unit/presentation/test_runtime_sync_s07.py` - presentation runtime tests moved from `tests/presentation_runtime/**`。
+- `tests/unit/cli/test_cli.py` - CLI/test inventory contract moved from root tests。
+- `tests/unit/infra/test_init_update.py` - installer/scaffold tests moved from root tests; dogfooding snapshot baseline synchronized。
+- `report.md` - S03 evidence ledger。
+
+#### コミット
+- pending
+
+#### メモ
+- No material implementation decisions beyond D-005.
 
 ---
 
