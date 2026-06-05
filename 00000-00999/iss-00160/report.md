@@ -52,6 +52,7 @@ Disposition ごとの必須証跡:
 | D-001 | resolved | test-strategy | orchestrator + user | 日常 unit run の成功判定が未固定だった | Option A: 60 秒以内; Option B: 120 秒以内; Option C: 秒数なし | Option B を採用し、`tests/unit/` local runtime target を 120 秒以内に固定する | ユーザーが Option B を明示採用した。現状 full run 10:00.07 total から十分な改善を要求しつつ、1 issue の差分肥大化を避けやすい | applied | `discussions/20260605t075347z-interview-unit-runtime-target-clarification.md`; `requirement.md` | design / plan に同じ threshold を反映する |
 | D-002 | resolved | test-strategy | user-shared external-agent discussion + ADR | Unit / integration 境界と heavy fixture 扱いを durable decision にする必要があった | Unit を純粋 in-process test のみに狭める; Unit を local/no external-service tests と定義する | Unit は local subprocess、tempdir、local git、stub `gh` を含む local/no external-service suite とし、real GitHub / remote git / network/auth は integration とする | ユーザー共有方針と ADR で採用済み。現状の遅延要因は外部通信ではなく local heavy fixture に集中している | promoted_to_adr | `discussions/20260605t075347z-01-adr-test-suite-boundary-and-fixture-strategy.md`; `requirement.md` | なし |
 | D-003 | resolved | implementation | dev-coder + orchestrator | S01 で空の `tests/unit` / `tests/integration` package だけを置くと Python 3.12 `unittest discover` が `NO TESTS RAN` で exit 5 になり、S01 の valid command 条件を満たせない | 空 package のまま exit 5 を許容する; S01 内の最小 discovery smoke test を追加する | `tests/unit/test_discovery.py` と `tests/integration/test_discovery.py` に package marker 存在確認だけの最小 smoke test を置く | S01 の目的は suite boundary と discovery command を有効化すること。production behavior や S02+ の実装には触れず、exit 0 の客観証跡を作れる | applied | `python -m unittest discover -s tests/unit`; `python -m unittest discover -s tests/integration`; code-reviewer `019e977f-71c7-7232-8bed-6e15b2fcf9f5` | なし |
+| D-004 | resolved | implementation | dev-coder | S02 で `UNKNOWN` GitHub state を minimal fixture に含めたとき、既存 domain behavior は non-`CLOSED` GitHub state を effective `open` として扱う | Production status semantics を変更する; S02 では既存 semantics を明示して fixture contract だけを固定する | S02 では production behavior を変えず、`UNKNOWN` snapshot は `source=github` / `effective_status=open`、missing issue は `source=unknown` / `effective_status=unknown` としてテストに固定する | S02 は fake `gh` fixture contract の step であり、status semantics 変更はスコープ外。既存 behavior を明示することで coverage loss を防ぐ | applied | `tests/unit/infra/test_fake_gh_harness.py::TestFakeGhHarness.test_state_variations_use_minimal_fixture` | なし |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -253,6 +254,127 @@ git diff --check
 
 #### メモ
 - No material implementation decisions beyond D-003.
+
+---
+
+### セッションログ（2026-06-05 S02）
+
+#### 対象
+- Step: S02 — fake `gh` Fixture Contract
+- AC/EC: AC-003, EC-002
+- 計画上の出典（Planned source）:
+  - `plan.md` section:
+    - `実装ステップ S02 — fake gh Fixture Contract`
+  - closure ids:
+    - `tc-s02-001`
+    - `tc-s02-002`
+    - `tc-s02-003`
+    - `tc-s02-004`
+
+#### 実施内容
+- `CliRuntimeHarness._make_default_gh_issue_list_stub` の default `gh issue list` を 1..10000 生成から 3 件の static fixture に変更した。
+- `--gh-limit=10000` は `sync --gh-limit 10000` と `issue_index_raw(..., limit=10000)` の argv capture で検証した。
+- Large issue number は `number: 10000` の 1 件 fixture で検証した。
+- open / closed / unknown / missing は 3 件 fixture と missing node で検証した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -s tests/unit/infra
+# Ran 4 tests in 1.445s
+# OK
+
+python -m unittest tests.cli_runtime.test_sync.TestCliSync.test_sync_github_passes_gh_limit_to_gh
+# Ran 1 test in 1.400s
+# OK
+
+python -m unittest tests.cli_runtime.test_deps.TestCliDeps.test_deps_check_github_index_incomplete_warns_and_blocks tests.cli_runtime.test_deps.TestCliDeps.test_deps_check_github_blocked_when_dep_open
+# Ran 2 tests in 2.990s
+# OK
+
+python -m unittest discover -s tests/unit
+# Ran 5 tests in 1.521s
+# OK
+
+git diff --check
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ / 代替証跡（Red / alternative） | `tc-s02-001` red-required | 旧 default fake `gh` は `range(1, 10001)` で 10000 件を生成 | code inspection; targeted test before fix | pass | dev-coder が旧 harness で targeted test failure を確認 |
+| S02 | 緑フェーズ（Green） | `tc-s02-001`〜`tc-s02-004` | fake `gh` fixture contract tests 4 件 OK | `python -m unittest discover -s tests/unit/infra` | pass | small fixture / argv / large number / state variations |
+| S02 | 緑フェーズ（Green） | `tc-s02-002` | CLI `sync --gh-limit 10000` が `--limit 10000` を渡す | `python -m unittest tests.cli_runtime.test_sync.TestCliSync.test_sync_github_passes_gh_limit_to_gh` | pass | 既存 CLI contract を 10000 に更新 |
+| S02 | 緑フェーズ（Green） | regression guard | deps GitHub incomplete / open blocker tests OK | `python -m unittest tests.cli_runtime.test_deps...` | pass | default fixture shrink の周辺回帰確認 |
+| S02 | リファクタリング（Refactor） | guardrail satisfied | production code 変更なし、S03+ 移動なし | `git diff --check`; diff inspection | pass | S02 のみ |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | `UNKNOWN` GitHub state は既存 semantics では effective `open` になる | dev-coder | D-004 として既存 behavior を明示し、production semantics は変更しない | `tc-s02-004` | no | `tests/unit/infra/test_fake_gh_harness.py` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | `tc-s02-001` | default fake `gh issue list` returns small fixture, not 10000 records | `test_default_fake_gh_issue_list_returns_small_fixture` | pass | 3 件 fixture |
+| S02 | `tc-s02-002` | `--gh-limit=10000` is verified by captured argv | `test_issue_index_raw_captures_large_limit_argv`; `test_sync_github_passes_gh_limit_to_gh` | pass | `--limit 10000` |
+| S02 | `tc-s02-003` | issue `number: 10000` behavior uses minimal fixture | `test_large_issue_number_uses_minimal_fixture` | pass | 1 件 fixture |
+| S02 | `tc-s02-004` | missing / unknown / open / closed behavior represented with minimal fixtures | `test_state_variations_use_minimal_fixture` | pass | 3 件 fixture + missing node |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-s02-001` | S02 | yes | red-required | old default 10000 records | `python -m unittest discover -s tests/unit/infra` | pass | routine default no longer 10000 |
+| `tc-s02-002` | S02 | yes | red-required | old CLI limit test used 123, not 10000 | unit infra + CLI sync focused test | pass | captured argv contract |
+| `tc-s02-003` | S02 | yes | red-required | large number coverage was implicit in large fixture | `python -m unittest discover -s tests/unit/infra` | pass | `number: 10000` one fixture |
+| `tc-s02-004` | S02 | yes | red-required | state variation not explicit in default small fixture contract | `python -m unittest discover -s tests/unit/infra` | pass | open / closed / unknown / missing |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| `tc-s02-001` | S02 | `tests/unit/infra/test_fake_gh_harness.py` | pass | default small fixture |
+| `tc-s02-002` | S02 | `tests/unit/infra/test_fake_gh_harness.py`; `tests/cli_runtime/test_sync.py` | pass | argv capture |
+| `tc-s02-003` | S02 | `tests/unit/infra/test_fake_gh_harness.py` | pass | large number minimal |
+| `tc-s02-004` | S02 | `tests/unit/infra/test_fake_gh_harness.py` | pass | state variations minimal |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | `tc-s02-001`〜`tc-s02-004` | `tests/unit/infra/test_fake_gh_harness.py` | `tc-s02-001`〜`tc-s02-004` | S02 計画通りの fixture contract closure | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | fake `gh` fixture contract implementation | dev-coder | S02 only | `plan.md` S02 | harness and targeted fake gh tests | production code, S03+ moves, unrelated rewrites | unit infra, focused sync/deps, unit discover, diff check | production behavior change required | changed files, commands, closure evidence, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | default fake `gh` を small fixture 化し、limit / large number / state variation tests を追加 | `tests/cli_runtime/harness.py`; `tests/cli_runtime/test_sync.py`; `tests/unit/infra/test_fake_gh_harness.py` | unit infra, focused sync/deps, unit discover, diff check -> pass | initial code-reviewer `019e9788-e963-7ab2-a686-e075db0a8215` failed due report missing | none | accepted after report evidence added; re-review required |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | failed | no | re-review required | reviewer `019e9788-e963-7ab2-a686-e075db0a8215`; code diff acceptable, report evidence missing |
+| S02 | step reviewer re-review | code-reviewer | fresh | passed | N/A | proceed to commit | reviewer `019e978d-b1a3-70d2-bc32-ab638a603e2c`; non-blocking P2 Windows skip fixed before commit |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | ready-to-commit | `tests/cli_runtime/harness.py`, `tests/cli_runtime/test_sync.py`, `tests/unit/infra/test_fake_gh_harness.py`, `report.md` S02 evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/cli_runtime/harness.py` - default fake `gh issue list` を small fixture 化。
+- `tests/cli_runtime/test_sync.py` - `--gh-limit=10000` argv contract へ更新。
+- `tests/unit/infra/test_fake_gh_harness.py` - S02 fixture contract tests。
+- `report.md` - S02 evidence ledger。
+
+#### コミット
+- pending
+
+#### メモ
+- No material implementation decisions beyond D-004.
+- Reviewer P2 の Windows portability 指摘は `tests/unit/infra/test_fake_gh_harness.py` の `setUp()` skip で解消し、`python -m unittest discover -s tests/unit/infra`、`python -m unittest discover -s tests/unit`、`git diff --check` が pass。
 
 ---
 
