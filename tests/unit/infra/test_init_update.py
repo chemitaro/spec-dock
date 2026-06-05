@@ -9561,7 +9561,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         workflow_text = repo_root_provider_workflow.read_text(encoding="utf-8")
         self.assertIn("python -m pip install -e .", workflow_text)
-        self.assertIn("python -m unittest discover -v", workflow_text)
+        self.assertIn("python -m unittest discover -s tests/unit", workflow_text)
 
     def test_issue_68_legacy_codex_skills_tree_is_retired(self) -> None:
         legacy_root = self._ISSUE_68_RETIRED_LEGACY_ROOT
