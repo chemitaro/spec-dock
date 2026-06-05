@@ -1385,7 +1385,7 @@ class TestCliSync(CliRuntimeHarness):
             )
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-            p = self._run_runtime_capture(target, ["sync", "--gh-limit", "123", "--no-update-active"], env=test_env)
+            p = self._run_runtime_capture(target, ["sync", "--gh-limit", "10000", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
             self.assertTrue(log_path.is_file())
@@ -1395,7 +1395,7 @@ class TestCliSync(CliRuntimeHarness):
             self.assertIn("--limit", argv)
             i = argv.index("--limit")
             self.assertLess(i + 1, len(argv))
-            self.assertEqual(argv[i + 1], "123")
+            self.assertEqual(argv[i + 1], "10000")
 
     def test_sync_github_index_incomplete_warns_and_marks_unknown(self) -> None:
         if os.name == "nt":
