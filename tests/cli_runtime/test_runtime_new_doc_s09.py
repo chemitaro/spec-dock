@@ -2,11 +2,47 @@ import sys
 import tempfile
 import threading
 import time
-import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 
+
+
+import contextlib
+import pytest
+import re
+_MISSING = object()
+
+
+class _CallProbe:
+    def __init__(self, *, side_effect=_MISSING, return_value=_MISSING):
+        self.calls = []
+        self._side_effect = side_effect
+        self._return_value = return_value
+
+    def __call__(self, *args, **kwargs):
+        self.calls.append((args, kwargs))
+        if self._side_effect is not _MISSING:
+            if isinstance(self._side_effect, BaseException):
+                raise self._side_effect
+            return self._side_effect(*args, **kwargs)
+        if self._return_value is not _MISSING:
+            return self._return_value
+        return None
+
+    def assert_called_once_with(self, *args, **kwargs):
+        assert self.calls == [(args, kwargs)]
+
+
+@contextlib.contextmanager
+def _patch_object(target, name, replacement=_MISSING, *, side_effect=_MISSING, return_value=_MISSING):
+    original = getattr(target, name)
+    if replacement is _MISSING:
+        replacement = _CallProbe(side_effect=side_effect, return_value=return_value)
+    setattr(target, name, replacement)
+    try:
+        yield replacement
+    finally:
+        setattr(target, name, original)
 def _runtime_modules():
     runtime_scripts_dir = (
         Path(__file__).resolve().parents[2]
@@ -140,7 +176,7 @@ class _StubClock:
         return "2026-03-12"
 
 
-class TestRuntimeNewDocS09(unittest.TestCase):
+class TestRuntimeNewDocS09:
     def _create_lock_path(self, specdock_dir: Path) -> Path:
         return specdock_dir / "system" / ".runtime" / "create.lock"
 
@@ -227,9 +263,9 @@ class TestRuntimeNewDocS09(unittest.TestCase):
         thread_b.start()
         thread_a.join(timeout=5.0)
         thread_b.join(timeout=5.0)
-        self.assertFalse(thread_a.is_alive(), "parallel new doc thread A did not finish")
-        self.assertFalse(thread_b.is_alive(), "parallel new doc thread B did not finish")
-        self.assertEqual(errors, [])
+        assert not thread_a.is_alive(), "parallel new doc thread A did not finish"
+        assert not thread_b.is_alive(), "parallel new doc thread B did not finish"
+        assert errors == []
         return results
 
     def _issue_scope_record(self, infra_contracts, *, specdock_dir: Path):
@@ -318,10 +354,10 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 timestamp="20260312t010203z",
             )
 
-            self.assertEqual(template_path, specdock_dir / "templates" / "discussions" / "adr.md")
-            self.assertEqual(dest_path.name, "20260312t010203z-adr-decision-one.md")
-            self.assertEqual(replacements["<ADR_ID>"], "20260312t010203z-adr")
-            self.assertEqual(replacements["<SCOPE_ID>"], "iss-local-00001")
+            assert template_path == specdock_dir / "templates" / "discussions" / "adr.md"
+            assert dest_path.name == "20260312t010203z-adr-decision-one.md"
+            assert replacements["<ADR_ID>"] == "20260312t010203z-adr"
+            assert replacements["<SCOPE_ID>"] == "iss-local-00001"
 
     def test_generated_path_name_content_regression(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -343,18 +379,18 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 ports,
             )
 
-            self.assertEqual(result.doc_id, "20260312t010203z-scratch")
-            self.assertEqual(result.doc_type, "scratch")
-            self.assertEqual(result.path.name, "20260312t010203z-scratch-note-one.md")
-            self.assertTrue(result.path.exists())
-            self.assertEqual(events, ["load_template_text", "render_text", "write_text"])
+            assert result.doc_id == "20260312t010203z-scratch"
+            assert result.doc_type == "scratch"
+            assert result.path.name == "20260312t010203z-scratch-note-one.md"
+            assert result.path.exists()
+            assert events == ["load_template_text", "render_text", "write_text"]
 
             content = result.path.read_text(encoding="utf-8")
-            self.assertIn("type=scratch", content)
-            self.assertIn("id=20260312t010203z-scratch", content)
-            self.assertIn("title=Note one", content)
-            self.assertIn("scope=iss-local-00001", content)
-            self.assertIn("date=2026-03-12", content)
+            assert "type=scratch" in content
+            assert "id=20260312t010203z-scratch" in content
+            assert "title=Note one" in content
+            assert "scope=iss-local-00001" in content
+            assert "date=2026-03-12" in content
 
     def test_doc_type_parity_template_selection_regression(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -382,11 +418,11 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                     ),
                     ports,
                 )
-                self.assertEqual(result.doc_type, doc_type)
-                self.assertEqual(result.doc_id, expected_ids[doc_type])
+                assert result.doc_type == doc_type
+                assert result.doc_id == expected_ids[doc_type]
                 content = result.path.read_text(encoding="utf-8")
-                self.assertIn(f"type={doc_type}", content)
-                self.assertIn(f"id={expected_ids[doc_type]}", content)
+                assert f"type={doc_type}" in content
+                assert f"id={expected_ids[doc_type]}" in content
 
     def test_report_and_reflection_are_not_creatable_discussion_doc_types(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -398,17 +434,16 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
 
             for doc_type in ("report", "reflection"):
-                with self.subTest(doc_type=doc_type):
-                    with self.assertRaisesRegex(RuntimeError, f"Unknown discussion doc type: {doc_type}"):
-                        app_create_node.create_discussion_doc(
-                            app_contracts.CreateDiscussionDocRequest(
-                                doc_type=doc_type,
-                                scope_node_id="iss-local-00001",
-                                title=f"{doc_type} title",
-                                slug=None,
-                            ),
-                            ports,
-                        )
+                with pytest.raises(RuntimeError, match=f"Unknown discussion doc type: {doc_type}"):
+                    app_create_node.create_discussion_doc(
+                        app_contracts.CreateDiscussionDocRequest(
+                            doc_type=doc_type,
+                            scope_node_id="iss-local-00001",
+                            title=f"{doc_type} title",
+                            slug=None,
+                        ),
+                        ports,
+                    )
 
     def test_draft_doc_types_render_scope_specific_template_bodies(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -447,22 +482,16 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                         ),
                         ports,
                     )
-                    self.assertRegex(
-                        result.doc_id,
-                        rf"^20260312t010203z(?:-[0-9]{{2}})?-{doc_type}$",
-                    )
-                    self.assertRegex(result.path.name, rf"^20260312t010203z(?:-[0-9]{{2}})?-{doc_type}-")
-                    self.assertEqual(
-                        ports.template_scaffolder.loaded_paths[-1],
-                        specdock_dir / "templates" / scope_kind / f"{target}.md",
-                    )
+                    assert re.search(rf"^20260312t010203z(?:-[0-9]{{2}})?-{doc_type}$", result.doc_id)
+                    assert re.search(rf"^20260312t010203z(?:-[0-9]{{2}})?-{doc_type}-", result.path.name)
+                    assert ports.template_scaffolder.loaded_paths[-1] == specdock_dir / "templates" / scope_kind / f"{target}.md"
                     content = result.path.read_text(encoding="utf-8")
-                    self.assertIn(f"kind={scope_kind}-{target}", content)
-                    self.assertIn(f"body={scope_kind}-{target}", content)
-                    self.assertNotIn(f"type={doc_type}", content)
-                    self.assertNotIn("envelope=discussion-draft-template", content)
-                    self.assertNotIn("template=templates/", content)
-                    self.assertNotIn("target=", content)
+                    assert f"kind={scope_kind}-{target}" in content
+                    assert f"body={scope_kind}-{target}" in content
+                    assert f"type={doc_type}" not in content
+                    assert "envelope=discussion-draft-template" not in content
+                    assert "template=templates/" not in content
+                    assert "target=" not in content
 
             suffix_results = [
                 app_create_node.create_discussion_doc(
@@ -476,14 +505,11 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 )
                 for doc_type in ("draft-requirement", "draft-design", "draft-plan")
             ]
-            self.assertEqual(
-                [result.doc_id for result in suffix_results],
-                [
+            assert [result.doc_id for result in suffix_results] == [
                     "20260312t010203z-03-draft-requirement",
                     "20260312t010203z-04-draft-design",
                     "20260312t010203z-05-draft-plan",
-                ],
-            )
+                ]
 
     def test_suffix_exhaustion_fail_fast_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -504,7 +530,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                     encoding="utf-8",
                 )
 
-            with self.assertRaisesRegex(RuntimeError, "Discussion timestamp suffix exhaustion"):
+            with pytest.raises(RuntimeError, match="Discussion timestamp suffix exhaustion"):
                 app_create_node.create_discussion_doc(
                     app_contracts.CreateDiscussionDocRequest(
                         doc_type="scratch",
@@ -515,8 +541,8 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                     ports,
                 )
 
-            self.assertEqual(events, [])
-            self.assertEqual(list(discussions_dir.glob("20260312t010203z-*-scratch-*.md")), [])
+            assert events == []
+            assert list(discussions_dir.glob("20260312t010203z-*-scratch-*.md")) == []
 
     def test_duplicate_timestamp_corruption_fail_fast_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -533,7 +559,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             (discussions_dir / "20260312t010203z-adr-first.md").write_text("first\n", encoding="utf-8")
             (discussions_dir / "20260312t010203z-disc-second.md").write_text("second\n", encoding="utf-8")
 
-            with self.assertRaisesRegex(RuntimeError, "Duplicate discussion timestamp slot detected"):
+            with pytest.raises(RuntimeError, match="Duplicate discussion timestamp slot detected"):
                 app_create_node.create_discussion_doc(
                     app_contracts.CreateDiscussionDocRequest(
                         doc_type="scratch",
@@ -544,17 +570,14 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                     ports,
                 )
 
-            self.assertEqual(events, [])
+            assert events == []
             lock_path = self._create_lock_path(specdock_dir)
-            self.assertFalse(lock_path.exists())
-            self.assertFalse(lock_path.parent.exists())
-            self.assertEqual(
-                sorted(path.name for path in discussions_dir.glob("*.md")),
-                [
+            assert not lock_path.exists()
+            assert not lock_path.parent.exists()
+            assert sorted(path.name for path in discussions_dir.glob("*.md")) == [
                     "20260312t010203z-adr-first.md",
                     "20260312t010203z-disc-second.md",
-                ],
-            )
+                ]
 
     def test_duplicate_timestamp_suffix_corruption_fail_fast_no_lock_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -571,7 +594,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             (discussions_dir / "20260312t010203z-01-adr-first.md").write_text("first\n", encoding="utf-8")
             (discussions_dir / "20260312t010203z-01-disc-second.md").write_text("second\n", encoding="utf-8")
 
-            with self.assertRaisesRegex(RuntimeError, "Duplicate discussion timestamp suffix detected"):
+            with pytest.raises(RuntimeError, match="Duplicate discussion timestamp suffix detected"):
                 app_create_node.create_discussion_doc(
                     app_contracts.CreateDiscussionDocRequest(
                         doc_type="scratch",
@@ -582,17 +605,14 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                     ports,
                 )
 
-            self.assertEqual(events, [])
+            assert events == []
             lock_path = self._create_lock_path(specdock_dir)
-            self.assertFalse(lock_path.exists())
-            self.assertFalse(lock_path.parent.exists())
-            self.assertEqual(
-                sorted(path.name for path in discussions_dir.glob("*.md")),
-                [
+            assert not lock_path.exists()
+            assert not lock_path.parent.exists()
+            assert sorted(path.name for path in discussions_dir.glob("*.md")) == [
                     "20260312t010203z-01-adr-first.md",
                     "20260312t010203z-01-disc-second.md",
-                ],
-            )
+                ]
 
     def test_duplicate_timestamp_corruption_post_lock_rescan_fail_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -611,7 +631,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             lock_path = self._create_lock_path(specdock_dir)
             lock_path.parent.mkdir(parents=True, exist_ok=True)
             lock_path.write_text(app_create_node._build_create_lock_metadata("holder"), encoding="utf-8")
-            self.assertTrue(lock_path.exists())
+            assert lock_path.exists()
 
             scan_snapshots: list[list[str]] = []
             original_scan = app_create_node._scan_discussion_timestamp_duplicate_state
@@ -629,12 +649,12 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             worker = threading.Thread(target=_release_and_corrupt)
             worker.start()
             try:
-                with patch.object(
+                with _patch_object(
                     app_create_node,
                     "_scan_discussion_timestamp_duplicate_state",
                     side_effect=_wrapped_scan,
                 ):
-                    with self.assertRaisesRegex(RuntimeError, "Duplicate discussion timestamp slot detected"):
+                    with pytest.raises(RuntimeError, match="Duplicate discussion timestamp slot detected"):
                         app_create_node.create_discussion_doc(
                             app_contracts.CreateDiscussionDocRequest(
                                 doc_type="scratch",
@@ -646,15 +666,12 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                         )
             finally:
                 worker.join(timeout=5.0)
-            self.assertFalse(worker.is_alive(), "lock release worker did not finish")
+            assert not worker.is_alive(), "lock release worker did not finish"
 
-            self.assertEqual(scan_snapshots, [[first_name, second_name]])
-            self.assertEqual(events, [])
-            self.assertFalse(lock_path.exists())
-            self.assertEqual(
-                sorted(path.name for path in discussions_dir.glob("*.md")),
-                [first_name, second_name],
-            )
+            assert scan_snapshots == [[first_name, second_name]]
+            assert events == []
+            assert not lock_path.exists()
+            assert sorted(path.name for path in discussions_dir.glob("*.md")) == [first_name, second_name]
 
     def test_malformed_discussion_candidate_fail_fast_pre_lock_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -664,35 +681,34 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             "bogus-01-adr-kickoff.md",
         )
         for malformed_name in cases:
-            with self.subTest(malformed_name=malformed_name):
-                with tempfile.TemporaryDirectory() as tmp:
-                    repo_root = Path(tmp)
-                    specdock_dir = repo_root / "spec-dock"
-                    self._prepare_discussion_templates(specdock_dir)
-                    issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
-                    events: list[str] = []
-                    ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], events=events)
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                specdock_dir = repo_root / "spec-dock"
+                self._prepare_discussion_templates(specdock_dir)
+                issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+                events: list[str] = []
+                ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], events=events)
 
-                    discussions_dir = Path(issue_record.path) / "discussions"
-                    discussions_dir.mkdir(parents=True, exist_ok=True)
-                    (discussions_dir / malformed_name).write_text("broken\n", encoding="utf-8")
+                discussions_dir = Path(issue_record.path) / "discussions"
+                discussions_dir.mkdir(parents=True, exist_ok=True)
+                (discussions_dir / malformed_name).write_text("broken\n", encoding="utf-8")
 
-                    with self.assertRaisesRegex(RuntimeError, "Malformed discussion document filename"):
-                        app_create_node.create_discussion_doc(
-                            app_contracts.CreateDiscussionDocRequest(
-                                doc_type="scratch",
-                                scope_node_id="iss-local-00001",
-                                title="Note one",
-                                slug=None,
-                            ),
-                            ports,
-                        )
+                with pytest.raises(RuntimeError, match="Malformed discussion document filename"):
+                    app_create_node.create_discussion_doc(
+                        app_contracts.CreateDiscussionDocRequest(
+                            doc_type="scratch",
+                            scope_node_id="iss-local-00001",
+                            title="Note one",
+                            slug=None,
+                        ),
+                        ports,
+                    )
 
-                    self.assertEqual(events, [])
-                    lock_path = self._create_lock_path(specdock_dir)
-                    self.assertFalse(lock_path.exists())
-                    self.assertFalse(lock_path.parent.exists())
-                    self.assertEqual(sorted(path.name for path in discussions_dir.glob("*.md")), [malformed_name])
+                assert events == []
+                lock_path = self._create_lock_path(specdock_dir)
+                assert not lock_path.exists()
+                assert not lock_path.parent.exists()
+                assert sorted(path.name for path in discussions_dir.glob("*.md")) == [malformed_name]
 
     def test_malformed_timestamp_intent_variant_fail_fast_pre_lock_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -709,7 +725,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             malformed_name = "20260329x-adr-kickoff.md"
             (discussions_dir / malformed_name).write_text("broken\n", encoding="utf-8")
 
-            with self.assertRaisesRegex(RuntimeError, "Malformed discussion document filename"):
+            with pytest.raises(RuntimeError, match="Malformed discussion document filename"):
                 app_create_node.create_discussion_doc(
                     app_contracts.CreateDiscussionDocRequest(
                         doc_type="scratch",
@@ -720,11 +736,11 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                     ports,
                 )
 
-            self.assertEqual(events, [])
+            assert events == []
             lock_path = self._create_lock_path(specdock_dir)
-            self.assertFalse(lock_path.exists())
-            self.assertFalse(lock_path.parent.exists())
-            self.assertEqual(sorted(path.name for path in discussions_dir.glob("*.md")), [malformed_name])
+            assert not lock_path.exists()
+            assert not lock_path.parent.exists()
+            assert sorted(path.name for path in discussions_dir.glob("*.md")) == [malformed_name]
 
     def test_malformed_discussion_candidate_post_lock_rescan_fail_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -734,60 +750,59 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             "bogus-01-adr-kickoff.md",
         )
         for malformed_name in cases:
-            with self.subTest(malformed_name=malformed_name):
-                with tempfile.TemporaryDirectory() as tmp:
-                    repo_root = Path(tmp)
-                    specdock_dir = repo_root / "spec-dock"
-                    self._prepare_discussion_templates(specdock_dir)
-                    issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
-                    events: list[str] = []
-                    ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], events=events)
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                specdock_dir = repo_root / "spec-dock"
+                self._prepare_discussion_templates(specdock_dir)
+                issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+                events: list[str] = []
+                ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], events=events)
 
-                    discussions_dir = Path(issue_record.path) / "discussions"
-                    discussions_dir.mkdir(parents=True, exist_ok=True)
-                    lock_path = self._create_lock_path(specdock_dir)
-                    lock_path.parent.mkdir(parents=True, exist_ok=True)
-                    lock_path.write_text(app_create_node._build_create_lock_metadata("holder"), encoding="utf-8")
-                    self.assertTrue(lock_path.exists())
+                discussions_dir = Path(issue_record.path) / "discussions"
+                discussions_dir.mkdir(parents=True, exist_ok=True)
+                lock_path = self._create_lock_path(specdock_dir)
+                lock_path.parent.mkdir(parents=True, exist_ok=True)
+                lock_path.write_text(app_create_node._build_create_lock_metadata("holder"), encoding="utf-8")
+                assert lock_path.exists()
 
-                    scan_snapshots: list[list[str]] = []
-                    original_scan = app_create_node._scan_discussion_timestamp_duplicate_state
+                scan_snapshots: list[list[str]] = []
+                original_scan = app_create_node._scan_discussion_timestamp_duplicate_state
 
-                    def _wrapped_scan(target_dir):
-                        scan_snapshots.append(sorted(path.name for path in target_dir.glob("*.md")))
-                        return original_scan(target_dir)
+                def _wrapped_scan(target_dir):
+                    scan_snapshots.append(sorted(path.name for path in target_dir.glob("*.md")))
+                    return original_scan(target_dir)
 
-                    def _release_and_corrupt() -> None:
-                        time.sleep(0.1)
-                        (discussions_dir / malformed_name).write_text("broken\n", encoding="utf-8")
-                        lock_path.unlink()
+                def _release_and_corrupt() -> None:
+                    time.sleep(0.1)
+                    (discussions_dir / malformed_name).write_text("broken\n", encoding="utf-8")
+                    lock_path.unlink()
 
-                    worker = threading.Thread(target=_release_and_corrupt)
-                    worker.start()
-                    try:
-                        with patch.object(
-                            app_create_node,
-                            "_scan_discussion_timestamp_duplicate_state",
-                            side_effect=_wrapped_scan,
-                        ):
-                            with self.assertRaisesRegex(RuntimeError, "Malformed discussion document filename"):
-                                app_create_node.create_discussion_doc(
-                                    app_contracts.CreateDiscussionDocRequest(
-                                        doc_type="scratch",
-                                        scope_node_id="iss-local-00001",
-                                        title="Note one",
-                                        slug=None,
-                                    ),
-                                    ports,
-                                )
-                    finally:
-                        worker.join(timeout=5.0)
-                    self.assertFalse(worker.is_alive(), "lock release worker did not finish")
+                worker = threading.Thread(target=_release_and_corrupt)
+                worker.start()
+                try:
+                    with _patch_object(
+                        app_create_node,
+                        "_scan_discussion_timestamp_duplicate_state",
+                        side_effect=_wrapped_scan,
+                    ):
+                        with pytest.raises(RuntimeError, match="Malformed discussion document filename"):
+                            app_create_node.create_discussion_doc(
+                                app_contracts.CreateDiscussionDocRequest(
+                                    doc_type="scratch",
+                                    scope_node_id="iss-local-00001",
+                                    title="Note one",
+                                    slug=None,
+                                ),
+                                ports,
+                            )
+                finally:
+                    worker.join(timeout=5.0)
+                assert not worker.is_alive(), "lock release worker did not finish"
 
-                    self.assertEqual(scan_snapshots, [[malformed_name]])
-                    self.assertEqual(events, [])
-                    self.assertFalse(lock_path.exists())
-                    self.assertEqual(sorted(path.name for path in discussions_dir.glob("*.md")), [malformed_name])
+                assert scan_snapshots == [[malformed_name]]
+                assert events == []
+                assert not lock_path.exists()
+                assert sorted(path.name for path in discussions_dir.glob("*.md")) == [malformed_name]
 
     def test_parallel_new_doc_allocates_unique_suffixes(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -815,7 +830,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                         time.sleep(0.1)
                 return allocated
 
-            with patch.object(app_create_node, "_allocate_discussion_doc_filename", side_effect=_slow_allocate):
+            with _patch_object(app_create_node, "_allocate_discussion_doc_filename", side_effect=_slow_allocate):
                 results = self._run_parallel_doc_create(
                     lambda req: app_create_node.create_discussion_doc(req, ports),
                     app_contracts.CreateDiscussionDocRequest(
@@ -832,11 +847,11 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                     ),
                 )
 
-            self.assertEqual(len(results), 2)
+            assert len(results) == 2
             doc_ids = sorted(result.doc_id for result in results)
-            self.assertEqual(len([doc_id for doc_id in doc_ids if "-01-" in doc_id]), 1)
-            self.assertEqual(len([doc_id for doc_id in doc_ids if "-01-" not in doc_id]), 1)
-            self.assertEqual(sorted(result.doc_type for result in results), ["adr", "disc"])
+            assert len([doc_id for doc_id in doc_ids if "-01-" in doc_id]) == 1
+            assert len([doc_id for doc_id in doc_ids if "-01-" not in doc_id]) == 1
+            assert sorted(result.doc_type for result in results) == ["adr", "disc"]
 
     def test_invalid_slug_fail_fast_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -849,7 +864,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], events=events)
             discussions_dir = Path(issue_record.path) / "discussions"
 
-            with self.assertRaisesRegex(RuntimeError, "--slug is invalid"):
+            with pytest.raises(RuntimeError, match="--slug is invalid"):
                 app_create_node.create_discussion_doc(
                     app_contracts.CreateDiscussionDocRequest(
                         doc_type="adr",
@@ -860,8 +875,8 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                     ports,
                 )
 
-            self.assertEqual(events, [])
-            self.assertEqual(list(discussions_dir.glob("*.md")), [])
+            assert events == []
+            assert list(discussions_dir.glob("*.md")) == []
 
     def test_new_node_non_regression_for_shared_file_edits(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -909,9 +924,9 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 ports,
             )
 
-            self.assertEqual(result.node.kind, "issue")
-            self.assertEqual(result.node.parent_id, "epic-local-00001")
-            self.assertTrue((result.node.path / "README.md").exists())
+            assert result.node.kind == "issue"
+            assert result.node.parent_id == "epic-local-00001"
+            assert (result.node.path / "README.md").exists()
 
     def test_renderer_text_regression(self) -> None:
         _runtime_app, app_contracts, _app_create_node, _app_ports, _new_commands, _infra_contracts, presentation_cli_text = _runtime_modules()
@@ -926,17 +941,14 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             warnings=[],
         )
         text = presentation_cli_text.render_new_doc_text(result)
-        self.assertEqual(
-            text.stdout_lines,
-            [
+        assert text.stdout_lines == [
                 (
                     "spec-dock: ok (new doc) "
                     "type=adr id=20260312t010203z-03-adr scope=iss-local-00001 "
                     "path=spec-dock/initiatives/init-local-00001-auth/epics/epic-local-00001-login/"
                     "issues/iss-local-00001-refresh-token/discussions/20260312t010203z-03-adr-decision-one.md"
                 )
-            ],
-        )
+            ]
 
     def test_command_new_doc_smoke(self) -> None:
         _runtime_app, app_contracts, _app_create_node, _app_ports, new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -984,15 +996,8 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             use_cases,
         )
 
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0].doc_type, "adr")
-        self.assertEqual(calls[0].scope_node_id, "iss-local-00001")
-        self.assertEqual(outcome.exit_code, 0)
-        self.assertIn(
-            "spec-dock: ok (new doc) type=adr id=20260312t010203z-adr",
-            "\n".join(outcome.text.stdout_lines),
-        )
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert len(calls) == 1
+        assert calls[0].doc_type == "adr"
+        assert calls[0].scope_node_id == "iss-local-00001"
+        assert outcome.exit_code == 0
+        assert "spec-dock: ok (new doc) type=adr id=20260312t010203z-adr" in "\n".join(outcome.text.stdout_lines)

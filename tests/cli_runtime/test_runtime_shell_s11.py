@@ -1,13 +1,13 @@
 import argparse
 import ast
-import contextlib
 import io
 import json
 import sys
-import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+import contextlib
+import pytest
 _LEGACY_HELPER_MODULES = {"io_json", "github", "render_md", "render_puml", "active", "nodes", "ids"}
 
 
@@ -65,7 +65,7 @@ def _import_root(imported: str) -> str:
     return _normalize_import_module(imported).split(".", 1)[0]
 
 
-class RuntimeShellS11Tests(unittest.TestCase):
+class TestRuntimeShellS11:
     def test_import_scan_detects_legacy_helper_import_styles(self) -> None:
         tree = ast.parse(
             "import spec_dock_runtime.io_json\n"
@@ -73,11 +73,11 @@ class RuntimeShellS11Tests(unittest.TestCase):
             "from .. import io_json\n"
         )
         imported = _iter_import_modules(tree)
-        self.assertIn("spec_dock_runtime.io_json", imported)
-        self.assertIn("io_json", imported)
+        assert "spec_dock_runtime.io_json" in imported
+        assert "io_json" in imported
 
         roots = {_import_root(module) for module in imported}
-        self.assertIn("io_json", roots & _LEGACY_HELPER_MODULES)
+        assert "io_json" in roots & _LEGACY_HELPER_MODULES
 
     def test_import_root_normalizes_fully_qualified_layer_modules(self) -> None:
         tree = ast.parse(
@@ -86,8 +86,8 @@ class RuntimeShellS11Tests(unittest.TestCase):
         )
         imported = _iter_import_modules(tree)
         roots = {_import_root(module) for module in imported}
-        self.assertIn("domain", roots)
-        self.assertIn("infra", roots)
+        assert "domain" in roots
+        assert "infra" in roots
 
     def test_parser_help_and_argparse_failure_regression(self) -> None:
         (_runtime_app, _app_contracts, _cli_dispatch, cli_parser, cli_registry, _cmd_contracts, _domain_models) = (
@@ -99,20 +99,20 @@ class RuntimeShellS11Tests(unittest.TestCase):
 
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            with self.assertRaises(SystemExit) as cm:
+            with pytest.raises(SystemExit) as cm:
                 parser.parse_args(["new", "--help"])
-        self.assertEqual(cm.exception.code, 0)
-        self.assertIn("Create a new initiative", stdout.getvalue())
+        assert cm.value.code == 0
+        assert "Create a new initiative" in stdout.getvalue()
 
         stderr = io.StringIO()
         with contextlib.redirect_stderr(stderr):
-            with self.assertRaises(SystemExit) as cm:
+            with pytest.raises(SystemExit) as cm:
                 parser.parse_args(["active", "set", "--initiative", "1"])
-        self.assertEqual(cm.exception.code, 2)
+        assert cm.value.code == 2
         error_text = stderr.getvalue()
-        self.assertIn("unrecognized arguments: --initiative", error_text)
-        self.assertIn("'active set' supports explicit targets:", error_text)
-        self.assertIn("active set --id <node-id>", error_text)
+        assert "unrecognized arguments: --initiative" in error_text
+        assert "'active set' supports explicit targets:" in error_text
+        assert "active set --id <node-id>" in error_text
 
     def test_dispatch_business_exit_ownership(self) -> None:
         (_runtime_app, _app_contracts, cli_dispatch, _cli_parser, _cli_registry, cmd_contracts, _domain_models) = (
@@ -152,15 +152,12 @@ class RuntimeShellS11Tests(unittest.TestCase):
         stderr = io.StringIO()
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             exit_code = cli_dispatch.dispatch(ns, registry, None)  # type: ignore[arg-type]
-        self.assertEqual(exit_code, 3)
-        self.assertEqual(stdout.getvalue(), "")
-        self.assertEqual(
-            stderr.getvalue().splitlines(),
-            [
+        assert exit_code == 3
+        assert stdout.getvalue() == ""
+        assert stderr.getvalue().splitlines() == [
                 "spec-dock: (warn) deps_topology_external_ref:iss-local-99999",
                 "spec-dock: blocked (deps check) target=iss-local-00001 ready=false blockers=1",
-            ],
-        )
+            ]
 
     def test_representative_command_wrapper_smoke(self) -> None:
         (_runtime_app, app_contracts, cli_dispatch, cli_parser, cli_registry, _cmd_contracts, domain_models) = (
@@ -210,13 +207,13 @@ class RuntimeShellS11Tests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
 
-        self.assertEqual(exit_code, 0)
+        assert exit_code == 0
         request = captured.get("request")
-        self.assertIsNotNone(request)
-        self.assertEqual(request.target.kind, "github_issue")
-        self.assertEqual(request.target.github_issue_number, 123)
-        self.assertIn("spec-dock: ok (active set) target=github#123", stdout.getvalue())
-        self.assertEqual(stderr.getvalue(), "")
+        assert request is not None
+        assert request.target.kind == "github_issue"
+        assert request.target.github_issue_number == 123
+        assert "spec-dock: ok (active set) target=github#123" in stdout.getvalue()
+        assert stderr.getvalue() == ""
 
     def test_close_command_wrapper_smoke(self) -> None:
         (_runtime_app, app_contracts, cli_dispatch, cli_parser, cli_registry, _cmd_contracts, domain_models) = (
@@ -270,13 +267,13 @@ class RuntimeShellS11Tests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
 
-        self.assertEqual(exit_code, 0)
+        assert exit_code == 0
         request = captured.get("request")
-        self.assertIsNotNone(request)
-        self.assertEqual(request.target.kind, "github_issue")
-        self.assertEqual(request.target.github_issue_number, 123)
-        self.assertIn("spec-dock: ok (close) target=github#123", stdout.getvalue())
-        self.assertEqual(stderr.getvalue(), "")
+        assert request is not None
+        assert request.target.kind == "github_issue"
+        assert request.target.github_issue_number == 123
+        assert "spec-dock: ok (close) target=github#123" in stdout.getvalue()
+        assert stderr.getvalue() == ""
 
     def test_delete_command_wrapper_smoke(self) -> None:
         (_runtime_app, app_contracts, cli_dispatch, cli_parser, cli_registry, _cmd_contracts, _domain_models) = (
@@ -331,13 +328,13 @@ class RuntimeShellS11Tests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
 
-        self.assertEqual(exit_code, 0)
+        assert exit_code == 0
         request = captured.get("request")
-        self.assertIsNotNone(request)
-        self.assertEqual(request.positional_target, "iss-local-00001")
-        self.assertTrue(request.confirmed)
-        self.assertIn("spec-dock: ok (delete) target=iss-local-00001", stdout.getvalue())
-        self.assertEqual(stderr.getvalue(), "")
+        assert request is not None
+        assert request.positional_target == "iss-local-00001"
+        assert request.confirmed
+        assert "spec-dock: ok (delete) target=iss-local-00001" in stdout.getvalue()
+        assert stderr.getvalue() == ""
 
     def test_deps_json_stdout_only_and_text_warning_regression(self) -> None:
         (_runtime_app, app_contracts, cli_dispatch, cli_parser, cli_registry, _cmd_contracts, domain_models) = (
@@ -387,19 +384,19 @@ class RuntimeShellS11Tests(unittest.TestCase):
         stderr_json = io.StringIO()
         with contextlib.redirect_stdout(stdout_json), contextlib.redirect_stderr(stderr_json):
             exit_code_json = cli_dispatch.dispatch(ns_json, registry, use_cases)
-        self.assertEqual(exit_code_json, 0)
-        self.assertEqual(stderr_json.getvalue(), "")
+        assert exit_code_json == 0
+        assert stderr_json.getvalue() == ""
         payload = json.loads(stdout_json.getvalue())
-        self.assertEqual(payload["warnings"], ["gh_fetch_failed"])
+        assert payload["warnings"] == ["gh_fetch_failed"]
 
         ns_text = parser.parse_args(["deps", "check", "iss-local-00001"])
         stdout_text = io.StringIO()
         stderr_text = io.StringIO()
         with contextlib.redirect_stdout(stdout_text), contextlib.redirect_stderr(stderr_text):
             exit_code_text = cli_dispatch.dispatch(ns_text, registry, use_cases)
-        self.assertEqual(exit_code_text, 0)
-        self.assertIn("spec-dock: ok (deps check)", stdout_text.getvalue())
-        self.assertIn("spec-dock: (warn) gh_fetch_failed", stderr_text.getvalue())
+        assert exit_code_text == 0
+        assert "spec-dock: ok (deps check)" in stdout_text.getvalue()
+        assert "spec-dock: (warn) gh_fetch_failed" in stderr_text.getvalue()
 
     def test_staged_delegation_path_regression(self) -> None:
         (runtime_app, _app_contracts, _cli_dispatch, _cli_parser, _cli_registry, _cmd_contracts, _domain_models) = (
@@ -436,14 +433,11 @@ class RuntimeShellS11Tests(unittest.TestCase):
             runtime_app._cli_build_runtime = original_build_runtime
             runtime_app._cli_dispatch = original_dispatch
 
-        self.assertEqual(exit_code, 17)
-        self.assertEqual(
-            calls,
-            [
+        assert exit_code == 17
+        assert calls == [
                 ("parse_args", ["validate"]),
                 ("dispatch", "validate", "registry", "use_cases"),
-            ],
-        )
+            ]
 
     def test_rollback_ready_wrapper_swap_smoke(self) -> None:
         (_runtime_app, app_contracts, cli_dispatch, cli_parser, cli_registry, cmd_contracts, _domain_models) = (
@@ -490,8 +484,8 @@ class RuntimeShellS11Tests(unittest.TestCase):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
-        self.assertEqual(exit_code, 9)
-        self.assertEqual(stdout.getvalue().strip(), "spec-dock: ok (swapped wrapper)")
+        assert exit_code == 9
+        assert stdout.getvalue().strip() == "spec-dock: ok (swapped wrapper)"
 
     def test_final_api_call_site_and_structural_regression(self) -> None:
         (runtime_app, _app_contracts, _cli_dispatch, _cli_parser, _cli_registry, _cmd_contracts, _domain_models) = (
@@ -509,7 +503,7 @@ class RuntimeShellS11Tests(unittest.TestCase):
             ),
             None,
         )
-        self.assertIsNotNone(main_node, "main() not found in app.py")
+        assert main_node is not None, "main() not found in app.py"
 
         call_names: set[str] = set()
         for node in ast.walk(main_node):
@@ -520,10 +514,10 @@ class RuntimeShellS11Tests(unittest.TestCase):
             elif isinstance(node.func, ast.Attribute):
                 call_names.add(node.func.attr)
 
-        self.assertIn("_cli_build_registry", call_names)
-        self.assertIn("_cli_build_parser", call_names)
-        self.assertIn("_cli_build_runtime", call_names)
-        self.assertIn("_cli_dispatch", call_names)
+        assert "_cli_build_registry" in call_names
+        assert "_cli_build_parser" in call_names
+        assert "_cli_build_runtime" in call_names
+        assert "_cli_dispatch" in call_names
 
         legacy_helper_calls = {
             "_new_initiative",
@@ -540,7 +534,7 @@ class RuntimeShellS11Tests(unittest.TestCase):
             "_import_issue",
             "_validate",
         }
-        self.assertTrue(call_names.isdisjoint(legacy_helper_calls))
+        assert call_names.isdisjoint(legacy_helper_calls)
 
         runtime_root = app_source_path.parent
         layer_dirs = ("commands", "application", "infra", "presentation", "cli")
@@ -551,11 +545,7 @@ class RuntimeShellS11Tests(unittest.TestCase):
                 tree = ast.parse(module_path.read_text(encoding="utf-8"))
                 for imported in _iter_import_modules(tree):
                     root = _import_root(imported)
-                    self.assertNotIn(
-                        root,
-                        _LEGACY_HELPER_MODULES,
-                        f"legacy helper direct import in {module_path}: {imported}",
-                    )
+                    assert root not in _LEGACY_HELPER_MODULES, f"legacy helper direct import in {module_path}: {imported}"
 
         # commands/* must stay as thin shell layer: no direct domain/infra/app imports.
         commands_dir = app_source_path.parent / "commands"
@@ -565,7 +555,7 @@ class RuntimeShellS11Tests(unittest.TestCase):
             tree = ast.parse(module_path.read_text(encoding="utf-8"))
             for imported in _iter_import_modules(tree):
                 root = _import_root(imported)
-                self.assertNotIn(root, {"domain", "infra", "app"}, f"forbidden import in {module_path}: {imported}")
+                assert root not in {"domain", "infra", "app"}, f"forbidden import in {module_path}: {imported}"
 
         # application/* may only refer to infra through contracts.
         application_dir = app_source_path.parent / "application"
@@ -577,11 +567,7 @@ class RuntimeShellS11Tests(unittest.TestCase):
                 root = _import_root(imported)
                 if root != "infra":
                     continue
-                self.assertEqual(
-                    _normalize_import_module(imported),
-                    "infra.contracts",
-                    f"application layer must not import infra concrete module: {module_path}: {imported}",
-                )
+                assert _normalize_import_module(imported) == "infra.contracts", f"application layer must not import infra concrete module: {module_path}: {imported}"
 
         # infra/* must not depend on shell/entrypoint layers.
         infra_dir = app_source_path.parent / "infra"
@@ -592,11 +578,7 @@ class RuntimeShellS11Tests(unittest.TestCase):
             tree = ast.parse(module_path.read_text(encoding="utf-8"))
             for imported in _iter_import_modules(tree):
                 root = _import_root(imported)
-                self.assertNotIn(
-                    root,
-                    forbidden_infra_roots,
-                    f"infra layer must not depend on shell layers: {module_path}: {imported}",
-                )
+                assert root not in forbidden_infra_roots, f"infra layer must not depend on shell layers: {module_path}: {imported}"
 
     def test_app_no_command_wrapper_regression(self) -> None:
         (runtime_app, _app_contracts, _cli_dispatch, _cli_parser, _cli_registry, _cmd_contracts, _domain_models) = (
@@ -629,30 +611,23 @@ class RuntimeShellS11Tests(unittest.TestCase):
             "_run_new_doc",
             "_run_import_node",
         }
-        self.assertTrue(
-            function_names.isdisjoint(forbidden_wrappers),
-            f"forbidden command wrappers remain in app.py: {sorted(function_names & forbidden_wrappers)}",
-        )
+        assert function_names.isdisjoint(forbidden_wrappers), f"forbidden command wrappers remain in app.py: {sorted(function_names & forbidden_wrappers)}"
 
         bootstrap_source_path = app_source_path.parent / "cli" / "bootstrap.py"
         bootstrap_source = bootstrap_source_path.read_text(encoding="utf-8")
-        self.assertIn("application_create_initiative(req, ports)", bootstrap_source)
-        self.assertIn("application_import_issue(req, ports)", bootstrap_source)
-        self.assertIn("application_set_active(req, ports)", bootstrap_source)
-        self.assertIn("application_sync(req, ports)", bootstrap_source)
-        self.assertIn("application_check_deps(req, ports)", bootstrap_source)
-        self.assertIn("application_validate_tree(req, ports)", bootstrap_source)
-        self.assertIn("from ..application.create_node import create_initiative as application_create_initiative", bootstrap_source)
-        self.assertIn("from ..application.import_node import import_issue as application_import_issue", bootstrap_source)
-        self.assertNotIn("from .. import app as runtime_app", bootstrap_source)
-        self.assertNotIn("runtime_app._application_", bootstrap_source)
-        self.assertNotIn("runtime_app._new_", bootstrap_source)
-        self.assertNotIn("runtime_app._import_", bootstrap_source)
-        self.assertNotIn("runtime_app._active_", bootstrap_source)
-        self.assertNotIn("runtime_app._sync(", bootstrap_source)
-        self.assertNotIn("runtime_app._deps_check(", bootstrap_source)
-        self.assertNotIn("runtime_app._validate(", bootstrap_source)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert "application_create_initiative(req, ports)" in bootstrap_source
+        assert "application_import_issue(req, ports)" in bootstrap_source
+        assert "application_set_active(req, ports)" in bootstrap_source
+        assert "application_sync(req, ports)" in bootstrap_source
+        assert "application_check_deps(req, ports)" in bootstrap_source
+        assert "application_validate_tree(req, ports)" in bootstrap_source
+        assert "from ..application.create_node import create_initiative as application_create_initiative" in bootstrap_source
+        assert "from ..application.import_node import import_issue as application_import_issue" in bootstrap_source
+        assert "from .. import app as runtime_app" not in bootstrap_source
+        assert "runtime_app._application_" not in bootstrap_source
+        assert "runtime_app._new_" not in bootstrap_source
+        assert "runtime_app._import_" not in bootstrap_source
+        assert "runtime_app._active_" not in bootstrap_source
+        assert "runtime_app._sync(" not in bootstrap_source
+        assert "runtime_app._deps_check(" not in bootstrap_source
+        assert "runtime_app._validate(" not in bootstrap_source

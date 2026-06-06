@@ -5,42 +5,39 @@ from pathlib import Path
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
-class UpdateCommandTests(CliRuntimeHarness):
+class TestUpdateCommand(CliRuntimeHarness):
     def test_update_help_describes_upstream_no_cache_and_default_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             p = self._run_runtime_capture(target, ["update", "--help"])
 
-            self.assertEqual(p.returncode, 0, msg=f"stdout:\n{p.stdout}\nstderr:\n{p.stderr}")
-            self.assertIn("update", p.stdout)
-            self.assertIn("uvx --no-cache", p.stdout)
-            self.assertIn("git+https://github.com/chemitaro/spec-dock", p.stdout)
-            self.assertIn("current working directory", p.stdout)
+            assert p.returncode == 0, f"stdout:\n{p.stdout}\nstderr:\n{p.stderr}"
+            assert "update" in p.stdout
+            assert "uvx --no-cache" in p.stdout
+            assert "git+https://github.com/chemitaro/spec-dock" in p.stdout
+            assert "current working directory" in p.stdout
 
     def test_update_runs_uvx_no_cache_with_default_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             bin_dir = target / ".test-bin"
             args_log = target / "uvx-args.txt"
             self._make_uvx_stub(bin_dir, args_log=args_log)
 
             p = self._run_runtime_capture(target, ["update"], env={"PATH": str(bin_dir)})
 
-            self.assertEqual(p.returncode, 0, msg=f"stdout:\n{p.stdout}\nstderr:\n{p.stderr}")
-            self.assertEqual(
-                args_log.read_text(encoding="utf-8").splitlines(),
-                [
+            assert p.returncode == 0, f"stdout:\n{p.stdout}\nstderr:\n{p.stderr}"
+            assert args_log.read_text(encoding="utf-8").splitlines() == [
                     "--no-cache",
                     "--from",
                     "git+https://github.com/chemitaro/spec-dock",
                     "spec-dock",
                     "update",
                     str(target.resolve()),
-                ],
-            )
+                ]
 
     def test_update_passes_explicit_target_to_installer_update(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -49,51 +46,51 @@ class UpdateCommandTests(CliRuntimeHarness):
             explicit_target = root / "target-project"
             managed.mkdir()
             explicit_target.mkdir()
-            self.assertEqual(main(["init", str(managed)]), 0)
+            assert main(["init", str(managed)]) == 0
             bin_dir = root / ".test-bin"
             args_log = root / "uvx-args.txt"
             self._make_uvx_stub(bin_dir, args_log=args_log)
 
             p = self._run_runtime_capture(managed, ["update", "../target-project"], env={"PATH": str(bin_dir)})
 
-            self.assertEqual(p.returncode, 0, msg=f"stdout:\n{p.stdout}\nstderr:\n{p.stderr}")
-            self.assertEqual(args_log.read_text(encoding="utf-8").splitlines()[-1], str(explicit_target.resolve()))
+            assert p.returncode == 0, f"stdout:\n{p.stdout}\nstderr:\n{p.stderr}"
+            assert args_log.read_text(encoding="utf-8").splitlines()[-1] == str(explicit_target.resolve())
 
     def test_update_propagates_subprocess_failure_output_and_exit_code(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             bin_dir = target / ".test-bin"
             self._make_uvx_stub(bin_dir, stdout="stub stdout", stderr="stub stderr", exit_code=7)
 
             p = self._run_runtime_capture(target, ["update"], env={"PATH": str(bin_dir)})
 
-            self.assertEqual(p.returncode, 7)
-            self.assertIn("stub stdout", p.stdout)
-            self.assertIn("stub stderr", p.stderr)
+            assert p.returncode == 7
+            assert "stub stdout" in p.stdout
+            assert "stub stderr" in p.stderr
 
     def test_update_missing_uvx_fails_with_actionable_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             empty_bin = target / ".empty-bin"
             empty_bin.mkdir()
 
             p = self._run_runtime_capture(target, ["update"], env={"PATH": str(empty_bin)})
 
-            self.assertNotEqual(p.returncode, 0)
-            self.assertIn("uvx could not be executed", p.stderr)
-            self.assertIn("PATH", p.stderr)
+            assert p.returncode != 0
+            assert "uvx could not be executed" in p.stderr
+            assert "PATH" in p.stderr
 
     def test_update_rejects_force_option(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             p = self._run_runtime_capture(target, ["update", "--force"])
 
-            self.assertNotEqual(p.returncode, 0)
-            self.assertIn("unrecognized arguments: --force", p.stderr)
+            assert p.returncode != 0
+            assert "unrecognized arguments: --force" in p.stderr
 
     def test_update_rejects_source_and_cache_overrides_without_invoking_uvx(self) -> None:
         cases = (
@@ -102,20 +99,19 @@ class UpdateCommandTests(CliRuntimeHarness):
         )
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             bin_dir = target / ".test-bin"
             args_log = target / "uvx-args.txt"
             self._make_uvx_stub(bin_dir, args_log=args_log)
 
             for args, rejected_option in cases:
-                with self.subTest(args=args):
-                    args_log.unlink(missing_ok=True)
+                args_log.unlink(missing_ok=True)
 
-                    p = self._run_runtime_capture(target, args, env={"PATH": str(bin_dir)})
+                p = self._run_runtime_capture(target, args, env={"PATH": str(bin_dir)})
 
-                    self.assertNotEqual(p.returncode, 0)
-                    self.assertIn(f"unrecognized arguments: {rejected_option}", p.stderr)
-                    self.assertFalse(args_log.exists(), "uvx must not be invoked for rejected options")
+                assert p.returncode != 0
+                assert f"unrecognized arguments: {rejected_option}" in p.stderr
+                assert not args_log.exists(), "uvx must not be invoked for rejected options"
 
     def _make_uvx_stub(
         self,
