@@ -318,7 +318,7 @@ result:
 | existing / new | new PR created after confirming no existing PR for `iss-00166-align-templates-as-scaffolds-and-examples` |
 | selected base | `main` |
 | base-resolution source | `refs/remotes/origin/HEAD` -> `origin/main`; branch-specific `gh-merge-base` unset |
-| base conflict / handling | none observed |
+| base conflict / handling | initial PR creation had no base conflict; after `origin/main` advanced, PR #168 reported `mergeStateStatus=DIRTY`, so `origin/main` was merged locally and the single conflict in `tests/unit/infra/test_init_update.py` was resolved by preserving both `main` test-layout/snapshot updates and `iss-00166` snapshot additions |
 | draft / ready decision | ready PR; local final gates had passed before PR creation |
 | head branch | `iss-00166-align-templates-as-scaffolds-and-examples` |
 | initial head SHA | `cc833cb4130d8f48efc8ace9ffb0bed53f855d8e` |
@@ -337,9 +337,9 @@ result:
 | failure evidence | GitHub Actions job `27057305457` / `79863906790`; `python -m unittest discover -s tests/unit` failed |
 | failure cause | tests still expected old template / clarification / dogfooding snapshot contract after S01/S02/S90 context-surface changes |
 | repair action | updated `tests/test_init_update.py` scaffold wording, clarification contract fragments, routing contract allowance, and checked-in dogfooding snapshot constants |
-| local repair verification | `python -m unittest tests.test_init_update.TestInitUpdate.test_spec_document_templates_keep_policy_out_of_scaffold` pass; `python -m unittest discover -s tests -p 'test_init_update.py'` pass (`210 tests`) |
-| fix loop count / history | 1 repair attempt; no code/runtime behavior changes |
-| current merge-prepared decision | pending repaired commit push and PR re-monitor |
+| local repair verification | pre-merge: `python -m unittest tests.test_init_update.TestInitUpdate.test_spec_document_templates_keep_policy_out_of_scaffold` pass; `python -m unittest discover -s tests -p 'test_init_update.py'` pass (`210 tests`). post-merge with `origin/main`: `python -m unittest discover -s tests/unit` pass (`421 tests`); `./spec-dock/scripts/spec-dock validate` pass (`nodes=86`); `git diff --check` pass |
+| fix loop count / history | 2 repair attempts: test contract update, then `origin/main` merge conflict resolution for the new `tests/unit` layout and `iss-00167` snapshot |
+| current merge-prepared decision | pending merge-resolution commit push and PR re-monitor |
 | unresolved review-thread limitation | not yet determined for repaired head |
 
 ## 省略/例外メモ
