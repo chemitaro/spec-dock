@@ -283,7 +283,7 @@ git diff --check
   - findings: none
   - review_status: pass
   - notes: previous shim finding resolved; scope is harness-only; replacement assertions preserve checked conditions; downstream migration remains S03 risk.
-- Commit gate: pending at time of report update.
+- Commit gate: committed as `d2d6871c test(runtime): harnessをpytestネイティブ化`.
 
 #### 仕様解釈 / 判断記録
 
@@ -356,7 +356,7 @@ git diff --check
   - findings: none
   - review_status: pass
   - notes: no P0/P1/P2 finding; no old unittest API residue; no test function deletion; no out-of-scope diff; no new xfail; S03 step commit possible.
-- Commit gate: pending at time of report update.
+- Commit gate: committed as `67a94d31 test(runtime): CLIランタイムテストをpytestへ移行`.
 
 #### 仕様解釈 / 判断記録
 
@@ -561,7 +561,7 @@ git diff --check
   - reviewer: `019e9c31-7940-74d3-87d3-a037d28a7b0f`
   - review_status: pass
   - summary: no remaining actionable S05 correctness issues; report now records delegated adoption, D-015/D-016, Step/Test Contract Closure, and scoped grep plus infra/unit pytest evidence.
-- Commit gate: pending at time of report update.
+- Commit gate: committed as `fbb7c012 test(pytest): infraユニットテストをpytestへ移行`.
 
 #### 仕様解釈 / 判断記録
 
@@ -692,7 +692,7 @@ git diff --check
   - reviewer: `019e9c3a-3d26-70a1-9d3a-ff8a17bdce9a`
   - review_status: pass
   - summary: no findings; previous stale AGENTS lane/path issue is resolved, provider CI command assertion is coherent, retired lane/root test paths are absent, and S08 lane evidence is sufficient.
-- Commit gate: pending at time of report update.
+- Commit gate: committed as `c17bf78d docs(pytest): unittest不在検証のS08証跡を記録`.
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 
@@ -746,7 +746,7 @@ git diff --check
   - reviewer: `019e9c3a-3e1b-7e11-a137-917fea79caa9`
   - review_status: pass
   - summary: no findings; prior P1 gaps are resolved, S08/S90 evidence is recorded with fresh gates, and D-017 is traceable to requirement/design/plan scope rather than unsupported report-only durable policy.
-- Commit gate: pending at time of report update.
+- Commit gate: committed as `3aaf1d1b docs(pytest): docsとCIをpytest実行契約へ切り替え`.
 
 #### 仕様解釈 / 判断記録
 
@@ -819,24 +819,24 @@ git diff --check
 
 #### レビュー / コミットゲート
 - S99 qa-reviewer gate: pass.
-  - reviewer: `019e9c53-f4c2-7cc3-9f87-4915dca1dbd3`
+  - reviewer: `019e9c6c-6cc2-7aa1-baa9-fc55d4bc3a4d`
   - review_status: pass
-  - summary: no findings; test/API grep and stale docs/CI grep are clean, pytest is the only configured runner dependency, full suite passed, and no assertion weakening, hidden unittest dependency, test deletion, or new xfail usage was found.
+  - summary: no findings; pytest discovery is explicitly scoped with `testpaths`, collect-only discovers 1082 tests, no residual unittest API / stale command / xfail markers were found, and S99 closure coverage is sufficient.
 - S99 code-reviewer gate: pass.
-  - reviewer: `019e9c54-156d-7363-aa55-1f6e88312133`
+  - reviewer: `019e9c6c-9706-7802-9c91-bfec836f50b6`
   - review_status: pass
-  - summary: provider CI runs full `uv run pytest`, product runtime source is unchanged, final verification supports the migration, and the duplicate S99 report ledger finding was addressed by this report cleanup.
+  - summary: no findings; provider CI runs exact full `uv run pytest`, pytest config uses `testpaths = ["tests"]`, old unittest runner / API searches have no actionable residue, and S99 report evidence is reliable for closeout.
 - S99 spec-reviewer gate: pass.
-  - reviewer: `019e9c54-7847-7042-b2d0-1e0ddb5fa159`
+  - reviewer: `019e9c6c-c879-7170-a03b-e131752e8c95`
   - review_status: pass
-  - summary: no findings; previous P1/P2 findings are resolved, single S99 ledger and Closure Coverage are sufficient, AC-001..AC-009 and EC-001..EC-007 have closure evidence, and no user-intent blocker or unsupported report-only durable workflow decision was found.
-- Commit gate: pending at time of report update.
+  - summary: no findings; pytest config, S99 mandatory command evidence, tc-012 final QA/code/spec reviewer closure, AC/EC coverage, resolved decision ledger entries, and single S99 section are sufficient for PR creation after pass.
+- Commit gate: final S99 report / pytest config evidence is carried by the final report commit that contains this record; the exact commit hash is recorded in the PR summary after commit creation.
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S99 | `tc-011`, `tc-012` | full pytest migration is proven by full commands, grep absence, and three final reviewers | tests grep no output; docs/CI grep no output; `pyproject.toml` testpaths config present; `uv run pytest --version` -> pytest 9.0.3; `uv run pytest --collect-only` -> 1082 tests collected; `spec-dock validate` pass; unit / integration / cli_runtime lanes pass; `uv run pytest` -> 1006 passed, 76 skipped; `git diff --check` pass; QA reviewer pass `019e9c53-f4c2-7cc3-9f87-4915dca1dbd3`; code-reviewer pass `019e9c54-156d-7363-aa55-1f6e88312133`; spec-reviewer pass `019e9c54-7847-7042-b2d0-1e0ddb5fa159` | passed | final QA / code / spec reviewer gates passed |
+| S99 | `tc-011`, `tc-012` | full pytest migration is proven by full commands, grep absence, and three final reviewers | tests grep no output; docs/CI grep no output; `pyproject.toml` testpaths config present; `uv run pytest --version` -> pytest 9.0.3; `uv run pytest --collect-only` -> 1082 tests collected; `spec-dock validate` pass; unit / integration / cli_runtime lanes pass; `uv run pytest` -> 1006 passed, 76 skipped; `git diff --check` pass; QA reviewer pass `019e9c6c-6cc2-7aa1-baa9-fc55d4bc3a4d`; code-reviewer pass `019e9c6c-9706-7802-9c91-bfec836f50b6`; spec-reviewer pass `019e9c6c-c879-7170-a03b-e131752e8c95` | passed | final QA / code / spec reviewer gates passed |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 
@@ -857,7 +857,7 @@ git diff --check
 | AC-006 | acceptance | S08 tests grep no output; S99 tests grep no output | passed | no permanent `unittest` framework dependency remains in tests |
 | AC-007 | acceptance | S90 README / AGENTS / provider CI cutover; S99 docs/CI grep no output | passed | stale unittest commands and retired paths removed from docs / CI contract |
 | AC-008 | acceptance | Step-local reviewer passes, S99 QA reviewer pass, full lane / full suite verification | passed | assertion strength / hermeticity preservation reviewed |
-| AC-009 | acceptance | Parent epic boundary retained in plan/report; S99 spec-reviewer pass `019e9c54-7847-7042-b2d0-1e0ddb5fa159` | passed | parent Epic first-wave boundary preserved |
+| AC-009 | acceptance | Parent epic boundary retained in plan/report; S99 spec-reviewer pass `019e9c6c-c879-7170-a03b-e131752e8c95` | passed | parent Epic first-wave boundary preserved |
 | EC-001 | edge case | S01 and S99 collect-only evidence | passed | collection succeeds under pytest config |
 | EC-002 | edge case | S03 / S04 / S05 reviewer evidence for parametrization or labeled assertions; S99 QA reviewer pass | passed | former subTest visibility preserved |
 | EC-003 | edge case | S03 / S04 / S05 exception migration evidence; S99 QA reviewer pass | passed | exception expectations use pytest-native assertions where applicable |
@@ -869,3 +869,33 @@ git diff --check
 #### 変更したファイル
 - `pyproject.toml` - pytest collection scope を `tests` 配下に明示。
 - `report.md` - final gate evidence and Closure Coverage を更新。
+
+### PR delivery gate
+
+#### 対象
+- PR: `#169` `test(pytest): テスト基盤をpytestへ移行`
+- URL: `https://github.com/chemitaro/spec-dock/pull/169`
+- Closing issue: `#167`
+- Head branch: `iss-00167-migrate-tests-to-pytest`
+- Base branch: `main`
+
+#### 実施内容
+- `iss-00167-migrate-tests-to-pytest` を `origin` へ push した。
+- GitHub PR #169 を作成し、`Closes #167` を本文に記録した。
+- PR #168 への直接統合は、既存 issue docs の大きな added-in-both 競合が出るため、この時点では #167 issue-scoped PR として delivery した。
+
+#### PR 状態 / checks
+```bash
+gh pr view 169 --repo chemitaro/spec-dock --json mergeable,mergeStateStatus,closingIssuesReferences,statusCheckRollup
+# mergeable: MERGEABLE
+# mergeStateStatus: UNSTABLE while checks were running; checks later passed.
+# closingIssuesReferences: #167
+
+gh pr checks 169 --repo chemitaro/spec-dock --watch --interval 10
+# validate: pass (8s / 9s)
+# provider-tests: pass (9m22s / 9m48s)
+```
+
+#### 結果
+- PR #169 is merge-prepared from the issue perspective after checks passed.
+- Report update itself requires one final report-only push and check refresh before `issue finish`.
