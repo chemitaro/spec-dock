@@ -3,267 +3,296 @@
 ID: "iss-00162"
 タイトル: "Align Skill Docs Template Context Surfaces"
 関連GitHub: ["#162"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-06"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00158", "init-local-00003"]
 ---
 
-# iss-00162 Align Skill Docs Template Context Surfaces — 実装計画（実行契約 / Execution Contract）
-
-> このテンプレートは最小 scaffold です。`plan.md` は計画済み契約（planned contract）を所有し、実装者が step を上から順に実行できる command queue として書く。実行結果、逸脱、発見された tests、reviewer verdict、commit/no-op evidence は `report.md` の観測証跡台帳（observed evidence ledger）に記録する。実行 policy は `workflow_issue.md`、Issue 計画の書き方は `phase_plan_issue.md` と `docs/authoring/issue-plan.md` を正本にする。
+# iss-00162 Align Skill Docs Template Context Surfaces — 実装計画
 
 ## この計画で満たす要件ID
+
 - AC:
-  - ...
+  - AC-001, AC-002, AC-003, AC-004, AC-005
 - EC:
-  - ...
+  - EC-001, EC-002, EC-003
 - 制約:
-  - ...
+  - Runtime gate / CLI enforcement / automated harness は作らない。
+  - Downstream owner issue の rewrite scope を吸収しない。
+  - Provider source を正本、dogfooding mirror を verification target とする。
 
 ## 依存関係から導く実装順序
+
 - 依存関係の正本:
-  - `design.md` の依存関係、図、ファイル変更計画
-- 順序ルール:
-  - prerequisite / lower-dependency slice から先に閉じる
-  - downstream slice は前提が固定されてから置く
+  - `design.md` の inventory flow と file change plan。
 - step 依存サマリー:
-  - S01:
-    - 依存:
-    - unblock:
+  - S01 inventory matrix:
+    - 依存: passed requirement/design
+    - unblock: S02
+    - 対象ファイル: `spec-dock/active/issue/discussions/<ts>-disc-context-surface-inventory.md`
+  - S02 bounded hub wording cleanup:
+    - 依存: S01 inventory matrix
+    - unblock: S90, S99
     - 対象ファイル:
+      - `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+      - `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+  - S90 docs impact:
+    - 依存: S01, S02
+    - unblock: S99
+  - S99 final quality gate:
+    - 依存: S01, S02, S90
 
 ## ステップ一覧
+
 - S01:
-  - 観測可能な振る舞い:
-  - 依存:
-  - unblock:
-  - 対象ファイル:
-  - 閉じる要件:
-  - レビューゲート:
+  - 観測可能な振る舞い: 後続 issue が surface ownership と handoff owner を判断できる inventory / trace matrix が存在する。
+  - 閉じる要件: AC-001, AC-002, AC-005, EC-001, EC-002, EC-003
+  - レビューゲート: `spec-reviewer`
 - S02:
-  - ...
+  - 観測可能な振る舞い: hub first-read wording から、skills/docs/templates boundary が Epic ADR と矛盾なく読める。
+  - 閉じる要件: AC-002, AC-003, AC-004
+  - レビューゲート: `spec-reviewer`
+- S90:
+  - 観測可能な振る舞い: docs/templates/runtime 影響が unresolved で残っていない。
+  - 閉じる要件: docs impact
+  - レビューゲート: `spec-reviewer`
+- S99:
+  - 観測可能な振る舞い: issue-wide diff, reports, validation, reviewer gates が完了している。
+  - 閉じる要件: all
+  - レビューゲート: `qa-reviewer`, `code-reviewer`, `spec-reviewer`
 
 ## 要件 ↔ ステップ対応
+
 - AC-001 -> S01
-- EC-001 -> S02
+- AC-002 -> S01, S02
+- AC-003 -> S02
+- AC-004 -> S02, S90, S99
+- AC-005 -> S01
+- EC-001 -> S01
+- EC-002 -> S01
+- EC-003 -> S01
 
 ## 仕様固定クロージャ索引（Spec-Locked Closure Index）
 
-> これは Issue 全体のテスト一覧ではなく、仕様を縮小解釈・後付けテスト・過剰実装しないための coverage ledger です。実際の step-local obligation と concrete seeds は各 implementation step の `具体テストケース一覧` に置く。
-
-| 識別子（ID） | ステップ（step） | スライス（slice） | 種別（type） | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル（evidence level） | クロージャ証跡（closure evidence） |
+| 識別子 | ステップ | スライス | 種別 | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル | クロージャ証跡 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | <behavior> | 受け入れ（acceptance） | AC-001 | ... | ... | 仕様 drift（spec drift） | yes | red-required | ステップ完了証跡（report step closure） |
-| tc-002 | S01 | <behavior> | 否定系（negative） | EC-001 | ... | ... | 沈黙失敗（silent failure） | yes | inspect-only | ステップ完了証跡（report step closure） |
+| cl-001 | S01 | inventory coverage | acceptance | AC-001 | provider skills/docs/templates が matrix に分類される | discussion matrix | hidden contradiction | yes | inspect-only | Step Contract Closure / Test Contract Closure / Closure Coverage |
+| cl-002 | S01 | downstream handoff | acceptance | AC-002, AC-005 | contradiction rows have owner issue and action/defer reason | discussion matrix | owner ambiguity | yes | inspect-only | Step Contract Closure / Test Contract Closure / Closure Coverage / Evidence Adoption Ledger |
+| cl-003 | S01 | scope split | edge | EC-001 | broad rewrite scope is split or handed off | discussion matrix/report | scope absorption | yes | inspect-only | Step Contract Closure / Test Contract Closure / Closure Coverage / Closure Delta |
+| cl-004 | S01 | docs/template classification | edge | EC-002, EC-003 | docs hidden workflow and template authority risks are classified | discussion matrix | docs/templates authority drift | yes | inspect-only | Step Contract Closure / Test Contract Closure / Closure Coverage |
+| cl-005 | S02 | hub wording cleanup | acceptance | AC-003 | hub wording says skills carry first-read spine and docs/templates carry details/scaffold | hub skill text | stale boundary wording | yes | inspect-only | Step Contract Closure / Test Contract Closure / Closure Coverage |
+| cl-006 | S02 | no iss-00164 absorption | negative | AC-002 | route table / clarification routing / leaf ownership restructuring are unchanged | diff inspection | downstream scope theft | yes | inspect-only | Step Contract Closure / Test Contract Closure / Closure Coverage / Closure Delta |
+| cl-007 | S02 | provider/mirror parity | regression | AC-004 | provider and mirror hub skill are byte-equivalent | `cmp` and parity unittest | stale mirror | yes | covered-existing | Step Contract Closure / Test Contract Closure / Closure Coverage / Step Commit Gate |
+| cl-008 | S90 | docs impact resolved | final | AC-004 | `sync`, validate, and docs impact review pass | commands/report | stale derived views | yes | manual-required | Docs Impact Resolution / Reviewer Gate Status |
+| cl-009 | S99 | final gates | final | all | QA/code/spec reviewers pass | reviewer outputs | incomplete issue | yes | manual-required | Final QA Gate / Final Code Review Gate / Final Spec Review Gate / Final Commit |
 
-- 証跡レベル（evidence level）:
-  - red-required: 実装前に失敗する新規 test / characterization を固定する。
-  - covered-existing: 既存 test が対象 behavior を検出できる根拠を固定する。
-  - inspect-only: docs / template / config などを inspection、structural assertion、review evidence で閉じる。
-  - manual-required: 自動化できない確認手順、期待結果、記録先を固定する。
-- 詳細化方針:
-  - 件数ではなく、AC、changed contract、failure mode、regression risk、invariant、manual / integration risk から必要な obligation を決める。
-  - private method、実装アルゴリズム、mock 構造、assert 細部は原則固定しない。
+## 実装ステップ S01 — Context surface inventory / trace matrix
 
-## レビュー / QA ゲート方針
-- RG1 step review:
-  - 実施タイミング: 各 implementation step の commit 前
-  - reviewer: code-reviewer（code / runtime / tests / scaffold behavior）; spec-reviewer（docs-only / template-only / skill-text-only）
-  - pass 条件: review_status: pass
-- QG1 final QA:
-  - reviewer: qa-reviewer
-  - 範囲: Issue 全体の obligation coverage、missing high-value tests、manual / integration test 要否
-- SG1 final spec review:
-  - reviewer: spec-reviewer
-  - 範囲: requirement / design / plan / report / docs 整合
-
-## 実行ルール（全ステップ共通）
-- 各 implementation step は原則として 1 behavior slice / 1 review scope / 1 commit boundary とする。
-- `plan.md` には planned requirements、evidence destination、closure 条件だけを書く。observed result は `report.md` に書く。
-- docs-only / inspect-only / manual-required step は code test 前提にせず、代替 evidence path と rationale を implementation 前に固定する。
-- implementation 中に新しい仕様、bug class、外部 contract risk、未計画の closure が見つかった場合は、report 記録だけで足りるか、plan amendment と re-review が必要かを判断する。
-
-## 実装ステップ
-
-### 実装ステップ S01 — <観測可能な振る舞い>
-- 振る舞いの目標（behavior goal）:
-  - ...
-- design 参照:
-  - ...
-- 依存:
-  - ...
-- unblock:
-  - ...
+- 振る舞いの目標:
+  - 後続 issue が、どの surface にどの ownership claim / contradiction があり、誰が修正するかを判断できる。
 - 対象ファイル:
-  - ...
-- 計画済み契約（planned contract）:
+  - `spec-dock/active/issue/discussions/<ts>-disc-context-surface-inventory.md`
+- 計画済み契約:
   - scope:
-    - 実装・文書化する範囲:
-  - テスト義務（test obligation）:
-    - closure id:
-      - tc-001
-    - coverage rationale:
-      - AC / changed contract / failure mode / regression risk / invariant / manual risk から必要性を書く:
-  - Red / 代替証跡の要件:
-    - red-required / covered-existing:
-      - 実装前に確認する failing test、characterization、または既存 test sensitivity:
-    - docs-only / inspect-only / manual-required:
-      - code test を置かない理由:
-      - 代替 evidence path:
-      - manual 手順と期待結果:
-  - 実装範囲（implementation scope）:
-    - allowed paths:
-      - ...
-    - forbidden changes:
-      - ...
+    - provider skills/docs/templates の inventory と trace matrix。
+  - Red / 代替証跡:
+    - code test 不要。discussion evidence と inspection で閉じる。
   - Green 検証:
-    - command / inspection / manual evidence:
-      - ...
-  - Refactor / cleanup ガードレール:
-    - 目的:
-    - 禁止する広がり:
-  - closure 証跡要件:
-    - Step Contract Closure:
-    - Test Contract Closure:
-    - Closure Coverage:
-  - report 証跡の記録先:
-    - `report.md` の対象 section / ledger:
-  - amendment trigger（plan amendment が必要になる契機）:
-    - plan amendment と re-review が必要になる発見:
+    - `find src/spec_dock/assets/install_root/.agents/skills -maxdepth 2 -name SKILL.md | sort`
+    - `find src/spec_dock/assets/spec_dock/docs -maxdepth 2 -type f | sort`
+    - `find src/spec_dock/assets/spec_dock/templates -maxdepth 3 -type f | sort`
+    - matrix に required columns があることを manual inspection。
+  - Refactor / cleanup guardrail:
+    - S01 では provider files を変更しない。
+  - amendment trigger:
+    - matrix が issue scope に収まらず、追加 issue split が必要。
+- 委任契約:
+  - delegated role: `doc-writer`
+  - input docs / source of truth:
+    - `requirement.md`
+    - `design.md`
+    - `plan.md`
+    - `workflow_spec_authoring.md`
+    - `workflow_issue.md`
+    - `docs/authoring/issue-plan.md`
+    - Epic ADRs listed in `requirement.md`
+    - provider skills/docs/templates file lists
+  - allowed paths:
+    - exactly one new flat Markdown file under `spec-dock/active/issue/discussions/`
+    - filename rule: `<ts>-disc-context-surface-inventory.md` or same-second collision `<ts>-01-disc-context-surface-inventory.md`
+  - forbidden changes:
+    - canonical docs, provider source, tests, runtime, GitHub metadata.
+    - nested discussion directories, non-Markdown files, symlinks, deletes, renames, staged changes.
+  - acceptance criteria:
+    - cl-001..cl-004 pass.
+  - required tests or docs-only verification:
+    - file list commands in S01 Green verification.
+    - manual inspection of matrix columns and downstream owner rows.
+  - stop conditions:
+    - input docs conflict.
+    - required inventory cannot be scoped to one discussion file.
+    - provider source changes appear necessary.
+    - discussion filename/provenance/diff guard requirements cannot be met.
+  - scope-local discussion direct-write contract:
+    - required provenance fields: `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`.
+    - intended target: `report.md` Evidence Adoption Ledger / Delegated Draft Evidence / Step Contract Closure.
+    - fallback decision: if no valid discussion draft can be produced, stop and return to parent manual authoring; do not write canonical docs as fallback.
+    - post-run diff guard: parent verifies exactly one new direct-child discussion Markdown file and no forbidden side effects with `git status --short` / `git diff --name-only`.
+    - report destinations: Evidence Adoption Ledger, Delegated Draft Evidence, Step Contract Closure, Test Contract Closure, Closure Coverage, Closure Delta, Reviewer Gate Status.
+  - reviewer focus:
+    - `spec-reviewer`
+  - output required:
+    - created discussion path, matrix coverage summary, unresolved risks, Ledger Note or no material decision.
+- 具体テストケース一覧:
+  - `tc-s01-001` inspect-only: inventory matrix has required columns
+    - 前提: S01 discussion matrix exists.
+    - 操作: matrix header and rows are inspected.
+    - 期待結果: surface path / family / current claim / target ownership / contradiction / owner issue / action / evidence がある。
+    - 失敗検出: downstream issue owner が推測に戻る regression を検出する。
+    - 検証方法: manual inspection and `rg` for headers.
+    - 関連 closure id: cl-001, cl-002
+  - `tc-s01-002` inspect-only: downstream boundaries are explicit
+    - 前提: Matrix includes clarification, hub, workflow docs, and templates rows.
+    - 操作: owner issue columnを確認する。
+    - 期待結果: `iss-00163`, `iss-00164`, `iss-00165`, `iss-00166` へ渡す rows がある。
+    - 失敗検出: この issue が downstream rewrite を吸収する regression を検出する。
+    - 検証方法: `rg 'iss-00163|iss-00164|iss-00165|iss-00166' <matrix>`.
+    - 関連 closure id: cl-002, cl-003, cl-004
+- ステップ完了契約:
+  - close 条件: cl-001..cl-004 pass and step `spec-reviewer` pass.
+  - commit / no-op gate: committed.
 
-#### 委任契約（delegation contract）
-- 委任ロール（delegated role）:
-  - dev-coder / doc-writer / other named worker / N/A
-- 入力 docs:
-  - `requirement.md`
-  - `design.md`
-  - `plan.md`
-  - workflow / authoring docs:
-  - current target files:
-- 許可 paths:
-  - ...
-- 禁止 changes:
-  - ...
-- 受け入れ条件:
-  - closure id / step close condition:
-- 必須 tests または docs-only verification:
-  - targeted command / inspection / docs diff / manual evidence:
-- reviewer focus:
-  - code-reviewer（code / runtime / tests / scaffold behavior）; spec-reviewer（docs-only / template-only / skill-text-only docs/spec alignment）
-- 必須出力（output required）:
-  - changed files:
-  - verification result:
-  - report evidence to update:
-  - unresolved risks:
-- 停止条件（stop conditions）:
-  - input docs conflict / path outside allowed scope / verification cannot run / acceptance cannot be met:
+## 実装ステップ S02 — Bounded hub wording cleanup
 
-#### 具体テストケース一覧
+- 振る舞いの目標:
+  - Hub skill の first-read wording が、Epic ADR の skill/docs/templates boundary と矛盾しない。
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+  - `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+- 計画済み契約:
+  - scope:
+    - stale wording `skills stay concise`, `docs are source of truth for workflow explanations` を、skills carry first-read workflow spine and docs carry detail/semantics に整える。
+  - Red / 代替証跡:
+    - docs-only text change; inspect-only evidence.
+  - Green 検証:
+    - `rg 'first-read workflow spine|details|templates as minimum authoring scaffolds|source of truth' src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md .agents/skills/spec-driven-tdd-workflow/SKILL.md`
+    - negative inspection: stale wording must not say skills merely stay concise while docs own workflow explanations.
+    - `cmp -s src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md .agents/skills/spec-driven-tdd-workflow/SKILL.md`
+    - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets`
+  - Forbidden:
+    - route table changes
+    - clarification routing changes
+    - leaf ownership restructuring
+    - broader hub rewrite owned by `iss-00164`
+  - amendment trigger:
+    - cleanup requires route table or leaf ownership changes.
+- 委任契約:
+  - delegated role: `doc-writer`
+  - input docs / source of truth:
+    - `requirement.md`
+    - `design.md`
+    - `plan.md`
+    - S01 inventory matrix
+    - `workflow_spec_authoring.md`
+    - `workflow_issue.md`
+    - `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+    - `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+  - allowed paths:
+    - `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+    - `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+  - forbidden changes:
+    - runtime, tests, templates, docs, other skills, route table rewrite.
+    - clarification routing changes, leaf ownership restructuring, broader hub/leaf rewrite owned by `iss-00164`.
+  - acceptance criteria:
+    - cl-005..cl-007 pass.
+  - required tests or docs-only verification:
+    - S02 `rg` inspection.
+    - provider/mirror `cmp`.
+    - targeted dogfooding parity unittest.
+    - diff inspection proving route table / clarification routing / leaf ownership blocks are unchanged.
+  - stop conditions:
+    - changing route table or clarification routing is required.
+    - S01 matrix does not support the cleanup.
+    - provider/mirror parity cannot be preserved.
+    - verification cannot run.
+  - reviewer focus:
+    - `spec-reviewer`
+  - output required:
+    - changed files, verification, unresolved risks, Ledger Note or no material decision.
+- 具体テストケース一覧:
+  - `tc-s02-001` inspect-only: hub wording reflects boundary
+    - 前提: provider/mirror hub skill are updated.
+    - 操作: hub intro wording is inspected.
+    - 期待結果: skill first-read spine / docs detail / templates scaffold が読める。
+    - 失敗検出: docs-only source-of-truth wording が残る regression を検出する。
+    - 検証方法: `rg` inspection.
+    - 関連 closure id: cl-005
+  - `tc-s02-002` negative inspect-only: iss-00164 scope is not consumed
+    - 前提: S02 diff exists.
+    - 操作: route table and clarification routing diffを確認する。
+    - 期待結果: route table / clarification routing / leaf ownership restructuring は変更されていない。
+    - 失敗検出: downstream hub issue の scope を先取りする regression を検出する。
+    - 検証方法: `git diff -- ...spec-driven-tdd-workflow/SKILL.md`.
+    - 関連 closure id: cl-006
+  - `tc-s02-003` covered-existing: provider/mirror parity
+    - 前提: provider/mirror hub skill updated.
+    - 操作: `cmp` and parity unittest.
+    - 期待結果: provider/mirror byte-equivalent and parity test passes.
+    - 失敗検出: stale dogfooding mirror regression.
+    - 検証方法: `cmp` and targeted unittest.
+    - 関連 closure id: cl-007
+- ステップ完了契約:
+  - close 条件: cl-005..cl-007 pass and step `spec-reviewer` pass.
+  - commit / no-op gate: committed.
 
-> この欄は full test inventory ではありません。step-local obligation と concrete red / characterization / inspect / manual seeds を、実装前に固定するための欄です。
+## ドキュメント影響の解消ステップ S90
 
-- `tc-s01-001` acceptance: <短い説明>
-  - 前提: ...
-  - 操作: ...
-  - 期待結果: ...
-  - 失敗検出: ...
-  - 検証方法: ...
-  - 関連 closure id: tc-001
-
-- `tc-s01-002` inspect-only / manual-required: <短い説明>
-  - テスト不要理由: <自動テスト不要の理由>
-  - 代替検証方法: <確認手順>
-  - 期待結果: <期待される状態>
-  - 記録先: <証跡の保存先>
-  - 関連 closure id: tc-002
-
-#### ステップ完了契約（step closure contract）
-- closure id:
-  - tc-001
-- close 条件:
-  - ...
-- 検証 evidence:
-  - targeted command / inspection / manual evidence:
-- report evidence:
-  - Step Contract Closure:
-  - Test Contract Closure:
-  - Closure Coverage:
-  - Closure Delta:
-- 残リスク:
-  - ...
-
-#### ステップゲート（step gate）
-- step reviewer gate:
-  - reviewer:
-  - review 範囲:
-  - pass 条件: review_status: pass
-  - re-review rule: 指摘を修正し pass まで再実行
-- commit / no-op gate:
-  - closure 状態: committed / approved-no-op
-  - commit 範囲:
-  - no-op の場合の確認対象、差分なし確認コマンド、read-only evidence:
-
-### 実装ステップ Sxx — <次に観測可能な振る舞い>
-- S01 の subsections を複製して記入する。
-- `planned contract`、`delegation contract`、`具体テストケース一覧`、`step closure contract`、`step gate` がない implementation step は implementation-ready ではない。
-
-### ドキュメント影響の解消ステップ S90（docs impact resolution / docs refresh）
 - 対象:
-  - docs / templates / README / workflow / skill / migration notes / none
+  - skill / discussions / generated projections
+  - docs / templates / README / workflow docs as no-change surfaces unless S01/S02 discovers a blocker
 - 対応:
-  - ...
-- doc update owner:
-  - doc-writer when updates are required
+  - `./spec-dock/scripts/spec-dock sync`
+  - `./spec-dock/scripts/spec-dock validate`
+  - `git diff --check`
+  - report S90 evidence and no-change rationale.
 - spec/doc review:
-  - reviewer: spec-reviewer
-  - pass 条件: docs が requirement / design / plan と整合し、未解決の必須 docs 影響が残っていない
+  - reviewer: `spec-reviewer`
+  - pass 条件: docs impact resolved and no downstream owner scope consumed.
 
-### 最終品質ゲートステップ S99（final quality gate）
+## 最終品質ゲートステップ S99
+
 - branch diff 範囲:
-  - ...
+  - inventory discussion
+  - bounded hub skill cleanup
+  - issue docs/report
 - 必須 validation:
-  - ...
+  - `./spec-dock/scripts/spec-dock sync`
+  - `./spec-dock/scripts/spec-dock validate`
+  - `git diff --check`
+  - provider/mirror `cmp`
+  - targeted parity unittest
 - final QA gate:
-  - reviewer: qa-reviewer
-  - 範囲: Issue 全体の obligation coverage と integration test 要否
-  - pass 条件: reviewer pass
-- final code review ゲート:
-  - reviewer: code-reviewer
-  - 範囲: issue-wide integrated diff、構造、責務境界、回帰リスク、保守性
-  - pass 条件: review_status: pass
-- final spec review ゲート:
-  - reviewer: spec-reviewer
-  - 範囲: requirement / design / plan / report / implementation / tests / docs 整合
-  - pass 条件: reviewer pass
+  - reviewer: `qa-reviewer`
+  - 範囲: closure coverage and integration test need.
+  - pass 条件: reviewer pass.
+- final code review gate:
+  - reviewer: `code-reviewer`
+  - 範囲: issue-wide diff, scope creep, provider/mirror parity, maintainability.
+  - pass 条件: `review_status: pass`.
+- final spec review gate:
+  - reviewer: `spec-reviewer`
+  - 範囲: requirement / design / plan / report / implementation / docs alignment.
+  - pass 条件: reviewer pass.
 - final commit gate:
-  - commit 範囲:
-  - final report ledger:
-  - post-commit external evidence destination:
-
-## 未確定事項
-- Q-001:
-  - 質問:
-  - 推奨案:
-  - 影響範囲:
+  - commit 範囲: final report evidence only after S99.
+  - post-commit external evidence destination: final response / PR body / issue finish evidence.
 
 ## 最終完了条件
-- AC/EC 達成:
-  - ...
-- docs 影響解決:
-  - ...
-- 全 implementation step 完了:
-  - committed / approved-no-op:
-- final quality gate pass:
-  - qa-reviewer:
-  - issue-wide code-reviewer:
-  - spec-reviewer:
-- final commit 完了:
-  - ...
-- 必須 closure id 完了:
-  - Step Contract Closure:
-  - Test Contract Closure:
-  - Closure Coverage:
-- final clean state:
-  - no unintended staged / unstaged changes:
+
+- cl-001..cl-009 are pass in report.
+- S01 and S02 are committed.
+- S90 and S99 reviewer gates pass.
+- Final report evidence is committed.
+- `issue finish` can close GitHub issue #162 and clear active issue.
