@@ -50,6 +50,8 @@ reflected_to: []
   - ...
 
 ## 質問 (必須)
+- pressure-test question:
+  - ...
 - 質問:
   - ...
 - 回答してほしいこと:
@@ -90,6 +92,8 @@ reflected_to: []
   - ...
 
 ## ユーザー回答 (回答後に必須)
+- answer capture:
+  - ...
 - 回答:
   - ...
 - 回答日時:
@@ -106,6 +110,8 @@ reflected_to: []
   - unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked
 - 採用 / 棄却 / deferred の理由:
   - ...
+- `report.md` Evidence Adoption Ledger への反映要否:
+  - yes | no
 
 ## requirement / design / plan / ADR への含意 (回答後に必須)
 - `requirement.md`:
@@ -117,6 +123,8 @@ reflected_to: []
 - `ADR`:
   - ...
 - reflected_to 更新方針:
+  - ...
+- adoption reflection:
   - ...
 
 ## 条件付き補足 (必要な場合だけ)

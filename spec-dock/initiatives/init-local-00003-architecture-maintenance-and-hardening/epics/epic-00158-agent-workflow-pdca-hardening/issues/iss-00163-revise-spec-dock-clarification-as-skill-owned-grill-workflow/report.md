@@ -130,6 +130,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - S01 で `spec-dock-clarification` skill を source-grounded grill loop の first-read workflow に更新した。
 - Provider と dogfooding mirror は byte-equivalent に保ち、stale source-of-truth wording を削除した。
 - S02 で `workflow_clarification.md` を skill-owned workflow の bridge/reference doc として再位置付けした。
+- S03 で `interview` / `research` / `disc` templates に clarification-specific scaffold slots を追加した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -384,6 +385,143 @@ pass: cmp exited 0; unittest OK.
 
 #### メモ
 - No user interview blocker was found for S02.
+
+---
+
+### セッションログ（2026-06-06 14:23 - 14:27）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-003, AC-004, AC-005
+- 計画上の出典（Planned source）:
+  - `plan.md` section: 実装ステップ S03 — Clarification-specific discussion template slots
+  - closure ids: cl-007, cl-008, cl-009
+
+#### 実施内容
+- `interview` template に `pressure-test question`、`answer capture`、`Evidence Adoption Ledger` 反映要否、`adoption reflection` slots を追加した。
+- `research` template に source-grounded に解けない質問候補を分ける `question candidates` slot を追加した。
+- `disc` template に canonical docs / ADR / report ledger への `adoption target` slot を追加した。
+- Provider と dogfooding mirror の 3 template pairs は byte-equivalent に保った。
+
+#### 実行コマンド / 結果
+```bash
+rg -n 'pressure-test question' src/spec_dock/assets/spec_dock/templates/discussions/interview.md spec-dock/templates/discussions/interview.md
+rg -n 'unanswered' src/spec_dock/assets/spec_dock/templates/discussions/interview.md spec-dock/templates/discussions/interview.md
+rg -n 'answer capture|ユーザー回答' src/spec_dock/assets/spec_dock/templates/discussions/interview.md spec-dock/templates/discussions/interview.md
+rg -n 'adoption' src/spec_dock/assets/spec_dock/templates/discussions/interview.md spec-dock/templates/discussions/interview.md
+rg -n 'Evidence Adoption Ledger' src/spec_dock/assets/spec_dock/templates/discussions/interview.md spec-dock/templates/discussions/interview.md
+
+pass: interview scaffold terms found in provider and mirror.
+```
+
+```bash
+rg -n 'facts|観測できた事実' src/spec_dock/assets/spec_dock/templates/discussions/research.md spec-dock/templates/discussions/research.md
+rg -n 'question candidates' src/spec_dock/assets/spec_dock/templates/discussions/research.md spec-dock/templates/discussions/research.md
+rg -n 'unverified' src/spec_dock/assets/spec_dock/templates/discussions/research.md spec-dock/templates/discussions/research.md
+rg -n 'synthesis' src/spec_dock/assets/spec_dock/templates/discussions/disc.md spec-dock/templates/discussions/disc.md
+rg -n 'ADR candidate' src/spec_dock/assets/spec_dock/templates/discussions/disc.md spec-dock/templates/discussions/disc.md
+rg -n 'adoption target' src/spec_dock/assets/spec_dock/templates/discussions/disc.md spec-dock/templates/discussions/disc.md
+rg -n 'Evidence Adoption Ledger' src/spec_dock/assets/spec_dock/templates/discussions/disc.md spec-dock/templates/discussions/disc.md
+
+pass: research/disc scaffold terms found in provider and mirror.
+```
+
+```bash
+rg -n 'compliance authority|source of truth|must pass validation' src/spec_dock/assets/spec_dock/templates/discussions/interview.md src/spec_dock/assets/spec_dock/templates/discussions/research.md src/spec_dock/assets/spec_dock/templates/discussions/disc.md spec-dock/templates/discussions/interview.md spec-dock/templates/discussions/research.md spec-dock/templates/discussions/disc.md
+
+pass: no matches; command exited 1.
+```
+
+```bash
+cmp -s src/spec_dock/assets/spec_dock/templates/discussions/interview.md spec-dock/templates/discussions/interview.md
+cmp -s src/spec_dock/assets/spec_dock/templates/discussions/research.md spec-dock/templates/discussions/research.md
+cmp -s src/spec_dock/assets/spec_dock/templates/discussions/disc.md spec-dock/templates/discussions/disc.md
+
+pass: all cmp commands exited 0.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only | pre-change templates lacked explicit `pressure-test question`, `question candidates`, and `adoption target` slots | pre-change read and planned positive checks | pass | template-only scaffold slot additions |
+| S03 | 緑フェーズ（Green） | interview/research/disc positive checks, template authority negative check, provider/mirror parity | all required terms found; authority negative returned no matches; three cmp commands passed | `rg`, `cmp` | pass | cl-007..cl-009 evidence recorded |
+| S03 | リファクタリング（Refactor） | no outside-path changes | diff limited to six discussion templates before report update | `git diff --stat`, diff inspection | pass | no global template rewrite / workflow docs / runtime / skills changes in S03 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | none | implementation | no action | cl-007..cl-009 | no | S03 commands above |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | cl-007, cl-008, cl-009 | interview/research/disc slots, no compliance authority wording, provider/mirror parity, fresh spec-reviewer | implementation evidence passes; fresh S03 spec-reviewer passed | pass | ready for S03 commit |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s03-001 | S03 | yes | inspect-only | interview template lacked explicit pressure-test / answer capture emphasis | interview positive `rg` commands | pass | resolves cl-007 after reviewer pass |
+| tc-s03-002 | S03 | yes | inspect-only | research/disc templates lacked explicit question candidates / adoption target emphasis | research/disc positive `rg` commands | pass | resolves cl-008 after reviewer pass |
+| tc-s03-003 | S03 | yes | covered-existing | provider/mirror template parity existed before S03 | three `cmp` commands | pass | resolves cl-009 after reviewer pass |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-007 | S03 | interview positive `rg`; no compliance authority wording | pass | fresh S03 spec-reviewer passed |
+| cl-008 | S03 | research/disc positive `rg`; no compliance authority wording | pass | fresh S03 spec-reviewer passed |
+| cl-009 | S03 | three provider/mirror `cmp` commands | pass | fresh S03 spec-reviewer passed |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | cl-007 | tc-s03-001 | cl-007 | plan concrete test id used as test id | no | no |
+| alias-mapped | cl-008 | tc-s03-002 | cl-008 | plan concrete test id used as test id | no | no |
+| alias-mapped | cl-009 | tc-s03-003 | cl-009 | plan concrete test id used as test id | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction to use issue planning/execution workflow and subagents; follow-up correction forbids deep-consultant as user proxy | `/Users/iwasawayuuta/.codex/worktrees/8d9b/spec-dock` | iss-00163 | current session | spec-reviewer, code-reviewer, qa-reviewer, read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use; ask user directly if user-intent clarification becomes blocking | issue complete / session end / scope change / host policy conflict / user revocation | none | request fresh S03 spec-reviewer |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | approved-local-execution | narrow six-file mirror template edit; plan allowed parent-local template edit and required fresh spec-reviewer gate | N/A | provider/mirror discussion template clarification slots | `requirement.md`; `design.md`; `plan.md`; passed S01/S02 artifacts | six S03 target discussion templates only | global template normalization, non-discussion templates, template README, runtime, skills, workflow docs | S03 positive `rg`, template authority negative `rg`, three `cmp`, diff inspection | clarification-specific slots require global style/wording decisions; user-intent clarification blocking; provider/mirror parity cannot be preserved | changed files, verification result, template authority negative inspection, unresolved risks | pass; fresh S03 spec-reviewer pending |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | N/A | No delegated worker used; parent orchestrator performed the narrow approved-local template edit | `src/spec_dock/assets/spec_dock/templates/discussions/interview.md`; `src/spec_dock/assets/spec_dock/templates/discussions/research.md`; `src/spec_dock/assets/spec_dock/templates/discussions/disc.md`; `spec-dock/templates/discussions/interview.md`; `spec-dock/templates/discussions/research.md`; `spec-dock/templates/discussions/disc.md` | S03 `rg` checks pass; template authority negative pass; three `cmp` commands pass | fresh S03 spec-reviewer pass by `019e9b68-7d2d-7610-b14d-f780d381db20` | none | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | delegation not required; parent-local edit was explicitly allowed by `plan.md` | user-approved workflow execution; no waiver | six S03 target discussion templates | bounded text edit | revert the six template files to pre-S03 state if reviewer fails | S03 planned commands -> pass | spec-reviewer `019e9b68-7d2d-7610-b14d-f780d381db20` passed | no unavailable/denied/host conflict remained |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | spec-reviewer | fresh | passed | no | proceed to S03 commit | Agent `019e9b68-7d2d-7610-b14d-f780d381db20`; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | pending-commit | six discussion templates + report S03 evidence | pending | pending | not applicable | not applicable | not applicable | not applicable |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/templates/discussions/interview.md` - Provider interview clarification slots.
+- `src/spec_dock/assets/spec_dock/templates/discussions/research.md` - Provider research question candidates slot.
+- `src/spec_dock/assets/spec_dock/templates/discussions/disc.md` - Provider disc adoption target slot.
+- `spec-dock/templates/discussions/interview.md` - Dogfooding mirror interview template.
+- `spec-dock/templates/discussions/research.md` - Dogfooding mirror research template.
+- `spec-dock/templates/discussions/disc.md` - Dogfooding mirror disc template.
+- `spec-dock/active/issue/report.md` - S03 evidence and pending reviewer records.
+
+#### コミット
+- pending S03 commit.
+
+#### メモ
+- No user interview blocker was found for S03.
 
 ---
 
