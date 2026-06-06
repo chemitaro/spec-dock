@@ -53,8 +53,9 @@ ID: "iss-00165"
 
 ## 実装サマリー
 
-- Implementation has not started.
-- Current work is spec authoring for requirement/design/plan readiness.
+- S01 updated provider workflow / entry / phase / authoring docs and dogfooding mirror docs so skills are described as operational entrypoints / first-read spine and docs as detail / reference surfaces.
+- No skills, templates, runtime code, tests, or GitHub metadata were changed in S01.
+- `workflow_clarification.md` remains a bridge/reference document for `spec-dock-clarification`, not a workflow source of truth.
 
 ## 実装記録（セッションログ）
 
@@ -84,11 +85,67 @@ result:
 - git diff --check passed
 ```
 
+### S01 実装ログ（2026-06-06）
+
+#### 対象
+- Phase: issue execution / S01 Workflow Docs Boundary Wording.
+- AC/EC: AC-001..AC-003, AC-005, EC-001..EC-003.
+- Closure: cl-001..cl-005.
+
+#### 実施内容
+- `doc-writer` `019e9bc0-2229-7493-9c77-cceb71cc635b` に S01 target docs の provider / mirror wording alignment を委任した。
+- Provider docs and dogfooding mirror docs now state that skills are the operational entrypoints / first-read spine and docs are detail / reference surfaces.
+- `workflow_spec_authoring.md` の stale wording を follow-up で修正し、formal question trigger と lightweight chat question の境界は `workflow_clarification.md` の bridge/reference detail を参照すると表現した。
+- Worker reported: `No material implementation decisions beyond the approved plan.`
+
+#### 変更ファイル
+- `src/spec_dock/assets/spec_dock/docs/README.md`
+- `src/spec_dock/assets/spec_dock/docs/guide.md`
+- `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+- `src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md`
+- `src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md`
+- `spec-dock/docs/README.md`
+- `spec-dock/docs/guide.md`
+- `spec-dock/docs/workflow_spec_authoring.md`
+- `spec-dock/docs/workflow_issue.md`
+- `spec-dock/docs/phase_plan_issue.md`
+- `spec-dock/docs/authoring/issue-plan.md`
+
+#### 実行コマンド / 結果
+
+```bash
+git diff --check
+diff -q src/spec_dock/assets/spec_dock/docs/README.md spec-dock/docs/README.md
+diff -q src/spec_dock/assets/spec_dock/docs/guide.md spec-dock/docs/guide.md
+diff -q src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md spec-dock/docs/workflow_spec_authoring.md
+diff -q src/spec_dock/assets/spec_dock/docs/workflow_issue.md spec-dock/docs/workflow_issue.md
+diff -q src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md spec-dock/docs/phase_plan_issue.md
+diff -q src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md spec-dock/docs/authoring/issue-plan.md
+rg -n "operational entrypoint|first-read spine|detail / reference|bridge/reference|field semantics|phase promotion semantics|skill-owned" src/spec_dock/assets/spec_dock/docs spec-dock/docs
+rg -n "workflow_clarification\.md.*正本|workflow_clarification\.md.*source of truth|Clarification workflow.*source of truth|明確化.*workflow_clarification\.md.*正本|仕様書作成前後の曖昧さ.*workflow_clarification\.md を正本" src/spec_dock/assets/spec_dock/docs spec-dock/docs
+git diff --name-only
+git diff --name-only | rg -v '^(src/spec_dock/assets/spec_dock/docs/(README\.md|guide\.md|workflow_clarification\.md|workflow_spec_authoring\.md|workflow_issue\.md|phase_plan_issue\.md|authoring/issue-plan\.md)|spec-dock/docs/(README\.md|guide\.md|workflow_clarification\.md|workflow_spec_authoring\.md|workflow_issue\.md|phase_plan_issue\.md|authoring/issue-plan\.md))$'
+
+result:
+- git diff --check passed.
+- all changed provider / mirror doc pairs matched by diff -q.
+- positive rg found operational entrypoint / first-read spine / detail-reference / bridge-reference wording.
+- stale clarification-docs-as-source-of-truth negative rg returned exit 1, meaning no matches.
+- git diff --name-only contained only S01 docs files before report evidence was added.
+- scope guard rg returned exit 1, meaning no disallowed changed files.
+```
+
 ## ステップ契約の完了証跡（Step Contract Closure）
 
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
 | planning | N/A | requirement/design/plan authored and reviewed in phase order | requirement/design/plan approved by fresh reviewers | pass | implementation not started |
+| S01 | cl-001 | Docs identify skills as operational entrypoints / first-read workflow spine and docs as detail/reference layer | Positive rg found `operational entrypoint`, `first-read spine`, and `detail / reference` wording in provider and mirror docs | pass | docs-only wording alignment |
+| S01 | cl-002 | Workflow / phase / authoring docs retain detailed semantics, lifecycle policy, hard cases, and field meanings | Diff inspection shows wording changes without wholesale deletion of workflow / phase / authoring detail; positive rg retains `field semantics` and `phase promotion semantics` | pass | no over-thinning observed |
+| S01 | cl-003 | Clarification docs and entry docs point to `spec-dock-clarification` as skill-owned / entry workflow and docs as bridge/reference | Positive rg found `skill-owned` and `bridge/reference`; stale source-of-truth negative rg returned no matches | pass | `workflow_spec_authoring.md` stale `正本` wording removed |
+| S01 | cl-004 | No skill/template/runtime changes are included | `git diff --name-only` before report evidence contained only S01 provider / mirror docs; disallowed-file rg returned no matches | pass | report evidence added after scope check |
+| S01 | cl-005 | `iss-00163` and `iss-00164` completion evidence exists before docs wording changes | GitHub #163/#164 states were CLOSED; local history includes final gate commits `8d9d62c` and `925095f4` | pass | prerequisite evidence confirmed |
 
 ## レビューゲート状態（Reviewer Gate Status）
 
@@ -97,12 +154,14 @@ result:
 | requirement | phase reviewer | spec-reviewer `019e9bb8-b915-7462-a4f0-174e0d0ed3a4` | fresh | pass | no | promoted to design | no findings |
 | design | phase reviewer | spec-reviewer `019e9bbb-563e-7d91-8479-219714052b0d` | fresh | pass | no | promoted to plan | no findings |
 | plan | phase reviewer | spec-reviewer `019e9bbd-4725-71a2-84fd-3bd451424f48` | fresh | pass | no | promoted to execution | no findings |
+| S01 | step reviewer | spec-reviewer `019e9bc8-29c3-7302-9524-565343b4427b` | fresh | pass | no | S01 complete; proceed to S01 commit | findings none; confidence 0.9 |
 
 ## ステップ commit ゲート（Step Commit Gate）
 
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） |
 |---|---|---|---|---|
-| planning | pass | requirement/design/plan/report authoring evidence | pending | pending |
+| planning | pass | requirement/design/plan/report authoring evidence | `e44a2fad` | post-commit clean confirmed before S01 |
+| S01 | pass | docs wording + S01 report evidence | pending | pending |
 
 ## 最終品質ゲート（Final Quality Gate）
 
