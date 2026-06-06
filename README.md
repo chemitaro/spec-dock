@@ -179,7 +179,14 @@ See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + 
 ## Testing
 
 ```bash
-python -m unittest discover -v
+# Daily local unit suite
+python -m unittest discover -s tests/unit
+
+# Optional integration suite for real external boundaries
+python -m unittest discover -s tests/integration
+
+# Full regression fallback
+python -m unittest discover
 ```
 
 ---
