@@ -146,6 +146,7 @@ result:
 | S01 | cl-003 | Clarification docs and entry docs point to `spec-dock-clarification` as skill-owned / entry workflow and docs as bridge/reference | Positive rg found `skill-owned` and `bridge/reference`; stale source-of-truth negative rg returned no matches | pass | `workflow_spec_authoring.md` stale `正本` wording removed |
 | S01 | cl-004 | No skill/template/runtime changes are included | `git diff --name-only` before report evidence contained only S01 provider / mirror docs; disallowed-file rg returned no matches | pass | report evidence added after scope check |
 | S01 | cl-005 | `iss-00163` and `iss-00164` completion evidence exists before docs wording changes | GitHub #163/#164 states were CLOSED; local history includes final gate commits `8d9d62c` and `925095f4` | pass | prerequisite evidence confirmed |
+| S90 | cl-006 | `sync`, `validate`, mirror inspection, and diff-check pass; generated changes are recorded | `sync` completed and rewrote projection paths but produced no git diff; `validate` passed with nodes=84; post-S90 `diff -q` confirmed all changed provider / mirror doc pairs still matched; `git diff --check`, `git status --short`, and `git diff --name-only` were clean before report evidence | pass | no projection commit required |
 
 ## レビューゲート状態（Reviewer Gate Status）
 
@@ -155,13 +156,15 @@ result:
 | design | phase reviewer | spec-reviewer `019e9bbb-563e-7d91-8479-219714052b0d` | fresh | pass | no | promoted to plan | no findings |
 | plan | phase reviewer | spec-reviewer `019e9bbd-4725-71a2-84fd-3bd451424f48` | fresh | pass | no | promoted to execution | no findings |
 | S01 | step reviewer | spec-reviewer `019e9bc8-29c3-7302-9524-565343b4427b` | fresh | pass | no | S01 complete; proceed to S01 commit | findings none; confidence 0.9 |
+| S90 | docs impact reviewer | spec-reviewer `019e9bcb-719a-72c1-97fc-5bb0a9ab9c4a` | fresh | pass | no | S90 complete; proceed to S90 commit | initial fail on missing mirror inspection; follow-up pass after post-S90 diff-q evidence |
 
 ## ステップ commit ゲート（Step Commit Gate）
 
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） |
 |---|---|---|---|---|
 | planning | pass | requirement/design/plan/report authoring evidence | `e44a2fad` | post-commit clean confirmed before S01 |
-| S01 | pass | docs wording + S01 report evidence | pending | pending |
+| S01 | pass | docs wording + S01 report evidence | `228dc044` | clean confirmed before S90 |
+| S90 | pass | docs impact / sync validation report evidence | pending | pending |
 
 ## 最終品質ゲート（Final Quality Gate）
 
