@@ -78,10 +78,10 @@ ID: "iss-00167"
 | user instruction: 「適切なサブエージェントを利用」 | `/Users/iwasawayuuta/.codex/worktrees/cfd8/spec-dock` | iss-00167 | current session | repo-analyst, spec-reviewer, later code-reviewer / qa-reviewer / dev-coder / doc-writer as plan requires | same repo, active issue, current session, named role; no destructive action, publishing, credentialed access, scope expansion, or canonical doc write by sub-agent | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed with required fresh reviewer gates |
 
 ## 実装サマリー
-- Planning phase complete after D-004 CI scope correction and D-005 plan-scope correction. Implementation has not started.
-- Requirement, design, and plan were recreated from the post-`iss-00160` test topology and the user-selected complete pytest migration scope.
-- D-004 corrected the GitHub Actions / provider CI scope from unit-only pytest to `uv run pytest` full suite. Fresh requirement, design, and plan reviewer gates passed in phase order.
-- D-005 corrected the plan execution scope so `tests/unit/commands/**` is owned by S04 and full migration closure can be reached.
+- Pytest dependency, harness, runtime lane, unit lane, infra lane, integration lane, docs / CI cutover, and final quality gate have been implemented and verified.
+- Requirement, design, and plan were recreated from the post-`iss-00160` test topology and the user-selected complete pytest migration scope, including D-004 full-suite provider CI correction and D-005 `tests/unit/commands/**` scope correction.
+- Current final evidence shows no residual `unittest` framework dependency in tests, no stale docs / CI unittest command references, `uv run pytest` full suite pass, `spec-dock validate` pass, and S99 QA / code / spec reviewer pass.
+- The issue is ready for final report commit and PR delivery / closeout workflow.
 
 ## 実装記録（セッションログ）
 
@@ -771,3 +771,101 @@ git diff --check
 - `AGENTS.md`
 - `.github/workflows/provider-ci.yml`
 - `tests/unit/infra/test_init_update.py`
+
+### 最終品質ゲート S99 — Final quality gate
+
+#### 対象
+- Step: S99
+- Closure IDs: `tc-011`, `tc-012`
+- Scope: final verification and issue-wide QA / code / spec review.
+
+#### 実施内容
+- pytest 完全移行後の最終状態で、残存 `unittest` API dependency、旧 docs / CI コマンド、SpecDock projection validity、full pytest suite を確認した。
+- `pyproject.toml` に `[tool.pytest.ini_options] testpaths = ["tests"]` を追加し、pytest collection scope を計画上の `tests/unit`, `tests/integration`, `tests/cli_runtime` 配下に明示した。
+- 最終品質ゲートと Issue-wide Closure Coverage の証跡を記録した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n 'self\.fail\(|def tearDown|def setUp|super\(\)\.tearDown|super\(\)\.setUp|import unittest|from unittest|unittest\.|self\.assert|assertRaises|subTest|skipTest|unittest\.main|mock\.' tests
+# no output
+
+rg -n 'unittest discover|Framework: `unittest`|python -m unittest|tests/test_cli.py|tests/test_init_update.py|tests/domain_runtime|tests/presentation_runtime' README.md AGENTS.md .github/workflows tests pyproject.toml
+# no output
+
+uv run pytest --version
+# pytest 9.0.3
+
+uv run pytest --collect-only
+# 1082 tests collected in 0.35s
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=86
+
+uv run pytest tests/unit
+# 428 passed in 71.34s (0:01:11)
+
+uv run pytest tests/integration
+# 3 passed in 0.01s
+
+uv run pytest tests/cli_runtime
+# 575 passed, 76 skipped in 352.95s (0:05:52)
+
+uv run pytest
+# 1006 passed, 76 skipped in 421.25s (0:07:01)
+
+git diff --check
+# pass
+```
+
+#### レビュー / コミットゲート
+- S99 qa-reviewer gate: pass.
+  - reviewer: `019e9c53-f4c2-7cc3-9f87-4915dca1dbd3`
+  - review_status: pass
+  - summary: no findings; test/API grep and stale docs/CI grep are clean, pytest is the only configured runner dependency, full suite passed, and no assertion weakening, hidden unittest dependency, test deletion, or new xfail usage was found.
+- S99 code-reviewer gate: pass.
+  - reviewer: `019e9c54-156d-7363-aa55-1f6e88312133`
+  - review_status: pass
+  - summary: provider CI runs full `uv run pytest`, product runtime source is unchanged, final verification supports the migration, and the duplicate S99 report ledger finding was addressed by this report cleanup.
+- S99 spec-reviewer gate: pass.
+  - reviewer: `019e9c54-7847-7042-b2d0-1e0ddb5fa159`
+  - review_status: pass
+  - summary: no findings; previous P1/P2 findings are resolved, single S99 ledger and Closure Coverage are sufficient, AC-001..AC-009 and EC-001..EC-007 have closure evidence, and no user-intent blocker or unsupported report-only durable workflow decision was found.
+- Commit gate: pending at time of report update.
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S99 | `tc-011`, `tc-012` | full pytest migration is proven by full commands, grep absence, and three final reviewers | tests grep no output; docs/CI grep no output; `pyproject.toml` testpaths config present; `uv run pytest --version` -> pytest 9.0.3; `uv run pytest --collect-only` -> 1082 tests collected; `spec-dock validate` pass; unit / integration / cli_runtime lanes pass; `uv run pytest` -> 1006 passed, 76 skipped; `git diff --check` pass; QA reviewer pass `019e9c53-f4c2-7cc3-9f87-4915dca1dbd3`; code-reviewer pass `019e9c54-156d-7363-aa55-1f6e88312133`; spec-reviewer pass `019e9c54-7847-7042-b2d0-1e0ddb5fa159` | passed | final QA / code / spec reviewer gates passed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-011` | S99 | yes | red-required | full fallback previously depended on `python -m unittest discover` | `uv run pytest --version`; `uv run pytest --collect-only`; lane commands; full `uv run pytest` | passed: pytest 9.0.3; 1082 tests collected; unit 428 passed; integration 3 passed; cli_runtime 575 passed, 76 skipped; full suite 1006 passed, 76 skipped | full pytest fallback proven |
+| `tc-012` | S99 | yes | manual-required | step-local reviews were required but issue-wide gates remained pending | QA / code / spec reviewers | passed | QA / code / spec reviewers passed |
+
+#### Issue-wide Closure Coverage
+
+| ID | 種別 | 最終証跡 | 結果 | メモ |
+|---|---|---|---|---|
+| AC-001 | acceptance | S01 `uv run pytest --version` / collect-only; S99 `pyproject.toml` testpaths config; S99 `uv run pytest --version` -> pytest 9.0.3; S99 collect-only -> 1082 tests collected | passed | pytest dependency / collection contract is active |
+| AC-002 | acceptance | S04 / S05 unit migration evidence; S90 provider CI runs full `uv run pytest`; S99 unit lane and full suite pass | passed | provider CI scope is full pytest suite, not unit-only |
+| AC-003 | acceptance | S06 integration migration; S99 `uv run pytest tests/integration` -> 3 passed | passed | integration lane is pytest-native |
+| AC-004 | acceptance | S02 harness migration; S03 runtime lane migration; S99 `uv run pytest tests/cli_runtime` -> 575 passed, 76 skipped | passed | runtime / CLI lane is pytest-native |
+| AC-005 | acceptance | S90 docs / CI full-suite command; S99 `uv run pytest` -> 1006 passed, 76 skipped | passed | full fallback command is `uv run pytest` |
+| AC-006 | acceptance | S08 tests grep no output; S99 tests grep no output | passed | no permanent `unittest` framework dependency remains in tests |
+| AC-007 | acceptance | S90 README / AGENTS / provider CI cutover; S99 docs/CI grep no output | passed | stale unittest commands and retired paths removed from docs / CI contract |
+| AC-008 | acceptance | Step-local reviewer passes, S99 QA reviewer pass, full lane / full suite verification | passed | assertion strength / hermeticity preservation reviewed |
+| AC-009 | acceptance | Parent epic boundary retained in plan/report; S99 spec-reviewer pass `019e9c54-7847-7042-b2d0-1e0ddb5fa159` | passed | parent Epic first-wave boundary preserved |
+| EC-001 | edge case | S01 and S99 collect-only evidence | passed | collection succeeds under pytest config |
+| EC-002 | edge case | S03 / S04 / S05 reviewer evidence for parametrization or labeled assertions; S99 QA reviewer pass | passed | former subTest visibility preserved |
+| EC-003 | edge case | S03 / S04 / S05 exception migration evidence; S99 QA reviewer pass | passed | exception expectations use pytest-native assertions where applicable |
+| EC-004 | edge case | S02 harness migration; S04 / S05 fixture / fake migration evidence; S99 QA reviewer pass | passed | pytest-native fixtures / local fakes used without `unittest.mock` |
+| EC-005 | edge case | S03 / S99 runtime lane durations recorded | passed | runtime lane duration recorded; optimization remains out of scope |
+| EC-006 | edge case | S08 cleanup no-op evidence and grep absence; S99 grep absence | passed | no stale directories/cache cleanup required by evidence |
+| EC-007 | edge case | S90 docs / CI command-string assertion; S99 docs/CI grep no output | passed | docs / CI command-string assertions are pytest-aligned |
+
+#### 変更したファイル
+- `pyproject.toml` - pytest collection scope を `tests` 配下に明示。
+- `report.md` - final gate evidence and Closure Coverage を更新。
