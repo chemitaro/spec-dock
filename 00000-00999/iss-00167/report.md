@@ -460,7 +460,7 @@ git diff --check
   - reviewer: `019e9c1f-550b-7da3-bcea-e0f28059f2c4`
   - review_status: pass
   - summary: HEAD `30e4a4c6` plus the report-only working tree diff has no remaining actionable findings; `setup_method` resolves the CLI smoke lifecycle concern and the remaining diff is suitable as S04 gate evidence.
-- Commit gate: implementation commit `30e4a4c6`; report-only gate evidence commit pending at time of this report update.
+- Commit gate: implementation commit `30e4a4c6`; report-only gate evidence commit `751381b5`.
 
 #### 仕様解釈 / 判断記録
 
@@ -500,3 +500,66 @@ git diff --check
 - `tests/unit/domain/test_runtime_domain_s03.py`
 - `tests/unit/presentation/test_runtime_sync_s07.py`
 - `tests/unit/test_discovery.py`
+
+### 実装ステップ S06 — Integration lane migration
+
+#### 対象
+- Step: S06
+- Closure IDs: `tc-008`
+- Scope: `tests/integration/test_discovery.py`
+
+#### 実施内容
+- integration discovery smoke を pytest-native function に移行した。
+- `unittest.TestCase`, `unittest.main`, `self.subTest`, `self.assertTrue` を除去した。
+- 旧 `subTest(path=...)` の case visibility は `pytest.mark.parametrize` により、3 つの package marker case として個別 collection される形で維持した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n 'self\.fail\(|def tearDown|def setUp|super\(\)\.tearDown|super\(\)\.setUp|import unittest|from unittest|unittest\.|self\.assert|assertRaises|subTest|skipTest|unittest\.main|mock\.' tests/integration
+# no output
+
+uv run pytest tests/integration -q
+# 3 passed in 0.01s
+
+uv run pytest tests/integration --collect-only -q
+# tests/integration/test_discovery.py::test_integration_package_markers_exist[integration]
+# tests/integration/test_discovery.py::test_integration_package_markers_exist[integration/git_remote]
+# tests/integration/test_discovery.py::test_integration_package_markers_exist[integration/github]
+# 3 tests collected in 0.00s
+
+git diff --check
+# pass
+```
+
+#### レビュー / コミットゲート
+- Initial S06 code-reviewer gate: pass with P2.
+  - P2: loop assertion preserved the first failure message but did not preserve former `subTest` case-level collection when multiple markers are missing.
+- Follow-up:
+  - Replaced the loop with `pytest.mark.parametrize`, making each integration marker path a separate pytest case.
+- Fresh S06 code-reviewer gate: pass.
+  - reviewer: `019e9c26-ee98-76d3-8761-c4d143472af9`
+  - review_status: pass
+  - summary: no findings remain; unittest usage is removed, pytest discovery naming is valid, and former subTest case visibility is preserved through parametrized collection.
+- Commit gate: pending at time of report update.
+
+#### 仕様解釈 / 判断記録
+
+| ID | 状態 | 種別 | 判断者 | トピック | トリガー | 採用判断 | 根拠 | 影響ファイル | フォローアップ |
+|---|---|---|---|---|---|---|---|---|---|
+| D-014 | resolved | implementation | code-reviewer + orchestrator | Integration marker smoke case visibility | S06 review noted that a plain loop would stop at the first missing marker and reduce former `subTest` visibility | Use `pytest.mark.parametrize` for the three integration marker paths | EC-002 requires former multi-case visibility to remain observable after pytest migration; parametrization is the smallest pytest-native replacement for this side-effect-free smoke | `tests/integration/test_discovery.py` | none |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S06 | `tc-008`, with applicable `tc-004` | integration lane is pytest-native, hermetic, collected, and free of unittest dependency | scoped grep no output; `uv run pytest tests/integration -q` -> 3 passed; `uv run pytest tests/integration --collect-only -q` -> 3 tests collected; `git diff --check` pass; fresh code-reviewer pass `019e9c26-ee98-76d3-8761-c4d143472af9` | passed | initial P2 fixed by parametrization |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-008` | S06 | yes | red-required | integration discovery smoke used `unittest.TestCase`, `self.subTest`, `self.assertTrue`, and `unittest.main` | scoped grep; integration pytest; collect-only; `git diff --check` | passed: 3 passed; 3 parametrized cases collected; grep no output | Integration lane migrated |
+| `tc-004` | S06 | yes | covered-existing | former `subTest(path=...)` cases existed for three integration marker paths | `pytest.mark.parametrize`; collect-only evidence | passed | case-level visibility preserved |
+
+#### 変更したファイル
+- `tests/integration/test_discovery.py`
