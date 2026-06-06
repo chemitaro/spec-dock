@@ -147,6 +147,46 @@ git diff --check
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | N/A | planning-spec-authoring | no | inspect-only | current docs / test topology inspection | fresh `spec-reviewer` requirement/design/plan re-reviews after D-004/D-005 | passed | implementation tests are planned in `plan.md`; execution has not started |
+| tc-000 | S00 preflight characterization | yes | inspect-only | clean tree before implementation; current pytest/unittest state | `uv run pytest --version`; `uv run pytest --collect-only`; baseline grep commands | passed / baseline recorded | `uv run pytest --version` unexpectedly succeeds in current environment with pytest 9.0.3, but `pyproject.toml` / `uv.lock` contain no pytest contract; collect-only finds 1065 tests as unittest-compatible collection; unittest dependencies remain across docs, CI, runtime, unit, and integration files |
+
+### 実装ステップ S00 — Preflight characterization
+
+#### 対象
+- Step: S00
+- Closure IDs: `tc-000`
+- Scope: read-only baseline plus orchestrator report evidence.
+
+#### 実施内容
+- Current pytest availability / collection behavior を観測した。
+- unittest runner / assertion / fixture API と docs / CI の旧契約が残っていることを baseline として記録した。
+- 実装ファイル、テスト、docs、config は変更していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest --version
+# pytest 9.0.3
+
+uv run pytest --collect-only
+# collected 1065 items
+# pytest currently collects existing unittest-style tests as UnitTestCase/TestCaseFunction.
+
+rg -l 'unittest|self\.assert|assertRaises|subTest|unittest\.main|from unittest|import unittest' tests README.md AGENTS.md .github/workflows pyproject.toml
+# matched 44 paths, including README.md, AGENTS.md, .github/workflows/provider-ci.yml,
+# tests/cli_runtime/harness.py, tests/cli_runtime/test_*.py,
+# tests/unit/{application,cli,commands,domain,infra,presentation}/..., and tests/integration/test_discovery.py
+
+rg -n '^\[tool\.pytest|pytest' pyproject.toml uv.lock
+# no output
+
+rg -n 'UnitTestCase|python -m unittest discover|Framework: `unittest`' README.md AGENTS.md .github/workflows tests/cli_runtime tests/unit tests/integration
+# README.md and AGENTS.md still document unittest commands/framework.
+# .github/workflows/provider-ci.yml still runs python -m unittest discover -s tests/unit.
+# tests/unit/infra/test_init_update.py still asserts the old provider CI command string.
+```
+
+#### レビュー / コミットゲート
+- Step reviewer gate: N/A read-only.
+- Commit gate: commit report evidence only.
 
 #### 変更したファイル
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/requirement.md` - post-`iss-00160` 前提の pytest 完全移行要件を作成。
