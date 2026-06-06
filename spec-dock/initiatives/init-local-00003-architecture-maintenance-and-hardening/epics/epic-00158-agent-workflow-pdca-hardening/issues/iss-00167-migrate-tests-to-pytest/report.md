@@ -227,7 +227,7 @@ git diff --check
   - findings: none
   - review_status: pass
   - notes: scope verified as `pyproject.toml` and `uv.lock` only; pytest is in `dependency-groups.dev`; no pytest plugins; version and collect-only commands pass.
-- Commit gate: pending at time of report update.
+- Commit gate: `47631e17 build(test): pytest依存をdevグループへ追加`.
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 
@@ -634,7 +634,7 @@ git diff --check
   - reviewer: `019e9c26-ee98-76d3-8761-c4d143472af9`
   - review_status: pass
   - summary: no findings remain; unittest usage is removed, pytest discovery naming is valid, and former subTest case visibility is preserved through parametrized collection.
-- Commit gate: pending at time of report update.
+- Commit gate: committed as `7c58222c test(pytest): integrationレーンをpytestへ移行`.
 
 #### 仕様解釈 / 判断記録
 
@@ -657,3 +657,54 @@ git diff --check
 
 #### 変更したファイル
 - `tests/integration/test_discovery.py`
+
+### 実装ステップ S08 — Unittest absence cleanup and lane consolidation
+
+#### 対象
+- Step: S08
+- Closure IDs: `tc-009`
+- Scope: tests-only cleanup caused by S02..S06.
+
+#### 実施内容
+- S02..S06 の移行後、追加 cleanup が必要な stale `unittest` API dependency は検出されなかった。
+- S08 は implementation no-op とし、テストレーンと grep absence の現在状態を記録した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n 'self\.fail\(|def setUp|def tearDown|super\(\)\.tearDown|super\(\)\.setUp|import unittest|from unittest|unittest\.|self\.assert|assertRaises|subTest|skipTest|unittest\.main|mock\.' tests
+# no output
+
+uv run pytest tests/unit
+# 428 passed in 73.03s
+
+uv run pytest tests/integration -q
+# 3 passed in 0.01s
+
+uv run pytest tests/cli_runtime
+# 575 passed, 76 skipped in 364.53s
+
+git diff --check
+# pass
+```
+
+#### レビュー / コミットゲート
+- Step reviewer gate: code-reviewer pass.
+  - reviewer: `019e9c43-1625-7920-b674-8eae83c58158`
+  - review_status: pass
+  - summary: no findings; S08 has a single closure record, tests scoped grep absence plus unit / integration / cli_runtime lane evidence is sufficient, and S90 dirty files are scope-separated.
+- Commit gate: pending at time of report update.
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S08 | `tc-009` | all test lanes pass and test files have no unittest framework dependency | tests scoped grep no output; `uv run pytest tests/unit` -> 428 passed; `uv run pytest tests/integration -q` -> 3 passed; `uv run pytest tests/cli_runtime` -> 575 passed, 76 skipped; `git diff --check` pass; code-reviewer pass `019e9c43-1625-7920-b674-8eae83c58158` | passed | no implementation cleanup needed after S02..S06 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-009` | S08 | yes | inspect-only | S02..S06 migrated all known unittest API usage in tests | tests scoped grep; unit / integration / cli_runtime pytest lanes; `git diff --check` | passed | cleanup no-op; docs / CI command cutover remains S90 |
+
+#### 変更したファイル
+- no implementation file changes for S08; this report records the no-op closure evidence.
