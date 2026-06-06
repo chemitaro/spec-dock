@@ -131,6 +131,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - Provider と dogfooding mirror は byte-equivalent に保ち、stale source-of-truth wording を削除した。
 - S02 で `workflow_clarification.md` を skill-owned workflow の bridge/reference doc として再位置付けした。
 - S03 で `interview` / `research` / `disc` templates に clarification-specific scaffold slots を追加した。
+- S90 で `sync` / `validate` / `git diff --check` を実行し、未解決の projection / docs impact 差分が残っていないことを確認した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -353,7 +354,7 @@ pass: cmp exited 0; unittest OK.
 #### 実装委任ゲート（Implementation Delegation Gate）
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S02 | approved-local-execution | narrow two-file mirror docs edit; plan allowed parent-local docs edit and required fresh spec-reviewer gate | N/A | provider/mirror workflow clarification bridge/reference update | `requirement.md`; `design.md`; `plan.md`; provider source under `src/spec_dock/assets/spec_dock/docs/` | two S02 target workflow docs only | doc deletion, route table changes, issue planning/execution policy rewrites, templates, runtime | S02 positive `rg`, contextual authority `rg`, `cmp`, diff inspection, targeted parity unittest | bridge wording cannot preserve existing link surface; user-intent clarification blocking; provider/mirror parity cannot be preserved | changed files, verification result, link-compatibility note, unresolved risks | pass; fresh S02 spec-reviewer pending |
+| S02 | approved-local-execution | narrow two-file mirror docs edit; plan allowed parent-local docs edit and required fresh spec-reviewer gate | N/A | provider/mirror workflow clarification bridge/reference update | `requirement.md`; `design.md`; `plan.md`; provider source under `src/spec_dock/assets/spec_dock/docs/` | two S02 target workflow docs only | doc deletion, route table changes, issue planning/execution policy rewrites, templates, runtime | S02 positive `rg`, contextual authority `rg`, `cmp`, diff inspection, targeted parity unittest | bridge wording cannot preserve existing link surface; user-intent clarification blocking; provider/mirror parity cannot be preserved | changed files, verification result, link-compatibility note, unresolved risks | pass; fresh S02 spec-reviewer passed |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -373,15 +374,15 @@ pass: cmp exited 0; unittest OK.
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S02 | pending-commit | two workflow clarification docs + report S02 evidence | pending | pending | not applicable | not applicable | not applicable | not applicable |
+| S02 | committed | two workflow clarification docs + report S02 evidence | `63a642dd` | `git status --short` -> clean | not applicable | not applicable | not applicable | not applicable |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/docs/workflow_clarification.md` - Provider workflow clarification bridge/reference doc.
 - `spec-dock/docs/workflow_clarification.md` - Dogfooding mirror workflow clarification doc.
-- `spec-dock/active/issue/report.md` - S02 evidence and pending reviewer records.
+- `spec-dock/active/issue/report.md` - S02 evidence and reviewer records.
 
 #### コミット
-- pending S02 commit.
+- `63a642dd` `docs(clarification): workflow文書をbridge referenceへ整理`
 
 #### メモ
 - No user interview blocker was found for S02.
@@ -486,7 +487,7 @@ pass: all cmp commands exited 0.
 #### 実装委任ゲート（Implementation Delegation Gate）
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S03 | approved-local-execution | narrow six-file mirror template edit; plan allowed parent-local template edit and required fresh spec-reviewer gate | N/A | provider/mirror discussion template clarification slots | `requirement.md`; `design.md`; `plan.md`; passed S01/S02 artifacts | six S03 target discussion templates only | global template normalization, non-discussion templates, template README, runtime, skills, workflow docs | S03 positive `rg`, template authority negative `rg`, three `cmp`, diff inspection | clarification-specific slots require global style/wording decisions; user-intent clarification blocking; provider/mirror parity cannot be preserved | changed files, verification result, template authority negative inspection, unresolved risks | pass; fresh S03 spec-reviewer pending |
+| S03 | approved-local-execution | narrow six-file mirror template edit; plan allowed parent-local template edit and required fresh spec-reviewer gate | N/A | provider/mirror discussion template clarification slots | `requirement.md`; `design.md`; `plan.md`; passed S01/S02 artifacts | six S03 target discussion templates only | global template normalization, non-discussion templates, template README, runtime, skills, workflow docs | S03 positive `rg`, template authority negative `rg`, three `cmp`, diff inspection | clarification-specific slots require global style/wording decisions; user-intent clarification blocking; provider/mirror parity cannot be preserved | changed files, verification result, template authority negative inspection, unresolved risks | pass; fresh S03 spec-reviewer passed |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -506,7 +507,7 @@ pass: all cmp commands exited 0.
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S03 | pending-commit | six discussion templates + report S03 evidence | pending | pending | not applicable | not applicable | not applicable | not applicable |
+| S03 | committed | six discussion templates + report S03 evidence | `fd9b8800` | `git status --short` -> clean | not applicable | not applicable | not applicable | not applicable |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/templates/discussions/interview.md` - Provider interview clarification slots.
@@ -515,13 +516,120 @@ pass: all cmp commands exited 0.
 - `spec-dock/templates/discussions/interview.md` - Dogfooding mirror interview template.
 - `spec-dock/templates/discussions/research.md` - Dogfooding mirror research template.
 - `spec-dock/templates/discussions/disc.md` - Dogfooding mirror disc template.
-- `spec-dock/active/issue/report.md` - S03 evidence and pending reviewer records.
+- `spec-dock/active/issue/report.md` - S03 evidence and reviewer records.
 
 #### コミット
-- pending S03 commit.
+- `fd9b8800` `docs(clarification): discussion templatesにclarification slotsを追加`
 
 #### メモ
 - No user interview blocker was found for S03.
+
+---
+
+### セッションログ（2026-06-06 14:28 - 14:32）
+
+#### 対象
+- Step: S90
+- AC/EC: AC-005 / docs impact
+- 計画上の出典（Planned source）:
+  - `plan.md` section: ドキュメント影響の解消ステップ S90
+  - closure id: cl-010
+
+#### 実施内容
+- S01-S03 コミット後に `spec-dock sync` を実行した。
+- `sync` は projection files を write 対象として報告したが、結果の working tree diff は clean だった。
+- `validate` と `git diff --check` が pass し、未解決の docs/templates/runtime impact は観測されなかった。
+
+#### 実行コマンド / 結果
+```bash
+./spec-dock/scripts/spec-dock sync
+
+pass: active unchanged; wrote projection paths; post-sync working tree remained clean.
+```
+
+```bash
+./spec-dock/scripts/spec-dock validate
+
+pass: spec-dock: ok (validate) nodes=84
+```
+
+```bash
+git diff --check
+git status --short
+git diff --stat
+
+pass: diff-check had no output; status and diff stat were clean.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S90 | 緑フェーズ（Green） | `sync`, `validate`, `git diff --check`, status inspection | sync and validate passed; diff-check clean; no generated diff remained | commands above | pass | no projection commit needed |
+| S90 | リファクタリング（Refactor） | no unexpected provider/runtime/docs/templates changes | working tree clean after sync/validate before report update | `git status --short`; `git diff --stat` | pass | S90 only updates report evidence |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S90 | none | verification | no action | cl-010 | no | S90 commands above |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | cl-010 | sync / validate / git diff --check pass and generated projection impact resolved | commands pass; no generated diff remained; fresh S90 spec-reviewer passed | pass | ready for S90 commit |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s90-001 | S90 | yes | manual-required | S01-S03 committed and working tree clean | `sync`; `validate`; `git diff --check`; status inspection | pass | resolves cl-010 after reviewer pass |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-010 | S90 | `sync`, `validate`, `git diff --check`, status inspection | pass | fresh S90 spec-reviewer passed |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | cl-010 | tc-s90-001 | cl-010 | plan concrete test id used as test id | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction to use issue planning/execution workflow and subagents; follow-up correction forbids deep-consultant as user proxy | `/Users/iwasawayuuta/.codex/worktrees/8d9b/spec-dock` | iss-00163 | current session | spec-reviewer, code-reviewer, qa-reviewer, read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use; ask user directly if user-intent clarification becomes blocking | issue complete / session end / scope change / host policy conflict / user revocation | none | request fresh S90 spec-reviewer |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S90 | verification-only | docs impact resolution step after S01-S03 commits | N/A | sync/validate/diff-check and report evidence | `plan.md`; working tree | report evidence only because sync produced no diff | provider/runtime/docs/templates changes beyond S01-S03 without returning to relevant step | `sync`, `validate`, `git diff --check`, status inspection | unexpected provider assets; validate failure; diff-check failure; user-intent clarification blocking | command results and no-op projection note | pass; fresh S90 spec-reviewer passed |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S90 | N/A | No delegated worker used; parent orchestrator ran verification commands | `spec-dock/active/issue/report.md` only | `sync` pass; `validate` pass; `git diff --check` pass; post-sync diff clean | fresh S90 spec-reviewer pass by `019e9b71-d020-7332-a21c-8d99c6932170` | none | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | delegation not required; parent-local verification step | user-approved workflow execution; no waiver | `spec-dock/active/issue/report.md` | verification evidence update | revert S90 report section if reviewer fails | S90 commands -> pass | spec-reviewer `019e9b71-d020-7332-a21c-8d99c6932170` passed | no unavailable/denied/host conflict remained |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | step reviewer | spec-reviewer | fresh | passed | no | proceed to S90 commit | Agent `019e9b71-d020-7332-a21c-8d99c6932170`; prior failed reviews fixed stale S02/S03 commit evidence and Docs Impact Resolution row |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | pending-commit | report S90 evidence only | pending | pending | sync produced no working tree diff | generated projections under `spec-dock/.agent/`, `spec-dock/*.puml`, `spec-dock/dashboard.md` | `git status --short`; `git diff --stat` | clean before report update |
+
+#### 変更したファイル
+- `spec-dock/active/issue/report.md` - S90 verification evidence.
+
+#### コミット
+- pending S90 commit.
+
+#### メモ
+- No user interview blocker was found for S90.
 
 ---
 
@@ -541,7 +649,7 @@ pass: all cmp commands exited 0.
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / workflow / skill | yes | parent orchestrator | `./spec-dock/scripts/spec-dock sync` pass; `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=84`; `git diff --check` pass; post-sync status/diff clean before report update | pass by `019e9b71-d020-7332-a21c-8d99c6932170` |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
