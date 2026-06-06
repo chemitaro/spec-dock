@@ -13,7 +13,6 @@ import zipfile
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 
 try:
     import tomllib
@@ -26,6 +25,24 @@ from tests.cli_runtime.harness import (
     _expected_spec_dock_version,
     main,
 )
+import pytest
+
+
+@contextmanager
+def _case(**labels: object):
+    try:
+        yield
+    except AssertionError as exc:
+        label_text = ", ".join(f"{key}={value!r}" for key, value in labels.items())
+        message = f"{exc} [{label_text}]" if str(exc) else f"case failed [{label_text}]"
+        raise AssertionError(message) from exc
+
+
+def _raise(exc: BaseException):
+    def _raiser(*_args: object, **_kwargs: object) -> None:
+        raise exc
+
+    return _raiser
 
 _ISS_00031_STALE_WHEEL_PATHS = (
     "spec_dock/assets/spec_dock/templates/adr.md",
@@ -327,14 +344,14 @@ class TestInitUpdate(CliRuntimeHarness):
             for path in root.rglob("*")
             if "__pycache__" in path.parts or path.name.endswith(".pyc")
         )
-        self.assertEqual(copied, [])
+        assert copied == []
 
     def _uninstall_json_actions(self, target: Path, *args: str) -> dict[str, dict[str, object]]:
         exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json", *args])
-        self.assertEqual(exit_code, 0, stderr)
-        self.assertEqual(stderr, "")
+        assert exit_code == 0, stderr
+        assert stderr == ""
         payload = json.loads(stdout)
-        self.assertEqual(payload["status"], "planned")
+        assert payload["status"] == "planned"
         return {action["path"]: action for action in payload["actions"]}
 
     def _uninstall_json_payload(
@@ -344,10 +361,10 @@ class TestInitUpdate(CliRuntimeHarness):
         expected_exit_code: int = 0,
     ) -> dict[str, object]:
         exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json", *args])
-        self.assertEqual(exit_code, expected_exit_code, stderr)
-        self.assertEqual(stderr, "")
+        assert exit_code == expected_exit_code, stderr
+        assert stderr == ""
         payload = json.loads(stdout)
-        self.assertEqual(stdout.count("\n"), 1)
+        assert stdout.count("\n") == 1
         return payload
 
     def _actions_by_path(self, payload: dict[str, object]) -> dict[str, dict[str, object]]:
@@ -652,7 +669,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ).read_text(encoding="utf-8")
 
         for label in _INTERVIEW_REQUIRED_LABELS:
-            self.assertIn(label, interview_text)
+            assert label in interview_text
     _GUIDE_REFERENCE_NAME_REQUIRED_FRAGMENTS = (
         "[workflow_initiative.md](workflow_initiative.md)",
         "[workflow_epic.md](workflow_epic.md)",
@@ -1166,6 +1183,13 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00131-debug-codex-subagent-permission-profile-callability/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00138-split-issue-planning-execution-skills/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00159-make-issue-planning-skill-expose-mandatory-authoring-gates/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00162-align-skill-docs-template-context-surfaces/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00163-revise-spec-dock-clarification-as-skill-owned-grill-workflow/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00164-clarify-hub-and-leaf-skill-routing-surface/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00165-align-workflow-docs-with-skill-spine-boundary/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00166-align-templates-as-scaffolds-and-examples/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1308,6 +1332,28 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00131-debug-codex-subagent-permission-profile-callability/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00138-split-issue-planning-execution-skills/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00159-make-issue-planning-skill-expose-mandatory-authoring-gates/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00162-align-skill-docs-template-context-surfaces/.meta.json": [
+            "iss-00159"
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00163-revise-spec-dock-clarification-as-skill-owned-grill-workflow/.meta.json": [
+            "iss-00162"
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00164-clarify-hub-and-leaf-skill-routing-surface/.meta.json": [
+            "iss-00159",
+            "iss-00163",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00165-align-workflow-docs-with-skill-spine-boundary/.meta.json": [
+            "iss-00159",
+            "iss-00163",
+            "iss-00164",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00166-align-templates-as-scaffolds-and-examples/.meta.json": [
+            "iss-00162",
+            "iss-00163",
+            "iss-00165",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -1329,6 +1375,11 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00123": ["iss-00120", "iss-00122"],
         "iss-00124": ["iss-00121", "iss-00122", "iss-00123"],
         "iss-00125": ["iss-00120", "iss-00121", "iss-00122", "iss-00123", "iss-00124"],
+        "iss-00162": ["iss-00159"],
+        "iss-00163": ["iss-00162"],
+        "iss-00164": ["iss-00159", "iss-00163"],
+        "iss-00165": ["iss-00159", "iss-00163", "iss-00164"],
+        "iss-00166": ["iss-00162", "iss-00163", "iss-00165"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
@@ -1342,25 +1393,19 @@ class TestInitUpdate(CliRuntimeHarness):
     def _assert_canonical_rules_files_contract(self, text_map: dict[str, str]) -> None:
         for rel_suffix, expected in self._CANONICAL_RULES_EXPECTATIONS.items():
             matching_paths = [path for path in text_map if path.endswith(rel_suffix)]
-            self.assertEqual(
-                len(matching_paths),
-                1,
-                f"expected exactly one canonical rules document for {rel_suffix}: {matching_paths}",
-            )
+            assert len(matching_paths) == \
+                1, \
+                f"expected exactly one canonical rules document for {rel_suffix}: {matching_paths}"
             rel_path = matching_paths[0]
             text = text_map[rel_path]
             for fragment in expected["contains"]:
-                self.assertIn(
-                    fragment,
-                    text,
-                    f"expected canonical rules fragment missing from {rel_path}: {fragment}",
-                )
+                assert fragment in \
+                    text, \
+                    f"expected canonical rules fragment missing from {rel_path}: {fragment}"
             for fragment in expected["absent"]:
-                self.assertNotIn(
-                    fragment,
-                    text,
-                    f"unexpected canonical rules fragment present in {rel_path}: {fragment}",
-                )
+                assert fragment not in \
+                    text, \
+                    f"unexpected canonical rules fragment present in {rel_path}: {fragment}"
 
     def _assert_canonical_rules_files_match_provider_assets(
         self,
@@ -1372,46 +1417,36 @@ class TestInitUpdate(CliRuntimeHarness):
         for installed_rel_path, asset_rel_path in self._CANONICAL_RULES_PROVIDER_ASSET_MAP.items():
             installed_path = installed_base / installed_rel_path
             asset_path = repo_root / asset_rel_path
-            self.assertTrue(installed_path.is_file(), f"missing canonical rules file: {installed_path}")
-            self.assertTrue(asset_path.is_file(), f"missing canonical rules asset: {asset_path}")
-            self.assertEqual(
-                installed_path.read_text(encoding="utf-8"),
-                asset_path.read_text(encoding="utf-8"),
-                f"canonical rules file diverged from provider asset: {installed_rel_path}",
-            )
+            assert installed_path.is_file(), f"missing canonical rules file: {installed_path}"
+            assert asset_path.is_file(), f"missing canonical rules asset: {asset_path}"
+            assert installed_path.read_text(encoding="utf-8") == \
+                asset_path.read_text(encoding="utf-8"), \
+                f"canonical rules file diverged from provider asset: {installed_rel_path}"
 
     def _assert_workflow_tree_docs_contract(self, workflow_tree_text: str) -> None:
         for fragment in self._WORKFLOW_TREE_REQUIRED_FRAGMENTS:
-            self.assertIn(
-                fragment,
-                workflow_tree_text,
-                f"workflow-tree contract fragment missing: {fragment}",
-            )
+            assert fragment in \
+                workflow_tree_text, \
+                f"workflow-tree contract fragment missing: {fragment}"
         for legacy_token in (
             "spec-dock-guide.md",
             "sync.md",
             "workflow-issue.md",
             "workflow-adr.md",
         ):
-            self.assertNotIn(
-                f"`{legacy_token}`",
-                workflow_tree_text,
-                f"workflow-tree contains legacy link token: {legacy_token}",
-            )
+            assert f"`{legacy_token}`" not in \
+                workflow_tree_text, \
+                f"workflow-tree contains legacy link token: {legacy_token}"
 
     def _assert_guide_docs_contract(self, guide_text: str) -> None:
         for fragment in self._GUIDE_REQUIRED_FRAGMENTS:
-            self.assertIn(
-                fragment,
-                guide_text,
-                f"guide contract fragment missing: {fragment}",
-            )
+            assert fragment in \
+                guide_text, \
+                f"guide contract fragment missing: {fragment}"
         for fragment in self._GUIDE_REFERENCE_NAME_REQUIRED_FRAGMENTS:
-            self.assertIn(
-                fragment,
-                guide_text,
-                f"guide reference-name contract fragment missing: {fragment}",
-            )
+            assert fragment in \
+                guide_text, \
+                f"guide reference-name contract fragment missing: {fragment}"
         for legacy_token in (
             "workflow-initiative.md",
             "workflow-epic.md",
@@ -1422,11 +1457,9 @@ class TestInitUpdate(CliRuntimeHarness):
             "reference-deps.md",
             "reference-sync.md",
         ):
-            self.assertNotIn(
-                legacy_token,
-                guide_text,
-                f"guide contains legacy link token: {legacy_token}",
-            )
+            assert legacy_token not in \
+                guide_text, \
+                f"guide contains legacy link token: {legacy_token}"
 
     def _assert_user_facing_markdown_labels_use_japanese_primary(
         self,
@@ -1514,7 +1547,7 @@ class TestInitUpdate(CliRuntimeHarness):
             }
             if sum(1 for word in lowercase_words if word in common_prose_words) < 4:
                 return
-            self.fail(
+            raise AssertionError(
                 f"{source}:{line_number}: explanatory prose must use Japanese primary "
                 f"with English anchor only: {line}"
             )
@@ -1530,31 +1563,23 @@ class TestInitUpdate(CliRuntimeHarness):
             heading_match = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
             if heading_match:
                 label = heading_match.group(2)
-                self.assertNotIn(
-                    label,
-                    _JAPANESE_PRIMARY_FORBIDDEN_HEADING_LABELS,
-                    f"{source}:{line_number}: heading must use Japanese primary with English anchor: {line}",
-                )
+                assert label not in \
+                    _JAPANESE_PRIMARY_FORBIDDEN_HEADING_LABELS, \
+                    f"{source}:{line_number}: heading must use Japanese primary with English anchor: {line}"
                 primary = re.split(r"\s*[（(]", label, maxsplit=1)[0].strip()
                 primary_without_number = re.sub(r"^\d+[.)]\s+", "", primary)
                 lower_primary = primary_without_number.lower()
-                self.assertNotIn(
-                    primary_without_number,
-                    _JAPANESE_PRIMARY_FORBIDDEN_BARE_TOOL_TOKEN_HEADINGS,
-                    f"{source}:{line_number}: heading must use Japanese primary with tool anchor: {line}",
-                )
+                assert primary_without_number not in \
+                    _JAPANESE_PRIMARY_FORBIDDEN_BARE_TOOL_TOKEN_HEADINGS, \
+                    f"{source}:{line_number}: heading must use Japanese primary with tool anchor: {line}"
                 for phrase in _JAPANESE_PRIMARY_FORBIDDEN_PRIMARY_PHRASES:
-                    self.assertNotIn(
-                        phrase,
-                        lower_primary,
-                        f"{source}:{line_number}: heading must keep English phrase in anchor only: {line}",
-                    )
+                    assert phrase not in \
+                        lower_primary, \
+                        f"{source}:{line_number}: heading must keep English phrase in anchor only: {line}"
                 for phrase in _JAPANESE_PRIMARY_FORBIDDEN_HEADING_PRIMARY_PHRASES:
-                    self.assertNotIn(
-                        phrase,
-                        lower_primary,
-                        f"{source}:{line_number}: heading must use Japanese primary with English anchor: {line}",
-                    )
+                    assert phrase not in \
+                        lower_primary, \
+                        f"{source}:{line_number}: heading must use Japanese primary with English anchor: {line}"
                 if any(
                     primary_without_number.startswith(prefix)
                     for prefix in _JAPANESE_PRIMARY_HEADING_ALLOWED_PREFIXES
@@ -1572,11 +1597,8 @@ class TestInitUpdate(CliRuntimeHarness):
                     token_remainder = primary_without_number[len(leading_tool_token) :].strip()
                     if not token_remainder or not re.match(r"^[A-Za-z`-]", token_remainder):
                         continue
-                self.assertNotRegex(
-                    primary_without_number,
-                    r"^[A-Za-z]",
-                    f"{source}:{line_number}: heading must use Japanese primary with English anchor: {line}",
-                )
+                assert not re.search(r"^[A-Za-z]", primary_without_number), \
+                    f"{source}:{line_number}: heading must use Japanese primary with English anchor: {line}"
                 continue
 
             if line.startswith("|") and not re.fullmatch(r"\|[\s:-]+\|?", line):
@@ -1587,26 +1609,22 @@ class TestInitUpdate(CliRuntimeHarness):
                     primary = re.split(r"\s*[（(]", cell, maxsplit=1)[0].strip()
                     lower_primary = primary.lower()
                     for phrase in _JAPANESE_PRIMARY_FORBIDDEN_PRIMARY_PHRASES:
-                        self.assertNotIn(
-                            phrase,
-                            lower_primary,
-                            f"{source}:{line_number}: table label must keep English phrase in anchor only: {line}",
-                        )
+                        assert phrase not in \
+                            lower_primary, \
+                            f"{source}:{line_number}: table label must keep English phrase in anchor only: {line}"
                     if not re.match(r"^[a-z]", lower_primary):
                         continue
-                    self.assertTrue(
-                        is_allowed_ascii_table_primary(primary),
-                        f"{source}:{line_number}: table label must use Japanese primary "
-                        "unless it is an explicit contract/code/path/status/role value "
-                        f"(cell {cell_index}: {cell!r}): {line}",
-                    )
+                    assert is_allowed_ascii_table_primary(primary), \
+                        f"{source}:{line_number}: table label must use Japanese primary " \
+                        "unless it is an explicit contract/code/path/status/role value " \
+                        f"(cell {cell_index}: {cell!r}): {line}"
                 continue
 
             assert_not_full_english_prose(line, line_number=line_number)
 
     def _assert_concrete_test_cases_nested_list_contract(self, text: str, *, source: str) -> None:
         marker = "#### 具体テストケース一覧"
-        self.assertIn(marker, text, f"{source} must include concrete test case section")
+        assert marker in text, f"{source} must include concrete test case section"
         section = text.split(marker, 1)[1]
         section_end_candidates = [
             index
@@ -1618,28 +1636,20 @@ class TestInitUpdate(CliRuntimeHarness):
         ]
         if section_end_candidates:
             section = section[: min(section_end_candidates)]
-        self.assertNotRegex(
-            section,
-            r"(?m)^\|.*\|$",
-            f"{source} concrete test case section must not contain table rows",
-        )
+        assert not re.search(r"(?m)^\|.*\|$", section), \
+            f"{source} concrete test case section must not contain table rows"
         case_pattern = re.compile(
             r"(?m)^- `tc-s\d{2}-\d{3}` [^\n:]+: .+\n"
             r"(?:  - .+\n)+"
         )
         case_blocks = case_pattern.findall(section)
-        self.assertGreaterEqual(
-            len(case_blocks),
-            2,
-            f"{source} must include at least two concrete nested test case examples",
-        )
+        assert len(case_blocks) >= \
+            2, \
+            f"{source} must include at least two concrete nested test case examples"
         require_related_closure_id = len(case_blocks) > 1
         for case_block in case_blocks:
-            self.assertRegex(
-                case_block,
-                r"(?m)^- `tc-s\d{2}-\d{3}` [^:]+: .+$",
-                f"{source} concrete case must start with a backticked concrete test case id bullet",
-            )
+            assert re.search(r"(?m)^- `tc-s\d{2}-\d{3}` [^:]+: .+$", case_block), \
+                f"{source} concrete case must start with a backticked concrete test case id bullet"
             standard_labels_present = all(
                 re.search(rf"(?m)^  - {label}:[ \t]*\S.*$", case_block)
                 for label in ("前提", "操作", "期待結果", "失敗検出", "検証方法")
@@ -1648,22 +1658,14 @@ class TestInitUpdate(CliRuntimeHarness):
                 re.search(rf"(?m)^  - {label}:[ \t]*\S.*$", case_block)
                 for label in ("テスト不要理由", "代替検証方法", "期待結果", "記録先")
             )
-            self.assertTrue(
-                standard_labels_present or alternative_labels_present,
-                f"{source} concrete case must include standard test labels "
-                f"or inspect/manual alternative labels: {case_block}",
-            )
+            assert standard_labels_present or alternative_labels_present, \
+                f"{source} concrete case must include standard test labels " \
+                f"or inspect/manual alternative labels: {case_block}"
             if require_related_closure_id:
-                self.assertRegex(
-                    case_block,
-                    r"(?m)^  - 関連 closure id: .+",
-                    f"{source} multi-case section must map each case to related closure id: {case_block}",
-                )
-            self.assertNotRegex(
-                case_block,
-                r"(?m)^\|.*\|$",
-                f"{source} concrete case must not use a table row: {case_block}",
-            )
+                assert re.search(r"(?m)^  - 関連 closure id: .+", case_block), \
+                    f"{source} multi-case section must map each case to related closure id: {case_block}"
+            assert not re.search(r"(?m)^\|.*\|$", case_block), \
+                f"{source} concrete case must not use a table row: {case_block}"
 
     def _assert_delegated_draft_evidence_schema_contract(self, text: str, *, source: str) -> None:
         for state in (
@@ -1676,7 +1678,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "blocked",
             "stale",
         ):
-            self.assertIn(state, text, f"{source}: missing lifecycle state {state}")
+            assert state in text, f"{source}: missing lifecycle state {state}"
         ineligible_rule_pattern = re.compile(
             r"(?:Promotion-ineligible states:[\s\S]{0,160}"
             r"stale[\s\S]{0,160}rejected[\s\S]{0,160}superseded[\s\S]{0,160}blocked"
@@ -1685,11 +1687,8 @@ class TestInitUpdate(CliRuntimeHarness):
             r"|stale[\s\S]{0,80}rejected[\s\S]{0,80}superseded[\s\S]{0,80}blocked"
             r"[\s\S]{0,80}promotion evidence に使えない)"
         )
-        self.assertRegex(
-            text,
-            ineligible_rule_pattern,
-            f"{source}: missing explicit promotion-ineligible rule for stale/rejected/superseded/blocked",
-        )
+        assert re.search(ineligible_rule_pattern, text), \
+            f"{source}: missing explicit promotion-ineligible rule for stale/rejected/superseded/blocked"
         for field in (
             "role",
             "phase",
@@ -1704,7 +1703,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "reviewer result",
             "promotion decision",
         ):
-            self.assertIn(field, text, f"{source}: missing delegated evidence field {field}")
+            assert field in text, f"{source}: missing delegated evidence field {field}"
         for field in (
             "created_by_role",
             "scope_id",
@@ -1717,7 +1716,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "report evidence destination",
             "Evidence Adoption Ledger fields",
         ):
-            self.assertIn(field, text, f"{source}: missing scope-local discussion evidence field {field}")
+            assert field in text, f"{source}: missing scope-local discussion evidence field {field}"
         for retired_heavy_field in (
             "manifest_hash",
             "permission_profile_name",
@@ -1728,11 +1727,9 @@ class TestInitUpdate(CliRuntimeHarness):
             "input authority path/hash",
             "session invocation path/hash",
         ):
-            self.assertNotIn(
-                retired_heavy_field,
-                text,
-                f"{source}: retired manifest-heavy field must not be standard delegated draft evidence {retired_heavy_field}",
-            )
+            assert retired_heavy_field not in \
+                text, \
+                f"{source}: retired manifest-heavy field must not be standard delegated draft evidence {retired_heavy_field}"
         for retired_grant_key in (
             "can_write_requirement",
             "can_write_design",
@@ -1744,23 +1741,19 @@ class TestInitUpdate(CliRuntimeHarness):
             "can_finish_issue",
             "can_complete_phase",
         ):
-            self.assertNotIn(
-                retired_grant_key,
-                text,
-                f"{source}: retired grant key must not appear in authority schema {retired_grant_key}",
-            )
+            assert retired_grant_key not in \
+                text, \
+                f"{source}: retired grant key must not appear in authority schema {retired_grant_key}"
         for invalid_wildcard in ("`*`", "`grants.*`", "`all`"):
-            self.assertIn(invalid_wildcard, text, f"{source}: missing invalid wildcard token {invalid_wildcard}")
+            assert invalid_wildcard in text, f"{source}: missing invalid wildcard token {invalid_wildcard}"
         for field, alternatives in (
             ("expected verdict", ("expected verdict", "期待される判定")),
             ("allowed next action", ("allowed next action", "許可される次アクション")),
             ("report evidence path", ("report evidence path", "report 証跡の記録先", "レポート証跡の記録先")),
             ("promotion eligibility", ("promotion eligibility", "昇格可否")),
         ):
-            self.assertTrue(
-                any(alternative in text for alternative in alternatives),
-                f"{source}: missing failure-mode field {field}",
-            )
+            assert any(alternative in text for alternative in alternatives), \
+                f"{source}: missing failure-mode field {field}"
         expected_failure_mode_rows = {
             "missing consent": (
                 "blocked / incomplete",
@@ -1859,39 +1852,29 @@ class TestInitUpdate(CliRuntimeHarness):
                 or key.startswith(f"{failure_mode}（")
                 or key.endswith(f"（{failure_mode}）")
             ]
-            self.assertTrue(matching_keys, f"{source}: missing failure-mode table row {failure_mode}")
+            assert matching_keys, f"{source}: missing failure-mode table row {failure_mode}"
             cells = table_rows[matching_keys[0]]
-            self.assertEqual(
-                cells[1],
-                expected_verdict,
-                f"{source}: unexpected verdict for failure mode {failure_mode}",
-            )
-            self.assertIn(
-                cells[2],
-                expected_next_actions,
-                f"{source}: unexpected next action for failure mode {failure_mode}",
-            )
-            self.assertTrue(
-                cells[3],
-                f"{source}: missing report evidence path for failure mode {failure_mode}",
-            )
-            self.assertEqual(
-                cells[4],
-                "ineligible",
-                f"{source}: unexpected promotion eligibility for failure mode {failure_mode}",
-            )
+            assert cells[1] == \
+                expected_verdict, \
+                f"{source}: unexpected verdict for failure mode {failure_mode}"
+            assert cells[2] in \
+                expected_next_actions, \
+                f"{source}: unexpected next action for failure mode {failure_mode}"
+            assert cells[3], \
+                f"{source}: missing report evidence path for failure mode {failure_mode}"
+            assert cells[4] == \
+                "ineligible", \
+                f"{source}: unexpected promotion eligibility for failure mode {failure_mode}"
 
     def _assert_checked_in_dogfooding_mirror_docs_match_provider_assets(self, repo_root: Path) -> None:
         for mirror_rel_path, asset_rel_path in self._DOGFOODING_MIRROR_PROVIDER_ASSET_MAP.items():
             mirror_path = repo_root / mirror_rel_path
             asset_path = repo_root / asset_rel_path
-            self.assertTrue(mirror_path.is_file(), f"missing checked-in dogfooding mirror file: {mirror_path}")
-            self.assertTrue(asset_path.is_file(), f"missing provider asset file: {asset_path}")
-            self.assertEqual(
-                mirror_path.read_text(encoding="utf-8"),
-                asset_path.read_text(encoding="utf-8"),
-                f"checked-in dogfooding mirror file diverged from provider asset: {mirror_rel_path}",
-            )
+            assert mirror_path.is_file(), f"missing checked-in dogfooding mirror file: {mirror_path}"
+            assert asset_path.is_file(), f"missing provider asset file: {asset_path}"
+            assert mirror_path.read_text(encoding="utf-8") == \
+                asset_path.read_text(encoding="utf-8"), \
+                f"checked-in dogfooding mirror file diverged from provider asset: {mirror_rel_path}"
 
     def _assert_checked_in_dogfooding_active_none_reports_match_provider_assets(
         self,
@@ -1900,25 +1883,21 @@ class TestInitUpdate(CliRuntimeHarness):
         for mirror_rel_path, asset_rel_path in self._DOGFOODING_ACTIVE_NONE_REPORT_PROVIDER_ASSET_MAP.items():
             mirror_path = repo_root / mirror_rel_path
             asset_path = repo_root / asset_rel_path
-            self.assertTrue(mirror_path.is_file(), f"missing checked-in active-none report mirror: {mirror_path}")
-            self.assertTrue(asset_path.is_file(), f"missing provider active-none report asset: {asset_path}")
-            self.assertEqual(
-                mirror_path.read_text(encoding="utf-8"),
-                asset_path.read_text(encoding="utf-8"),
-                f"checked-in active-none report mirror diverged from provider asset: {mirror_rel_path}",
-            )
+            assert mirror_path.is_file(), f"missing checked-in active-none report mirror: {mirror_path}"
+            assert asset_path.is_file(), f"missing provider active-none report asset: {asset_path}"
+            assert mirror_path.read_text(encoding="utf-8") == \
+                asset_path.read_text(encoding="utf-8"), \
+                f"checked-in active-none report mirror diverged from provider asset: {mirror_rel_path}"
 
     def _assert_checked_in_dogfooding_runtime_mirror_match_provider_assets(self, repo_root: Path) -> None:
         for mirror_rel_path, asset_rel_path in self._DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP.items():
             mirror_path = repo_root / mirror_rel_path
             asset_path = repo_root / asset_rel_path
-            self.assertTrue(mirror_path.is_file(), f"missing checked-in dogfooding runtime mirror file: {mirror_path}")
-            self.assertTrue(asset_path.is_file(), f"missing provider runtime asset file: {asset_path}")
-            self.assertEqual(
-                mirror_path.read_text(encoding="utf-8"),
-                asset_path.read_text(encoding="utf-8"),
-                f"checked-in dogfooding runtime mirror file diverged from provider asset: {mirror_rel_path}",
-            )
+            assert mirror_path.is_file(), f"missing checked-in dogfooding runtime mirror file: {mirror_path}"
+            assert asset_path.is_file(), f"missing provider runtime asset file: {asset_path}"
+            assert mirror_path.read_text(encoding="utf-8") == \
+                asset_path.read_text(encoding="utf-8"), \
+                f"checked-in dogfooding runtime mirror file diverged from provider asset: {mirror_rel_path}"
 
     def _assert_issue_execution_runtime_command_reminders(self, text: str, *, source: str) -> None:
         for fragment in (
@@ -1934,7 +1913,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "`--no-github`",
             "Do not copy the full workflow here",
         ):
-            self.assertIn(fragment, text, f"{source} missing concise runtime command reminder: {fragment}")
+            assert fragment in text, f"{source} missing concise runtime command reminder: {fragment}"
 
     def _assert_installed_templates_match_provider_assets(
         self,
@@ -1948,31 +1927,23 @@ class TestInitUpdate(CliRuntimeHarness):
 
         mirror_entries = sorted(path.relative_to(mirror_root).as_posix() for path in mirror_root.rglob("*"))
         asset_entries = sorted(path.relative_to(asset_root).as_posix() for path in asset_root.rglob("*"))
-        self.assertEqual(
-            mirror_entries,
-            asset_entries,
-            "installed templates tree diverged from provider assets",
-        )
+        assert mirror_entries == \
+            asset_entries, \
+            "installed templates tree diverged from provider assets"
 
         for rel_path in asset_entries:
             mirror_path = mirror_root / rel_path
             asset_path = asset_root / rel_path
-            self.assertEqual(
-                mirror_path.is_dir(),
-                asset_path.is_dir(),
-                f"installed templates entry kind diverged from provider asset: {rel_path}",
-            )
-            self.assertEqual(
-                mirror_path.is_file(),
-                asset_path.is_file(),
-                f"installed templates entry kind diverged from provider asset: {rel_path}",
-            )
+            assert mirror_path.is_dir() == \
+                asset_path.is_dir(), \
+                f"installed templates entry kind diverged from provider asset: {rel_path}"
+            assert mirror_path.is_file() == \
+                asset_path.is_file(), \
+                f"installed templates entry kind diverged from provider asset: {rel_path}"
             if asset_path.is_file():
-                self.assertEqual(
-                    mirror_path.read_text(encoding="utf-8"),
-                    asset_path.read_text(encoding="utf-8"),
-                    f"installed template diverged from provider asset: {rel_path}",
-                )
+                assert mirror_path.read_text(encoding="utf-8") == \
+                    asset_path.read_text(encoding="utf-8"), \
+                    f"installed template diverged from provider asset: {rel_path}"
 
     def _run_command_with_host_adapter_manifest_override(
         self,
@@ -2015,8 +1986,10 @@ class TestInitUpdate(CliRuntimeHarness):
                 yield patched_assets_root
 
             err = io.StringIO()
-            with patch("spec_dock.cli._assets_dir", _patched_assets_dir), redirect_stderr(err):
-                code = main([command, str(target)])
+            with pytest.MonkeyPatch.context() as monkeypatch:
+                monkeypatch.setattr("spec_dock.cli._assets_dir", _patched_assets_dir)
+                with redirect_stderr(err):
+                    code = main([command, str(target)])
         return code, err.getvalue()
 
     def _run_update_with_host_adapter_manifest_override(
@@ -2079,11 +2052,9 @@ class TestInitUpdate(CliRuntimeHarness):
         for rel_path, expected_bytes in expected_snapshot.items():
             path = target / rel_path
             observed_bytes = path.read_bytes() if path.is_file() else None
-            self.assertEqual(
-                observed_bytes,
-                expected_bytes,
-                f"managed file changed despite manifest contract failure: {rel_path}",
-            )
+            assert observed_bytes == \
+                expected_bytes, \
+                f"managed file changed despite manifest contract failure: {rel_path}"
 
     def _build_managed_skill_install_plan_from_assets_root(self, assets_root: Path):
         import spec_dock.cli as cli
@@ -2124,10 +2095,8 @@ class TestInitUpdate(CliRuntimeHarness):
             if line.startswith(heading_marker):
                 start_index = index
                 break
-        self.assertIsNotNone(
-            start_index,
-            f"issue-71 expected heading prefix missing in {source_label}: {heading_prefix}",
-        )
+        assert start_index is not None, \
+            f"issue-71 expected heading prefix missing in {source_label}: {heading_prefix}"
 
         assert start_index is not None
         end_index = len(lines)
@@ -2144,11 +2113,9 @@ class TestInitUpdate(CliRuntimeHarness):
         delegation_expected: str,
         shim_label: str,
     ) -> None:
-        self.assertIn(
-            delegation_expected,
-            text,
-            f"spec-manager missing delegation reference ({shim_label}): {delegation_expected}",
-        )
+        assert delegation_expected in \
+            text, \
+            f"spec-manager missing delegation reference ({shim_label}): {delegation_expected}"
         for fragment in (
             "command operator",
             "./spec-dock/scripts/spec-dock active {set,show,clear}",
@@ -2157,67 +2124,43 @@ class TestInitUpdate(CliRuntimeHarness):
             "manual",
             "Read order",
         ):
-            self.assertIn(
-                fragment,
-                text,
-                f"spec-manager missing command-operator fragment ({shim_label}): {fragment}",
-            )
-        self.assertRegex(
-            text,
-            r"(?i)(must not manually edit|manual file edit|manual file editing)",
-            f"spec-manager missing manual-edit prohibition ({shim_label})",
-        )
-        self.assertNotRegex(
-            text,
-            self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN,
-            f"spec-manager includes structured state payload keys ({shim_label})",
-        )
-        self.assertNotRegex(
-            text,
-            self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN,
-            f"spec-manager includes .agent/*.json or context-pack inline reference ({shim_label})",
-        )
-        self.assertNotRegex(
-            text,
-            self._NATIVE_SHIM_DIRECT_PROTOCOL_PATTERN,
-            f"spec-manager includes direct protocol read reference ({shim_label})",
-        )
+            assert fragment in \
+                text, \
+                f"spec-manager missing command-operator fragment ({shim_label}): {fragment}"
+        assert re.search(r"(?i)(must not manually edit|manual file edit|manual file editing)", text), \
+            f"spec-manager missing manual-edit prohibition ({shim_label})"
+        assert not re.search(self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN, text), \
+            f"spec-manager includes structured state payload keys ({shim_label})"
+        assert not re.search(self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN, text), \
+            f"spec-manager includes .agent/*.json or context-pack inline reference ({shim_label})"
+        assert not re.search(self._NATIVE_SHIM_DIRECT_PROTOCOL_PATTERN, text), \
+            f"spec-manager includes direct protocol read reference ({shim_label})"
 
     def _assert_codex_native_shim_loader_contract(self, *, text: str, shim_label: str) -> None:
-        self.assertRegex(
-            text,
-            self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN,
-            f"codex native shim missing developer_instructions key ({shim_label})",
-        )
-        self.assertNotRegex(
-            text,
-            self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN,
-            f"codex native shim still uses legacy instructions key ({shim_label})",
-        )
-        self.assertIn('model = "gpt-5.5"', text, f"codex spec-manager missing model ({shim_label})")
-        self.assertIn(
-            'model_reasoning_effort = "low"',
-            text,
-            f"codex spec-manager missing reasoning effort ({shim_label})",
-        )
-        self.assertIn('approval_policy = "never"', text, f"codex spec-manager missing approval policy ({shim_label})")
-        self.assertIn('sandbox_mode = "workspace-write"', text, f"codex spec-manager missing sandbox mode ({shim_label})")
-        self.assertIn("notify = []", text, f"codex spec-manager missing notify disable ({shim_label})")
-        self.assertIn("[features]", text, f"codex spec-manager missing features table ({shim_label})")
-        self.assertIn("shell_tool = true", text, f"codex spec-manager missing shell tool enable ({shim_label})")
+        assert re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, text), \
+            f"codex native shim missing developer_instructions key ({shim_label})"
+        assert not re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, text), \
+            f"codex native shim still uses legacy instructions key ({shim_label})"
+        assert 'model = "gpt-5.5"' in text, f"codex spec-manager missing model ({shim_label})"
+        assert 'model_reasoning_effort = "low"' in \
+            text, \
+            f"codex spec-manager missing reasoning effort ({shim_label})"
+        assert 'approval_policy = "never"' in text, f"codex spec-manager missing approval policy ({shim_label})"
+        assert 'sandbox_mode = "workspace-write"' in text, f"codex spec-manager missing sandbox mode ({shim_label})"
+        assert "notify = []" in text, f"codex spec-manager missing notify disable ({shim_label})"
+        assert "[features]" in text, f"codex spec-manager missing features table ({shim_label})"
+        assert "shell_tool = true" in text, f"codex spec-manager missing shell tool enable ({shim_label})"
 
     def _assert_codex_doc_writer_contract(self, *, text: str, shim_label: str) -> None:
-        self.assertIn('name = "doc-writer"', text, f"codex doc-writer missing name ({shim_label})")
-        self.assertIn('model = "gpt-5.5"', text, f"codex doc-writer missing model ({shim_label})")
-        self.assertIn(
-            'model_reasoning_effort = "medium"',
-            text,
-            f"codex doc-writer missing reasoning effort ({shim_label})",
-        )
-        self.assertIn('approval_policy = "never"', text, f"codex doc-writer missing approval policy ({shim_label})")
-        self.assertIn('sandbox_mode = "workspace-write"', text, f"codex doc-writer missing sandbox mode ({shim_label})")
-        self.assertIn("[features]", text, f"codex doc-writer missing features table ({shim_label})")
-        self.assertIn("shell_tool = true", text, f"codex doc-writer missing shell tool enable ({shim_label})")
+        assert 'name = "doc-writer"' in text, f"codex doc-writer missing name ({shim_label})"
+        assert 'model = "gpt-5.5"' in text, f"codex doc-writer missing model ({shim_label})"
+        assert 'model_reasoning_effort = "medium"' in \
+            text, \
+            f"codex doc-writer missing reasoning effort ({shim_label})"
+        assert 'approval_policy = "never"' in text, f"codex doc-writer missing approval policy ({shim_label})"
+        assert 'sandbox_mode = "workspace-write"' in text, f"codex doc-writer missing sandbox mode ({shim_label})"
+        assert "[features]" in text, f"codex doc-writer missing features table ({shim_label})"
+        assert "shell_tool = true" in text, f"codex doc-writer missing shell tool enable ({shim_label})"
 
     def _assert_codex_delegated_author_adapter_contract(
         self,
@@ -2229,23 +2172,21 @@ class TestInitUpdate(CliRuntimeHarness):
         draft_kind: str,
     ) -> None:
         parsed = tomllib.loads(text)
-        self.assertEqual(parsed.get("name"), agent_name)
-        self.assertEqual(parsed.get("model"), "gpt-5.5")
-        self.assertEqual(parsed.get("model_reasoning_effort"), "high")
-        self.assertEqual(parsed.get("web_search"), "disabled")
-        self.assertEqual(parsed.get("approval_policy"), "never")
-        self.assertEqual(parsed.get("sandbox_mode"), "workspace-write")
-        self.assertNotIn("default_permissions", parsed)
-        self.assertNotIn("permissions", parsed)
-        self.assertEqual(parsed.get("sandbox_workspace_write", {}).get("network_access"), False)
-        self.assertEqual(parsed.get("features", {}).get("shell_tool"), True)
-        self.assertIsInstance(parsed.get("developer_instructions"), str)
-        self.assertIn(f'name = "{agent_name}"', text, f"delegated author adapter missing name ({shim_label})")
-        self.assertIn(
-            f".agents/skills/{skill_name}/SKILL.md",
-            text,
-            f"delegated author adapter missing canonical role skill reference ({shim_label})",
-        )
+        assert parsed.get("name") == agent_name
+        assert parsed.get("model") == "gpt-5.5"
+        assert parsed.get("model_reasoning_effort") == "high"
+        assert parsed.get("web_search") == "disabled"
+        assert parsed.get("approval_policy") == "never"
+        assert parsed.get("sandbox_mode") == "workspace-write"
+        assert "default_permissions" not in parsed
+        assert "permissions" not in parsed
+        assert parsed.get("sandbox_workspace_write", {}).get("network_access") == False
+        assert parsed.get("features", {}).get("shell_tool") == True
+        assert isinstance(parsed.get("developer_instructions"), str)
+        assert f'name = "{agent_name}"' in text, f"delegated author adapter missing name ({shim_label})"
+        assert f".agents/skills/{skill_name}/SKILL.md" in \
+            text, \
+            f"delegated author adapter missing canonical role skill reference ({shim_label})"
         for fragment in (
             "intentionally thin",
             "source of",
@@ -2274,142 +2215,98 @@ class TestInitUpdate(CliRuntimeHarness):
             "Manual spec authoring remains valid",
             "fresh `spec-reviewer` pass remains required",
         ):
-            self.assertIn(
-                fragment,
-                text,
-                f"delegated author adapter missing boundary fragment ({shim_label}): {fragment}",
-            )
-        self.assertIn('model = "gpt-5.5"', text, f"delegated author adapter missing model ({shim_label})")
-        self.assertIn(
-            'model_reasoning_effort = "high"',
-            text,
-            f"delegated author adapter missing reasoning effort ({shim_label})",
-        )
-        self.assertIn('web_search = "disabled"', text, f"delegated author adapter missing web setting ({shim_label})")
-        self.assertIn('approval_policy = "never"', text, f"delegated author adapter missing approval policy ({shim_label})")
-        self.assertIn('sandbox_mode = "workspace-write"', text, f"delegated author adapter missing sandbox mode ({shim_label})")
-        self.assertIn("[sandbox_workspace_write]", text, f"delegated author adapter missing workspace-write table ({shim_label})")
-        self.assertIn("network_access = false", text, f"delegated author adapter must disable network ({shim_label})")
-        self.assertNotIn("default_permissions =", text, f"delegated author adapter must not use Permission Profiles ({shim_label})")
-        self.assertNotIn("[permissions.", text, f"delegated author adapter must not define Permission Profiles ({shim_label})")
-        self.assertIn("[features]", text, f"delegated author adapter missing features table ({shim_label})")
-        self.assertIn("shell_tool = true", text, f"delegated author adapter missing shell tool enable ({shim_label})")
+            assert fragment in \
+                text, \
+                f"delegated author adapter missing boundary fragment ({shim_label}): {fragment}"
+        assert 'model = "gpt-5.5"' in text, f"delegated author adapter missing model ({shim_label})"
+        assert 'model_reasoning_effort = "high"' in \
+            text, \
+            f"delegated author adapter missing reasoning effort ({shim_label})"
+        assert 'web_search = "disabled"' in text, f"delegated author adapter missing web setting ({shim_label})"
+        assert 'approval_policy = "never"' in text, f"delegated author adapter missing approval policy ({shim_label})"
+        assert 'sandbox_mode = "workspace-write"' in text, f"delegated author adapter missing sandbox mode ({shim_label})"
+        assert "[sandbox_workspace_write]" in text, f"delegated author adapter missing workspace-write table ({shim_label})"
+        assert "network_access = false" in text, f"delegated author adapter must disable network ({shim_label})"
+        assert "default_permissions =" not in text, f"delegated author adapter must not use Permission Profiles ({shim_label})"
+        assert "[permissions." not in text, f"delegated author adapter must not define Permission Profiles ({shim_label})"
+        assert "[features]" in text, f"delegated author adapter missing features table ({shim_label})"
+        assert "shell_tool = true" in text, f"delegated author adapter missing shell tool enable ({shim_label})"
 
     def _assert_copilot_spec_manager_contract(self, *, text: str, shim_label: str) -> None:
-        self.assertIn("name: spec-manager", text, f"copilot spec-manager name missing ({shim_label})")
-        self.assertIn("model: gpt-5.4-mini", text, f"copilot spec-manager model missing ({shim_label})")
-        self.assertIn("tools: ['read', 'search', 'execute', 'todo']", text, f"copilot spec-manager tools mismatch ({shim_label})")
-        self.assertIn("user-invocable: false", text, f"copilot spec-manager must be subagent-only ({shim_label})")
-        self.assertNotIn("mcp-servers:", text, f"copilot spec-manager must not add mcp-servers ({shim_label})")
-        self.assertNotIn("'edit'", text, f"copilot spec-manager must not allow edit tool ({shim_label})")
-        self.assertNotIn("'agent'", text, f"copilot spec-manager must not allow agent tool ({shim_label})")
-        self.assertNotIn("'web'", text, f"copilot spec-manager must not allow web tool ({shim_label})")
-        self.assertNotRegex(
-            text,
-            self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN,
-            f"copilot spec-manager includes structured state payload keys ({shim_label})",
-        )
-        self.assertNotRegex(
-            text,
-            self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN,
-            f"copilot spec-manager includes .agent/*.json or context-pack inline reference ({shim_label})",
-        )
+        assert "name: spec-manager" in text, f"copilot spec-manager name missing ({shim_label})"
+        assert "model: gpt-5.4-mini" in text, f"copilot spec-manager model missing ({shim_label})"
+        assert "tools: ['read', 'search', 'execute', 'todo']" in text, f"copilot spec-manager tools mismatch ({shim_label})"
+        assert "user-invocable: false" in text, f"copilot spec-manager must be subagent-only ({shim_label})"
+        assert "mcp-servers:" not in text, f"copilot spec-manager must not add mcp-servers ({shim_label})"
+        assert "'edit'" not in text, f"copilot spec-manager must not allow edit tool ({shim_label})"
+        assert "'agent'" not in text, f"copilot spec-manager must not allow agent tool ({shim_label})"
+        assert "'web'" not in text, f"copilot spec-manager must not allow web tool ({shim_label})"
+        assert not re.search(self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN, text), \
+            f"copilot spec-manager includes structured state payload keys ({shim_label})"
+        assert not re.search(self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN, text), \
+            f"copilot spec-manager includes .agent/*.json or context-pack inline reference ({shim_label})"
 
     def _assert_copilot_orchestrator_contract(self, *, text: str, shim_label: str) -> None:
-        self.assertIn("name: orchestrator", text, f"copilot orchestrator name missing ({shim_label})")
-        self.assertIn("user-invocable: true", text, f"copilot orchestrator must be user-invocable ({shim_label})")
-        self.assertIn(
-            "delegate bounded `./spec-dock/scripts/spec-dock ...` command operations to `spec-manager` by default",
-            text,
-            f"copilot orchestrator missing spec-manager routing guidance ({shim_label})",
-        )
-        self.assertIn(
-            "Keep requirement/design/plan/report authoring, context synthesis, and user-facing judgment in the main orchestrator.",
-            text,
-            f"copilot orchestrator missing docs-owner boundary ({shim_label})",
-        )
-        self.assertNotIn(
-            "disable-model-invocation: true",
-            text,
-            f"copilot orchestrator must keep model invocation enabled ({shim_label})",
-        )
-        self.assertNotRegex(
-            text,
-            self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN,
-            f"copilot orchestrator includes structured state payload keys ({shim_label})",
-        )
-        self.assertNotRegex(
-            text,
-            self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN,
-            f"copilot orchestrator includes .agent/*.json or context-pack inline reference ({shim_label})",
-        )
+        assert "name: orchestrator" in text, f"copilot orchestrator name missing ({shim_label})"
+        assert "user-invocable: true" in text, f"copilot orchestrator must be user-invocable ({shim_label})"
+        assert "delegate bounded `./spec-dock/scripts/spec-dock ...` command operations to `spec-manager` by default" in \
+            text, \
+            f"copilot orchestrator missing spec-manager routing guidance ({shim_label})"
+        assert "Keep requirement/design/plan/report authoring, context synthesis, and user-facing judgment in the main orchestrator." in \
+            text, \
+            f"copilot orchestrator missing docs-owner boundary ({shim_label})"
+        assert "disable-model-invocation: true" not in \
+            text, \
+            f"copilot orchestrator must keep model invocation enabled ({shim_label})"
+        assert not re.search(self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN, text), \
+            f"copilot orchestrator includes structured state payload keys ({shim_label})"
+        assert not re.search(self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN, text), \
+            f"copilot orchestrator includes .agent/*.json or context-pack inline reference ({shim_label})"
 
     def _assert_codex_bootstrap_routing_contract(self, *, text: str, shim_label: str) -> None:
-        self.assertIn("Treat `spec-manager` as the default specialist for SpecDock operations.", text)
-        self.assertIn(
-            "Use `spec-manager` by default for SpecDock command workflows instead of operating the tool ad hoc.",
-            text,
-            f"codex bootstrap missing command routing guidance ({shim_label})",
-        )
-        self.assertIn(
-            "Keep requirement/design/plan/report authoring with the main orchestrator.",
-            text,
-            f"codex bootstrap missing docs-owner boundary ({shim_label})",
-        )
-        self.assertIn(
-            "delegate only the command portion to `spec-manager`",
-            text,
-            f"codex bootstrap missing mixed-task delegation guidance ({shim_label})",
-        )
+        assert "Treat `spec-manager` as the default specialist for SpecDock operations." in text
+        assert "Use `spec-manager` by default for SpecDock command workflows instead of operating the tool ad hoc." in \
+            text, \
+            f"codex bootstrap missing command routing guidance ({shim_label})"
+        assert "Keep requirement/design/plan/report authoring with the main orchestrator." in \
+            text, \
+            f"codex bootstrap missing docs-owner boundary ({shim_label})"
+        assert "delegate only the command portion to `spec-manager`" in \
+            text, \
+            f"codex bootstrap missing mixed-task delegation guidance ({shim_label})"
 
     def _assert_codex_main_config_routing_contract(self, *, text: str, shim_label: str) -> None:
-        self.assertIn(
-            "SpecDock のコマンド操作は原則として `spec-manager` へ委任する。",
-            text,
-            f"codex main config missing spec-manager routing guidance ({shim_label})",
-        )
+        assert "SpecDock のコマンド操作は原則として `spec-manager` へ委任する。" in \
+            text, \
+            f"codex main config missing spec-manager routing guidance ({shim_label})"
         parsed = tomllib.loads(text)
-        self.assertEqual(parsed.get("agents", {}).get("max_depth"), 2, f"codex main config must set agents.max_depth = 2 ({shim_label})")
+        assert parsed.get("agents", {}).get("max_depth") == 2, f"codex main config must set agents.max_depth = 2 ({shim_label})"
 
     def _assert_codex_command_rules_contract(self, *, text: str, shim_label: str) -> None:
-        self.assertIn("prefix_rule(", text, f"codex command rules missing prefix_rule ({shim_label})")
-        self.assertIn(
-            'pattern = [["./spec-dock/scripts/spec-dock", "./spec"]]',
-            text,
-            f"codex command rules missing repo-local entrypoint prefixes ({shim_label})",
-        )
-        self.assertIn('decision = "allow"', text, f"codex command rules missing allow decision ({shim_label})")
-        self.assertIn(
-            "./spec-dock/scripts/spec-dock new future-command --flag value",
-            text,
-            f"codex command rules must cover future subcommands by entrypoint prefix ({shim_label})",
-        )
-        self.assertIn(
-            "./spec future-command --flag value",
-            text,
-            f"codex command rules must cover future shortcut subcommands by entrypoint prefix ({shim_label})",
-        )
-        self.assertIn("spec-dock validate", text, f"codex command rules missing global-command guard ({shim_label})")
-        self.assertIn(
-            "uvx --from . spec-dock update .",
-            text,
-            f"codex command rules missing installer-command guard ({shim_label})",
-        )
-        self.assertIn(
-            'pattern = [["./.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"]]',
-            text,
-            f"codex command rules missing PR review wrapper allow prefix ({shim_label})",
-        )
-        self.assertIn(
-            "gh api repos/owner/repo/pulls/13/comments",
-            text,
-            f"codex command rules missing direct gh api guard ({shim_label})",
-        )
-        self.assertIn(
-            "curl https://api.github.com/repos/owner/repo/pulls/13/comments",
-            text,
-            f"codex command rules missing direct curl guard ({shim_label})",
-        )
+        assert "prefix_rule(" in text, f"codex command rules missing prefix_rule ({shim_label})"
+        assert 'pattern = [["./spec-dock/scripts/spec-dock", "./spec"]]' in \
+            text, \
+            f"codex command rules missing repo-local entrypoint prefixes ({shim_label})"
+        assert 'decision = "allow"' in text, f"codex command rules missing allow decision ({shim_label})"
+        assert "./spec-dock/scripts/spec-dock new future-command --flag value" in \
+            text, \
+            f"codex command rules must cover future subcommands by entrypoint prefix ({shim_label})"
+        assert "./spec future-command --flag value" in \
+            text, \
+            f"codex command rules must cover future shortcut subcommands by entrypoint prefix ({shim_label})"
+        assert "spec-dock validate" in text, f"codex command rules missing global-command guard ({shim_label})"
+        assert "uvx --from . spec-dock update ." in \
+            text, \
+            f"codex command rules missing installer-command guard ({shim_label})"
+        assert 'pattern = [["./.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"]]' in \
+            text, \
+            f"codex command rules missing PR review wrapper allow prefix ({shim_label})"
+        assert "gh api repos/owner/repo/pulls/13/comments" in \
+            text, \
+            f"codex command rules missing direct gh api guard ({shim_label})"
+        assert "curl https://api.github.com/repos/owner/repo/pulls/13/comments" in \
+            text, \
+            f"codex command rules missing direct curl guard ({shim_label})"
 
     def _issue_69_run_subprocess(
         self,
@@ -2426,15 +2323,13 @@ class TestInitUpdate(CliRuntimeHarness):
             text=True,
             check=False,
         )
-        self.assertEqual(
-            result.returncode,
-            0,
-            "issue-69 command failed:\n"
-            f"command: {' '.join(args)}\n"
-            f"cwd: {cwd}\n"
-            f"stdout:\n{result.stdout}\n"
-            f"stderr:\n{result.stderr}",
-        )
+        assert result.returncode == \
+            0, \
+            "issue-69 command failed:\n" \
+            f"command: {' '.join(args)}\n" \
+            f"cwd: {cwd}\n" \
+            f"stdout:\n{result.stdout}\n" \
+            f"stderr:\n{result.stderr}"
 
     def _issue_69_run_subprocess_capture(
         self,
@@ -2451,33 +2346,27 @@ class TestInitUpdate(CliRuntimeHarness):
             text=True,
             check=False,
         )
-        self.assertEqual(
-            result.returncode,
-            0,
-            "issue-69 command failed:\n"
-            f"command: {' '.join(args)}\n"
-            f"cwd: {cwd}\n"
-            f"stdout:\n{result.stdout}\n"
-            f"stderr:\n{result.stderr}",
-        )
+        assert result.returncode == \
+            0, \
+            "issue-69 command failed:\n" \
+            f"command: {' '.join(args)}\n" \
+            f"cwd: {cwd}\n" \
+            f"stdout:\n{result.stdout}\n" \
+            f"stderr:\n{result.stderr}"
         return result
 
     def _issue_69_resolve_wheelhouse(self, repo_root: Path) -> Path:
         wheelhouse = repo_root / self._ISSUE_69_WHEELHOUSE_RELATIVE
-        self.assertTrue(
-            wheelhouse.is_dir(),
-            f"issue-69 local wheelhouse is missing: {wheelhouse}",
-        )
+        assert wheelhouse.is_dir(), \
+            f"issue-69 local wheelhouse is missing: {wheelhouse}"
         missing_wheels = [
             wheel_name
             for wheel_name in self._ISSUE_69_WHEELHOUSE_FILENAMES
             if not (wheelhouse / wheel_name).is_file()
         ]
-        self.assertEqual(
-            missing_wheels,
-            [],
-            f"issue-69 local wheelhouse is missing pinned backend wheels: {missing_wheels}",
-        )
+        assert missing_wheels == \
+            [], \
+            f"issue-69 local wheelhouse is missing pinned backend wheels: {missing_wheels}"
         return wheelhouse
 
     def _issue_69_venv_python(self, venv_dir: Path) -> Path:
@@ -2513,20 +2402,43 @@ class TestInitUpdate(CliRuntimeHarness):
     def _issue_69_install_target_packages(
         self,
         *,
+        python_executable: Path,
         target_dir: Path,
         requirements: list[str],
         wheelhouse: Path | None = None,
     ) -> None:
         target_dir.mkdir(parents=True, exist_ok=True)
-        command = [
-            sys.executable,
-            "-m",
-            "pip",
-            "install",
-            "--no-cache-dir",
-            "--target",
-            str(target_dir),
-        ]
+        pip_probe = subprocess.run(
+            [str(python_executable), "-m", "pip", "--version"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if pip_probe.returncode == 0:
+            command = [
+                str(python_executable),
+                "-m",
+                "pip",
+                "install",
+                "--no-cache-dir",
+                "--target",
+                str(target_dir),
+            ]
+        else:
+            uv_executable = shutil.which("uv")
+            assert uv_executable is not None, (
+                "issue-69 package install requires either pip in the current Python "
+                f"or uv on PATH; pip stderr:\n{pip_probe.stderr}"
+            )
+            command = [
+                uv_executable,
+                "pip",
+                "install",
+                "--python",
+                str(python_executable),
+                "--target",
+                str(target_dir),
+            ]
         if wheelhouse is not None:
             command.extend(
                 [
@@ -2539,7 +2451,7 @@ class TestInitUpdate(CliRuntimeHarness):
         self._issue_69_run_subprocess(command)
 
     def _issue_69_create_fallback_runtime_env(self, env_root: Path) -> Path:
-        self.assertNotEqual(os.name, "nt", "issue-69 fallback runtime env is only implemented for POSIX")
+        assert os.name != "nt", "issue-69 fallback runtime env is only implemented for POSIX"
         bin_dir = env_root / "bin"
         site_packages_dir = self._issue_69_site_packages_dir(env_root)
         bin_dir.mkdir(parents=True, exist_ok=True)
@@ -2603,14 +2515,21 @@ class TestInitUpdate(CliRuntimeHarness):
         )
         if venv_result.returncode == 0:
             venv_python = self._issue_69_venv_python(venv_dir)
-            self.assertTrue(
-                venv_python.is_file(),
-                f"issue-69 expected venv python executable at: {venv_python}",
+            assert venv_python.is_file(), \
+                f"issue-69 expected venv python executable at: {venv_python}"
+            pip_result = subprocess.run(
+                [str(venv_python), "-m", "pip", "--version"],
+                capture_output=True,
+                text=True,
+                check=False,
             )
+            if pip_result.returncode != 0:
+                venv_python = self._issue_69_create_fallback_runtime_env(fallback_env_dir)
         else:
             venv_python = self._issue_69_create_fallback_runtime_env(fallback_env_dir)
 
         self._issue_69_install_target_packages(
+            python_executable=venv_python,
             target_dir=self._issue_69_site_packages_dir(self._issue_69_env_root(venv_python)),
             requirements=list(self._ISSUE_69_BUILD_BACKEND_REQUIREMENTS),
             wheelhouse=wheelhouse,
@@ -2633,8 +2552,8 @@ class TestInitUpdate(CliRuntimeHarness):
 
         wheel_paths = sorted(dist_dir.glob("*.whl"))
         sdist_paths = sorted(dist_dir.glob("*.tar.gz"))
-        self.assertEqual(len(wheel_paths), 1, f"issue-69 expected one wheel artifact, got: {wheel_paths}")
-        self.assertEqual(len(sdist_paths), 1, f"issue-69 expected one sdist artifact, got: {sdist_paths}")
+        assert len(wheel_paths) == 1, f"issue-69 expected one wheel artifact, got: {wheel_paths}"
+        assert len(sdist_paths) == 1, f"issue-69 expected one sdist artifact, got: {sdist_paths}"
 
         wheel_dir.mkdir(parents=True, exist_ok=True)
         sdist_dir.mkdir(parents=True, exist_ok=True)
@@ -2661,6 +2580,7 @@ class TestInitUpdate(CliRuntimeHarness):
             sdist_dir=sdist_dir,
         )
         self._issue_69_install_target_packages(
+            python_executable=venv_python,
             target_dir=self._issue_69_site_packages_dir(self._issue_69_env_root(venv_python)),
             requirements=[str(wheel_path)],
         )
@@ -2719,9 +2639,9 @@ class TestInitUpdate(CliRuntimeHarness):
             env=self._issue_69_runtime_env_without_checkout_fallback(),
         )
         output_lines = [line for line in result.stdout.splitlines() if line.strip()]
-        self.assertTrue(output_lines, "issue-69 runtime snapshot command produced no JSON output")
+        assert output_lines, "issue-69 runtime snapshot command produced no JSON output"
         payload = json.loads(output_lines[-1])
-        self.assertIsInstance(payload, dict, "issue-69 runtime snapshot must be a JSON object")
+        assert isinstance(payload, dict), "issue-69 runtime snapshot must be a JSON object"
         return payload
 
     def _issue_70_collect_isolated_installed_plan_snapshot(
@@ -2751,9 +2671,9 @@ class TestInitUpdate(CliRuntimeHarness):
             env=self._issue_69_runtime_env_without_checkout_fallback(),
         )
         output_lines = [line for line in result.stdout.splitlines() if line.strip()]
-        self.assertTrue(output_lines, "issue-70 plan snapshot command produced no JSON output")
+        assert output_lines, "issue-70 plan snapshot command produced no JSON output"
         payload = json.loads(output_lines[-1])
-        self.assertIsInstance(payload, dict, "issue-70 plan snapshot must be a JSON object")
+        assert isinstance(payload, dict), "issue-70 plan snapshot must be a JSON object"
         return payload
 
     def _issue_69_assert_runtime_snapshot_uses_installed_package(
@@ -2764,28 +2684,18 @@ class TestInitUpdate(CliRuntimeHarness):
     ) -> None:
         spec_dock_file = Path(str(snapshot.get("spec_dock_file", ""))).resolve()
         assets_dir = Path(str(snapshot.get("assets_dir", ""))).resolve()
-        self.assertIn(
-            "site-packages",
-            spec_dock_file.as_posix(),
-            f"issue-69 expected installed package module path, got: {spec_dock_file}",
-        )
-        self.assertIn(
-            "site-packages",
-            assets_dir.as_posix(),
-            f"issue-69 expected installed package assets path, got: {assets_dir}",
-        )
-        self.assertFalse(
-            self._issue_69_path_is_within(spec_dock_file, repo_root),
-            f"issue-69 runtime imported spec_dock from checkout path: {spec_dock_file}",
-        )
-        self.assertFalse(
-            self._issue_69_path_is_within(assets_dir, repo_root),
-            f"issue-69 runtime loaded assets from checkout path: {assets_dir}",
-        )
-        self.assertFalse(
-            bool(snapshot.get("sys_path_has_repo_root")),
-            "issue-69 runtime sys.path unexpectedly includes repository checkout path",
-        )
+        assert "site-packages" in \
+            spec_dock_file.as_posix(), \
+            f"issue-69 expected installed package module path, got: {spec_dock_file}"
+        assert "site-packages" in \
+            assets_dir.as_posix(), \
+            f"issue-69 expected installed package assets path, got: {assets_dir}"
+        assert not self._issue_69_path_is_within(spec_dock_file, repo_root), \
+            f"issue-69 runtime imported spec_dock from checkout path: {spec_dock_file}"
+        assert not self._issue_69_path_is_within(assets_dir, repo_root), \
+            f"issue-69 runtime loaded assets from checkout path: {assets_dir}"
+        assert not bool(snapshot.get("sys_path_has_repo_root")), \
+            "issue-69 runtime sys.path unexpectedly includes repository checkout path"
 
     def _issue_69_seed_stale_fixtures_in_sdist_source_context(self, build_context: Path) -> set[str]:
         source_root = build_context / "src"
@@ -2816,10 +2726,10 @@ class TestInitUpdate(CliRuntimeHarness):
 
     def _issue_69_extract_pyproject_stale_exclusion_patterns(self, pyproject_text: str) -> tuple[str, ...]:
         section_header = "[tool.setuptools.exclude-package-data]"
-        self.assertIn(section_header, pyproject_text, "missing setuptools exclude-package-data section")
+        assert section_header in pyproject_text, "missing setuptools exclude-package-data section"
         exclude_section = pyproject_text.split(section_header, 1)[1]
         list_header = "spec_dock = ["
-        self.assertIn(list_header, exclude_section, "missing spec_dock exclude-package-data list")
+        assert list_header in exclude_section, "missing spec_dock exclude-package-data list"
         list_block = exclude_section.split(list_header, 1)[1].split("]", 1)[0]
         patterns: list[str] = []
         for line in list_block.splitlines():
@@ -2839,9 +2749,9 @@ class TestInitUpdate(CliRuntimeHarness):
             for target in statement.targets:
                 if isinstance(target, ast.Name) and target.id == "_STALE_BUILD_OUTPUT_PATTERNS":
                     extracted = ast.literal_eval(statement.value)
-                    self.assertIsInstance(extracted, tuple)
+                    assert isinstance(extracted, tuple)
                     return tuple(str(item) for item in extracted)
-        self.fail("setup.py is missing _STALE_BUILD_OUTPUT_PATTERNS")
+        pytest.fail("setup.py is missing _STALE_BUILD_OUTPUT_PATTERNS")
 
     def _issue_69_prepare_build_context(self, repo_root: Path, build_context: Path) -> None:
         build_context.mkdir(parents=True, exist_ok=True)
@@ -2889,10 +2799,8 @@ class TestInitUpdate(CliRuntimeHarness):
     def _issue_69_collect_installed_install_root_inventory(self, installed_root: Path) -> set[str]:
         package_root = installed_root / "spec_dock"
         install_root = package_root / "assets" / "install_root"
-        self.assertTrue(
-            install_root.is_dir(),
-            f"issue-69 installed package is missing install_root assets: {install_root}",
-        )
+        assert install_root.is_dir(), \
+            f"issue-69 installed package is missing install_root assets: {install_root}"
         return {
             f"spec_dock/{candidate.relative_to(package_root).as_posix()}"
             for candidate in install_root.rglob("*")
@@ -2958,66 +2866,66 @@ class TestInitUpdate(CliRuntimeHarness):
             target = Path(tmp)
 
             exit_code = main(["init", str(target)])
-            self.assertEqual(exit_code, 0)
+            assert exit_code == 0
 
             self._assert_version_file(target)
 
             # Repo-root shortcut (best-effort; only assert when symlinks are supported).
             if self._can_create_symlink(target):
-                self.assertTrue((target / "spec").is_symlink(), "repo-root shortcut missing: spec")
+                assert (target / "spec").is_symlink(), "repo-root shortcut missing: spec"
 
-            self.assertTrue((target / "spec-dock" / "docs").is_dir())
-            self.assertTrue((target / "spec-dock" / "templates").is_dir())
-            self.assertTrue((target / "spec-dock" / "scripts").is_dir())
-            self.assertTrue((target / "spec-dock" / "system").is_dir())
-            self.assertTrue((target / "spec-dock" / "initiatives").is_dir())
-            self.assertTrue((target / "spec-dock" / "active").is_dir())
-            self.assertTrue((target / "spec-dock" / ".agent").is_dir())
-            self.assertTrue((target / "spec-dock" / ".gitignore").is_file())
+            assert (target / "spec-dock" / "docs").is_dir()
+            assert (target / "spec-dock" / "templates").is_dir()
+            assert (target / "spec-dock" / "scripts").is_dir()
+            assert (target / "spec-dock" / "system").is_dir()
+            assert (target / "spec-dock" / "initiatives").is_dir()
+            assert (target / "spec-dock" / "active").is_dir()
+            assert (target / "spec-dock" / ".agent").is_dir()
+            assert (target / "spec-dock" / ".gitignore").is_file()
             gitignore = (target / "spec-dock" / ".gitignore").read_text(encoding="utf-8")
-            self.assertIn(".agent/", gitignore)
-            self.assertIn("active/", gitignore)
-            self.assertIn("/adrs/", gitignore)
+            assert ".agent/" in gitignore
+            assert "active/" in gitignore
+            assert "/adrs/" in gitignore
 
             docs_dir = target / "spec-dock" / "docs"
-            self.assertTrue((docs_dir / "README.md").is_file())
-            self.assertTrue((docs_dir / "guide.md").is_file())
-            self.assertTrue((docs_dir / "workflow_initiative.md").is_file())
-            self.assertTrue((docs_dir / "workflow_epic.md").is_file())
-            self.assertTrue((docs_dir / "workflow_issue.md").is_file())
-            self.assertTrue((docs_dir / "workflow_spec_authoring.md").is_file())
-            self.assertTrue((docs_dir / "workflow_adr.md").is_file())
-            self.assertTrue((docs_dir / "workflow-tree.md").is_file())
-            self.assertTrue((docs_dir / "phase_requirement.md").is_file())
-            self.assertTrue((docs_dir / "phase_design.md").is_file())
-            self.assertTrue((docs_dir / "phase_plan.md").is_file())
-            self.assertTrue((docs_dir / "authoring" / "issue-plan.md").is_file())
-            self.assertTrue((docs_dir / "reference_github.md").is_file())
-            self.assertTrue((docs_dir / "reference_naming.md").is_file())
-            self.assertTrue((docs_dir / "reference_sync.md").is_file())
+            assert (docs_dir / "README.md").is_file()
+            assert (docs_dir / "guide.md").is_file()
+            assert (docs_dir / "workflow_initiative.md").is_file()
+            assert (docs_dir / "workflow_epic.md").is_file()
+            assert (docs_dir / "workflow_issue.md").is_file()
+            assert (docs_dir / "workflow_spec_authoring.md").is_file()
+            assert (docs_dir / "workflow_adr.md").is_file()
+            assert (docs_dir / "workflow-tree.md").is_file()
+            assert (docs_dir / "phase_requirement.md").is_file()
+            assert (docs_dir / "phase_design.md").is_file()
+            assert (docs_dir / "phase_plan.md").is_file()
+            assert (docs_dir / "authoring" / "issue-plan.md").is_file()
+            assert (docs_dir / "reference_github.md").is_file()
+            assert (docs_dir / "reference_naming.md").is_file()
+            assert (docs_dir / "reference_sync.md").is_file()
 
             docs_readme = (docs_dir / "README.md").read_text(encoding="utf-8")
-            self.assertIn("spec-driven-tdd-workflow", docs_readme)
-            self.assertIn("spec-dock-clarification", docs_readme)
-            self.assertIn("spec-dock-initiative-planning", docs_readme)
-            self.assertIn("spec-dock-epic-planning", docs_readme)
-            self.assertIn("spec-dock-issue-planning", docs_readme)
-            self.assertIn("spec-dock-issue-execution", docs_readme)
-            self.assertIn("spec-dock-adr-facilitation", docs_readme)
-            self.assertIn("reference レイヤ", docs_readme)
-            self.assertIn("[workflow_clarification.md](workflow_clarification.md)", docs_readme)
-            self.assertIn("[workflow_spec_authoring.md](workflow_spec_authoring.md)", docs_readme)
-            self.assertIn("[phase_requirement.md](phase_requirement.md)", docs_readme)
-            self.assertIn("[phase_design.md](phase_design.md)", docs_readme)
-            self.assertIn("[phase_plan.md](phase_plan.md)", docs_readme)
+            assert "spec-driven-tdd-workflow" in docs_readme
+            assert "spec-dock-clarification" in docs_readme
+            assert "spec-dock-initiative-planning" in docs_readme
+            assert "spec-dock-epic-planning" in docs_readme
+            assert "spec-dock-issue-planning" in docs_readme
+            assert "spec-dock-issue-execution" in docs_readme
+            assert "spec-dock-adr-facilitation" in docs_readme
+            assert "reference レイヤ" in docs_readme
+            assert "[workflow_clarification.md](workflow_clarification.md)" in docs_readme
+            assert "[workflow_spec_authoring.md](workflow_spec_authoring.md)" in docs_readme
+            assert "[phase_requirement.md](phase_requirement.md)" in docs_readme
+            assert "[phase_design.md](phase_design.md)" in docs_readme
+            assert "[phase_plan.md](phase_plan.md)" in docs_readme
 
             guide_text = (docs_dir / "guide.md").read_text(encoding="utf-8")
-            self.assertIn("phase playbook（共通の作り方）", guide_text)
-            self.assertIn("[workflow_clarification.md](workflow_clarification.md)", guide_text)
-            self.assertIn("[workflow_spec_authoring.md](workflow_spec_authoring.md)", guide_text)
-            self.assertIn("[phase_requirement.md](phase_requirement.md)", guide_text)
-            self.assertIn("[phase_design.md](phase_design.md)", guide_text)
-            self.assertIn("[phase_plan.md](phase_plan.md)", guide_text)
+            assert "phase playbook（共通の作り方）" in guide_text
+            assert "[workflow_clarification.md](workflow_clarification.md)" in guide_text
+            assert "[workflow_spec_authoring.md](workflow_spec_authoring.md)" in guide_text
+            assert "[phase_requirement.md](phase_requirement.md)" in guide_text
+            assert "[phase_design.md](phase_design.md)" in guide_text
+            assert "[phase_plan.md](phase_plan.md)" in guide_text
             self._assert_guide_docs_contract(guide_text)
             workflow_tree = (docs_dir / "workflow-tree.md").read_text(encoding="utf-8")
             self._assert_workflow_tree_docs_contract(workflow_tree)
@@ -3033,13 +2941,13 @@ class TestInitUpdate(CliRuntimeHarness):
             issue_plan_authoring = (docs_dir / "authoring" / "issue-plan.md").read_text(
                 encoding="utf-8"
             )
-            self.assertIn("fresh `spec-reviewer`", workflow_spec_authoring)
-            self.assertIn("`review_status: pass`", workflow_spec_authoring)
-            self.assertIn("Spec Authoring Gate", workflow_spec_authoring)
-            self.assertIn("scope / non-scope", workflow_spec_authoring)
-            self.assertIn("docs/authoring/<scope>-<phase>.md", workflow_spec_authoring)
-            self.assertIn("docs/authoring/issue-plan.md", workflow_spec_authoring)
-            self.assertIn("具体テストケース一覧", workflow_spec_authoring)
+            assert "fresh `spec-reviewer`" in workflow_spec_authoring
+            assert "`review_status: pass`" in workflow_spec_authoring
+            assert "Spec Authoring Gate" in workflow_spec_authoring
+            assert "scope / non-scope" in workflow_spec_authoring
+            assert "docs/authoring/<scope>-<phase>.md" in workflow_spec_authoring
+            assert "docs/authoring/issue-plan.md" in workflow_spec_authoring
+            assert "具体テストケース一覧" in workflow_spec_authoring
             for fragment in (
                 "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
                 "Sub-agent が作る authoring output は、対象 initiative / epic / issue の scope-local `discussions/` 直下に置く flat Markdown draft / analysis / discussion-local report",
@@ -3054,24 +2962,24 @@ class TestInitUpdate(CliRuntimeHarness):
                 "manual authoring path は有効",
                 "Delegated draft は fresh `spec-reviewer` pass の代替ではない",
             ):
-                self.assertIn(fragment, workflow_spec_authoring)
-            self.assertIn("カード型のネストリスト", issue_plan_authoring)
-            self.assertIn("横長テーブルに押し込まない", issue_plan_authoring)
-            self.assertIn("- `tc-s01-001` acceptance: <短い説明>", issue_plan_authoring)
-            self.assertIn("concrete test case id", issue_plan_authoring)
-            self.assertIn("関連 closure id", issue_plan_authoring)
-            self.assertIn("この文書を入口として読んだあと", issue_plan_authoring)
-            self.assertIn("複数の closure id または複数の concrete test case", issue_plan_authoring)
+                assert fragment in workflow_spec_authoring
+            assert "カード型のネストリスト" in issue_plan_authoring
+            assert "横長テーブルに押し込まない" in issue_plan_authoring
+            assert "- `tc-s01-001` acceptance: <短い説明>" in issue_plan_authoring
+            assert "concrete test case id" in issue_plan_authoring
+            assert "関連 closure id" in issue_plan_authoring
+            assert "この文書を入口として読んだあと" in issue_plan_authoring
+            assert "複数の closure id または複数の concrete test case" in issue_plan_authoring
             self._assert_concrete_test_cases_nested_list_contract(
                 issue_plan_authoring,
                 source="docs/authoring/issue-plan.md",
             )
             for fragment in ("前提", "操作", "期待結果", "失敗検出", "検証方法"):
-                self.assertIn(fragment, issue_plan_authoring)
-            self.assertIn("Spec-Locked Closure Index", issue_plan_authoring)
-            self.assertIn("Parent Agent Invariant", issue_plan_authoring)
-            self.assertIn("delegated worker handoff", issue_plan_authoring)
-            self.assertIn("reviewer gate mapping", issue_plan_authoring)
+                assert fragment in issue_plan_authoring
+            assert "Spec-Locked Closure Index" in issue_plan_authoring
+            assert "Parent Agent Invariant" in issue_plan_authoring
+            assert "delegated worker handoff" in issue_plan_authoring
+            assert "reviewer gate mapping" in issue_plan_authoring
             for fragment in (
                 "`delegated role`",
                 "`input docs`",
@@ -3083,40 +2991,40 @@ class TestInitUpdate(CliRuntimeHarness):
                 "`stop conditions`",
                 "`output required`",
             ):
-                self.assertIn(fragment, issue_plan_authoring)
+                assert fragment in issue_plan_authoring
             for workflow_text in (workflow_initiative, workflow_epic, workflow_issue):
-                self.assertIn("workflow_spec_authoring.md", workflow_text)
-                self.assertIn("fresh `spec-reviewer`", workflow_text)
-                self.assertIn("`review_status: pass`", workflow_text)
-                self.assertIn("Spec Authoring Gate", workflow_text)
+                assert "workflow_spec_authoring.md" in workflow_text
+                assert "fresh `spec-reviewer`" in workflow_text
+                assert "`review_status: pass`" in workflow_text
+                assert "Spec Authoring Gate" in workflow_text
             for phase_text in (phase_requirement, phase_design, phase_plan):
-                self.assertIn("workflow_spec_authoring.md", phase_text)
-                self.assertIn("fresh `spec-reviewer`", phase_text)
-                self.assertIn("`review_status: pass`", phase_text)
-                self.assertIn("Spec Authoring Gate", phase_text)
-            self.assertIn("scope / non-scope / user intent / acceptance criteria", phase_requirement)
-            self.assertIn("spec-dock-initiative-planning", workflow_initiative)
-            self.assertIn("spec-dock-epic-planning", workflow_epic)
-            self.assertIn("spec-dock-issue-planning", workflow_issue)
-            self.assertIn("spec-dock-issue-execution", workflow_issue)
-            self.assertIn("workflow_spec_authoring.md", workflow_issue)
-            self.assertIn("workflow_clarification.md", workflow_issue)
-            self.assertIn("reviewer-pass", workflow_issue)
-            self.assertIn("executable `plan.md`", workflow_issue)
-            self.assertIn("spec-dock-adr-facilitation", workflow_adr)
-            self.assertIn("plan upfront approval", workflow_issue)
-            self.assertIn("step result approval", workflow_issue)
-            self.assertIn("docs impact", workflow_issue)
-            self.assertIn("final quality gate", workflow_issue)
-            self.assertIn("`qa-reviewer`", workflow_issue)
-            self.assertIn("issue-wide `code-reviewer`", workflow_issue)
-            self.assertIn("Parent Agent Invariant", workflow_issue)
-            self.assertIn("inspect / plan / delegate / verify / integrate / report", workflow_issue)
-            self.assertIn("delegated worker handoff", workflow_issue)
-            self.assertIn("Parent Implementation Exception", workflow_issue)
-            self.assertIn("run-local orchestration metadata", workflow_issue)
-            self.assertIn("reviewer gate mapping", workflow_issue)
-            self.assertIn("docs-only / template-only / skill-text-only", workflow_issue)
+                assert "workflow_spec_authoring.md" in phase_text
+                assert "fresh `spec-reviewer`" in phase_text
+                assert "`review_status: pass`" in phase_text
+                assert "Spec Authoring Gate" in phase_text
+            assert "scope / non-scope / user intent / acceptance criteria" in phase_requirement
+            assert "spec-dock-initiative-planning" in workflow_initiative
+            assert "spec-dock-epic-planning" in workflow_epic
+            assert "spec-dock-issue-planning" in workflow_issue
+            assert "spec-dock-issue-execution" in workflow_issue
+            assert "workflow_spec_authoring.md" in workflow_issue
+            assert "workflow_clarification.md" in workflow_issue
+            assert "reviewer-pass" in workflow_issue
+            assert "executable `plan.md`" in workflow_issue
+            assert "spec-dock-adr-facilitation" in workflow_adr
+            assert "plan upfront approval" in workflow_issue
+            assert "step result approval" in workflow_issue
+            assert "docs impact" in workflow_issue
+            assert "final quality gate" in workflow_issue
+            assert "`qa-reviewer`" in workflow_issue
+            assert "issue-wide `code-reviewer`" in workflow_issue
+            assert "Parent Agent Invariant" in workflow_issue
+            assert "inspect / plan / delegate / verify / integrate / report" in workflow_issue
+            assert "delegated worker handoff" in workflow_issue
+            assert "Parent Implementation Exception" in workflow_issue
+            assert "run-local orchestration metadata" in workflow_issue
+            assert "reviewer gate mapping" in workflow_issue
+            assert "docs-only / template-only / skill-text-only" in workflow_issue
             for command in (
                 "./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title",
                 "./spec-dock/scripts/spec-dock import issue <num|#num|canonical-url> --title",
@@ -3129,53 +3037,45 @@ class TestInitUpdate(CliRuntimeHarness):
                 "./spec-dock/scripts/spec-dock validate",
                 "./spec-dock/scripts/spec-dock sync",
             ):
-                self.assertIn(command, workflow_issue)
-            self.assertNotIn("./spec ", workflow_issue)
+                assert command in workflow_issue
+            assert "./spec " not in workflow_issue
 
             # v2 does not ship legacy docs/old/ (keep the published docs minimal).
-            self.assertFalse((docs_dir / "old").exists())
+            assert not (docs_dir / "old").exists()
 
             # Runtime script exists; legacy close scripts must not be present.
             scripts_dir = target / "spec-dock" / "scripts"
-            self.assertTrue((scripts_dir / "spec-dock").is_file())
-            self.assertEqual(list(scripts_dir.glob("spec-dock-close*.sh")), [])
+            assert (scripts_dir / "spec-dock").is_file()
+            assert list(scripts_dir.glob("spec-dock-close*.sh")) == []
 
             # Placeholders exist (active pointers must never be broken).
             placeholder_root = target / "spec-dock" / "system" / "active-none"
-            self.assertTrue((placeholder_root / "initiative" / "README.md").is_file())
-            self.assertTrue((placeholder_root / "epic" / "README.md").is_file())
-            self.assertTrue((placeholder_root / "issue" / "README.md").is_file())
-            self.assertEqual(
-                self._read_active_pointer_text(target, "initiative", "README.md"),
-                (placeholder_root / "initiative" / "README.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "epic", "README.md"),
-                (placeholder_root / "epic" / "README.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "README.md"),
-                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8"),
-            )
+            assert (placeholder_root / "initiative" / "README.md").is_file()
+            assert (placeholder_root / "epic" / "README.md").is_file()
+            assert (placeholder_root / "issue" / "README.md").is_file()
+            assert self._read_active_pointer_text(target, "initiative", "README.md") == \
+                (placeholder_root / "initiative" / "README.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "README.md") == \
+                (placeholder_root / "epic" / "README.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "README.md") == \
+                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8")
             context_pack_text = (target / "spec-dock" / "active" / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- initiative: (none)", context_pack_text)
-            self.assertIn("- epic: (none)", context_pack_text)
-            self.assertIn("- issue: (none)", context_pack_text)
-            self.assertIn("- state (github default): `./spec-dock/scripts/spec-dock sync`", context_pack_text)
-            self.assertIn(
-                "- state (cache/local opt-out): `./spec-dock/scripts/spec-dock sync --no-github`",
-                context_pack_text,
-            )
-            self.assertNotIn("- state (local): `./spec-dock/scripts/spec-dock sync`", context_pack_text)
-            self.assertNotIn("- state (github): `./spec-dock/scripts/spec-dock sync --github`", context_pack_text)
+            assert "- initiative: (none)" in context_pack_text
+            assert "- epic: (none)" in context_pack_text
+            assert "- issue: (none)" in context_pack_text
+            assert "- state (github default): `./spec-dock/scripts/spec-dock sync`" in context_pack_text
+            assert "- state (cache/local opt-out): `./spec-dock/scripts/spec-dock sync --no-github`" in \
+                context_pack_text
+            assert "- state (local): `./spec-dock/scripts/spec-dock sync`" not in context_pack_text
+            assert "- state (github): `./spec-dock/scripts/spec-dock sync --github`" not in context_pack_text
 
             # Legacy (v1) templates should not be installed.
             templates_dir = target / "spec-dock" / "templates"
             self._assert_installed_templates_match_provider_assets(target)
             for legacy in ("requirement.md", "design.md", "plan.md", "report.md"):
-                self.assertFalse((templates_dir / legacy).exists(), f"legacy template leaked: {legacy}")
-            self.assertEqual(list(templates_dir.rglob("current")), [])
-            self.assertEqual(list(templates_dir.rglob("completed")), [])
+                assert not (templates_dir / legacy).exists(), f"legacy template leaked: {legacy}"
+            assert list(templates_dir.rglob("current")) == []
+            assert list(templates_dir.rglob("completed")) == []
 
             # Issue templates should be sufficiently detailed (regression guard).
             initiative_templates_dir = templates_dir / "initiative"
@@ -3183,76 +3083,74 @@ class TestInitUpdate(CliRuntimeHarness):
             issue_templates_dir = templates_dir / "issue"
 
             req_text = (issue_templates_dir / "requirement.md").read_text(encoding="utf-8")
-            self.assertIn("## 対象ユーザー / 利用シナリオ", req_text)
-            self.assertIn("## 用語（ドメイン語彙）", req_text)
+            assert "## 対象ユーザー / 利用シナリオ" in req_text
+            assert "## 用語（ドメイン語彙）" in req_text
             for scope_templates in (
                 initiative_templates_dir,
                 epic_templates_dir,
                 issue_templates_dir,
             ):
-                self.assertFalse((scope_templates / "discussions" / "rules.md").exists())
-                self.assertFalse((scope_templates / "adrs").exists())
-                self.assertFalse((scope_templates / "artifacts").exists())
-                self.assertEqual(list((scope_templates / "discussions").glob("new-*")), [])
-            self.assertFalse((initiative_templates_dir / "epics" / "new-epic").exists())
-            self.assertFalse((epic_templates_dir / "issues" / "new-issue").exists())
-            self.assertFalse((initiative_templates_dir / "discussions" / "rules.md").exists())
-            self.assertFalse((epic_templates_dir / "discussions" / "rules.md").exists())
-            self.assertFalse((issue_templates_dir / "discussions" / "rules.md").exists())
+                assert not (scope_templates / "discussions" / "rules.md").exists()
+                assert not (scope_templates / "adrs").exists()
+                assert not (scope_templates / "artifacts").exists()
+                assert list((scope_templates / "discussions").glob("new-*")) == []
+            assert not (initiative_templates_dir / "epics" / "new-epic").exists()
+            assert not (epic_templates_dir / "issues" / "new-issue").exists()
+            assert not (initiative_templates_dir / "discussions" / "rules.md").exists()
+            assert not (epic_templates_dir / "discussions" / "rules.md").exists()
+            assert not (issue_templates_dir / "discussions" / "rules.md").exists()
 
             rules_dir = target / "spec-dock" / "docs" / "rules"
-            self.assertTrue((rules_dir / "initiative" / "discussions.md").is_file())
-            self.assertTrue((rules_dir / "initiative" / "epics.md").is_file())
-            self.assertTrue((rules_dir / "epic" / "discussions.md").is_file())
-            self.assertTrue((rules_dir / "epic" / "issues.md").is_file())
-            self.assertTrue((rules_dir / "issue" / "discussions.md").is_file())
+            assert (rules_dir / "initiative" / "discussions.md").is_file()
+            assert (rules_dir / "initiative" / "epics.md").is_file()
+            assert (rules_dir / "epic" / "discussions.md").is_file()
+            assert (rules_dir / "epic" / "issues.md").is_file()
+            assert (rules_dir / "issue" / "discussions.md").is_file()
 
             discussions_templates_dir = templates_dir / "discussions"
-            self.assertTrue((discussions_templates_dir / "adr.md").is_file())
-            self.assertTrue((discussions_templates_dir / "disc.md").is_file())
-            self.assertTrue((discussions_templates_dir / "research.md").is_file())
-            self.assertTrue((discussions_templates_dir / "interview.md").is_file())
-            self.assertTrue((discussions_templates_dir / "scratch.md").is_file())
+            assert (discussions_templates_dir / "adr.md").is_file()
+            assert (discussions_templates_dir / "disc.md").is_file()
+            assert (discussions_templates_dir / "research.md").is_file()
+            assert (discussions_templates_dir / "interview.md").is_file()
+            assert (discussions_templates_dir / "scratch.md").is_file()
             for draft_template in ("draft-requirement.md", "draft-design.md", "draft-plan.md"):
-                self.assertFalse((discussions_templates_dir / draft_template).exists())
-            self.assertFalse((discussions_templates_dir / "note.md").exists())
+                assert not (discussions_templates_dir / draft_template).exists()
+            assert not (discussions_templates_dir / "note.md").exists()
             interview_text = (discussions_templates_dir / "interview.md").read_text(encoding="utf-8")
             for label in _INTERVIEW_REQUIRED_LABELS:
-                self.assertIn(label, interview_text)
-            self.assertEqual(list(initiative_templates_dir.rglob("README.md")), [])
-            self.assertEqual(list(epic_templates_dir.rglob("README.md")), [])
-            self.assertEqual(list(issue_templates_dir.rglob("README.md")), [])
+                assert label in interview_text
+            assert list(initiative_templates_dir.rglob("README.md")) == []
+            assert list(epic_templates_dir.rglob("README.md")) == []
+            assert list(issue_templates_dir.rglob("README.md")) == []
 
             design_text = (issue_templates_dir / "design.md").read_text(encoding="utf-8")
             # UML is embedded as small subsections (not a single block at the end).
-            self.assertIn("```plantuml", design_text)
-            self.assertIn("### 図表（UML /", design_text)
+            assert "```plantuml" in design_text
+            assert "### 図表（UML /" in design_text
 
             plan_text = (issue_templates_dir / "plan.md").read_text(encoding="utf-8")
-            self.assertNotIn("update_plan", plan_text)
-            self.assertIn("このテンプレートは最小 scaffold", plan_text)
-            self.assertIn("## 実行ルール（全ステップ共通）", plan_text)
-            self.assertIn("workflow_issue.md", plan_text)
-            self.assertIn("phase_plan_issue.md", plan_text)
-            self.assertIn(
-                "### ドキュメント影響の解消ステップ S90（docs impact resolution / docs refresh）",
-                plan_text,
-            )
-            self.assertIn("### 最終品質ゲートステップ S99（final quality gate）", plan_text)
-            self.assertIn("step reviewer gate", plan_text)
-            self.assertIn("commit gate", plan_text)
-            self.assertIn("planned contract", plan_text)
-            self.assertIn("command queue", plan_text)
-            self.assertIn("observed evidence ledger", plan_text)
-            self.assertIn("report 証跡の記録先", plan_text)
-            self.assertIn("amendment trigger", plan_text)
-            self.assertIn("read-only evidence", plan_text)
-            self.assertIn("qa-reviewer", plan_text)
-            self.assertIn("final QA gate", plan_text)
-            self.assertIn("final code review ゲート", plan_text)
-            self.assertIn("final spec review ゲート", plan_text)
-            self.assertIn("対象ファイル:", plan_text)
-            self.assertIn("#### 委任契約（delegation contract）", plan_text)
+            assert "update_plan" not in plan_text
+            assert "このテンプレートは最小 scaffold" in plan_text
+            assert "## 実行ルール（全ステップ共通）" in plan_text
+            assert "workflow_issue.md" in plan_text
+            assert "phase_plan_issue.md" in plan_text
+            assert "### ドキュメント影響の解消ステップ S90（docs impact resolution / docs refresh）" in \
+                plan_text
+            assert "### 最終品質ゲートステップ S99（final quality gate）" in plan_text
+            assert "step reviewer gate" in plan_text
+            assert "commit gate" in plan_text
+            assert "planned contract" in plan_text
+            assert "command queue" in plan_text
+            assert "observed evidence ledger" in plan_text
+            assert "report 証跡の記録先" in plan_text
+            assert "amendment trigger" in plan_text
+            assert "read-only evidence" in plan_text
+            assert "qa-reviewer" in plan_text
+            assert "final QA gate" in plan_text
+            assert "final code review ゲート" in plan_text
+            assert "final spec review ゲート" in plan_text
+            assert "対象ファイル:" in plan_text
+            assert "#### 委任契約（delegation contract）" in plan_text
             for fragment in (
                 "委任ロール（delegated role）:",
                 "入力 docs:",
@@ -3268,12 +3166,12 @@ class TestInitUpdate(CliRuntimeHarness):
                 "#### ステップ完了契約（step closure contract）",
                 "#### ステップゲート（step gate）",
             ):
-                self.assertIn(fragment, plan_text)
+                assert fragment in plan_text
 
             report_text = (issue_templates_dir / "report.md").read_text(encoding="utf-8")
-            self.assertIn("## 遭遇した問題と解決", report_text)
-            self.assertIn("Observed Evidence Ledger", report_text)
-            self.assertIn("## 委任ドラフト証跡（Delegated Draft Evidence / 必須）", report_text)
+            assert "## 遭遇した問題と解決" in report_text
+            assert "Observed Evidence Ledger" in report_text
+            assert "## 委任ドラフト証跡（Delegated Draft Evidence / 必須）" in report_text
             self._assert_delegated_draft_evidence_schema_contract(
                 workflow_spec_authoring,
                 source="docs/workflow_spec_authoring.md",
@@ -3286,91 +3184,85 @@ class TestInitUpdate(CliRuntimeHarness):
                     scope_report_text,
                     source=f"templates/{scope}/report.md",
                 )
-            self.assertIn("#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）", report_text)
-            self.assertIn("#### 発見されたテスト / リスク（Discovered Tests）", report_text)
-            self.assertIn("#### ステップ契約の完了証跡（Step Contract Closure）", report_text)
-            self.assertIn("#### テスト契約の完了証跡（Test Contract Closure）", report_text)
-            self.assertIn("#### クロージャ網羅（Closure Coverage）", report_text)
-            self.assertIn("#### クロージャ差分（Closure Delta）", report_text)
-            self.assertIn("#### ワークフロー委任同意の証跡（Workflow Delegation Consent）", report_text)
-            self.assertIn(_WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER, report_text)
+            assert "#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）" in report_text
+            assert "#### 発見されたテスト / リスク（Discovered Tests）" in report_text
+            assert "#### ステップ契約の完了証跡（Step Contract Closure）" in report_text
+            assert "#### テスト契約の完了証跡（Test Contract Closure）" in report_text
+            assert "#### クロージャ網羅（Closure Coverage）" in report_text
+            assert "#### クロージャ差分（Closure Delta）" in report_text
+            assert "#### ワークフロー委任同意の証跡（Workflow Delegation Consent）" in report_text
+            assert _WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER in report_text
             for fragment in (
                 "consent source",
                 "boundary",
                 "expires / invalidation condition",
                 "denied / unavailable handling",
             ):
-                self.assertIn(fragment, report_text)
-            self.assertIn("#### 実装委任ゲート（Implementation Delegation Gate）", report_text)
-            self.assertIn("#### 委任 worker 証跡（Delegated Worker Evidence）", report_text)
-            self.assertIn("#### 親実装例外（Parent Implementation Exception）", report_text)
-            self.assertIn("#### レビューゲート状態（Reviewer Gate Status）", report_text)
-            self.assertIn("#### ステップ commit ゲート（Step Commit Gate）", report_text)
-            self.assertIn("## 最終品質ゲート（Final Quality Gate / 必須）", report_text)
-            self.assertIn("### 最終 QA ゲート（Final QA Gate）", report_text)
-            self.assertIn("### 最終コードレビューゲート（Final Code Review Gate）", report_text)
-            self.assertIn("### 最終 spec review ゲート（Final Spec Review Gate）", report_text)
-            self.assertIn("### 最終 commit（Final Commit）", report_text)
-            self.assertIn("no-op checked contracts / files", report_text)
+                assert fragment in report_text
+            assert "#### 実装委任ゲート（Implementation Delegation Gate）" in report_text
+            assert "#### 委任 worker 証跡（Delegated Worker Evidence）" in report_text
+            assert "#### 親実装例外（Parent Implementation Exception）" in report_text
+            assert "#### レビューゲート状態（Reviewer Gate Status）" in report_text
+            assert "#### ステップ commit ゲート（Step Commit Gate）" in report_text
+            assert "## 最終品質ゲート（Final Quality Gate / 必須）" in report_text
+            assert "### 最終 QA ゲート（Final QA Gate）" in report_text
+            assert "### 最終コードレビューゲート（Final Code Review Gate）" in report_text
+            assert "### 最終 spec review ゲート（Final Spec Review Gate）" in report_text
+            assert "### 最終 commit（Final Commit）" in report_text
+            assert "no-op checked contracts / files" in report_text
 
             for scope in ("initiative", "epic", "issue"):
                 active_none_report = (
                     target / "spec-dock" / "system" / "active-none" / scope / "report.md"
                 ).read_text(encoding="utf-8")
-                self.assertIn("## 委任ドラフト証跡 schema（Delegated Draft Evidence Schema / reference）", active_none_report)
+                assert "## 委任ドラフト証跡 schema（Delegated Draft Evidence Schema / reference）" in active_none_report
                 self._assert_delegated_draft_evidence_schema_contract(
                     active_none_report,
                     source=f"system/active-none/{scope}/report.md",
                 )
-            self.assertIn("no-op diff-clean command", report_text)
-            self.assertIn("no-op read-only confirmation", report_text)
-            self.assertIn("post-commit external evidence destination", report_text)
-            self.assertIn("| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |", report_text)
-            self.assertTrue(
-                any(
+            assert "no-op diff-clean command" in report_text
+            assert "no-op read-only confirmation" in report_text
+            assert "post-commit external evidence destination" in report_text
+            assert "| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |" in report_text
+            assert any(
                     header in report_text
                     for header in (
                         "| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | reviewer 判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |",
                         "| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |",
                     )
                 )
-            )
-            self.assertIn("| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |", report_text)
-            self.assertIn("delegated / approved-local-execution / degraded mode", report_text)
-            self.assertNotIn("clean / expected only", report_text)
-            self.assertIn("| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |", report_text)
-            self.assertIn("| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |", report_text)
-            self.assertIn("| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |", report_text)
-            self.assertIn("`closure id / test id` は Spec-Locked Closure Index の `id` を指す", report_text)
-            self.assertIn("pass / approved-no-op / fail / blocked", report_text)
-            self.assertIn("|---|---|---|---|---|", report_text)
+            assert "| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |" in report_text
+            assert "delegated / approved-local-execution / degraded mode" in report_text
+            assert "clean / expected only" not in report_text
+            assert "| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |" in report_text
+            assert "| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |" in report_text
+            assert "| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |" in report_text
+            assert "`closure id / test id` は Spec-Locked Closure Index の `id` を指す" in report_text
+            assert "pass / approved-no-op / fail / blocked" in report_text
+            assert "|---|---|---|---|---|" in report_text
 
             skills_root = target / ".agents" / "skills"
             self._assert_managed_skills_installed(target)
-            self.assertTrue((target / ".codex" / "agents" / "spec-manager.toml").is_file())
-            self.assertTrue((target / ".github" / "agents" / "orchestrator.agent.md").is_file())
+            assert (target / ".codex" / "agents" / "spec-manager.toml").is_file()
+            assert (target / ".github" / "agents" / "orchestrator.agent.md").is_file()
 
             workflow_skill_text = (skills_root / "spec-driven-tdd-workflow" / "SKILL.md").read_text(
                 encoding="utf-8"
             )
-            self.assertIn("`discussions/`", workflow_skill_text)
-            self.assertIn("./spec-dock/scripts/spec-dock new doc adr --issue", workflow_skill_text)
-            self.assertIn("`spec-dock/docs/reference_deps.md`", workflow_skill_text)
-            self.assertIn("`spec-dock/docs/reference_sync.md`", workflow_skill_text)
-            self.assertIn("./spec-dock/scripts/spec-dock ...", workflow_skill_text)
-            self.assertNotIn(
-                "./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>",
-                workflow_skill_text,
-            )
-            self.assertNotIn(
-                "./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>",
-                workflow_skill_text,
-            )
-            self.assertNotIn("./spec-dock/scripts/spec-dock deps check <target>", workflow_skill_text)
-            self.assertNotIn("./spec-dock/scripts/spec-dock validate", workflow_skill_text)
-            self.assertNotIn("./spec-dock/scripts/spec-dock sync", workflow_skill_text)
-            self.assertNotIn("./spec ", workflow_skill_text)
-            self.assertNotIn("adrs/new-adr", workflow_skill_text)
+            assert "`discussions/`" in workflow_skill_text
+            assert "./spec-dock/scripts/spec-dock new doc adr --issue" in workflow_skill_text
+            assert "`spec-dock/docs/reference_deps.md`" in workflow_skill_text
+            assert "`spec-dock/docs/reference_sync.md`" in workflow_skill_text
+            assert "./spec-dock/scripts/spec-dock ..." in workflow_skill_text
+            assert "./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>" not in \
+                workflow_skill_text
+            assert "./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>" not in \
+                workflow_skill_text
+            assert "./spec-dock/scripts/spec-dock deps check <target>" not in workflow_skill_text
+            assert "./spec-dock/scripts/spec-dock validate" not in workflow_skill_text
+            assert "./spec-dock/scripts/spec-dock sync" not in workflow_skill_text
+            assert "./spec " not in workflow_skill_text
+            assert "adrs/new-adr" not in workflow_skill_text
 
             issue_skill_text = (skills_root / "spec-dock-issue-execution" / "SKILL.md").read_text(
                 encoding="utf-8"
@@ -3378,18 +3270,16 @@ class TestInitUpdate(CliRuntimeHarness):
             issue_planning_skill_text = (
                 skills_root / "spec-dock-issue-planning" / "SKILL.md"
             ).read_text(encoding="utf-8")
-            self.assertIn("spec-dock/docs/workflow_issue.md", issue_planning_skill_text)
-            self.assertIn("spec-dock/docs/workflow_spec_authoring.md", issue_planning_skill_text)
-            self.assertIn("spec-dock/docs/workflow_clarification.md", issue_planning_skill_text)
-            self.assertIn("spec-dock/docs/phase_plan_issue.md", issue_planning_skill_text)
-            self.assertIn("spec-dock/docs/authoring/issue-plan.md", issue_planning_skill_text)
+            assert "spec-dock/docs/workflow_issue.md" in issue_planning_skill_text
+            assert "spec-dock/docs/workflow_spec_authoring.md" in issue_planning_skill_text
+            assert "spec-dock/docs/workflow_clarification.md" in issue_planning_skill_text
+            assert "spec-dock/docs/phase_plan_issue.md" in issue_planning_skill_text
+            assert "spec-dock/docs/authoring/issue-plan.md" in issue_planning_skill_text
             self._assert_issue_execution_runtime_command_reminders(
                 issue_skill_text,
                 source="generated issue-execution skill",
             )
-            self.assertFalse(
-                (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
-            )
+            assert not (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
 
     def test_issue_78_init_allows_install_when_legacy_hidden_workspace_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3403,11 +3293,11 @@ class TestInitUpdate(CliRuntimeHarness):
             with redirect_stderr(stderr):
                 exit_code = main(["init", str(target)])
 
-            self.assertEqual(exit_code, 0)
-            self.assertTrue((target / "spec-dock").is_dir())
-            self.assertTrue(legacy_dir.is_dir())
-            self.assertEqual(marker_path.read_text(encoding="utf-8"), "legacy data\n")
-            self.assertNotIn("Please rename it before installing", stderr.getvalue())
+            assert exit_code == 0
+            assert (target / "spec-dock").is_dir()
+            assert legacy_dir.is_dir()
+            assert marker_path.read_text(encoding="utf-8") == "legacy data\n"
+            assert "Please rename it before installing" not in stderr.getvalue()
 
     def test_issue_78_update_reports_manual_migration_guidance_without_rename(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3418,19 +3308,19 @@ class TestInitUpdate(CliRuntimeHarness):
             with redirect_stderr(stderr):
                 exit_code = main(["update", str(target)])
 
-            self.assertEqual(exit_code, 1)
+            assert exit_code == 1
             error_text = stderr.getvalue()
-            self.assertIn("'spec-dock' not found.", error_text)
-            self.assertIn("Legacy '.spec-dock' exists with an incompatible format.", error_text)
-            self.assertIn("Run 'spec-dock init'", error_text)
-            self.assertIn("migrate manually", error_text)
-            self.assertNotIn("Please rename it", error_text)
-            self.assertNotIn("mv .spec-dock spec-dock", error_text)
+            assert "'spec-dock' not found." in error_text
+            assert "Legacy '.spec-dock' exists with an incompatible format." in error_text
+            assert "Run 'spec-dock init'" in error_text
+            assert "migrate manually" in error_text
+            assert "Please rename it" not in error_text
+            assert "mv .spec-dock spec-dock" not in error_text
 
     def test_issue_78_update_keeps_legacy_hidden_workspace_untouched_during_coexistence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             current_dir = target / "spec-dock"
             legacy_dir = target / ".spec-dock"
@@ -3442,22 +3332,22 @@ class TestInitUpdate(CliRuntimeHarness):
             with redirect_stderr(stderr):
                 exit_code = main(["update", str(target)])
 
-            self.assertEqual(exit_code, 0)
-            self.assertTrue(current_dir.is_dir())
-            self.assertTrue(legacy_dir.is_dir())
-            self.assertEqual(marker_path.read_text(encoding="utf-8"), "legacy data\n")
-            self.assertNotIn("Please rename it", stderr.getvalue())
-            self.assertNotIn("mv .spec-dock spec-dock", stderr.getvalue())
+            assert exit_code == 0
+            assert current_dir.is_dir()
+            assert legacy_dir.is_dir()
+            assert marker_path.read_text(encoding="utf-8") == "legacy data\n"
+            assert "Please rename it" not in stderr.getvalue()
+            assert "mv .spec-dock spec-dock" not in stderr.getvalue()
 
     def test_init_does_not_seed_legacy_node_deps_json_templates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             templates_dir = target / "spec-dock" / "templates"
-            self.assertFalse((templates_dir / "initiative" / "deps.json").exists())
-            self.assertFalse((templates_dir / "epic" / "deps.json").exists())
-            self.assertFalse((templates_dir / "issue" / "deps.json").exists())
+            assert not (templates_dir / "initiative" / "deps.json").exists()
+            assert not (templates_dir / "epic" / "deps.json").exists()
+            assert not (templates_dir / "issue" / "deps.json").exists()
 
     def test_init_prunes_legacy_node_deps_json_templates_from_stale_assets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3470,17 +3360,17 @@ class TestInitUpdate(CliRuntimeHarness):
                     deps_path.write_text("legacy deps fixture\n", encoding="utf-8")
 
             exit_code, _stderr = self._run_command_with_assets_override("init", target, _mutate_assets)
-            self.assertEqual(exit_code, 0)
+            assert exit_code == 0
 
             templates_dir = target / "spec-dock" / "templates"
-            self.assertFalse((templates_dir / "initiative" / "deps.json").exists())
-            self.assertFalse((templates_dir / "epic" / "deps.json").exists())
-            self.assertFalse((templates_dir / "issue" / "deps.json").exists())
+            assert not (templates_dir / "initiative" / "deps.json").exists()
+            assert not (templates_dir / "epic" / "deps.json").exists()
+            assert not (templates_dir / "issue" / "deps.json").exists()
 
     def test_update_prunes_legacy_node_deps_json_templates_from_stale_assets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             def _mutate_assets(patched_assets_root: Path) -> None:
                 for scope in ("initiative", "epic", "issue"):
@@ -3489,17 +3379,17 @@ class TestInitUpdate(CliRuntimeHarness):
                     deps_path.write_text("legacy deps fixture\n", encoding="utf-8")
 
             exit_code, _stderr = self._run_command_with_assets_override("update", target, _mutate_assets)
-            self.assertEqual(exit_code, 0)
+            assert exit_code == 0
 
             templates_dir = target / "spec-dock" / "templates"
-            self.assertFalse((templates_dir / "initiative" / "deps.json").exists())
-            self.assertFalse((templates_dir / "epic" / "deps.json").exists())
-            self.assertFalse((templates_dir / "issue" / "deps.json").exists())
+            assert not (templates_dir / "initiative" / "deps.json").exists()
+            assert not (templates_dir / "epic" / "deps.json").exists()
+            assert not (templates_dir / "issue" / "deps.json").exists()
 
     def test_init_scaffolds_discussion_guidance_without_legacy_examples_across_asset_set(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._assert_canonical_rules_files_match_provider_assets(target)
 
             guidance_paths = [
@@ -3530,7 +3420,7 @@ class TestInitUpdate(CliRuntimeHarness):
     def test_update_refreshes_discussion_guidance_without_legacy_examples_across_asset_set(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             corrupted_rules_text_map = {
                 installed_rel_path: f"corrupted canonical rules guidance for {installed_rel_path}\n"
@@ -3539,10 +3429,8 @@ class TestInitUpdate(CliRuntimeHarness):
             for installed_rel_path, corrupted_rules_text in corrupted_rules_text_map.items():
                 canonical_rules_path = target / installed_rel_path
                 self._write_text_force(canonical_rules_path, corrupted_rules_text)
-                self.assertEqual(
-                    canonical_rules_path.read_text(encoding="utf-8"),
-                    corrupted_rules_text,
-                )
+                assert canonical_rules_path.read_text(encoding="utf-8") == \
+                    corrupted_rules_text
 
             self._write_text_force(
                 target / "spec-dock" / "docs" / "workflow_adr.md",
@@ -3570,7 +3458,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 legacy_path = target / legacy_rel_path
                 legacy_path.parent.mkdir(parents=True, exist_ok=True)
                 self._write_text_force(legacy_path, legacy_text)
-                self.assertTrue(legacy_path.is_file(), f"expected legacy template fixture: {legacy_rel_path}")
+                assert legacy_path.is_file(), f"expected legacy template fixture: {legacy_rel_path}"
             self._write_text_force(
                 target / "spec-dock" / "scripts" / "README.md",
                 "legacy example: new adr --issue ...\n",
@@ -3589,15 +3477,13 @@ class TestInitUpdate(CliRuntimeHarness):
                 "deps-issues.puml\n"
                 "dashboard.md\n",
             )
-            self.assertNotIn(
-                "/adrs/",
-                legacy_gitignore_path.read_text(encoding="utf-8"),
-                "legacy fixture must omit /adrs/ before update",
-            )
+            assert "/adrs/" not in \
+                legacy_gitignore_path.read_text(encoding="utf-8"), \
+                "legacy fixture must omit /adrs/ before update"
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
             gitignore = (target / "spec-dock" / ".gitignore").read_text(encoding="utf-8")
-            self.assertIn("/adrs/", gitignore)
+            assert "/adrs/" in gitignore
             self._assert_canonical_rules_files_match_provider_assets(target)
             self._assert_installed_templates_match_provider_assets(target)
             self._assert_workflow_tree_docs_contract(
@@ -3607,13 +3493,11 @@ class TestInitUpdate(CliRuntimeHarness):
                 (target / "spec-dock" / "docs" / "guide.md").read_text(encoding="utf-8")
             )
             for installed_rel_path, corrupted_rules_text in corrupted_rules_text_map.items():
-                self.assertNotEqual(
-                    (target / installed_rel_path).read_text(encoding="utf-8"),
-                    corrupted_rules_text,
-                    f"canonical rules file was not refreshed: {installed_rel_path}",
-                )
+                assert (target / installed_rel_path).read_text(encoding="utf-8") != \
+                    corrupted_rules_text, \
+                    f"canonical rules file was not refreshed: {installed_rel_path}"
             for legacy_rel_path in legacy_template_text_map:
-                self.assertFalse((target / legacy_rel_path).exists(), f"legacy template survived update: {legacy_rel_path}")
+                assert not (target / legacy_rel_path).exists(), f"legacy template survived update: {legacy_rel_path}"
 
             guidance_paths = [
                 "spec-dock/templates/README.md",
@@ -3643,7 +3527,7 @@ class TestInitUpdate(CliRuntimeHarness):
     def test_update_preserves_legacy_artifacts_inside_existing_node_trees(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._write_text_force(
                 target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md",
@@ -3686,17 +3570,17 @@ class TestInitUpdate(CliRuntimeHarness):
             for artifact_path, artifact_text in node_legacy_artifacts.items():
                 artifact_path.parent.mkdir(parents=True, exist_ok=True)
                 self._write_text_force(artifact_path, artifact_text)
-                self.assertEqual(artifact_path.read_text(encoding="utf-8"), artifact_text)
+                assert artifact_path.read_text(encoding="utf-8") == artifact_text
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
             self._assert_canonical_rules_files_match_provider_assets(target)
             self._assert_installed_templates_match_provider_assets(target)
             for artifact_path in managed_legacy_artifacts:
-                self.assertFalse(artifact_path.exists(), f"managed legacy artifact survived update: {artifact_path}")
+                assert not artifact_path.exists(), f"managed legacy artifact survived update: {artifact_path}"
             for artifact_path, artifact_text in node_legacy_artifacts.items():
-                self.assertTrue(artifact_path.is_file(), f"node-tree artifact should be preserved: {artifact_path}")
-                self.assertEqual(artifact_path.read_text(encoding="utf-8"), artifact_text)
+                assert artifact_path.is_file(), f"node-tree artifact should be preserved: {artifact_path}"
+                assert artifact_path.read_text(encoding="utf-8") == artifact_text
 
     def test_current_guidance_documents_match_discussion_numbering_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -3729,11 +3613,9 @@ class TestInitUpdate(CliRuntimeHarness):
         pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
 
         for package_data_pattern in _ISS_00031_EXCLUDE_PATTERNS:
-            self.assertIn(
-                f'"{package_data_pattern}"',
-                pyproject_text,
-                f"missing exclude-package-data guard for stale build artifact: {package_data_pattern}",
-            )
+            assert f'"{package_data_pattern}"' in \
+                pyproject_text, \
+                f"missing exclude-package-data guard for stale build artifact: {package_data_pattern}"
 
     def test_built_wheel_excludes_deleted_wrapper_era_assets_from_stale_build_outputs(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -3770,68 +3652,56 @@ class TestInitUpdate(CliRuntimeHarness):
             with zipfile.ZipFile(wheel_path) as wheel_zip:
                 wheel_entries = set(wheel_zip.namelist())
 
-            self.assertIn(
-                "spec_dock/assets/spec_dock/templates/README.md",
-                wheel_entries,
-                "sanity check failed: built wheel did not include expected live template asset",
-            )
+            assert "spec_dock/assets/spec_dock/templates/README.md" in \
+                wheel_entries, \
+                "sanity check failed: built wheel did not include expected live template asset"
             for stale_rel_path in _ISS_00031_STALE_WHEEL_PATHS:
-                self.assertNotIn(
-                    stale_rel_path,
-                    wheel_entries,
-                    f"built wheel unexpectedly shipped stale build artifact: {stale_rel_path}",
-                )
+                assert stale_rel_path not in \
+                    wheel_entries, \
+                    f"built wheel unexpectedly shipped stale build artifact: {stale_rel_path}"
 
     def test_issue_69_package_data_includes_hidden_install_root_subtrees(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
         section_header = "[tool.setuptools.package-data]"
         next_section_header = "[tool.setuptools.exclude-package-data]"
-        self.assertIn(section_header, pyproject_text, "missing setuptools package-data section")
-        self.assertIn(next_section_header, pyproject_text, "missing setuptools exclude-package-data section")
+        assert section_header in pyproject_text, "missing setuptools package-data section"
+        assert next_section_header in pyproject_text, "missing setuptools exclude-package-data section"
 
         package_data_section = pyproject_text.split(section_header, 1)[1].split(next_section_header, 1)[0]
         for pattern in self._ISSUE_69_INSTALL_ROOT_PACKAGE_DATA_PATTERNS:
-            self.assertIn(
-                f'"{pattern}"',
-                package_data_section,
-                f"missing issue-69 hidden install_root package-data inclusion: {pattern}",
-            )
+            assert f'"{pattern}"' in \
+                package_data_section, \
+                f"missing issue-69 hidden install_root package-data inclusion: {pattern}"
 
     def test_issue_69_representative_install_root_assets_are_packaged_in_all_artifact_surfaces(self) -> None:
         surfaces = self._issue_69_collect_install_root_artifact_surfaces()
         for surface_name in ("source", "wheel", "sdist", "installed"):
-            self.assertTrue(
-                surfaces[surface_name],
-                f"issue-69 expected non-empty install_root inventory for artifact surface: {surface_name}",
-            )
+            assert surfaces[surface_name], \
+                f"issue-69 expected non-empty install_root inventory for artifact surface: {surface_name}"
             for artifact_relative_path in self._ISSUE_69_REPRESENTATIVE_ARTIFACT_RELATIVE_PATHS:
-                self.assertIn(
-                    artifact_relative_path,
-                    surfaces[surface_name],
+                assert artifact_relative_path in \
+                    surfaces[surface_name], \
                     (
                         f"missing issue-69 representative install_root asset in {surface_name}: "
                         f"{artifact_relative_path}"
-                    ),
-                )
+                    )
 
     def test_issue_69_full_install_root_inventory_is_packaged_in_wheel_sdist_and_installed_resources(self) -> None:
         surfaces = self._issue_69_collect_install_root_artifact_surfaces()
         source_inventory = surfaces["source"]
-        self.assertTrue(source_inventory, "issue-69 source install_root inventory must be non-empty")
+        assert source_inventory, "issue-69 source install_root inventory must be non-empty"
 
         for surface_name in ("wheel", "sdist", "installed"):
             observed_inventory = surfaces[surface_name]
             missing = sorted(source_inventory - observed_inventory)
             unexpected = sorted(observed_inventory - source_inventory)
-            self.assertEqual(
-                observed_inventory,
-                source_inventory,
+            assert observed_inventory == \
+                source_inventory, \
                 (
                     f"issue-69 full install_root inventory parity failed for {surface_name}; "
                     f"missing={missing[:10]} unexpected={unexpected[:10]}"
-                ),
-            )
+                )
 
     def test_issue_69_isolated_wheel_install_exposes_install_root_handoff_surface(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -3865,14 +3735,12 @@ class TestInitUpdate(CliRuntimeHarness):
                 for artifact_relative_path in installed_inventory
                 if any(artifact_relative_path.startswith(prefix) for prefix in scope_prefixes)
             }
-            self.assertEqual(
-                discovered_handoff_scope,
-                expected_handoff_surface,
+            assert discovered_handoff_scope == \
+                expected_handoff_surface, \
                 (
                     "issue-69 isolated installed package handoff surface mismatch; "
                     f"expected={sorted(expected_handoff_surface)} observed={sorted(discovered_handoff_scope)}"
-                ),
-            )
+                )
 
     def test_issue_69_isolated_wheel_install_runs_init_update_without_checkout_fallback(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -3888,10 +3756,8 @@ class TestInitUpdate(CliRuntimeHarness):
                 temp_root=temp_root,
             )
             spec_dock_command = self._issue_69_venv_spec_dock(venv_python)
-            self.assertTrue(
-                spec_dock_command.is_file(),
-                f"issue-69 expected installed spec-dock command in isolated venv: {spec_dock_command}",
-            )
+            assert spec_dock_command.is_file(), \
+                f"issue-69 expected installed spec-dock command in isolated venv: {spec_dock_command}"
             runtime_env = self._issue_69_runtime_env_without_checkout_fallback()
             init_result = self._issue_69_run_subprocess_capture(
                 [str(spec_dock_command), "init", str(target_repo)],
@@ -3904,22 +3770,18 @@ class TestInitUpdate(CliRuntimeHarness):
                 env=runtime_env,
             )
 
-            self.assertTrue(
-                (target_repo / "spec-dock").is_dir(),
-                "issue-69 isolated installed package smoke should create target spec-dock directory",
-            )
+            assert (target_repo / "spec-dock").is_dir(), \
+                "issue-69 isolated installed package smoke should create target spec-dock directory"
             combined_output = (
                 f"{init_result.stdout}\n{init_result.stderr}\n{update_result.stdout}\n{update_result.stderr}"
             ).lower()
             for error_fragment in ("missing asset", "missing install_root", "missing bundled"):
-                self.assertNotIn(
-                    error_fragment,
-                    combined_output,
+                assert error_fragment not in \
+                    combined_output, \
                     (
                         "issue-69 isolated installed package smoke emitted missing-asset diagnostics: "
                         f"{error_fragment}"
-                    ),
-                )
+                    )
 
             snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
                 venv_python=venv_python,
@@ -3943,13 +3805,14 @@ class TestInitUpdate(CliRuntimeHarness):
             spec_dock_cmd = scripts_dir / "spec-dock.cmd"
             spec_dock_cmd.write_text("@echo off\r\n", encoding="utf-8")
 
-            with patch("tests.unit.infra.test_init_update.os.name", "nt"):
+            with pytest.MonkeyPatch.context() as monkeypatch:
+                monkeypatch.setattr("tests.unit.infra.test_init_update.os.name", "nt")
                 resolved = self._issue_69_venv_spec_dock(venv_python)
                 ensured = self._issue_69_ensure_spec_dock_wrapper(venv_python)
 
-            self.assertEqual(resolved, spec_dock_exe)
-            self.assertEqual(ensured, spec_dock_exe)
-            self.assertEqual(spec_dock_exe.read_text(encoding="utf-8"), "")
+            assert resolved == spec_dock_exe
+            assert ensured == spec_dock_exe
+            assert spec_dock_exe.read_text(encoding="utf-8") == ""
 
     def test_issue_69_windows_helper_prefers_existing_cmd_launcher_when_exe_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3961,17 +3824,16 @@ class TestInitUpdate(CliRuntimeHarness):
             spec_dock_cmd = scripts_dir / "spec-dock.cmd"
             spec_dock_cmd.write_text("@echo off\r\nrem existing\r\n", encoding="utf-8")
 
-            with patch("tests.unit.infra.test_init_update.os.name", "nt"):
+            with pytest.MonkeyPatch.context() as monkeypatch:
+                monkeypatch.setattr("tests.unit.infra.test_init_update.os.name", "nt")
                 resolved = self._issue_69_venv_spec_dock(venv_python)
                 ensured = self._issue_69_ensure_spec_dock_wrapper(venv_python)
 
-            self.assertEqual(resolved, spec_dock_cmd)
-            self.assertEqual(ensured, spec_dock_cmd)
-            self.assertEqual(
-                spec_dock_cmd.read_text(encoding="utf-8").splitlines(),
-                ["@echo off", "rem existing"],
-            )
-            self.assertFalse((scripts_dir / "spec-dock.exe").exists())
+            assert resolved == spec_dock_cmd
+            assert ensured == spec_dock_cmd
+            assert spec_dock_cmd.read_text(encoding="utf-8").splitlines() == \
+                ["@echo off", "rem existing"]
+            assert not (scripts_dir / "spec-dock.exe").exists()
 
     def test_issue_69_windows_helper_synthesizes_cmd_wrapper_when_launcher_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3982,32 +3844,29 @@ class TestInitUpdate(CliRuntimeHarness):
             venv_python.write_text("", encoding="utf-8")
             expected_wrapper = scripts_dir / "spec-dock.cmd"
 
-            with patch("tests.unit.infra.test_init_update.os.name", "nt"):
+            with pytest.MonkeyPatch.context() as monkeypatch:
+                monkeypatch.setattr("tests.unit.infra.test_init_update.os.name", "nt")
                 resolved = self._issue_69_venv_spec_dock(venv_python)
                 ensured = self._issue_69_ensure_spec_dock_wrapper(venv_python)
 
-            self.assertEqual(resolved, expected_wrapper)
-            self.assertEqual(ensured, expected_wrapper)
-            self.assertTrue(expected_wrapper.is_file())
-            self.assertEqual(
-                expected_wrapper.read_text(encoding="utf-8").splitlines(),
-                ["@echo off", f"\"{venv_python}\" -m spec_dock.cli %*"],
-            )
-            self.assertFalse((scripts_dir / "spec-dock.exe").exists())
+            assert resolved == expected_wrapper
+            assert ensured == expected_wrapper
+            assert expected_wrapper.is_file()
+            assert expected_wrapper.read_text(encoding="utf-8").splitlines() == \
+                ["@echo off", f"\"{venv_python}\" -m spec_dock.cli %*"]
+            assert not (scripts_dir / "spec-dock.exe").exists()
 
     def test_issue_69_local_and_installed_handoff_surface_inventories_match(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         source_inventory = self._issue_69_collect_source_install_root_inventory(repo_root)
         expected_handoff_surface = set(self._ISSUE_69_HANDOFF_SURFACE_ARTIFACT_RELATIVE_PATHS)
         source_handoff_surface = source_inventory & expected_handoff_surface
-        self.assertEqual(
-            source_handoff_surface,
-            expected_handoff_surface,
+        assert source_handoff_surface == \
+            expected_handoff_surface, \
             (
                 "issue-69 source handoff surface mismatch; "
                 f"expected={sorted(expected_handoff_surface)} observed={sorted(source_handoff_surface)}"
-            ),
-        )
+            )
 
         with tempfile.TemporaryDirectory() as tmp:
             temp_root = Path(tmp)
@@ -4030,14 +3889,12 @@ class TestInitUpdate(CliRuntimeHarness):
             installed_handoff_surface = installed_inventory & expected_handoff_surface
             missing = sorted(source_handoff_surface - installed_handoff_surface)
             unexpected = sorted(installed_handoff_surface - source_handoff_surface)
-            self.assertEqual(
-                installed_handoff_surface,
-                source_handoff_surface,
+            assert installed_handoff_surface == \
+                source_handoff_surface, \
                 (
                     "issue-69 local and isolated installed handoff surface inventory mismatch; "
                     f"missing={missing[:10]} unexpected={unexpected[:10]}"
-                ),
-            )
+                )
 
     def test_issue_69_wheel_build_prunes_seeded_stale_wrapper_era_outputs(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -4062,33 +3919,25 @@ class TestInitUpdate(CliRuntimeHarness):
                 build_env=build_env,
             )
 
-            self.assertTrue(
-                pre_prune_snapshot.is_file(),
-                f"issue-69 expected pre-prune snapshot to exist: {pre_prune_snapshot}",
-            )
+            assert pre_prune_snapshot.is_file(), \
+                f"issue-69 expected pre-prune snapshot to exist: {pre_prune_snapshot}"
             snapshot_payload = json.loads(pre_prune_snapshot.read_text(encoding="utf-8"))
             expected_seeded_fixtures = set(self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS)
-            self.assertEqual(
-                set(snapshot_payload.get("expected_seeded_stale_fixture_paths", [])),
-                expected_seeded_fixtures,
-                "issue-69 setup.py snapshot did not report the approved seeded fixture set",
-            )
-            self.assertEqual(
-                set(snapshot_payload.get("present_before_prune", [])),
-                expected_seeded_fixtures,
-                "issue-69 seeded stale fixture set must exist in wheel build staging before prune",
-            )
+            assert set(snapshot_payload.get("expected_seeded_stale_fixture_paths", [])) == \
+                expected_seeded_fixtures, \
+                "issue-69 setup.py snapshot did not report the approved seeded fixture set"
+            assert set(snapshot_payload.get("present_before_prune", [])) == \
+                expected_seeded_fixtures, \
+                "issue-69 seeded stale fixture set must exist in wheel build staging before prune"
 
             wheel_inventory = self._issue_69_collect_wheel_file_inventory(wheel_path)
             for stale_artifact_path in self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS:
-                self.assertNotIn(
-                    stale_artifact_path,
-                    wheel_inventory,
+                assert stale_artifact_path not in \
+                    wheel_inventory, \
                     (
                         "issue-69 wheel build unexpectedly shipped seeded stale wrapper-era output: "
                         f"{stale_artifact_path}"
-                    ),
-                )
+                    )
 
     def test_issue_69_sdist_build_excludes_seeded_stale_wrapper_era_outputs(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -4102,11 +3951,9 @@ class TestInitUpdate(CliRuntimeHarness):
             self._issue_69_prepare_build_context(repo_root, build_context)
             present_before_build = self._issue_69_seed_stale_fixtures_in_sdist_source_context(build_context)
             expected_seeded_fixtures = set(self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS)
-            self.assertEqual(
-                present_before_build,
-                expected_seeded_fixtures,
-                "issue-69 seeded stale fixture set must exist in sdist source context before build",
-            )
+            assert present_before_build == \
+                expected_seeded_fixtures, \
+                "issue-69 seeded stale fixture set must exist in sdist source context before build"
 
             _, sdist_path, _ = self._issue_69_build_artifacts_with_local_wheelhouse(
                 repo_root=repo_root,
@@ -4117,14 +3964,12 @@ class TestInitUpdate(CliRuntimeHarness):
 
             sdist_inventory = self._issue_69_collect_sdist_source_file_inventory(sdist_path)
             for stale_artifact_path in self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS:
-                self.assertNotIn(
-                    stale_artifact_path,
-                    sdist_inventory,
+                assert stale_artifact_path not in \
+                    sdist_inventory, \
                     (
                         "issue-69 sdist build unexpectedly shipped seeded stale wrapper-era output: "
                         f"{stale_artifact_path}"
-                    ),
-                )
+                    )
 
     def test_issue_69_stale_exclusion_patterns_are_aligned_between_pyproject_and_setup(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -4138,21 +3983,17 @@ class TestInitUpdate(CliRuntimeHarness):
         setup_pattern_set = set(setup_patterns)
         expected_pattern_set = set(self._ISSUE_69_STALE_EXCLUSION_ARTIFACT_RELATIVE_PATTERNS)
 
-        self.assertEqual(
-            pyproject_normalized_patterns,
-            setup_pattern_set,
-            "issue-69 stale exclusion patterns diverged between pyproject.toml and setup.py",
-        )
-        self.assertEqual(
-            setup_pattern_set,
-            expected_pattern_set,
-            "issue-69 stale exclusion patterns must stay aligned to the approved exact pattern set",
-        )
+        assert pyproject_normalized_patterns == \
+            setup_pattern_set, \
+            "issue-69 stale exclusion patterns diverged between pyproject.toml and setup.py"
+        assert setup_pattern_set == \
+            expected_pattern_set, \
+            "issue-69 stale exclusion patterns must stay aligned to the approved exact pattern set"
 
     def test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         runtime_script = repo_root / "spec-dock" / "scripts" / "spec-dock"
-        self.assertTrue(runtime_script.is_file(), f"dogfooding runtime script missing: {runtime_script}")
+        assert runtime_script.is_file(), f"dogfooding runtime script missing: {runtime_script}"
 
         doctor_help = subprocess.run(
             [sys.executable, str(runtime_script), "doctor", "--help"],
@@ -4160,16 +4001,14 @@ class TestInitUpdate(CliRuntimeHarness):
             capture_output=True,
             text=True,
         )
-        self.assertEqual(
-            doctor_help.returncode,
-            0,
-            msg=(
+        assert doctor_help.returncode == \
+            0, \
+            (
                 "checked-in dogfooding runtime must expose 'doctor'\n"
                 f"stdout:\n{doctor_help.stdout}\n"
                 f"stderr:\n{doctor_help.stderr}\n"
-            ),
-        )
-        self.assertIn("usage: spec-dock/scripts/spec-dock doctor", doctor_help.stdout)
+            )
+        assert "usage: spec-dock/scripts/spec-dock doctor" in doctor_help.stdout
 
         legacy_active = subprocess.run(
             [sys.executable, str(runtime_script), "active", "set", "--initiative", "1"],
@@ -4177,9 +4016,9 @@ class TestInitUpdate(CliRuntimeHarness):
             capture_output=True,
             text=True,
         )
-        self.assertEqual(legacy_active.returncode, 2)
-        self.assertIn("'active set' supports explicit targets:", legacy_active.stderr)
-        self.assertIn("active set --id <node-id>", legacy_active.stderr)
+        assert legacy_active.returncode == 2
+        assert "'active set' supports explicit targets:" in legacy_active.stderr
+        assert "active set --id <node-id>" in legacy_active.stderr
 
     def test_checked_in_dogfooding_mirror_docs_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -4201,27 +4040,27 @@ class TestInitUpdate(CliRuntimeHarness):
             "| N/A | not used | manual authoring | none | no delegated draft promotion |\n",
             source="table-value-guard-allowed-fixture",
         )
-        with self.assertRaisesRegex(AssertionError, "table label must use Japanese primary"):
+        with pytest.raises(AssertionError, match="table label must use Japanese primary"):
             self._assert_user_facing_markdown_labels_use_japanese_primary(
                 "| acceptance | spec drift | report step closure |\n",
                 source="table-value-guard-rejected-fixture",
             )
-        with self.assertRaisesRegex(AssertionError, "heading must use Japanese primary"):
+        with pytest.raises(AssertionError, match="heading must use Japanese primary"):
             self._assert_user_facing_markdown_labels_use_japanese_primary(
                 "## 3. reader contract\n",
                 source="numbered-heading-guard-rejected-fixture",
             )
-        with self.assertRaisesRegex(AssertionError, "heading must use Japanese primary"):
+        with pytest.raises(AssertionError, match="heading must use Japanese primary"):
             self._assert_user_facing_markdown_labels_use_japanese_primary(
                 "## 5. GitHub default と `--no-github`\n",
                 source="github-default-heading-guard-rejected-fixture",
             )
-        with self.assertRaisesRegex(AssertionError, "heading must use Japanese primary"):
+        with pytest.raises(AssertionError, match="heading must use Japanese primary"):
             self._assert_user_facing_markdown_labels_use_japanese_primary(
                 "## 8. PlantUML（処理フロー）\n",
                 source="plantuml-flow-heading-guard-rejected-fixture",
             )
-        with self.assertRaisesRegex(AssertionError, "heading must use Japanese primary"):
+        with pytest.raises(AssertionError, match="heading must use Japanese primary"):
             self._assert_user_facing_markdown_labels_use_japanese_primary(
                 "## 4) PlantUML（内部処理のイメージ）\n",
                 source="plantuml-internal-heading-guard-rejected-fixture",
@@ -4234,13 +4073,13 @@ class TestInitUpdate(CliRuntimeHarness):
                 allowed_heading,
                 source="plantuml-heading-guard-allowed-fixture",
             )
-        with self.assertRaisesRegex(AssertionError, "heading must use Japanese primary"):
+        with pytest.raises(AssertionError, match="heading must use Japanese primary"):
             self._assert_user_facing_markdown_labels_use_japanese_primary(
                 "## 2. Initiative を固める（Outcome とガードレールを固定）\n"
                 "### 4.1 doc family と保存先\n",
                 source="titlecase-heading-primary-guard-rejected-fixture",
             )
-        with self.assertRaisesRegex(AssertionError, "explanatory prose must use Japanese primary"):
+        with pytest.raises(AssertionError, match="explanatory prose must use Japanese primary"):
             self._assert_user_facing_markdown_labels_use_japanese_primary(
                 "- This is lifecycle closure only and it does not guarantee final delivery completion.\n",
                 source="english-prose-guard-rejected-fixture",
@@ -4250,13 +4089,13 @@ class TestInitUpdate(CliRuntimeHarness):
             for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
                 path = template_root / scope / filename
                 text = path.read_text(encoding="utf-8")
-                self.assertNotIn("## 文書契約", text)
-                self.assertNotIn("この文書が答える問い", text)
-                self.assertNotIn("この文書に書かないこと", text)
-                self.assertNotIn("trace policy", text)
-                self.assertNotIn("## 図表方針", text)
-                self.assertNotIn("## 図表ポートフォリオ", text)
-                self.assertNotIn("## Traceability matrix", text)
+                assert "## 文書契約" not in text
+                assert "この文書が答える問い" not in text
+                assert "この文書に書かないこと" not in text
+                assert "trace policy" not in text
+                assert "## 図表方針" not in text
+                assert "## 図表ポートフォリオ" not in text
+                assert "## Traceability matrix" not in text
                 self._assert_user_facing_markdown_labels_use_japanese_primary(
                     text,
                     source=str(path.relative_to(repo_root)),
@@ -4277,8 +4116,8 @@ class TestInitUpdate(CliRuntimeHarness):
         ]
         for path in phase_docs:
             text = path.read_text(encoding="utf-8")
-            self.assertIn("## 範囲所有（scope ownership）", text)
-            self.assertIn("## 図表指針（diagram guidance）", text)
+            assert "## 範囲所有（scope ownership）" in text
+            assert "## 図表指針（diagram guidance）" in text
             self._assert_user_facing_markdown_labels_use_japanese_primary(
                 text,
                 source=str(path.relative_to(repo_root)),
@@ -4291,7 +4130,7 @@ class TestInitUpdate(CliRuntimeHarness):
         }
         for path, expected_heading in plan_scope_docs.items():
             text = path.read_text(encoding="utf-8")
-            self.assertIn(expected_heading, text)
+            assert expected_heading in text
             self._assert_user_facing_markdown_labels_use_japanese_primary(
                 text,
                 source=str(path.relative_to(repo_root)),
@@ -4308,49 +4147,47 @@ class TestInitUpdate(CliRuntimeHarness):
         issue_design = (template_root / "issue" / "design.md").read_text(encoding="utf-8")
         issue_plan = (template_root / "issue" / "plan.md").read_text(encoding="utf-8")
         issue_report = (template_root / "issue" / "report.md").read_text(encoding="utf-8")
-        self.assertIn(
-            "### 図表（UML / 推奨: システムコンテキスト / 目指す状態の全体像）",
-            initiative_design,
-        )
-        self.assertIn("```plantuml", initiative_design)
-        self.assertIn("!include C4_Context.puml", initiative_design)
-        self.assertIn("LAYOUT_WITH_LEGEND()", initiative_design)
-        self.assertIn("Person(user", initiative_design)
-        self.assertIn("System(system", initiative_design)
-        self.assertIn("System_Ext(external", initiative_design)
-        self.assertIn("Rel(user, system", initiative_design)
-        self.assertIn("## システムコンテキスト", initiative_design)
-        self.assertIn("- タイトル:\n  - システムコンテキスト / 目指す状態の全体像", initiative_design)
-        self.assertIn("## ドメイン境界 / ユビキタス言語（必要時）", initiative_design)
-        self.assertIn("## コンテナ概要（必要時）", initiative_design)
+        assert "### 図表（UML / 推奨: システムコンテキスト / 目指す状態の全体像）" in \
+            initiative_design
+        assert "```plantuml" in initiative_design
+        assert "!include C4_Context.puml" in initiative_design
+        assert "LAYOUT_WITH_LEGEND()" in initiative_design
+        assert "Person(user" in initiative_design
+        assert "System(system" in initiative_design
+        assert "System_Ext(external" in initiative_design
+        assert "Rel(user, system" in initiative_design
+        assert "## システムコンテキスト" in initiative_design
+        assert "- タイトル:\n  - システムコンテキスト / 目指す状態の全体像" in initiative_design
+        assert "## ドメイン境界 / ユビキタス言語（必要時）" in initiative_design
+        assert "## コンテナ概要（必要時）" in initiative_design
         container_overview_section = initiative_design.split("## コンテナ概要（必要時）", 1)[1].split(
             "## 対象境界 / 依存", 1
         )[0]
-        self.assertIn("N/A: 理由", container_overview_section)
-        self.assertNotIn("```plantuml", container_overview_section)
-        self.assertIn("## コンポーネント / モジュール構成（Component / Module View）", epic_design)
-        self.assertIn("## パッケージ依存（Package Dependency）", epic_design)
-        self.assertIn("### 図表（UML / 推奨: パッケージ依存 / 依存差分）", epic_design)
-        self.assertIn("diagram メタデータ:", epic_design)
-        self.assertIn("## ドメインモデル（Domain Model / DDD 必要時）", epic_design)
-        self.assertIn("### 図表（UML / 推奨: コンポーネント / モジュール）", epic_design)
-        self.assertIn("### 図表（UML / 推奨: main sequence）", epic_design)
+        assert "N/A: 理由" in container_overview_section
+        assert "```plantuml" not in container_overview_section
+        assert "## コンポーネント / モジュール構成（Component / Module View）" in epic_design
+        assert "## パッケージ依存（Package Dependency）" in epic_design
+        assert "### 図表（UML / 推奨: パッケージ依存 / 依存差分）" in epic_design
+        assert "diagram メタデータ:" in epic_design
+        assert "## ドメインモデル（Domain Model / DDD 必要時）" in epic_design
+        assert "### 図表（UML / 推奨: コンポーネント / モジュール）" in epic_design
+        assert "### 図表（UML / 推奨: main sequence）" in epic_design
         domain_model_section = epic_design.split("## ドメインモデル（Domain Model / DDD 必要時）", 1)[1].split(
             "## 契約", 1
         )[0]
         data_model_section = epic_design.split("## データモデル", 1)[1].split(
             "## 主要フロー", 1
         )[0]
-        self.assertNotIn("```plantuml", domain_model_section)
-        self.assertNotIn("```plantuml", data_model_section)
-        self.assertIn("N/A: 理由", domain_model_section)
-        self.assertIn("N/A: 理由", data_model_section)
-        self.assertIn("## 状態 / アクティビティ（State / Activity / 必要時）", epic_design)
+        assert "```plantuml" not in domain_model_section
+        assert "```plantuml" not in data_model_section
+        assert "N/A: 理由" in domain_model_section
+        assert "N/A: 理由" in data_model_section
+        assert "## 状態 / アクティビティ（State / Activity / 必要時）" in epic_design
         state_activity_section = epic_design.split("## 状態 / アクティビティ（State / Activity / 必要時）", 1)[1].split(
             "## 失敗設計", 1
         )[0]
-        self.assertIn("N/A: 理由", state_activity_section)
-        self.assertNotIn("```plantuml", state_activity_section)
+        assert "N/A: 理由" in state_activity_section
+        assert "```plantuml" not in state_activity_section
         for section in (
             epic_design.split("## コンポーネント / モジュール構成（Component / Module View）", 1)[1].split(
                 "## パッケージ依存（Package Dependency）", 1
@@ -4372,25 +4209,25 @@ class TestInitUpdate(CliRuntimeHarness):
                 "含めない詳細:",
                 "更新条件:",
             ):
-                self.assertIn(metadata_field, section)
-        self.assertIn("このテンプレートは最小 scaffold", issue_design)
-        self.assertIn("項目は追加・削除・統合・並べ替えてよい", issue_design)
-        self.assertIn("## 親図（Diagram）参照", issue_design)
-        self.assertIn("module 依存:", issue_design)
-        self.assertIn("class 依存（必要時）:", issue_design)
-        self.assertIn("function 依存（必要時）:", issue_design)
-        self.assertIn("file 依存:", issue_design)
-        self.assertIn("## モジュール依存図（Module Dependency Diagram）", issue_design)
-        self.assertIn("- タイトル:", issue_design)
-        self.assertIn("### 図表（UML / 原則: モジュール依存 / パッケージ依存差分）", issue_design)
+                assert metadata_field in section
+        assert "このテンプレートは最小 scaffold" in issue_design
+        assert "項目は追加・削除・統合・並べ替えてよい" in issue_design
+        assert "## 親図（Diagram）参照" in issue_design
+        assert "module 依存:" in issue_design
+        assert "class 依存（必要時）:" in issue_design
+        assert "function 依存（必要時）:" in issue_design
+        assert "file 依存:" in issue_design
+        assert "## モジュール依存図（Module Dependency Diagram）" in issue_design
+        assert "- タイトル:" in issue_design
+        assert "### 図表（UML / 原則: モジュール依存 / パッケージ依存差分）" in issue_design
         module_dependency_section = issue_design.split("## モジュール依存図（Module Dependency Diagram）", 1)[1].split(
             "## ローカル図の差分（Local Diagram Delta / 必要時）", 1
         )[0]
-        self.assertIn("```plantuml", module_dependency_section)
-        self.assertNotIn("N/A: 理由", module_dependency_section)
-        self.assertIn("## ローカル図の差分（Local Diagram Delta / 必要時）", issue_design)
-        self.assertIn("## シーケンス差分（Sequence Delta / 必要時）", issue_design)
-        self.assertIn("## ドメインモデル差分（Domain Model Delta / 必要時）", issue_design)
+        assert "```plantuml" in module_dependency_section
+        assert "N/A: 理由" not in module_dependency_section
+        assert "## ローカル図の差分（Local Diagram Delta / 必要時）" in issue_design
+        assert "## シーケンス差分（Sequence Delta / 必要時）" in issue_design
+        assert "## ドメインモデル差分（Domain Model Delta / 必要時）" in issue_design
         for optional_issue_section in (
             issue_design.split("## シーケンス差分（Sequence Delta / 必要時）", 1)[1].split(
                 "## ドメインモデル差分（Domain Model Delta / 必要時）", 1
@@ -4402,74 +4239,72 @@ class TestInitUpdate(CliRuntimeHarness):
                 "## ディレクトリ / ファイル変更計画", 1
             )[0],
         ):
-            self.assertIn("N/A: 理由", optional_issue_section)
-            self.assertNotIn("```plantuml", optional_issue_section)
-        self.assertEqual(
-            1,
-            issue_design.count("```plantuml"),
-            "issue design scaffold should only ship the standard module dependency UML placeholder",
-        )
-        self.assertNotIn("必要な場合だけ追加する", issue_design)
-        self.assertIn("## ディレクトリ / ファイル変更計画", issue_design)
-        self.assertRegex(issue_design, r"```text\n\.\n\|-- src/\n\|   \|-- package/")
+            assert "N/A: 理由" in optional_issue_section
+            assert "```plantuml" not in optional_issue_section
+        assert 1 == \
+            issue_design.count("```plantuml"), \
+            "issue design scaffold should only ship the standard module dependency UML placeholder"
+        assert "必要な場合だけ追加する" not in issue_design
+        assert "## ディレクトリ / ファイル変更計画" in issue_design
+        assert re.search(r"```text\n\.\n\|-- src/\n\|   \|-- package/", issue_design)
         for operation in ("追加", "変更", "移動/rename", "読取のみ", "削除"):
-            self.assertRegex(issue_design, rf"# .*{re.escape(operation)}")
-        self.assertIn("依存:", issue_design)
-        self.assertNotIn("\n- Add:\n", issue_design)
-        self.assertNotIn("\n- Modify:\n", issue_design)
-        self.assertNotIn("\n- Delete:\n", issue_design)
-        self.assertNotIn("\n- Move/Rename:\n", issue_design)
-        self.assertNotIn("\n- Read only:\n", issue_design)
-        self.assertNotIn("unknown path handling", issue_design)
-        self.assertNotIn("user confirmation points", issue_design)
-        self.assertIn("## 要件 → 設計マッピング", issue_design)
-        self.assertIn("## 要件 / 例外 -> 検証マッピング", issue_design)
-        self.assertIn("このテンプレートは最小 scaffold", issue_plan)
-        self.assertIn("workflow_issue.md", issue_plan)
-        self.assertIn("phase_plan_issue.md", issue_plan)
-        self.assertIn("## 依存関係から導く実装順序", issue_plan)
-        self.assertIn("planned contract", issue_plan)
-        self.assertIn("command queue", issue_plan)
-        self.assertIn("observed evidence ledger", issue_plan)
-        self.assertIn("依存:", issue_plan)
-        self.assertIn("unblock:", issue_plan)
-        self.assertIn("対象ファイル:", issue_plan)
-        self.assertIn("## 仕様固定クロージャ索引（Spec-Locked Closure Index）", issue_plan)
-        self.assertIn("coverage ledger", issue_plan)
-        self.assertIn("実際の step-local obligation", issue_plan)
-        self.assertIn("| 識別子（ID） | ステップ（step） | スライス（slice） | 種別（type） | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル（evidence level） | クロージャ証跡（closure evidence） |", issue_plan)
-        self.assertIn("証跡レベル（evidence level）:", issue_plan)
-        self.assertIn("red-required:", issue_plan)
-        self.assertIn("covered-existing:", issue_plan)
-        self.assertIn("inspect-only:", issue_plan)
-        self.assertIn("manual-required:", issue_plan)
-        self.assertIn("件数ではなく、AC、changed contract、failure mode、regression risk、invariant、manual / integration risk", issue_plan)
-        self.assertIn("private method、実装アルゴリズム、mock 構造、assert 細部は原則固定しない", issue_plan)
-        self.assertIn("テスト義務（test obligation）:", issue_plan)
-        self.assertIn("closure id:", issue_plan)
-        self.assertIn("coverage rationale:", issue_plan)
-        self.assertIn("Red / 代替証跡の要件:", issue_plan)
-        self.assertIn("代替 evidence path:", issue_plan)
-        self.assertIn("Green 検証:", issue_plan)
-        self.assertIn("Refactor / cleanup ガードレール:", issue_plan)
-        self.assertIn("report 証跡の記録先:", issue_plan)
-        self.assertIn("amendment trigger（plan amendment が必要になる契機）:", issue_plan)
-        self.assertIn("#### 具体テストケース一覧", issue_plan)
-        self.assertIn("- `tc-s01-001` acceptance: <短い説明>", issue_plan)
-        self.assertIn("- `tc-s01-002` inspect-only / manual-required: <短い説明>", issue_plan)
-        self.assertIn("step-local obligation と concrete red / characterization / inspect / manual seeds", issue_plan)
+            assert re.search(rf"# .*{re.escape(operation)}", issue_design)
+        assert "依存:" in issue_design
+        assert "\n- Add:\n" not in issue_design
+        assert "\n- Modify:\n" not in issue_design
+        assert "\n- Delete:\n" not in issue_design
+        assert "\n- Move/Rename:\n" not in issue_design
+        assert "\n- Read only:\n" not in issue_design
+        assert "unknown path handling" not in issue_design
+        assert "user confirmation points" not in issue_design
+        assert "## 要件 → 設計マッピング" in issue_design
+        assert "## 要件 / 例外 -> 検証マッピング" in issue_design
+        assert "このテンプレートは最小 scaffold" in issue_plan
+        assert "workflow_issue.md" in issue_plan
+        assert "phase_plan_issue.md" in issue_plan
+        assert "## 依存関係から導く実装順序" in issue_plan
+        assert "planned contract" in issue_plan
+        assert "command queue" in issue_plan
+        assert "observed evidence ledger" in issue_plan
+        assert "依存:" in issue_plan
+        assert "unblock:" in issue_plan
+        assert "対象ファイル:" in issue_plan
+        assert "## 仕様固定クロージャ索引（Spec-Locked Closure Index）" in issue_plan
+        assert "coverage ledger" in issue_plan
+        assert "実際の step-local obligation" in issue_plan
+        assert "| 識別子（ID） | ステップ（step） | スライス（slice） | 種別（type） | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル（evidence level） | クロージャ証跡（closure evidence） |" in issue_plan
+        assert "証跡レベル（evidence level）:" in issue_plan
+        assert "red-required:" in issue_plan
+        assert "covered-existing:" in issue_plan
+        assert "inspect-only:" in issue_plan
+        assert "manual-required:" in issue_plan
+        assert "件数ではなく、AC、changed contract、failure mode、regression risk、invariant、manual / integration risk" in issue_plan
+        assert "private method、実装アルゴリズム、mock 構造、assert 細部は原則固定しない" in issue_plan
+        assert "テスト義務（test obligation）:" in issue_plan
+        assert "closure id:" in issue_plan
+        assert "coverage rationale:" in issue_plan
+        assert "Red / 代替証跡の要件:" in issue_plan
+        assert "代替 evidence path:" in issue_plan
+        assert "Green 検証:" in issue_plan
+        assert "Refactor / cleanup ガードレール:" in issue_plan
+        assert "report 証跡の記録先:" in issue_plan
+        assert "amendment trigger（plan amendment が必要になる契機）:" in issue_plan
+        assert "#### 具体テストケース一覧" in issue_plan
+        assert "- `tc-s01-001` acceptance: <短い説明>" in issue_plan
+        assert "- `tc-s01-002` inspect-only / manual-required: <短い説明>" in issue_plan
+        assert "step-local obligation と concrete red / characterization / inspect / manual seeds" in issue_plan
         self._assert_concrete_test_cases_nested_list_contract(
             issue_plan,
             source="templates/issue/plan.md",
         )
         for fragment in ("前提:", "操作:", "期待結果:", "失敗検出:", "検証方法:"):
-            self.assertIn(fragment, issue_plan)
-        self.assertIn("テスト不要理由:", issue_plan)
-        self.assertIn("代替検証方法:", issue_plan)
-        self.assertIn("記録先:", issue_plan)
-        self.assertIn("S01 の subsections を複製して記入する", issue_plan)
-        self.assertIn("implementation-ready ではない", issue_plan)
-        self.assertIn("#### 委任契約（delegation contract）", issue_plan)
+            assert fragment in issue_plan
+        assert "テスト不要理由:" in issue_plan
+        assert "代替検証方法:" in issue_plan
+        assert "記録先:" in issue_plan
+        assert "S01 の subsections を複製して記入する" in issue_plan
+        assert "implementation-ready ではない" in issue_plan
+        assert "#### 委任契約（delegation contract）" in issue_plan
         for fragment in (
             "委任ロール（delegated role）:",
             "入力 docs:",
@@ -4482,35 +4317,35 @@ class TestInitUpdate(CliRuntimeHarness):
             "verification result:",
             "停止条件（stop conditions）:",
         ):
-            self.assertIn(fragment, issue_plan)
-        self.assertIn("#### ステップ完了契約（step closure contract）", issue_plan)
-        self.assertIn("closure id:", issue_plan)
-        self.assertIn("close 条件:", issue_plan)
-        self.assertIn("検証 evidence:", issue_plan)
-        self.assertIn("Step Contract Closure:", issue_plan)
-        self.assertIn("Test Contract Closure:", issue_plan)
-        self.assertIn("Closure Coverage:", issue_plan)
-        self.assertNotIn("TDD iterations", issue_plan)
-        self.assertNotIn("update_plan", issue_plan)
-        self.assertIn("commit gate", issue_plan)
-        self.assertIn("step reviewer gate", issue_plan)
-        self.assertIn("no-op gate", issue_plan)
-        self.assertIn("#### ステップゲート（step gate）", issue_plan)
-        self.assertIn("## 要件 ↔ ステップ対応", issue_plan)
+            assert fragment in issue_plan
+        assert "#### ステップ完了契約（step closure contract）" in issue_plan
+        assert "closure id:" in issue_plan
+        assert "close 条件:" in issue_plan
+        assert "検証 evidence:" in issue_plan
+        assert "Step Contract Closure:" in issue_plan
+        assert "Test Contract Closure:" in issue_plan
+        assert "Closure Coverage:" in issue_plan
+        assert "TDD iterations" not in issue_plan
+        assert "update_plan" not in issue_plan
+        assert "commit gate" in issue_plan
+        assert "step reviewer gate" in issue_plan
+        assert "no-op gate" in issue_plan
+        assert "#### ステップゲート（step gate）" in issue_plan
+        assert "## 要件 ↔ ステップ対応" in issue_plan
 
-        self.assertIn("#### ワークフロー委任同意の証跡（Workflow Delegation Consent）", issue_report)
-        self.assertIn(_WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER, issue_report)
+        assert "#### ワークフロー委任同意の証跡（Workflow Delegation Consent）" in issue_report
+        assert _WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER in issue_report
         for fragment in (
             "consent source",
             "boundary",
             "expires / invalidation condition",
             "denied / unavailable handling",
         ):
-            self.assertIn(fragment, issue_report)
-        self.assertIn("#### 委任 worker 証跡（Delegated Worker Evidence）", issue_report)
-        self.assertIn("#### 親実装例外（Parent Implementation Exception）", issue_report)
-        self.assertIn("| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |", issue_report)
-        self.assertIn("| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |", issue_report)
+            assert fragment in issue_report
+        assert "#### 委任 worker 証跡（Delegated Worker Evidence）" in issue_report
+        assert "#### 親実装例外（Parent Implementation Exception）" in issue_report
+        assert "| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |" in issue_report
+        assert "| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |" in issue_report
         for fragment in (
             "workflow_issue.md",
             "source of truth",
@@ -4519,24 +4354,24 @@ class TestInitUpdate(CliRuntimeHarness):
             "reviewer role + passed / failed / unavailable / denied / waived / provisional",
             "blocked / incomplete / waived with explicit risk acceptance / next action",
         ):
-            self.assertIn(fragment, issue_report)
+            assert fragment in issue_report
 
         phase_design = (repo_root / "src/spec_dock/assets/spec_dock/docs/phase_design.md").read_text(
             encoding="utf-8"
         )
-        self.assertIn("Markdown preview compatibility", phase_design)
-        self.assertIn("`c4plantuml` fence は VS Code Markdown preview 互換性のため使わない", phase_design)
-        self.assertIn("`!include C4_Context.puml`", phase_design)
-        self.assertIn("## 図表での PlantUML / UML 利用方針（PlantUML / UML usage policy）", phase_design)
-        self.assertIn("人間が構造・境界・責務・流れ・状態・依存を短時間で理解できる設計書", phase_design)
-        self.assertIn("視覚的・構造的に把握しやすくするために使う", phase_design)
-        self.assertIn("目的は「図を増やすこと」ではなく", phase_design)
-        self.assertIn("templates は完成形や準拠規格ではなく", phase_design)
-        self.assertIn("項目を追加・削除・統合・並べ替えてよい", phase_design)
-        self.assertIn("## 図表選択ルール（diagram selection rules）", phase_design)
-        self.assertIn("## 任意 diagram catalog（optional diagram catalog）", phase_design)
-        self.assertIn("テンプレートから削った図表は「不要になった情報」ではなく", phase_design)
-        self.assertIn("必要ならここにない図表も追加してよい", phase_design)
+        assert "Markdown preview compatibility" in phase_design
+        assert "`c4plantuml` fence は VS Code Markdown preview 互換性のため使わない" in phase_design
+        assert "`!include C4_Context.puml`" in phase_design
+        assert "## 図表での PlantUML / UML 利用方針（PlantUML / UML usage policy）" in phase_design
+        assert "人間が構造・境界・責務・流れ・状態・依存を短時間で理解できる設計書" in phase_design
+        assert "視覚的・構造的に把握しやすくするために使う" in phase_design
+        assert "目的は「図を増やすこと」ではなく" in phase_design
+        assert "templates は完成形や準拠規格ではなく" in phase_design
+        assert "項目を追加・削除・統合・並べ替えてよい" in phase_design
+        assert "## 図表選択ルール（diagram selection rules）" in phase_design
+        assert "## 任意 diagram catalog（optional diagram catalog）" in phase_design
+        assert "テンプレートから削った図表は「不要になった情報」ではなく" in phase_design
+        assert "必要ならここにない図表も追加してよい" in phase_design
         for diagram_name in (
             "Use Case",
             "C4 System Context",
@@ -4555,174 +4390,174 @@ class TestInitUpdate(CliRuntimeHarness):
             "Deployment",
             "Step Dependency Graph / Test Matrix / Rollback Map",
         ):
-            self.assertIn(diagram_name, phase_design)
-        self.assertIn("## ドメイン駆動設計図表指針（DDD diagram guidance）", phase_design)
-        self.assertIn("## 図表レビューゲート（UML review gate）", phase_design)
-        self.assertIn("Title", phase_design)
-        self.assertIn("Question answered", phase_design)
-        self.assertIn("Excluded details", phase_design)
-        self.assertIn("Update trigger", phase_design)
-        self.assertIn("N/A: reason", phase_design)
-        self.assertIn("対応する `plantuml` block は削除する", phase_design)
-        self.assertIn("図を書く場合は `N/A: reason` を残さない", phase_design)
-        self.assertIn("Domain Model Delta", phase_design)
-        self.assertIn("PlantUML / C4 / DDD 図は Markdown 内では `plantuml` fence を使う", phase_design)
-        self.assertIn("## 委任 design authoring ゲート（delegated design authoring gate）", phase_design)
-        self.assertIn("fresh requirement reviewer pass", phase_design)
-        self.assertIn("delegated draft provenance", phase_design)
-        self.assertIn("stale / superseded / rejected / blocked", phase_design)
-        self.assertIn("proposal-only ではありません", phase_design)
-        self.assertIn("adoption_status: unreviewed", phase_design)
-        self.assertIn("diff_guard_result", phase_design)
-        self.assertIn("task manifest hash", phase_design)
-        self.assertIn("authority: accepted", phase_design)
-        self.assertIn("fresh `spec-reviewer` pass の代替ではありません", phase_design)
-        self.assertIn("## 課題依存と file-change planning（Issue dependency and file-change planning）", phase_design)
-        self.assertIn("Module Dependency Diagram", phase_design)
-        self.assertIn("ディレクトリ / ファイル変更計画", phase_design)
-        self.assertIn("Linux `tree` style", phase_design)
-        self.assertIn("tree の下に同じ path 一覧を重複して置かない", phase_design)
-        self.assertIn("この節は後方互換の入口です", phase_design)
+            assert diagram_name in phase_design
+        assert "## ドメイン駆動設計図表指針（DDD diagram guidance）" in phase_design
+        assert "## 図表レビューゲート（UML review gate）" in phase_design
+        assert "Title" in phase_design
+        assert "Question answered" in phase_design
+        assert "Excluded details" in phase_design
+        assert "Update trigger" in phase_design
+        assert "N/A: reason" in phase_design
+        assert "対応する `plantuml` block は削除する" in phase_design
+        assert "図を書く場合は `N/A: reason` を残さない" in phase_design
+        assert "Domain Model Delta" in phase_design
+        assert "PlantUML / C4 / DDD 図は Markdown 内では `plantuml` fence を使う" in phase_design
+        assert "## 委任 design authoring ゲート（delegated design authoring gate）" in phase_design
+        assert "fresh requirement reviewer pass" in phase_design
+        assert "delegated draft provenance" in phase_design
+        assert "stale / superseded / rejected / blocked" in phase_design
+        assert "proposal-only ではありません" in phase_design
+        assert "adoption_status: unreviewed" in phase_design
+        assert "diff_guard_result" in phase_design
+        assert "task manifest hash" in phase_design
+        assert "authority: accepted" in phase_design
+        assert "fresh `spec-reviewer` pass の代替ではありません" in phase_design
+        assert "## 課題依存と file-change planning（Issue dependency and file-change planning）" in phase_design
+        assert "Module Dependency Diagram" in phase_design
+        assert "ディレクトリ / ファイル変更計画" in phase_design
+        assert "Linux `tree` style" in phase_design
+        assert "tree の下に同じ path 一覧を重複して置かない" in phase_design
+        assert "この節は後方互換の入口です" in phase_design
 
         phase_plan_issue = (
             repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md"
         ).read_text(encoding="utf-8")
-        self.assertIn("`Module Dependency Diagram`", phase_plan_issue)
-        self.assertIn("`ディレクトリ / ファイル変更計画`", phase_plan_issue)
-        self.assertIn("`depends on`", phase_plan_issue)
-        self.assertIn("`unblocks`", phase_plan_issue)
-        self.assertIn("`target files`", phase_plan_issue)
-        self.assertIn("planned contract", phase_plan_issue)
-        self.assertIn("command queue", phase_plan_issue)
-        self.assertIn("observed evidence ledger", phase_plan_issue)
-        self.assertIn("templates は最小 scaffold", phase_plan_issue)
-        self.assertIn("`behavior slice` は 1 つの観測可能な振る舞い", phase_plan_issue)
-        self.assertIn("step-local obligation", phase_plan_issue)
-        self.assertIn("planned verification evidence", phase_plan_issue)
-        self.assertIn("observed evidence ledger", phase_plan_issue)
-        self.assertIn("report evidence destination", phase_plan_issue)
-        self.assertIn("amendment trigger", phase_plan_issue)
-        self.assertIn("仕様固定クロージャ索引（`Spec-Locked Closure Index`）", phase_plan_issue)
-        self.assertIn("coverage ledger", phase_plan_issue)
-        self.assertIn("`spec link`、`locked expectation`、`observable input/state`、`bug class guarded`、`required`、`evidence level`、closure owner step", phase_plan_issue)
-        self.assertIn("docs-only / inspect-only / manual-required", phase_plan_issue)
-        self.assertIn("code test を義務化しない", phase_plan_issue)
-        self.assertIn("raw count ではなく risk-calibrated obligation coverage", phase_plan_issue)
-        self.assertIn("docs-only / inspect-only step は code test を義務化しない", phase_plan_issue)
-        self.assertIn("代替 evidence path と rationale", phase_plan_issue)
-        self.assertIn("required row の削除", phase_plan_issue)
-        self.assertIn("plan amendment と re-review", phase_plan_issue)
-        self.assertIn("`delegation contract` の field semantics", phase_plan_issue)
-        self.assertIn("`doc-writer` による必要 docs 更新", phase_plan_issue)
-        self.assertIn("issue-wide `code-reviewer`", phase_plan_issue)
-        self.assertIn("`具体テストケース一覧`", phase_plan_issue)
-        self.assertIn("concrete red / characterization / inspect / manual seeds", phase_plan_issue)
-        self.assertIn("alternative evidence path", phase_plan_issue)
-        self.assertIn("planned contract として実行できる", phase_plan_issue)
-        self.assertIn("delegated worker work を reviewer gate の代替として扱っている場合は fail", phase_plan_issue)
-        self.assertIn("plan amendment と re-review を必須", phase_plan_issue)
-        self.assertIn("every `required=yes` closure row", phase_plan_issue)
-        self.assertIn("every required row に step-local close condition", phase_plan_issue)
-        self.assertIn("public CLI behavior、shipped scaffold / runtime contract", phase_plan_issue)
-        self.assertNotIn("failing test は iteration ごとに 1 本ずつ進める", phase_plan_issue)
-        self.assertIn("completion policy の正本は `workflow_issue.md`", phase_plan_issue)
-        self.assertIn("step 固有の worker handoff contract", phase_plan_issue)
-        self.assertIn("report-before-commit、step reviewer gate pass、step commit、approved-no-op", phase_plan_issue)
-        self.assertIn("`1 implementation step = 1 review scope = 1 commit`", phase_plan_issue)
-        self.assertIn("`step reviewer gate`、`commit gate`、`no-op gate`", phase_plan_issue)
-        self.assertIn("`S99 最終品質ゲート（S99 final quality gate）`", phase_plan_issue)
-        self.assertIn("`qa-reviewer` / issue-wide `code-reviewer` / `spec-reviewer`", phase_plan_issue)
-        self.assertIn("三者最終品質ゲート（final quality gate）", phase_plan_issue)
-        self.assertIn("delegated plan draft", phase_plan_issue)
-        self.assertIn("phase gate preservation", phase_plan_issue)
-        self.assertIn("scope-local discussion direct-write consent", phase_plan_issue)
-        self.assertIn("forbidden canonical/implementation paths", phase_plan_issue)
-        self.assertIn("post-run diff guard", phase_plan_issue)
-        self.assertIn("adoption-ineligible", phase_plan_issue)
-        self.assertIn("完了済み issue plan/report の修正を含まない", phase_plan_issue)
-        self.assertIn("manual authoring path が有効", phase_plan_issue)
+        assert "`Module Dependency Diagram`" in phase_plan_issue
+        assert "`ディレクトリ / ファイル変更計画`" in phase_plan_issue
+        assert "`depends on`" in phase_plan_issue
+        assert "`unblocks`" in phase_plan_issue
+        assert "`target files`" in phase_plan_issue
+        assert "planned contract" in phase_plan_issue
+        assert "command queue" in phase_plan_issue
+        assert "observed evidence ledger" in phase_plan_issue
+        assert "templates は最小 scaffold" in phase_plan_issue
+        assert "`behavior slice` は 1 つの観測可能な振る舞い" in phase_plan_issue
+        assert "step-local obligation" in phase_plan_issue
+        assert "planned verification evidence" in phase_plan_issue
+        assert "observed evidence ledger" in phase_plan_issue
+        assert "report evidence destination" in phase_plan_issue
+        assert "amendment trigger" in phase_plan_issue
+        assert "仕様固定クロージャ索引（`Spec-Locked Closure Index`）" in phase_plan_issue
+        assert "coverage ledger" in phase_plan_issue
+        assert "`spec link`、`locked expectation`、`observable input/state`、`bug class guarded`、`required`、`evidence level`、closure owner step" in phase_plan_issue
+        assert "docs-only / inspect-only / manual-required" in phase_plan_issue
+        assert "code test を義務化しない" in phase_plan_issue
+        assert "raw count ではなく risk-calibrated obligation coverage" in phase_plan_issue
+        assert "docs-only / inspect-only step は code test を義務化しない" in phase_plan_issue
+        assert "代替 evidence path と rationale" in phase_plan_issue
+        assert "required row の削除" in phase_plan_issue
+        assert "plan amendment と re-review" in phase_plan_issue
+        assert "`delegation contract` の field semantics" in phase_plan_issue
+        assert "`doc-writer` による必要 docs 更新" in phase_plan_issue
+        assert "issue-wide `code-reviewer`" in phase_plan_issue
+        assert "`具体テストケース一覧`" in phase_plan_issue
+        assert "concrete red / characterization / inspect / manual seeds" in phase_plan_issue
+        assert "alternative evidence path" in phase_plan_issue
+        assert "planned contract として実行できる" in phase_plan_issue
+        assert "delegated worker work を reviewer gate の代替として扱っている場合は fail" in phase_plan_issue
+        assert "plan amendment と re-review を必須" in phase_plan_issue
+        assert "every `required=yes` closure row" in phase_plan_issue
+        assert "every required row に step-local close condition" in phase_plan_issue
+        assert "public CLI behavior、shipped scaffold / runtime contract" in phase_plan_issue
+        assert "failing test は iteration ごとに 1 本ずつ進める" not in phase_plan_issue
+        assert "completion policy の正本は `workflow_issue.md`" in phase_plan_issue
+        assert "step 固有の worker handoff contract" in phase_plan_issue
+        assert "report-before-commit、step reviewer gate pass、step commit、approved-no-op" in phase_plan_issue
+        assert "`1 implementation step = 1 review scope = 1 commit`" in phase_plan_issue
+        assert "`step reviewer gate`、`commit gate`、`no-op gate`" in phase_plan_issue
+        assert "`S99 最終品質ゲート（S99 final quality gate）`" in phase_plan_issue
+        assert "`qa-reviewer` / issue-wide `code-reviewer` / `spec-reviewer`" in phase_plan_issue
+        assert "三者最終品質ゲート（final quality gate）" in phase_plan_issue
+        assert "delegated plan draft" in phase_plan_issue
+        assert "phase gate preservation" in phase_plan_issue
+        assert "scope-local discussion direct-write consent" in phase_plan_issue
+        assert "forbidden canonical/implementation paths" in phase_plan_issue
+        assert "post-run diff guard" in phase_plan_issue
+        assert "adoption-ineligible" in phase_plan_issue
+        assert "完了済み issue plan/report の修正を含まない" in phase_plan_issue
+        assert "manual authoring path が有効" in phase_plan_issue
 
         phase_plan = (repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan.md").read_text(
             encoding="utf-8"
         )
-        self.assertIn("## 委任 plan authoring ゲート（delegated plan authoring gate）", phase_plan)
-        self.assertIn("fresh requirement reviewer pass と fresh design reviewer pass", phase_plan)
-        self.assertIn("Plan Summary", phase_plan)
-        self.assertIn("plan blocker", phase_plan)
-        self.assertIn("phase gate bypass", phase_plan)
-        self.assertIn("proposal-only ではありません", phase_plan)
-        self.assertIn("adoption_status: unreviewed", phase_plan)
-        self.assertIn("diff_guard_result", phase_plan)
-        self.assertIn("task manifest hash", phase_plan)
-        self.assertIn("post-run diff guard が failed / not run", phase_plan)
+        assert "## 委任 plan authoring ゲート（delegated plan authoring gate）" in phase_plan
+        assert "fresh requirement reviewer pass と fresh design reviewer pass" in phase_plan
+        assert "Plan Summary" in phase_plan
+        assert "plan blocker" in phase_plan
+        assert "phase gate bypass" in phase_plan
+        assert "proposal-only ではありません" in phase_plan
+        assert "adoption_status: unreviewed" in phase_plan
+        assert "diff_guard_result" in phase_plan
+        assert "task manifest hash" in phase_plan
+        assert "post-run diff guard が failed / not run" in phase_plan
 
         phase_plan_epic = (
             repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md"
         ).read_text(encoding="utf-8")
-        self.assertIn("delegated plan draft", phase_plan_epic)
-        self.assertIn("fresh requirement/design reviewer pass", phase_plan_epic)
-        self.assertIn("scope-local discussion direct-write consent", phase_plan_epic)
-        self.assertIn("forbidden canonical/implementation paths", phase_plan_epic)
-        self.assertIn("post-run diff guard", phase_plan_epic)
-        self.assertIn("adoption-ineligible", phase_plan_epic)
-        self.assertIn("完了済み issue plan/report の修正を含まない", phase_plan_epic)
-        self.assertIn("manual authoring path が有効", phase_plan_epic)
+        assert "delegated plan draft" in phase_plan_epic
+        assert "fresh requirement/design reviewer pass" in phase_plan_epic
+        assert "scope-local discussion direct-write consent" in phase_plan_epic
+        assert "forbidden canonical/implementation paths" in phase_plan_epic
+        assert "post-run diff guard" in phase_plan_epic
+        assert "adoption-ineligible" in phase_plan_epic
+        assert "完了済み issue plan/report の修正を含まない" in phase_plan_epic
+        assert "manual authoring path が有効" in phase_plan_epic
 
         workflow_issue = (
             repo_root / "src/spec_dock/assets/spec_dock/docs/workflow_issue.md"
         ).read_text(encoding="utf-8")
-        self.assertIn("templates は完成形ではなく、書き始めるための最小 scaffold", workflow_issue)
-        self.assertIn("項目を追加・削除・統合・並べ替えてよい", workflow_issue)
-        self.assertIn("正確性、検証可能性、人間の理解、エージェントの実行", workflow_issue)
-        self.assertIn("`optional diagram catalog` から必要なものを選んで追加してよい", workflow_issue)
-        self.assertIn("カタログ外でも、構造・境界・責務・流れ・状態・依存", workflow_issue)
-        self.assertIn("Linux `tree` style の `ディレクトリ / ファイル変更計画`", workflow_issue)
-        self.assertIn("仕様固定マイクロバッチTDD", workflow_issue)
-        self.assertIn("Spec-Locked Micro-Batch TDD", workflow_issue)
-        self.assertIn("Spec-Locked Closure Index", workflow_issue)
-        self.assertIn("Parent Agent Invariant", workflow_issue)
-        self.assertIn("inspect / plan / delegate / verify / integrate / report", workflow_issue)
-        self.assertIn("run-local orchestration metadata", workflow_issue)
-        self.assertIn("Issue 全体のテストケース一覧や詳細なテスト実装指示ではなく", workflow_issue)
-        self.assertIn("closure index の `id` を参照", workflow_issue)
-        self.assertIn("required closure id が behavior slice", workflow_issue)
-        self.assertIn("plan amendment と re-review", workflow_issue)
-        self.assertIn("Step Contract Closure", workflow_issue)
-        self.assertIn("Test Contract Closure", workflow_issue)
-        self.assertIn("Closure Coverage", workflow_issue)
-        self.assertIn("required closure id が step 契約クロージャ（`Step Contract Closure`）/ テスト契約クロージャ（`Test Contract Closure`）/ クロージャ coverage（`Closure Coverage`）で pass または approved-no-op", workflow_issue)
-        self.assertIn("Closure Delta", workflow_issue)
-        self.assertIn("planned executable workflow contract / command queue", workflow_issue)
-        self.assertIn("`report.md` は observed evidence ledger", workflow_issue)
-        self.assertIn("field semantics、card schema、risk-calibrated obligation coverage", workflow_issue)
-        self.assertIn("lifecycle、実行順、reviewer gate、completion policy", workflow_issue)
-        self.assertNotIn("test bundle", workflow_issue)
-        self.assertIn("bounded implementation batch", workflow_issue)
-        self.assertIn("Implementation Delegation Gate", workflow_issue)
-        self.assertIn("delegated worker handoff", workflow_issue)
-        self.assertIn("`delegated role`、`scope`、`source of truth`、`allowed changes`、`forbidden changes`、`required verification`、`stop conditions`、`output required`", workflow_issue)
-        self.assertIn("複数 layer / module / package", workflow_issue)
-        self.assertIn("runtime / CLI / infra / templates / shipped scaffold / shared docs", workflow_issue)
-        self.assertIn("integration test / migration / backward compatibility / filesystem / GitHub / active state", workflow_issue)
-        self.assertIn("`delegated` / `approved-local-execution` / degraded mode", workflow_issue)
-        self.assertIn("implementation delegation は reviewer gate の代替ではない", workflow_issue)
-        self.assertIn("Parent Implementation Exception", workflow_issue)
-        self.assertIn("delegation 不可理由、user approval、allowed files、allowed operation、rollback plan、post-change verification、reviewer gate", workflow_issue)
-        self.assertIn("reviewer gate mapping", workflow_issue)
-        self.assertIn("docs-only / template-only / skill-text-only", workflow_issue)
-        self.assertIn("bounded delegated follow-up", workflow_issue)
-        self.assertIn("test sensitivity evidence", workflow_issue)
-        self.assertNotIn("Red → Green → Refactor → review", workflow_issue)
-        self.assertIn("step reviewer gate → fix → re-review → commit → clean確認", workflow_issue)
-        self.assertIn("`1 implementation step = 1 review scope = 1 commit`", workflow_issue)
-        self.assertIn("`committed` または `approved-no-op`", workflow_issue)
-        self.assertIn("docs impact `none` は、docs / templates / README / workflow / skill / migration notes を確認", workflow_issue)
-        self.assertIn("`qa-reviewer` がテスト十分性", workflow_issue)
-        self.assertIn("issue-wide `code-reviewer` pass", workflow_issue)
-        self.assertIn("final `spec-reviewer` pass", workflow_issue)
-        self.assertIn("final commit 済み", workflow_issue)
-        self.assertIn("post-commit external delivery evidence", workflow_issue)
-        self.assertIn("意図しない staged / unstaged 変更なし", workflow_issue)
+        assert "templates は完成形ではなく、書き始めるための最小 scaffold" in workflow_issue
+        assert "項目を追加・削除・統合・並べ替えてよい" in workflow_issue
+        assert "正確性、検証可能性、人間の理解、エージェントの実行" in workflow_issue
+        assert "`optional diagram catalog` から必要なものを選んで追加してよい" in workflow_issue
+        assert "カタログ外でも、構造・境界・責務・流れ・状態・依存" in workflow_issue
+        assert "Linux `tree` style の `ディレクトリ / ファイル変更計画`" in workflow_issue
+        assert "仕様固定マイクロバッチTDD" in workflow_issue
+        assert "Spec-Locked Micro-Batch TDD" in workflow_issue
+        assert "Spec-Locked Closure Index" in workflow_issue
+        assert "Parent Agent Invariant" in workflow_issue
+        assert "inspect / plan / delegate / verify / integrate / report" in workflow_issue
+        assert "run-local orchestration metadata" in workflow_issue
+        assert "Issue 全体のテストケース一覧や詳細なテスト実装指示ではなく" in workflow_issue
+        assert "closure index の `id` を参照" in workflow_issue
+        assert "required closure id が behavior slice" in workflow_issue
+        assert "plan amendment と re-review" in workflow_issue
+        assert "Step Contract Closure" in workflow_issue
+        assert "Test Contract Closure" in workflow_issue
+        assert "Closure Coverage" in workflow_issue
+        assert "required closure id が step 契約クロージャ（`Step Contract Closure`）/ テスト契約クロージャ（`Test Contract Closure`）/ クロージャ coverage（`Closure Coverage`）で pass または approved-no-op" in workflow_issue
+        assert "Closure Delta" in workflow_issue
+        assert "planned executable workflow contract / command queue" in workflow_issue
+        assert "`report.md` は observed evidence ledger" in workflow_issue
+        assert "field semantics、card schema、risk-calibrated obligation coverage" in workflow_issue
+        assert "lifecycle、実行順、reviewer gate、completion policy" in workflow_issue
+        assert "test bundle" not in workflow_issue
+        assert "bounded implementation batch" in workflow_issue
+        assert "Implementation Delegation Gate" in workflow_issue
+        assert "delegated worker handoff" in workflow_issue
+        assert "`delegated role`、`scope`、`source of truth`、`allowed changes`、`forbidden changes`、`required verification`、`stop conditions`、`output required`" in workflow_issue
+        assert "複数 layer / module / package" in workflow_issue
+        assert "runtime / CLI / infra / templates / shipped scaffold / shared docs" in workflow_issue
+        assert "integration test / migration / backward compatibility / filesystem / GitHub / active state" in workflow_issue
+        assert "`delegated` / `approved-local-execution` / degraded mode" in workflow_issue
+        assert "implementation delegation は reviewer gate の代替ではない" in workflow_issue
+        assert "Parent Implementation Exception" in workflow_issue
+        assert "delegation 不可理由、user approval、allowed files、allowed operation、rollback plan、post-change verification、reviewer gate" in workflow_issue
+        assert "reviewer gate mapping" in workflow_issue
+        assert "docs-only / template-only / skill-text-only" in workflow_issue
+        assert "bounded delegated follow-up" in workflow_issue
+        assert "test sensitivity evidence" in workflow_issue
+        assert "Red → Green → Refactor → review" not in workflow_issue
+        assert "step reviewer gate → fix → re-review → commit → clean確認" in workflow_issue
+        assert "`1 implementation step = 1 review scope = 1 commit`" in workflow_issue
+        assert "`committed` または `approved-no-op`" in workflow_issue
+        assert "docs impact `none` は、docs / templates / README / workflow / skill / migration notes を確認" in workflow_issue
+        assert "`qa-reviewer` がテスト十分性" in workflow_issue
+        assert "issue-wide `code-reviewer` pass" in workflow_issue
+        assert "final `spec-reviewer` pass" in workflow_issue
+        assert "final commit 済み" in workflow_issue
+        assert "post-commit external delivery evidence" in workflow_issue
+        assert "意図しない staged / unstaged 変更なし" in workflow_issue
 
         issue_execution_skill = (
             repo_root
@@ -4737,23 +4572,23 @@ class TestInitUpdate(CliRuntimeHarness):
             "bounded delegated follow-up",
             "Parent direct fixes require a documented Parent Implementation Exception",
         ):
-            self.assertIn(fragment, issue_execution_skill)
+            assert fragment in issue_execution_skill
         self._assert_issue_execution_runtime_command_reminders(
             issue_execution_skill,
             source="provider issue-execution skill",
         )
-        self.assertNotIn("Spec authoring mode", issue_execution_skill)
-        self.assertNotIn("Role selection matrix", issue_execution_skill)
-        self.assertNotIn("Add Use Case, Sequence", issue_execution_skill)
+        assert "Spec authoring mode" not in issue_execution_skill
+        assert "Role selection matrix" not in issue_execution_skill
+        assert "Add Use Case, Sequence" not in issue_execution_skill
 
         workflow_skill = (
             repo_root
             / "src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md"
         ).read_text(encoding="utf-8")
-        self.assertIn("minimum authoring scaffolds", workflow_skill)
-        self.assertIn("add, remove, merge, reorder, or rewrite", workflow_skill)
-        self.assertIn("optional diagram choices", workflow_skill)
-        self.assertIn("project-specific sections outside the catalog", workflow_skill)
+        assert "minimum authoring scaffolds" in workflow_skill
+        assert "add, remove, merge, reorder, or rewrite" in workflow_skill
+        assert "optional diagram choices" in workflow_skill
+        assert "project-specific sections outside the catalog" in workflow_skill
 
         for root in (
             repo_root / "src/spec_dock/assets/spec_dock/templates",
@@ -4762,40 +4597,30 @@ class TestInitUpdate(CliRuntimeHarness):
             repo_root / "spec-dock/docs",
         ):
             for path in root.rglob("*.md"):
-                self.assertNotIn(
-                    "```c4plantuml",
-                    path.read_text(encoding="utf-8"),
-                    f"Markdown preview does not render c4plantuml fences: {path}",
-                )
+                assert "```c4plantuml" not in \
+                    path.read_text(encoding="utf-8"), \
+                    f"Markdown preview does not render c4plantuml fences: {path}"
 
     def test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         initiatives_root = repo_root / "spec-dock" / "initiatives"
-        self.assertTrue(
-            initiatives_root.is_dir(),
-            f"checked-in dogfooding initiatives tree missing: {initiatives_root}",
-        )
+        assert initiatives_root.is_dir(), \
+            f"checked-in dogfooding initiatives tree missing: {initiatives_root}"
         meta_paths = sorted(initiatives_root.rglob(".meta.json"))
-        self.assertGreater(
-            len(meta_paths),
-            0,
-            f"checked-in dogfooding initiatives tree is empty of .meta.json: {initiatives_root}",
-        )
+        assert len(meta_paths) > \
+            0, \
+            f"checked-in dogfooding initiatives tree is empty of .meta.json: {initiatives_root}"
         observed_meta_paths = [meta_path.relative_to(repo_root).as_posix() for meta_path in meta_paths]
-        self.assertEqual(
-            observed_meta_paths,
-            list(self._CHECKED_IN_DOGFOODING_META_JSON_PATHS),
-            "checked-in dogfooding .meta.json path set diverged from cutover snapshot",
-        )
+        assert observed_meta_paths == \
+            list(self._CHECKED_IN_DOGFOODING_META_JSON_PATHS), \
+            "checked-in dogfooding .meta.json path set diverged from cutover snapshot"
 
         legacy_deps_paths = sorted(
             path.relative_to(repo_root).as_posix() for path in initiatives_root.rglob("deps.json")
         )
-        self.assertEqual(
-            legacy_deps_paths,
-            [],
-            f"checked-in dogfooding initiatives still contain legacy deps.json: {legacy_deps_paths}",
-        )
+        assert legacy_deps_paths == \
+            [], \
+            f"checked-in dogfooding initiatives still contain legacy deps.json: {legacy_deps_paths}"
 
         non_list_depends_on_paths: list[str] = []
         observed_depends_on_by_meta_path: dict[str, list[object]] = {}
@@ -4807,34 +4632,26 @@ class TestInitUpdate(CliRuntimeHarness):
                 non_list_depends_on_paths.append(rel_meta_path)
                 continue
             observed_depends_on_by_meta_path[rel_meta_path] = depends_on
-        self.assertEqual(
-            non_list_depends_on_paths,
-            [],
-            "checked-in dogfooding .meta.json has non-list depends_on values: "
-            f"{non_list_depends_on_paths}",
-        )
-        self.assertEqual(
-            observed_depends_on_by_meta_path,
-            self._CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH,
-            "checked-in dogfooding depends_on values diverged from cutover baseline",
-        )
+        assert non_list_depends_on_paths == \
+            [], \
+            "checked-in dogfooding .meta.json has non-list depends_on values: " \
+            f"{non_list_depends_on_paths}"
+        assert observed_depends_on_by_meta_path == \
+            self._CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH, \
+            "checked-in dogfooding depends_on values diverged from cutover baseline"
 
     def test_checked_in_dogfooding_runtime_subprocess_validate_and_sync_on_cutover_snapshot(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         checked_in_initiatives_root = repo_root / "spec-dock" / "initiatives"
-        self.assertTrue(
-            checked_in_initiatives_root.is_dir(),
-            f"checked-in dogfooding initiatives tree missing: {checked_in_initiatives_root}",
-        )
-        self.assertGreater(
-            len(list(checked_in_initiatives_root.rglob(".meta.json"))),
-            0,
-            "checked-in dogfooding initiatives tree must contain .meta.json before runtime cutover checks",
-        )
+        assert checked_in_initiatives_root.is_dir(), \
+            f"checked-in dogfooding initiatives tree missing: {checked_in_initiatives_root}"
+        assert len(list(checked_in_initiatives_root.rglob(".meta.json"))) > \
+            0, \
+            "checked-in dogfooding initiatives tree must contain .meta.json before runtime cutover checks"
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
 
             target_initiatives_root = target / "spec-dock" / "initiatives"
@@ -4842,20 +4659,16 @@ class TestInitUpdate(CliRuntimeHarness):
             shutil.copytree(checked_in_initiatives_root, target_initiatives_root)
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(
-                validate_result.returncode,
-                0,
-                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
-            )
-            self.assertIn("spec-dock: ok (validate)", validate_result.stdout)
+            assert validate_result.returncode == \
+                0, \
+                f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            assert "spec-dock: ok (validate)" in validate_result.stdout
 
             sync_result = self._run_runtime_capture(target, ["sync"])
-            self.assertEqual(
-                sync_result.returncode,
-                0,
-                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
-            )
-            self.assertIn("spec-dock: ok (sync)", sync_result.stdout)
+            assert sync_result.returncode == \
+                0, \
+                f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            assert "spec-dock: ok (sync)" in sync_result.stdout
 
             runtime_map_check_code = f"""
 import json
@@ -4902,27 +4715,23 @@ assert observed_non_empty == expected_non_empty, json.dumps(
                 capture_output=True,
                 text=True,
             )
-            self.assertEqual(
-                runtime_map_result.returncode,
-                0,
-                msg=(
+            assert runtime_map_result.returncode == \
+                0, \
+                (
                     "runtime issue_depends_on_map mismatch on cutover snapshot\n"
                     f"stdout:\n{runtime_map_result.stdout}\n"
                     f"stderr:\n{runtime_map_result.stderr}"
-                ),
-            )
+                )
 
     def test_checked_in_dogfooding_runtime_subprocess_deps_mutation_on_cutover_snapshot(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         checked_in_initiatives_root = repo_root / "spec-dock" / "initiatives"
-        self.assertTrue(
-            checked_in_initiatives_root.is_dir(),
-            f"checked-in dogfooding initiatives tree missing: {checked_in_initiatives_root}",
-        )
+        assert checked_in_initiatives_root.is_dir(), \
+            f"checked-in dogfooding initiatives tree missing: {checked_in_initiatives_root}"
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
 
             target_initiatives_root = target / "spec-dock" / "initiatives"
@@ -4935,78 +4744,58 @@ assert observed_non_empty == expected_non_empty, json.dumps(
                     payload = json.loads(meta_path.read_text(encoding="utf-8"))
                     if payload.get("type") == "issue" and payload.get("id") == issue_id:
                         matches.append(meta_path)
-                self.assertEqual(
-                    len(matches),
-                    1,
-                    f"cutover snapshot must have exactly one issue meta for {issue_id}: {matches}",
-                )
+                assert len(matches) == \
+                    1, \
+                    f"cutover snapshot must have exactly one issue meta for {issue_id}: {matches}"
                 return matches[0]
 
             from_issue_id = "iss-00063"
             to_issue_id = "iss-00062"
             from_meta_path = _find_issue_meta_path(from_issue_id)
-            self.assertEqual(
-                json.loads(from_meta_path.read_text(encoding="utf-8")).get("depends_on"),
-                [],
-                f"expected empty depends_on before deps add on {from_issue_id}",
-            )
+            assert json.loads(from_meta_path.read_text(encoding="utf-8")).get("depends_on") == \
+                [], \
+                f"expected empty depends_on before deps add on {from_issue_id}"
 
             add_result = self._run_runtime_capture(
                 target,
                 ["deps", "add", "--from", from_issue_id, "--to", to_issue_id],
             )
-            self.assertEqual(
-                add_result.returncode,
-                0,
-                msg=f"deps add stdout:\n{add_result.stdout}\ndeps add stderr:\n{add_result.stderr}",
-            )
-            self.assertIn(
-                f"spec-dock: ok (deps add) from={from_issue_id} to={to_issue_id} result=updated",
-                add_result.stdout,
-            )
-            self.assertEqual(
-                json.loads(from_meta_path.read_text(encoding="utf-8")).get("depends_on"),
-                [to_issue_id],
-                "deps add did not persist expected depends_on edge into .meta.json",
-            )
+            assert add_result.returncode == \
+                0, \
+                f"deps add stdout:\n{add_result.stdout}\ndeps add stderr:\n{add_result.stderr}"
+            assert f"spec-dock: ok (deps add) from={from_issue_id} to={to_issue_id} result=updated" in \
+                add_result.stdout
+            assert json.loads(from_meta_path.read_text(encoding="utf-8")).get("depends_on") == \
+                [to_issue_id], \
+                "deps add did not persist expected depends_on edge into .meta.json"
 
             remove_result = self._run_runtime_capture(
                 target,
                 ["deps", "remove", "--from", from_issue_id, "--to", to_issue_id],
             )
-            self.assertEqual(
-                remove_result.returncode,
-                0,
-                msg=(
+            assert remove_result.returncode == \
+                0, \
+                (
                     f"deps remove stdout:\n{remove_result.stdout}\n"
                     f"deps remove stderr:\n{remove_result.stderr}"
-                ),
-            )
-            self.assertIn(
-                f"spec-dock: ok (deps remove) from={from_issue_id} to={to_issue_id} result=updated",
-                remove_result.stdout,
-            )
-            self.assertEqual(
-                json.loads(from_meta_path.read_text(encoding="utf-8")).get("depends_on"),
-                [],
-                "deps remove did not clear depends_on edge from .meta.json",
-            )
+                )
+            assert f"spec-dock: ok (deps remove) from={from_issue_id} to={to_issue_id} result=updated" in \
+                remove_result.stdout
+            assert json.loads(from_meta_path.read_text(encoding="utf-8")).get("depends_on") == \
+                [], \
+                "deps remove did not clear depends_on edge from .meta.json"
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(
-                validate_result.returncode,
-                0,
-                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
-            )
-            self.assertIn("spec-dock: ok (validate)", validate_result.stdout)
+            assert validate_result.returncode == \
+                0, \
+                f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            assert "spec-dock: ok (validate)" in validate_result.stdout
 
             sync_result = self._run_runtime_capture(target, ["sync"])
-            self.assertEqual(
-                sync_result.returncode,
-                0,
-                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
-            )
-            self.assertIn("spec-dock: ok (sync)", sync_result.stdout)
+            assert sync_result.returncode == \
+                0, \
+                f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            assert "spec-dock: ok (sync)" in sync_result.stdout
 
     def test_checked_in_dogfooding_runtime_mirror_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -5233,7 +5022,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_import_release_lock_backward_compat_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -5283,7 +5072,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_import_import_race_revalidation_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -5526,7 +5315,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_import_new_race_revalidation_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -5776,7 +5565,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_no_write_preflight_collision_with_active_parent_fallback_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -6029,7 +5818,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_parent_fallback_reresolve_inside_lock_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -6286,7 +6075,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_keeps_repo_scoped_sync_snapshot_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -6497,7 +6286,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_keeps_repo_scoped_active_deps_status_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -6713,7 +6502,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_non_issue_deps_target_status_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -6871,7 +6660,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -6882,8 +6671,8 @@ import shlex
 import sys
 import tempfile
 import threading
+from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import patch
 
 sys.path.insert(0, %r)
 try:
@@ -6893,6 +6682,20 @@ try:
     from spec_dock_runtime.infra import contracts as infra_contracts
 finally:
     sys.path.pop(0)
+
+@contextmanager
+def patch_object(obj, name, new=None, side_effect=None):
+    original = getattr(obj, name)
+    if side_effect is not None:
+        def replacement(*args, **kwargs):
+            raise side_effect
+    else:
+        replacement = new
+    setattr(obj, name, replacement)
+    try:
+        yield
+    finally:
+        setattr(obj, name, original)
 
 def _record(*, kind, node_id, title, path, parent_id, initiative_id, epic_id, github_issue_number):
     return infra_contracts.StoredMetaRecord(
@@ -7473,7 +7276,7 @@ with tempfile.TemporaryDirectory() as td:
         specdock_dir=specdock_dir,
     )
 
-    with patch.object(
+    with patch_object(
         app_create_node,
         "_post_write_duplicate_guard",
         side_effect=RuntimeError("simulated post-write duplicate guard failure"),
@@ -7559,7 +7362,7 @@ with tempfile.TemporaryDirectory() as td:
             raise OSError("permission denied")
         return original_unlink(path_self, *args, **kwargs)
 
-    with patch.object(app_create_node.Path, "unlink", new=_unlink_with_failure):
+    with patch_object(app_create_node.Path, "unlink", new=_unlink_with_failure):
         try:
             app_create_node.create_issue(
                 app_contracts.CreateNodeRequest(
@@ -7640,7 +7443,7 @@ with tempfile.TemporaryDirectory() as td:
             raise OSError("permission denied")
         return original_unlink(path_self, *args, **kwargs)
 
-    with patch.object(app_create_node.Path, "unlink", new=_unlink_with_failure):
+    with patch_object(app_create_node.Path, "unlink", new=_unlink_with_failure):
         try:
             app_create_node.create_issue(
                 app_contracts.CreateNodeRequest(
@@ -7724,12 +7527,12 @@ with tempfile.TemporaryDirectory() as td:
             raise OSError("permission denied")
         return original_unlink(path_self, *args, **kwargs)
 
-    with patch.object(
+    with patch_object(
         app_create_node,
         "_post_write_duplicate_guard",
         side_effect=RuntimeError("simulated post-write duplicate guard failure"),
     ):
-        with patch.object(app_create_node.Path, "unlink", new=_unlink_with_failure):
+        with patch_object(app_create_node.Path, "unlink", new=_unlink_with_failure):
             try:
                 app_create_node.create_issue(
                     app_contracts.CreateNodeRequest(
@@ -7763,7 +7566,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_issue_create_pre_github_validation_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -7975,7 +7778,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -7985,8 +7788,8 @@ import os
 import shlex
 import sys
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import patch
 
 sys.path.insert(0, %r)
 try:
@@ -7996,6 +7799,17 @@ try:
     from spec_dock_runtime.infra import contracts as infra_contracts
 finally:
     sys.path.pop(0)
+
+@contextmanager
+def patch_object(obj, name, side_effect):
+    original = getattr(obj, name)
+    def replacement(*args, **kwargs):
+        raise side_effect
+    setattr(obj, name, replacement)
+    try:
+        yield
+    finally:
+        setattr(obj, name, original)
 
 def _record(*, kind, node_id, title, path, parent_id, initiative_id, epic_id, github_issue_number):
     return infra_contracts.StoredMetaRecord(
@@ -8162,7 +7976,7 @@ with tempfile.TemporaryDirectory() as td:
         repo_root=repo_root,
         specdock_dir=specdock_dir,
     )
-    with patch.object(app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated epic write failure")):
+    with patch_object(app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated epic write failure")):
         try:
             app_create_node.create_epic(
                 app_contracts.CreateNodeRequest(
@@ -8190,7 +8004,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_create_mode_graph_preflight_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -8341,7 +8155,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_keeps_same_repo_index_missing_view_fallback_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -8544,7 +8358,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_keeps_unscoped_current_repo_fallback_sync_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -8738,7 +8552,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_keeps_unscoped_current_repo_fallback_active_deps_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -8949,7 +8763,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_keeps_repo_scoped_validation_doctor_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -9109,7 +8923,7 @@ with tempfile.TemporaryDirectory() as td:
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_keeps_numeric_branch_current_repo_overlap_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -9389,7 +9203,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+        assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_tool_version_fallback_reads_pyproject(self) -> None:
         import spec_dock.cli as cli
@@ -9401,7 +9215,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             cli.__version__ = "0.0.0+unknown"
             repo_root = Path(__file__).resolve().parents[3]
             cli.__file__ = str(repo_root / "src" / "spec_dock" / "cli.py")
-            self.assertEqual(cli._tool_version(), expected)
+            assert cli._tool_version() == expected
         finally:
             if old_version is not None:
                 cli.__version__ = old_version
@@ -9411,14 +9225,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
     def test_no_skill_option_is_rejected(self) -> None:
         import spec_dock.cli as cli
 
-        with self.assertRaises(SystemExit) as cm:
+        with pytest.raises(SystemExit) as cm:
             cli._parse_args(["init", "--no-skill", "."])
-        self.assertEqual(cm.exception.code, 2)
+        assert cm.value.code == 2
 
     def test_update_migrates_legacy_single_skill_and_preserves_custom_skill(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             skills_root = target / ".agents" / "skills"
             meta_path = target / ".agents" / "host-adapters" / "meta.json"
@@ -9433,30 +9247,28 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             (custom_dir / "SKILL.md").write_text("# custom\n", encoding="utf-8")
             (custom_dir / "notes.txt").write_text("keep\n", encoding="utf-8")
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
             self._assert_managed_skills_installed(target)
-            self.assertEqual(
-                json.loads(meta_path.read_text(encoding="utf-8")),
-                self._EXPECTED_HOST_ADAPTER_META,
-            )
-            self.assertTrue((custom_dir / "SKILL.md").is_file())
-            self.assertTrue((custom_dir / "notes.txt").is_file())
+            assert json.loads(meta_path.read_text(encoding="utf-8")) == \
+                self._EXPECTED_HOST_ADAPTER_META
+            assert (custom_dir / "SKILL.md").is_file()
+            assert (custom_dir / "notes.txt").is_file()
 
     def test_update_installs_full_skill_set_for_legacy_no_skill_repo(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             skills_root = target / ".agents" / "skills"
 
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             shutil.rmtree(skills_root)
-            self.assertFalse(skills_root.exists())
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert not skills_root.exists()
+            assert main(["update", str(target)]) == 0
             self._assert_managed_skills_installed(target)
 
             for skill_name in _EXPECTED_MANAGED_SKILL_NAMES:
                 shutil.rmtree(skills_root / skill_name)
-            self.assertEqual(list(skills_root.glob("*")), [])
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert list(skills_root.glob("*")) == []
+            assert main(["update", str(target)]) == 0
             self._assert_managed_skills_installed(target)
 
     def test_update_skill_sync_converges_after_interrupted_run(self) -> None:
@@ -9464,7 +9276,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             original_copy_file = cli._copy_file
             failed_once = False
@@ -9481,23 +9293,23 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             cli._copy_file = interrupted_copy
             try:
-                self.assertEqual(main(["update", str(target)]), 1)
+                assert main(["update", str(target)]) == 1
             finally:
                 cli._copy_file = original_copy_file
 
-            self.assertTrue(failed_once)
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert failed_once
+            assert main(["update", str(target)]) == 0
             self._assert_managed_skills_installed(target)
 
     def test_issue_68_install_root_tree_exists(self) -> None:
         install_root = self._ISSUE_68_INSTALL_ROOT
-        self.assertTrue(install_root.is_dir(), f"missing install_root: {install_root}")
+        assert install_root.is_dir(), f"missing install_root: {install_root}"
         for subtree in (".agents", ".codex", ".github"):
             subtree_path = install_root / subtree
-            self.assertTrue(subtree_path.is_dir(), f"missing install_root subtree: {subtree_path}")
+            assert subtree_path.is_dir(), f"missing install_root subtree: {subtree_path}"
         for relative_path in self._ISSUE_68_AUTHORITATIVE_RELATIVE_PATHS:
             asset_path = install_root / relative_path
-            self.assertTrue(asset_path.is_file(), f"missing issue-68 authoritative asset: {asset_path}")
+            assert asset_path.is_file(), f"missing issue-68 authoritative asset: {asset_path}"
 
     def test_issue_68_authoritative_inventory_paths_are_classified_under_install_root(self) -> None:
         install_root = self._ISSUE_68_INSTALL_ROOT
@@ -9505,70 +9317,52 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         for prefix, relative_paths in self._ISSUE_68_CLASSIFICATION_PREFIX_TO_RELATIVE_PATHS.items():
             for relative_path in relative_paths:
-                self.assertTrue(
-                    relative_path.startswith(prefix),
-                    f"issue-68 classification mismatch for {relative_path}; expected prefix {prefix}",
-                )
-                self.assertTrue(
-                    (install_root / relative_path).is_file(),
-                    f"missing issue-68 classified authoritative asset: {install_root / relative_path}",
-                )
+                assert relative_path.startswith(prefix), \
+                    f"issue-68 classification mismatch for {relative_path}; expected prefix {prefix}"
+                assert (install_root / relative_path).is_file(), \
+                    f"missing issue-68 classified authoritative asset: {install_root / relative_path}"
                 classified_paths.add(relative_path)
 
-        self.assertEqual(
-            classified_paths,
-            set(self._ISSUE_68_AUTHORITATIVE_RELATIVE_PATHS),
-            "issue-68 authoritative inventory should be fully classified under install_root",
-        )
+        assert classified_paths == \
+            set(self._ISSUE_68_AUTHORITATIVE_RELATIVE_PATHS), \
+            "issue-68 authoritative inventory should be fully classified under install_root"
 
     def test_issue_68_workflow_seed_matches_repo_root_ci_workflow(self) -> None:
         install_root_workflow = self._ISSUE_68_INSTALL_ROOT / ".github/workflows/ci.yml"
         repo_root_workflow = Path(".github/workflows/ci.yml")
 
-        self.assertTrue(
-            repo_root_workflow.is_file(),
-            f"missing repo-root workflow seed source: {repo_root_workflow}",
-        )
-        self.assertTrue(
-            install_root_workflow.is_file(),
-            f"missing issue-68 install_root workflow seed: {install_root_workflow}",
-        )
-        self.assertEqual(
-            install_root_workflow.read_bytes(),
-            repo_root_workflow.read_bytes(),
-            "install_root workflow seed must be byte-equivalent to repo-root .github/workflows/ci.yml",
-        )
+        assert repo_root_workflow.is_file(), \
+            f"missing repo-root workflow seed source: {repo_root_workflow}"
+        assert install_root_workflow.is_file(), \
+            f"missing issue-68 install_root workflow seed: {install_root_workflow}"
+        assert install_root_workflow.read_bytes() == \
+            repo_root_workflow.read_bytes(), \
+            "install_root workflow seed must be byte-equivalent to repo-root .github/workflows/ci.yml"
         workflow_text = install_root_workflow.read_text(encoding="utf-8")
-        self.assertIn("test -f ./spec-dock/scripts/spec-dock", workflow_text)
-        self.assertNotIn("test -x ./spec-dock/scripts/spec-dock", workflow_text)
-        self.assertIn("python3 ./spec-dock/scripts/spec-dock sync", workflow_text)
-        self.assertIn("python3 ./spec-dock/scripts/spec-dock validate", workflow_text)
+        assert "test -f ./spec-dock/scripts/spec-dock" in workflow_text
+        assert "test -x ./spec-dock/scripts/spec-dock" not in workflow_text
+        assert "python3 ./spec-dock/scripts/spec-dock sync" in workflow_text
+        assert "python3 ./spec-dock/scripts/spec-dock validate" in workflow_text
 
     def test_issue_68_provider_only_workflow_is_not_shipped_via_install_root(self) -> None:
         repo_root_provider_workflow = Path(".github/workflows/provider-ci.yml")
         install_root_provider_workflow = self._ISSUE_68_INSTALL_ROOT / ".github/workflows/provider-ci.yml"
 
-        self.assertTrue(
-            repo_root_provider_workflow.is_file(),
-            f"missing repo-root provider-only workflow: {repo_root_provider_workflow}",
-        )
-        self.assertFalse(
-            install_root_provider_workflow.exists(),
+        assert repo_root_provider_workflow.is_file(), \
+            f"missing repo-root provider-only workflow: {repo_root_provider_workflow}"
+        assert not install_root_provider_workflow.exists(), \
             (
                 "provider-only workflow must not be shipped in install_root managed assets: "
                 f"{install_root_provider_workflow}"
-            ),
-        )
+            )
         workflow_text = repo_root_provider_workflow.read_text(encoding="utf-8")
-        self.assertIn("python -m pip install -e .", workflow_text)
-        self.assertIn("python -m unittest discover -s tests/unit", workflow_text)
+        assert "python -m pip install -e ." in workflow_text
+        assert "python -m unittest discover -s tests/unit" in workflow_text
 
     def test_issue_68_legacy_codex_skills_tree_is_retired(self) -> None:
         legacy_root = self._ISSUE_68_RETIRED_LEGACY_ROOT
-        self.assertFalse(
-            legacy_root.exists(),
-            f"issue-68 legacy provider tree must be retired from current repo: {legacy_root}",
-        )
+        assert not legacy_root.exists(), \
+            f"issue-68 legacy provider tree must be retired from current repo: {legacy_root}"
 
     def test_issue_68_authority_inventory_disallows_unlisted_provider_duplicates(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -9582,32 +9376,24 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     for candidate in provider_assets_root.rglob(search_glob)
                     if candidate.is_file()
                 )
-            self.assertEqual(
-                sorted(observed_provider_paths),
-                sorted(duplicate_boundary["allowed_provider_paths"]),
-                f"issue-68 authority inventory boundary mismatch for {asset_label}",
-            )
+            assert sorted(observed_provider_paths) == \
+                sorted(duplicate_boundary["allowed_provider_paths"]), \
+                f"issue-68 authority inventory boundary mismatch for {asset_label}"
 
     def test_bundled_skill_assets_cover_managed_manifest(self) -> None:
         import spec_dock.cli as cli
 
-        self.assertEqual(cli._managed_skill_names(), _EXPECTED_MANAGED_SKILL_NAMES)
+        assert cli._managed_skill_names() == _EXPECTED_MANAGED_SKILL_NAMES
         with cli._assets_dir() as assets_dir:
             for skill_name in _EXPECTED_MANAGED_SKILL_NAMES:
                 skill_path = assets_dir / "install_root" / ".agents" / "skills" / skill_name / "SKILL.md"
-                self.assertTrue(skill_path.is_file(), f"missing bundled skill asset: {skill_path}")
-            self.assertTrue(
-                (assets_dir / "install_root" / ".agents" / "host-adapters" / "meta.json").is_file(),
-                "missing bundled host adapter metadata asset",
-            )
-            self.assertTrue(
-                (assets_dir / "install_root" / ".codex" / "agents" / "spec-manager.toml").is_file(),
-                "missing bundled codex native shim asset",
-            )
-            self.assertTrue(
-                (assets_dir / "install_root" / ".github" / "agents" / "orchestrator.agent.md").is_file(),
-                "missing bundled copilot native shim asset",
-            )
+                assert skill_path.is_file(), f"missing bundled skill asset: {skill_path}"
+            assert (assets_dir / "install_root" / ".agents" / "host-adapters" / "meta.json").is_file(), \
+                "missing bundled host adapter metadata asset"
+            assert (assets_dir / "install_root" / ".codex" / "agents" / "spec-manager.toml").is_file(), \
+                "missing bundled codex native shim asset"
+            assert (assets_dir / "install_root" / ".github" / "agents" / "orchestrator.agent.md").is_file(), \
+                "missing bundled copilot native shim asset"
 
     def test_bundled_native_shim_assets_satisfy_static_delegation_only_contract(self) -> None:
         import spec_dock.cli as cli
@@ -9620,19 +9406,15 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             codex_rules_path = assets_dir / "install_root" / ".codex" / "rules" / "spec-dock-commands.rules"
             copilot_spec_manager_path = assets_dir / "install_root" / ".github" / "agents" / "spec-manager.agent.md"
             copilot_path = assets_dir / "install_root" / ".github" / "agents" / "orchestrator.agent.md"
-            self.assertTrue(codex_path.is_file(), f"missing bundled codex native shim: {codex_path}")
-            self.assertTrue(
-                codex_doc_writer_path.is_file(),
-                f"missing bundled codex doc-writer agent: {codex_doc_writer_path}",
-            )
-            self.assertTrue(codex_bootstrap_path.is_file(), f"missing bundled codex bootstrap guide: {codex_bootstrap_path}")
-            self.assertTrue(codex_config_path.is_file(), f"missing bundled codex main config: {codex_config_path}")
-            self.assertTrue(codex_rules_path.is_file(), f"missing bundled codex command rules: {codex_rules_path}")
-            self.assertTrue(
-                copilot_spec_manager_path.is_file(),
-                f"missing bundled copilot spec-manager: {copilot_spec_manager_path}",
-            )
-            self.assertTrue(copilot_path.is_file(), f"missing bundled copilot native shim: {copilot_path}")
+            assert codex_path.is_file(), f"missing bundled codex native shim: {codex_path}"
+            assert codex_doc_writer_path.is_file(), \
+                f"missing bundled codex doc-writer agent: {codex_doc_writer_path}"
+            assert codex_bootstrap_path.is_file(), f"missing bundled codex bootstrap guide: {codex_bootstrap_path}"
+            assert codex_config_path.is_file(), f"missing bundled codex main config: {codex_config_path}"
+            assert codex_rules_path.is_file(), f"missing bundled codex command rules: {codex_rules_path}"
+            assert copilot_spec_manager_path.is_file(), \
+                f"missing bundled copilot spec-manager: {copilot_spec_manager_path}"
+            assert copilot_path.is_file(), f"missing bundled copilot native shim: {copilot_path}"
             codex_text = codex_path.read_text(encoding="utf-8")
             codex_doc_writer_text = codex_doc_writer_path.read_text(encoding="utf-8")
             codex_bootstrap_text = codex_bootstrap_path.read_text(encoding="utf-8")
@@ -9701,9 +9483,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         with cli._assets_dir() as assets_dir:
             install_root = assets_dir / "install_root"
             for label, expected in adapters.items():
-                with self.subTest(adapter=label, surface="provider"):
+                with _case(adapter=label, surface="provider"):
                     provider_path = install_root / expected["path"]
-                    self.assertTrue(provider_path.is_file(), f"missing provider Codex adapter: {provider_path}")
+                    assert provider_path.is_file(), f"missing provider Codex adapter: {provider_path}"
                     self._assert_codex_delegated_author_adapter_contract(
                         text=provider_path.read_text(encoding="utf-8"),
                         shim_label=f"provider {label}",
@@ -9712,14 +9494,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                         draft_kind=expected["draft_kind"],
                     )
 
-                with self.subTest(adapter=label, surface="dogfooding"):
+                with _case(adapter=label, surface="dogfooding"):
                     checked_in_path = Path(__file__).resolve().parents[3] / expected["path"]
-                    self.assertTrue(checked_in_path.is_file(), f"missing dogfooding Codex adapter: {checked_in_path}")
-                    self.assertEqual(
-                        checked_in_path.read_bytes(),
-                        provider_path.read_bytes(),
-                        f"dogfooding Codex adapter drifted from provider asset: {expected['path']}",
-                    )
+                    assert checked_in_path.is_file(), f"missing dogfooding Codex adapter: {checked_in_path}"
+                    assert checked_in_path.read_bytes() == \
+                        provider_path.read_bytes(), \
+                        f"dogfooding Codex adapter drifted from provider asset: {expected['path']}"
 
     def test_s04_codex_agent_permission_taxonomy_contract(self) -> None:
         import spec_dock.cli as cli
@@ -9741,32 +9521,32 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         with cli._assets_dir() as assets_dir:
             agents_dir = assets_dir / "install_root" / ".codex" / "agents"
             for agent_name in read_only_specialists:
-                with self.subTest(agent=agent_name, taxonomy="read-only-specialist"):
+                with _case(agent=agent_name, taxonomy="read-only-specialist"):
                     text = (agents_dir / f"{agent_name}.toml").read_text(encoding="utf-8")
                     parsed = tomllib.loads(text)
-                    self.assertEqual(parsed.get("sandbox_mode"), "read-only")
-                    self.assertNotEqual(parsed.get("sandbox_mode"), "workspace-write")
-                    self.assertNotIn("default_permissions", parsed)
+                    assert parsed.get("sandbox_mode") == "read-only"
+                    assert parsed.get("sandbox_mode") != "workspace-write"
+                    assert "default_permissions" not in parsed
 
             for agent_name in workspace_write_workers:
-                with self.subTest(agent=agent_name, taxonomy="workspace-write-worker"):
+                with _case(agent=agent_name, taxonomy="workspace-write-worker"):
                     text = (agents_dir / f"{agent_name}.toml").read_text(encoding="utf-8")
                     parsed = tomllib.loads(text)
-                    self.assertEqual(parsed.get("sandbox_mode"), "workspace-write")
+                    assert parsed.get("sandbox_mode") == "workspace-write"
 
             for agent_name in scoped_delegated_authors:
-                with self.subTest(agent=agent_name, taxonomy="scoped-delegated-author"):
+                with _case(agent=agent_name, taxonomy="scoped-delegated-author"):
                     text = (agents_dir / f"{agent_name}.toml").read_text(encoding="utf-8")
                     parsed = tomllib.loads(text)
-                    self.assertEqual(parsed.get("sandbox_mode"), "workspace-write")
-                    self.assertNotIn("default_permissions", parsed)
-                    self.assertNotIn("permissions", parsed)
-                    self.assertEqual(parsed.get("sandbox_workspace_write", {}).get("network_access"), False)
-                    self.assertIn("write-capable delegated authoring path", text)
-                    self.assertIn("post-run diff guard", text)
-                    self.assertNotIn("spec-dock/initiatives = \"write\"", text)
-                    self.assertNotIn('".codex" = "write"', text)
-                    self.assertNotIn('".agents" = "write"', text)
+                    assert parsed.get("sandbox_mode") == "workspace-write"
+                    assert "default_permissions" not in parsed
+                    assert "permissions" not in parsed
+                    assert parsed.get("sandbox_workspace_write", {}).get("network_access") == False
+                    assert "write-capable delegated authoring path" in text
+                    assert "post-run diff guard" in text
+                    assert "spec-dock/initiatives = \"write\"" not in text
+                    assert '".codex" = "write"' not in text
+                    assert '".agents" = "write"' not in text
 
     def test_issue_102_agentic_tdd_contract_assets(self) -> None:
         import spec_dock.cli as cli
@@ -9820,10 +9600,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             }
 
         for label, text in texts.items():
-            with self.subTest(asset=label, stale_count_guidance=True):
-                self.assertNotRegex(text, r"1\s*[〜～~]\s*3\s*件(?:程度)?")
-                self.assertNotIn("minimal necessary tests", text)
-                self.assertNotIn("minimal tests", text)
+            with _case(asset=label, stale_count_guidance=True):
+                assert not re.search(r"1\s*[〜～~]\s*3\s*件(?:程度)?", text)
+                assert "minimal necessary tests" not in text
+                assert "minimal tests" not in text
 
         for label in (
             "workflow issue docs",
@@ -9831,9 +9611,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "issue plan authoring docs",
             "issue plan template",
         ):
-            with self.subTest(asset=label, raw_count_context=True):
+            with _case(asset=label, raw_count_context=True):
                 if "raw count" in texts[label]:
-                    self.assertIn("risk-calibrated", texts[label])
+                    assert "risk-calibrated" in texts[label]
 
         plan_text = texts["issue plan template"]
         for fragment in (
@@ -9851,8 +9631,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Green 検証",
             "Refactor / cleanup ガードレール",
         ):
-            with self.subTest(asset="issue plan template", fragment=fragment):
-                self.assertIn(fragment, plan_text)
+            with _case(asset="issue plan template", fragment=fragment):
+                assert fragment in plan_text
 
         report_text = texts["issue report template"]
         for fragment in (
@@ -9869,8 +9649,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "reviewer status",
             "commit/no-op evidence",
         ):
-            with self.subTest(asset="issue report template", fragment=fragment):
-                self.assertIn(fragment, report_text)
+            with _case(asset="issue report template", fragment=fragment):
+                assert fragment in report_text
 
         for label in ("execute issue prompt", "issue execution skill"):
             text = texts[label]
@@ -9883,8 +9663,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "docs/authoring/issue-plan.md",
                 "workflow_issue.md",
             ):
-                with self.subTest(asset=label, fragment=fragment):
-                    self.assertIn(fragment, text)
+                with _case(asset=label, fragment=fragment):
+                    assert fragment in text
 
         agent_contracts = {
             "dev-coder agent": (
@@ -9930,8 +9710,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         for label, fragments in agent_contracts.items():
             text = texts[label]
             for fragment in fragments:
-                with self.subTest(asset=label, fragment=fragment):
-                    self.assertIn(fragment, text)
+                with _case(asset=label, fragment=fragment):
+                    assert fragment in text
 
     def test_issue_103_report_decision_ledger_contract_assets(self) -> None:
         import spec_dock.cli as cli
@@ -10101,8 +9881,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         for label, fragments in expected_fragments.items():
             text = texts[label]
             for fragment in fragments:
-                with self.subTest(asset=label, fragment=fragment):
-                    self.assertIn(fragment, text)
+                with _case(asset=label, fragment=fragment):
+                    assert fragment in text
 
     def test_issue_142_matt_pocock_phase_discipline_contract_assets(self) -> None:
         import spec_dock.cli as cli
@@ -10176,8 +9956,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         for label, fragments in expected_fragments.items():
             text = texts[label]
             for fragment in fragments:
-                with self.subTest(asset=label, fragment=fragment):
-                    self.assertIn(fragment, text)
+                with _case(asset=label, fragment=fragment):
+                    assert fragment in text
 
     def test_issue_134_clarification_contract_assets(self) -> None:
         import spec_dock.cli as cli
@@ -10222,10 +10002,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             texts = {label: path.read_text(encoding="utf-8") for label, path in asset_paths.items()}
             discussions_dir = spec_dock_assets / "templates" / "discussions"
 
-        self.assertFalse((discussions_dir / "report.md").exists())
-        self.assertFalse((discussions_dir / "reflection.md").exists())
-        self.assertFalse((discussions_dir / "clarification-interview.md").exists())
-        self.assertFalse((discussions_dir / "grill-interview.md").exists())
+        assert not (discussions_dir / "report.md").exists()
+        assert not (discussions_dir / "reflection.md").exists()
+        assert not (discussions_dir / "clarification-interview.md").exists()
+        assert not (discussions_dir / "grill-interview.md").exists()
 
         expected_fragments = {
             "workflow clarification": (
@@ -10322,8 +10102,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         for label, fragments in expected_fragments.items():
             text = texts[label]
             for fragment in fragments:
-                with self.subTest(asset=label, fragment=fragment):
-                    self.assertIn(fragment, text)
+                with _case(asset=label, fragment=fragment):
+                    assert fragment in text
 
         for label in ("issue report template", "epic report template", "initiative report template"):
             text = texts[label]
@@ -10336,9 +10116,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "Evidence Adoption Ledger",
                 "Spec Authoring Gate",
             ):
-                with self.subTest(asset=label, fragment=fragment):
-                    self.assertIn(fragment, text)
-            self.assertNotIn("new doc report", text)
+                with _case(asset=label, fragment=fragment):
+                    assert fragment in text
+            assert "new doc report" not in text
 
     def test_issue_116_delegated_authoring_phase_gate_contract_assets(self) -> None:
         import spec_dock.cli as cli
@@ -10474,8 +10254,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         for label, fragments in expected_fragments.items():
             text = texts[label]
             for fragment in fragments:
-                with self.subTest(asset=label, fragment=fragment):
-                    self.assertIn(fragment, text)
+                with _case(asset=label, fragment=fragment):
+                    assert fragment in text
 
     def test_issue_127_removed_scoped_context_contract_stays_removed(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -10519,7 +10299,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     if term in text:
                         offenders.append(f"{path.relative_to(repo_root)}: {term}")
 
-        self.assertEqual([], offenders)
+        assert [] == offenders
 
     def test_bundled_skill_routing_contract(self) -> None:
         import spec_dock.cli as cli
@@ -10550,66 +10330,48 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 encoding="utf-8"
             )
 
-        self.assertIn(
-            "`spec-dock-initiative-planning`: initiative-level requirement/design/plan planning.",
-            hub_text,
-        )
-        self.assertIn(
-            "`spec-dock-epic-planning`: epic-level requirement/design/plan planning.",
-            hub_text,
-        )
-        self.assertIn(
-            "`spec-dock-issue-planning`: issue-level requirement/design/plan planning, review readiness, and implementation handoff readiness.",
-            hub_text,
-        )
-        self.assertIn(
-            "`spec-dock-issue-execution`: issue-level TDD execution and report updates after approved / reviewer-pass planning artifacts and an executable `plan.md` are ready.",
-            hub_text,
-        )
-        self.assertIn(
-            "`spec-dock-clarification`: first-class docs-aware clarification companion",
-            hub_text,
-        )
-        self.assertIn(
-            "`spec-dock-system-architect`: delegated architecture analysis and draft design evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only.",
-            hub_text,
-        )
-        self.assertIn(
-            "`spec-dock-implementation-planner`: delegated planning analysis and draft plan evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only.",
-            hub_text,
-        )
-        self.assertIn(
-            "`spec-dock-adr-facilitation`: ADR drafting/decision facilitation linked to the current workflow.",
-            hub_text,
-        )
-        self.assertIn("`spec-dock/docs/reference_github.md`", hub_text)
-        self.assertIn("`spec-dock/docs/reference_deps.md`", hub_text)
-        self.assertIn("`spec-dock/docs/reference_sync.md`", hub_text)
-        self.assertIn("`spec-dock/docs/reference_naming.md`", hub_text)
-        self.assertIn("`spec-dock/docs/workflow_spec_authoring.md`", hub_text)
-        self.assertIn("`spec-dock/docs/workflow_clarification.md`", hub_text)
-        self.assertIn("route requirement/design/plan authoring", hub_text)
-        self.assertIn("fresh reviewer gates", hub_text)
-        self.assertIn("handoff readiness evidence", hub_text)
-        self.assertIn("`spec-dock/active/context-pack.md`", hub_text)
-        self.assertIn("issue-00049", codex_adapter_text)
-        self.assertIn("spec-dock/docs/workflow_issue.md", codex_adapter_text)
-        self.assertIn("thin", codex_adapter_text.lower())
-        self.assertIn("issue-00049", copilot_adapter_text)
-        self.assertIn("spec-dock/docs/workflow_issue.md", copilot_adapter_text)
-        self.assertIn("thin", copilot_adapter_text.lower())
+        assert "`spec-dock-initiative-planning`: initiative-level requirement/design/plan planning." in \
+            hub_text
+        assert "`spec-dock-epic-planning`: epic-level requirement/design/plan planning." in \
+            hub_text
+        assert "`spec-dock-issue-planning`: issue-level requirement/design/plan planning, review readiness, and implementation handoff readiness." in \
+            hub_text
+        assert "`spec-dock-issue-execution`: issue-level TDD execution and report updates after approved / reviewer-pass planning artifacts and an executable `plan.md` are ready." in \
+            hub_text
+        assert "`spec-dock-clarification`: first-class docs-aware clarification companion" in \
+            hub_text
+        assert "`spec-dock-system-architect`: delegated architecture analysis and draft design evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only." in \
+            hub_text
+        assert "`spec-dock-implementation-planner`: delegated planning analysis and draft plan evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only." in \
+            hub_text
+        assert "`spec-dock-adr-facilitation`: ADR drafting/decision facilitation linked to the current workflow." in \
+            hub_text
+        assert "`spec-dock/docs/reference_github.md`" in hub_text
+        assert "`spec-dock/docs/reference_deps.md`" in hub_text
+        assert "`spec-dock/docs/reference_sync.md`" in hub_text
+        assert "`spec-dock/docs/reference_naming.md`" in hub_text
+        assert "`spec-dock/docs/workflow_spec_authoring.md`" in hub_text
+        assert "`spec-dock/docs/workflow_clarification.md`" in hub_text
+        assert "route requirement/design/plan authoring" in hub_text
+        assert "fresh reviewer gates" in hub_text
+        assert "handoff readiness evidence" in hub_text
+        assert "`spec-dock/active/context-pack.md`" in hub_text
+        assert "issue-00049" in codex_adapter_text
+        assert "spec-dock/docs/workflow_issue.md" in codex_adapter_text
+        assert "thin" in codex_adapter_text.lower()
+        assert "issue-00049" in copilot_adapter_text
+        assert "spec-dock/docs/workflow_issue.md" in copilot_adapter_text
+        assert "thin" in copilot_adapter_text.lower()
 
         for skill_text in (issue_planning_text, issue_text, clarification_text, codex_adapter_text, copilot_adapter_text):
             if "./spec-dock/scripts/spec-dock" not in skill_text:
-                self.assertTrue(
-                    "spec-dock/docs/workflow_issue.md as the source of truth" in skill_text
-                    or "spec-dock/docs/workflow_clarification.md` is the source of truth" in skill_text
+                assert "spec-dock/docs/workflow_issue.md as the source of truth" in skill_text \
+                    or "spec-dock/docs/workflow_clarification.md` is the source of truth" in skill_text \
                     or "Primary lifecycle / execution workflow: `spec-dock/docs/workflow_issue.md`" in skill_text
-                )
             else:
-                self.assertIn("./spec-dock/scripts/spec-dock", skill_text)
-            self.assertNotIn("./spec ", skill_text)
-        self.assertNotIn("./spec ", hub_text)
+                assert "./spec-dock/scripts/spec-dock" in skill_text
+            assert "./spec " not in skill_text
+        assert "./spec " not in hub_text
 
         for fragment in (
             "spec-dock/docs/workflow_issue.md as the source of truth",
@@ -10624,7 +10386,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "bounded delegated follow-up",
             "Parent direct fixes require a documented Parent Implementation Exception",
         ):
-            self.assertIn(fragment, issue_text)
+            assert fragment in issue_text
 
         for fragment in (
             "workflow_issue.md",
@@ -10638,7 +10400,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "fresh `spec-reviewer`",
             "does not grant delegated canonical write authority",
         ):
-            self.assertIn(fragment, issue_planning_text)
+            assert fragment in issue_planning_text
 
         for fragment in (
             "Requirement Coverage",
@@ -10690,7 +10452,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "claim final authority, issue ready, issue finish, or phase completion",
             "claim `spec-reviewer` pass",
         ):
-            self.assertIn(fragment, system_architect_text)
+            assert fragment in system_architect_text
 
         for fragment in (
             "Plan Summary",
@@ -10742,56 +10504,56 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "claim final authority, issue ready, issue finish, or phase completion",
             "claim `spec-reviewer` pass",
         ):
-            self.assertIn(fragment, implementation_planner_text)
+            assert fragment in implementation_planner_text
         for fragment in (
             "Bounded depth=2 delegation",
             "Depth=3 / grandchild delegation is forbidden",
             "Leaf-only evidence producers must not edit canonical artifacts",
             "final fresh reviewer pass remains independent",
         ):
-            self.assertIn(fragment, epic_text)
+            assert fragment in epic_text
         self._assert_issue_execution_runtime_command_reminders(
             issue_text,
             source="bundled issue-execution skill",
         )
 
         for skill_text in (hub_text, codex_adapter_text, copilot_adapter_text):
-            self.assertNotIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", skill_text)
-            self.assertNotIn("./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>", skill_text)
-            self.assertNotIn("./spec-dock/scripts/spec-dock deps check <target>", skill_text)
-            self.assertNotIn("./spec-dock/scripts/spec-dock validate", skill_text)
-            self.assertNotIn("./spec-dock/scripts/spec-dock sync", skill_text)
+            assert "./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>" not in skill_text
+            assert "./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>" not in skill_text
+            assert "./spec-dock/scripts/spec-dock deps check <target>" not in skill_text
+            assert "./spec-dock/scripts/spec-dock validate" not in skill_text
+            assert "./spec-dock/scripts/spec-dock sync" not in skill_text
 
-        self.assertIn("`spec-dock/docs/reference_deps.md`", codex_adapter_text)
-        self.assertIn("`spec-dock/docs/reference_sync.md`", codex_adapter_text)
-        self.assertIn("`spec-dock/docs/reference_deps.md`", copilot_adapter_text)
-        self.assertIn("`spec-dock/docs/reference_sync.md`", copilot_adapter_text)
+        assert "`spec-dock/docs/reference_deps.md`" in codex_adapter_text
+        assert "`spec-dock/docs/reference_sync.md`" in codex_adapter_text
+        assert "`spec-dock/docs/reference_deps.md`" in copilot_adapter_text
+        assert "`spec-dock/docs/reference_sync.md`" in copilot_adapter_text
 
-        self.assertIn("`spec-dock/docs/workflow_initiative.md`", initiative_text)
-        self.assertIn("`spec-dock/docs/workflow_spec_authoring.md`", initiative_text)
-        self.assertIn("`spec-dock/docs/reference_github.md`", initiative_text)
-        self.assertIn("`spec-dock/docs/reference_sync.md`", initiative_text)
-        self.assertIn("`spec-dock/docs/reference_naming.md`", initiative_text)
-        self.assertIn("`spec-dock/docs/phase_requirement.md`", initiative_text)
-        self.assertIn("`spec-dock/docs/phase_design.md`", initiative_text)
-        self.assertIn("`spec-dock/docs/phase_plan.md`", initiative_text)
-        self.assertIn("create/import an initiative", initiative_text)
-        self.assertIn("scope-specific constraints and decisions", initiative_text)
-        self.assertIn("fresh `spec-reviewer`", initiative_text)
-        self.assertIn("Spec Authoring Gate", initiative_text)
+        assert "`spec-dock/docs/workflow_initiative.md`" in initiative_text
+        assert "`spec-dock/docs/workflow_spec_authoring.md`" in initiative_text
+        assert "`spec-dock/docs/reference_github.md`" in initiative_text
+        assert "`spec-dock/docs/reference_sync.md`" in initiative_text
+        assert "`spec-dock/docs/reference_naming.md`" in initiative_text
+        assert "`spec-dock/docs/phase_requirement.md`" in initiative_text
+        assert "`spec-dock/docs/phase_design.md`" in initiative_text
+        assert "`spec-dock/docs/phase_plan.md`" in initiative_text
+        assert "create/import an initiative" in initiative_text
+        assert "scope-specific constraints and decisions" in initiative_text
+        assert "fresh `spec-reviewer`" in initiative_text
+        assert "Spec Authoring Gate" in initiative_text
 
-        self.assertIn("`spec-dock/docs/workflow_epic.md`", epic_text)
-        self.assertIn("`spec-dock/docs/workflow_spec_authoring.md`", epic_text)
-        self.assertIn("`spec-dock/docs/reference_github.md`", epic_text)
-        self.assertIn("`spec-dock/docs/reference_sync.md`", epic_text)
-        self.assertIn("`spec-dock/docs/reference_naming.md`", epic_text)
-        self.assertIn("`spec-dock/docs/phase_requirement.md`", epic_text)
-        self.assertIn("`spec-dock/docs/phase_design.md`", epic_text)
-        self.assertIn("`spec-dock/docs/phase_plan.md`", epic_text)
-        self.assertIn("create/import an epic", epic_text)
-        self.assertIn("scope-specific constraints and decisions", epic_text)
-        self.assertIn("fresh `spec-reviewer`", epic_text)
-        self.assertIn("Spec Authoring Gate", epic_text)
+        assert "`spec-dock/docs/workflow_epic.md`" in epic_text
+        assert "`spec-dock/docs/workflow_spec_authoring.md`" in epic_text
+        assert "`spec-dock/docs/reference_github.md`" in epic_text
+        assert "`spec-dock/docs/reference_sync.md`" in epic_text
+        assert "`spec-dock/docs/reference_naming.md`" in epic_text
+        assert "`spec-dock/docs/phase_requirement.md`" in epic_text
+        assert "`spec-dock/docs/phase_design.md`" in epic_text
+        assert "`spec-dock/docs/phase_plan.md`" in epic_text
+        assert "create/import an epic" in epic_text
+        assert "scope-specific constraints and decisions" in epic_text
+        assert "fresh `spec-reviewer`" in epic_text
+        assert "Spec Authoring Gate" in epic_text
         for fragment in (
             "Use this skill for issue planning work",
             "create or update issue-level requirement/design/plan docs",
@@ -10800,7 +10562,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "fresh `spec-reviewer` returns `review_status: pass`",
             "Spec Authoring Gate",
         ):
-            self.assertIn(fragment, issue_planning_text)
+            assert fragment in issue_planning_text
         for fragment in (
             "spec-dock/docs/workflow_issue.md as the source of truth",
             "concise reminder for issue execution",
@@ -10812,25 +10574,25 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Route shipped docs, templates, skills, and workflow text to `doc-writer`",
             "Parent direct fixes require a documented Parent Implementation Exception",
         ):
-            self.assertIn(fragment, issue_text)
+            assert fragment in issue_text
 
-        self.assertIn("`spec-dock/docs/workflow_adr.md`", adr_text)
-        self.assertIn("`spec-dock/docs/reference_naming.md`", adr_text)
-        self.assertIn("Return to the current parent workflow", adr_text)
-        self.assertIn("create/update an ADR", adr_text)
+        assert "`spec-dock/docs/workflow_adr.md`" in adr_text
+        assert "`spec-dock/docs/reference_naming.md`" in adr_text
+        assert "Return to the current parent workflow" in adr_text
+        assert "create/update an ADR" in adr_text
 
         for skill_text in (hub_text, initiative_text, epic_text, issue_planning_text, issue_text, adr_text):
-            self.assertNotIn("runtime-operations", skill_text)
+            assert "runtime-operations" not in skill_text
 
     def test_init_installs_host_adapter_metadata_with_fixed_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             meta_path = target / ".agents" / "host-adapters" / "meta.json"
-            self.assertTrue(meta_path.is_file(), f"missing host adapter metadata: {meta_path}")
+            assert meta_path.is_file(), f"missing host adapter metadata: {meta_path}"
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            self.assertEqual(meta, self._EXPECTED_HOST_ADAPTER_META)
+            assert meta == self._EXPECTED_HOST_ADAPTER_META
 
     def test_issue_70_build_plan_uses_install_root_recursive_inventory_including_workflow(self) -> None:
         import spec_dock.cli as cli
@@ -10847,15 +10609,13 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         managed_targets = {
             mapping.target_rel.as_posix() for mapping in plan.current_file_mappings
         }
-        self.assertEqual(managed_targets, expected_inventory)
-        self.assertIn(".github/workflows/ci.yml", managed_targets)
-        self.assertEqual(
-            {
+        assert managed_targets == expected_inventory
+        assert ".github/workflows/ci.yml" in managed_targets
+        assert {
                 mapping.source_asset_rel.as_posix()
                 for mapping in plan.current_file_mappings
-            },
-            {f"install_root/{rel_path}" for rel_path in expected_inventory},
-        )
+            } == \
+            {f"install_root/{rel_path}" for rel_path in expected_inventory}
 
     def test_issue_70_update_rejects_missing_or_invalid_managed_assets_obsolete_manifest(self) -> None:
         cases = (
@@ -10866,10 +10626,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             ("non_list_obsolete_exact_file_paths", "invalid managed_assets.obsolete_exact_file_paths"),
         )
         for case_name, expected_error in cases:
-            with self.subTest(case_name=case_name):
+            with _case(case_name=case_name):
                 with tempfile.TemporaryDirectory() as tmp:
                     target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
+                    assert main(["init", str(target)]) == 0
                     before = self._seed_managed_contract_guard_snapshot(target)
                     malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
 
@@ -10893,14 +10653,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                         malformed_manifest,
                     )
 
-                    self.assertEqual(exit_code, 1)
-                    self.assertIn(expected_error, stderr)
+                    assert exit_code == 1
+                    assert expected_error in stderr
                     self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_issue_70_update_rejects_current_obsolete_overlap_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             before = self._seed_managed_contract_guard_snapshot(target)
             malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
             malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
@@ -10912,12 +10672,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 malformed_manifest,
             )
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "managed_assets.obsolete_exact_file_paths overlaps current managed path "
-                "'.agents/host-adapters/meta.json'",
-                stderr,
-            )
+            assert exit_code == 1
+            assert "managed_assets.obsolete_exact_file_paths overlaps current managed path " \
+                "'.agents/host-adapters/meta.json'" in \
+                stderr
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_issue_70_init_rejects_current_managed_directory_conflict_before_writes(self) -> None:
@@ -10932,16 +10690,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 exit_code = main(["init", str(target)])
             stderr = err.getvalue()
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
-                stderr,
-            )
-            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
-            self.assertEqual(
-                (target / "README.md").read_text(encoding="utf-8"),
-                "preflight-marker\n",
-            )
+            assert exit_code == 1
+            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in \
+                stderr
+            assert not (target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes"
+            assert (target / "README.md").read_text(encoding="utf-8") == \
+                "preflight-marker\n"
 
     def test_issue_70_init_rejects_current_managed_container_file_conflict_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -10953,19 +10707,17 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 exit_code = main(["init", str(target)])
             stderr = err.getvalue()
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "target directory/container conflict for current managed path '.github/agents/",
-                stderr,
-            )
-            self.assertIn("non-directory container: '.github'", stderr)
-            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
+            assert exit_code == 1
+            assert "target directory/container conflict for current managed path '.github/agents/" in \
+                stderr
+            assert "non-directory container: '.github'" in stderr
+            assert not (target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes"
 
     def test_issue_70_init_rejects_current_managed_symlink_parent_conflict_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             if not self._can_create_symlink(target):
-                self.skipTest("symlink is not supported in this environment")
+                pytest.skip("symlink is not supported in this environment")
 
             (target / "README.md").write_text("preflight-marker\n", encoding="utf-8")
             workflows_parent = target / ".github" / "workflows"
@@ -10978,20 +10730,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 exit_code = main(["init", str(target)])
             stderr = err.getvalue()
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
-                stderr,
-            )
-            self.assertIn("symlink container: '.github/workflows'", stderr)
-            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
-            self.assertEqual((target / "README.md").read_text(encoding="utf-8"), "preflight-marker\n")
+            assert exit_code == 1
+            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in \
+                stderr
+            assert "symlink container: '.github/workflows'" in stderr
+            assert not (target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes"
+            assert (target / "README.md").read_text(encoding="utf-8") == "preflight-marker\n"
 
     def test_issue_70_init_rejects_current_managed_symlink_exact_file_conflict_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             if not self._can_create_symlink(target):
-                self.skipTest("symlink is not supported in this environment")
+                pytest.skip("symlink is not supported in this environment")
 
             (target / "README.md").write_text("preflight-marker\n", encoding="utf-8")
             managed_workflow_path = target / ".github" / "workflows" / "ci.yml"
@@ -11006,21 +10756,19 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 exit_code = main(["init", str(target)])
             stderr = err.getvalue()
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
-                stderr,
-            )
-            self.assertIn("symlink at exact file path", stderr)
-            self.assertTrue(managed_workflow_path.is_symlink())
-            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
-            self.assertEqual((target / "README.md").read_text(encoding="utf-8"), "preflight-marker\n")
-            self.assertEqual(symlink_target.read_text(encoding="utf-8"), "managed-workflow-symlink-target\n")
+            assert exit_code == 1
+            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in \
+                stderr
+            assert "symlink at exact file path" in stderr
+            assert managed_workflow_path.is_symlink()
+            assert not (target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes"
+            assert (target / "README.md").read_text(encoding="utf-8") == "preflight-marker\n"
+            assert symlink_target.read_text(encoding="utf-8") == "managed-workflow-symlink-target\n"
 
     def test_issue_70_update_rejects_current_managed_directory_conflict_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             before = self._seed_managed_contract_guard_snapshot(target)
             managed_workflow_path = target / ".github" / "workflows" / "ci.yml"
             managed_workflow_path.unlink(missing_ok=True)
@@ -11031,20 +10779,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 exit_code = main(["update", str(target)])
             stderr = err.getvalue()
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
-                stderr,
-            )
+            assert exit_code == 1
+            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in \
+                stderr
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_issue_70_update_rejects_current_managed_symlink_parent_conflict_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             if not self._can_create_symlink(target):
-                self.skipTest("symlink is not supported in this environment")
+                pytest.skip("symlink is not supported in this environment")
 
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             before = self._seed_managed_contract_guard_snapshot(target)
 
             workflows_parent = target / ".github" / "workflows"
@@ -11060,21 +10806,19 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 exit_code = main(["update", str(target)])
             stderr = err.getvalue()
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
-                stderr,
-            )
-            self.assertIn("symlink container: '.github/workflows'", stderr)
+            assert exit_code == 1
+            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in \
+                stderr
+            assert "symlink container: '.github/workflows'" in stderr
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_issue_70_update_rejects_current_managed_symlink_exact_file_conflict_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             if not self._can_create_symlink(target):
-                self.skipTest("symlink is not supported in this environment")
+                pytest.skip("symlink is not supported in this environment")
 
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             before = self._seed_managed_contract_guard_snapshot(target)
 
             managed_workflow_path = target / ".github" / "workflows" / "ci.yml"
@@ -11088,21 +10832,19 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 exit_code = main(["update", str(target)])
             stderr = err.getvalue()
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
-                stderr,
-            )
-            self.assertIn("symlink at exact file path", stderr)
-            self.assertTrue(managed_workflow_path.is_symlink())
-            self.assertEqual(symlink_target.read_text(encoding="utf-8"), "managed-workflow-symlink-target\n")
+            assert exit_code == 1
+            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in \
+                stderr
+            assert "symlink at exact file path" in stderr
+            assert managed_workflow_path.is_symlink()
+            assert symlink_target.read_text(encoding="utf-8") == "managed-workflow-symlink-target\n"
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_issue_75_init_allows_bootstrap_only_exact_file_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             if not self._can_create_symlink(target):
-                self.skipTest("symlink is not supported in this environment")
+                pytest.skip("symlink is not supported in this environment")
 
             bootstrap_path = target / ".codex" / "config.toml"
             bootstrap_path.parent.mkdir(parents=True, exist_ok=True)
@@ -11112,22 +10854,20 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             exit_code = main(["init", str(target)])
 
-            self.assertEqual(exit_code, 0)
-            self.assertTrue((target / "spec-dock").is_dir(), "init should complete when bootstrap-only symlink points to file")
-            self.assertTrue(bootstrap_path.is_symlink(), "bootstrap-only path should remain a symlink")
-            self.assertEqual(
-                symlink_target.read_text(encoding="utf-8"),
-                "# bootstrap symlink target\n",
-                "init must preserve existing bootstrap-only symlink target content",
-            )
+            assert exit_code == 0
+            assert (target / "spec-dock").is_dir(), "init should complete when bootstrap-only symlink points to file"
+            assert bootstrap_path.is_symlink(), "bootstrap-only path should remain a symlink"
+            assert symlink_target.read_text(encoding="utf-8") == \
+                "# bootstrap symlink target\n", \
+                "init must preserve existing bootstrap-only symlink target content"
 
     def test_issue_75_update_allows_bootstrap_only_exact_file_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             if not self._can_create_symlink(target):
-                self.skipTest("symlink is not supported in this environment")
+                pytest.skip("symlink is not supported in this environment")
 
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             bootstrap_path = target / ".codex" / "config.toml"
             bootstrap_path.unlink(missing_ok=True)
             symlink_target = target / "bootstrap-config-update-target.toml"
@@ -11136,19 +10876,17 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             exit_code = main(["update", str(target)])
 
-            self.assertEqual(exit_code, 0)
-            self.assertTrue(bootstrap_path.is_symlink(), "update should keep bootstrap-only path as symlink")
-            self.assertEqual(
-                symlink_target.read_text(encoding="utf-8"),
-                "# bootstrap update symlink target\n",
-                "update must preserve existing bootstrap-only symlink target content",
-            )
+            assert exit_code == 0
+            assert bootstrap_path.is_symlink(), "update should keep bootstrap-only path as symlink"
+            assert symlink_target.read_text(encoding="utf-8") == \
+                "# bootstrap update symlink target\n", \
+                "update must preserve existing bootstrap-only symlink target content"
 
     def test_issue_75_init_rejects_bootstrap_only_broken_symlink_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             if not self._can_create_symlink(target):
-                self.skipTest("symlink is not supported in this environment")
+                pytest.skip("symlink is not supported in this environment")
 
             (target / "README.md").write_text("preflight-marker\n", encoding="utf-8")
             bootstrap_path = target / ".codex" / "config.toml"
@@ -11160,21 +10898,19 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 exit_code = main(["init", str(target)])
             stderr = err.getvalue()
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "target directory/container conflict for current managed path '.codex/config.toml'",
-                stderr,
-            )
-            self.assertIn("symlink at exact file path", stderr)
-            self.assertTrue(bootstrap_path.is_symlink())
-            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
-            self.assertEqual((target / "README.md").read_text(encoding="utf-8"), "preflight-marker\n")
+            assert exit_code == 1
+            assert "target directory/container conflict for current managed path '.codex/config.toml'" in \
+                stderr
+            assert "symlink at exact file path" in stderr
+            assert bootstrap_path.is_symlink()
+            assert not (target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes"
+            assert (target / "README.md").read_text(encoding="utf-8") == "preflight-marker\n"
 
     def test_issue_75_init_rejects_bootstrap_only_non_file_symlink_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             if not self._can_create_symlink(target):
-                self.skipTest("symlink is not supported in this environment")
+                pytest.skip("symlink is not supported in this environment")
 
             (target / "README.md").write_text("preflight-marker\n", encoding="utf-8")
             bootstrap_path = target / ".codex" / "config.toml"
@@ -11188,20 +10924,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 exit_code = main(["init", str(target)])
             stderr = err.getvalue()
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "target directory/container conflict for current managed path '.codex/config.toml'",
-                stderr,
-            )
-            self.assertIn("symlink at exact file path", stderr)
-            self.assertTrue(bootstrap_path.is_symlink())
-            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
-            self.assertEqual((target / "README.md").read_text(encoding="utf-8"), "preflight-marker\n")
+            assert exit_code == 1
+            assert "target directory/container conflict for current managed path '.codex/config.toml'" in \
+                stderr
+            assert "symlink at exact file path" in stderr
+            assert bootstrap_path.is_symlink()
+            assert not (target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes"
+            assert (target / "README.md").read_text(encoding="utf-8") == "preflight-marker\n"
 
     def test_issue_70_update_rejects_obsolete_managed_directory_conflict_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             before = self._seed_managed_contract_guard_snapshot(target)
 
             obsolete_workflow = target / ".github" / "workflows" / "spec-dock-close.yml"
@@ -11217,48 +10951,44 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 malformed_manifest,
             )
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "target directory/container conflict for obsolete managed path '.github/workflows/spec-dock-close.yml'",
-                stderr,
-            )
+            assert exit_code == 1
+            assert "target directory/container conflict for obsolete managed path '.github/workflows/spec-dock-close.yml'" in \
+                stderr
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_issue_70_update_prunes_obsolete_managed_symlink_exact_file_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             if not self._can_create_symlink(target):
-                self.skipTest("symlink is not supported in this environment")
+                pytest.skip("symlink is not supported in this environment")
 
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             obsolete_target = target / ".codex" / "agents" / "spec-dock-codex-adapter.toml"
             obsolete_target.parent.mkdir(parents=True, exist_ok=True)
             symlink_target = target / "obsolete-managed-symlink-target.toml"
             symlink_target.write_text("obsolete symlink target\n", encoding="utf-8")
             os.symlink("../../obsolete-managed-symlink-target.toml", obsolete_target)
-            self.assertTrue(obsolete_target.is_symlink())
+            assert obsolete_target.is_symlink()
 
             err = io.StringIO()
             with redirect_stderr(err):
                 exit_code = main(["update", str(target)])
             stderr = err.getvalue()
 
-            self.assertEqual(exit_code, 0, stderr)
-            self.assertFalse(obsolete_target.exists())
-            self.assertFalse(obsolete_target.is_symlink())
-            self.assertEqual(
-                symlink_target.read_text(encoding="utf-8"),
-                "obsolete symlink target\n",
-            )
+            assert exit_code == 0, stderr
+            assert not obsolete_target.exists()
+            assert not obsolete_target.is_symlink()
+            assert symlink_target.read_text(encoding="utf-8") == \
+                "obsolete symlink target\n"
 
     def test_issue_70_update_prunes_obsolete_managed_symlink_to_directory_exact_file_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             if not self._can_create_symlink(target):
-                self.skipTest("symlink is not supported in this environment")
+                pytest.skip("symlink is not supported in this environment")
 
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             obsolete_target = target / ".codex" / "agents" / "spec-dock-codex-adapter.toml"
             obsolete_target.parent.mkdir(parents=True, exist_ok=True)
@@ -11267,25 +10997,23 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             symlink_target_file = symlink_target_dir / "keep.txt"
             symlink_target_file.write_text("keep me\n", encoding="utf-8")
             os.symlink("../../obsolete-managed-symlink-dir", obsolete_target)
-            self.assertTrue(obsolete_target.is_symlink())
+            assert obsolete_target.is_symlink()
 
             err = io.StringIO()
             with redirect_stderr(err):
                 exit_code = main(["update", str(target)])
             stderr = err.getvalue()
 
-            self.assertEqual(exit_code, 0, stderr)
-            self.assertFalse(obsolete_target.exists())
-            self.assertFalse(obsolete_target.is_symlink())
-            self.assertEqual(
-                symlink_target_file.read_text(encoding="utf-8"),
-                "keep me\n",
-            )
+            assert exit_code == 0, stderr
+            assert not obsolete_target.exists()
+            assert not obsolete_target.is_symlink()
+            assert symlink_target_file.read_text(encoding="utf-8") == \
+                "keep me\n"
 
     def test_issue_70_update_syncs_workflow_and_prunes_obsolete_exact_workflow_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             repo_root = Path(__file__).resolve().parents[3]
             expected_workflow = (
@@ -11318,20 +11046,20 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 manifest_override,
             )
 
-            self.assertEqual(exit_code, 0)
-            self.assertTrue(managed_workflow.is_file(), f"missing managed workflow after update: {managed_workflow}")
-            self.assertEqual(managed_workflow.read_bytes(), expected_workflow)
-            self.assertNotEqual(managed_workflow.read_bytes(), stale_workflow)
-            self.assertFalse(obsolete_workflow.exists(), "obsolete exact workflow path must be pruned")
-            self.assertTrue(custom_workflow.is_file(), f"missing custom workflow after update: {custom_workflow}")
-            self.assertEqual(custom_workflow.read_text(encoding="utf-8"), custom_workflow_text)
+            assert exit_code == 0
+            assert managed_workflow.is_file(), f"missing managed workflow after update: {managed_workflow}"
+            assert managed_workflow.read_bytes() == expected_workflow
+            assert managed_workflow.read_bytes() != stale_workflow
+            assert not obsolete_workflow.exists(), "obsolete exact workflow path must be pruned"
+            assert custom_workflow.is_file(), f"missing custom workflow after update: {custom_workflow}"
+            assert custom_workflow.read_text(encoding="utf-8") == custom_workflow_text
 
     def test_issue_70_update_skips_obsolete_cleanup_when_post_sync_verify_fails(self) -> None:
         import spec_dock.cli as cli
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             workflow_path = target / ".github" / "workflows" / "ci.yml"
             workflow_path.unlink(missing_ok=True)
@@ -11346,21 +11074,21 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 original_copy_file(src, dest)
 
             err = io.StringIO()
-            with patch("spec_dock.cli._copy_file", side_effect=_copy_file_without_workflow), redirect_stderr(err):
-                exit_code = main(["update", str(target)])
+            with pytest.MonkeyPatch.context() as monkeypatch:
+                monkeypatch.setattr("spec_dock.cli._copy_file", _copy_file_without_workflow)
+                with redirect_stderr(err):
+                    exit_code = main(["update", str(target)])
             stderr = err.getvalue()
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn("managed current sync incomplete (missing target): .github/workflows/ci.yml", stderr)
-            self.assertTrue(
-                obsolete_codex_path.is_file(),
-                "obsolete cleanup must be skipped when current sync verification fails",
-            )
+            assert exit_code == 1
+            assert "managed current sync incomplete (missing target): .github/workflows/ci.yml" in stderr
+            assert obsolete_codex_path.is_file(), \
+                "obsolete cleanup must be skipped when current sync verification fails"
 
     def test_issue_70_update_reflection_ignores_legacy_codex_skills_duplicates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             repo_root = Path(__file__).resolve().parents[3]
             expected_adapter_skill = (
@@ -11420,19 +11148,13 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 target,
                 _mutate_assets,
             )
-            self.assertEqual(exit_code, 0)
-            self.assertEqual(
-                (target / ".agents" / "skills" / "spec-dock-codex-adapter" / "SKILL.md").read_bytes(),
-                expected_adapter_skill,
-            )
-            self.assertEqual(
-                (target / ".codex" / "agents" / "spec-manager.toml").read_bytes(),
-                expected_codex_shim,
-            )
-            self.assertEqual(
-                json.loads((target / ".agents" / "host-adapters" / "meta.json").read_text(encoding="utf-8")),
-                self._EXPECTED_HOST_ADAPTER_META,
-            )
+            assert exit_code == 0
+            assert (target / ".agents" / "skills" / "spec-dock-codex-adapter" / "SKILL.md").read_bytes() == \
+                expected_adapter_skill
+            assert (target / ".codex" / "agents" / "spec-manager.toml").read_bytes() == \
+                expected_codex_shim
+            assert json.loads((target / ".agents" / "host-adapters" / "meta.json").read_text(encoding="utf-8")) == \
+                self._EXPECTED_HOST_ADAPTER_META
 
     def test_issue_70_provider_transition_detects_removed_current_paths_without_obsolete_coverage(self) -> None:
         repo_assets_root = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets"
@@ -11450,11 +11172,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             previous_plan=previous_plan,
             current_plan=current_plan,
         )
-        self.assertEqual(
-            missing_coverage,
-            {removed_workflow_rel.as_posix()},
-            "removed current managed paths must be covered by obsolete manifest or ownership transfer",
-        )
+        assert missing_coverage == \
+            {removed_workflow_rel.as_posix()}, \
+            "removed current managed paths must be covered by obsolete manifest or ownership transfer"
 
     def test_issue_70_provider_transition_accepts_removed_current_paths_with_obsolete_coverage(self) -> None:
         repo_assets_root = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets"
@@ -11484,7 +11204,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             previous_plan=previous_plan,
             current_plan=current_plan,
         )
-        self.assertEqual(missing_coverage, set())
+        assert missing_coverage == set()
 
     def test_issue_70_isolated_wheel_install_reflects_cutover_contract_without_legacy_fallback(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -11501,10 +11221,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 temp_root=temp_root,
             )
             spec_dock_command = self._issue_69_venv_spec_dock(venv_python)
-            self.assertTrue(
-                spec_dock_command.is_file(),
-                f"issue-70 expected installed spec-dock command in isolated venv: {spec_dock_command}",
-            )
+            assert spec_dock_command.is_file(), \
+                f"issue-70 expected installed spec-dock command in isolated venv: {spec_dock_command}"
 
             runtime_snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
                 venv_python=venv_python,
@@ -11521,24 +11239,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             )
 
             installed_assets_dir = Path(str(runtime_snapshot.get("assets_dir", ""))).resolve()
-            self.assertEqual(
-                Path(str(plan_snapshot.get("assets_dir", ""))).resolve(),
-                installed_assets_dir,
-                "issue-70 installed plan snapshot should resolve from the same installed assets root",
-            )
+            assert Path(str(plan_snapshot.get("assets_dir", ""))).resolve() == \
+                installed_assets_dir, \
+                "issue-70 installed plan snapshot should resolve from the same installed assets root"
 
             current_targets = {str(path) for path in plan_snapshot.get("current_targets", [])}
             current_sources = {str(path) for path in plan_snapshot.get("current_sources", [])}
             obsolete_targets = {str(path) for path in plan_snapshot.get("obsolete_targets", [])}
-            self.assertTrue(current_sources, "issue-70 installed plan must expose current managed sources")
-            self.assertTrue(
-                all(source.startswith("install_root/") for source in current_sources),
-                "issue-70 installed plan should source current managed files from install_root only",
-            )
-            self.assertFalse(
-                any("codex_skills" in source for source in current_sources),
-                "issue-70 installed plan should not source current managed files from legacy codex_skills",
-            )
+            assert current_sources, "issue-70 installed plan must expose current managed sources"
+            assert all(source.startswith("install_root/") for source in current_sources), \
+                "issue-70 installed plan should source current managed files from install_root only"
+            assert not any("codex_skills" in source for source in current_sources), \
+                "issue-70 installed plan should not source current managed files from legacy codex_skills"
             for required_target in (
                 ".agents/skills/spec-dock-codex-adapter/SKILL.md",
                 ".agents/host-adapters/meta.json",
@@ -11547,26 +11259,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 ".github/agents/orchestrator.agent.md",
                 ".github/workflows/ci.yml",
             ):
-                self.assertIn(
-                    required_target,
-                    current_targets,
-                    f"issue-70 installed plan is missing required managed target: {required_target}",
-                )
-            self.assertNotIn(
-                ".codex/agents/orchestrator.toml",
-                current_targets,
-                "issue-70 installed plan should not generate codex direct orchestrator target",
-            )
-            self.assertIn(
-                ".codex/agents/spec-dock-codex-adapter.toml",
-                obsolete_targets,
-                "issue-70 installed plan missing obsolete managed codex shim target",
-            )
-            self.assertIn(
-                ".github/agents/spec-dock-copilot-adapter.agent.md",
-                obsolete_targets,
-                "issue-70 installed plan missing obsolete managed copilot shim target",
-            )
+                assert required_target in \
+                    current_targets, \
+                    f"issue-70 installed plan is missing required managed target: {required_target}"
+            assert ".codex/agents/orchestrator.toml" not in \
+                current_targets, \
+                "issue-70 installed plan should not generate codex direct orchestrator target"
+            assert ".codex/agents/spec-dock-codex-adapter.toml" in \
+                obsolete_targets, \
+                "issue-70 installed plan missing obsolete managed codex shim target"
+            assert ".github/agents/spec-dock-copilot-adapter.agent.md" in \
+                obsolete_targets, \
+                "issue-70 installed plan missing obsolete managed copilot shim target"
 
             install_root = installed_assets_dir / "install_root"
             managed_rel_paths = (
@@ -11605,22 +11309,16 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             for rel_path, expected_bytes in expected_managed_bytes.items():
                 target_path = target_repo / rel_path
-                self.assertTrue(target_path.is_file(), f"missing managed file after isolated init: {target_path}")
-                self.assertEqual(
-                    target_path.read_bytes(),
-                    expected_bytes,
-                    f"isolated init did not reflect installed install_root asset for: {rel_path}",
-                )
+                assert target_path.is_file(), f"missing managed file after isolated init: {target_path}"
+                assert target_path.read_bytes() == \
+                    expected_bytes, \
+                    f"isolated init did not reflect installed install_root asset for: {rel_path}"
             bootstrap_only_target = target_repo / bootstrap_only_rel_path
-            self.assertTrue(
-                bootstrap_only_target.is_file(),
-                f"missing bootstrap-only file after isolated init: {bootstrap_only_target}",
-            )
-            self.assertEqual(
-                bootstrap_only_target.read_bytes(),
-                expected_bootstrap_only_bytes,
-                "isolated init did not copy bootstrap-only codex config from install_root",
-            )
+            assert bootstrap_only_target.is_file(), \
+                f"missing bootstrap-only file after isolated init: {bootstrap_only_target}"
+            assert bootstrap_only_target.read_bytes() == \
+                expected_bootstrap_only_bytes, \
+                "isolated init did not copy bootstrap-only codex config from install_root"
 
             for rel_path in managed_rel_paths:
                 self._write_text_force(target_repo / rel_path, f"issue-70 stale managed payload: {rel_path}\n")
@@ -11656,39 +11354,27 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             for rel_path, expected_bytes in expected_managed_bytes.items():
                 target_path = target_repo / rel_path
-                self.assertTrue(target_path.is_file(), f"missing managed file after isolated update: {target_path}")
-                self.assertEqual(
-                    target_path.read_bytes(),
-                    expected_bytes,
-                    f"isolated update did not reflect installed install_root asset for: {rel_path}",
-                )
-            self.assertEqual(
-                bootstrap_only_target.read_text(encoding="utf-8"),
-                bootstrap_only_custom_text,
-                "isolated update should preserve user-edited bootstrap-only codex config",
-            )
-            self.assertFalse(
-                (target_repo / ".codex/agents/orchestrator.toml").exists(),
-                "isolated update should not generate codex direct orchestrator",
-            )
+                assert target_path.is_file(), f"missing managed file after isolated update: {target_path}"
+                assert target_path.read_bytes() == \
+                    expected_bytes, \
+                    f"isolated update did not reflect installed install_root asset for: {rel_path}"
+            assert bootstrap_only_target.read_text(encoding="utf-8") == \
+                bootstrap_only_custom_text, \
+                "isolated update should preserve user-edited bootstrap-only codex config"
+            assert not (target_repo / ".codex/agents/orchestrator.toml").exists(), \
+                "isolated update should not generate codex direct orchestrator"
 
             for rel_path in obsolete_paths:
-                self.assertFalse(
-                    (target_repo / rel_path).exists(),
-                    f"isolated update should prune obsolete managed path: {rel_path}",
-                )
+                assert not (target_repo / rel_path).exists(), \
+                    f"isolated update should prune obsolete managed path: {rel_path}"
 
             for rel_path, expected_text in custom_paths.items():
                 custom_path = target_repo / rel_path
-                self.assertTrue(
-                    custom_path.is_file(),
-                    f"isolated update removed custom managed-outside file: {rel_path}",
-                )
-                self.assertEqual(
-                    custom_path.read_text(encoding="utf-8"),
-                    expected_text,
-                    f"isolated update mutated custom managed-outside file: {rel_path}",
-                )
+                assert custom_path.is_file(), \
+                    f"isolated update removed custom managed-outside file: {rel_path}"
+                assert custom_path.read_text(encoding="utf-8") == \
+                    expected_text, \
+                    f"isolated update mutated custom managed-outside file: {rel_path}"
 
     def test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -11710,10 +11396,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             if provider_prefix_path.is_file():
                 provider_rel_paths.add(rel_prefix.as_posix())
             else:
-                self.assertTrue(
-                    provider_prefix_path.is_dir(),
-                    f"issue-71 missing provider parity directory: {provider_prefix_path}",
-                )
+                assert provider_prefix_path.is_dir(), \
+                    f"issue-71 missing provider parity directory: {provider_prefix_path}"
                 provider_rel_paths.update(
                     path.relative_to(install_root).as_posix()
                     for path in provider_prefix_path.rglob("*")
@@ -11723,34 +11407,28 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             if checked_in_prefix_path.is_file():
                 checked_in_rel_paths.add(rel_prefix.as_posix())
             else:
-                self.assertTrue(
-                    checked_in_prefix_path.is_dir(),
-                    f"issue-71 missing checked-in parity directory: {checked_in_prefix_path}",
-                )
+                assert checked_in_prefix_path.is_dir(), \
+                    f"issue-71 missing checked-in parity directory: {checked_in_prefix_path}"
                 checked_in_rel_paths.update(
                     path.relative_to(repo_root).as_posix()
                     for path in checked_in_prefix_path.rglob("*")
                     if path.is_file()
                 )
 
-        self.assertEqual(
-            checked_in_rel_paths,
-            provider_rel_paths,
-            "issue-71 checked-in host-pack parity file inventory diverged from install_root",
-        )
+        assert checked_in_rel_paths == \
+            provider_rel_paths, \
+            "issue-71 checked-in host-pack parity file inventory diverged from install_root"
 
         for rel_path in sorted(provider_rel_paths):
-            with self.subTest(rel_path=rel_path):
+            with _case(rel_path=rel_path):
                 checked_in_path = repo_root / rel_path
                 provider_asset_path = install_root / rel_path
-                self.assertEqual(
-                    checked_in_path.read_bytes(),
-                    provider_asset_path.read_bytes(),
+                assert checked_in_path.read_bytes() == \
+                    provider_asset_path.read_bytes(), \
                     (
                         "issue-71 checked-in agent-tooling parity diverged from install_root asset: "
                         f"{rel_path}"
-                    ),
-                )
+                    )
 
     def test_issue_105_pr_merge_preparer_install_and_update_contract(self) -> None:
         required_paths = (
@@ -11760,21 +11438,17 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             for rel_path in required_paths:
-                self.assertTrue(
-                    (target / rel_path).is_file(),
-                    f"missing github-pr-merge-preparer managed asset after init: {rel_path}",
-                )
+                assert (target / rel_path).is_file(), \
+                    f"missing github-pr-merge-preparer managed asset after init: {rel_path}"
 
             shutil.rmtree(target / ".agents" / "skills" / "github-pr-merge-preparer")
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
             self._assert_managed_skills_installed(target)
             for rel_path in required_paths:
-                self.assertTrue(
-                    (target / rel_path).is_file(),
-                    f"missing github-pr-merge-preparer managed asset after update: {rel_path}",
-                )
+                assert (target / rel_path).is_file(), \
+                    f"missing github-pr-merge-preparer managed asset after update: {rel_path}"
 
     def test_issue_105_pr_merge_preparer_content_regression_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -11834,7 +11508,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Running `spec-dock issue finish`",
         )
         for phrase in merge_preparer_phrases:
-            self.assertIn(phrase, merge_preparer)
+            assert phrase in merge_preparer
 
         workflow_phrases = (
             "github-pr-merge-preparer",
@@ -11847,14 +11521,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "commit、push、PR、merge、validate、test、review、final delivery completion は保証しません",
         )
         for phrase in workflow_phrases:
-            self.assertIn(phrase, workflow_issue)
+            assert phrase in workflow_issue
 
         issue_execution_phrases = (
             "github-pr-merge-preparer",
             "final PR delivery and merge-preparation evidence before `issue finish`",
         )
         for phrase in issue_execution_phrases:
-            self.assertIn(phrase, issue_execution)
+            assert phrase in issue_execution
 
     def test_issue_93_execute_prompts_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -11905,10 +11579,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             for prompt_name, scope_fragments in prompt_contracts.items():
-                with self.subTest(prompt=prompt_name):
+                with _case(prompt=prompt_name):
                     provider_prompt_path = (
                         repo_root
                         / "src"
@@ -11922,24 +11596,16 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     dogfooding_prompt_path = repo_root / ".codex/prompts" / prompt_name
                     installed_prompt_path = target / ".codex/prompts" / prompt_name
 
-                    self.assertTrue(
-                        provider_prompt_path.is_file(),
-                        f"missing execute prompt provider asset: {provider_prompt_path}",
-                    )
-                    self.assertTrue(
-                        dogfooding_prompt_path.is_file(),
-                        f"missing execute prompt dogfooding mirror: {dogfooding_prompt_path}",
-                    )
-                    self.assertEqual(
-                        dogfooding_prompt_path.read_bytes(),
-                        provider_prompt_path.read_bytes(),
-                        "execute prompt dogfooding mirror must match provider asset",
-                    )
-                    self.assertEqual(
-                        installed_prompt_path.read_bytes(),
-                        provider_prompt_path.read_bytes(),
-                        "execute prompt must be installed from provider asset",
-                    )
+                    assert provider_prompt_path.is_file(), \
+                        f"missing execute prompt provider asset: {provider_prompt_path}"
+                    assert dogfooding_prompt_path.is_file(), \
+                        f"missing execute prompt dogfooding mirror: {dogfooding_prompt_path}"
+                    assert dogfooding_prompt_path.read_bytes() == \
+                        provider_prompt_path.read_bytes(), \
+                        "execute prompt dogfooding mirror must match provider asset"
+                    assert installed_prompt_path.read_bytes() == \
+                        provider_prompt_path.read_bytes(), \
+                        "execute prompt must be installed from provider asset"
 
                     prompt_text = provider_prompt_path.read_text(encoding="utf-8")
                     required_fragments = (
@@ -11951,17 +11617,17 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                         *scope_fragments,
                     )
                     for fragment in required_fragments:
-                        self.assertIn(fragment, prompt_text)
+                        assert fragment in prompt_text
 
                     if prompt_name in {"execute-epic.md", "execute-initiative.md"}:
-                        self.assertIn("nested slash command", prompt_text)
+                        assert "nested slash command" in prompt_text
 
                     forbidden_fragments = (
                         "Create a new skill",
                         "run `/goal` for the user",
                     )
                     for fragment in forbidden_fragments:
-                        self.assertNotIn(fragment, prompt_text)
+                        assert fragment not in prompt_text
 
     def test_issue_75_pr_monitor_guidance_uses_repo_relative_helper_path(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -11979,23 +11645,17 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
 
         for rel_path in guidance_files:
-            with self.subTest(rel_path=rel_path):
+            with _case(rel_path=rel_path):
                 content = (repo_root / rel_path).read_text(encoding="utf-8")
-                self.assertIn(
-                    expected_helper_path,
-                    content,
-                    f"issue-75 guidance missing repo-relative helper path in: {rel_path}",
-                )
-                self.assertNotIn(
-                    legacy_helper_path,
-                    content,
-                    f"issue-75 guidance still contains legacy absolute helper path in: {rel_path}",
-                )
-                self.assertIn(
-                    "always use the approved read-only wrapper",
-                    content,
-                    f"issue-75 guidance must require the read-only wrapper in: {rel_path}",
-                )
+                assert expected_helper_path in \
+                    content, \
+                    f"issue-75 guidance missing repo-relative helper path in: {rel_path}"
+                assert legacy_helper_path not in \
+                    content, \
+                    f"issue-75 guidance still contains legacy absolute helper path in: {rel_path}"
+                assert "always use the approved read-only wrapper" in \
+                    content, \
+                    f"issue-75 guidance must require the read-only wrapper in: {rel_path}"
                 for forbidden_fallback in (
                     "direct `gh api`",
                     "direct `curl`",
@@ -12003,11 +11663,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     "POST / PATCH / PUT / DELETE",
                     "Do not request approval or fall back to direct GitHub API calls.",
                 ):
-                    self.assertIn(
-                        forbidden_fallback,
-                        content,
-                        f"issue-75 guidance missing forbidden fallback '{forbidden_fallback}' in: {rel_path}",
-                    )
+                    assert forbidden_fallback in \
+                        content, \
+                        f"issue-75 guidance missing forbidden fallback '{forbidden_fallback}' in: {rel_path}"
 
     def test_issue_75_pr_review_wrapper_uses_fixed_read_only_gh_api_endpoints(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -12064,37 +11722,31 @@ esac
                 check=False,
             )
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            assert result.returncode == 0, result.stdout + result.stderr
             gh_calls = gh_log.read_text(encoding="utf-8").splitlines()
-            self.assertEqual(len(gh_calls), 3, gh_calls)
+            assert len(gh_calls) == 3, gh_calls
             for call in gh_calls:
-                self.assertIn("--method GET", call)
-                self.assertIn("--paginate", call)
-                self.assertIn("--slurp", call)
-                self.assertNotIn("--jq", call)
-                self.assertNotIn("--method POST", call)
-                self.assertNotIn("graphql", call.lower())
+                assert "--method GET" in call
+                assert "--paginate" in call
+                assert "--slurp" in call
+                assert "--jq" not in call
+                assert "--method POST" not in call
+                assert "graphql" not in call.lower()
 
-            self.assertTrue(
-                any("repos/owner/repo/issues/13/comments?per_page=100" in call for call in gh_calls),
-                gh_calls,
-            )
-            self.assertTrue(
-                any("repos/owner/repo/pulls/13/comments?per_page=100" in call for call in gh_calls),
-                gh_calls,
-            )
-            self.assertTrue(
-                any("repos/owner/repo/pulls/13/reviews?per_page=100" in call for call in gh_calls),
-                gh_calls,
-            )
+            assert any("repos/owner/repo/issues/13/comments?per_page=100" in call for call in gh_calls), \
+                gh_calls
+            assert any("repos/owner/repo/pulls/13/comments?per_page=100" in call for call in gh_calls), \
+                gh_calls
+            assert any("repos/owner/repo/pulls/13/reviews?per_page=100" in call for call in gh_calls), \
+                gh_calls
 
             review_data = json.loads((out_dir / "review_data.json").read_text(encoding="utf-8"))
-            self.assertEqual(review_data["meta"]["transport"], "gh api --method GET")
-            self.assertEqual(len(review_data["issue_comments"]), 1)
-            self.assertEqual(len(review_data["review_comments"]), 1)
-            self.assertEqual(len(review_data["reviews"]), 1)
-            self.assertEqual(len(review_data["codex"]["issue_comments"]), 1)
-            self.assertIn("inline review comments: 1", (out_dir / "codex_report.md").read_text(encoding="utf-8"))
+            assert review_data["meta"]["transport"] == "gh api --method GET"
+            assert len(review_data["issue_comments"]) == 1
+            assert len(review_data["review_comments"]) == 1
+            assert len(review_data["reviews"]) == 1
+            assert len(review_data["codex"]["issue_comments"]) == 1
+            assert "inline review comments: 1" in (out_dir / "codex_report.md").read_text(encoding="utf-8")
 
     def test_issue_75_pr_review_wrapper_rejects_unsafe_inputs_before_gh_api(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -12131,7 +11783,7 @@ exit 44
                 ("--repo", "owner/repo", "--pr", "0"),
             )
             for args in invalid_args:
-                with self.subTest(args=args):
+                with _case(args=args):
                     if gh_log.exists():
                         gh_log.unlink()
                     result = subprocess.run(
@@ -12141,8 +11793,8 @@ exit 44
                         text=True,
                         check=False,
                     )
-                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-                    self.assertFalse(gh_log.exists(), "unsafe input reached fake gh api")
+                    assert result.returncode != 0, result.stdout + result.stderr
+                    assert not gh_log.exists(), "unsafe input reached fake gh api"
 
     def test_issue_71_upstream_handoff_reports_expose_evidence_bearing_sections(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -12168,8 +11820,8 @@ exit 44
             / "iss-00070-installer-source-discovery-and-managed-ownership"
             / "report.md"
         )
-        self.assertTrue(issue_69_report.is_file(), f"issue-71 missing issue-69 report: {issue_69_report}")
-        self.assertTrue(issue_70_report.is_file(), f"issue-71 missing issue-70 report: {issue_70_report}")
+        assert issue_69_report.is_file(), f"issue-71 missing issue-69 report: {issue_69_report}"
+        assert issue_70_report.is_file(), f"issue-71 missing issue-70 report: {issue_70_report}"
 
         issue_69_text = issue_69_report.read_text(encoding="utf-8")
         issue_70_text = issue_70_report.read_text(encoding="utf-8")
@@ -12185,31 +11837,21 @@ exit 44
             "stale exclusion guard:",
             "isolated install smoke:",
         ):
-            self.assertIn(
-                required_phrase,
-                package_parity_section,
-                f"issue-71 missing package parity subcheck phrase: {required_phrase}",
-            )
-        self.assertGreaterEqual(
-            package_parity_section.count("- result:"),
-            4,
-            "issue-71 package parity evidence should include result lines for required subchecks",
-        )
-        self.assertGreaterEqual(
-            package_parity_section.count("- pass"),
-            4,
-            "issue-71 package parity evidence should include pass results for required subchecks",
-        )
-        self.assertNotIn(
-            "pending",
-            package_parity_section.lower(),
-            "issue-71 package parity evidence should not be pending-only",
-        )
-        self.assertNotIn(
-            "placeholder",
-            package_parity_section.lower(),
-            "issue-71 package parity evidence should not be placeholder-only",
-        )
+            assert required_phrase in \
+                package_parity_section, \
+                f"issue-71 missing package parity subcheck phrase: {required_phrase}"
+        assert package_parity_section.count("- result:") >= \
+            4, \
+            "issue-71 package parity evidence should include result lines for required subchecks"
+        assert package_parity_section.count("- pass") >= \
+            4, \
+            "issue-71 package parity evidence should include pass results for required subchecks"
+        assert "pending" not in \
+            package_parity_section.lower(), \
+            "issue-71 package parity evidence should not be pending-only"
+        assert "placeholder" not in \
+            package_parity_section.lower(), \
+            "issue-71 package parity evidence should not be placeholder-only"
 
         handoff_section = self._issue_71_extract_markdown_section_by_heading_prefix(
             markdown_text=issue_70_text,
@@ -12222,31 +11864,21 @@ exit 44
             "current managed / obsolete managed boundary assertions:",
             "installed-package cutover evidence:",
         ):
-            self.assertIn(
-                required_phrase,
-                handoff_section,
-                f"issue-71 missing issue-70 handoff subcheck phrase: {required_phrase}",
-            )
-        self.assertGreaterEqual(
-            handoff_section.count("- result:"),
-            4,
-            "issue-71 handoff evidence should include result lines for required subchecks",
-        )
-        self.assertGreaterEqual(
-            handoff_section.count("- pass"),
-            4,
-            "issue-71 handoff evidence should include pass results for required subchecks",
-        )
-        self.assertNotIn(
-            "pending",
-            handoff_section.lower(),
-            "issue-71 handoff evidence should not be pending-only",
-        )
-        self.assertNotIn(
-            "placeholder",
-            handoff_section.lower(),
-            "issue-71 handoff evidence should not be placeholder-only",
-        )
+            assert required_phrase in \
+                handoff_section, \
+                f"issue-71 missing issue-70 handoff subcheck phrase: {required_phrase}"
+        assert handoff_section.count("- result:") >= \
+            4, \
+            "issue-71 handoff evidence should include result lines for required subchecks"
+        assert handoff_section.count("- pass") >= \
+            4, \
+            "issue-71 handoff evidence should include pass results for required subchecks"
+        assert "pending" not in \
+            handoff_section.lower(), \
+            "issue-71 handoff evidence should not be pending-only"
+        assert "placeholder" not in \
+            handoff_section.lower(), \
+            "issue-71 handoff evidence should not be placeholder-only"
 
     def test_issue_71_isolated_wheel_install_final_smoke_closure_surface_without_fallback(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -12263,14 +11895,12 @@ exit 44
                 temp_root=temp_root,
             )
             spec_dock_command = self._issue_69_venv_spec_dock(venv_python)
-            self.assertTrue(
-                spec_dock_command.is_file(),
-                f"issue-71 expected installed spec-dock command in isolated venv: {spec_dock_command}",
-            )
+            assert spec_dock_command.is_file(), \
+                f"issue-71 expected installed spec-dock command in isolated venv: {spec_dock_command}"
 
             runtime_env = self._issue_69_runtime_env_without_checkout_fallback()
-            self.assertNotIn("PYTHONPATH", runtime_env, "issue-71 runtime env must not rely on PYTHONPATH fallback")
-            self.assertNotIn("PYTHONHOME", runtime_env, "issue-71 runtime env must not rely on PYTHONHOME fallback")
+            assert "PYTHONPATH" not in runtime_env, "issue-71 runtime env must not rely on PYTHONPATH fallback"
+            assert "PYTHONHOME" not in runtime_env, "issue-71 runtime env must not rely on PYTHONHOME fallback"
 
             runtime_snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
                 venv_python=venv_python,
@@ -12281,25 +11911,19 @@ exit 44
                 snapshot=runtime_snapshot,
                 repo_root=repo_root,
             )
-            self.assertFalse(
-                bool(runtime_snapshot.get("sys_path_has_repo_root")),
-                "issue-71 isolated installed runtime unexpectedly resolved repo-root fallback in sys.path",
-            )
+            assert not bool(runtime_snapshot.get("sys_path_has_repo_root")), \
+                "issue-71 isolated installed runtime unexpectedly resolved repo-root fallback in sys.path"
 
             plan_snapshot = self._issue_70_collect_isolated_installed_plan_snapshot(
                 venv_python=venv_python,
                 cwd=isolated_cwd,
             )
             current_sources = {str(path) for path in plan_snapshot.get("current_sources", [])}
-            self.assertTrue(current_sources, "issue-71 installed plan must expose current managed sources")
-            self.assertTrue(
-                all(source.startswith("install_root/") for source in current_sources),
-                "issue-71 installed plan should source current managed files from install_root only",
-            )
-            self.assertFalse(
-                any(source.startswith("codex_skills/") for source in current_sources),
-                "issue-71 installed plan must not source current managed files from legacy codex_skills",
-            )
+            assert current_sources, "issue-71 installed plan must expose current managed sources"
+            assert all(source.startswith("install_root/") for source in current_sources), \
+                "issue-71 installed plan should source current managed files from install_root only"
+            assert not any(source.startswith("codex_skills/") for source in current_sources), \
+                "issue-71 installed plan must not source current managed files from legacy codex_skills"
 
             installed_assets_dir = Path(str(runtime_snapshot.get("assets_dir", ""))).resolve()
             managed_rel_path = ".codex/agents/spec-manager.toml"
@@ -12312,12 +11936,10 @@ exit 44
             )
 
             managed_target = target_repo / managed_rel_path
-            self.assertTrue(managed_target.is_file(), f"issue-71 missing managed file after isolated init: {managed_target}")
-            self.assertEqual(
-                managed_target.read_bytes(),
-                expected_managed_bytes,
-                "issue-71 isolated init did not reflect install_root managed asset bytes",
-            )
+            assert managed_target.is_file(), f"issue-71 missing managed file after isolated init: {managed_target}"
+            assert managed_target.read_bytes() == \
+                expected_managed_bytes, \
+                "issue-71 isolated init did not reflect install_root managed asset bytes"
 
             obsolete_rel_path = ".codex/agents/spec-dock-codex-adapter.toml"
             obsolete_target = target_repo / obsolete_rel_path
@@ -12337,29 +11959,21 @@ exit 44
                 env=runtime_env,
             )
 
-            self.assertEqual(
-                managed_target.read_bytes(),
-                expected_managed_bytes,
-                "issue-71 isolated update did not restore managed file from install_root",
-            )
-            self.assertFalse(
-                obsolete_target.exists(),
-                f"issue-71 isolated update should prune obsolete managed path: {obsolete_rel_path}",
-            )
-            self.assertTrue(
-                custom_target.is_file(),
-                f"issue-71 isolated update removed custom unmanaged file: {custom_rel_path}",
-            )
-            self.assertEqual(
-                custom_target.read_text(encoding="utf-8"),
-                custom_text,
-                f"issue-71 isolated update mutated custom unmanaged file: {custom_rel_path}",
-            )
+            assert managed_target.read_bytes() == \
+                expected_managed_bytes, \
+                "issue-71 isolated update did not restore managed file from install_root"
+            assert not obsolete_target.exists(), \
+                f"issue-71 isolated update should prune obsolete managed path: {obsolete_rel_path}"
+            assert custom_target.is_file(), \
+                f"issue-71 isolated update removed custom unmanaged file: {custom_rel_path}"
+            assert custom_target.read_text(encoding="utf-8") == \
+                custom_text, \
+                f"issue-71 isolated update mutated custom unmanaged file: {custom_rel_path}"
 
     def test_init_generated_native_shims_satisfy_static_delegation_only_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             repo_root = Path(__file__).resolve().parents[3]
             expected_codex_bytes = (
@@ -12399,33 +12013,23 @@ exit 44
             copilot_spec_manager_path = target / ".github" / "agents" / "spec-manager.agent.md"
             copilot_path = target / ".github" / "agents" / "orchestrator.agent.md"
             codex_orchestrator_path = target / ".codex" / "agents" / "orchestrator.toml"
-            self.assertTrue(codex_path.is_file(), f"missing generated codex native shim: {codex_path}")
-            self.assertTrue(codex_bootstrap_path.is_file(), f"missing generated codex bootstrap guide: {codex_bootstrap_path}")
-            self.assertTrue(codex_config_path.is_file(), f"missing generated codex main config: {codex_config_path}")
-            self.assertTrue(
-                copilot_spec_manager_path.is_file(),
-                f"missing generated copilot spec-manager: {copilot_spec_manager_path}",
-            )
-            self.assertTrue(copilot_path.is_file(), f"missing generated copilot native shim: {copilot_path}")
-            self.assertFalse(
-                codex_orchestrator_path.exists(),
-                f"codex direct orchestrator should not be generated: {codex_orchestrator_path}",
-            )
-            self.assertEqual(
-                codex_path.read_bytes(),
-                expected_codex_bytes,
-                "generated codex native shim diverged from provider asset bytes",
-            )
-            self.assertEqual(
-                copilot_path.read_bytes(),
-                expected_copilot_bytes,
-                "generated copilot native shim diverged from provider asset bytes",
-            )
-            self.assertEqual(
-                copilot_spec_manager_path.read_bytes(),
-                expected_copilot_spec_manager_bytes,
-                "generated copilot spec-manager diverged from provider asset bytes",
-            )
+            assert codex_path.is_file(), f"missing generated codex native shim: {codex_path}"
+            assert codex_bootstrap_path.is_file(), f"missing generated codex bootstrap guide: {codex_bootstrap_path}"
+            assert codex_config_path.is_file(), f"missing generated codex main config: {codex_config_path}"
+            assert copilot_spec_manager_path.is_file(), \
+                f"missing generated copilot spec-manager: {copilot_spec_manager_path}"
+            assert copilot_path.is_file(), f"missing generated copilot native shim: {copilot_path}"
+            assert not codex_orchestrator_path.exists(), \
+                f"codex direct orchestrator should not be generated: {codex_orchestrator_path}"
+            assert codex_path.read_bytes() == \
+                expected_codex_bytes, \
+                "generated codex native shim diverged from provider asset bytes"
+            assert copilot_path.read_bytes() == \
+                expected_copilot_bytes, \
+                "generated copilot native shim diverged from provider asset bytes"
+            assert copilot_spec_manager_path.read_bytes() == \
+                expected_copilot_spec_manager_bytes, \
+                "generated copilot spec-manager diverged from provider asset bytes"
             codex_text = codex_path.read_text(encoding="utf-8")
             codex_bootstrap_text = codex_bootstrap_path.read_text(encoding="utf-8")
             codex_config_text = codex_config_path.read_text(encoding="utf-8")
@@ -12466,7 +12070,7 @@ exit 44
     def test_update_copies_legacy_codex_native_shim_instructions_key_as_is(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             repo_root = Path(__file__).resolve().parents[3]
             source_assets_root = repo_root / "src" / "spec_dock" / "assets"
@@ -12477,10 +12081,10 @@ exit 44
 
                 codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-manager.toml"
                 codex_text = codex_shim_path.read_text(encoding="utf-8")
-                self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+                assert re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, codex_text)
                 patched_text = codex_text.replace("developer_instructions =", "instructions =", 1)
-                self.assertRegex(patched_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
-                self.assertNotRegex(patched_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+                assert re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, patched_text)
+                assert not re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, patched_text)
                 codex_shim_path.write_text(patched_text, encoding="utf-8")
                 expected_bytes = codex_shim_path.read_bytes()
 
@@ -12488,18 +12092,17 @@ exit 44
                 def _patched_assets_dir():
                     yield patched_assets_root
 
-                with patch("spec_dock.cli._assets_dir", _patched_assets_dir):
-                    self.assertEqual(main(["update", str(target)]), 0)
+                with pytest.MonkeyPatch.context() as monkeypatch:
+                    monkeypatch.setattr("spec_dock.cli._assets_dir", _patched_assets_dir)
+                    assert main(["update", str(target)]) == 0
 
             generated_path = target / ".codex" / "agents" / "spec-manager.toml"
             generated_text = generated_path.read_text(encoding="utf-8")
-            self.assertEqual(
-                generated_path.read_bytes(),
-                expected_bytes,
-                "update should copy legacy codex shim asset bytes without normalization",
-            )
-            self.assertRegex(generated_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
-            self.assertNotRegex(generated_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+            assert generated_path.read_bytes() == \
+                expected_bytes, \
+                "update should copy legacy codex shim asset bytes without normalization"
+            assert re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, generated_text)
+            assert not re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, generated_text)
 
     def test_init_copies_legacy_codex_native_shim_instructions_key_as_is(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -12515,10 +12118,10 @@ exit 44
 
                 codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-manager.toml"
                 codex_text = codex_shim_path.read_text(encoding="utf-8")
-                self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+                assert re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, codex_text)
                 patched_text = codex_text.replace("developer_instructions =", "instructions =", 1)
-                self.assertRegex(patched_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
-                self.assertNotRegex(patched_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+                assert re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, patched_text)
+                assert not re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, patched_text)
                 codex_shim_path.write_text(patched_text, encoding="utf-8")
                 expected_bytes = codex_shim_path.read_bytes()
 
@@ -12526,23 +12129,22 @@ exit 44
                 def _patched_assets_dir():
                     yield patched_assets_root
 
-                with patch("spec_dock.cli._assets_dir", _patched_assets_dir):
-                    self.assertEqual(main(["init", str(target)]), 0)
+                with pytest.MonkeyPatch.context() as monkeypatch:
+                    monkeypatch.setattr("spec_dock.cli._assets_dir", _patched_assets_dir)
+                    assert main(["init", str(target)]) == 0
 
             generated_path = target / ".codex" / "agents" / "spec-manager.toml"
             generated_text = generated_path.read_text(encoding="utf-8")
-            self.assertEqual(
-                generated_path.read_bytes(),
-                expected_bytes,
-                "init should copy legacy codex shim asset bytes without normalization",
-            )
-            self.assertRegex(generated_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
-            self.assertNotRegex(generated_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+            assert generated_path.read_bytes() == \
+                expected_bytes, \
+                "init should copy legacy codex shim asset bytes without normalization"
+            assert re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, generated_text)
+            assert not re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, generated_text)
 
     def test_update_copies_codex_native_shim_without_instruction_keys_as_is(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             repo_root = Path(__file__).resolve().parents[3]
             source_assets_root = repo_root / "src" / "spec_dock" / "assets"
@@ -12553,8 +12155,8 @@ exit 44
 
                 codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-manager.toml"
                 codex_text = codex_shim_path.read_text(encoding="utf-8")
-                self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
-                self.assertNotRegex(codex_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
+                assert re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, codex_text)
+                assert not re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, codex_text)
 
                 lines = codex_text.splitlines(keepends=True)
                 normalized_lines: list[str] = []
@@ -12570,8 +12172,8 @@ exit 44
                     normalized_lines.append(line)
 
                 patched_text = "".join(normalized_lines)
-                self.assertNotRegex(patched_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
-                self.assertNotRegex(patched_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
+                assert not re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, patched_text)
+                assert not re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, patched_text)
                 codex_shim_path.write_text(patched_text, encoding="utf-8")
                 expected_bytes = codex_shim_path.read_bytes()
 
@@ -12579,23 +12181,22 @@ exit 44
                 def _patched_assets_dir():
                     yield patched_assets_root
 
-                with patch("spec_dock.cli._assets_dir", _patched_assets_dir):
-                    self.assertEqual(main(["update", str(target)]), 0)
+                with pytest.MonkeyPatch.context() as monkeypatch:
+                    monkeypatch.setattr("spec_dock.cli._assets_dir", _patched_assets_dir)
+                    assert main(["update", str(target)]) == 0
 
             generated_path = target / ".codex" / "agents" / "spec-manager.toml"
             generated_text = generated_path.read_text(encoding="utf-8")
-            self.assertEqual(
-                generated_path.read_bytes(),
-                expected_bytes,
-                "update should copy codex shim asset bytes without instruction key validation",
-            )
-            self.assertNotRegex(generated_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
-            self.assertNotRegex(generated_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
+            assert generated_path.read_bytes() == \
+                expected_bytes, \
+                "update should copy codex shim asset bytes without instruction key validation"
+            assert not re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, generated_text)
+            assert not re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, generated_text)
 
     def test_update_manages_native_shims_with_gate_2_five_subchecks(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             repo_root = Path(__file__).resolve().parents[3]
             codex_shim_asset = (
@@ -12655,7 +12256,7 @@ exit 44
             custom_skill_path.parent.mkdir(parents=True, exist_ok=True)
             self._write_text_force(custom_skill_path, custom_skill_content)
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             managed_codex_bytes = (
@@ -12751,15 +12352,15 @@ exit 44
             )
 
             for subcheck, evidence in gate_2_sync_prune_evidence.items():
-                self.assertTrue(bool(evidence["pass"]), f"{subcheck} failed: {evidence}")
-            self.assertTrue(gate_2_sync_prune_pass, gate_2_sync_prune_evidence)
+                assert bool(evidence["pass"]), f"{subcheck} failed: {evidence}"
+            assert gate_2_sync_prune_pass, gate_2_sync_prune_evidence
 
     def test_update_rejects_non_boolean_native_shim_managed_values(self) -> None:
         for invalid_managed in ("true", 1):
-            with self.subTest(invalid_managed=invalid_managed):
+            with _case(invalid_managed=invalid_managed):
                 with tempfile.TemporaryDirectory() as tmp:
                     target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
+                    assert main(["init", str(target)]) == 0
                     before = self._seed_managed_contract_guard_snapshot(target)
                     malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
                     malformed_manifest["targets"]["codex"]["native_shim"]["managed"] = invalid_managed
@@ -12769,14 +12370,14 @@ exit 44
                         malformed_manifest,
                     )
 
-                    self.assertEqual(exit_code, 1)
-                    self.assertIn("invalid native_shim.managed for host 'codex'", stderr)
+                    assert exit_code == 1
+                    assert "invalid native_shim.managed for host 'codex'" in stderr
                     self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_manifest_missing_required_native_shim_host(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             before = self._seed_managed_contract_guard_snapshot(target)
             malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
             malformed_manifest["targets"].pop("copilot")
@@ -12786,16 +12387,16 @@ exit 44
                 malformed_manifest,
             )
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn("missing required managed native shim hosts: copilot", stderr)
+            assert exit_code == 1
+            assert "missing required managed native shim hosts: copilot" in stderr
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_missing_or_null_required_host_native_shim_contract(self) -> None:
         for mode in ("missing", "null"):
-            with self.subTest(mode=mode):
+            with _case(mode=mode):
                 with tempfile.TemporaryDirectory() as tmp:
                     target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
+                    assert main(["init", str(target)]) == 0
                     before = self._seed_managed_contract_guard_snapshot(target)
                     malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
                     if mode == "missing":
@@ -12808,14 +12409,14 @@ exit 44
                         malformed_manifest,
                     )
 
-                    self.assertEqual(exit_code, 1)
-                    self.assertIn("missing required native_shim contract for host 'codex'", stderr)
+                    assert exit_code == 1
+                    assert "missing required native_shim contract for host 'codex'" in stderr
                     self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_required_host_native_shim_managed_disabled(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             before = self._seed_managed_contract_guard_snapshot(target)
             malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
             malformed_manifest["targets"]["codex"]["native_shim"]["managed"] = False
@@ -12825,14 +12426,14 @@ exit 44
                 malformed_manifest,
             )
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn("required host 'codex' must define native_shim.managed=true", stderr)
+            assert exit_code == 1
+            assert "required host 'codex' must define native_shim.managed=true" in stderr
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_required_host_native_shim_target_file_swaps(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             before = self._seed_managed_contract_guard_snapshot(target)
             malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
             malformed_manifest["targets"]["codex"]["native_shim"]["target_file"] = (
@@ -12847,17 +12448,15 @@ exit 44
                 malformed_manifest,
             )
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "required host 'codex' must use canonical native_shim.target_file '.codex/agents/spec-manager.toml'",
-                stderr,
-            )
+            assert exit_code == 1
+            assert "required host 'codex' must use canonical native_shim.target_file '.codex/agents/spec-manager.toml'" in \
+                stderr
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_duplicate_required_host_native_shim_target_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             before = self._seed_managed_contract_guard_snapshot(target)
             malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
             malformed_manifest["targets"]["copilot"]["native_shim"]["target_file"] = (
@@ -12869,12 +12468,10 @@ exit 44
                 malformed_manifest,
             )
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "duplicate native_shim.target_file '.codex/agents/spec-manager.toml'",
-                stderr,
-            )
-            self.assertIn("for hosts 'codex' and 'copilot'", stderr)
+            assert exit_code == 1
+            assert "duplicate native_shim.target_file '.codex/agents/spec-manager.toml'" in \
+                stderr
+            assert "for hosts 'codex' and 'copilot'" in stderr
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_init_preflight_rejects_invalid_host_manifest_before_scaffold_write(self) -> None:
@@ -12891,19 +12488,17 @@ exit 44
                 malformed_manifest,
             )
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "required host 'codex' must use canonical native_shim.target_file '.codex/agents/spec-manager.toml'",
-                stderr,
-            )
-            self.assertEqual(list(target.iterdir()), [], "preflight failure should not write managed scaffold files")
+            assert exit_code == 1
+            assert "required host 'codex' must use canonical native_shim.target_file '.codex/agents/spec-manager.toml'" in \
+                stderr
+            assert list(target.iterdir()) == [], "preflight failure should not write managed scaffold files"
 
     def test_update_preflight_rejects_missing_or_non_directory_later_managed_asset_before_mutation(self) -> None:
         for mode in ("missing", "non_directory"):
-            with self.subTest(mode=mode):
+            with _case(mode=mode):
                 with tempfile.TemporaryDirectory() as tmp:
                     target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
+                    assert main(["init", str(target)]) == 0
                     before = self._seed_managed_contract_guard_snapshot(target)
 
                     def _mutate_assets(patched_assets_root: Path) -> None:
@@ -12918,17 +12513,17 @@ exit 44
                         _mutate_assets,
                     )
 
-                    self.assertEqual(exit_code, 1)
+                    assert exit_code == 1
                     if mode == "missing":
-                        self.assertIn("Missing asset directory", stderr)
+                        assert "Missing asset directory" in stderr
                     else:
-                        self.assertIn("Invalid asset directory", stderr)
+                        assert "Invalid asset directory" in stderr
                     self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_required_host_entry_file_drift_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             before = self._seed_managed_contract_guard_snapshot(target)
             malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
             malformed_manifest["targets"]["codex"]["entry_file"] = ".agents/skills/spec-dock-copilot-adapter/SKILL.md"
@@ -12938,11 +12533,9 @@ exit 44
                 malformed_manifest,
             )
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "required host 'codex' must use canonical entry_file '.agents/skills/spec-dock-codex-adapter/SKILL.md'",
-                stderr,
-            )
+            assert exit_code == 1
+            assert "required host 'codex' must use canonical entry_file '.agents/skills/spec-dock-codex-adapter/SKILL.md'" in \
+                stderr
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_missing_or_malformed_required_native_shim_owner_and_delegates_to_before_writes(
@@ -12961,10 +12554,10 @@ exit 44
             ),
         )
         for case_name, expected_error in cases:
-            with self.subTest(case_name=case_name):
+            with _case(case_name=case_name):
                 with tempfile.TemporaryDirectory() as tmp:
                     target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
+                    assert main(["init", str(target)]) == 0
                     before = self._seed_managed_contract_guard_snapshot(target)
                     malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
                     native_shim = malformed_manifest["targets"]["codex"]["native_shim"]
@@ -12989,14 +12582,14 @@ exit 44
                         malformed_manifest,
                     )
 
-                    self.assertEqual(exit_code, 1)
-                    self.assertIn(expected_error, stderr)
+                    assert exit_code == 1
+                    assert expected_error in stderr
                     self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_non_mapping_host_target_entries(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             before = self._seed_managed_contract_guard_snapshot(target)
             malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
             malformed_manifest["targets"]["codex"] = "not-a-map"
@@ -13006,16 +12599,16 @@ exit 44
                 malformed_manifest,
             )
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn("invalid host adapter target contract for host 'codex'", stderr)
+            assert exit_code == 1
+            assert "invalid host adapter target contract for host 'codex'" in stderr
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_current_dir_obsolete_exact_file_paths(self) -> None:
         for invalid_obsolete_path in (".", "./"):
-            with self.subTest(invalid_obsolete_path=invalid_obsolete_path):
+            with _case(invalid_obsolete_path=invalid_obsolete_path):
                 with tempfile.TemporaryDirectory() as tmp:
                     target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
+                    assert main(["init", str(target)]) == 0
                     before = self._seed_managed_contract_guard_snapshot(target)
                     malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
                     malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
@@ -13027,14 +12620,14 @@ exit 44
                         malformed_manifest,
                     )
 
-                    self.assertEqual(exit_code, 1)
-                    self.assertIn("invalid managed_assets.obsolete_exact_file_paths item", stderr)
+                    assert exit_code == 1
+                    assert "invalid managed_assets.obsolete_exact_file_paths item" in stderr
                     self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_directory_like_obsolete_exact_file_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             before = self._seed_managed_contract_guard_snapshot(target)
             malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
             malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
@@ -13046,12 +12639,10 @@ exit 44
                 malformed_manifest,
             )
 
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "invalid managed_assets.obsolete_exact_file_paths item (must be exact file path): "
-                "'.codex/agents/legacy'",
-                stderr,
-            )
+            assert exit_code == 1
+            assert "invalid managed_assets.obsolete_exact_file_paths item (must be exact file path): " \
+                "'.codex/agents/legacy'" in \
+                stderr
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_parent_traversal_native_shim_paths(self) -> None:
@@ -13073,10 +12664,10 @@ exit 44
             ),
         )
         for field, invalid_path, expected_error in cases:
-            with self.subTest(field=field, invalid_path=invalid_path):
+            with _case(field=field, invalid_path=invalid_path):
                 with tempfile.TemporaryDirectory() as tmp:
                     target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
+                    assert main(["init", str(target)]) == 0
                     before = self._seed_managed_contract_guard_snapshot(target)
                     malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
                     if field == "obsolete_exact_file_paths":
@@ -13089,8 +12680,8 @@ exit 44
                         malformed_manifest,
                     )
 
-                    self.assertEqual(exit_code, 1)
-                    self.assertIn(expected_error, stderr)
+                    assert exit_code == 1
+                    assert expected_error in stderr
                     self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_windows_drive_relative_native_shim_paths(self) -> None:
@@ -13102,10 +12693,10 @@ exit 44
         invalid_paths = ("C:foo", "/foo", "\\foo")
         for field, expected_error in cases:
             for invalid_path in invalid_paths:
-                with self.subTest(field=field, invalid_path=invalid_path):
+                with _case(field=field, invalid_path=invalid_path):
                     with tempfile.TemporaryDirectory() as tmp:
                         target = Path(tmp)
-                        self.assertEqual(main(["init", str(target)]), 0)
+                        assert main(["init", str(target)]) == 0
                         before = self._seed_managed_contract_guard_snapshot(target)
                         malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
                         if field == "obsolete_exact_file_paths":
@@ -13118,16 +12709,16 @@ exit 44
                             malformed_manifest,
                         )
 
-                        self.assertEqual(exit_code, 1)
-                        self.assertIn(expected_error, stderr)
+                        assert exit_code == 1
+                        assert expected_error in stderr
                         self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_native_shim_target_file_outside_managed_prefixes(self) -> None:
         for invalid_target in ("README.md", ".agents/skills/spec-dock-codex-adapter/SKILL.md"):
-            with self.subTest(invalid_target=invalid_target):
+            with _case(invalid_target=invalid_target):
                 with tempfile.TemporaryDirectory() as tmp:
                     target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
+                    assert main(["init", str(target)]) == 0
                     before = self._seed_managed_contract_guard_snapshot(target)
                     malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
                     malformed_manifest["targets"]["codex"]["native_shim"]["target_file"] = invalid_target
@@ -13137,16 +12728,16 @@ exit 44
                         malformed_manifest,
                     )
 
-                    self.assertEqual(exit_code, 1)
-                    self.assertIn("invalid native_shim.target_file path for host 'codex'", stderr)
+                    assert exit_code == 1
+                    assert "invalid native_shim.target_file path for host 'codex'" in stderr
                     self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_obsolete_exact_file_paths_outside_managed_prefixes(self) -> None:
         for invalid_obsolete in ("README.md", ".agents/spec-dock-codex-adapter/SKILL.md"):
-            with self.subTest(invalid_obsolete=invalid_obsolete):
+            with _case(invalid_obsolete=invalid_obsolete):
                 with tempfile.TemporaryDirectory() as tmp:
                     target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
+                    assert main(["init", str(target)]) == 0
                     before = self._seed_managed_contract_guard_snapshot(target)
                     malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
                     malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
@@ -13158,8 +12749,8 @@ exit 44
                         malformed_manifest,
                     )
 
-                    self.assertEqual(exit_code, 1)
-                    self.assertIn("invalid managed_assets.obsolete_exact_file_paths item", stderr)
+                    assert exit_code == 1
+                    assert "invalid managed_assets.obsolete_exact_file_paths item" in stderr
                     self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_reference_sync_doc_matches_bundled_asset(self) -> None:
@@ -13172,7 +12763,7 @@ exit 44
             Path(__file__).resolve().parents[3] / "spec-dock" / "docs" / "reference_sync.md"
         ).read_text(encoding="utf-8")
 
-        self.assertEqual(repo_copy, bundled)
+        assert repo_copy == bundled
 
     def test_reference_deps_doc_matches_bundled_asset(self) -> None:
         import spec_dock.cli as cli
@@ -13184,7 +12775,7 @@ exit 44
             Path(__file__).resolve().parents[3] / "spec-dock" / "docs" / "reference_deps.md"
         ).read_text(encoding="utf-8")
 
-        self.assertEqual(repo_copy, bundled)
+        assert repo_copy == bundled
 
     def test_workflow_issue_doc_matches_bundled_asset(self) -> None:
         import spec_dock.cli as cli
@@ -13196,28 +12787,28 @@ exit 44
             Path(__file__).resolve().parents[3] / "spec-dock" / "docs" / "workflow_issue.md"
         ).read_text(encoding="utf-8")
 
-        self.assertEqual(repo_copy, bundled)
+        assert repo_copy == bundled
 
     def test_init_fails_without_force_when_spec_dock_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             # Second init without --force should fail.
-            self.assertNotEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) != 0
 
     def test_init_does_not_copy_generated_python_caches_from_provider_assets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp, self._temporary_provider_cache_files():
             target = Path(tmp)
 
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._assert_no_generated_python_caches(target)
 
     def test_update_keeps_initiatives_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             marker = target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("keep\n", encoding="utf-8")
@@ -13237,108 +12828,108 @@ exit 44
                 # Some environments may restrict symlinks; workflow pruning is still validated.
                 created_symlink = False
 
-            self.assertEqual(main(["update", str(target)]), 0)
-            self.assertTrue(marker.is_file())
+            assert main(["update", str(target)]) == 0
+            assert marker.is_file()
             self._assert_version_file(target)
-            self.assertFalse(legacy_workflow.exists())
+            assert not legacy_workflow.exists()
             if created_symlink:
-                self.assertFalse(legacy_symlink.is_symlink())
+                assert not legacy_symlink.is_symlink()
 
     def test_update_does_not_copy_generated_python_caches_from_provider_assets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             with self._temporary_provider_cache_files():
-                self.assertEqual(main(["update", str(target)]), 0)
+                assert main(["update", str(target)]) == 0
 
             self._assert_no_generated_python_caches(target)
 
     def test_uninstall_dry_run_prints_plan_and_mutates_no_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             marker = target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("keep\n", encoding="utf-8")
             before = self._relative_file_snapshot(target)
 
             exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target)])
 
-            self.assertEqual(exit_code, 0, stderr)
-            self.assertIn("spec-dock: uninstall plan", stdout)
-            self.assertIn("would_remove", stdout)
-            self.assertIn("preserved", stdout)
-            self.assertEqual(stderr, "")
-            self.assertEqual(self._relative_file_snapshot(target), before)
+            assert exit_code == 0, stderr
+            assert "spec-dock: uninstall plan" in stdout
+            assert "would_remove" in stdout
+            assert "preserved" in stdout
+            assert stderr == ""
+            assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_apply_without_specs_mode_fails_before_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             marker = target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("keep\n", encoding="utf-8")
             before = self._relative_file_snapshot(target)
 
             exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--apply"])
 
-            self.assertEqual(exit_code, 2)
-            self.assertEqual(stdout, "")
-            self.assertIn("--keep-specs", stderr)
-            self.assertIn("--remove-specs", stderr)
-            self.assertEqual(self._relative_file_snapshot(target), before)
+            assert exit_code == 2
+            assert stdout == ""
+            assert "--keep-specs" in stderr
+            assert "--remove-specs" in stderr
+            assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_apply_keep_specs_removes_tooling_and_preserves_spec_history(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             marker = target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("keep\n", encoding="utf-8")
 
             exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--apply", "--keep-specs"])
 
-            self.assertEqual(exit_code, 0, stderr)
-            self.assertEqual(stderr, "")
-            self.assertIn("spec-dock: uninstall result", stdout)
-            self.assertIn("removed", stdout)
-            self.assertIn("preserved", stdout)
-            self.assertFalse((target / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md").exists())
-            self.assertFalse((target / "spec-dock" / "scripts" / "spec-dock").exists())
-            self.assertTrue(marker.is_file())
-            self.assertEqual(marker.read_text(encoding="utf-8"), "keep\n")
+            assert exit_code == 0, stderr
+            assert stderr == ""
+            assert "spec-dock: uninstall result" in stdout
+            assert "removed" in stdout
+            assert "preserved" in stdout
+            assert not (target / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md").exists()
+            assert not (target / "spec-dock" / "scripts" / "spec-dock").exists()
+            assert marker.is_file()
+            assert marker.read_text(encoding="utf-8") == "keep\n"
 
     def test_uninstall_apply_remove_specs_removes_spec_history_with_explicit_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             marker = target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("remove\n", encoding="utf-8")
 
             payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
             actions = self._actions_by_path(payload)
 
-            self.assertEqual(payload["status"], "completed")
-            self.assertEqual(payload["specs_mode"], "remove")
+            assert payload["status"] == "completed"
+            assert payload["specs_mode"] == "remove"
             spec_action = actions["spec-dock/initiatives"]
-            self.assertEqual(spec_action["category"], "spec_history")
-            self.assertEqual(spec_action["status"], "removed")
-            self.assertIn("remove-specs", spec_action["reason"])
-            self.assertFalse(marker.exists())
-            self.assertFalse((target / "spec-dock" / "initiatives").exists())
+            assert spec_action["category"] == "spec_history"
+            assert spec_action["status"] == "removed"
+            assert "remove-specs" in spec_action["reason"]
+            assert not marker.exists()
+            assert not (target / "spec-dock" / "initiatives").exists()
 
     def test_uninstall_apply_rejects_symlinked_boundary_root_without_external_deletion(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "repo"
             target.mkdir()
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             outside_specdock = Path(tmp) / "outside" / "spec-dock"
             outside_specdock.parent.mkdir()
             shutil.move(str(target / "spec-dock"), outside_specdock)
             try:
                 os.symlink("../outside/spec-dock", target / "spec-dock")
             except OSError:
-                self.skipTest("symlink creation is unavailable")
+                pytest.skip("symlink creation is unavailable")
             outside_script = outside_specdock / "scripts" / "spec-dock"
-            self.assertTrue(outside_script.is_file())
+            assert outside_script.is_file()
 
             payload = self._uninstall_json_payload(
                 target,
@@ -13347,24 +12938,24 @@ exit 44
                 expected_exit_code=2,
             )
 
-            self.assertEqual(payload["status"], "error")
-            self.assertIn("symlink", payload["errors"][0])
-            self.assertTrue((target / "spec-dock").is_symlink())
-            self.assertTrue(outside_script.is_file())
-            self.assertTrue(outside_specdock.is_dir())
+            assert payload["status"] == "error"
+            assert "symlink" in payload["errors"][0]
+            assert (target / "spec-dock").is_symlink()
+            assert outside_script.is_file()
+            assert outside_specdock.is_dir()
 
     def test_uninstall_apply_rejects_symlinked_retry_marker_without_external_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "repo"
             target.mkdir()
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             outside_file = Path(tmp) / "outside-marker.json"
             outside_file.write_text("outside\n", encoding="utf-8")
             retry_marker = target / "spec-dock" / ".uninstall-retry.json"
             try:
                 os.symlink(outside_file, retry_marker)
             except OSError:
-                self.skipTest("symlink creation is unavailable")
+                pytest.skip("symlink creation is unavailable")
 
             payload = self._uninstall_json_payload(
                 target,
@@ -13373,10 +12964,10 @@ exit 44
                 expected_exit_code=2,
             )
 
-            self.assertEqual(payload["status"], "error")
-            self.assertIn("symlinked SpecDock uninstall retry marker", payload["errors"][0])
-            self.assertTrue(retry_marker.is_symlink())
-            self.assertEqual(outside_file.read_text(encoding="utf-8"), "outside\n")
+            assert payload["status"] == "error"
+            assert "symlinked SpecDock uninstall retry marker" in payload["errors"][0]
+            assert retry_marker.is_symlink()
+            assert outside_file.read_text(encoding="utf-8") == "outside\n"
 
     def test_uninstall_apply_rejects_unmanaged_initiatives_only_target_before_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -13393,16 +12984,16 @@ exit 44
                 expected_exit_code=2,
             )
 
-            self.assertEqual(payload["status"], "error")
-            self.assertIn("not a managed SpecDock repo", payload["errors"][0])
-            self.assertEqual(self._relative_file_snapshot(target), before)
-            self.assertTrue(user_file.is_file())
+            assert payload["status"] == "error"
+            assert "not a managed SpecDock repo" in payload["errors"][0]
+            assert self._relative_file_snapshot(target) == before
+            assert user_file.is_file()
 
     def test_uninstall_apply_bounded_cleanup_respects_preserved_files_and_roots(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "repo"
             target.mkdir()
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             (target / ".git").mkdir()
             (target / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
             parent_sentinel = target.parent / "parent-sentinel.txt"
@@ -13413,64 +13004,60 @@ exit 44
 
             payload = self._uninstall_json_payload(target, "--apply", "--keep-specs")
 
-            self.assertEqual(payload["status"], "completed")
+            assert payload["status"] == "completed"
             cleanup_actions = [
                 action
                 for action in payload["actions"]  # type: ignore[index]
                 if action["status"] == "empty_dir_removed"
             ]
-            self.assertTrue(cleanup_actions)
+            assert cleanup_actions
             for action in cleanup_actions:
-                self.assertRegex(action["path"], r"^(\.agents|\.codex|\.github|spec-dock)(/|$)")
-                self.assertNotEqual(action["path"], ".git")
-            self.assertTrue(target.is_dir())
-            self.assertTrue((target / ".git" / "HEAD").is_file())
-            self.assertTrue(parent_sentinel.is_file())
-            self.assertTrue(preserved.is_file())
-            self.assertTrue(preserved.parent.is_dir())
+                assert re.search(r"^(\.agents|\.codex|\.github|spec-dock)(/|$)", action["path"])
+                assert action["path"] != ".git"
+            assert target.is_dir()
+            assert (target / ".git" / "HEAD").is_file()
+            assert parent_sentinel.is_file()
+            assert preserved.is_file()
+            assert preserved.parent.is_dir()
 
     def test_uninstall_apply_rerun_reports_already_removed_and_succeeds(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             marker = target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("keep\n", encoding="utf-8")
 
             first_payload = self._uninstall_json_payload(target, "--apply", "--keep-specs")
             second_payload = self._uninstall_json_payload(target, "--apply", "--keep-specs")
 
-            self.assertEqual(first_payload["status"], "completed")
-            self.assertEqual(second_payload["status"], "completed")
-            self.assertGreater(second_payload["summary"]["already_removed"], 0)  # type: ignore[index]
-            self.assertEqual(second_payload["summary"]["failed"], 0)  # type: ignore[index]
-            self.assertIn(
-                "already_removed",
-                {action["status"] for action in second_payload["actions"]},  # type: ignore[index]
-            )
+            assert first_payload["status"] == "completed"
+            assert second_payload["status"] == "completed"
+            assert second_payload["summary"]["already_removed"] > 0  # type: ignore[index]
+            assert second_payload["summary"]["failed"] == 0  # type: ignore[index]
+            assert "already_removed" in \
+                {action["status"] for action in second_payload["actions"]}
 
     def test_uninstall_apply_remove_specs_rerun_reports_already_removed_and_succeeds(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             marker = target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("remove\n", encoding="utf-8")
 
             first_payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
             second_payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
 
-            self.assertEqual(first_payload["status"], "completed")
-            self.assertEqual(second_payload["status"], "completed")
-            self.assertGreater(second_payload["summary"]["already_removed"], 0)  # type: ignore[index]
-            self.assertEqual(second_payload["summary"]["failed"], 0)  # type: ignore[index]
-            self.assertIn(
-                "already_removed",
-                {action["status"] for action in second_payload["actions"]},  # type: ignore[index]
-            )
+            assert first_payload["status"] == "completed"
+            assert second_payload["status"] == "completed"
+            assert second_payload["summary"]["already_removed"] > 0  # type: ignore[index]
+            assert second_payload["summary"]["failed"] == 0  # type: ignore[index]
+            assert "already_removed" in \
+                {action["status"] for action in second_payload["actions"]}
 
     def test_uninstall_apply_partial_unlink_failure_reports_failed_separately(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             failing = (target / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md").resolve()
             original_unlink = Path.unlink
 
@@ -13479,7 +13066,8 @@ exit 44
                     raise OSError("injected unlink failure")
                 return original_unlink(path, *args, **kwargs)
 
-            with patch("src.spec_dock.cli.Path.unlink", fail_one):
+            with pytest.MonkeyPatch.context() as monkeypatch:
+                monkeypatch.setattr("src.spec_dock.cli.Path.unlink", fail_one)
                 payload = self._uninstall_json_payload(
                     target,
                     "--apply",
@@ -13489,17 +13077,17 @@ exit 44
 
             actions = self._actions_by_path(payload)
             failed_action = actions[".agents/skills/spec-dock-issue-execution/SKILL.md"]
-            self.assertEqual(payload["status"], "partial_failure")
-            self.assertGreater(payload["summary"]["failed"], 0)  # type: ignore[index]
-            self.assertGreater(payload["summary"]["removed"], 0)  # type: ignore[index]
-            self.assertEqual(failed_action["status"], "failed")
-            self.assertIn("injected unlink failure", failed_action["error"])
-            self.assertTrue(failing.is_file())
+            assert payload["status"] == "partial_failure"
+            assert payload["summary"]["failed"] > 0  # type: ignore[index]
+            assert payload["summary"]["removed"] > 0  # type: ignore[index]
+            assert failed_action["status"] == "failed"
+            assert "injected unlink failure" in failed_action["error"]
+            assert failing.is_file()
 
     def test_uninstall_apply_partial_rmtree_failure_reports_failed_spec_history_separately(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             marker = target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("remove\n", encoding="utf-8")
             failing = (target / "spec-dock" / "initiatives").resolve()
@@ -13510,7 +13098,8 @@ exit 44
                     raise OSError("injected rmtree failure")
                 return original_rmtree(path, *args, **kwargs)
 
-            with patch("src.spec_dock.cli.shutil.rmtree", fail_one):
+            with pytest.MonkeyPatch.context() as monkeypatch:
+                monkeypatch.setattr("src.spec_dock.cli.shutil.rmtree", fail_one)
                 payload = self._uninstall_json_payload(
                     target,
                     "--apply",
@@ -13520,34 +13109,34 @@ exit 44
 
             actions = self._actions_by_path(payload)
             failed_action = actions["spec-dock/initiatives"]
-            self.assertEqual(payload["status"], "partial_failure")
-            self.assertGreater(payload["summary"]["failed"], 0)  # type: ignore[index]
-            self.assertGreater(payload["summary"]["removed"], 0)  # type: ignore[index]
-            self.assertEqual(failed_action["category"], "spec_history")
-            self.assertEqual(failed_action["status"], "failed")
-            self.assertIn("injected rmtree failure", failed_action["error"])
-            self.assertTrue(marker.is_file())
+            assert payload["status"] == "partial_failure"
+            assert payload["summary"]["failed"] > 0  # type: ignore[index]
+            assert payload["summary"]["removed"] > 0  # type: ignore[index]
+            assert failed_action["category"] == "spec_history"
+            assert failed_action["status"] == "failed"
+            assert "injected rmtree failure" in failed_action["error"]
+            assert marker.is_file()
 
     def test_uninstall_apply_output_provides_installer_direct_recovery_guidance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--apply", "--keep-specs"])
 
-            self.assertEqual(exit_code, 0, stderr)
-            self.assertEqual(stderr, "")
-            self.assertFalse((target / "spec-dock" / "scripts" / "spec-dock").exists())
-            self.assertIn("spec-dock uninstall", stdout)
-            self.assertIn("spec-dock init", stdout)
-            self.assertIn("spec-dock update", stdout)
-            self.assertNotIn("./spec-dock/scripts/spec-dock uninstall", stdout)
+            assert exit_code == 0, stderr
+            assert stderr == ""
+            assert not (target / "spec-dock" / "scripts" / "spec-dock").exists()
+            assert "spec-dock uninstall" in stdout
+            assert "spec-dock init" in stdout
+            assert "spec-dock update" in stdout
+            assert "./spec-dock/scripts/spec-dock uninstall" not in stdout
 
     def test_uninstall_apply_json_covers_success_rerun_and_partial_failure_statuses(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             success_target = Path(tmp) / "success"
             success_target.mkdir()
-            self.assertEqual(main(["init", str(success_target)]), 0)
+            assert main(["init", str(success_target)]) == 0
             marker = success_target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("keep\n", encoding="utf-8")
             preserved = success_target / ".codex" / "config.toml"
@@ -13556,22 +13145,22 @@ exit 44
             success_payload = self._uninstall_json_payload(success_target, "--apply", "--keep-specs")
             rerun_payload = self._uninstall_json_payload(success_target, "--apply", "--keep-specs")
 
-            self.assertEqual(success_payload["status"], "completed")
+            assert success_payload["status"] == "completed"
             success_statuses = {action["status"] for action in success_payload["actions"]}  # type: ignore[index]
-            self.assertIn("removed", success_statuses)
-            self.assertIn("preserved", success_statuses)
-            self.assertIn("empty_dir_removed", success_statuses)
-            self.assertIn("already_removed", {action["status"] for action in rerun_payload["actions"]})  # type: ignore[index]
-            self.assertTrue(preserved.is_file())
-            self.assertEqual(preserved.read_text(encoding="utf-8"), "product-owned config\n")
+            assert "removed" in success_statuses
+            assert "preserved" in success_statuses
+            assert "empty_dir_removed" in success_statuses
+            assert "already_removed" in {action["status"] for action in rerun_payload["actions"]}  # type: ignore[index]
+            assert preserved.is_file()
+            assert preserved.read_text(encoding="utf-8") == "product-owned config\n"
             for payload in (success_payload, rerun_payload):
                 for action in payload["actions"]:  # type: ignore[index]
                     for key in ("path", "category", "status", "reason", "error"):
-                        self.assertIn(key, action)
+                        assert key in action
 
             failure_target = Path(tmp) / "failure"
             failure_target.mkdir()
-            self.assertEqual(main(["init", str(failure_target)]), 0)
+            assert main(["init", str(failure_target)]) == 0
             failing = (failure_target / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md").resolve()
             original_unlink = Path.unlink
 
@@ -13580,7 +13169,8 @@ exit 44
                     raise OSError("injected unlink failure")
                 return original_unlink(path, *args, **kwargs)
 
-            with patch("src.spec_dock.cli.Path.unlink", fail_one):
+            with pytest.MonkeyPatch.context() as monkeypatch:
+                monkeypatch.setattr("src.spec_dock.cli.Path.unlink", fail_one)
                 failure_payload = self._uninstall_json_payload(
                     failure_target,
                     "--apply",
@@ -13589,24 +13179,24 @@ exit 44
                 )
 
             failure_statuses = {action["status"] for action in failure_payload["actions"]}  # type: ignore[index]
-            self.assertEqual(failure_payload["status"], "partial_failure")
-            self.assertIn("failed", failure_statuses)
-            self.assertIn("removed", failure_statuses)
-            self.assertGreater(failure_payload["summary"]["failed"], 0)  # type: ignore[index]
+            assert failure_payload["status"] == "partial_failure"
+            assert "failed" in failure_statuses
+            assert "removed" in failure_statuses
+            assert failure_payload["summary"]["failed"] > 0  # type: ignore[index]
 
     def test_uninstall_keep_and_remove_specs_are_mutually_exclusive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             before = self._relative_file_snapshot(target)
 
             exit_code, _stdout, stderr = self._capture_installer_main(
                 ["uninstall", str(target), "--apply", "--keep-specs", "--remove-specs"]
             )
 
-            self.assertEqual(exit_code, 2)
-            self.assertIn("not allowed with argument", stderr)
-            self.assertEqual(self._relative_file_snapshot(target), before)
+            assert exit_code == 2
+            assert "not allowed with argument" in stderr
+            assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_unmanaged_target_fails_before_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -13618,68 +13208,68 @@ exit 44
                 ["uninstall", str(target)],
                 ["uninstall", str(target), "--apply", "--keep-specs"],
             ):
-                with self.subTest(args=args):
+                with _case(args=args):
                     exit_code, stdout, stderr = self._capture_installer_main(args)
-                    self.assertEqual(exit_code, 2)
-                    self.assertEqual(stdout, "")
-                    self.assertIn("not a managed SpecDock repo", stderr)
-                    self.assertEqual(self._relative_file_snapshot(target), before)
+                    assert exit_code == 2
+                    assert stdout == ""
+                    assert "not a managed SpecDock repo" in stderr
+                    assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_json_is_one_parseable_object(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             marker = target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("keep\n", encoding="utf-8")
 
             exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json"])
 
-            self.assertEqual(exit_code, 0, stderr)
-            self.assertEqual(stderr, "")
+            assert exit_code == 0, stderr
+            assert stderr == ""
             payload = json.loads(stdout)
-            self.assertEqual(stdout.count("\n"), 1)
-            self.assertEqual(payload["schema_version"], 1)
-            self.assertEqual(payload["target"], str(target.resolve()))
-            self.assertEqual(payload["mode"], "dry-run")
-            self.assertFalse(payload["apply"])
-            self.assertEqual(payload["status"], "planned")
+            assert stdout.count("\n") == 1
+            assert payload["schema_version"] == 1
+            assert payload["target"] == str(target.resolve())
+            assert payload["mode"] == "dry-run"
+            assert not payload["apply"]
+            assert payload["status"] == "planned"
             for key in ("summary", "actions", "guidance", "errors"):
-                self.assertIn(key, payload)
+                assert key in payload
 
             actions_by_status = {action["status"]: action for action in payload["actions"]}
-            self.assertIn("would_remove", actions_by_status)
-            self.assertIn("preserved", actions_by_status)
+            assert "would_remove" in actions_by_status
+            assert "preserved" in actions_by_status
             for action in (actions_by_status["would_remove"], actions_by_status["preserved"]):
-                self.assertIn("path", action)
-                self.assertIn("category", action)
-                self.assertIn("reason", action)
-                self.assertIn("error", action)
+                assert "path" in action
+                assert "category" in action
+                assert "reason" in action
+                assert "error" in action
 
     def test_uninstall_json_preflight_errors_are_parseable_objects(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             before = self._relative_file_snapshot(target)
 
             cases = (
                 (["uninstall", str(target), "--json", "--apply"], "--keep-specs"),
             )
             for args, expected_error_text in cases:
-                with self.subTest(args=args):
+                with _case(args=args):
                     exit_code, stdout, stderr = self._capture_installer_main(args)
 
-                    self.assertEqual(exit_code, 2)
-                    self.assertEqual(stderr, "")
+                    assert exit_code == 2
+                    assert stderr == ""
                     payload = json.loads(stdout)
-                    self.assertEqual(stdout.count("\n"), 1)
-                    self.assertEqual(payload["schema_version"], 1)
-                    self.assertEqual(payload["target"], str(target.resolve()))
-                    self.assertEqual(payload["mode"], "apply")
-                    self.assertTrue(payload["apply"])
-                    self.assertEqual(payload["status"], "error")
-                    self.assertIn(expected_error_text, payload["errors"][0])
-                    self.assertEqual(payload["actions"], [])
-                    self.assertEqual(self._relative_file_snapshot(target), before)
+                    assert stdout.count("\n") == 1
+                    assert payload["schema_version"] == 1
+                    assert payload["target"] == str(target.resolve())
+                    assert payload["mode"] == "apply"
+                    assert payload["apply"]
+                    assert payload["status"] == "error"
+                    assert expected_error_text in payload["errors"][0]
+                    assert payload["actions"] == []
+                    assert self._relative_file_snapshot(target) == before
 
             unmanaged = target / "unmanaged"
             unmanaged.mkdir()
@@ -13688,16 +13278,16 @@ exit 44
 
             exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(unmanaged), "--json"])
 
-            self.assertEqual(exit_code, 2)
-            self.assertEqual(stderr, "")
+            assert exit_code == 2
+            assert stderr == ""
             payload = json.loads(stdout)
-            self.assertEqual(stdout.count("\n"), 1)
-            self.assertEqual(payload["mode"], "dry-run")
-            self.assertFalse(payload["apply"])
-            self.assertEqual(payload["status"], "error")
-            self.assertIn("not a managed SpecDock repo", payload["errors"][0])
-            self.assertEqual(payload["actions"], [])
-            self.assertEqual(self._relative_file_snapshot(unmanaged), unmanaged_before)
+            assert stdout.count("\n") == 1
+            assert payload["mode"] == "dry-run"
+            assert not payload["apply"]
+            assert payload["status"] == "error"
+            assert "not a managed SpecDock repo" in payload["errors"][0]
+            assert payload["actions"] == []
+            assert self._relative_file_snapshot(unmanaged) == unmanaged_before
 
     def test_uninstall_json_missing_target_path_returns_json_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -13705,14 +13295,14 @@ exit 44
 
             exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json"])
 
-            self.assertEqual(exit_code, 2)
-            self.assertEqual(stderr, "")
+            assert exit_code == 2
+            assert stderr == ""
             payload = json.loads(stdout)
-            self.assertEqual(stdout.count("\n"), 1)
-            self.assertEqual(payload["status"], "error")
-            self.assertIn("target path is not a directory", payload["errors"][0])
-            self.assertIn(str(target.resolve()), payload["errors"][0])
-            self.assertEqual(payload["actions"], [])
+            assert stdout.count("\n") == 1
+            assert payload["status"] == "error"
+            assert "target path is not a directory" in payload["errors"][0]
+            assert str(target.resolve()) in payload["errors"][0]
+            assert payload["actions"] == []
 
     def test_uninstall_json_file_target_returns_json_error_without_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -13722,32 +13312,32 @@ exit 44
 
             exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json"])
 
-            self.assertEqual(exit_code, 2)
-            self.assertEqual(stderr, "")
+            assert exit_code == 2
+            assert stderr == ""
             payload = json.loads(stdout)
-            self.assertEqual(stdout.count("\n"), 1)
-            self.assertEqual(payload["status"], "error")
-            self.assertIn("target path is not a directory", payload["errors"][0])
-            self.assertIn(str(target.resolve()), payload["errors"][0])
-            self.assertEqual(payload["actions"], [])
-            self.assertTrue(target.is_file())
-            self.assertEqual(target.read_text(encoding="utf-8"), before)
+            assert stdout.count("\n") == 1
+            assert payload["status"] == "error"
+            assert "target path is not a directory" in payload["errors"][0]
+            assert str(target.resolve()) in payload["errors"][0]
+            assert payload["actions"] == []
+            assert target.is_file()
+            assert target.read_text(encoding="utf-8") == before
 
     def test_uninstall_accepts_recovery_target_when_scripts_are_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             shutil.rmtree(target / "spec-dock" / "scripts")
             before = self._relative_file_snapshot(target)
 
             exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json"])
 
-            self.assertEqual(exit_code, 0, stderr)
-            self.assertEqual(stderr, "")
+            assert exit_code == 0, stderr
+            assert stderr == ""
             payload = json.loads(stdout)
-            self.assertEqual(payload["status"], "planned")
-            self.assertEqual(payload["target"], str(target.resolve()))
-            self.assertEqual(self._relative_file_snapshot(target), before)
+            assert payload["status"] == "planned"
+            assert payload["target"] == str(target.resolve())
+            assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_rejects_target_missing_version_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -13758,17 +13348,17 @@ exit 44
 
             exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json"])
 
-            self.assertEqual(exit_code, 2)
-            self.assertEqual(stderr, "")
+            assert exit_code == 2
+            assert stderr == ""
             payload = json.loads(stdout)
-            self.assertEqual(payload["status"], "error")
-            self.assertIn("spec-dock/spec-dock.version", payload["errors"][0])
-            self.assertEqual(self._relative_file_snapshot(target), before)
+            assert payload["status"] == "error"
+            assert "spec-dock/spec-dock.version" in payload["errors"][0]
+            assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_removes_known_agent_skill_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             managed_skill = target / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md"
             managed_skill.write_text("user edited managed skill\n", encoding="utf-8")
             before = self._relative_file_snapshot(target)
@@ -13776,15 +13366,15 @@ exit 44
             actions = self._uninstall_json_actions(target)
 
             action = actions[".agents/skills/spec-dock-issue-execution/SKILL.md"]
-            self.assertEqual(action["category"], "agent_skill")
-            self.assertEqual(action["status"], "would_remove")
-            self.assertIn("agent/skill", action["reason"])
-            self.assertEqual(self._relative_file_snapshot(target), before)
+            assert action["category"] == "agent_skill"
+            assert action["status"] == "would_remove"
+            assert "agent/skill" in action["reason"]
+            assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_preserves_unknown_files_under_managed_roots(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             unknown_paths = [
                 target / ".agents" / "skills" / "custom-product-agent" / "SKILL.md",
                 target / ".codex" / "notes" / "product.md",
@@ -13800,17 +13390,17 @@ exit 44
 
             for path in unknown_paths:
                 rel = path.relative_to(target).as_posix()
-                with self.subTest(rel=rel):
+                with _case(rel=rel):
                     action = actions[rel]
-                    self.assertEqual(action["category"], "unmanaged")
-                    self.assertEqual(action["status"], "preserved")
-                    self.assertIn("unmanaged", action["reason"])
-            self.assertEqual(self._relative_file_snapshot(target), before)
+                    assert action["category"] == "unmanaged"
+                    assert action["status"] == "preserved"
+                    assert "unmanaged" in action["reason"]
+            assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_removes_exact_match_bootstrap_and_product_reusable_assets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             before = self._relative_file_snapshot(target)
 
             actions = self._uninstall_json_actions(target)
@@ -13821,17 +13411,17 @@ exit 44
                 ".github/workflows/ci.yml": "product_reusable",
             }
             for rel, category in expected.items():
-                with self.subTest(rel=rel):
+                with _case(rel=rel):
                     action = actions[rel]
-                    self.assertEqual(action["category"], category)
-                    self.assertEqual(action["status"], "would_remove")
-                    self.assertIn("exact match", action["reason"])
-            self.assertEqual(self._relative_file_snapshot(target), before)
+                    assert action["category"] == category
+                    assert action["status"] == "would_remove"
+                    assert "exact match" in action["reason"]
+            assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_preserves_mismatch_bootstrap_and_product_reusable_assets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             edited = [
                 target / ".codex" / "config.toml",
                 target / ".github" / "workflows" / "ci.yml",
@@ -13844,17 +13434,17 @@ exit 44
 
             for path in edited:
                 rel = path.relative_to(target).as_posix()
-                with self.subTest(rel=rel):
+                with _case(rel=rel):
                     action = actions[rel]
-                    self.assertEqual(action["status"], "preserved")
-                    self.assertIn("content mismatch", action["reason"])
-                    self.assertIn("manual review", action["reason"])
-            self.assertEqual(self._relative_file_snapshot(target), before)
+                    assert action["status"] == "preserved"
+                    assert "content mismatch" in action["reason"]
+                    assert "manual review" in action["reason"]
+            assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_preserves_non_core_comparison_errors_for_manual_review(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             config = target / ".codex" / "config.toml"
             config.unlink()
             config.mkdir()
@@ -13871,19 +13461,19 @@ exit 44
             actions = self._uninstall_json_actions(target)
 
             for rel in (".codex/config.toml", ".github/workflows/ci.yml"):
-                with self.subTest(rel=rel):
+                with _case(rel=rel):
                     action = actions[rel]
-                    self.assertEqual(action["status"], "preserved")
-                    self.assertIn("comparison error", action["reason"])
-                    self.assertIn("manual review", action["reason"])
+                    assert action["status"] == "preserved"
+                    assert "comparison error" in action["reason"]
+                    assert "manual review" in action["reason"]
             if symlink_created:
-                self.assertEqual(os.readlink(workflow), "../product-ci.yml")
-            self.assertEqual(self._relative_file_snapshot(target), before)
+                assert os.readlink(workflow) == "../product-ci.yml"
+            assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_scaffold_managed_exact_match_removes_and_mismatch_preserves(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             edited_doc = target / "spec-dock" / "docs" / "guide.md"
             edited_doc.write_text("product docs edit\n", encoding="utf-8")
             before = self._relative_file_snapshot(target)
@@ -13891,19 +13481,19 @@ exit 44
             actions = self._uninstall_json_actions(target)
 
             exact_action = actions["spec-dock/scripts/spec-dock"]
-            self.assertEqual(exact_action["category"], "scaffold_managed")
-            self.assertEqual(exact_action["status"], "would_remove")
-            self.assertIn("exact match", exact_action["reason"])
+            assert exact_action["category"] == "scaffold_managed"
+            assert exact_action["status"] == "would_remove"
+            assert "exact match" in exact_action["reason"]
             edited_action = actions["spec-dock/docs/guide.md"]
-            self.assertEqual(edited_action["category"], "scaffold_managed")
-            self.assertEqual(edited_action["status"], "preserved")
-            self.assertIn("content mismatch", edited_action["reason"])
-            self.assertEqual(self._relative_file_snapshot(target), before)
+            assert edited_action["category"] == "scaffold_managed"
+            assert edited_action["status"] == "preserved"
+            assert "content mismatch" in edited_action["reason"]
+            assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_removes_stale_specdock_version(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             version_file = target / "spec-dock" / "spec-dock.version"
             version_file.write_text("0.0.0\n", encoding="utf-8")
             before = self._relative_file_snapshot(target)
@@ -13911,10 +13501,10 @@ exit 44
             actions = self._uninstall_json_actions(target)
 
             action = actions["spec-dock/spec-dock.version"]
-            self.assertEqual(action["category"], "scaffold_managed")
-            self.assertEqual(action["status"], "would_remove")
-            self.assertIn("managed state", action["reason"])
-            self.assertEqual(self._relative_file_snapshot(target), before)
+            assert action["category"] == "scaffold_managed"
+            assert action["status"] == "would_remove"
+            assert "managed state" in action["reason"]
+            assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_spec_shortcut_only_removes_matching_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -13925,10 +13515,10 @@ exit 44
                 ("directory", "directory", None, "preserved"),
             )
             for name, kind, link_target, expected_status in cases:
-                with self.subTest(name=name):
+                with _case(name=name):
                     target = Path(tmp) / name
                     target.mkdir()
-                    self.assertEqual(main(["init", str(target)]), 0)
+                    assert main(["init", str(target)]) == 0
                     shortcut = target / "spec"
                     if shortcut.is_symlink() or shortcut.is_file():
                         shortcut.unlink()
@@ -13939,7 +13529,7 @@ exit 44
                         try:
                             os.symlink(link_target, shortcut)
                         except OSError:
-                            self.skipTest("symlink creation is unavailable")
+                            pytest.skip("symlink creation is unavailable")
                     elif kind == "file":
                         shortcut.write_text("product shortcut\n", encoding="utf-8")
                     else:
@@ -13949,13 +13539,13 @@ exit 44
                     actions = self._uninstall_json_actions(target)
 
                     action = actions["spec"]
-                    self.assertEqual(action["category"], "shortcut")
-                    self.assertEqual(action["status"], expected_status)
+                    assert action["category"] == "shortcut"
+                    assert action["status"] == expected_status
                     if expected_status == "would_remove":
-                        self.assertIn("spec-dock/scripts/spec-dock", action["reason"])
+                        assert "spec-dock/scripts/spec-dock" in action["reason"]
                     else:
-                        self.assertIn("not spec-dock shortcut", action["reason"])
-                    self.assertEqual(self._relative_file_snapshot(target), before)
+                        assert "not spec-dock shortcut" in action["reason"]
+                    assert self._relative_file_snapshot(target) == before
 
     def _clear_active_entrypoints(self, target: Path) -> Path:
         active_dir = target / "spec-dock" / "active"
@@ -13965,15 +13555,15 @@ exit 44
                 p.unlink(missing_ok=True)
             elif p.is_dir():
                 shutil.rmtree(p)
-        self.assertEqual(list(active_dir.iterdir()), [])
+        assert list(active_dir.iterdir()) == []
         return active_dir
 
     def _overlay_checked_in_dogfooding_runtime(self, target: Path) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         checked_in_scripts_dir = repo_root / "spec-dock" / "scripts"
         target_scripts_dir = target / "spec-dock" / "scripts"
-        self.assertTrue(checked_in_scripts_dir.is_dir(), f"checked-in scripts dir missing: {checked_in_scripts_dir}")
-        self.assertTrue(target_scripts_dir.is_dir(), f"target scripts dir missing: {target_scripts_dir}")
+        assert checked_in_scripts_dir.is_dir(), f"checked-in scripts dir missing: {checked_in_scripts_dir}"
+        assert target_scripts_dir.is_dir(), f"target scripts dir missing: {target_scripts_dir}"
 
         target_runtime_dir = target_scripts_dir / "spec_dock_runtime"
         if target_runtime_dir.exists():
@@ -14043,9 +13633,9 @@ exit 44
                 },
             },
         )
-        self.assertTrue((initiative_dir / ".meta.json").is_file())
-        self.assertTrue((epic_dir / ".meta.json").is_file())
-        self.assertTrue((issue_dir / ".meta.json").is_file())
+        assert (initiative_dir / ".meta.json").is_file()
+        assert (epic_dir / ".meta.json").is_file()
+        assert (issue_dir / ".meta.json").is_file()
         return initiative_dir, epic_dir, issue_dir
 
     def _materialize_local_issue_under_epic(
@@ -14087,11 +13677,11 @@ exit 44
 
     def test_checked_in_dogfooding_runtime_subprocess_import_post_sync_no_crash_parity(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             self._create_minimal_local_tree(target)
             self._run_git(target, ["init"])
@@ -14107,23 +13697,21 @@ exit 44
                 ["import", "issue", "123", "--title", "Imported issue", "--epic", "epic-local-00001"],
                 env=test_env,
             )
-            self.assertEqual(
-                import_result.returncode,
-                0,
-                msg=f"import stdout:\n{import_result.stdout}\nimport stderr:\n{import_result.stderr}",
-            )
-            self.assertIn("spec-dock: ok (import issue)", import_result.stdout)
-            self.assertNotIn("import_post_sync_failed", import_result.stderr)
-            self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
-            self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
+            assert import_result.returncode == \
+                0, \
+                f"import stdout:\n{import_result.stdout}\nimport stderr:\n{import_result.stderr}"
+            assert "spec-dock: ok (import issue)" in import_result.stdout
+            assert "import_post_sync_failed" not in import_result.stderr
+            assert (target / "spec-dock" / ".agent" / "index.json").is_file()
+            assert (target / "spec-dock" / ".agent" / "tree.json").is_file()
 
     def test_checked_in_dogfooding_runtime_subprocess_issue_create_gateway_failure_pre_github_parity(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, _current_issue_dir = self._create_minimal_local_tree(target)
 
@@ -14160,26 +13748,24 @@ exit 44
                 ["new", "issue", "--epic", "epic-local-00001", "--title", "Gateway failure issue"],
                 env=test_env,
             )
-            self.assertEqual(
-                create_result.returncode,
-                1,
-                msg=f"new issue stdout:\n{create_result.stdout}\nnew issue stderr:\n{create_result.stderr}",
-            )
-            self.assertIn("Outcome: pre_github_fail", create_result.stderr)
-            self.assertNotIn("GitHub issue was created:", create_result.stderr)
+            assert create_result.returncode == \
+                1, \
+                f"new issue stdout:\n{create_result.stdout}\nnew issue stderr:\n{create_result.stderr}"
+            assert "Outcome: pre_github_fail" in create_result.stderr
+            assert "GitHub issue was created:" not in create_result.stderr
 
             after_issue_dirs = sorted(p.name for p in issues_dir.iterdir() if p.is_dir())
-            self.assertEqual(after_issue_dirs, before_issue_dirs)
-            self.assertFalse(any(name.endswith("-gateway-failure-issue") for name in after_issue_dirs))
+            assert after_issue_dirs == before_issue_dirs
+            assert not any(name.endswith("-gateway-failure-issue") for name in after_issue_dirs)
 
             gh_calls = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
-            self.assertEqual(len(gh_calls), 1, msg=f"unexpected gh calls: {gh_calls}")
-            self.assertEqual(gh_calls[0], "issue create", msg=f"unexpected gh calls: {gh_calls}")
+            assert len(gh_calls) == 1, f"unexpected gh calls: {gh_calls}"
+            assert gh_calls[0] == "issue create", f"unexpected gh calls: {gh_calls}"
 
     def test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
             self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
@@ -14213,20 +13799,18 @@ exit 44
                 target,
                 ["deps", "check", "--id", "iss-local-00003", "--json"],
             )
-            self.assertEqual(
-                deps_result.returncode,
-                3,
-                msg=f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}",
-            )
+            assert deps_result.returncode == \
+                3, \
+                f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}"
             payload = json.loads(deps_result.stdout)
-            self.assertEqual(payload.get("effective_depends_on"), ["iss-local-00001"])
-            self.assertEqual(payload.get("blockers"), ["iss-local-00001"])
-            self.assertNotIn("Ambiguous github.issue_number=123", deps_result.stderr)
+            assert payload.get("effective_depends_on") == ["iss-local-00001"]
+            assert payload.get("blockers") == ["iss-local-00001"]
+            assert "Ambiguous github.issue_number=123" not in deps_result.stderr
 
     def test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
             self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
@@ -14250,44 +13834,38 @@ exit 44
             self._write_json_force(foreign_meta_path, foreign_meta)
 
             ambiguous_active = self._run_runtime_capture(target, ["active", "set", "123", "--force"])
-            self.assertEqual(
-                ambiguous_active.returncode,
-                1,
-                msg=f"active(ambiguous) stdout:\n{ambiguous_active.stdout}\nactive(ambiguous) stderr:\n{ambiguous_active.stderr}",
-            )
-            self.assertIn("Ambiguous github.issue_number=123", ambiguous_active.stderr)
+            assert ambiguous_active.returncode == \
+                1, \
+                f"active(ambiguous) stdout:\n{ambiguous_active.stdout}\nactive(ambiguous) stderr:\n{ambiguous_active.stderr}"
+            assert "Ambiguous github.issue_number=123" in ambiguous_active.stderr
 
             scoped_active = self._run_runtime_capture(
                 target,
                 ["active", "set", "https://github.com/other/repo/issues/123", "--force"],
             )
-            self.assertEqual(
-                scoped_active.returncode,
-                0,
-                msg=f"active(scoped) stdout:\n{scoped_active.stdout}\nactive(scoped) stderr:\n{scoped_active.stderr}",
-            )
-            self.assertIn("spec-dock: ok (active set)", scoped_active.stdout)
+            assert scoped_active.returncode == \
+                0, \
+                f"active(scoped) stdout:\n{scoped_active.stdout}\nactive(scoped) stderr:\n{scoped_active.stderr}"
+            assert "spec-dock: ok (active set)" in scoped_active.stdout
 
             active_manifest = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active_manifest["issue"]["id"], "iss-local-00002")
+            assert active_manifest["issue"]["id"] == "iss-local-00002"
 
             scoped_deps = self._run_runtime_capture(
                 target,
                 ["deps", "check", "https://github.com/other/repo/issues/123", "--json"],
             )
-            self.assertIn(
-                scoped_deps.returncode,
-                (0, 3),
-                msg=f"deps(scoped) stdout:\n{scoped_deps.stdout}\ndeps(scoped) stderr:\n{scoped_deps.stderr}",
-            )
-            self.assertIn('"target": "iss-local-00002"', scoped_deps.stdout)
+            assert scoped_deps.returncode in \
+                (0, 3), \
+                f"deps(scoped) stdout:\n{scoped_deps.stdout}\ndeps(scoped) stderr:\n{scoped_deps.stderr}"
+            assert '"target": "iss-local-00002"' in scoped_deps.stdout
 
     def test_checked_in_dogfooding_runtime_subprocess_current_repo_url_target_resolves_unscoped_current_parity(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
             self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
@@ -14314,29 +13892,25 @@ exit 44
                 target,
                 ["active", "set", "https://github.com/current/repo/issues/123", "--force"],
             )
-            self.assertEqual(
-                active_current.returncode,
-                0,
-                msg=f"active(current) stdout:\n{active_current.stdout}\nactive(current) stderr:\n{active_current.stderr}",
-            )
+            assert active_current.returncode == \
+                0, \
+                f"active(current) stdout:\n{active_current.stdout}\nactive(current) stderr:\n{active_current.stderr}"
             active_manifest = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active_manifest["issue"]["id"], "iss-local-00001")
+            assert active_manifest["issue"]["id"] == "iss-local-00001"
 
             deps_current = self._run_runtime_capture(
                 target,
                 ["deps", "check", "https://github.com/current/repo/issues/123", "--json"],
             )
-            self.assertIn(
-                deps_current.returncode,
-                (0, 3),
-                msg=f"deps(current) stdout:\n{deps_current.stdout}\ndeps(current) stderr:\n{deps_current.stderr}",
-            )
-            self.assertIn('"target": "iss-local-00001"', deps_current.stdout)
+            assert deps_current.returncode in \
+                (0, 3), \
+                f"deps(current) stdout:\n{deps_current.stdout}\ndeps(current) stderr:\n{deps_current.stderr}"
+            assert '"target": "iss-local-00001"' in deps_current.stdout
 
     def test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
             self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
@@ -14368,7 +13942,7 @@ exit 44
                 "https://github.com/current/repo/issues/123": "iss-local-00001",
             }
             for dep_ref, expected_dep in expected_by_ref.items():
-                with self.subTest(dep_ref=dep_ref):
+                with _case(dep_ref=dep_ref):
                     depends_meta_path = depends_issue_dir / ".meta.json"
                     depends_meta = json.loads(depends_meta_path.read_text(encoding="utf-8"))
                     depends_meta["depends_on"] = [dep_ref]
@@ -14377,19 +13951,17 @@ exit 44
                         target,
                         ["deps", "check", "--id", "iss-local-00003", "--json"],
                     )
-                    self.assertEqual(
-                        deps_result.returncode,
-                        3,
-                        msg=f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}",
-                    )
+                    assert deps_result.returncode == \
+                        3, \
+                        f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}"
                     payload = json.loads(deps_result.stdout)
-                    self.assertEqual(payload.get("effective_depends_on"), [expected_dep])
-                    self.assertEqual(payload.get("blockers"), [expected_dep])
+                    assert payload.get("effective_depends_on") == [expected_dep]
+                    assert payload.get("blockers") == [expected_dep]
 
     def test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, _current_issue_dir = self._create_minimal_local_tree(target)
             self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
@@ -14418,75 +13990,59 @@ exit 44
                 target,
                 ["deps", "check", "--id", "iss-local-00003"],
             )
-            self.assertEqual(
-                deps_result.returncode,
-                1,
-                msg=f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}",
-            )
-            self.assertIn(
-                "No node found for github.issue_number=123 in current repo scope (current/repo)",
-                deps_result.stderr,
-            )
-            self.assertIn("Create/link the node first.", deps_result.stderr)
+            assert deps_result.returncode == \
+                1, \
+                f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}"
+            assert "No node found for github.issue_number=123 in current repo scope (current/repo)" in \
+                deps_result.stderr
+            assert "Create/link the node first." in deps_result.stderr
 
     def test_checked_in_dogfooding_runtime_subprocess_keeps_sync_deps_active_validate_doctor_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             self._create_minimal_local_tree(target)
 
             sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(
-                sync_result.returncode,
-                0,
-                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
-            )
-            self.assertIn("spec-dock: ok (sync)", sync_result.stdout)
+            assert sync_result.returncode == \
+                0, \
+                f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            assert "spec-dock: ok (sync)" in sync_result.stdout
 
             deps_result = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-local-00001"])
-            self.assertIn(
-                deps_result.returncode,
-                (0, 3),
-                msg=f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}",
-            )
-            self.assertTrue(
-                "spec-dock: ok (deps check)" in deps_result.stdout
-                or "spec-dock: blocked (deps check)" in deps_result.stderr,
-                msg=f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}",
-            )
+            assert deps_result.returncode in \
+                (0, 3), \
+                f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}"
+            assert "spec-dock: ok (deps check)" in deps_result.stdout \
+                or "spec-dock: blocked (deps check)" in deps_result.stderr, \
+                f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}"
 
             active_result = self._run_runtime_capture(target, ["active", "set", "--id", "iss-local-00001", "--force"])
-            self.assertEqual(
-                active_result.returncode,
-                0,
-                msg=f"active stdout:\n{active_result.stdout}\nactive stderr:\n{active_result.stderr}",
-            )
-            self.assertIn("spec-dock: ok (active set)", active_result.stdout)
+            assert active_result.returncode == \
+                0, \
+                f"active stdout:\n{active_result.stdout}\nactive stderr:\n{active_result.stderr}"
+            assert "spec-dock: ok (active set)" in active_result.stdout
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(
-                validate_result.returncode,
-                0,
-                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
-            )
-            self.assertIn("spec-dock: ok (validate)", validate_result.stdout)
+            assert validate_result.returncode == \
+                0, \
+                f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            assert "spec-dock: ok (validate)" in validate_result.stdout
 
             doctor_result = self._run_runtime_capture(target, ["doctor"])
-            self.assertEqual(
-                doctor_result.returncode,
-                0,
-                msg=f"doctor stdout:\n{doctor_result.stdout}\ndoctor stderr:\n{doctor_result.stderr}",
-            )
-            self.assertIn("spec-dock: ok (doctor) findings=0", doctor_result.stdout)
+            assert doctor_result.returncode == \
+                0, \
+                f"doctor stdout:\n{doctor_result.stdout}\ndoctor stderr:\n{doctor_result.stderr}"
+            assert "spec-dock: ok (doctor) findings=0" in doctor_result.stdout
 
     def test_checked_in_dogfooding_runtime_subprocess_keeps_lone_unscoped_legacy_without_backfill_parity(self) -> None:
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
             self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
@@ -14505,24 +14061,22 @@ exit 44
             self._write_json_force(foreign_meta_path, foreign_meta)
 
             sync_result = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"])
-            self.assertEqual(
-                sync_result.returncode,
-                0,
-                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
-            )
+            assert sync_result.returncode == \
+                0, \
+                f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
 
             current_meta_after = json.loads(current_meta_path.read_text(encoding="utf-8"))
-            self.assertEqual(current_meta_after["github"]["issue_number"], 123)
-            self.assertNotIn("repo_owner", current_meta_after["github"])
-            self.assertNotIn("repo_name", current_meta_after["github"])
+            assert current_meta_after["github"]["issue_number"] == 123
+            assert "repo_owner" not in current_meta_after["github"]
+            assert "repo_name" not in current_meta_after["github"]
 
     def test_checked_in_dogfooding_runtime_subprocess_keeps_readonly_lone_unscoped_without_backfill_parity(self) -> None:
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
             self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
@@ -14551,22 +14105,20 @@ exit 44
             )
 
             sync_result = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"])
-            self.assertEqual(
-                sync_result.returncode,
-                0,
-                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
-            )
+            assert sync_result.returncode == \
+                0, \
+                f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
 
             current_meta_after = json.loads(current_meta_path.read_text(encoding="utf-8"))
-            self.assertEqual(current_meta_after["github"]["issue_number"], 123)
-            self.assertNotIn("repo_owner", current_meta_after["github"])
-            self.assertNotIn("repo_name", current_meta_after["github"])
-            self.assertEqual(current_meta_path.stat().st_mode & 0o222, 0)
+            assert current_meta_after["github"]["issue_number"] == 123
+            assert "repo_owner" not in current_meta_after["github"]
+            assert "repo_name" not in current_meta_after["github"]
+            assert current_meta_path.stat().st_mode & 0o222 == 0
 
     def test_checked_in_dogfooding_runtime_subprocess_validation_boundary_prefers_structure_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
 
@@ -14580,36 +14132,30 @@ exit 44
             (issue_dir / "design.md").unlink()
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(
-                validate_result.returncode,
-                1,
-                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
-            )
-            self.assertIn("epic missing parent_id", validate_result.stderr)
-            self.assertNotIn("Missing required artifact", validate_result.stderr)
+            assert validate_result.returncode == \
+                1, \
+                f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            assert "epic missing parent_id" in validate_result.stderr
+            assert "Missing required artifact" not in validate_result.stderr
 
             doctor_result = self._run_runtime_capture(target, ["doctor"])
-            self.assertEqual(
-                doctor_result.returncode,
-                1,
-                msg=f"doctor stdout:\n{doctor_result.stdout}\ndoctor stderr:\n{doctor_result.stderr}",
-            )
-            self.assertIn("epic missing parent_id", doctor_result.stderr)
-            self.assertNotIn("Missing required artifact", doctor_result.stderr)
+            assert doctor_result.returncode == \
+                1, \
+                f"doctor stdout:\n{doctor_result.stdout}\ndoctor stderr:\n{doctor_result.stderr}"
+            assert "epic missing parent_id" in doctor_result.stderr
+            assert "Missing required artifact" not in doctor_result.stderr
 
             sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(
-                sync_result.returncode,
-                1,
-                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
-            )
-            self.assertIn("epic missing parent_id", sync_result.stderr)
-            self.assertNotIn("Missing required artifact", sync_result.stderr)
+            assert sync_result.returncode == \
+                1, \
+                f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            assert "epic missing parent_id" in sync_result.stderr
+            assert "Missing required artifact" not in sync_result.stderr
 
     def test_checked_in_dogfooding_runtime_subprocess_sync_fails_when_required_artifact_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _, _, issue_dir = self._create_minimal_local_tree(target)
 
@@ -14617,22 +14163,20 @@ exit 44
             (issue_dir / "report.md").unlink()
 
             sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(
-                sync_result.returncode,
-                1,
-                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
-            )
-            self.assertIn("preflight validate failed: Missing required artifact", sync_result.stderr)
-            self.assertIn("report.md", sync_result.stderr)
-            self.assertNotIn("spec-dock: ok (sync)", sync_result.stdout)
+            assert sync_result.returncode == \
+                1, \
+                f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            assert "preflight validate failed: Missing required artifact" in sync_result.stderr
+            assert "report.md" in sync_result.stderr
+            assert "spec-dock: ok (sync)" not in sync_result.stdout
 
     def test_checked_in_dogfooding_runtime_subprocess_import_fails_fast_when_required_artifact_missing(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _, _, issue_dir = self._create_minimal_local_tree(target)
 
@@ -14650,16 +14194,13 @@ exit 44
                 ["import", "issue", "123", "--title", "Imported issue", "--epic", "epic-local-00001"],
                 env=test_env,
             )
-            self.assertEqual(
-                import_result.returncode,
-                1,
-                msg=f"import stdout:\n{import_result.stdout}\nimport stderr:\n{import_result.stderr}",
-            )
-            self.assertIn("preflight validate failed", import_result.stderr)
-            self.assertIn("Missing required artifact", import_result.stderr)
-            self.assertIn("report.md", import_result.stderr)
-            self.assertFalse(
-                (
+            assert import_result.returncode == \
+                1, \
+                f"import stdout:\n{import_result.stdout}\nimport stderr:\n{import_result.stderr}"
+            assert "preflight validate failed" in import_result.stderr
+            assert "Missing required artifact" in import_result.stderr
+            assert "report.md" in import_result.stderr
+            assert not (
                     target
                     / "spec-dock"
                     / "initiatives"
@@ -14669,17 +14210,16 @@ exit 44
                     / "issues"
                     / "iss-00123-imported-issue"
                 ).exists()
-            )
             if log_path.exists():
-                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
+                assert log_path.read_text(encoding="utf-8").strip() == ""
 
     def test_checked_in_dogfooding_runtime_subprocess_import_partial_write_doctor_first_parity(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             self._create_minimal_local_tree(target)
             self._run_git(target, ["init"])
@@ -14695,9 +14235,8 @@ exit 44
 import io
 import os
 import sys
-from contextlib import redirect_stderr
+from contextlib import contextmanager, redirect_stderr
 from pathlib import Path
-from unittest.mock import patch
 
 sys.path.insert(0, {str(runtime_scripts_dir)!r})
 try:
@@ -14707,9 +14246,20 @@ try:
 finally:
     sys.path.pop(0)
 
+@contextmanager
+def patch_object(obj, name, side_effect):
+    original = getattr(obj, name)
+    def replacement(*args, **kwargs):
+        raise side_effect
+    setattr(obj, name, replacement)
+    try:
+        yield
+    finally:
+        setattr(obj, name, original)
+
 os.chdir({str(target)!r})
 stderr_buffer = io.StringIO()
-with patch.object(
+with patch_object(
     app_import_node,
     "execute_create_plan",
     side_effect=app_create_node.CreatePlanExecutionError(
@@ -14738,12 +14288,12 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 text=True,
                 env=test_env,
             )
-            self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+            assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
     def test_checked_in_dogfooding_runtime_subprocess_sync_force_degrades_when_required_artifact_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _, _, issue_dir = self._create_minimal_local_tree(target)
             agent_dir = target / "spec-dock" / ".agent"
@@ -14752,31 +14302,27 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             (issue_dir / "report.md").unlink()
 
             sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active", "--force"])
-            self.assertEqual(
-                sync_result.returncode,
-                0,
-                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
-            )
-            self.assertIn("preflight validate failed", sync_result.stderr)
-            self.assertIn("report.md", sync_result.stderr)
-            self.assertTrue(
-                "deps_preflight_failed" in sync_result.stderr or "DEPS_DISABLED" in sync_result.stderr,
-                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
-            )
-            self.assertIn("spec-dock: ok (sync)", sync_result.stdout)
+            assert sync_result.returncode == \
+                0, \
+                f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            assert "preflight validate failed" in sync_result.stderr
+            assert "report.md" in sync_result.stderr
+            assert "deps_preflight_failed" in sync_result.stderr or "DEPS_DISABLED" in sync_result.stderr, \
+                f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            assert "spec-dock: ok (sync)" in sync_result.stdout
 
             index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
-            self.assertFalse(index["deps"]["valid"])
-            self.assertIn("preflight validate failed", str(index["deps"]["error"]))
+            assert not index["deps"]["valid"]
+            assert "preflight validate failed" in str(index["deps"]["error"])
 
             tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
-            self.assertFalse(tree["deps"]["valid"])
-            self.assertIn("preflight validate failed", str(tree["deps"]["error"]))
+            assert not tree["deps"]["valid"]
+            assert "preflight validate failed" in str(tree["deps"]["error"])
 
     def test_checked_in_dogfooding_runtime_subprocess_sync_validation_boundary_prefers_structure_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
 
@@ -14790,18 +14336,16 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             (issue_dir / "design.md").unlink()
 
             sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(
-                sync_result.returncode,
-                1,
-                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
-            )
-            self.assertIn("epic missing parent_id", sync_result.stderr)
-            self.assertNotIn("Missing required artifact", sync_result.stderr)
+            assert sync_result.returncode == \
+                1, \
+                f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            assert "epic missing parent_id" in sync_result.stderr
+            assert "Missing required artifact" not in sync_result.stderr
 
     def test_checked_in_dogfooding_runtime_subprocess_validate_doctor_fail_when_required_artifact_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _, _, issue_dir = self._create_minimal_local_tree(target)
 
@@ -14809,27 +14353,23 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             (issue_dir / "design.md").unlink()
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(
-                validate_result.returncode,
-                1,
-                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
-            )
-            self.assertIn("Missing required artifact", validate_result.stderr)
-            self.assertIn("design.md", validate_result.stderr)
+            assert validate_result.returncode == \
+                1, \
+                f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            assert "Missing required artifact" in validate_result.stderr
+            assert "design.md" in validate_result.stderr
 
             doctor_result = self._run_runtime_capture(target, ["doctor"])
-            self.assertEqual(
-                doctor_result.returncode,
-                1,
-                msg=f"doctor stdout:\n{doctor_result.stdout}\ndoctor stderr:\n{doctor_result.stderr}",
-            )
-            self.assertIn("[missing_artifact] Missing required artifact", doctor_result.stderr)
-            self.assertIn("design.md", doctor_result.stderr)
+            assert doctor_result.returncode == \
+                1, \
+                f"doctor stdout:\n{doctor_result.stdout}\ndoctor stderr:\n{doctor_result.stderr}"
+            assert "[missing_artifact] Missing required artifact" in doctor_result.stderr
+            assert "design.md" in doctor_result.stderr
 
     def test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, _epic_dir, issue_dir = self._create_minimal_local_tree(target)
 
@@ -14854,31 +14394,25 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             )
 
             validate_in_progress = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(
-                validate_in_progress.returncode,
-                1,
-                msg=f"validate(in_progress) stdout:\n{validate_in_progress.stdout}\nvalidate(in_progress) stderr:\n{validate_in_progress.stderr}",
-            )
-            self.assertIn("Create in-progress state detected", validate_in_progress.stderr)
-            self.assertNotIn("Missing required artifact", validate_in_progress.stderr)
+            assert validate_in_progress.returncode == \
+                1, \
+                f"validate(in_progress) stdout:\n{validate_in_progress.stdout}\nvalidate(in_progress) stderr:\n{validate_in_progress.stderr}"
+            assert "Create in-progress state detected" in validate_in_progress.stderr
+            assert "Missing required artifact" not in validate_in_progress.stderr
 
             sync_in_progress = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(
-                sync_in_progress.returncode,
-                1,
-                msg=f"sync(in_progress) stdout:\n{sync_in_progress.stdout}\nsync(in_progress) stderr:\n{sync_in_progress.stderr}",
-            )
-            self.assertIn("Create in-progress state detected", sync_in_progress.stderr)
+            assert sync_in_progress.returncode == \
+                1, \
+                f"sync(in_progress) stdout:\n{sync_in_progress.stdout}\nsync(in_progress) stderr:\n{sync_in_progress.stderr}"
+            assert "Create in-progress state detected" in sync_in_progress.stderr
 
             doctor_in_progress = self._run_runtime_capture(target, ["doctor"])
-            self.assertEqual(
-                doctor_in_progress.returncode,
-                1,
-                msg=f"doctor(in_progress) stdout:\n{doctor_in_progress.stdout}\ndoctor(in_progress) stderr:\n{doctor_in_progress.stderr}",
-            )
-            self.assertIn("[stale_create_lock]", doctor_in_progress.stderr)
-            self.assertIn("Create in-progress state detected", doctor_in_progress.stderr)
-            self.assertNotIn("[missing_artifact]", doctor_in_progress.stderr)
+            assert doctor_in_progress.returncode == \
+                1, \
+                f"doctor(in_progress) stdout:\n{doctor_in_progress.stdout}\ndoctor(in_progress) stderr:\n{doctor_in_progress.stderr}"
+            assert "[stale_create_lock]" in doctor_in_progress.stderr
+            assert "Create in-progress state detected" in doctor_in_progress.stderr
+            assert "[missing_artifact]" not in doctor_in_progress.stderr
 
             lock_path.write_text(
                 "\n".join(
@@ -14895,36 +14429,30 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             )
 
             validate_stale = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(
-                validate_stale.returncode,
-                1,
-                msg=f"validate(stale) stdout:\n{validate_stale.stdout}\nvalidate(stale) stderr:\n{validate_stale.stderr}",
-            )
-            self.assertIn("Stale create-lock state detected", validate_stale.stderr)
-            self.assertNotIn("Missing required artifact", validate_stale.stderr)
+            assert validate_stale.returncode == \
+                1, \
+                f"validate(stale) stdout:\n{validate_stale.stdout}\nvalidate(stale) stderr:\n{validate_stale.stderr}"
+            assert "Stale create-lock state detected" in validate_stale.stderr
+            assert "Missing required artifact" not in validate_stale.stderr
 
             sync_stale = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(
-                sync_stale.returncode,
-                1,
-                msg=f"sync(stale) stdout:\n{sync_stale.stdout}\nsync(stale) stderr:\n{sync_stale.stderr}",
-            )
-            self.assertIn("Stale create-lock state detected", sync_stale.stderr)
+            assert sync_stale.returncode == \
+                1, \
+                f"sync(stale) stdout:\n{sync_stale.stdout}\nsync(stale) stderr:\n{sync_stale.stderr}"
+            assert "Stale create-lock state detected" in sync_stale.stderr
 
             doctor_stale = self._run_runtime_capture(target, ["doctor"])
-            self.assertEqual(
-                doctor_stale.returncode,
-                1,
-                msg=f"doctor(stale) stdout:\n{doctor_stale.stdout}\ndoctor(stale) stderr:\n{doctor_stale.stderr}",
-            )
-            self.assertIn("[stale_create_lock]", doctor_stale.stderr)
-            self.assertIn("Stale create-lock state detected", doctor_stale.stderr)
-            self.assertNotIn("[missing_artifact]", doctor_stale.stderr)
+            assert doctor_stale.returncode == \
+                1, \
+                f"doctor(stale) stdout:\n{doctor_stale.stdout}\ndoctor(stale) stderr:\n{doctor_stale.stderr}"
+            assert "[stale_create_lock]" in doctor_stale.stderr
+            assert "Stale create-lock state detected" in doctor_stale.stderr
+            assert "[missing_artifact]" not in doctor_stale.stderr
 
     def test_update_rebuilds_active_entrypoints_from_persisted_manifest_when_valid_and_active_dir_empty(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
             active_dir = self._clear_active_entrypoints(target)
 
@@ -14947,44 +14475,36 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
-            self.assertEqual(
-                self._read_active_pointer_text(target, "initiative", "requirement.md"),
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "epic", "requirement.md"),
-                (epic_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "report.md"),
-                (issue_dir / "report.md").read_text(encoding="utf-8"),
-            )
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
+                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
+                (epic_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == \
+                (issue_dir / "report.md").read_text(encoding="utf-8")
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- initiative: init-local-00001", context_pack_text)
-            self.assertIn("- epic: epic-local-00001", context_pack_text)
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertIn("- `spec-dock/active/initiative/requirement.md`", context_pack_text)
-            self.assertIn("- `spec-dock/active/epic/requirement.md`", context_pack_text)
-            self.assertIn("- `spec-dock/active/issue/report.md`", context_pack_text)
-            self.assertNotIn("- `spec-dock/active/issue/README.md`", context_pack_text)
-            self.assertIn("- state (github default): `./spec-dock/scripts/spec-dock sync`", context_pack_text)
-            self.assertIn(
-                "- state (cache/local opt-out): `./spec-dock/scripts/spec-dock sync --no-github`",
-                context_pack_text,
-            )
-            self.assertNotIn("- state (local): `./spec-dock/scripts/spec-dock sync`", context_pack_text)
-            self.assertNotIn("- state (github): `./spec-dock/scripts/spec-dock sync --github`", context_pack_text)
+            assert "- initiative: init-local-00001" in context_pack_text
+            assert "- epic: epic-local-00001" in context_pack_text
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "- `spec-dock/active/initiative/requirement.md`" in context_pack_text
+            assert "- `spec-dock/active/epic/requirement.md`" in context_pack_text
+            assert "- `spec-dock/active/issue/report.md`" in context_pack_text
+            assert "- `spec-dock/active/issue/README.md`" not in context_pack_text
+            assert "- state (github default): `./spec-dock/scripts/spec-dock sync`" in context_pack_text
+            assert "- state (cache/local opt-out): `./spec-dock/scripts/spec-dock sync --no-github`" in \
+                context_pack_text
+            assert "- state (local): `./spec-dock/scripts/spec-dock sync`" not in context_pack_text
+            assert "- state (github): `./spec-dock/scripts/spec-dock sync --github`" not in context_pack_text
 
     def test_update_rebuilds_placeholder_symlink_entrypoints_from_persisted_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             if not self._can_create_symlink(target):
-                self.skipTest("symlink is not supported in this environment")
+                pytest.skip("symlink is not supported in this environment")
 
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
             active_dir = target / "spec-dock" / "active"
             placeholder_root = target / "spec-dock" / "system" / "active-none"
@@ -14999,7 +14519,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 pathfile.unlink(missing_ok=True)
                 rel_placeholder = os.path.relpath(placeholder_root / layer, start=active_dir)
                 os.symlink(rel_placeholder, link)
-                self.assertTrue(link.is_symlink())
+                assert link.is_symlink()
 
             self._write_json_force(
                 target / "spec-dock" / ".agent" / "active.json",
@@ -15020,7 +14540,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
             expected_paths = {
                 "initiative": initiative_dir,
@@ -15028,34 +14548,28 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 "issue": issue_dir,
             }
             for layer, expected in expected_paths.items():
-                with self.subTest(layer=layer):
+                with _case(layer=layer):
                     link = active_dir / layer
-                    self.assertTrue(link.exists())
-                    self.assertEqual(link.resolve(), expected.resolve())
+                    assert link.exists()
+                    assert link.resolve() == expected.resolve()
 
-            self.assertEqual(
-                self._read_active_pointer_text(target, "initiative", "requirement.md"),
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "epic", "requirement.md"),
-                (epic_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "report.md"),
-                (issue_dir / "report.md").read_text(encoding="utf-8"),
-            )
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
+                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
+                (epic_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == \
+                (issue_dir / "report.md").read_text(encoding="utf-8")
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- initiative: init-local-00001", context_pack_text)
-            self.assertIn("- epic: epic-local-00001", context_pack_text)
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertNotIn("- issue: (none)", context_pack_text)
+            assert "- initiative: init-local-00001" in context_pack_text
+            assert "- epic: epic-local-00001" in context_pack_text
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "- issue: (none)" not in context_pack_text
 
     def test_update_rebuilds_placeholder_pathfile_entrypoints_from_persisted_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
             active_dir = target / "spec-dock" / "active"
             placeholder_root = target / "spec-dock" / "system" / "active-none"
@@ -15088,7 +14602,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
             expected_paths = {
                 "initiative": initiative_dir,
@@ -15096,39 +14610,33 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 "issue": issue_dir,
             }
             for layer, expected in expected_paths.items():
-                with self.subTest(layer=layer):
+                with _case(layer=layer):
                     link = active_dir / layer
                     pathfile = active_dir / f"{layer}.path"
                     if link.exists():
-                        self.assertEqual(link.resolve(), expected.resolve())
+                        assert link.resolve() == expected.resolve()
                     else:
-                        self.assertTrue(pathfile.is_file())
+                        assert pathfile.is_file()
                         resolved = (active_dir / pathfile.read_text(encoding="utf-8").strip()).resolve()
-                        self.assertEqual(resolved, expected.resolve())
+                        assert resolved == expected.resolve()
 
-            self.assertEqual(
-                self._read_active_pointer_text(target, "initiative", "requirement.md"),
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "epic", "requirement.md"),
-                (epic_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "report.md"),
-                (issue_dir / "report.md").read_text(encoding="utf-8"),
-            )
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
+                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
+                (epic_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == \
+                (issue_dir / "report.md").read_text(encoding="utf-8")
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- initiative: init-local-00001", context_pack_text)
-            self.assertIn("- epic: epic-local-00001", context_pack_text)
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertNotIn("- issue: (none)", context_pack_text)
+            assert "- initiative: init-local-00001" in context_pack_text
+            assert "- epic: epic-local-00001" in context_pack_text
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "- issue: (none)" not in context_pack_text
 
     def test_update_mixed_entrypoints_keep_healthy_real_and_rebuild_placeholder_layers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
             active_dir = target / "spec-dock" / "active"
             placeholder_root = target / "spec-dock" / "system" / "active-none"
@@ -15172,31 +14680,25 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
-            self.assertEqual(
-                self._read_active_pointer_text(target, "initiative", "requirement.md"),
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "epic", "requirement.md"),
-                (epic_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "report.md"),
-                (issue_dir / "report.md").read_text(encoding="utf-8"),
-            )
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
+                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
+                (epic_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == \
+                (issue_dir / "report.md").read_text(encoding="utf-8")
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- initiative: init-local-00001", context_pack_text)
-            self.assertIn("- epic: epic-local-00001", context_pack_text)
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertNotIn("init-local-99999", context_pack_text)
+            assert "- initiative: init-local-00001" in context_pack_text
+            assert "- epic: epic-local-00001" in context_pack_text
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "init-local-99999" not in context_pack_text
 
     def test_update_keeps_placeholder_and_none_context_pack_when_persisted_manifest_is_broken(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
             active_dir = target / "spec-dock" / "active"
             placeholder_root = target / "spec-dock" / "system" / "active-none"
@@ -15239,41 +14741,35 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 encoding="utf-8",
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
-            self.assertEqual(
-                self._read_active_pointer_text(target, "initiative", "README.md"),
-                (placeholder_root / "initiative" / "README.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "epic", "README.md"),
-                (placeholder_root / "epic" / "README.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "README.md"),
-                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8"),
-            )
+            assert self._read_active_pointer_text(target, "initiative", "README.md") == \
+                (placeholder_root / "initiative" / "README.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "README.md") == \
+                (placeholder_root / "epic" / "README.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "README.md") == \
+                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8")
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- initiative: (none)", context_pack_text)
-            self.assertIn("- epic: (none)", context_pack_text)
-            self.assertIn("- issue: (none)", context_pack_text)
-            self.assertIn("- entry: `spec-dock/.agent/active.json`", context_pack_text)
-            self.assertIn("- default working set: `spec-dock/.agent/index.json`", context_pack_text)
-            self.assertIn("- default dependency view: `spec-dock/.agent/deps-issues.json`", context_pack_text)
-            self.assertIn("- escalation only: `spec-dock/.agent/index-all.json`", context_pack_text)
-            self.assertIn("- Start with `spec-dock/.agent/active.json`.", context_pack_text)
-            self.assertIn("- `spec-dock/active/initiative/README.md`", context_pack_text)
-            self.assertIn("- `spec-dock/active/epic/README.md`", context_pack_text)
-            self.assertIn("- `spec-dock/active/issue/README.md`", context_pack_text)
-            self.assertNotIn("init-local-99999", context_pack_text)
-            self.assertNotIn("epic-local-99999", context_pack_text)
-            self.assertNotIn("iss-local-99999", context_pack_text)
+            assert "- initiative: (none)" in context_pack_text
+            assert "- epic: (none)" in context_pack_text
+            assert "- issue: (none)" in context_pack_text
+            assert "- entry: `spec-dock/.agent/active.json`" in context_pack_text
+            assert "- default working set: `spec-dock/.agent/index.json`" in context_pack_text
+            assert "- default dependency view: `spec-dock/.agent/deps-issues.json`" in context_pack_text
+            assert "- escalation only: `spec-dock/.agent/index-all.json`" in context_pack_text
+            assert "- Start with `spec-dock/.agent/active.json`." in context_pack_text
+            assert "- `spec-dock/active/initiative/README.md`" in context_pack_text
+            assert "- `spec-dock/active/epic/README.md`" in context_pack_text
+            assert "- `spec-dock/active/issue/README.md`" in context_pack_text
+            assert "init-local-99999" not in context_pack_text
+            assert "epic-local-99999" not in context_pack_text
+            assert "iss-local-99999" not in context_pack_text
 
     def test_update_rewrites_stale_context_pack_when_rebuilding_active_entrypoints(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
             active_dir = target / "spec-dock" / "active"
 
@@ -15310,32 +14806,26 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 encoding="utf-8",
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
-            self.assertEqual(
-                self._read_active_pointer_text(target, "initiative", "requirement.md"),
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "epic", "requirement.md"),
-                (epic_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "report.md"),
-                (issue_dir / "report.md").read_text(encoding="utf-8"),
-            )
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
+                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
+                (epic_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == \
+                (issue_dir / "report.md").read_text(encoding="utf-8")
 
             context_pack_text = context_pack_path.read_text(encoding="utf-8")
-            self.assertIn("- initiative: init-local-00001", context_pack_text)
-            self.assertIn("- epic: epic-local-00001", context_pack_text)
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertNotIn("- initiative: (none)", context_pack_text)
-            self.assertNotIn("- issue: (none)", context_pack_text)
+            assert "- initiative: init-local-00001" in context_pack_text
+            assert "- epic: epic-local-00001" in context_pack_text
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "- initiative: (none)" not in context_pack_text
+            assert "- issue: (none)" not in context_pack_text
 
     def test_update_keeps_context_pack_aligned_with_existing_active_entrypoints_when_persisted_manifest_is_stale(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_minimal_local_tree(target)
             self._run_runtime(target, ["active", "set", "--id", "iss-local-00001", "--force"])
 
@@ -15372,24 +14862,24 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 encoding="utf-8",
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- initiative: init-local-00001", context_pack_text)
-            self.assertIn("- epic: epic-local-00001", context_pack_text)
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertNotIn("init-local-99999", context_pack_text)
-            self.assertNotIn("epic-local-99999", context_pack_text)
-            self.assertNotIn("iss-local-99999", context_pack_text)
+            assert "- initiative: init-local-00001" in context_pack_text
+            assert "- epic: epic-local-00001" in context_pack_text
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "init-local-99999" not in context_pack_text
+            assert "epic-local-99999" not in context_pack_text
+            assert "iss-local-99999" not in context_pack_text
 
-            self.assertIn("init-local-00001", self._read_active_pointer_text(target, "initiative", "requirement.md"))
-            self.assertIn("epic-local-00001", self._read_active_pointer_text(target, "epic", "requirement.md"))
-            self.assertIn("iss-local-00001", self._read_active_pointer_text(target, "issue", "report.md"))
+            assert "init-local-00001" in self._read_active_pointer_text(target, "initiative", "requirement.md")
+            assert "epic-local-00001" in self._read_active_pointer_text(target, "epic", "requirement.md")
+            assert "iss-local-00001" in self._read_active_pointer_text(target, "issue", "report.md")
 
     def test_update_skips_persisted_target_resolution_when_active_entrypoints_are_healthy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_minimal_local_tree(target)
             self._run_runtime(target, ["active", "set", "--id", "iss-local-00001", "--force"])
 
@@ -15415,29 +14905,30 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            with patch(
-                "spec_dock.cli._resolve_manifest_target_dir",
-                side_effect=AssertionError("healthy active entrypoint should skip persisted target resolution"),
-            ):
-                self.assertEqual(main(["update", str(target)]), 0)
+            with pytest.MonkeyPatch.context() as monkeypatch:
+                monkeypatch.setattr(
+                    "spec_dock.cli._resolve_manifest_target_dir",
+                    _raise(AssertionError("healthy active entrypoint should skip persisted target resolution")),
+                )
+                assert main(["update", str(target)]) == 0
 
             active_dir = target / "spec-dock" / "active"
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- initiative: init-local-00001", context_pack_text)
-            self.assertIn("- epic: epic-local-00001", context_pack_text)
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
+            assert "- initiative: init-local-00001" in context_pack_text
+            assert "- epic: epic-local-00001" in context_pack_text
+            assert "- issue: iss-local-00001" in context_pack_text
 
     def test_update_regenerates_context_pack_from_existing_active_entrypoints_when_manifest_stale(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_minimal_local_tree(target)
             self._run_runtime(target, ["active", "set", "--id", "iss-local-00001", "--force"])
 
             active_dir = target / "spec-dock" / "active"
             context_pack_path = active_dir / "context-pack.md"
             context_pack_path.unlink(missing_ok=True)
-            self.assertFalse(context_pack_path.exists())
+            assert not context_pack_path.exists()
 
             self._write_json_force(
                 target / "spec-dock" / ".agent" / "active.json",
@@ -15461,20 +14952,20 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
             context_pack_text = context_pack_path.read_text(encoding="utf-8")
-            self.assertIn("- initiative: init-local-00001", context_pack_text)
-            self.assertIn("- epic: epic-local-00001", context_pack_text)
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertNotIn("init-local-99999", context_pack_text)
-            self.assertNotIn("epic-local-99999", context_pack_text)
-            self.assertNotIn("iss-local-99999", context_pack_text)
+            assert "- initiative: init-local-00001" in context_pack_text
+            assert "- epic: epic-local-00001" in context_pack_text
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "init-local-99999" not in context_pack_text
+            assert "epic-local-99999" not in context_pack_text
+            assert "iss-local-99999" not in context_pack_text
 
     def test_update_keeps_context_pack_aligned_with_existing_active_pathfiles_when_persisted_manifest_is_stale(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
             active_dir = target / "spec-dock" / "active"
 
@@ -15513,23 +15004,23 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 rel_target = os.path.relpath(node_dir, start=active_dir)
                 (active_dir / f"{layer}.path").write_text(rel_target + "\n", encoding="utf-8")
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- initiative: init-local-00001", context_pack_text)
-            self.assertIn("- epic: epic-local-00001", context_pack_text)
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertNotIn("init-local-99999", context_pack_text)
-            self.assertNotIn("epic-local-99999", context_pack_text)
-            self.assertNotIn("iss-local-99999", context_pack_text)
-            self.assertIn("init-local-00001", self._read_active_pointer_text(target, "initiative", "requirement.md"))
-            self.assertIn("epic-local-00001", self._read_active_pointer_text(target, "epic", "requirement.md"))
-            self.assertIn("iss-local-00001", self._read_active_pointer_text(target, "issue", "report.md"))
+            assert "- initiative: init-local-00001" in context_pack_text
+            assert "- epic: epic-local-00001" in context_pack_text
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "init-local-99999" not in context_pack_text
+            assert "epic-local-99999" not in context_pack_text
+            assert "iss-local-99999" not in context_pack_text
+            assert "init-local-00001" in self._read_active_pointer_text(target, "initiative", "requirement.md")
+            assert "epic-local-00001" in self._read_active_pointer_text(target, "epic", "requirement.md")
+            assert "iss-local-00001" in self._read_active_pointer_text(target, "issue", "report.md")
 
     def test_update_recovers_active_entrypoints_from_id_when_persisted_paths_are_broken(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             _initiative_dir, _epic_dir, _issue_dir = self._create_minimal_local_tree(target)
             active_dir = self._clear_active_entrypoints(target)
 
@@ -15552,22 +15043,22 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- initiative: init-local-00001", context_pack_text)
-            self.assertIn("- epic: epic-local-00001", context_pack_text)
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertNotIn("- initiative: (none)", context_pack_text)
-            self.assertNotIn("- issue: (none)", context_pack_text)
-            self.assertIn("init-local-00001", self._read_active_pointer_text(target, "initiative", "requirement.md"))
-            self.assertIn("epic-local-00001", self._read_active_pointer_text(target, "epic", "requirement.md"))
-            self.assertIn("iss-local-00001", self._read_active_pointer_text(target, "issue", "requirement.md"))
+            assert "- initiative: init-local-00001" in context_pack_text
+            assert "- epic: epic-local-00001" in context_pack_text
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "- initiative: (none)" not in context_pack_text
+            assert "- issue: (none)" not in context_pack_text
+            assert "init-local-00001" in self._read_active_pointer_text(target, "initiative", "requirement.md")
+            assert "epic-local-00001" in self._read_active_pointer_text(target, "epic", "requirement.md")
+            assert "iss-local-00001" in self._read_active_pointer_text(target, "issue", "requirement.md")
 
     def test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
             active_dir = self._clear_active_entrypoints(target)
 
@@ -15590,34 +15081,28 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
             placeholder_root = target / "spec-dock" / "system" / "active-none"
-            self.assertEqual(
-                self._read_active_pointer_text(target, "initiative", "README.md"),
-                (placeholder_root / "initiative" / "README.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "epic", "README.md"),
-                (placeholder_root / "epic" / "README.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "README.md"),
-                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8"),
-            )
+            assert self._read_active_pointer_text(target, "initiative", "README.md") == \
+                (placeholder_root / "initiative" / "README.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "README.md") == \
+                (placeholder_root / "epic" / "README.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "README.md") == \
+                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8")
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- initiative: (none)", context_pack_text)
-            self.assertIn("- epic: (none)", context_pack_text)
-            self.assertIn("- issue: (none)", context_pack_text)
-            self.assertIn("- `spec-dock/active/initiative/README.md`", context_pack_text)
-            self.assertIn("- `spec-dock/active/epic/README.md`", context_pack_text)
-            self.assertIn("- `spec-dock/active/issue/README.md`", context_pack_text)
+            assert "- initiative: (none)" in context_pack_text
+            assert "- epic: (none)" in context_pack_text
+            assert "- issue: (none)" in context_pack_text
+            assert "- `spec-dock/active/initiative/README.md`" in context_pack_text
+            assert "- `spec-dock/active/epic/README.md`" in context_pack_text
+            assert "- `spec-dock/active/issue/README.md`" in context_pack_text
 
     def test_update_falls_back_to_placeholder_when_persisted_path_points_to_same_layer_wrong_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             _initiative_dir, _epic_dir, issue_dir = self._create_minimal_local_tree(target)
             active_dir = self._clear_active_entrypoints(target)
 
@@ -15655,23 +15140,21 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
             placeholder_root = target / "spec-dock" / "system" / "active-none"
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "README.md"),
-                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8"),
-            )
+            assert self._read_active_pointer_text(target, "issue", "README.md") == \
+                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8")
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- issue: (none)", context_pack_text)
-            self.assertNotIn("iss-local-00002", context_pack_text)
-            self.assertNotIn("iss-local-99999", context_pack_text)
+            assert "- issue: (none)" in context_pack_text
+            assert "iss-local-00002" not in context_pack_text
+            assert "iss-local-99999" not in context_pack_text
 
     def test_update_prefers_id_based_recovery_when_same_layer_wrong_id_path_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             _initiative_dir, _epic_dir, issue_dir = self._create_minimal_local_tree(target)
             active_dir = self._clear_active_entrypoints(target)
 
@@ -15709,17 +15192,17 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
-            self.assertIn("iss-local-00001", self._read_active_pointer_text(target, "issue", "requirement.md"))
+            assert "iss-local-00001" in self._read_active_pointer_text(target, "issue", "requirement.md")
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertNotIn("iss-local-00002", context_pack_text)
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "iss-local-00002" not in context_pack_text
 
     def test_update_bootstraps_active_fallback_entrypoints_when_active_dir_is_empty(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             active_dir = target / "spec-dock" / "active"
             for name in ("initiative", "epic", "issue", "context-pack.md", "initiative.path", "epic.path", "issue.path"):
@@ -15729,31 +15212,25 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 elif p.is_dir():
                     shutil.rmtree(p)
 
-            self.assertEqual(list(active_dir.iterdir()), [])
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert list(active_dir.iterdir()) == []
+            assert main(["update", str(target)]) == 0
 
             placeholder_root = target / "spec-dock" / "system" / "active-none"
-            self.assertEqual(
-                self._read_active_pointer_text(target, "initiative", "README.md"),
-                (placeholder_root / "initiative" / "README.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "epic", "README.md"),
-                (placeholder_root / "epic" / "README.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "README.md"),
-                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8"),
-            )
+            assert self._read_active_pointer_text(target, "initiative", "README.md") == \
+                (placeholder_root / "initiative" / "README.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "README.md") == \
+                (placeholder_root / "epic" / "README.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "README.md") == \
+                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8")
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- initiative: (none)", context_pack_text)
-            self.assertIn("- epic: (none)", context_pack_text)
-            self.assertIn("- issue: (none)", context_pack_text)
+            assert "- initiative: (none)" in context_pack_text
+            assert "- epic: (none)" in context_pack_text
+            assert "- issue: (none)" in context_pack_text
 
     def test_update_regenerates_context_pack_from_persisted_active_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
             active_dir = self._clear_active_entrypoints(target)
 
@@ -15778,26 +15255,26 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             context_pack_path = active_dir / "context-pack.md"
             context_pack_path.unlink(missing_ok=True)
-            self.assertFalse(context_pack_path.exists())
+            assert not context_pack_path.exists()
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
             context_pack_text = context_pack_path.read_text(encoding="utf-8")
-            self.assertIn("- initiative: init-local-00001", context_pack_text)
-            self.assertIn("- epic: epic-local-00001", context_pack_text)
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertIn("- `spec-dock/active/initiative/requirement.md`", context_pack_text)
-            self.assertIn("- `spec-dock/active/epic/requirement.md`", context_pack_text)
-            self.assertIn("- `spec-dock/active/issue/report.md`", context_pack_text)
-            self.assertNotIn("- issue: (none)", context_pack_text)
-            self.assertNotIn("- `spec-dock/active/issue/README.md`", context_pack_text)
+            assert "- initiative: init-local-00001" in context_pack_text
+            assert "- epic: epic-local-00001" in context_pack_text
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "- `spec-dock/active/initiative/requirement.md`" in context_pack_text
+            assert "- `spec-dock/active/epic/requirement.md`" in context_pack_text
+            assert "- `spec-dock/active/issue/report.md`" in context_pack_text
+            assert "- issue: (none)" not in context_pack_text
+            assert "- `spec-dock/active/issue/README.md`" not in context_pack_text
 
     def test_update_bootstraps_active_path_files_when_active_symlink_creation_fails(self) -> None:
         import spec_dock.cli as cli
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             active_dir = target / "spec-dock" / "active"
             for name in ("initiative", "epic", "issue", "context-pack.md", "initiative.path", "epic.path", "issue.path"):
@@ -15807,7 +15284,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 elif p.is_dir():
                     shutil.rmtree(p)
 
-            self.assertEqual(list(active_dir.iterdir()), [])
+            assert list(active_dir.iterdir()) == []
 
             original_symlink = cli.os.symlink
 
@@ -15819,31 +15296,29 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             cli.os.symlink = _fail_active_symlink
             try:
-                self.assertEqual(main(["update", str(target)]), 0)
+                assert main(["update", str(target)]) == 0
             finally:
                 cli.os.symlink = original_symlink
 
             placeholder_root = target / "spec-dock" / "system" / "active-none"
             for layer in ("initiative", "epic", "issue"):
-                with self.subTest(layer=layer):
+                with _case(layer=layer):
                     link = active_dir / layer
                     pathfile = active_dir / f"{layer}.path"
-                    self.assertFalse(link.exists())
-                    self.assertFalse(link.is_symlink())
-                    self.assertTrue(pathfile.is_file())
+                    assert not link.exists()
+                    assert not link.is_symlink()
+                    assert pathfile.is_file()
                     resolved = (active_dir / pathfile.read_text(encoding="utf-8").strip()).resolve()
-                    self.assertEqual(resolved, (placeholder_root / layer).resolve())
-                    self.assertEqual(
-                        self._read_active_pointer_text(target, layer, "README.md"),
-                        (placeholder_root / layer / "README.md").read_text(encoding="utf-8"),
-                    )
+                    assert resolved == (placeholder_root / layer).resolve()
+                    assert self._read_active_pointer_text(target, layer, "README.md") == \
+                        (placeholder_root / layer / "README.md").read_text(encoding="utf-8")
 
     def test_update_rebuilds_active_path_files_from_persisted_manifest_when_symlink_creation_fails(self) -> None:
         import spec_dock.cli as cli
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
             active_dir = self._clear_active_entrypoints(target)
 
@@ -15876,7 +15351,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             cli.os.symlink = _fail_active_symlink
             try:
-                self.assertEqual(main(["update", str(target)]), 0)
+                assert main(["update", str(target)]) == 0
             finally:
                 cli.os.symlink = original_symlink
 
@@ -15886,40 +15361,34 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 "issue": issue_dir,
             }
             for layer, expected in expected_paths.items():
-                with self.subTest(layer=layer):
+                with _case(layer=layer):
                     link = active_dir / layer
                     pathfile = active_dir / f"{layer}.path"
-                    self.assertFalse(link.exists())
-                    self.assertFalse(link.is_symlink())
-                    self.assertTrue(pathfile.is_file())
+                    assert not link.exists()
+                    assert not link.is_symlink()
+                    assert pathfile.is_file()
                     resolved = (active_dir / pathfile.read_text(encoding="utf-8").strip()).resolve()
-                    self.assertEqual(resolved, expected.resolve())
+                    assert resolved == expected.resolve()
 
-            self.assertEqual(
-                self._read_active_pointer_text(target, "initiative", "requirement.md"),
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "epic", "requirement.md"),
-                (epic_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "report.md"),
-                (issue_dir / "report.md").read_text(encoding="utf-8"),
-            )
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
+                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
+                (epic_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == \
+                (issue_dir / "report.md").read_text(encoding="utf-8")
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- initiative: init-local-00001", context_pack_text)
-            self.assertIn("- epic: epic-local-00001", context_pack_text)
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertNotIn("- issue: (none)", context_pack_text)
+            assert "- initiative: init-local-00001" in context_pack_text
+            assert "- epic: epic-local-00001" in context_pack_text
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "- issue: (none)" not in context_pack_text
 
     def test_update_repairs_stale_active_path_files_to_persisted_targets_when_symlink_creation_fails(self) -> None:
         import spec_dock.cli as cli
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
             active_dir = self._clear_active_entrypoints(target)
 
@@ -15956,7 +15425,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             cli.os.symlink = _fail_active_symlink
             try:
-                self.assertEqual(main(["update", str(target)]), 0)
+                assert main(["update", str(target)]) == 0
             finally:
                 cli.os.symlink = original_symlink
 
@@ -15966,26 +15435,20 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 "issue": issue_dir,
             }
             for layer, expected in expected_paths.items():
-                with self.subTest(layer=layer):
+                with _case(layer=layer):
                     pathfile = active_dir / f"{layer}.path"
-                    self.assertTrue(pathfile.is_file())
+                    assert pathfile.is_file()
                     rel_target = pathfile.read_text(encoding="utf-8").strip()
-                    self.assertNotEqual(rel_target, stale_rel)
+                    assert rel_target != stale_rel
                     resolved = (active_dir / rel_target).resolve()
-                    self.assertEqual(resolved, expected.resolve())
+                    assert resolved == expected.resolve()
 
-            self.assertEqual(
-                self._read_active_pointer_text(target, "initiative", "requirement.md"),
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "epic", "requirement.md"),
-                (epic_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "report.md"),
-                (issue_dir / "report.md").read_text(encoding="utf-8"),
-            )
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
+                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
+                (epic_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == \
+                (issue_dir / "report.md").read_text(encoding="utf-8")
 
     def test_update_repairs_stale_active_path_files_to_placeholder_when_persisted_manifest_broken_and_symlink_creation_fails(
         self,
@@ -15994,7 +15457,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
             active_dir = self._clear_active_entrypoints(target)
 
@@ -16031,28 +15494,26 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             cli.os.symlink = _fail_active_symlink
             try:
-                self.assertEqual(main(["update", str(target)]), 0)
+                assert main(["update", str(target)]) == 0
             finally:
                 cli.os.symlink = original_symlink
 
             placeholder_root = target / "spec-dock" / "system" / "active-none"
             for layer in ("initiative", "epic", "issue"):
-                with self.subTest(layer=layer):
+                with _case(layer=layer):
                     pathfile = active_dir / f"{layer}.path"
-                    self.assertTrue(pathfile.is_file())
+                    assert pathfile.is_file()
                     rel_target = pathfile.read_text(encoding="utf-8").strip()
-                    self.assertNotEqual(rel_target, stale_rel)
+                    assert rel_target != stale_rel
                     resolved = (active_dir / rel_target).resolve()
-                    self.assertEqual(resolved, (placeholder_root / layer).resolve())
-                    self.assertEqual(
-                        self._read_active_pointer_text(target, layer, "README.md"),
-                        (placeholder_root / layer / "README.md").read_text(encoding="utf-8"),
-                    )
+                    assert resolved == (placeholder_root / layer).resolve()
+                    assert self._read_active_pointer_text(target, layer, "README.md") == \
+                        (placeholder_root / layer / "README.md").read_text(encoding="utf-8")
 
     def test_update_prefers_existing_active_entrypoints_over_stale_persisted_manifest_for_context_pack(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
             active_dir = target / "spec-dock" / "active"
 
@@ -16063,7 +15524,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 "issue": issue_dir,
             }
             for layer, target_dir in entry_targets.items():
-                with self.subTest(layer=layer):
+                with _case(layer=layer):
                     link = active_dir / layer
                     if link.is_symlink() or link.is_file():
                         link.unlink(missing_ok=True)
@@ -16091,28 +15552,22 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
-            self.assertEqual(
-                self._read_active_pointer_text(target, "initiative", "requirement.md"),
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "epic", "requirement.md"),
-                (epic_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "report.md"),
-                (issue_dir / "report.md").read_text(encoding="utf-8"),
-            )
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
+                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
+                (epic_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == \
+                (issue_dir / "report.md").read_text(encoding="utf-8")
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- initiative: init-local-00001", context_pack_text)
-            self.assertIn("- epic: epic-local-00001", context_pack_text)
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertNotIn("init-local-99999", context_pack_text)
-            self.assertNotIn("epic-local-99999", context_pack_text)
-            self.assertNotIn("iss-local-99999", context_pack_text)
+            assert "- initiative: init-local-00001" in context_pack_text
+            assert "- epic: epic-local-00001" in context_pack_text
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "init-local-99999" not in context_pack_text
+            assert "epic-local-99999" not in context_pack_text
+            assert "iss-local-99999" not in context_pack_text
 
     def test_update_prefers_real_pathfile_entrypoint_over_placeholder_symlink_when_manifest_is_stale(self) -> None:
         import spec_dock.cli as cli
@@ -16120,9 +15575,9 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             if not self._can_create_symlink(target):
-                self.skipTest("symlink is not supported in this environment")
+                pytest.skip("symlink is not supported in this environment")
 
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
             specdock_dir = target / "spec-dock"
             active_dir = specdock_dir / "active"
@@ -16134,7 +15589,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 "issue": issue_dir,
             }
             for layer, target_dir in entry_targets.items():
-                with self.subTest(layer=layer):
+                with _case(layer=layer):
                     link = active_dir / layer
                     if link.is_symlink() or link.is_file():
                         link.unlink(missing_ok=True)
@@ -16164,7 +15619,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
             expected_ids = {
                 "initiative": "init-local-00001",
@@ -16172,49 +15627,43 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 "issue": "iss-local-00001",
             }
             for layer, expected_id in expected_ids.items():
-                with self.subTest(layer=layer):
+                with _case(layer=layer):
                     pointer = active_dir / layer
-                    self.assertTrue(pointer.is_symlink())
-                    self.assertEqual(pointer.resolve(), entry_targets[layer].resolve())
+                    assert pointer.is_symlink()
+                    assert pointer.resolve() == entry_targets[layer].resolve()
 
                     resolved = cli._resolve_existing_active_entrypoint(
                         specdock_dir,
                         active_dir=active_dir,
                         layer=layer,
                     )
-                    self.assertIsNotNone(resolved)
+                    assert resolved is not None
                     if resolved is None:
                         continue
-                    self.assertEqual(resolved[1], expected_id)
+                    assert resolved[1] == expected_id
 
-            self.assertEqual(
-                self._read_active_pointer_text(target, "initiative", "requirement.md"),
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "epic", "requirement.md"),
-                (epic_dir / "requirement.md").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "report.md"),
-                (issue_dir / "report.md").read_text(encoding="utf-8"),
-            )
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
+                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
+                (epic_dir / "requirement.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == \
+                (issue_dir / "report.md").read_text(encoding="utf-8")
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- initiative: init-local-00001", context_pack_text)
-            self.assertIn("- epic: epic-local-00001", context_pack_text)
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertNotIn("- initiative: (none)", context_pack_text)
-            self.assertNotIn("- epic: (none)", context_pack_text)
-            self.assertNotIn("- issue: (none)", context_pack_text)
-            self.assertNotIn("init-local-99999", context_pack_text)
-            self.assertNotIn("epic-local-99999", context_pack_text)
-            self.assertNotIn("iss-local-99999", context_pack_text)
+            assert "- initiative: init-local-00001" in context_pack_text
+            assert "- epic: epic-local-00001" in context_pack_text
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "- initiative: (none)" not in context_pack_text
+            assert "- epic: (none)" not in context_pack_text
+            assert "- issue: (none)" not in context_pack_text
+            assert "init-local-99999" not in context_pack_text
+            assert "epic-local-99999" not in context_pack_text
+            assert "iss-local-99999" not in context_pack_text
 
     def test_update_repairs_same_layer_non_symlink_file_conflict_using_real_pathfile_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             _initiative_dir, _epic_dir, issue_dir = self._create_minimal_local_tree(target)
             specdock_dir = target / "spec-dock"
             active_dir = specdock_dir / "active"
@@ -16229,8 +15678,8 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             issue_pathfile.write_text(os.path.relpath(issue_dir, start=active_dir) + "\n", encoding="utf-8")
             issue_link.write_text("stale non-symlink conflict\n", encoding="utf-8")
-            self.assertTrue(issue_link.exists())
-            self.assertFalse(issue_link.is_symlink())
+            assert issue_link.exists()
+            assert not issue_link.is_symlink()
 
             self._write_json_force(
                 specdock_dir / ".agent" / "active.json",
@@ -16261,28 +15710,26 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 encoding="utf-8",
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
             if issue_link.exists():
-                self.assertTrue(issue_link.is_symlink())
-                self.assertEqual(issue_link.resolve(), issue_dir.resolve())
+                assert issue_link.is_symlink()
+                assert issue_link.resolve() == issue_dir.resolve()
             else:
-                self.assertTrue(issue_pathfile.is_file())
+                assert issue_pathfile.is_file()
                 rel_target = issue_pathfile.read_text(encoding="utf-8").strip()
-                self.assertEqual((active_dir / rel_target).resolve(), issue_dir.resolve())
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "report.md"),
-                (issue_dir / "report.md").read_text(encoding="utf-8"),
-            )
+                assert (active_dir / rel_target).resolve() == issue_dir.resolve()
+            assert self._read_active_pointer_text(target, "issue", "report.md") == \
+                (issue_dir / "report.md").read_text(encoding="utf-8")
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertNotIn("iss-local-99999", context_pack_text)
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "iss-local-99999" not in context_pack_text
 
     def test_update_repairs_same_layer_invalid_directory_conflict_using_real_pathfile_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             _initiative_dir, _epic_dir, issue_dir = self._create_minimal_local_tree(target)
             specdock_dir = target / "spec-dock"
             active_dir = specdock_dir / "active"
@@ -16298,13 +15745,13 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             issue_link.mkdir(parents=True, exist_ok=True)
             (issue_link / "report.md").write_text("stale invalid directory conflict\n", encoding="utf-8")
-            self.assertFalse((issue_link / ".meta.json").exists())
+            assert not (issue_link / ".meta.json").exists()
             issue_pathfile.write_text(
                 os.path.relpath(placeholder_root / "issue", start=active_dir) + "\n",
                 encoding="utf-8",
             )
-            self.assertTrue(issue_link.exists())
-            self.assertFalse(issue_link.is_symlink())
+            assert issue_link.exists()
+            assert not issue_link.is_symlink()
 
             self._write_json_force(
                 specdock_dir / ".agent" / "active.json",
@@ -16332,43 +15779,39 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 encoding="utf-8",
             )
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
             if issue_link.exists():
-                self.assertTrue(issue_link.is_symlink())
-                self.assertEqual(issue_link.resolve(), issue_dir.resolve())
+                assert issue_link.is_symlink()
+                assert issue_link.resolve() == issue_dir.resolve()
             else:
-                self.assertTrue(issue_pathfile.is_file())
+                assert issue_pathfile.is_file()
                 rel_target = issue_pathfile.read_text(encoding="utf-8").strip()
-                self.assertEqual((active_dir / rel_target).resolve(), issue_dir.resolve())
-            self.assertEqual(
-                self._read_active_pointer_text(target, "issue", "report.md"),
-                (issue_dir / "report.md").read_text(encoding="utf-8"),
-            )
+                assert (active_dir / rel_target).resolve() == issue_dir.resolve()
+            assert self._read_active_pointer_text(target, "issue", "report.md") == \
+                (issue_dir / "report.md").read_text(encoding="utf-8")
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- issue: iss-local-00001", context_pack_text)
-            self.assertNotIn("iss-local-99999", context_pack_text)
+            assert "- issue: iss-local-00001" in context_pack_text
+            assert "iss-local-99999" not in context_pack_text
 
     def test_update_repairs_dangling_active_symlink_entrypoint(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             if not self._can_create_symlink(target):
-                self.skipTest("symlink is not supported in this environment")
+                pytest.skip("symlink is not supported in this environment")
 
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             active_dir = target / "spec-dock" / "active"
             pointer = active_dir / "initiative"
             pointer.unlink(missing_ok=True)
             os.symlink("../system/active-none/missing-initiative", pointer)
-            self.assertTrue(pointer.is_symlink())
-            self.assertFalse(pointer.exists())
+            assert pointer.is_symlink()
+            assert not pointer.exists()
 
-            self.assertEqual(main(["update", str(target)]), 0)
+            assert main(["update", str(target)]) == 0
 
             placeholder = target / "spec-dock" / "system" / "active-none" / "initiative" / "README.md"
-            self.assertEqual(
-                self._read_active_pointer_text(target, "initiative", "README.md"),
-                placeholder.read_text(encoding="utf-8"),
-            )
+            assert self._read_active_pointer_text(target, "initiative", "README.md") == \
+                placeholder.read_text(encoding="utf-8")
