@@ -52,7 +52,8 @@ ID: "iss-00166"
 
 - Planning / spec authoring is complete and committed at `f7413abf`.
 - S01 template boundary / evidence-slot alignment is implemented and committed at `54e8ea40`.
-- S02 discussion template evidence-flow alignment is implemented in provider and dogfooding mirror templates; S02 review and commit are pending.
+- S02 discussion template evidence-flow alignment is implemented and committed at `736679d9`.
+- S90 sync / validate / provider-mirror validation passed with no generated projection diff; S90 reviewer gate passed with one stale-summary correction applied.
 
 ## 実装記録（セッションログ）
 
@@ -159,6 +160,35 @@ result:
 - accepted/canonical authority claim wording was not found.
 ```
 
+### セッションログ（2026-06-06 / S90）
+
+#### 対象
+- Step: S90 docs impact resolution / provider-mirror validation.
+- AC/EC: AC-005.
+- Closure ids: cl-006.
+
+#### 実施内容
+- Ran `sync` after S01/S02 commits.
+- Ran `validate`, whitespace check, final status check, and provider/mirror parity checks for all S01/S02 changed template pairs.
+- Confirmed `sync` produced no persisted diff after generation.
+
+#### 実行コマンド / 結果
+
+```bash
+./spec-dock/scripts/spec-dock sync
+./spec-dock/scripts/spec-dock validate
+git diff --check
+git status --short
+diff -q <provider template> <mirror template>  # 9 changed pairs
+
+result:
+- `sync` succeeded and reported generated projection writes.
+- `validate` succeeded with `nodes=84`.
+- `git diff --check` passed.
+- `git status --short` returned clean after sync / validate.
+- all 9 provider/mirror template pairs matched.
+```
+
 ## 実装委任ゲート（Implementation Delegation Gate）
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
@@ -186,6 +216,7 @@ result:
 | planning-plan | reviewer-finding-004 | report evidence destinations must be explicit per step | S01/S02/S90/S99 now list report destinations for delegation, closure, reviewer, commit, and final-gate evidence | pass | fixes P2 report evidence destination finding |
 | S01 | cl-001, cl-002, cl-003, cl-005 | S01 templates identify scaffold / evidence / example boundaries, preserve report slots, route plan detail to skills/docs, and stay in S01 scope | worker output; parent `git diff --name-only`; positive/negative `rg`; report-slot `rg`; 6 provider/mirror `diff -q`; `git diff --check`; spec-reviewer `019e9bef-59aa-78b0-8aed-959c201a3630` | pass | reviewer passed with one P3 wording correction, applied |
 | S02 | cl-004, cl-005 | Discussion templates support source-grounded question, facts/inference separation, synthesis, adoption target, reflection, ADR triage, and stay in S02 scope | worker output; parent `git diff --name-only`; positive/negative `rg`; 3 provider/mirror `diff -q`; `git diff --check`; spec-reviewer `019e9bf5-628e-7771-85fb-98eea5a92640` | pass | reviewer passed with no findings |
+| S90 | cl-006 | sync / validate / whitespace / status / provider-mirror parity pass, and projection diff is limited to allowed paths or no-op | `./spec-dock/scripts/spec-dock sync`; `./spec-dock/scripts/spec-dock validate`; `git diff --check`; `git status --short`; 9 provider/mirror `diff -q` | pass | no generated projection diff remained |
 
 ## テスト契約の完了証跡（Test Contract Closure）
 
@@ -198,6 +229,7 @@ result:
 | cl-004 / tc-s02-001 | S02 | yes | inspect-only | `interview.md` already had source-grounded context and answer fields before S02 | `rg` for one essential question, source-grounded context, answer capture, adoption target, reflection; diff inspection | pass | interview template is a non-canonical evidence surface for one-question user interviews |
 | cl-004 / tc-s02-002 | S02 | yes | inspect-only | `research.md` and `disc.md` already separated research and synthesis fields before S02 | `rg` for facts / inference / unverified / question candidates / synthesis / adoption target / ADR triage; diff inspection | pass | research and disc templates preserve evidence separation and adoption routing |
 | cl-005 / tc-s02-003 | S02 | yes | inspect-only | clean worktree after S01 commit `54e8ea40` | `git diff --name-only` and path comparison against S02 allowed paths | pass | only S02 provider/mirror discussion templates changed before report evidence |
+| cl-006 / tc-s90-001 | S90 | yes | manual-required | clean worktree after S02 commit `736679d9` | `sync`, `validate`, `git diff --check`, `git status --short`, 9 provider/mirror `diff -q` checks | pass | sync/validate passed and no projection diff remained |
 
 ## クロージャ網羅（Closure Coverage）
 
@@ -209,6 +241,7 @@ result:
 | cl-005 | S01 | `git diff --name-only`; `git diff --check`; provider/mirror `diff -q` | pass | S01 scope contained |
 | cl-004 | S02 | positive/negative `rg`; diff inspection; provider/mirror `diff -q` | pass | discussion templates support source-grounded evidence flow |
 | cl-005 | S02 | `git diff --name-only`; `git diff --check`; provider/mirror `diff -q` | pass | S02 scope contained |
+| cl-006 | S90 | `sync`, `validate`, whitespace check, clean status, 9 provider/mirror parity checks | pass | provider/mirror validation and generated projection check passed |
 
 ## レビューゲート状態（Reviewer Gate Status）
 
@@ -219,6 +252,7 @@ result:
 | plan | phase reviewer | spec-reviewer `019e9bdf-9f9e-7d83-8ce3-672c6231b5f4` | fresh after fix | pass | no | promoted to issue execution | no findings; plan ready for execution handoff |
 | S01 | step reviewer | spec-reviewer `019e9bef-59aa-78b0-8aed-959c201a3630` | fresh | pass | no | commit S01 | one P3 report wording correction applied |
 | S02 | step reviewer | spec-reviewer `019e9bf5-628e-7771-85fb-98eea5a92640` | fresh | pass | no | commit S02 | no findings |
+| S90 | docs impact reviewer | spec-reviewer `019e9bf9-31e4-76b2-a50f-7c4cddc9c20a` | fresh | pass | no | commit S90 report evidence | one P2 stale-summary correction applied |
 
 ## ステップ commit ゲート（Step Commit Gate）
 
@@ -226,7 +260,8 @@ result:
 |---|---|---|---|---|
 | planning-requirement/design/plan | committed | requirement/design/plan/report authoring evidence | `f7413abf` | clean before S01 delegation |
 | S01 | committed | S01 provider/mirror template changes + report evidence | `54e8ea40` | clean before S02 delegation |
-| S02 | pending commit | S02 provider/mirror discussion template changes + report evidence | pending | pending |
+| S02 | committed | S02 provider/mirror discussion template changes + report evidence | `736679d9` | clean before S90 |
+| S90 | approved-no-op pending commit | sync / validate / parity evidence only | report evidence commit pending | clean after sync / validate |
 
 ## 最終品質ゲート（Final Quality Gate）
 
