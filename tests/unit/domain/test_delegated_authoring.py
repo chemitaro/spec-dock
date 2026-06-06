@@ -1,6 +1,5 @@
 import sys
 import tempfile
-import unittest
 from pathlib import Path
 
 
@@ -45,7 +44,7 @@ def _application_diff_guard_modules():
     return DelegatedAuthoringDiffGuardRequest, run_delegated_authoring_diff_guard
 
 
-class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
+class TestDelegatedAuthoringRuntimeDomain:
     def test_manifest_request_returns_deprecated_blocked_result_without_artifacts(self) -> None:
         request_cls, generate, _domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
@@ -66,10 +65,10 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 )
             )
 
-            self.assertFalse(result.ok)
-            self.assertEqual(result.status, "deprecated")
-            self.assertEqual(result.reason, "deprecated_scope_local_discussion_drafts")
-            self.assertFalse((issue_dir / "discussions" / "delegated-authoring").exists())
+            assert not result.ok
+            assert result.status == "deprecated"
+            assert result.reason == "deprecated_scope_local_discussion_drafts"
+            assert not (issue_dir / "discussions" / "delegated-authoring").exists()
 
     def test_application_diff_guard_rejects_missing_baseline_status(self) -> None:
         request_cls, run_diff_guard = _application_diff_guard_modules()
@@ -87,9 +86,9 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 )
             )
 
-            self.assertFalse(result.ok)
-            self.assertEqual(result.status, "blocked")
-            self.assertEqual(result.reason, "missing_baseline_status")
+            assert not result.ok
+            assert result.status == "blocked"
+            assert result.reason == "missing_baseline_status"
 
     def test_diff_guard_allows_new_flat_discussion_markdown(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -106,8 +105,8 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
             )
 
-            self.assertTrue(result.ok, result.details)
-            self.assertEqual(result.status, "pass")
+            assert result.ok, result.details
+            assert result.status == "pass"
 
     def test_diff_guard_allows_implementation_planner_discussion_markdown(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -125,8 +124,8 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
             )
 
-            self.assertTrue(result.ok, result.details)
-            self.assertEqual(result.status, "pass")
+            assert result.ok, result.details
+            assert result.status == "pass"
 
     def test_diff_guard_allows_quoted_role_and_scope_frontmatter_scalars(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -149,8 +148,8 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
             )
 
-            self.assertTrue(result.ok, result.details)
-            self.assertEqual(result.status, "pass")
+            assert result.ok, result.details
+            assert result.status == "pass"
 
     def test_diff_guard_rejects_discussion_created_by_different_authorized_role(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -168,8 +167,8 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
             )
 
-            self.assertFalse(result.ok)
-            self.assertIn("reason=new_discussion_created_by_role_mismatch", "\n".join(result.details))
+            assert not result.ok
+            assert "reason=new_discussion_created_by_role_mismatch" in "\n".join(result.details)
 
     def test_diff_guard_rejects_arbitrary_diff_guard_result_frontmatter(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -190,8 +189,8 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
             )
 
-            self.assertFalse(result.ok)
-            self.assertIn("reason=new_discussion_missing_provenance:diff_guard_result", "\n".join(result.details))
+            assert not result.ok
+            assert "reason=new_discussion_missing_provenance:diff_guard_result" in "\n".join(result.details)
 
     def test_diff_guard_rejects_new_discussion_without_frontmatter_editable_state(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -208,8 +207,8 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
             )
 
-            self.assertFalse(result.ok)
-            self.assertIn("reason=new_discussion_missing_proposed_state", "\n".join(result.details))
+            assert not result.ok
+            assert "reason=new_discussion_missing_proposed_state" in "\n".join(result.details)
 
     def test_diff_guard_rejects_new_discussion_with_non_editable_state_claim(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -226,8 +225,8 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
             )
 
-            self.assertFalse(result.ok)
-            self.assertIn("reason=new_discussion_claims_non_editable_state", "\n".join(result.details))
+            assert not result.ok
+            assert "reason=new_discussion_claims_non_editable_state" in "\n".join(result.details)
 
     def test_diff_guard_rejects_new_discussion_without_required_provenance(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -244,11 +243,11 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
             )
 
-            self.assertFalse(result.ok)
+            assert not result.ok
             joined = "\n".join(result.details)
-            self.assertIn("reason=new_discussion_missing_provenance:", joined)
-            self.assertIn("created_by_role", joined)
-            self.assertIn("diff_guard_result", joined)
+            assert "reason=new_discussion_missing_provenance:" in joined
+            assert "created_by_role" in joined
+            assert "diff_guard_result" in joined
 
     def test_diff_guard_rejects_mixed_staged_and_unmerged_discussion_statuses(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -275,10 +274,10 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 allow_existing_discussions=(mixed_update.relative_to(repo_root),),
             )
 
-            self.assertFalse(result.ok)
+            assert not result.ok
             joined = "\n".join(result.details)
-            self.assertEqual(joined.count("reason=mixed_staged_unstaged_discussion"), 2)
-            self.assertIn("reason=unmerged_status", joined)
+            assert joined.count("reason=mixed_staged_unstaged_discussion") == 2
+            assert "reason=unmerged_status" in joined
 
     def test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -296,8 +295,8 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 allow_existing_discussions=(discussion.relative_to(repo_root),),
             )
 
-            self.assertFalse(result.ok)
-            self.assertIn("reason=existing_discussion_update_unsupported", "\n".join(result.details))
+            assert not result.ok
+            assert "reason=existing_discussion_update_unsupported" in "\n".join(result.details)
 
     def test_diff_guard_rejects_multiple_new_discussion_drafts(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -319,8 +318,8 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 ),
             )
 
-            self.assertFalse(result.ok)
-            self.assertIn("reason=expected_exactly_one_new_discussion_draft count=2", "\n".join(result.details))
+            assert not result.ok
+            assert "reason=expected_exactly_one_new_discussion_draft count=2" in "\n".join(result.details)
 
     def test_diff_guard_rejects_zero_new_discussion_drafts(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -335,8 +334,8 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 entries=(),
             )
 
-            self.assertFalse(result.ok)
-            self.assertIn("reason=expected_exactly_one_new_discussion_draft count=0", "\n".join(result.details))
+            assert not result.ok
+            assert "reason=expected_exactly_one_new_discussion_draft count=0" in "\n".join(result.details)
 
     def test_diff_guard_rejects_new_discussion_with_mismatched_scope_or_role(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -349,22 +348,22 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
             ),
         )
         for _name, text, expected in cases:
-            with self.subTest(expected=expected):
-                with tempfile.TemporaryDirectory() as tmp:
-                    repo_root = Path(tmp)
-                    issue_dir = _make_issue_scope(repo_root)
-                    discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
-                    discussion.write_text(text, encoding="utf-8")
+            case = f"case={_name}"
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                issue_dir = _make_issue_scope(repo_root)
+                discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+                discussion.write_text(text, encoding="utf-8")
 
-                    result = domain.evaluate_diff_guard(
-                        scope_id="iss-00003",
-                        repo_root=repo_root,
-                        scope_dir=issue_dir,
-                        entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
-                    )
+                result = domain.evaluate_diff_guard(
+                    scope_id="iss-00003",
+                    repo_root=repo_root,
+                    scope_dir=issue_dir,
+                    entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+                )
 
-                    self.assertFalse(result.ok)
-                    self.assertIn(f"reason=new_discussion_{expected}", "\n".join(result.details))
+                assert not result.ok, case
+                assert f"reason=new_discussion_{expected}" in "\n".join(result.details), case
 
     def test_diff_guard_rejects_new_discussion_with_empty_source_or_target_provenance(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -385,22 +384,22 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
             ),
         )
         for _name, old, new, expected in cases:
-            with self.subTest(expected=expected):
-                with tempfile.TemporaryDirectory() as tmp:
-                    repo_root = Path(tmp)
-                    issue_dir = _make_issue_scope(repo_root)
-                    discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
-                    discussion.write_text(_draft_text("# draft").replace(old, new), encoding="utf-8")
+            case = f"case={_name}"
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                issue_dir = _make_issue_scope(repo_root)
+                discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+                discussion.write_text(_draft_text("# draft").replace(old, new), encoding="utf-8")
 
-                    result = domain.evaluate_diff_guard(
-                        scope_id="iss-00003",
-                        repo_root=repo_root,
-                        scope_dir=issue_dir,
-                        entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
-                    )
+                result = domain.evaluate_diff_guard(
+                    scope_id="iss-00003",
+                    repo_root=repo_root,
+                    scope_dir=issue_dir,
+                    entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+                )
 
-                    self.assertFalse(result.ok)
-                    self.assertIn(f"reason=new_discussion_{expected}", "\n".join(result.details))
+                assert not result.ok, case
+                assert f"reason=new_discussion_{expected}" in "\n".join(result.details), case
 
     def test_diff_guard_rejects_duplicate_frontmatter_provenance_keys(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -414,25 +413,25 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
             ("diff_guard_result", "diff_guard_result: pending"),
         )
         for key, duplicate_line in cases:
-            with self.subTest(key=key):
-                with tempfile.TemporaryDirectory() as tmp:
-                    repo_root = Path(tmp)
-                    issue_dir = _make_issue_scope(repo_root)
-                    discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
-                    discussion.write_text(
-                        _draft_text("# draft").replace("---\n", f"---\n{duplicate_line}\n", 1),
-                        encoding="utf-8",
-                    )
+            case = f"key={key}"
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                issue_dir = _make_issue_scope(repo_root)
+                discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+                discussion.write_text(
+                    _draft_text("# draft").replace("---\n", f"---\n{duplicate_line}\n", 1),
+                    encoding="utf-8",
+                )
 
-                    result = domain.evaluate_diff_guard(
-                        scope_id="iss-00003",
-                        repo_root=repo_root,
-                        scope_dir=issue_dir,
-                        entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
-                    )
+                result = domain.evaluate_diff_guard(
+                    scope_id="iss-00003",
+                    repo_root=repo_root,
+                    scope_dir=issue_dir,
+                    entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+                )
 
-                    self.assertFalse(result.ok)
-                    self.assertIn(f"reason=new_discussion_duplicate_provenance:{key}", "\n".join(result.details))
+                assert not result.ok, case
+                assert f"reason=new_discussion_duplicate_provenance:{key}" in "\n".join(result.details), case
 
     def test_diff_guard_rejects_allowlisted_existing_discussion_without_state_as_unsupported_update(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -472,12 +471,9 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 allow_existing_discussions=tuple(path.relative_to(repo_root) for path in (*non_editable_paths, unstated)),
             )
 
-            self.assertFalse(result.ok)
+            assert not result.ok
             joined = "\n".join(result.details)
-            self.assertEqual(
-                joined.count("reason=existing_discussion_update_unsupported"),
-                (len(non_editable_paths) + 1) * 2,
-            )
+            assert joined.count("reason=existing_discussion_update_unsupported") == (len(non_editable_paths) + 1) * 2
 
     def test_diff_guard_rejects_allowlisted_update_with_body_only_state_as_unsupported_update(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -495,8 +491,8 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 allow_existing_discussions=(discussion.relative_to(repo_root),),
             )
 
-            self.assertFalse(result.ok)
-            self.assertIn("reason=existing_discussion_update_unsupported", "\n".join(result.details))
+            assert not result.ok
+            assert "reason=existing_discussion_update_unsupported" in "\n".join(result.details)
 
     def test_diff_guard_rejects_symlinked_discussions_dir_without_status_entries(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -516,8 +512,8 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 entries=(),
             )
 
-            self.assertFalse(result.ok)
-            self.assertIn("reason=discussions_dir_symlink", "\n".join(result.details))
+            assert not result.ok
+            assert "reason=discussions_dir_symlink" in "\n".join(result.details)
 
     def test_diff_guard_rejects_discussion_symlink_without_status_entries(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -534,8 +530,8 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 entries=(),
             )
 
-            self.assertFalse(result.ok)
-            self.assertIn("reason=discussion_symlink", "\n".join(result.details))
+            assert not result.ok
+            assert "reason=discussion_symlink" in "\n".join(result.details)
 
 
     def test_diff_guard_rejects_forbidden_paths(self) -> None:
@@ -560,11 +556,11 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 entries=forbidden_entries,
             )
 
-            self.assertFalse(result.ok)
+            assert not result.ok
             joined = "\n".join(result.details)
-            self.assertIn("reason=canonical_doc", joined)
-            self.assertIn("reason=forbidden_root", joined)
-            self.assertIn("reason=env_file", joined)
+            assert "reason=canonical_doc" in joined
+            assert "reason=forbidden_root" in joined
+            assert "reason=env_file" in joined
 
     def test_diff_guard_rejects_malformed_discussion_diffs(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -616,15 +612,15 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 ),
             )
 
-            self.assertFalse(result.ok)
+            assert not result.ok
             joined = "\n".join(result.details)
-            self.assertIn("reason=outside_target_discussions", joined)
-            self.assertIn("reason=symlink", joined)
-            self.assertIn("reason=non_markdown", joined)
-            self.assertIn("reason=discussion_name_noncompliant", joined)
-            self.assertIn("reason=delete", joined)
-            self.assertIn("reason=rename_or_copy", joined)
-            self.assertIn("reason=existing_discussion_update_unsupported", joined)
+            assert "reason=outside_target_discussions" in joined
+            assert "reason=symlink" in joined
+            assert "reason=non_markdown" in joined
+            assert "reason=discussion_name_noncompliant" in joined
+            assert "reason=delete" in joined
+            assert "reason=rename_or_copy" in joined
+            assert "reason=existing_discussion_update_unsupported" in joined
 
 
 def _make_issue_scope(repo_root: Path, *, scope_id: str = "iss-00003", slug: str = "delegated-authoring") -> Path:
@@ -661,7 +657,3 @@ def _draft_text(body: str, *, role: str = "spec-dock-system-architect") -> str:
         "---\n"
         f"{body}\n"
     )
-
-
-if __name__ == "__main__":
-    unittest.main()
