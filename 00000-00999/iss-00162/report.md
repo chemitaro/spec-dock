@@ -261,14 +261,14 @@ pass: no missing provider template paths.
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | ready to commit | discussion + report S01 evidence | pending commit | pending | not applicable | not applicable | not applicable | not applicable |
+| S01 | committed | discussion + report S01 evidence | `b39e36ec` | `git status --short` -> clean | not applicable | not applicable | not applicable | not applicable |
 
 #### 変更したファイル
 - `spec-dock/active/issue/discussions/20260606t040013z-disc-context-surface-inventory.md` - S01 context surface inventory / trace matrix.
 - `spec-dock/active/issue/report.md` - S01 evidence adoption, delegation, closure, and reviewer gate records.
 
 #### コミット
-- pending S01 commit.
+- `b39e36ec` `docs(context-surface): provider文脈面のinventory証跡を追加`
 
 #### メモ
 - No user interview blocker was found for S01. If a future step requires user-intent clarification, the issue workflow will block and ask the user directly instead of using deep-consultant as a proxy.
