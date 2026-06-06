@@ -7,6 +7,7 @@ import sys
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import skip
 
 from tests.cli_runtime.harness import (
     CliRuntimeHarness,
@@ -1111,6 +1112,7 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(data["blockers"], ["iss-00401", "iss-00403"])
             self.assertEqual(data["warnings"], [])
 
+    @skip("S04: covered by TestCheckDepsApplication.test_no_github_uses_cached_status_and_last_sync_without_fetching_github")
     def test_deps_check_without_github_uses_index_snapshot_when_present(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -1187,6 +1189,7 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(data["target_status"]["last_sync_at"], "t")
             self.assertEqual(data["nodes"]["iss-00302"]["source"], "cache")
 
+    @skip("S04: covered by TestCheckDepsApplication.test_no_github_missing_cache_defaults_to_unknown_and_blocks")
     def test_deps_check_no_github_falls_back_to_unknown_when_snapshot_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -1281,6 +1284,7 @@ class TestCliDeps(CliRuntimeHarness):
                 self.assertEqual(data["target"], "iss-00301")
                 self.assertTrue(data["ready"])
 
+    @skip("S04: covered by TestCheckDepsApplication.test_github_snapshots_drive_ready_and_blocked_states_without_cli")
     def test_deps_check_default_github_ready_when_deps_closed(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -1337,6 +1341,7 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(data["blockers"], [])
             self.assertEqual(data["nodes"]["iss-00301"]["state"], "done")
 
+    @skip("S04: covered by TestCheckDepsApplication.test_no_github_uses_cached_status_and_last_sync_without_fetching_github")
     def test_deps_check_no_github_uses_synced_index_status(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -1401,6 +1406,7 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(data["blockers"], [])
             self.assertEqual(data["nodes"]["iss-00301"]["state"], "done")
 
+    @skip("S04: covered by TestCheckDepsApplication.test_no_github_missing_cache_defaults_to_unknown_and_blocks")
     def test_deps_check_no_github_missing_index_defaults_unknown(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -1443,6 +1449,7 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(data["blockers"], ["iss-00301"])
             self.assertEqual(data["nodes"]["iss-00301"]["state"], "unknown")
 
+    @skip("S04: covered by TestCheckDepsApplication.test_github_snapshots_drive_ready_and_blocked_states_without_cli")
     def test_deps_check_github_blocked_when_dep_open(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -1498,6 +1505,7 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(data["effective_depends_on"], ["iss-00301"])
             self.assertEqual(data["blockers"], ["iss-00301"])
 
+    @skip("S04: covered by TestCheckDepsApplication.test_github_index_incomplete_warns_and_leaves_missing_dependency_unknown")
     def test_deps_check_github_index_incomplete_warns_and_blocks(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -1553,6 +1561,7 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertIn("gh_fetch_failed", data["warnings"])
             self.assertEqual(data["blockers"], ["iss-00301"])
 
+    @skip("S04: covered by TestCheckDepsApplication.test_github_fetch_failure_warns_and_blocks_on_unknown_dependency")
     def test_deps_check_github_fetch_failure_warns_and_blocks(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -2062,6 +2071,7 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertIn("123", p.stderr)
             self.assertIn(".meta.json", p.stderr)
 
+    @skip("S04: covered by TestCheckDepsApplication.test_effective_depends_on_merges_parents_and_dedups_without_cli")
     def test_deps_effective_depends_on_merges_parents_and_dedups(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -2091,6 +2101,7 @@ class TestCliDeps(CliRuntimeHarness):
             data = json.loads(p.stdout)
             self.assertEqual(data["effective_depends_on"], ["iss-00302", "iss-00401"])
 
+    @skip("S04: covered by TestCheckDepsApplication.test_effective_depends_on_merges_epic_and_initiative_without_cli")
     def test_deps_effective_depends_on_merges_epic_and_initiative(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

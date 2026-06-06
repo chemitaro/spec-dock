@@ -7,6 +7,7 @@ import tempfile
 import time
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import skip
 
 from tests.cli_runtime.harness import (
     CliRuntimeHarness,
@@ -110,6 +111,7 @@ class TestCliValidate(CliRuntimeHarness):
 
             self._run_runtime_expect_fail(target, ["validate"])
 
+    @skip("S04: covered by TestRuntimeDomainS03.test_validate_graph_rejects_local_only_initiative_under_github_mandatory_contract")
     def test_validate_rejects_local_only_initiative_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -126,6 +128,7 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("initiative missing github.issue_number", p.stderr)
 
+    @skip("S04: covered by TestValidateApplication.test_validate_graph_reports_linkage_and_parent_diagnostics_without_cli")
     def test_validate_rejects_legacy_unscoped_issue_linkage(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -152,6 +155,7 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("legacy unscoped github linkage", p.stderr)
 
+    @skip("S04: covered by TestRuntimeSyncS07.test_sync_fails_preflight_for_malformed_partial_repo_scope_linkage")
     def test_sync_fails_preflight_on_partially_scoped_issue_linkage(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -185,6 +189,7 @@ class TestCliValidate(CliRuntimeHarness):
                     self.assertIn("both fields are required", p.stderr)
                     self.assertNotIn("deps_preflight_failed", p.stderr)
 
+    @skip("S04: covered by TestRuntimeDomainS03.test_validate_graph_rejects_partially_scoped_issue_linkage")
     def test_validate_rejects_blank_string_repo_scope_in_meta_loader(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -762,6 +767,7 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertIn("20260329t123456z-01-adr-first.md", p.stderr)
             self.assertIn("20260329t123456z-01-note-second.md", p.stderr)
 
+    @skip("S04: covered by TestValidateApplication.test_validate_tree_reports_missing_required_artifact_docs_without_cli")
     def test_validate_detects_missing_required_artifact_docs_for_each_node_kind(self) -> None:
         artifact_names = ("requirement.md", "design.md", "plan.md", "report.md")
         node_roots = {
@@ -802,6 +808,7 @@ class TestCliValidate(CliRuntimeHarness):
                     self.assertIn(expected, p.stderr)
                     self.assertIn(artifact_rel_path.as_posix(), p.stderr)
 
+    @skip("S04: covered by TestValidateApplication.test_validate_tree_reports_missing_required_meta_without_cli")
     def test_validate_detects_missing_required_meta_for_each_node_kind(self) -> None:
         cases = [
             (
