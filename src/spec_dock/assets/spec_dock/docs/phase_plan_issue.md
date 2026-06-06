@@ -2,7 +2,7 @@
 
 Issue plan の playbook です。
 shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / execution / reviewer / completion policy は [workflow_issue.md](workflow_issue.md)、Issue plan の field semantics と executable step schema は [authoring/issue-plan.md](authoring/issue-plan.md) を参照します。
-この文書は field-level template manual ではなく、Issue plan をどう設計し、どう review するかに集中します。
+Operational entrypoint / first-read spine は `spec-dock-issue-planning` skill です。この文書は skill から到達する detail / reference surface として、field-level template manual ではなく、Issue plan をどう設計し、どう review するかに集中します。
 
 ## 範囲契約（scope contract）
 

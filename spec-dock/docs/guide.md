@@ -1,7 +1,8 @@
 # 全体ガイド（guide）
 
 spec-dock の docs レイヤ、概念、生成物を最短で把握するための入口です。
-scope 固有の手順は `workflow_*.md`、曖昧さの明確化は `workflow_clarification.md`、仕様書作成の phase promotion は `workflow_spec_authoring.md`、shared な requirement / design の作法は `phase_*.md`、plan は `phase_plan.md` と `phase_plan_<scope>.md` の二段構成、コマンドや制約は `reference_*.md` を正本とします。
+Agent の operational entrypoint / first-read spine は skill が所有します。docs は skill から到達する detail / reference surface として、field semantics、policy detail、hard cases、生成物の読み方を説明します。
+scope 固有の詳細手順は `workflow_*.md`、曖昧さの明確化の bridge/reference は `workflow_clarification.md`、仕様書作成の phase promotion semantics は `workflow_spec_authoring.md`、shared な requirement / design の作法は `phase_*.md`、plan は `phase_plan.md` と `phase_plan_<scope>.md` の二段構成、コマンドや制約は `reference_*.md` を参照します。
 runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` です。
 
 ## 文書の読み分け（docs）
@@ -23,13 +24,13 @@ phase playbook:
 - [phase_plan_epic.md](phase_plan_epic.md)
 - [phase_plan_issue.md](phase_plan_issue.md)
 
-入口:
-- Clarification: [workflow_clarification.md](workflow_clarification.md)
-- Spec authoring: [workflow_spec_authoring.md](workflow_spec_authoring.md)
-- Initiative: [workflow_initiative.md](workflow_initiative.md)
-- Epic: [workflow_epic.md](workflow_epic.md)
-- Issue: [workflow_issue.md](workflow_issue.md)
-- ADR: [workflow_adr.md](workflow_adr.md)
+detail / reference 入口:
+- Clarification bridge/reference: [workflow_clarification.md](workflow_clarification.md)
+- Spec authoring semantics: [workflow_spec_authoring.md](workflow_spec_authoring.md)
+- Initiative detail: [workflow_initiative.md](workflow_initiative.md)
+- Epic detail: [workflow_epic.md](workflow_epic.md)
+- Issue detail: [workflow_issue.md](workflow_issue.md)
+- ADR detail: [workflow_adr.md](workflow_adr.md)
 
 ## 基本概念
 
@@ -115,7 +116,7 @@ spec-dock/
 
 1. 既存ノードに収まるか確認し、必要なら `new` / `import` する
 2. Issue 実行では `issue start <target>` で作業対象を固定し、対象ブランチへ checkout する
-3. 仕様書作成は `workflow_spec_authoring.md` を正本にし、未解決の曖昧さは `workflow_clarification.md` で一問ずつ解消してから、対象 scope の `workflow_*.md`、requirement / design の shared playbook、`phase_plan.md` → `phase_plan_<scope>.md` の順で書く
+3. 仕様書作成は対応 planning skill を operational entrypoint にし、`workflow_spec_authoring.md` の phase promotion detail を参照する。未解決の曖昧さは `spec-dock-clarification` skill と `workflow_clarification.md` の bridge/reference で一問ずつ解消してから、対象 scope の `workflow_*.md`、requirement / design の shared playbook、`phase_plan.md` → `phase_plan_<scope>.md` の順で書く
 4. Initiative は Epic 分解、Epic は Issue 分割、Issue は agent-native / behavior-slice based execution contract を plan に落とす
 5. `validate` / `sync` で整合性と生成物を更新し、Issue lifecycle を閉じる場合は `issue finish` を使う
 
