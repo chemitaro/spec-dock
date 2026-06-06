@@ -147,6 +147,7 @@ result:
 | S01 | cl-004 | No skill/template/runtime changes are included | `git diff --name-only` before report evidence contained only S01 provider / mirror docs; disallowed-file rg returned no matches | pass | report evidence added after scope check |
 | S01 | cl-005 | `iss-00163` and `iss-00164` completion evidence exists before docs wording changes | GitHub #163/#164 states were CLOSED; local history includes final gate commits `8d9d62c` and `925095f4` | pass | prerequisite evidence confirmed |
 | S90 | cl-006 | `sync`, `validate`, mirror inspection, and diff-check pass; generated changes are recorded | `sync` completed and rewrote projection paths but produced no git diff; `validate` passed with nodes=84; post-S90 `diff -q` confirmed all changed provider / mirror doc pairs still matched; `git diff --check`, `git status --short`, and `git diff --name-only` were clean before report evidence | pass | no projection commit required |
+| S99 | cl-007 | QA/code/spec reviewers pass and final report ledger is committed | Final QA, code, and spec reviewers passed with only P2 final-ledger backfill findings; `validate`, `git diff --check`, final status, and issue-wide diff inspection passed | pass | ready for final report commit |
 
 ## レビューゲート状態（Reviewer Gate Status）
 
@@ -157,6 +158,9 @@ result:
 | plan | phase reviewer | spec-reviewer `019e9bbd-4725-71a2-84fd-3bd451424f48` | fresh | pass | no | promoted to execution | no findings |
 | S01 | step reviewer | spec-reviewer `019e9bc8-29c3-7302-9524-565343b4427b` | fresh | pass | no | S01 complete; proceed to S01 commit | findings none; confidence 0.9 |
 | S90 | docs impact reviewer | spec-reviewer `019e9bcb-719a-72c1-97fc-5bb0a9ab9c4a` | fresh | pass | no | S90 complete; proceed to S90 commit | initial fail on missing mirror inspection; follow-up pass after post-S90 diff-q evidence |
+| S99 | final QA reviewer | qa-reviewer `019e9bcf-62bc-7730-89d6-3c7bed89cf4f` | fresh | pass | no | final report backfill | P2 to record S90 commit evidence, addressed in final report update |
+| S99 | final code reviewer | code-reviewer `019e9bcf-ab8f-76a2-a7db-e3834cf8c661` | fresh | pass | no | final report backfill | P2 to record S90 commit evidence, addressed in final report update |
+| S99 | final spec reviewer | spec-reviewer `019e9bcf-f732-72a0-90f9-3d92fe5eeb8e` | fresh | pass | no | final report backfill | P2 to backfill S90/S99 completion evidence, addressed in final report update |
 
 ## ステップ commit ゲート（Step Commit Gate）
 
@@ -164,11 +168,16 @@ result:
 |---|---|---|---|---|
 | planning | pass | requirement/design/plan/report authoring evidence | `e44a2fad` | post-commit clean confirmed before S01 |
 | S01 | pass | docs wording + S01 report evidence | `228dc044` | clean confirmed before S90 |
-| S90 | pass | docs impact / sync validation report evidence | pending | pending |
+| S90 | pass | docs impact / sync validation report evidence | `56b3f9d1` | clean confirmed before S99 |
+| S99 | pass | final report ledger | ready for final report commit | final commit hash and clean check are external closeout evidence after this report is committed |
 
 ## 最終品質ゲート（Final Quality Gate）
 
-- Not started. Final QA/code/spec gates run after S01 and S90 are committed.
+- `./spec-dock/scripts/spec-dock validate` passed with `nodes=84`.
+- `git diff --check` passed.
+- `git status --short` was clean before final report evidence.
+- `git diff e44a2fad..HEAD --stat` and `git diff e44a2fad..HEAD --name-only` showed only provider / mirror docs and `iss-00165` report evidence.
+- Final QA, code, and spec reviewers returned `review_status: pass`; their P2 findings were final-ledger backfill items addressed in this section and the Step Commit Gate.
 
 ## 省略/例外メモ
 
