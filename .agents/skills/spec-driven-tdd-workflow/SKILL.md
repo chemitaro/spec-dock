@@ -6,17 +6,18 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 # Spec-driven TDD Workflow (Hub)
 
 - Use this as the entry/routing skill for spec-dock work.
-- Keep `spec-dock/docs/` as the source of truth; skills stay concise.
-- Keep templates as minimum authoring scaffolds, not compliance targets.
-- Put spec authoring rules and workflow explanations in `spec-dock/docs/` and route through these skills.
-- Use `spec-dock/docs/workflow_spec_authoring.md` as the source of truth for requirement / design / plan phase promotion across Initiative, Epic, and Issue.
+- Use skills for the first-read workflow spine: mandatory next actions, stop conditions, reviewer gates, and handoff boundaries an agent must know before following links.
+- Use `spec-dock/docs/` for detailed semantics, field meanings, lifecycle policy, hard cases, and reference material.
+- Use templates as minimum authoring scaffolds, evidence slots, and examples. Templates are not compliance authorities.
+- Route to docs for detailed explanations instead of copying schema or policy into skills.
+- Use `spec-dock/docs/workflow_spec_authoring.md` for detailed requirement / design / plan phase promotion semantics across Initiative, Epic, and Issue.
 - Use `spec-dock/docs/workflow_clarification.md` and `spec-dock-clarification` when the request is to clarify ambiguous requirements, sharpen domain language, prepare one-question-at-a-time interviews, or work in analysis-only / draft-only mode before canonical authoring.
 - In spec authoring mode, each artifact must pass a fresh `spec-reviewer` (`review_status: pass`) before the next phase starts; fix findings and re-run a fresh reviewer until pass.
 - In spec authoring or issue execution mode, honor workflow-scoped delegation consent before routing reviewer work: if the current user request or active report evidence grants issue-scoped consent, the orchestrator may invoke named reviewer / read-only specialist roles within that scope without per-phase confirmation.
 - Missing, stale, failed, unavailable, denied, waived, or provisional reviewer results are not `review_status: pass`. Do not route to implementation or completion by treating them as degraded success.
 - Agents may add, remove, merge, reorder, or rewrite template sections when it improves correctness, human understanding, or agent executability for the specific project.
 - Use `spec-dock/docs/phase_design.md` as the source of truth for optional diagram choices. Add useful UML / PlantUML / table sections from the catalog, or project-specific sections outside the catalog, when they clarify structure, boundaries, responsibility, flow, state, or dependency.
-- Route once the main output is clear; leaf skills own the workflow details.
+- Route once the main output is clear; leaf skills own the first-read spine for their workflow and docs own detailed semantics.
 
 ## Route to leaf skills
 
@@ -44,7 +45,7 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 ## Quick reminders
 
 - Do not default to create/import for initiative/epic; inspect existing nodes first.
-- Keep boundary rationale in `discussions/`; docs remain the source of truth for the rule itself.
+- Keep boundary rationale in `discussions/`; docs carry detailed rule semantics while skills expose the operational steps needed before consulting them.
 - Put interview and investigation notes under `discussions/` in the active node. Important questions use unanswered `interview` first; lightweight chat questions stay one-at-a-time and return to `interview` if they become specification decisions.
 - Sub-agent authoring outputs may be direct-written under the target scope `discussions/` direct child, but they do not become canonical authority until the main orchestrator adopts them in canonical docs and records the adoption in `report.md`.
 - Record `Spec Authoring Gate` evidence in the active node's `report.md` for each requirement / design / plan promotion.
