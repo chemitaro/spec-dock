@@ -11,6 +11,8 @@ ID: "<EPIC_ID>"
 
 # <EPIC_ID> <EPIC_TITLE> — レポート（進捗 / 決定 / 結果）
 
+> このテンプレートは observed evidence slot scaffold です。Epic の進捗、採用判断、reviewer state、blocking / next action、closure / follow-up を記録する starting shape を提供しますが、workflow / compliance authority ではありません。判断の詳細と lifecycle policy は skills / docs / accepted ADRs / reviewer gates を参照し、観測した証跡だけをこの report ledger に残します。
+
 ## 進捗サマリー (必須)
 - 現在地（何が完了し、何が未完か）:
   - ...

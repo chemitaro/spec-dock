@@ -12,7 +12,7 @@ ID: "<ISS_ID>"
 
 # <ISS_ID> <ISS_TITLE> — 実装計画（実行契約 / Execution Contract）
 
-> このテンプレートは最小 scaffold です。`plan.md` は計画済み契約（planned contract）を所有し、実装者が step を上から順に実行できる command queue として書く。実行結果、逸脱、発見された tests、reviewer verdict、commit/no-op evidence は `report.md` の観測証跡台帳（observed evidence ledger）に記録する。実行 policy は `workflow_issue.md`、Issue 計画の書き方は `phase_plan_issue.md` と `docs/authoring/issue-plan.md` を正本にする。
+> このテンプレートは executable scaffold です。`plan.md` は計画済み契約（planned contract）と、実装者が step を上から順に実行できる command queue を書く場所です。実行結果、逸脱、発見された tests、reviewer verdict、commit/no-op evidence は `report.md` の観測証跡台帳（observed evidence ledger）に記録する。workflow authority は skills / `workflow_issue.md` が持ち、Issue 計画の field semantics と詳しい書き方は `phase_plan_issue.md` と `docs/authoring/issue-plan.md` を detail-reference として参照する。
 
 ## この計画で満たす要件ID
 - AC:
@@ -23,7 +23,7 @@ ID: "<ISS_ID>"
   - ...
 
 ## 依存関係から導く実装順序
-- 依存関係の正本:
+- 依存関係の参照元:
   - `design.md` の依存関係、図、ファイル変更計画
 - 順序ルール:
   - prerequisite / lower-dependency slice から先に閉じる

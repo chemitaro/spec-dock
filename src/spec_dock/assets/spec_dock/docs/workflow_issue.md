@@ -1,10 +1,11 @@
 # 課題ワークフロー（workflow: issue / Agent-Native TDD）
 
 Issue は実装の最小単位です。
-この workflow は、active issue を入口にした仕様固定マイクロバッチTDD（Spec-Locked Micro-Batch TDD）、step review loop、docs impact、最終品質ゲート（final quality gate）を正本として扱います。
+Operational entrypoint / first-read spine は issue planning / issue execution skill が所有します。
+この workflow は、active issue を起点にした仕様固定マイクロバッチTDD（Spec-Locked Micro-Batch TDD）、step review loop、docs impact、最終品質ゲート（final quality gate）の detail / reference semantics を保持します。
 この workflow の品質ゲートは scope 固有の additive gate であり、`phase_*.md` の shared minimum gate 通過を前提とします。
 
-対応 leaf skill:
+対応 leaf skill（operational entrypoints）:
 - `.agents/skills/spec-dock-issue-planning/SKILL.md`: Issue の requirement / design / plan planning、review readiness、未解決 gap の spec authoring / clarification への戻し。
 - `.agents/skills/spec-dock-issue-execution/SKILL.md`: 承認済み planning artifacts を前提にした implementation、report evidence、issue execution gate / completion gate。
 
@@ -75,10 +76,10 @@ Issue は実装の最小単位です。
 
 ## 仕様 authoring（spec authoring）
 
-- Issue planning は `.agents/skills/spec-dock-issue-planning/SKILL.md` を入口にし、仕様作成の正本は `workflow_spec_authoring.md`、未解決の曖昧さは `workflow_clarification.md` に route する
-- Issue execution は `.agents/skills/spec-dock-issue-execution/SKILL.md` を入口にし、承認済み / reviewer-pass 済みの `requirement.md` / `design.md` / `plan.md` と executable `plan.md` を前提に、この workflow の execution gate / report gate / completion gate に route する
+- Issue planning は `.agents/skills/spec-dock-issue-planning/SKILL.md` を operational entrypoint にし、仕様作成の phase promotion detail は `workflow_spec_authoring.md`、未解決の曖昧さは `spec-dock-clarification` skill と `workflow_clarification.md` の bridge/reference に route する
+- Issue execution は `.agents/skills/spec-dock-issue-execution/SKILL.md` を operational entrypoint にし、承認済み / reviewer-pass 済みの `requirement.md` / `design.md` / `plan.md` と executable `plan.md` を前提に、この workflow の execution gate / report gate / completion gate detail に route する
 - active issue 配下の `requirement.md` / `design.md` / `plan.md` を埋める
-- Requirement / design / plan の phase promotion は `workflow_spec_authoring.md` を正本にし、各 artifact ごとに fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
+- Requirement / design / plan の phase promotion は `workflow_spec_authoring.md` の detail / reference semantics に従い、各 artifact ごとに fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
 - Requirement / design / plan に未解決の仕様 gap、用語衝突、責務境界の曖昧さがある場合は、実装で仮定せず [workflow_clarification.md](workflow_clarification.md) へ戻す。
 - `discussions/`: `new doc <type> --issue <issue-id> --title "..."` で、この issue の `discussions/` 配下に timestamp-prefixed original を作成する。current catalog は `scratch` / `interview` / `research` / `disc` / `adr` / `draft-requirement` / `draft-design` / `draft-plan`。標準形は `<ts>-<kind>-<slug>.md`、same-second collision は `<ts>-<nn>-<kind>-<slug>.md`。詳細 contract は [reference_naming.md](reference_naming.md) を参照する
 - discussion docs は思考、知識、未確定情報を外部化する作業面であり、それ自体を正本へ昇格させない。`scratch` / `interview` / `research` / `disc` の文脈をもとに、必要な `adr` を新規作成し、`requirement.md` / `design.md` / `plan.md` へ織り込む。
@@ -87,7 +88,7 @@ Issue は実装の最小単位です。
 - agent は、プロジェクトの目的、作業内容、人間の理解しやすさ、エージェントの実行可能性に合わせて、項目を追加・削除・統合・並べ替えてよい
 - 不要な placeholder や該当しない節は削ってよいが、正確性、検証可能性、人間の理解、エージェントの実行に必要な情報は削らない
 - テンプレートにない図表や節も、[phase_design.md](phase_design.md) の `optional diagram catalog` から必要なものを選んで追加してよい。カタログ外でも、構造・境界・責務・流れ・状態・依存を人間が理解しやすくする情報なら追加してよい
-- shared な書き方は `phase_*.md`、Issue plan の哲学と review checklist は `phase_plan_issue.md`、Issue plan の field semantics と executable step schema は [authoring/issue-plan.md](authoring/issue-plan.md)、Issue 固有の lifecycle / execution / reviewer / completion policy はこの workflow を正本とする
+- shared な書き方は `phase_*.md`、Issue plan の哲学と review checklist は `phase_plan_issue.md`、Issue plan の field semantics と executable step schema は [authoring/issue-plan.md](authoring/issue-plan.md)、Issue 固有の lifecycle / execution / reviewer / completion policy detail はこの workflow を参照する
 - Issue design では [phase_design.md](phase_design.md) に従い、必要な粒度で依存関係分析、`Module Dependency Diagram`、Linux `tree` style の `ディレクトリ / ファイル変更計画` を置く
 - Issue plan では [phase_plan_issue.md](phase_plan_issue.md) に従い、design の依存関係分析、module dependency diagram、directory / file change plan から step 順を導く
 
@@ -130,10 +131,10 @@ Issue は実装の最小単位です。
 - 完成版 `plan.md` には仕様固定クロージャ索引（`Spec-Locked Closure Index`）を置き、各 behavior slice の仕様ロックと closure owner step を実装前に固定する
 - 仕様固定クロージャ索引（`Spec-Locked Closure Index`）は Issue 全体のテストケース一覧や詳細なテスト実装指示ではなく、観測可能な入力・状態・locked expectation・防ぐ欠陥クラス・required/evidence level を固定する coverage ledger である
 - step クロージャ契約（`step closure contract`）は closure index の `id` を参照し、どの検証契約をその step で満たせば close してよいかを追えるようにする
-- 実装開始前に required closure id が step-local close condition と verification command または evidence path へ追跡できることを確認する。field semantics、card schema、risk-calibrated obligation coverage の詳細は [authoring/issue-plan.md](authoring/issue-plan.md) を正本にする
+- 実装開始前に required closure id が step-local close condition と verification command または evidence path へ追跡できることを確認する。field semantics、card schema、risk-calibrated obligation coverage の詳細は [authoring/issue-plan.md](authoring/issue-plan.md) を参照する
 - required closure row、`locked expectation`、`required`、`spec link` を変更する場合は plan amendment と re-review を先に通す
 - `pre-implementation evidence` は expected red / characterization pass / test sensitivity evidence のいずれかを記録し、failing-first を完全要求できない場合もテストが欠陥を検出できる根拠を残す
-- plan field semantics、`具体テストケース一覧` の card schema、docs-only / inspect-only / manual-required の書き方は [authoring/issue-plan.md](authoring/issue-plan.md) を正本にする。この workflow は lifecycle、実行順、reviewer gate、completion policy を所有し、field-level template manual を再定義しない
+- plan field semantics、`具体テストケース一覧` の card schema、docs-only / inspect-only / manual-required の書き方は [authoring/issue-plan.md](authoring/issue-plan.md) を参照する。この workflow は lifecycle、実行順、reviewer gate、completion policy を所有し、field-level template manual を再定義しない
 - `Implementation Delegation Gate` は各 implementation step の開始前に必ず置く。runtime / CLI / infra / code / tests / scaffold behavior は `dev-coder`、shipped docs / templates / skills / workflow text は `doc-writer` を primary delegated worker とし、step が複数 layer / module / package にまたがる、runtime / CLI / infra / templates / shipped scaffold / shared docs に影響する、既存 pattern 調査や影響範囲分析が必要、integration test / migration / backward compatibility / filesystem / GitHub / active state に関わる、または独立 worker scope に分割できる大きさの場合は、適切なサブエージェント利用を必須にする
 - delegated worker handoff には、`delegated role`、`scope`、`source of truth`、`allowed changes`、`forbidden changes`、`required verification`、`stop conditions`、`output required` を必ず含める。複数 layer / package / shipped asset にまたがる step は、親 Codex が direct implementation せず、allowed paths と dependency boundary を明記して委任する
 - `delegated` の場合は delegated role、scope、source of truth、allowed changes、forbidden changes、required verification、stop conditions、output required、worker summary、changed files、verification result、unresolved risks、取り込み結果を `report.md` に残す
