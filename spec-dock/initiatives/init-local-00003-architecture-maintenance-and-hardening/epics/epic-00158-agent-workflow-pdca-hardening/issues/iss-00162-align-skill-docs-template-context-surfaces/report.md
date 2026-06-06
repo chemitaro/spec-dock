@@ -264,6 +264,7 @@ pass: no missing provider template paths.
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed | discussion + report S01 evidence | `b39e36ec` | `git status --short` -> clean | not applicable | not applicable | not applicable | not applicable |
+| S02 | committed | provider/mirror hub skill wording + report S02 evidence | `9f3da538` | `git status --short` -> clean | not applicable | not applicable | not applicable | not applicable |
 
 #### 変更したファイル
 - `spec-dock/active/issue/discussions/20260606t040013z-disc-context-surface-inventory.md` - S01 context surface inventory / trace matrix.
@@ -364,10 +365,80 @@ pass: diff is limited to hub introductory ownership wording and one Quick remind
 - `spec-dock/active/issue/report.md` - S02 evidence and reviewer gate records.
 
 #### コミット
-- pending S02 commit.
+- `9f3da538` `docs(context-surface): hubスキルの文脈境界を整理`
 
 #### メモ
 - No user interview blocker was found for S02. The user correction remains active: if user-intent clarification becomes blocking, stop and ask the user directly.
+
+---
+
+### セッションログ（2026-06-06 04:50 - 05:00）
+
+#### 対象
+- Step: S90
+- AC/EC: AC-004 / docs impact
+- 計画上の出典（Planned source）:
+  - `plan.md` section: ドキュメント影響の解消ステップ S90
+  - closure ids: cl-008
+
+#### 実施内容
+- `sync` / `validate` / `git diff --check` を実行し、S01/S02 後の generated projections と docs impact に unresolved 差分がないことを確認した。
+- S02 commit 後の report 証跡更新のみが未コミット差分として残っていることを確認した。
+
+#### 実行コマンド / 結果
+```bash
+./spec-dock/scripts/spec-dock sync
+
+spec-dock: sync: active unchanged (matched id in branch: iss-00162)
+spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+```
+
+```bash
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=84
+```
+
+```bash
+git diff --check
+
+pass
+```
+
+```bash
+git status --short
+
+ M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00162-align-skill-docs-template-context-surfaces/report.md
+```
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | cl-008 | `sync`, validate, and docs impact review pass | `sync` and `validate` pass; `git diff --check` pass; sync projections did not leave additional diffs | pass | Fresh S90 spec-reviewer passed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-008 | S90 | yes | manual-required | S01/S02 completed and committed | `./spec-dock/scripts/spec-dock sync`; `./spec-dock/scripts/spec-dock validate`; `git diff --check` | pass | docs impact reviewer passed |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-008 | S90 | sync / validate / diff-check | pass | fresh S90 spec-reviewer passed |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | docs impact reviewer | spec-reviewer | fresh | passed | no | proceed to S90 commit | Agent `019e9b2a-9b54-76d1-89eb-3dd3c6dd6c6a`; findings none; sync/validate/diff-check evidence and no-change rationale accepted |
+
+#### 変更したファイル
+- `spec-dock/active/issue/report.md` - S02 commit evidence and S90 docs impact evidence.
+
+#### コミット
+- pending S90 commit.
+
+#### メモ
+- No user interview blocker was found for S90.
 
 ---
 
@@ -376,7 +447,7 @@ pass: diff is limited to hub introductory ownership wording and one Quick remind
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| skill / generated projections / docs / templates / runtime | yes: hub skill changed; no additional docs/templates/runtime changes required | main orchestrator | `./spec-dock/scripts/spec-dock sync` -> pass; `./spec-dock/scripts/spec-dock validate` -> pass; `git diff --check` -> pass; sync left no projection diffs beyond report evidence | fresh S90 spec-reviewer pass by `019e9b2a-9b54-76d1-89eb-3dd3c6dd6c6a` |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
