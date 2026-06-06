@@ -309,6 +309,39 @@ result:
 - final report ledger commit:
   - pending now; final commit hash will be external delivery evidence after commit.
 
+## PR 送達ゲート（PR Delivery Gate）
+
+| 項目 | 証跡 |
+|---|---|
+| PR URL | https://github.com/chemitaro/spec-dock/pull/168 |
+| PR 番号 | #168 |
+| existing / new | new PR created after confirming no existing PR for `iss-00166-align-templates-as-scaffolds-and-examples` |
+| selected base | `main` |
+| base-resolution source | `refs/remotes/origin/HEAD` -> `origin/main`; branch-specific `gh-merge-base` unset |
+| base conflict / handling | none observed |
+| draft / ready decision | ready PR; local final gates had passed before PR creation |
+| head branch | `iss-00166-align-templates-as-scaffolds-and-examples` |
+| initial head SHA | `cc833cb4130d8f48efc8ace9ffb0bed53f855d8e` |
+| issue linkage | `Closes #166`; `Refs #158`; closed sibling issues `#159/#162/#163/#164/#165` referenced |
+| push evidence | branch pushed to `origin/iss-00166-align-templates-as-scaffolds-and-examples` |
+
+## マージ準備ゲート（Merge Preparation Gate）
+
+| 項目 | 証跡 |
+|---|---|
+| PR open state | open, ready PR |
+| monitor target | PR #168, initial head SHA `cc833cb4130d8f48efc8ace9ffb0bed53f855d8e` |
+| initial monitor status | not merge-prepared |
+| required check status | `validate` pass; `provider-tests` failure on initial head |
+| failure class | `check_failure:provider-tests` |
+| failure evidence | GitHub Actions job `27057305457` / `79863906790`; `python -m unittest discover -s tests/unit` failed |
+| failure cause | tests still expected old template / clarification / dogfooding snapshot contract after S01/S02/S90 context-surface changes |
+| repair action | updated `tests/test_init_update.py` scaffold wording, clarification contract fragments, routing contract allowance, and checked-in dogfooding snapshot constants |
+| local repair verification | `python -m unittest tests.test_init_update.TestInitUpdate.test_spec_document_templates_keep_policy_out_of_scaffold` pass; `python -m unittest discover -s tests -p 'test_init_update.py'` pass (`210 tests`) |
+| fix loop count / history | 1 repair attempt; no code/runtime behavior changes |
+| current merge-prepared decision | pending repaired commit push and PR re-monitor |
+| unresolved review-thread limitation | not yet determined for repaired head |
+
 ## 省略/例外メモ
 
 - User interview blocker: none.
