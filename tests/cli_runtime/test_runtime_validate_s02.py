@@ -1,11 +1,10 @@
-import contextlib
 import io
 import sys
 import tempfile
-import unittest
 from pathlib import Path
 
 
+import contextlib
 def _runtime_modules():
     runtime_scripts_dir = (
         Path(__file__).resolve().parents[2]
@@ -67,7 +66,7 @@ class _StubReader:
         return self.records
 
 
-class TestRuntimeValidateS02(unittest.TestCase):
+class TestRuntimeValidateS02:
     def test_validate_tree_use_case_returns_result_with_checked_node_count(self) -> None:
         (
             _runtime_app,
@@ -109,10 +108,10 @@ class TestRuntimeValidateS02(unittest.TestCase):
             ports = app_ports.Ports(node_reader=reader, repo_root=repo_root)
             result = app_validate_tree.validate_tree(app_contracts.ValidateTreeRequest(), ports)
 
-            self.assertEqual(reader.calls, 1)
-            self.assertEqual(result.checked_node_count, 1)
-            self.assertEqual(result.report.errors, [])
-            self.assertEqual(result.report.warnings, [])
+            assert reader.calls == 1
+            assert result.checked_node_count == 1
+            assert result.report.errors == []
+            assert result.report.warnings == []
 
     def test_validate_tree_use_case_returns_domain_error(self) -> None:
         (
@@ -164,9 +163,9 @@ class TestRuntimeValidateS02(unittest.TestCase):
             ports = app_ports.Ports(node_reader=reader, repo_root=repo_root)
             result = app_validate_tree.validate_tree(app_contracts.ValidateTreeRequest(), ports)
 
-        self.assertEqual(result.checked_node_count, 1)
-        self.assertTrue(result.report.errors)
-        self.assertIn("issue missing parent_id", result.report.errors[0])
+        assert result.checked_node_count == 1
+        assert result.report.errors
+        assert "issue missing parent_id" in result.report.errors[0]
 
     def test_validate_tree_use_case_rejects_local_only_legacy_contract_state(self) -> None:
         (
@@ -207,9 +206,9 @@ class TestRuntimeValidateS02(unittest.TestCase):
             ports = app_ports.Ports(node_reader=reader, repo_root=repo_root)
             result = app_validate_tree.validate_tree(app_contracts.ValidateTreeRequest(), ports)
 
-        self.assertEqual(result.checked_node_count, 1)
-        self.assertTrue(result.report.errors)
-        self.assertIn("initiative missing github.issue_number", result.report.errors[0])
+        assert result.checked_node_count == 1
+        assert result.report.errors
+        assert "initiative missing github.issue_number" in result.report.errors[0]
 
     def test_render_validate_text_regression(self) -> None:
         (
@@ -229,8 +228,8 @@ class TestRuntimeValidateS02(unittest.TestCase):
                 checked_node_count=3,
             )
         )
-        self.assertEqual(ok.stdout_lines, ["spec-dock: ok (validate) nodes=3"])
-        self.assertEqual(ok.stderr_lines, [])
+        assert ok.stdout_lines == ["spec-dock: ok (validate) nodes=3"]
+        assert ok.stderr_lines == []
 
         ng = presentation_cli_text.render_validate_text(
             app_contracts.ValidationResult(
@@ -238,8 +237,8 @@ class TestRuntimeValidateS02(unittest.TestCase):
                 checked_node_count=3,
             )
         )
-        self.assertEqual(ng.stdout_lines, [])
-        self.assertEqual(ng.stderr_lines, ["broken tree"])
+        assert ng.stdout_lines == []
+        assert ng.stderr_lines == ["broken tree"]
 
     def test_app_minimal_validate_reader_seam(self) -> None:
         (
@@ -284,8 +283,8 @@ class TestRuntimeValidateS02(unittest.TestCase):
         finally:
             cli_bootstrap.infra_fs_repo.load_node_records = original_load_node_records
 
-        self.assertEqual(calls.get("specdock_dir"), Path("/repo/spec-dock"))
-        self.assertEqual(records, expected_records)
+        assert calls.get("specdock_dir") == Path("/repo/spec-dock")
+        assert records == expected_records
 
     def test_validate_exit_0_and_stdout_only(self) -> None:
         (
@@ -320,9 +319,9 @@ class TestRuntimeValidateS02(unittest.TestCase):
             runtime_app._ensure_no_legacy_meta_json = original_ensure_no_legacy_meta_json
             cli_bootstrap.application_validate_tree = original_application_validate_tree
 
-        self.assertEqual(exit_code, 0)
-        self.assertEqual(stdout.getvalue(), "spec-dock: ok (validate) nodes=2\n")
-        self.assertEqual(stderr.getvalue(), "")
+        assert exit_code == 0
+        assert stdout.getvalue() == "spec-dock: ok (validate) nodes=2\n"
+        assert stderr.getvalue() == ""
 
     def test_validate_exit_1_and_stderr_only(self) -> None:
         (
@@ -357,9 +356,9 @@ class TestRuntimeValidateS02(unittest.TestCase):
             runtime_app._ensure_no_legacy_meta_json = original_ensure_no_legacy_meta_json
             cli_bootstrap.application_validate_tree = original_application_validate_tree
 
-        self.assertEqual(exit_code, 1)
-        self.assertEqual(stdout.getvalue(), "")
-        self.assertIn("error: broken tree", stderr.getvalue())
+        assert exit_code == 1
+        assert stdout.getvalue() == ""
+        assert "error: broken tree" in stderr.getvalue()
 
     def test_legacy_validate_path_delegates_to_use_case_and_renderer(self) -> None:
         (
@@ -400,15 +399,15 @@ class TestRuntimeValidateS02(unittest.TestCase):
             runtime_app._ensure_no_legacy_meta_json = original_ensure_no_legacy_meta_json
             cli_bootstrap.application_validate_tree = original_application_validate_tree
 
-        self.assertEqual(exit_code, 0)
-        self.assertEqual(stdout.getvalue(), "spec-dock: ok (validate) nodes=1\n")
-        self.assertEqual(stderr.getvalue(), "")
+        assert exit_code == 0
+        assert stdout.getvalue() == "spec-dock: ok (validate) nodes=1\n"
+        assert stderr.getvalue() == ""
         req = calls.get("req")
         ports = calls.get("ports")
-        self.assertIsInstance(req, app_contracts.ValidateTreeRequest)
-        self.assertIsNotNone(ports)
-        self.assertEqual(getattr(ports, "repo_root"), Path("/repo"))
-        self.assertEqual(getattr(ports, "specdock_dir"), Path("/repo/spec-dock"))
+        assert isinstance(req, app_contracts.ValidateTreeRequest)
+        assert ports is not None
+        assert getattr(ports, "repo_root") == Path("/repo")
+        assert getattr(ports, "specdock_dir") == Path("/repo/spec-dock")
 
     def test_issue_78_validate_uses_current_specdock_even_when_legacy_hidden_workspace_exists(self) -> None:
         cli_bootstrap = _runtime_cli_bootstrap_module()
@@ -434,6 +433,6 @@ class TestRuntimeValidateS02(unittest.TestCase):
             finally:
                 cli_bootstrap.infra_fs_repo.load_node_records = original_load_node_records
 
-        self.assertEqual(records, [])
-        self.assertEqual(calls.get("specdock_dir"), current_specdock)
-        self.assertNotEqual(calls.get("specdock_dir"), legacy_specdock)
+        assert records == []
+        assert calls.get("specdock_dir") == current_specdock
+        assert calls.get("specdock_dir") != legacy_specdock

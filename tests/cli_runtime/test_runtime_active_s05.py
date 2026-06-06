@@ -1,12 +1,11 @@
-import contextlib
 import io
 import json
 import sys
 import tempfile
-import unittest
 from pathlib import Path
 
 
+import contextlib
 def _runtime_modules():
     runtime_scripts_dir = (
         Path(__file__).resolve().parents[2]
@@ -61,7 +60,7 @@ class _StubActiveStateStore:
         raise AssertionError("load_active_manifest_no_migrate must not be used in S05 active show")
 
 
-class TestRuntimeActiveS05(unittest.TestCase):
+class TestRuntimeActiveS05:
     def test_render_context_pack_states_entry_default_and_escalation_contract(self) -> None:
         (
             _runtime_app,
@@ -93,28 +92,22 @@ class TestRuntimeActiveS05(unittest.TestCase):
 
         text = infra_active_store._render_context_pack(manifest)
 
-        self.assertIn("- entry: `spec-dock/.agent/active.json`", text)
-        self.assertIn("- default working set: `spec-dock/.agent/index.json`", text)
-        self.assertIn("- default dependency view: `spec-dock/.agent/deps-issues.json`", text)
-        self.assertIn("- escalation only: `spec-dock/.agent/index-all.json`", text)
-        self.assertIn("- Start with `spec-dock/.agent/active.json`.", text)
-        self.assertIn(
-            "- For normal work, read `spec-dock/.agent/index.json` and `spec-dock/.agent/deps-issues.json`.",
-            text,
-        )
-        self.assertIn(
-            "- Read `spec-dock/.agent/index-all.json` only when full-history context is needed.",
-            text,
-        )
-        self.assertIn("human guidance", text)
-        self.assertIn("not the sole source of truth", text)
-        self.assertIn("- `spec-dock/active/issue/report.md`", text)
-        self.assertIn("## Authority", text)
-        self.assertIn("- source: `spec-dock/.agent/active.json`", text)
-        self.assertIn("proposed or missing authority cannot authorize implementation", text)
-        self.assertIn("issue ready", text)
-        self.assertIn("- issue: authority=missing, grants=[]", text)
-        self.assertIn("- issue: authoritative_input=none, downstream_block=missing_authority", text)
+        assert "- entry: `spec-dock/.agent/active.json`" in text
+        assert "- default working set: `spec-dock/.agent/index.json`" in text
+        assert "- default dependency view: `spec-dock/.agent/deps-issues.json`" in text
+        assert "- escalation only: `spec-dock/.agent/index-all.json`" in text
+        assert "- Start with `spec-dock/.agent/active.json`." in text
+        assert "- For normal work, read `spec-dock/.agent/index.json` and `spec-dock/.agent/deps-issues.json`." in text
+        assert "- Read `spec-dock/.agent/index-all.json` only when full-history context is needed." in text
+        assert "human guidance" in text
+        assert "not the sole source of truth" in text
+        assert "- `spec-dock/active/issue/report.md`" in text
+        assert "## Authority" in text
+        assert "- source: `spec-dock/.agent/active.json`" in text
+        assert "proposed or missing authority cannot authorize implementation" in text
+        assert "issue ready" in text
+        assert "- issue: authority=missing, grants=[]" in text
+        assert "- issue: authoritative_input=none, downstream_block=missing_authority" in text
 
     def test_context_pack_marks_proposed_active_artifact_non_authoritative(self) -> None:
         _runtime_app, _app_contracts, _app_ports, app_set_active, infra_active_store, infra_contracts, _cli = _runtime_modules()
@@ -139,10 +132,9 @@ class TestRuntimeActiveS05(unittest.TestCase):
         )
 
         for rendered in (infra_active_store._render_context_pack(manifest), app_set_active.build_context_pack_text(manifest)):
-            with self.subTest(rendered=rendered[:20]):
-                self.assertIn("- issue: authority=proposed", rendered)
-                self.assertIn("- issue: authoritative_input=none", rendered)
-                self.assertIn("downstream_block=authority_not_approved", rendered)
+            assert "- issue: authority=proposed" in rendered
+            assert "- issue: authoritative_input=none" in rendered
+            assert "downstream_block=authority_not_approved" in rendered
 
     def test_context_pack_blocks_authoritative_input_when_scope_report_has_unresolved_eal(self) -> None:
         _runtime_app, _app_contracts, _app_ports, app_set_active, infra_active_store, infra_contracts, _cli = _runtime_modules()
@@ -190,11 +182,10 @@ class TestRuntimeActiveS05(unittest.TestCase):
                 infra_active_store._render_context_pack(manifest, repo_root=repo_root),
                 app_set_active.build_context_pack_text(manifest, repo_root=repo_root),
             ):
-                with self.subTest(rendered=rendered[:20]):
-                    self.assertIn("- issue: authority=approved", rendered)
-                    self.assertIn("- issue: authoritative_input=none", rendered)
-                    self.assertIn("downstream_block=evidence_ledger_blocked", rendered)
-                    self.assertIn("blocking_entry_id=EAL-030", rendered)
+                assert "- issue: authority=approved" in rendered
+                assert "- issue: authoritative_input=none" in rendered
+                assert "downstream_block=evidence_ledger_blocked" in rendered
+                assert "blocking_entry_id=EAL-030" in rendered
 
     def test_sync_auto_update_from_branch_writes_authority_context_pack(self) -> None:
         app_contracts, app_ports = _runtime_modules()[1:3]
@@ -319,19 +310,19 @@ class TestRuntimeActiveS05(unittest.TestCase):
 
         next_state, outcome = app_sync_state.maybe_auto_update_from_branch(state, ports)
 
-        self.assertIsNotNone(outcome)
         assert outcome is not None
-        self.assertTrue(outcome.applied)
-        self.assertEqual(next_state.active.issue_id, "iss-local-00001")
-        self.assertIsNotNone(active_state_store.written_manifest)
+        assert outcome is not None
+        assert outcome.applied
+        assert next_state.active.issue_id == "iss-local-00001"
+        assert active_state_store.written_manifest is not None
         assert active_state_store.written_manifest is not None
         assert active_state_store.written_manifest.issue is not None
-        self.assertEqual(active_state_store.written_manifest.issue.authority, "approved")
-        self.assertIn("issue_ready", active_state_store.written_manifest.issue.grants)
-        self.assertIsNotNone(active_state_store.rendered_context_pack)
+        assert active_state_store.written_manifest.issue.authority == "approved"
+        assert "issue_ready" in active_state_store.written_manifest.issue.grants
         assert active_state_store.rendered_context_pack is not None
-        self.assertIn("issue ready", active_state_store.rendered_context_pack)
-        self.assertIn("- issue: authority=approved", active_state_store.rendered_context_pack)
+        assert active_state_store.rendered_context_pack is not None
+        assert "issue ready" in active_state_store.rendered_context_pack
+        assert "- issue: authority=approved" in active_state_store.rendered_context_pack
 
     def test_show_active_reads_agent_manifest_into_active_view_result(self) -> None:
         (
@@ -376,13 +367,13 @@ class TestRuntimeActiveS05(unittest.TestCase):
 
         result = app_set_active.show_active(app_contracts.ShowActiveRequest(), ports)
 
-        self.assertEqual(result.source, "agent.active")
-        self.assertEqual(result.warnings, [])
-        self.assertEqual(result.initiative.id, "init-local-00001")
-        self.assertEqual(result.epic.id, "epic-local-00001")
-        self.assertEqual(result.issue.id, "iss-local-00001")
-        self.assertEqual(active_store.calls_load, 1)
-        self.assertEqual(active_store.calls_no_migrate, 0)
+        assert result.source == "agent.active"
+        assert result.warnings == []
+        assert result.initiative.id == "init-local-00001"
+        assert result.epic.id == "epic-local-00001"
+        assert result.issue.id == "iss-local-00001"
+        assert active_store.calls_load == 1
+        assert active_store.calls_no_migrate == 0
 
     def test_load_active_manifest_legacy_priority_and_no_write_back(self) -> None:
         (
@@ -425,17 +416,17 @@ class TestRuntimeActiveS05(unittest.TestCase):
 
             result = infra_active_store.load_active_manifest(specdock_dir)
 
-            self.assertEqual(result.source, "legacy.work.active")
-            self.assertEqual(result.warnings, [])
-            self.assertIsNotNone(result.manifest)
+            assert result.source == "legacy.work.active"
+            assert result.warnings == []
             assert result.manifest is not None
-            self.assertEqual(result.manifest.initiative.id, "init-local-00001")
-            self.assertEqual(result.manifest.epic.id, "epic-local-00001")
-            self.assertEqual(result.manifest.issue.id, "iss-local-00001")
+            assert result.manifest is not None
+            assert result.manifest.initiative.id == "init-local-00001"
+            assert result.manifest.epic.id == "epic-local-00001"
+            assert result.manifest.issue.id == "iss-local-00001"
 
-            self.assertFalse((agent_dir / "active.json").exists())
-            self.assertEqual(legacy_active_path.read_text(encoding="utf-8"), before_active)
-            self.assertEqual(legacy_current_path.read_text(encoding="utf-8"), before_current)
+            assert not (agent_dir / "active.json").exists()
+            assert legacy_active_path.read_text(encoding="utf-8") == before_active
+            assert legacy_current_path.read_text(encoding="utf-8") == before_current
 
     def test_load_active_manifest_all_null_agent_manifest_is_valid_and_no_legacy_fallback(self) -> None:
         (
@@ -491,14 +482,14 @@ class TestRuntimeActiveS05(unittest.TestCase):
 
             result = infra_active_store.load_active_manifest(specdock_dir)
 
-            self.assertEqual(result.source, "agent.active")
-            self.assertEqual(result.warnings, [])
-            self.assertIsNotNone(result.manifest)
+            assert result.source == "agent.active"
+            assert result.warnings == []
             assert result.manifest is not None
-            self.assertIsNone(result.manifest.initiative)
-            self.assertIsNone(result.manifest.epic)
-            self.assertIsNone(result.manifest.issue)
-            self.assertEqual(legacy_active_path.read_text(encoding="utf-8"), before_legacy)
+            assert result.manifest is not None
+            assert result.manifest.initiative is None
+            assert result.manifest.epic is None
+            assert result.manifest.issue is None
+            assert legacy_active_path.read_text(encoding="utf-8") == before_legacy
 
     def test_legacy_absolute_agent_manifest_is_readable_and_not_rewritten(self) -> None:
         (
@@ -540,11 +531,11 @@ class TestRuntimeActiveS05(unittest.TestCase):
             before = active_json_path.read_text(encoding="utf-8")
 
             result = infra_active_store.load_active_manifest(specdock_dir)
-            self.assertEqual(result.source, "agent.active")
-            self.assertIsNotNone(result.manifest)
+            assert result.source == "agent.active"
+            assert result.manifest is not None
             assert result.manifest is not None
             assert result.manifest.issue is not None
-            self.assertEqual(result.manifest.issue.path, issue_dir.as_posix())
+            assert result.manifest.issue.path == issue_dir.as_posix()
 
             infra_active_store.apply_active_pointers(
                 specdock_dir,
@@ -554,14 +545,14 @@ class TestRuntimeActiveS05(unittest.TestCase):
 
             issue_pointer = active_dir / "issue"
             if issue_pointer.is_symlink():
-                self.assertEqual(issue_pointer.resolve(), issue_dir.resolve())
+                assert issue_pointer.resolve() == issue_dir.resolve()
             else:
                 path_file = active_dir / "issue.path"
-                self.assertTrue(path_file.is_file())
+                assert path_file.is_file()
                 resolved = (active_dir / path_file.read_text(encoding="utf-8").strip()).resolve()
-                self.assertEqual(resolved, issue_dir.resolve())
+                assert resolved == issue_dir.resolve()
 
-            self.assertEqual(active_json_path.read_text(encoding="utf-8"), before)
+            assert active_json_path.read_text(encoding="utf-8") == before
 
     def test_legacy_absolute_agent_manifest_path_remaps_to_current_repo_when_possible(self) -> None:
         (
@@ -605,8 +596,8 @@ class TestRuntimeActiveS05(unittest.TestCase):
             before = active_json_path.read_text(encoding="utf-8")
 
             result = infra_active_store.load_active_manifest(specdock_dir)
-            self.assertEqual(result.source, "agent.active")
-            self.assertIsNotNone(result.manifest)
+            assert result.source == "agent.active"
+            assert result.manifest is not None
             assert result.manifest is not None
 
             infra_active_store.apply_active_pointers(
@@ -617,14 +608,14 @@ class TestRuntimeActiveS05(unittest.TestCase):
 
             issue_pointer = active_dir / "issue"
             if issue_pointer.is_symlink():
-                self.assertEqual(issue_pointer.resolve(), issue_dir.resolve())
+                assert issue_pointer.resolve() == issue_dir.resolve()
             else:
                 path_file = active_dir / "issue.path"
-                self.assertTrue(path_file.is_file())
+                assert path_file.is_file()
                 resolved = (active_dir / path_file.read_text(encoding="utf-8").strip()).resolve()
-                self.assertEqual(resolved, issue_dir.resolve())
+                assert resolved == issue_dir.resolve()
 
-            self.assertEqual(active_json_path.read_text(encoding="utf-8"), before)
+            assert active_json_path.read_text(encoding="utf-8") == before
 
     def test_legacy_absolute_agent_manifest_prefers_trailing_specdock_segment(self) -> None:
         (
@@ -676,8 +667,8 @@ class TestRuntimeActiveS05(unittest.TestCase):
             )
 
             result = infra_active_store.load_active_manifest(specdock_dir)
-            self.assertEqual(result.source, "agent.active")
-            self.assertIsNotNone(result.manifest)
+            assert result.source == "agent.active"
+            assert result.manifest is not None
             assert result.manifest is not None
 
             infra_active_store.apply_active_pointers(
@@ -688,12 +679,12 @@ class TestRuntimeActiveS05(unittest.TestCase):
 
             issue_pointer = active_dir / "issue"
             if issue_pointer.is_symlink():
-                self.assertEqual(issue_pointer.resolve(), issue_dir.resolve())
+                assert issue_pointer.resolve() == issue_dir.resolve()
             else:
                 path_file = active_dir / "issue.path"
-                self.assertTrue(path_file.is_file())
+                assert path_file.is_file()
                 resolved = (active_dir / path_file.read_text(encoding="utf-8").strip()).resolve()
-                self.assertEqual(resolved, issue_dir.resolve())
+                assert resolved == issue_dir.resolve()
 
     def test_legacy_absolute_agent_manifest_outside_repo_falls_back_to_placeholder(self) -> None:
         (
@@ -745,8 +736,8 @@ class TestRuntimeActiveS05(unittest.TestCase):
                 )
 
                 result = infra_active_store.load_active_manifest(specdock_dir)
-                self.assertEqual(result.source, "agent.active")
-                self.assertIsNotNone(result.manifest)
+                assert result.source == "agent.active"
+                assert result.manifest is not None
                 assert result.manifest is not None
 
                 infra_active_store.apply_active_pointers(
@@ -757,12 +748,12 @@ class TestRuntimeActiveS05(unittest.TestCase):
 
             issue_pointer = active_dir / "issue"
             if issue_pointer.is_symlink():
-                self.assertEqual(issue_pointer.resolve(), placeholder_issue_dir.resolve())
+                assert issue_pointer.resolve() == placeholder_issue_dir.resolve()
             else:
                 path_file = active_dir / "issue.path"
-                self.assertTrue(path_file.is_file())
+                assert path_file.is_file()
                 resolved = (active_dir / path_file.read_text(encoding="utf-8").strip()).resolve()
-                self.assertEqual(resolved, placeholder_issue_dir.resolve())
+                assert resolved == placeholder_issue_dir.resolve()
 
     def test_render_active_show_text_regression(self) -> None:
         (
@@ -795,19 +786,16 @@ class TestRuntimeActiveS05(unittest.TestCase):
             warnings=["active_manifest_legacy_shape_normalized"],
         )
         text = presentation_cli_text.render_active_show_text(result)
-        self.assertEqual(
-            text.stdout_lines,
-            [
+        assert text.stdout_lines == [
                 "initiative: init-local-00001 (spec-dock/initiatives/init-local-00001-alpha)",
                 "epic: epic-local-00001 (spec-dock/initiatives/init-local-00001-alpha/epics/epic-local-00001-beta)",
                 (
                     "issue: iss-local-00001 "
                     "(spec-dock/initiatives/init-local-00001-alpha/epics/epic-local-00001-beta/issues/iss-local-00001-gamma)"
                 ),
-            ],
-        )
-        self.assertEqual(text.stderr_lines, [])
-        self.assertEqual(text.warnings, ["active_manifest_legacy_shape_normalized"])
+            ]
+        assert text.stderr_lines == []
+        assert text.warnings == ["active_manifest_legacy_shape_normalized"]
 
         none_result = app_contracts.ActiveViewResult(
             initiative=app_contracts.ActiveViewEntry(id=None, path=None),
@@ -817,15 +805,12 @@ class TestRuntimeActiveS05(unittest.TestCase):
             warnings=[],
         )
         none_text = presentation_cli_text.render_active_show_text(none_result)
-        self.assertEqual(
-            none_text.stdout_lines,
-            [
+        assert none_text.stdout_lines == [
                 "spec-dock: active: (not set)",
                 "fallback: spec-dock/active/{initiative,epic,issue} -> spec-dock/system/active-none/{initiative,epic,issue}",
                 "next: spec-dock/scripts/spec-dock active set <target>",
-            ],
-        )
-        self.assertEqual(none_text.stderr_lines, [])
+            ]
+        assert none_text.stderr_lines == []
 
     def test_active_show_main_uses_use_case_and_returns_zero(self) -> None:
         (
@@ -866,13 +851,10 @@ class TestRuntimeActiveS05(unittest.TestCase):
             cli_bootstrap.application_show_active = original_application_show_active
             runtime_app._load_active_manifest_no_migrate = original_load_active_manifest_no_migrate
 
-        self.assertEqual(exit_code, 0)
-        self.assertEqual(
-            stdout.getvalue(),
-            (
+        assert exit_code == 0
+        assert stdout.getvalue() == (
                 "spec-dock: active: (not set)\n"
                 "fallback: spec-dock/active/{initiative,epic,issue} -> spec-dock/system/active-none/{initiative,epic,issue}\n"
                 "next: spec-dock/scripts/spec-dock active set <target>\n"
-            ),
-        )
-        self.assertIn("spec-dock: (warn) active_show_warning", stderr.getvalue())
+            )
+        assert "spec-dock: (warn) active_show_warning" in stderr.getvalue()

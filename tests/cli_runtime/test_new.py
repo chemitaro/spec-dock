@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -16,10 +15,12 @@ from tests.cli_runtime.harness import (
 )
 
 
+import pytest
+import re
 class TestCliNew(CliRuntimeHarness):
     def _init_origin_repo(self, target: Path, *, owner: str = "example", repo: str = "repo") -> None:
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
         self._run_git(target, ["init"])
         self._run_git(target, ["remote", "add", "origin", f"https://github.com/{owner}/{repo}.git"])
 
@@ -73,33 +74,29 @@ class TestCliNew(CliRuntimeHarness):
             dashboard_path,
         )
         for artifact_path in artifact_paths:
-            with self.subTest(artifact=artifact_path.name, node_id=node_id):
-                self.assertTrue(artifact_path.is_file(), f"missing artifact: {artifact_path}")
+            assert artifact_path.is_file(), f"missing artifact: {artifact_path}"
 
         index_all = json.loads(index_all_path.read_text(encoding="utf-8"))
         tree_all = json.loads(tree_all_path.read_text(encoding="utf-8"))
         tree = json.loads(tree_path.read_text(encoding="utf-8"))
         deps_issues = json.loads(deps_issues_path.read_text(encoding="utf-8"))
-        self.assertIn(node_id, index_all["nodes"])
-        self.assertIn(node_id, self._collect_tree_node_ids(tree_all))
-        self.assertTrue(deps_issues["deps"]["valid"])
-        self.assertEqual(
-            deps_issues["source"],
-            {"index": "spec-dock/.agent/index.json", "schema_version": 2},
-        )
+        assert node_id in index_all["nodes"]
+        assert node_id in self._collect_tree_node_ids(tree_all)
+        assert deps_issues["deps"]["valid"]
+        assert deps_issues["source"] == {"index": "spec-dock/.agent/index.json", "schema_version": 2}
         for text_path in (tree_all_puml_path, tree_puml_path, deps_issues_puml_path):
-            self.assertIn("@startuml", text_path.read_text(encoding="utf-8"))
+            assert "@startuml" in text_path.read_text(encoding="utf-8")
         if node_id.startswith("iss-"):
-            self.assertIn(node_id, tree_all_puml_path.read_text(encoding="utf-8"))
+            assert node_id in tree_all_puml_path.read_text(encoding="utf-8")
         if require_node_in_working_artifacts:
             index = json.loads(index_path.read_text(encoding="utf-8"))
-            self.assertIn(node_id, index["nodes"])
-            self.assertIn(node_id, self._collect_tree_node_ids(tree))
+            assert node_id in index["nodes"]
+            assert node_id in self._collect_tree_node_ids(tree)
             if node_id.startswith("iss-"):
-                self.assertIn(node_id, deps_issues["nodes"])
-                self.assertIn(node_id, tree_puml_path.read_text(encoding="utf-8"))
-                self.assertIn(node_id, deps_issues_puml_path.read_text(encoding="utf-8"))
-            self.assertIn(node_id, dashboard_path.read_text(encoding="utf-8"))
+                assert node_id in deps_issues["nodes"]
+                assert node_id in tree_puml_path.read_text(encoding="utf-8")
+                assert node_id in deps_issues_puml_path.read_text(encoding="utf-8")
+            assert node_id in dashboard_path.read_text(encoding="utf-8")
 
     def _collect_tree_node_ids(self, tree_payload: dict[str, object]) -> set[str]:
         node_ids: set[str] = set()
@@ -178,7 +175,7 @@ class TestCliNew(CliRuntimeHarness):
     def test_new_initiative_auto_syncs_index_and_dashboard(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             log_path = target / ".gh.log"
             test_env = self._install_gh_issue_list_stub(target, issue_numbers=[1], log_path=log_path)
@@ -194,12 +191,12 @@ class TestCliNew(CliRuntimeHarness):
                 "init-00001",
                 require_node_in_working_artifacts=False,
             )
-            self.assertIn("issue list", log_path.read_text(encoding="utf-8"))
+            assert "issue list" in log_path.read_text(encoding="utf-8")
 
     def test_new_epic_auto_syncs_index_and_dashboard(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             test_env = self._install_gh_issue_list_stub(target, issue_numbers=[1, 2])
             self._run_runtime(
@@ -223,7 +220,7 @@ class TestCliNew(CliRuntimeHarness):
     def test_new_issue_auto_syncs_index_and_dashboard(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             test_env = self._install_gh_issue_list_stub(target, issue_numbers=[1, 2, 3])
             self._run_runtime(
@@ -248,7 +245,7 @@ class TestCliNew(CliRuntimeHarness):
     def test_new_issue_auto_sync_preserves_local_only_projection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             test_env = self._install_gh_issue_list_stub(target, issue_numbers=[1, 2, 3, 4])
             self._run_runtime(
@@ -290,7 +287,7 @@ class TestCliNew(CliRuntimeHarness):
     def test_new_failure_paths_do_not_run_post_sync_or_refresh_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             log_path = target / ".gh.log"
             test_env = self._install_gh_issue_list_stub(target, issue_numbers=[1, 2, 3], log_path=log_path)
@@ -316,20 +313,22 @@ class TestCliNew(CliRuntimeHarness):
                 ["new", "issue", "--epic", "missing", "--title", "Missing parent", "--github-issue", "5"],
             )
             for argv in cases:
-                with self.subTest(argv=argv):
-                    before_artifacts = self._read_create_auto_sync_artifacts(target)
-                    log_path.write_text("", encoding="utf-8")
+                case_label = " ".join(argv)
+                before_artifacts = self._read_create_auto_sync_artifacts(target)
+                log_path.write_text("", encoding="utf-8")
 
-                    p = self._run_runtime_capture(target, argv, env=test_env)
+                p = self._run_runtime_capture(target, argv, env=test_env)
 
-                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-                    self.assertEqual(before_artifacts, self._read_create_auto_sync_artifacts(target))
-                    self.assertEqual(log_path.read_text(encoding="utf-8"), "")
+                assert p.returncode != 0, f"{case_label}: {p.stdout}{p.stderr}"
+                assert before_artifacts == self._read_create_auto_sync_artifacts(target), (
+                    f"{case_label}: argv={argv!r}"
+                )
+                assert log_path.read_text(encoding="utf-8") == "", f"{case_label}: argv={argv!r}"
 
     def test_new_node_id_option_is_parser_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             p = self._run_runtime_capture(
@@ -347,13 +346,13 @@ class TestCliNew(CliRuntimeHarness):
                     "4",
                 ],
             )
-            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
-            self.assertIn("unrecognized arguments: --id iss-00003", p.stderr)
+            assert p.returncode == 2, p.stdout + p.stderr
+            assert "unrecognized arguments: --id iss-00003" in p.stderr
 
     def test_new_rejects_duplicate_id_width_agnostic(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             p = self._run_runtime_capture(
@@ -369,14 +368,14 @@ class TestCliNew(CliRuntimeHarness):
                     "Duplicate by numeric id",
                 ],
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("github.issue_number=3", p.stderr)
-            self.assertIn("issue:iss-00003", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "github.issue_number=3" in p.stderr
+            assert "issue:iss-00003" in p.stderr
 
     def test_new_rejects_duplicate_github_issue_link_with_conflict_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--title", "Linked initiative", "--github-issue", "1"])
@@ -387,23 +386,23 @@ class TestCliNew(CliRuntimeHarness):
                 target,
                 ["new", "issue", "--epic", "3", "--title", "Add refresh token", "--github-issue", "1"],
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("github.issue_number=1", p.stderr)
-            self.assertIn("initiative:init-00001", p.stderr)
-            self.assertIn("spec-dock/initiatives/init-00001-linked-initiative/.meta.json", p.stderr)
-            self.assertIn("different GitHub issue number", p.stderr)
-            self.assertNotIn("--github-issue", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "github.issue_number=1" in p.stderr
+            assert "initiative:init-00001" in p.stderr
+            assert "spec-dock/initiatives/init-00001-linked-initiative/.meta.json" in p.stderr
+            assert "different GitHub issue number" in p.stderr
+            assert "--github-issue" not in p.stderr
 
             created = list((target / "spec-dock" / "initiatives").rglob("iss-00001-*"))
-            self.assertEqual(created, [])
+            assert created == []
 
     def test_new_issue_persists_current_repo_scope_when_origin_is_resolved(self) -> None:
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
 
@@ -423,14 +422,14 @@ class TestCliNew(CliRuntimeHarness):
                 / ".meta.json"
             )
             issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
-            self.assertEqual(issue_meta["github"]["issue_number"], 123)
-            self.assertEqual(issue_meta["github"]["repo_owner"], "current")
-            self.assertEqual(issue_meta["github"]["repo_name"], "repo")
+            assert issue_meta["github"]["issue_number"] == 123
+            assert issue_meta["github"]["repo_owner"] == "current"
+            assert issue_meta["github"]["repo_name"] == "repo"
 
     def test_new_rejects_unsafe_slug(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             # User-provided --slug must be safe for filesystem paths.
@@ -453,7 +452,7 @@ class TestCliNew(CliRuntimeHarness):
     def test_new_rejects_uppercase_slug(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._run_runtime_expect_fail(
                 target,
@@ -470,7 +469,7 @@ class TestCliNew(CliRuntimeHarness):
     def test_new_derives_kebab_slug_from_title(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(
@@ -478,20 +477,20 @@ class TestCliNew(CliRuntimeHarness):
                 ["new", "initiative", "--title", "Add Refresh Token", "--github-issue", "1"],
             )
             init_dir = target / "spec-dock" / "initiatives" / "init-00001-add-refresh-token"
-            self.assertTrue(init_dir.is_dir())
+            assert init_dir.is_dir()
             meta = json.loads((init_dir / ".meta.json").read_text(encoding="utf-8"))
-            self.assertEqual(meta["slug"], "add-refresh-token")
+            assert meta["slug"] == "add-refresh-token"
 
     def test_new_rejects_invalid_slug_before_gh_issue_create(self) -> None:
-        self.skipTest(
+        pytest.skip(
             "S06 replacement: tests.unit.commands.test_runtime_new_s08 covers pre-GitHub input validation."
         )
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -524,24 +523,24 @@ class TestCliNew(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("--slug", p.stderr)
-            self.assertIn("expected regex", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "--slug" in p.stderr
+            assert "expected regex" in p.stderr
 
             if log_path.exists():
-                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
-            self.assertEqual(list((target / "spec-dock" / "initiatives").glob("*")), [])
+                assert log_path.read_text(encoding="utf-8").strip() == ""
+            assert list((target / "spec-dock" / "initiatives").glob("*")) == []
 
     def test_new_missing_rules_source_fails_before_gh_issue_create(self) -> None:
-        self.skipTest(
+        pytest.skip(
             "S06 replacement: tests.unit.commands.test_runtime_new_s08 covers missing-rules preflight before GitHub create."
         )
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             (target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md").unlink()
@@ -575,21 +574,21 @@ class TestCliNew(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Missing rules source", p.stderr)
-            self.assertIn("epics.md", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Missing rules source" in p.stderr
+            assert "epics.md" in p.stderr
 
             if log_path.exists():
-                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
-            self.assertEqual(list((target / "spec-dock" / "initiatives").glob("*")), [])
+                assert log_path.read_text(encoding="utf-8").strip() == ""
+            assert list((target / "spec-dock" / "initiatives").glob("*")) == []
 
     def test_new_nodes_create_rules_symlinks_without_wrappers(self) -> None:
-        self.skipTest(
+        pytest.skip(
             "S06 replacement: tests.unit.commands.test_runtime_new_s08 covers create-plan rules symlink materialization."
         )
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             init_dir = target / "spec-dock" / "initiatives" / "init-00001-auth-platform"
@@ -605,22 +604,22 @@ class TestCliNew(CliRuntimeHarness):
                 issue_dir / "discussions" / "rules.md": target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md",
             }
             for link_path, target_path in expected_rules_links.items():
-                self.assertTrue(link_path.is_symlink(), f"missing rules symlink: {link_path}")
-                self.assertEqual(link_path.resolve(), target_path.resolve())
-                self.assertEqual(os.readlink(link_path), os.path.relpath(target_path, start=link_path.parent))
+                assert link_path.is_symlink(), f"missing rules symlink: {link_path}"
+                assert link_path.resolve() == target_path.resolve()
+                assert os.readlink(link_path) == os.path.relpath(target_path, start=link_path.parent)
 
-            self.assertFalse((init_dir / "epics" / "new-epic").exists())
-            self.assertFalse((epic_dir / "issues" / "new-issue").exists())
+            assert not (init_dir / "epics" / "new-epic").exists()
+            assert not (epic_dir / "issues" / "new-issue").exists()
 
             for scope_dir in (init_dir, epic_dir, issue_dir):
-                self.assertFalse((scope_dir / "adrs").exists())
-                self.assertFalse((scope_dir / "artifacts").exists())
-                self.assertEqual(list((scope_dir / "discussions").glob("new-*")), [])
+                assert not (scope_dir / "adrs").exists()
+                assert not (scope_dir / "artifacts").exists()
+                assert list((scope_dir / "discussions").glob("new-*")) == []
 
     def test_new_doc_adr_increments_id_within_scope_discussions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
             p_one = self._run_runtime_capture(
                 target,
@@ -630,8 +629,8 @@ class TestCliNew(CliRuntimeHarness):
                 target,
                 ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision two"],
             )
-            self.assertEqual(p_one.returncode, 0, p_one.stdout + p_one.stderr)
-            self.assertEqual(p_two.returncode, 0, p_two.stdout + p_two.stderr)
+            assert p_one.returncode == 0, p_one.stdout + p_one.stderr
+            assert p_two.returncode == 0, p_two.stdout + p_two.stderr
 
             issue_dir = (
                 target
@@ -646,18 +645,18 @@ class TestCliNew(CliRuntimeHarness):
             discussions_dir = issue_dir / "discussions"
             created_one = sorted(discussions_dir.glob("*-adr-decision-one.md"))
             created_two = sorted(discussions_dir.glob("*-adr-decision-two.md"))
-            self.assertEqual(len(created_one), 1)
-            self.assertEqual(len(created_two), 1)
-            self.assertRegex(created_one[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$")
-            self.assertRegex(created_two[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-two\.md$")
-            self.assertRegex(p_one.stdout, r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr\b")
-            self.assertRegex(p_two.stdout, r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr\b")
-            self.assertEqual(list(issue_dir.glob("adrs")), [])
+            assert len(created_one) == 1
+            assert len(created_two) == 1
+            assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$", created_one[0].name)
+            assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-two\.md$", created_two[0].name)
+            assert re.search(r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr\b", p_one.stdout)
+            assert re.search(r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr\b", p_two.stdout)
+            assert list(issue_dir.glob("adrs")) == []
 
     def test_new_doc_scope_shorthand_resolves_local_ids(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             p_init = self._run_runtime_capture(
@@ -672,24 +671,24 @@ class TestCliNew(CliRuntimeHarness):
                 target,
                 ["new", "doc", "scratch", "--issue", "3", "--title", "Issue note"],
             )
-            self.assertEqual(p_init.returncode, 0, p_init.stdout + p_init.stderr)
-            self.assertEqual(p_epic.returncode, 0, p_epic.stdout + p_epic.stderr)
-            self.assertEqual(p_issue.returncode, 0, p_issue.stdout + p_issue.stderr)
-            self.assertIn("scope=init-00001", p_init.stdout)
-            self.assertIn("scope=epic-00002", p_epic.stdout)
-            self.assertIn("scope=iss-00003", p_issue.stdout)
+            assert p_init.returncode == 0, p_init.stdout + p_init.stderr
+            assert p_epic.returncode == 0, p_epic.stdout + p_epic.stderr
+            assert p_issue.returncode == 0, p_issue.stdout + p_issue.stderr
+            assert "scope=init-00001" in p_init.stdout
+            assert "scope=epic-00002" in p_epic.stdout
+            assert "scope=iss-00003" in p_issue.stdout
 
             init_dir = target / "spec-dock" / "initiatives" / "init-00001-auth-platform"
             epic_dir = init_dir / "epics" / "epic-00002-jwt-auth"
             issue_dir = epic_dir / "issues" / "iss-00003-add-refresh-token"
-            self.assertEqual(len(sorted((init_dir / "discussions").glob("*-scratch-initiative-note.md"))), 1)
-            self.assertEqual(len(sorted((epic_dir / "discussions").glob("*-scratch-epic-note.md"))), 1)
-            self.assertEqual(len(sorted((issue_dir / "discussions").glob("*-scratch-issue-note.md"))), 1)
+            assert len(sorted((init_dir / "discussions").glob("*-scratch-initiative-note.md"))) == 1
+            assert len(sorted((epic_dir / "discussions").glob("*-scratch-epic-note.md"))) == 1
+            assert len(sorted((issue_dir / "discussions").glob("*-scratch-issue-note.md"))) == 1
 
     def test_new_doc_uses_timestamp_family_across_discussion_types(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
             self._run_runtime(target, ["new", "doc", "disc", "--issue", "iss-00003", "--title", "Discussion one"])
             self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"])
@@ -708,16 +707,16 @@ class TestCliNew(CliRuntimeHarness):
                 / "iss-00003-add-refresh-token"
             )
             discussions_dir = issue_dir / "discussions"
-            self.assertEqual(len(sorted(discussions_dir.glob("*-disc-discussion-one.md"))), 1)
-            self.assertEqual(len(sorted(discussions_dir.glob("*-adr-decision-one.md"))), 1)
-            self.assertEqual(len(sorted(discussions_dir.glob("*-research-research-one.md"))), 1)
-            self.assertEqual(len(sorted(discussions_dir.glob("*-interview-interview-one.md"))), 1)
-            self.assertEqual(len(sorted(discussions_dir.glob("*-scratch-scratch-one.md"))), 1)
+            assert len(sorted(discussions_dir.glob("*-disc-discussion-one.md"))) == 1
+            assert len(sorted(discussions_dir.glob("*-adr-decision-one.md"))) == 1
+            assert len(sorted(discussions_dir.glob("*-research-research-one.md"))) == 1
+            assert len(sorted(discussions_dir.glob("*-interview-interview-one.md"))) == 1
+            assert len(sorted(discussions_dir.glob("*-scratch-scratch-one.md"))) == 1
 
     def test_new_doc_creates_draft_artifacts_from_scope_specific_templates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             cases = (
@@ -763,32 +762,29 @@ class TestCliNew(CliRuntimeHarness):
 
             for command, discussions_dir, doc_type, template_source, _intended_target, body_heading in cases:
                 p = self._run_runtime_capture(target, command)
-                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-                self.assertIn(f"type={doc_type}", p.stdout)
+                assert p.returncode == 0, p.stdout + p.stderr
+                assert f"type={doc_type}" in p.stdout
                 created = sorted(discussions_dir.glob(f"*-{doc_type}-*.md"))
-                self.assertEqual(len(created), 1)
-                self.assertRegex(
-                    created[0].name,
-                    rf"^[0-9]{{8}}t[0-9]{{6}}z(?:-[0-9]{{2}})?-{doc_type}-[a-z0-9-]+\.md$",
-                )
+                assert len(created) == 1
+                assert re.search(rf"^[0-9]{{8}}t[0-9]{{6}}z(?:-[0-9]{{2}})?-{doc_type}-[a-z0-9-]+\.md$", created[0].name)
                 content = created[0].read_text(encoding="utf-8")
                 frontmatter = content.split("---", 2)[1]
-                self.assertIn("状態: \"draft | approved\"", frontmatter)
-                self.assertNotIn("adoption_status", frontmatter)
-                self.assertNotIn("template_source", frontmatter)
-                self.assertNotIn("created_by_role", frontmatter)
-                self.assertNotIn("Canonical `", content)
-                self.assertNotIn("remains main-orchestrator-only", content)
+                assert "状態: \"draft | approved\"" in frontmatter
+                assert "adoption_status" not in frontmatter
+                assert "template_source" not in frontmatter
+                assert "created_by_role" not in frontmatter
+                assert "Canonical `" not in content
+                assert "remains main-orchestrator-only" not in content
                 canonical_source = target / "spec-dock" / template_source
-                self.assertTrue(canonical_source.is_file(), f"missing source template: {canonical_source}")
+                assert canonical_source.is_file(), f"missing source template: {canonical_source}"
                 canonical_text = canonical_source.read_text(encoding="utf-8")
-                self.assertIn(canonical_text.splitlines()[1], content)
-                self.assertIn(body_heading, content)
+                assert canonical_text.splitlines()[1] in content
+                assert body_heading in content
 
     def test_new_doc_note_is_retired_with_scratch_guidance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             p = self._run_runtime_capture(
@@ -796,11 +792,11 @@ class TestCliNew(CliRuntimeHarness):
                 ["new", "doc", "note", "--issue", "iss-00003", "--title", "Note one"],
             )
 
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("note", p.stderr)
-            self.assertIn("retired", p.stderr)
-            self.assertIn("scratch", p.stderr)
-            self.assertNotIn("invalid choice", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "note" in p.stderr
+            assert "retired" in p.stderr
+            assert "scratch" in p.stderr
+            assert "invalid choice" not in p.stderr
 
             issue_dir = (
                 target
@@ -812,34 +808,31 @@ class TestCliNew(CliRuntimeHarness):
                 / "issues"
                 / "iss-00003-add-refresh-token"
             )
-            self.assertEqual(list((issue_dir / "discussions").glob("*-note-note-one.md")), [])
+            assert list((issue_dir / "discussions").glob("*-note-note-one.md")) == []
 
     def test_new_doc_stdout_uses_slugless_id_and_discussions_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
             p = self._run_runtime_capture(
                 target,
                 ["new", "doc", "disc", "--issue", "iss-00003", "--title", "Discussion one"],
             )
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
 
-            self.assertRegex(
-                p.stdout,
-                (
+            assert re.search((
                     r"spec-dock: ok \(new doc\) type=disc "
                     r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc "
                     r"scope=iss-00003 "
                     r"path=spec-dock/.*/discussions/[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-discussion-one\.md"
-                ),
-            )
-            self.assertNotIn("discussion-one", re.search(r"id=([^\s]+)", p.stdout).group(1))
+                ), p.stdout)
+            assert "discussion-one" not in re.search(r"id=([^\s]+)", p.stdout).group(1)
 
     def test_new_doc_renders_body_date_from_same_utc_instant_as_doc_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
             self._write_runtime_clock(
                 target,
@@ -860,14 +853,14 @@ class TestCliNew(CliRuntimeHarness):
                 / "iss-00003-add-refresh-token"
             )
             created = issue_dir / "discussions" / "20260312t003000z-scratch-utc-date-check.md"
-            self.assertTrue(created.is_file())
-            self.assertIn("2026-03-12", created.read_text(encoding="utf-8"))
-            self.assertNotIn("2026-03-11", created.read_text(encoding="utf-8"))
+            assert created.is_file()
+            assert "2026-03-12" in created.read_text(encoding="utf-8")
+            assert "2026-03-11" not in created.read_text(encoding="utf-8")
 
     def test_new_doc_ignores_unrelated_files_for_timestamp_allocation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             issue_dir = (
@@ -887,8 +880,8 @@ class TestCliNew(CliRuntimeHarness):
 
             self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"])
 
-            self.assertEqual(len(sorted(discussions_dir.glob("*-adr-decision-one.md"))), 1)
-            self.assertEqual(list(discussions_dir.glob("001-adr-*.md")), [])
+            assert len(sorted(discussions_dir.glob("*-adr-decision-one.md"))) == 1
+            assert list(discussions_dir.glob("001-adr-*.md")) == []
 
     def test_new_doc_rejects_malformed_discussion_doc_candidates(self) -> None:
         cases = (
@@ -897,39 +890,38 @@ class TestCliNew(CliRuntimeHarness):
             "bogus-01-adr-kickoff.md",
         )
         for malformed_name in cases:
-            with self.subTest(malformed_name=malformed_name):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
-                    self._create_same_repo_linked_hierarchy(target)
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                self._create_same_repo_linked_hierarchy(target)
 
-                    issue_dir = (
-                        target
-                        / "spec-dock"
-                        / "initiatives"
-                        / "init-00001-auth-platform"
-                        / "epics"
-                        / "epic-00002-jwt-auth"
-                        / "issues"
-                        / "iss-00003-add-refresh-token"
-                    )
-                    discussions_dir = issue_dir / "discussions"
-                    (discussions_dir / malformed_name).write_text("nonconforming type\n", encoding="utf-8")
+                issue_dir = (
+                    target
+                    / "spec-dock"
+                    / "initiatives"
+                    / "init-00001-auth-platform"
+                    / "epics"
+                    / "epic-00002-jwt-auth"
+                    / "issues"
+                    / "iss-00003-add-refresh-token"
+                )
+                discussions_dir = issue_dir / "discussions"
+                (discussions_dir / malformed_name).write_text("nonconforming type\n", encoding="utf-8")
 
-                    p = self._run_runtime_capture(
-                        target,
-                        ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"],
-                    )
+                p = self._run_runtime_capture(
+                    target,
+                    ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"],
+                )
 
-                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-                    self.assertIn("Malformed discussion document filename", p.stderr)
-                    self.assertIn(malformed_name, p.stderr)
-                    self.assertEqual(len(sorted(discussions_dir.glob("*-adr-decision-one.md"))), 0)
+                assert p.returncode != 0, p.stdout + p.stderr
+                assert "Malformed discussion document filename" in p.stderr
+                assert malformed_name in p.stderr
+                assert len(sorted(discussions_dir.glob("*-adr-decision-one.md"))) == 0
 
     def test_new_doc_rejects_timestamp_shaped_malformed_discussion_doc_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             issue_dir = (
@@ -951,15 +943,15 @@ class TestCliNew(CliRuntimeHarness):
                 ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"],
             )
 
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Malformed discussion document filename", p.stderr)
-            self.assertIn(malformed_name, p.stderr)
-            self.assertEqual(len(sorted(discussions_dir.glob("*-adr-decision-one.md"))), 0)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Malformed discussion document filename" in p.stderr
+            assert malformed_name in p.stderr
+            assert len(sorted(discussions_dir.glob("*-adr-decision-one.md"))) == 0
 
     def test_new_doc_preserves_legacy_files_without_reusing_sequence_names(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             issue_dir = (
@@ -977,14 +969,14 @@ class TestCliNew(CliRuntimeHarness):
             (discussions_dir / "001-disc-second.md").write_text("second\n", encoding="utf-8")
 
             p = self._run_runtime_capture(target, ["new", "doc", "scratch", "--issue", "iss-00003", "--title", "Note one"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertRegex(p.stdout, r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-scratch\b")
-            self.assertEqual(len(sorted(discussions_dir.glob("*-scratch-note-one.md"))), 1)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert re.search(r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-scratch\b", p.stdout)
+            assert len(sorted(discussions_dir.glob("*-scratch-note-one.md"))) == 1
 
     def test_new_doc_rejects_invalid_slug(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             p = self._run_runtime_capture(
@@ -1001,9 +993,9 @@ class TestCliNew(CliRuntimeHarness):
                     "Bad!Slug",
                 ],
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("--slug", p.stderr)
-            self.assertIn("expected regex", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "--slug" in p.stderr
+            assert "expected regex" in p.stderr
 
             issue_dir = (
                 target
@@ -1016,12 +1008,12 @@ class TestCliNew(CliRuntimeHarness):
                 / "iss-00003-add-refresh-token"
             )
             discussions_dir = issue_dir / "discussions"
-            self.assertEqual(list(discussions_dir.glob("001-adr-*.md")), [])
+            assert list(discussions_dir.glob("001-adr-*.md")) == []
 
     def test_new_doc_rejects_unexpected_sequence_override_option(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             p = self._run_runtime_capture(
                 target,
@@ -1037,61 +1029,60 @@ class TestCliNew(CliRuntimeHarness):
                     "Decision one",
                 ],
             )
-            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
-            self.assertIn("unrecognized arguments: --seq 1", p.stderr)
+            assert p.returncode == 2, p.stdout + p.stderr
+            assert "unrecognized arguments: --seq 1" in p.stderr
 
     def test_new_discussion_per_type_commands_are_not_available(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             for per_type in ("adr", "disc", "research", "interview", "scratch", "note"):
                 p = self._run_runtime_capture(
                     target,
                     ["new", per_type, "--issue", "iss-00003", "--title", "Doc title"],
                 )
-                self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
-                self.assertIn(f"invalid choice: '{per_type}'", p.stderr)
+                assert p.returncode == 2, p.stdout + p.stderr
+                assert f"invalid choice: '{per_type}'" in p.stderr
 
     def test_new_help_exposes_only_doc_discussion_entrypoint(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             p_new = self._run_runtime_capture(target, ["new", "--help"])
-            self.assertEqual(p_new.returncode, 0, p_new.stdout + p_new.stderr)
-            self.assertIn(" doc ", p_new.stdout)
-            self.assertNotIn("\n    adr", p_new.stdout)
-            self.assertNotIn("\n    disc", p_new.stdout)
-            self.assertNotIn("\n    research", p_new.stdout)
-            self.assertNotIn("\n    interview", p_new.stdout)
-            self.assertNotIn("\n    scratch", p_new.stdout)
-            self.assertNotIn("\n    note", p_new.stdout)
+            assert p_new.returncode == 0, p_new.stdout + p_new.stderr
+            assert " doc " in p_new.stdout
+            assert "\n    adr" not in p_new.stdout
+            assert "\n    disc" not in p_new.stdout
+            assert "\n    research" not in p_new.stdout
+            assert "\n    interview" not in p_new.stdout
+            assert "\n    scratch" not in p_new.stdout
+            assert "\n    note" not in p_new.stdout
 
             p_doc = self._run_runtime_capture(target, ["new", "doc", "--help"])
-            self.assertEqual(p_doc.returncode, 0, p_doc.stdout + p_doc.stderr)
-            self.assertIn("adr", p_doc.stdout)
-            self.assertIn("disc", p_doc.stdout)
-            self.assertIn("research", p_doc.stdout)
-            self.assertIn("interview", p_doc.stdout)
-            self.assertIn("scratch", p_doc.stdout)
-            self.assertIn("note", p_doc.stdout)
-            self.assertNotIn("--id", p_doc.stdout)
-            self.assertNotIn("--seq", p_doc.stdout)
+            assert p_doc.returncode == 0, p_doc.stdout + p_doc.stderr
+            assert "adr" in p_doc.stdout
+            assert "disc" in p_doc.stdout
+            assert "research" in p_doc.stdout
+            assert "interview" in p_doc.stdout
+            assert "scratch" in p_doc.stdout
+            assert "note" in p_doc.stdout
+            assert "--id" not in p_doc.stdout
+            assert "--seq" not in p_doc.stdout
 
     def test_new_node_help_does_not_expose_local_creation_options(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             for kind in ("initiative", "epic", "issue"):
-                with self.subTest(kind=kind):
-                    p = self._run_runtime_capture(target, ["new", kind, "--help"])
-                    self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-                    self.assertIn("--create-github-issue", p.stdout)
-                    self.assertIn("--github-issue", p.stdout)
-                    self.assertNotIn("--no-github", p.stdout)
-                    self.assertNotIn("--id", p.stdout)
+                p = self._run_runtime_capture(target, ["new", kind, "--help"])
+                assert p.returncode == 0, p.stdout + p.stderr
+                assert "--create-github-issue" in p.stdout
+                assert "--github-issue" in p.stdout
+                assert "--no-github" not in p.stdout
+                assert "--id" not in p.stdout
 
     def test_internal_issue_status_resolution_marks_cached_source(self) -> None:
         runtime_scripts_dir = (
@@ -1124,39 +1115,39 @@ class TestCliNew(CliRuntimeHarness):
             cached_issue_status_by_id={"iss-00301": "done"},
         )
 
-        self.assertEqual(resolved["iss-00301"].status, "done")
-        self.assertEqual(resolved["iss-00301"].source, "cache")
+        assert resolved["iss-00301"].status == "done"
+        assert resolved["iss-00301"].source == "cache"
 
     def test_new_doc_rejects_unknown_type(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             p = self._run_runtime_capture(
                 target,
                 ["new", "doc", "unknown", "--issue", "iss-00003", "--title", "Doc title"],
             )
-            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
-            self.assertIn("Unknown discussion doc type: unknown", p.stderr)
-            self.assertNotIn("invalid choice", p.stderr)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert "Unknown discussion doc type: unknown" in p.stderr
+            assert "invalid choice" not in p.stderr
 
     def test_new_nodes_do_not_generate_readme_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             init_dir = target / "spec-dock" / "initiatives" / "init-00001-auth-platform"
             readmes = list(init_dir.rglob("README.md"))
-            self.assertEqual(readmes, [])
+            assert readmes == []
 
     def test_new_no_github_is_parser_error_and_does_not_invoke_gh(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             # Provide a fake `gh` binary that always errors; --no-github must fail before invoking it.
             bin_dir = target / ".bin"
@@ -1177,15 +1168,15 @@ class TestCliNew(CliRuntimeHarness):
                 ["new", "initiative", "--no-github", "--title", "Auth platform"],
                 env=test_env,
             )
-            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
-            self.assertIn("unrecognized arguments: --no-github", p.stderr)
-            self.assertNotIn("'--no-github' is not supported", p.stderr)
-            self.assertNotIn("gh should not be invoked", p.stderr)
+            assert p.returncode == 2, p.stdout + p.stderr
+            assert "unrecognized arguments: --no-github" in p.stderr
+            assert "'--no-github' is not supported" not in p.stderr
+            assert "gh should not be invoked" not in p.stderr
 
     def test_new_no_github_is_parser_error_for_initiative_epic_and_issue(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             cases = [
@@ -1194,19 +1185,19 @@ class TestCliNew(CliRuntimeHarness):
                 ["new", "issue", "--no-github", "--epic", "2", "--title", "Another issue"],
             ]
             for argv in cases:
-                with self.subTest(argv=argv):
-                    p = self._run_runtime_capture(target, argv)
-                    self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
-                    self.assertIn("unrecognized arguments: --no-github", p.stderr)
-                    self.assertNotIn("'--no-github' is not supported", p.stderr)
+                case_label = " ".join(argv)
+                p = self._run_runtime_capture(target, argv)
+                assert p.returncode == 2, f"{case_label}: {p.stdout}{p.stderr}"
+                assert "unrecognized arguments: --no-github" in p.stderr, f"{case_label}: argv={argv!r}"
+                assert "'--no-github' is not supported" not in p.stderr, f"{case_label}: argv={argv!r}"
 
     def test_new_rejects_invalid_title_before_gh_issue_create(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1231,24 +1222,24 @@ class TestCliNew(CliRuntimeHarness):
                 ["new", "initiative", "--create-github-issue", "--title", "日本語"],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("--title", p.stderr)
-            self.assertIn("expected regex", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "--title" in p.stderr
+            assert "expected regex" in p.stderr
 
             if log_path.exists():
-                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
-            self.assertEqual(list((target / "spec-dock" / "initiatives").glob("*")), [])
+                assert log_path.read_text(encoding="utf-8").strip() == ""
+            assert list((target / "spec-dock" / "initiatives").glob("*")) == []
 
     def test_new_initiative_and_epic_default_to_github_create_when_gh_is_available(self) -> None:
-        self.skipTest(
+        pytest.skip(
             "S06 replacement: tests.unit.commands.test_runtime_new_s08 covers default GitHub create mode matrix."
         )
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             # Default for initiative/epic is GitHub create; `gh` must be invoked even without explicit flags.
@@ -1288,35 +1279,35 @@ class TestCliNew(CliRuntimeHarness):
 
             init_dir = target / "spec-dock" / "initiatives" / "init-00123-auth-platform"
             epic_dir = init_dir / "epics" / "epic-00124-jwt-auth"
-            self.assertTrue(init_dir.is_dir())
-            self.assertTrue(epic_dir.is_dir())
-            self.assertTrue(called_path.exists(), "gh was not invoked")
+            assert init_dir.is_dir()
+            assert epic_dir.is_dir()
+            assert called_path.exists(), "gh was not invoked"
 
             init_meta = json.loads((init_dir / ".meta.json").read_text(encoding="utf-8"))
             epic_meta = json.loads((epic_dir / ".meta.json").read_text(encoding="utf-8"))
-            self.assertEqual(init_meta["id"], "init-00123")
-            self.assertEqual(epic_meta["id"], "epic-00124")
-            self.assertEqual(init_meta["github"]["issue_number"], 123)
-            self.assertEqual(epic_meta["github"]["issue_number"], 124)
-            self.assertEqual(init_meta["github"]["repo_owner"], "example")
-            self.assertEqual(init_meta["github"]["repo_name"], "repo")
-            self.assertEqual(epic_meta["github"]["repo_owner"], "example")
-            self.assertEqual(epic_meta["github"]["repo_name"], "repo")
+            assert init_meta["id"] == "init-00123"
+            assert epic_meta["id"] == "epic-00124"
+            assert init_meta["github"]["issue_number"] == 123
+            assert epic_meta["github"]["issue_number"] == 124
+            assert init_meta["github"]["repo_owner"] == "example"
+            assert init_meta["github"]["repo_name"] == "repo"
+            assert epic_meta["github"]["repo_owner"] == "example"
+            assert epic_meta["github"]["repo_name"] == "repo"
             self._assert_spec_dock_meta_marker(init_meta)
             self._assert_spec_dock_meta_marker(epic_meta)
             self._assert_readonly_on_posix(init_dir / ".meta.json")
             self._assert_readonly_on_posix(epic_dir / ".meta.json")
 
     def test_new_initiative_warns_and_continues_when_readonly_lock_fails(self) -> None:
-        self.skipTest(
+        pytest.skip(
             "S06 replacement: tests.unit.commands.test_runtime_new_s08 covers create-lock failure guidance."
         )
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             bin_dir = target / ".bin"
@@ -1342,7 +1333,7 @@ class TestCliNew(CliRuntimeHarness):
             runtime_fs_repo = (
                 target / "spec-dock" / "scripts" / "spec_dock_runtime" / "infra" / "fs_repo.py"
             )
-            self.assertTrue(runtime_fs_repo.is_file())
+            assert runtime_fs_repo.is_file()
             runtime_fs_repo.write_text(
                 runtime_fs_repo.read_text(encoding="utf-8")
                 + "\n\n"
@@ -1356,16 +1347,16 @@ class TestCliNew(CliRuntimeHarness):
                 ["new", "initiative", "--title", "Auth platform"],
                 env={"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"},
             )
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: (warn)", p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "spec-dock: (warn)" in p.stderr
 
             init_dir = target / "spec-dock" / "initiatives" / "init-00123-auth-platform"
-            self.assertTrue((init_dir / ".meta.json").is_file())
+            assert (init_dir / ".meta.json").is_file()
 
     def test_new_github_flags_are_mutually_exclusive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             p1 = self._run_runtime_capture(
                 target,
@@ -1379,8 +1370,8 @@ class TestCliNew(CliRuntimeHarness):
                     "123",
                 ],
             )
-            self.assertEqual(p1.returncode, 2, p1.stdout + p1.stderr)
-            self.assertIn("not allowed with argument", p1.stderr)
+            assert p1.returncode == 2, p1.stdout + p1.stderr
+            assert "not allowed with argument" in p1.stderr
 
             p2 = self._run_runtime_capture(
                 target,
@@ -1395,9 +1386,9 @@ class TestCliNew(CliRuntimeHarness):
                     "--no-github",
                 ],
             )
-            self.assertEqual(p2.returncode, 2, p2.stdout + p2.stderr)
-            self.assertIn("unrecognized arguments: --no-github", p2.stderr)
-            self.assertNotIn("not allowed with argument", p2.stderr)
+            assert p2.returncode == 2, p2.stdout + p2.stderr
+            assert "unrecognized arguments: --no-github" in p2.stderr
+            assert "not allowed with argument" not in p2.stderr
 
             p3 = self._run_runtime_capture(
                 target,
@@ -1411,9 +1402,9 @@ class TestCliNew(CliRuntimeHarness):
                     "--no-github",
                 ],
             )
-            self.assertEqual(p3.returncode, 2, p3.stdout + p3.stderr)
-            self.assertIn("unrecognized arguments: --no-github", p3.stderr)
-            self.assertNotIn("not allowed with argument", p3.stderr)
+            assert p3.returncode == 2, p3.stdout + p3.stderr
+            assert "unrecognized arguments: --no-github" in p3.stderr
+            assert "not allowed with argument" not in p3.stderr
 
             p4 = self._run_runtime_capture(
                 target,
@@ -1429,9 +1420,9 @@ class TestCliNew(CliRuntimeHarness):
                     "--no-github",
                 ],
             )
-            self.assertEqual(p4.returncode, 2, p4.stdout + p4.stderr)
-            self.assertIn("unrecognized arguments: --no-github", p4.stderr)
-            self.assertNotIn("not allowed with argument", p4.stderr)
+            assert p4.returncode == 2, p4.stdout + p4.stderr
+            assert "unrecognized arguments: --no-github" in p4.stderr
+            assert "not allowed with argument" not in p4.stderr
 
             p5 = self._run_runtime_capture(
                 target,
@@ -1447,8 +1438,8 @@ class TestCliNew(CliRuntimeHarness):
                     "123",
                 ],
             )
-            self.assertEqual(p5.returncode, 2, p5.stdout + p5.stderr)
-            self.assertIn("not allowed with argument", p5.stderr)
+            assert p5.returncode == 2, p5.stdout + p5.stderr
+            assert "not allowed with argument" in p5.stderr
 
             p6 = self._run_runtime_capture(
                 target,
@@ -1463,17 +1454,17 @@ class TestCliNew(CliRuntimeHarness):
                     "--no-github",
                 ],
             )
-            self.assertEqual(p6.returncode, 2, p6.stdout + p6.stderr)
-            self.assertIn("unrecognized arguments: --no-github", p6.stderr)
-            self.assertNotIn("not allowed with argument", p6.stderr)
+            assert p6.returncode == 2, p6.stdout + p6.stderr
+            assert "unrecognized arguments: --no-github" in p6.stderr
+            assert "not allowed with argument" not in p6.stderr
 
     def test_new_issue_create_github_issue_flag_alias_is_accepted(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
             self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"])
@@ -1515,15 +1506,15 @@ class TestCliNew(CliRuntimeHarness):
                 / "issues"
                 / "iss-00123-add-refresh-token"
             )
-            self.assertTrue(issue_dir.is_dir())
+            assert issue_dir.is_dir()
 
     def test_new_issue_can_create_github_issue_and_use_its_number(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
@@ -1567,17 +1558,17 @@ class TestCliNew(CliRuntimeHarness):
                 / "issues"
                 / "iss-00123-add-refresh-token"
             )
-            self.assertTrue(issue_dir.is_dir())
+            assert issue_dir.is_dir()
             meta = json.loads((issue_dir / ".meta.json").read_text(encoding="utf-8"))
-            self.assertEqual(meta["id"], "iss-00123")
-            self.assertEqual(meta["github"]["issue_number"], 123)
+            assert meta["id"] == "iss-00123"
+            assert meta["github"]["issue_number"] == 123
             self._assert_spec_dock_meta_marker(meta)
             self._assert_readonly_on_posix(issue_dir / ".meta.json")
 
     def test_new_fails_preflight_on_legacy_meta_without_creating_nodes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--title", "Parent initiative", "--github-issue", "1"])
             self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "Parent epic", "--github-issue", "2"])
@@ -1590,8 +1581,8 @@ class TestCliNew(CliRuntimeHarness):
             dot_meta_path = legacy_init_dir / ".meta.json"
             legacy_meta_path = legacy_init_dir / "meta.json"
             dot_meta_path.rename(legacy_meta_path)
-            self.assertFalse(dot_meta_path.exists())
-            self.assertTrue(legacy_meta_path.is_file())
+            assert not dot_meta_path.exists()
+            assert legacy_meta_path.is_file()
 
             before_inits = sorted(p.name for p in initiatives_root.glob("init-*"))
             before_epics = sorted(p.name for p in (parent_init_dir / "epics").glob("epic-*"))
@@ -1601,26 +1592,26 @@ class TestCliNew(CliRuntimeHarness):
                 target,
                 ["new", "initiative", "--title", "Should fail initiative", "--github-issue", "4"],
             )
-            self.assertNotEqual(p_init.returncode, 0, p_init.stdout + p_init.stderr)
-            self.assertIn("Unsupported legacy meta.json detected", p_init.stderr)
-            self.assertIn(str(legacy_meta_path), p_init.stderr)
+            assert p_init.returncode != 0, p_init.stdout + p_init.stderr
+            assert "Unsupported legacy meta.json detected" in p_init.stderr
+            assert str(legacy_meta_path) in p_init.stderr
 
             p_epic = self._run_runtime_capture(
                 target,
                 ["new", "epic", "--initiative", "1", "--title", "Should fail epic", "--github-issue", "5"],
             )
-            self.assertNotEqual(p_epic.returncode, 0, p_epic.stdout + p_epic.stderr)
-            self.assertIn("Unsupported legacy meta.json detected", p_epic.stderr)
-            self.assertIn(str(legacy_meta_path), p_epic.stderr)
+            assert p_epic.returncode != 0, p_epic.stdout + p_epic.stderr
+            assert "Unsupported legacy meta.json detected" in p_epic.stderr
+            assert str(legacy_meta_path) in p_epic.stderr
 
             p_issue = self._run_runtime_capture(
                 target,
                 ["new", "issue", "--epic", "2", "--title", "Should fail issue", "--github-issue", "6"],
             )
-            self.assertNotEqual(p_issue.returncode, 0, p_issue.stdout + p_issue.stderr)
-            self.assertIn("Unsupported legacy meta.json detected", p_issue.stderr)
-            self.assertIn(str(legacy_meta_path), p_issue.stderr)
+            assert p_issue.returncode != 0, p_issue.stdout + p_issue.stderr
+            assert "Unsupported legacy meta.json detected" in p_issue.stderr
+            assert str(legacy_meta_path) in p_issue.stderr
 
-            self.assertEqual(before_inits, sorted(p.name for p in initiatives_root.glob("init-*")))
-            self.assertEqual(before_epics, sorted(p.name for p in (parent_init_dir / "epics").glob("epic-*")))
-            self.assertEqual(before_issues, sorted(p.name for p in (parent_epic_dir / "issues").glob("iss-*")))
+            assert before_inits == sorted(p.name for p in initiatives_root.glob("init-*"))
+            assert before_epics == sorted(p.name for p in (parent_init_dir / "epics").glob("epic-*"))
+            assert before_issues == sorted(p.name for p in (parent_epic_dir / "issues").glob("iss-*"))

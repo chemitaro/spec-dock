@@ -1,9 +1,9 @@
 import sys
-import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
 
+import pytest
 def _runtime_modules():
     runtime_scripts_dir = (
         Path(__file__).resolve().parents[2]
@@ -200,7 +200,7 @@ class _StubActiveStateStore:
             raise RuntimeError("restore failed")
 
 
-class TestRuntimeActiveS06(unittest.TestCase):
+class TestRuntimeActiveS06:
     def _ports(
         self,
         *,
@@ -276,12 +276,12 @@ class TestRuntimeActiveS06(unittest.TestCase):
             use_github=False,
             issue_limit=10000,
         )
-        with self.assertRaisesRegex(RuntimeError, "active set blocked"):
+        with pytest.raises(RuntimeError, match="active set blocked"):
             app_set_active.set_active(req, ports)
-        self.assertEqual(ports.deps_topology_reader.calls, 1)
+        assert ports.deps_topology_reader.calls == 1
         calls = [name for name, *_rest in ports.active_state_store.calls]
-        self.assertNotIn("snapshot_current_state", calls)
-        self.assertNotIn("write_active_manifest", calls)
+        assert "snapshot_current_state" not in calls
+        assert "write_active_manifest" not in calls
 
     def test_set_active_non_issue_local_only_without_blockers_is_ready(self) -> None:
         app_contracts, _app_ports, app_set_active, _infra_contracts = _runtime_modules()
@@ -297,10 +297,10 @@ class TestRuntimeActiveS06(unittest.TestCase):
             issue_limit=10000,
         )
         result = app_set_active.set_active(req, ports)
-        self.assertTrue(result.manifest_written)
-        self.assertEqual(result.selection.initiative_id, "init-local-00001")
-        self.assertIsNone(result.selection.epic_id)
-        self.assertIsNone(result.selection.issue_id)
+        assert result.manifest_written
+        assert result.selection.initiative_id == "init-local-00001"
+        assert result.selection.epic_id is None
+        assert result.selection.issue_id is None
 
     def test_set_active_force_commits_and_order_is_authoritative(self) -> None:
         app_contracts, _app_ports, app_set_active, _infra_contracts = _runtime_modules()
@@ -316,29 +316,26 @@ class TestRuntimeActiveS06(unittest.TestCase):
             issue_limit=10000,
         )
         result = app_set_active.set_active(req, ports)
-        self.assertTrue(result.manifest_written)
-        self.assertTrue(result.pointer_updated)
-        self.assertIn("deps_blocked", result.warnings[0])
+        assert result.manifest_written
+        assert result.pointer_updated
+        assert "deps_blocked" in result.warnings[0]
         calls = [name for name, *_rest in ports.active_state_store.calls]
-        self.assertEqual(
-            calls[-4:],
-            [
+        assert calls[-4:] == [
                 "snapshot_current_state",
                 "write_active_manifest",
                 "apply_active_pointers",
                 "patch_agent_state_active_fields",
-            ],
-        )
+            ]
         write_calls = [call for call in ports.active_state_store.calls if call[0] == "write_active_manifest"]
-        self.assertEqual(len(write_calls), 1)
+        assert len(write_calls) == 1
         written_manifest = write_calls[0][2]
         for entry in (written_manifest.initiative, written_manifest.epic, written_manifest.issue):
-            self.assertIsNotNone(entry)
             assert entry is not None
-            self.assertIsNotNone(entry.path)
+            assert entry is not None
             assert entry.path is not None
-            self.assertTrue(entry.path.startswith("spec-dock/"), entry.path)
-            self.assertFalse(Path(entry.path).is_absolute(), entry.path)
+            assert entry.path is not None
+            assert entry.path.startswith("spec-dock/"), entry.path
+            assert not Path(entry.path).is_absolute(), entry.path
 
     def test_set_active_absorbs_github_issue_index_failure_as_warning(self) -> None:
         app_contracts, _app_ports, app_set_active, _infra_contracts = _runtime_modules()
@@ -356,11 +353,11 @@ class TestRuntimeActiveS06(unittest.TestCase):
             issue_limit=10000,
         )
         result = app_set_active.set_active(req, ports)
-        self.assertTrue(result.manifest_written)
-        self.assertEqual(result.selection.issue_id, "iss-local-00001")
-        self.assertIn("gh_fetch_failed", result.warnings)
-        self.assertFalse(any(w.startswith("deps_blocked:") for w in result.warnings))
-        self.assertEqual(issue_gateway.calls, [("/repo", 10000)])
+        assert result.manifest_written
+        assert result.selection.issue_id == "iss-local-00001"
+        assert "gh_fetch_failed" in result.warnings
+        assert not any(w.startswith("deps_blocked:") for w in result.warnings)
+        assert issue_gateway.calls == [("/repo", 10000)]
 
     def test_set_active_github_resolves_current_unscoped_issue_with_current_repo_slug(self) -> None:
         app_contracts, _app_ports, app_set_active, infra_contracts = _runtime_modules()
@@ -457,13 +454,13 @@ class TestRuntimeActiveS06(unittest.TestCase):
             use_github=True,
             issue_limit=10000,
         )
-        with self.assertRaises(RuntimeError) as cm:
+        with pytest.raises(RuntimeError) as cm:
             app_set_active.set_active(req, ports)
-        message = str(cm.exception)
-        self.assertIn("guard_reason=blocked", message)
-        self.assertNotIn("guard_reason=unknown", message)
-        self.assertEqual(issue_gateway.calls, [("/repo", 10000)])
-        self.assertEqual(issue_gateway.view_calls, [("/repo", 123, "other/repo")])
+        message = str(cm.value)
+        assert "guard_reason=blocked" in message
+        assert "guard_reason=unknown" not in message
+        assert issue_gateway.calls == [("/repo", 10000)]
+        assert issue_gateway.view_calls == [("/repo", 123, "other/repo")]
 
     def test_set_active_skips_same_repo_repo_scoped_view_fetch_when_index_contains_key(self) -> None:
         app_contracts, _app_ports, app_set_active, infra_contracts = _runtime_modules()
@@ -537,11 +534,11 @@ class TestRuntimeActiveS06(unittest.TestCase):
             issue_limit=10000,
         )
         result = app_set_active.set_active(req, ports)
-        self.assertTrue(result.manifest_written)
-        self.assertEqual(result.selection.issue_id, "iss-local-00001")
-        self.assertEqual(issue_gateway.calls, [("/repo", 10000)])
-        self.assertEqual(issue_gateway.view_calls, [])
-        self.assertNotIn("gh_fetch_failed", result.warnings)
+        assert result.manifest_written
+        assert result.selection.issue_id == "iss-local-00001"
+        assert issue_gateway.calls == [("/repo", 10000)]
+        assert issue_gateway.view_calls == []
+        assert "gh_fetch_failed" not in result.warnings
 
     def test_set_active_falls_back_to_same_repo_repo_scoped_view_when_index_missing_key(self) -> None:
         app_contracts, _app_ports, app_set_active, infra_contracts = _runtime_modules()
@@ -615,11 +612,11 @@ class TestRuntimeActiveS06(unittest.TestCase):
             issue_limit=10000,
         )
         result = app_set_active.set_active(req, ports)
-        self.assertTrue(result.manifest_written)
-        self.assertEqual(result.selection.issue_id, "iss-local-00001")
-        self.assertEqual(issue_gateway.calls, [("/repo", 10000)])
-        self.assertEqual(issue_gateway.view_calls, [("/repo", 123, "current/repo")])
-        self.assertNotIn("gh_fetch_failed", result.warnings)
+        assert result.manifest_written
+        assert result.selection.issue_id == "iss-local-00001"
+        assert issue_gateway.calls == [("/repo", 10000)]
+        assert issue_gateway.view_calls == [("/repo", 123, "current/repo")]
+        assert "gh_fetch_failed" not in result.warnings
 
     def test_set_active_falls_back_to_current_repo_view_for_unscoped_linked_initiative_when_index_missing_key(self) -> None:
         app_contracts, _app_ports, app_set_active, infra_contracts = _runtime_modules()
@@ -682,11 +679,11 @@ class TestRuntimeActiveS06(unittest.TestCase):
             issue_limit=10000,
         )
         result = app_set_active.set_active(req, ports)
-        self.assertTrue(result.manifest_written)
-        self.assertEqual(result.selection.initiative_id, "init-local-00001")
-        self.assertEqual(issue_gateway.calls, [("/repo", 10000)])
-        self.assertEqual(issue_gateway.view_calls, [("/repo", 101, "current/repo")])
-        self.assertNotIn("gh_fetch_failed", result.warnings)
+        assert result.manifest_written
+        assert result.selection.initiative_id == "init-local-00001"
+        assert issue_gateway.calls == [("/repo", 10000)]
+        assert issue_gateway.view_calls == [("/repo", 101, "current/repo")]
+        assert "gh_fetch_failed" not in result.warnings
 
     def test_set_active_github_prefers_foreign_snapshot_under_same_number_collision(self) -> None:
         app_contracts, _app_ports, app_set_active, infra_contracts = _runtime_modules()
@@ -793,18 +790,15 @@ class TestRuntimeActiveS06(unittest.TestCase):
         )
         result = app_set_active.set_active(req, ports)
 
-        self.assertTrue(result.manifest_written)
-        self.assertEqual(result.selection.issue_id, "iss-local-00002")
-        self.assertEqual(issue_gateway.calls, [("/repo", 10000)])
-        self.assertEqual(
-            issue_gateway.view_calls,
-            [
+        assert result.manifest_written
+        assert result.selection.issue_id == "iss-local-00002"
+        assert issue_gateway.calls == [("/repo", 10000)]
+        assert issue_gateway.view_calls == [
                 ("/repo", 123, "other/repo"),
                 ("/repo", 101, "upstream/product"),
-            ],
-        )
-        self.assertFalse(any(w.startswith("deps_blocked:") for w in result.warnings))
-        self.assertNotIn("gh_fetch_failed", result.warnings)
+            ]
+        assert not any(w.startswith("deps_blocked:") for w in result.warnings)
+        assert "gh_fetch_failed" not in result.warnings
 
     def test_sync_branch_inference_propagates_current_repo_slug(self) -> None:
         app_contracts, _app_ports, _app_set_active, infra_contracts = _runtime_modules()
@@ -862,12 +856,12 @@ class TestRuntimeActiveS06(unittest.TestCase):
         finally:
             app_sync_state.infer_active_node_from_branch = original_infer
 
-        self.assertIs(next_state, state)
-        self.assertIsNotNone(outcome)
+        assert next_state is state
         assert outcome is not None
-        self.assertFalse(outcome.applied)
-        self.assertEqual(outcome.reason, "no branch match")
-        self.assertEqual(observed, {"branch": "123-fix-login", "current_repo_slug": "current/repo"})
+        assert outcome is not None
+        assert not outcome.applied
+        assert outcome.reason == "no branch match"
+        assert observed == {"branch": "123-fix-login", "current_repo_slug": "current/repo"}
 
     def test_set_active_checkout_pre_step7_failure_has_no_rollback(self) -> None:
         app_contracts, _app_ports, app_set_active, _infra_contracts = _runtime_modules()
@@ -885,11 +879,11 @@ class TestRuntimeActiveS06(unittest.TestCase):
             use_github=False,
             issue_limit=10000,
         )
-        with self.assertRaisesRegex(RuntimeError, "Working tree is not clean"):
+        with pytest.raises(RuntimeError, match="Working tree is not clean"):
             app_set_active.set_active(req, ports)
         calls = [name for name, *_rest in ports.active_state_store.calls]
-        self.assertNotIn("snapshot_current_state", calls)
-        self.assertNotIn("restore_previous_state", calls)
+        assert "snapshot_current_state" not in calls
+        assert "restore_previous_state" not in calls
 
     def test_set_active_patch_failure_rolls_back(self) -> None:
         app_contracts, _app_ports, app_set_active, _infra_contracts = _runtime_modules()
@@ -907,10 +901,10 @@ class TestRuntimeActiveS06(unittest.TestCase):
             use_github=False,
             issue_limit=10000,
         )
-        with self.assertRaisesRegex(RuntimeError, "patch failed"):
+        with pytest.raises(RuntimeError, match="patch failed"):
             app_set_active.set_active(req, ports)
         calls = [name for name, *_rest in active_store.calls]
-        self.assertIn("restore_previous_state", calls)
+        assert "restore_previous_state" in calls
 
     def test_clear_active_uses_patch_manifest_none(self) -> None:
         app_contracts, _app_ports, app_set_active, infra_contracts = _runtime_modules()
@@ -933,10 +927,6 @@ class TestRuntimeActiveS06(unittest.TestCase):
             active_state_store=active_store,
         )
         result = app_set_active.clear_active(app_contracts.ClearActiveRequest(), ports)
-        self.assertTrue(result.cleared)
-        self.assertEqual(result.previous.issue_id, "iss-local-00001")
-        self.assertIsNone(active_store.last_patch_manifest)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert result.cleared
+        assert result.previous.issue_id == "iss-local-00001"
+        assert active_store.last_patch_manifest is None
