@@ -49,7 +49,7 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | orchestrator | Clarification workflow is an exception lane where workflow itself should be skill-owned, while global template consistency and hub routing remain downstream | Option A: rewrite skill/doc/templates here; Option B: rewrite only skill; Option C: include hub/global templates | Apply clarification-specific skill/doc/template changes here, but defer hub routing to `iss-00164` and global template consistency to `iss-00166` | Requirement and design scope align with Epic ADR and S01 inventory handoff | applied | `requirement.md`; `design.md`; S01 inventory discussion | No follow-up beyond existing downstream issues |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +63,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | draft requirement discussion | `requirement.md` | Draft requirement captured skill-owned clarification workflow, bridge doc, and clarification-specific template boundary; canonical requirement adopted it with EC-003 for direct-user-only blocking clarification | `discussions/20260606t024142z-draft-requirement-revise-spec-dock-clarification-draft-requirement.md`; `requirement.md`; fresh requirement spec-reviewer `019e9b3a-623d-7190-a125-3cbe8a9b1df2` | promote to design |
+| EAL-002 | adopted | S01 inventory discussion from `iss-00162` | `requirement.md` / `design.md` / `plan.md` | Inventory classified `spec-dock-clarification/SKILL.md`, `workflow_clarification.md`, and clarification discussion templates as `iss-00163` handoff surfaces | `../iss-00162-align-skill-docs-template-context-surfaces/discussions/20260606t040013z-disc-context-surface-inventory.md` | implement this issue after plan review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +72,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | Primary objective is the clarification-specific skill-owned grill workflow | Secondary requirements cover bridge doc and clarification-specific template slots without absorbing hub/global template issues | low | requirement and design reviewers passed; plan reviewer pending |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +80,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | Epic docs/ADR; draft requirement; S01 inventory; current clarification skill/doc/templates | none | adopted draft requirement into canonical requirement with explicit downstream boundaries and direct-user-only blocker EC | fresh `spec-reviewer` pass by `019e9b3a-623d-7190-a125-3cbe8a9b1df2` | no | promote to design |
+| design | approved requirement; current provider/mirror files; S01 inventory; issue planning authoring docs | none | design authored from passed requirement; file plan and verification boundaries fixed | fresh `spec-reviewer` pass by `019e9b3d-0d70-7970-b7d4-792210d1f3f6` | no | promote to plan |
+| plan | approved requirement/design; `phase_plan_issue.md`; `docs/authoring/issue-plan.md` | none | plan authored with S01 skill, S02 bridge doc, S03 templates, S90, S99 and cl-001..cl-011; first review failed on missing step-local execution contracts and placeholder commands; fixed by adding delegation contracts, concrete test cases, report destinations, cleanup guardrails, and executable commands; second review failed on one malformed S01 negative `rg` command and the command was rewritten without Markdown-breaking backticks; third review found over-escaped regex and the literal dot was changed to `[.]`; fourth review found incomplete test/delegation contracts and broad positive checks; fixed by adding full test case fields, S90/S99 contracts, reviewer focus, acceptance criteria, required verification, and per-term commands; fifth review found missing checks for full skill loop, formal question trigger, and required template slots; fixed by adding per-obligation checks for gap classification, artifact capture, answer adoption, iterate/handoff, formal question trigger, unanswered, answer capture, facts, and synthesis; final pass had P2 parity-scope precision, fixed by making S02/S03 docs/templates parity rely on `cmp` and keeping agent-tooling parity unittest only for S01 skill assets | fresh `spec-reviewer` pass by `019e9b53-c275-74f0-bd8b-e76a1d72bcc4`; prior failed reviewers: `019e9b42-90ee-7a63-a359-547fddec747e`, `019e9b47-1af6-7bb0-bc44-eabc6f08ab26`, `019e9b49-9187-7340-9920-d8188ae51306`, `019e9b4c-0dfe-7471-97d3-9bd0456a5cd0`, `019e9b51-4729-71c0-968d-ce846513cfe2` | no | promote to execution |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
