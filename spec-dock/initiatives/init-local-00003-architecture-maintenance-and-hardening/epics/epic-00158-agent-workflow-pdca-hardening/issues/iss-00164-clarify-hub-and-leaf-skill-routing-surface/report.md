@@ -18,7 +18,7 @@ ID: "iss-00164"
 
 `report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
 
-この issue では material な scope / operation decision が発生したため、D-001 と D-002 に記録する。
+この issue では material な scope / operation decision が発生したため、D-001..D-003 に記録する。
 
 Ledger entry は次の契約値を使う。
 
@@ -278,7 +278,7 @@ pass: cmp exited 0; unittest OK; diff-check had no output.
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | pass | two hub skill files + report S01 evidence | `0c16edb2 docs(hub-routing): hub skillの経路選択面を明確化` | `git status --short` clean before S90 report update | not applicable | not applicable | not applicable | not applicable |
-| S90 | pass | report S90 evidence only; `sync` produced no persisted generated diff | pending | pending | generated projections already matched after sync | `spec-dock/.agent/*`, `spec-dock/*.puml`, `spec-dock/dashboard.md` | `git status --short`; `git diff --name-only` | clean before S90 report update; S90 spec-reviewer pass |
+| S90 | pass | report S90 evidence only; `sync` produced no persisted generated diff | `3fb0864a docs(hub-routing): docs impact証跡を記録` | `git status --short` clean before S99 validation | generated projections already matched after sync | `spec-dock/.agent/*`, `spec-dock/*.puml`, `spec-dock/dashboard.md` | `git status --short`; `git diff --name-only` | clean before S90 report update; S90 spec-reviewer pass |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md` - Provider hub route selector / global invariant wording.
@@ -287,7 +287,7 @@ pass: cmp exited 0; unittest OK; diff-check had no output.
 
 #### コミット
 - S01: `0c16edb2 docs(hub-routing): hub skillの経路選択面を明確化`
-- S90: pending commit after spec-reviewer `019e9ba5-fb61-7611-b700-66099b094af7` pass.
+- S90: `3fb0864a docs(hub-routing): docs impact証跡を記録`
 
 #### メモ
 - No user interview blocker was found for S01.
@@ -305,32 +305,34 @@ pass: cmp exited 0; unittest OK; diff-check had no output.
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer `019e9bab-a1c1-7a13-aab6-8d9a038815d9` | whole issue obligation coverage | already sufficient after report ledger repair | initial fail by `019e9ba8-bd6a-76a2-a3cb-cca4ce7bcb05`: S90 commit evidence was stale / pending in Step Commit Gate; fixed by recording `3fb0864a` and post-commit clean evidence; re-review found no remaining findings | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer `019e9baf-0e28-7df2-af3e-fbdc7ea352a4` | issue-wide integrated diff | initial fail by `019e9ba8-dbca-7da0-9cfe-0de0f514d182`: S90 commit evidence was stale / pending in Step Commit Gate; second fail by `019e9bab-b6c3-7ac2-8e46-1aac8101c77c`: Decision Ledger summary omitted D-003; fixed both | 2 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer `019e9bab-ceed-7323-8ad3-157c78369224` | requirement / design / plan / report / implementation / tests / docs alignment | initial fail by `019e9ba9-3616-7962-b995-677cc5c95453`: S99 final gate rows still had template placeholders; fixed by replacing placeholders with actual reviewer findings and final pass evidence | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| final reviewer gates pass; final report ledger ready to commit | report final gate evidence only | final response and `issue finish` evidence | ready |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: Initial final QA/code reviews found stale S90 commit evidence in Step Commit Gate.
+  - 解決: Recorded `3fb0864a docs(hub-routing): docs impact証跡を記録` and post-commit clean evidence in the S90 row.
+- 問題: Initial final spec review found S99 final gate placeholders.
+  - 解決: Replaced placeholders with actual reviewer findings, fixes, and final pass evidence.
 
 ## 学んだこと (任意)
-- ...
+- Final report rows must be updated after intermediate commits before final reviewers can verify issue finish readiness.
 
 ## 今後の推奨事項 (任意)
-- ...
+- Keep final gate rows in `pending` with concrete reviewer evidence instead of template placeholders while re-review is in progress.
 
 ## 省略/例外メモ (必須)
 - 該当なし
