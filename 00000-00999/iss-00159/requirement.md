@@ -3,7 +3,7 @@
 ID: "iss-00159"
 タイトル: "Make Issue Planning Skill Expose Mandatory Authoring Gates"
 関連GitHub: ["#159"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-05"
 親: ["epic-00158", "init-local-00003"]

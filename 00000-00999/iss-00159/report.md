@@ -81,7 +81,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| requirement | `workflow_spec_authoring.md`; `phase_requirement.md`; `workflow_issue.md`; epic synthesis and clean ChatGPT research reports; ChatGPT requirement critique report | Q-001 answered: update provider-side skill source and dogfooding mirror together | adopted into revised draft requirement | provisional self-check only; fresh `spec-reviewer` not yet run | yes | Run fresh `spec-reviewer`; block design until pass |
+| requirement | `workflow_spec_authoring.md`; `phase_requirement.md`; `workflow_issue.md`; epic synthesis and clean ChatGPT research reports; ChatGPT requirement critique report; target provider/mirror skill files | Q-001 answered: update provider-side skill source and dogfooding mirror together | adopted into revised requirement | fresh `spec-reviewer` pass by agent `019e9ae9-60d3-7da3-b098-9320299e9dfb`; findings: none; confidence: 0.94 | no | Promote to design phase |
+| design | `requirement.md`; `workflow_spec_authoring.md`; `workflow_issue.md`; `phase_design.md`; current provider/mirror skill files; existing parity test location; `cmp` and targeted parity unittest preflight | none | design authored from passed requirement and existing install_root / dogfooding mirror architecture | fresh `spec-reviewer` pass by agent `019e9aeb-9e9c-7142-a0f5-58d79b15d16d`; findings: none; confidence: 0.93 | no | Promote to plan phase |
+| plan | `requirement.md`; `design.md`; `workflow_spec_authoring.md`; `workflow_issue.md`; `phase_plan_issue.md`; `docs/authoring/issue-plan.md`; targeted parity unittest and `cmp` preflight | none | plan authored from passed requirement/design with one skill-text implementation slice plus S90/S99 gates | fresh `spec-reviewer` pass by agent `019e9aee-eea3-7633-ac39-c3bb223cd722`; findings: none; confidence: 0.93 | no | Promote to execution handoff |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -126,119 +128,137 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- `spec-dock-issue-planning` skill の first-read surface に `Mandatory Issue Authoring Workflow` と `Authority And Routing` を追加した。
+- Provider-side source と dogfooding mirror は同一内容で更新し、mandatory phase sequence、fresh reviewer semantics、non-pass state、delegated draft boundary、executable plan handoff、report evidence obligation を skill 本文から読めるようにした。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-06-05 HH:MM - HH:MM）
+### セッションログ（2026-06-06 12:35 - 12:58）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, EC-001, EC-002, EC-003
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: `実装ステップ S01 — Issue planning skill first-read workflow spine`
+  - closure ids: cl-001, cl-002, cl-003, cl-004, cl-005, cl-006, cl-007, cl-008
 
 #### 実施内容
-- ...
+- `doc-writer` に S01 を委任し、許可 path を provider skill と dogfooding mirror skill の 2 ファイルに限定した。
+- `Mandatory Issue Authoring Workflow` section を追加し、`Authority And Routing` heading で既存 authority / routing reminders を分離した。
+- 親 orchestrator が差分、`rg` inspection、provider/mirror parity、targeted unittest、whitespace を確認した。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+rg 'Mandatory Issue Authoring Workflow|review_status: pass|missing|stale|waived|provisional|executable.*plan|report.md' src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md .agents/skills/spec-dock-issue-planning/SKILL.md
 
-<result>
+result: pass; both provider and mirror contain the planned first-read workflow section, fresh reviewer wording, non-pass state wording, executable plan blocker, and report evidence wording.
+
+cmp -s src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md .agents/skills/spec-dock-issue-planning/SKILL.md
+
+result: pass
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets
+
+result: pass; Ran 1 test in 0.012s; OK
+
+git diff --check
+
+result: pass
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only / covered-existing | Before diff, skill lacked `Mandatory Issue Authoring Workflow`; current diff adds it in both provider and mirror | `git diff -- src/.../spec-dock-issue-planning/SKILL.md .agents/.../spec-dock-issue-planning/SKILL.md` | pass | docs-only instruction change; red-required code test is not applicable |
+| S01 | 緑フェーズ（Green） | `rg`, `cmp`, targeted parity unittest, `git diff --check` | Planned wording exists; provider/mirror are byte-equivalent; parity unittest passes | command evidence above | pass | cl-001..cl-008 covered |
+| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | No additional refactor performed beyond section heading organization | diff inspection | approved-no-op | scope remained limited to allowed skill paths |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | none | implementation | no additional test or plan amendment needed | none | no | `rg`, `cmp`, targeted parity unittest, `git diff --check` passed |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | cl-001, cl-002, cl-003, cl-004, cl-005, cl-006, cl-007, cl-008 | Planned skill wording, provider/mirror parity, and docs-only verification pass | `rg` inspection, `cmp`, targeted parity unittest, `git diff --check` | pass | Step reviewer initially failed only because this report evidence was missing; skill diff itself was aligned |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| cl-001 | S01 | yes | inspect-only | Provider/mirror lacked named mandatory workflow section before S01 diff | `rg 'Mandatory Issue Authoring Workflow' ...` | pass | section present in both files |
+| cl-002 | S01 | yes | inspect-only | Fresh/non-pass wording was thinner before S01 diff | `rg 'review_status: pass|missing|stale|waived|provisional' ...` | pass | fresh pass and non-pass states present |
+| cl-003 | S01 | yes | inspect-only | Gap return wording was thinner before S01 diff | `rg 'Unresolved requirement / design / plan gaps' ...` | pass | gap return rule present |
+| cl-004 | S01 | yes | inspect-only | Delegated draft authority wording was thinner before S01 diff | `rg 'Delegated drafts' ...` | pass | canonical adoption/report boundary present |
+| cl-005 | S01 | yes | inspect-only | Docs routing existed and was preserved | `rg 'workflow_spec_authoring|workflow_issue|phase_plan_issue|authoring/issue-plan' ...` | pass | detailed docs routing remains |
+| cl-006 | S01 | yes | inspect-only | Executable plan blocker wording was thinner before S01 diff | `rg 'executable.*plan' ...` | pass | handoff blocker present |
+| cl-007 | S01 | yes | inspect-only | Report evidence wording existed and was strengthened | `rg 'report.md' ...` | pass | Spec Authoring Gate evidence obligation present |
+| cl-008 | S01 | yes | covered-existing | Provider/mirror parity must hold after S01 diff | `cmp -s ...`; `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets` | pass | byte-equivalent and existing parity test passes |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| cl-001 | S01 | `rg 'Mandatory Issue Authoring Workflow' ...` | pass | named workflow section present |
+| cl-002 | S01 | `rg 'review_status: pass|missing|stale|waived|provisional' ...` | pass | fresh/non-pass semantics present |
+| cl-003 | S01 | `rg 'Unresolved requirement / design / plan gaps' ...` | pass | gap return wording present |
+| cl-004 | S01 | `rg 'Delegated drafts' ...` | pass | draft authority boundary present |
+| cl-005 | S01 | `rg 'workflow_spec_authoring|workflow_issue|phase_plan_issue|authoring/issue-plan' ...` | pass | docs routing present |
+| cl-006 | S01 | `rg 'executable.*plan' ...` | pass | executable plan blocker present |
+| cl-007 | S01 | `rg 'report.md' ...` | pass | report obligation present |
+| cl-008 | S01 | `cmp -s ...`; targeted parity unittest | pass | provider/mirror parity confirmed |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| none | cl-001..cl-008 | tc-s01-001..tc-s01-004 | cl-001..cl-008 | planned closure ids were sufficient | no | yes, initial S01 spec-review failed for missing report evidence; fresh re-review passed |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00159 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user objective in current goal | `/Users/iwasawayuuta/.codex/worktrees/8d9b/spec-dock` | iss-00159 | current thread goal session | spec-reviewer, code-reviewer, qa-reviewer, doc-writer, read-only specialist | same repo/worktree, active issue, session, named roles; no destructive action / publishing / credentialed access / scope expansion beyond active issue | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | shipped skill text / dogfooding mirror update | doc-writer | provider and mirror `spec-dock-issue-planning/SKILL.md` only | `requirement.md`, `design.md`, `plan.md` | Add mandatory workflow spine and authority/routing heading to allowed skill files | runtime, tests, templates, other skills, workflow docs, GitHub metadata, issue docs/report | `rg` inspection, `cmp`, targeted parity unittest | allowed paths outside scope, acceptance wording impossible, parity failure | worker summary, changed files, verification, risks, ledger note | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | doc-writer | Added `Mandatory Issue Authoring Workflow`; added `Authority And Routing`; kept provider/mirror same | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md`; `.agents/skills/spec-dock-issue-planning/SKILL.md` | `cmp -s ...` -> pass; `rg ...` -> pass | fresh step spec-review pass by agent `019e9af7-e4c4-7ea0-aae1-ca5dff4f00d4` | none | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01 | 該当なし。S01 は `doc-writer` に委任済み | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step reviewer | spec-reviewer | fresh | failed | N/A | follow-up required | agent `019e9af3-4d5f-74a3-9e98-8aab88ea3443`; finding: report closure evidence placeholders blocked auditability; skill diff itself aligned |
+| S01 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed | agent `019e9af7-e4c4-7ea0-aae1-ca5dff4f00d4`; findings: none; S01 can proceed to step commit and S90/S99 |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | committed after this ledger update | provider/mirror skill text plus issue planning/report evidence | commit hash recorded after commit as external evidence | pending post-commit clean check | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` - provider-side skill first-read workflow spine
+- `.agents/skills/spec-dock-issue-planning/SKILL.md` - dogfooding mirror skill first-read workflow spine
+- `spec-dock/active/issue/report.md` - S01 evidence ledger
 
 #### コミット
-- <hash> <message>
+- pending `git commit`; exact hash is post-commit external evidence
 
 #### メモ
-- ...
-
----
-
-### セッションログ（2026-06-05 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
-
----
+- Worker returned: `No material implementation decisions beyond the approved plan.`
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
