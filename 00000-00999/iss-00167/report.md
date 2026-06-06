@@ -501,6 +501,100 @@ git diff --check
 - `tests/unit/presentation/test_runtime_sync_s07.py`
 - `tests/unit/test_discovery.py`
 
+### 実装ステップ S05 — Large installer/update unit migration
+
+#### 対象
+- Step: S05
+- Closure IDs: `tc-007`, with applicable `tc-004`, `tc-005`
+- Scope: `tests/unit/infra/test_active_store.py`, `tests/unit/infra/test_fake_gh_harness.py`, `tests/unit/infra/test_init_update.py`
+
+#### 実施内容
+- `tests/unit/infra/**` を pytest-native に移行した。
+- `unittest.TestCase`, `unittest.mock.patch`, `self.assert*`, `self.fail`, `self.subTest`, `self.skipTest`, `unittest.main()` を除去した。
+- 旧 `subTest` 相当の case visibility は case label 付き assertion helper / assertion message で維持した。
+- 例外期待は `pytest.raises` と plain assert へ移行した。
+- `pytest.MonkeyPatch.context()`、plain assert、`pytest.skip` を使い、既存の isolation / skip guard を維持した。
+- `uv run pytest` の `.venv` Python に pip が無い場合でも packaging helper が対象 Python へ依存を入れられるよう、test helper は `uv pip install --target ... --python <target>` fallback を使う。
+- checked-in dogfooding snapshot fixtures を現行 `spec-dock/initiatives` に合わせ、`epic-00158` 配下の `iss-00159`, `iss-00162`..`iss-00167` の `.meta.json` と `depends_on` を固定値へ追加した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n 'self\.fail\(|def tearDown|def setUp|super\(\)\.tearDown|super\(\)\.setUp|import unittest|from unittest|unittest\.|self\.assert|assertRaises|subTest|skipTest|unittest\.main|mock\.' tests/unit/infra
+# no output
+
+uv run pytest tests/unit/infra
+# 217 passed in 74.29s
+
+uv run pytest tests/unit
+# 428 passed in 79.29s
+
+git diff --check
+# pass
+```
+
+#### Red / 代替証跡
+- Delegated dev-coder baseline:
+  - `tests/unit/infra` に `import unittest`, `from unittest.mock`, `self.assert*`, `subTest`, `skipTest`, `unittest.main` が残存していた。
+  - `uv run pytest tests/unit/infra -q` は `214 failed, 3 passed`。主因は plain pytest class では `self.assertEqual` 等が存在しないこと。
+- Orchestrator follow-up after worker diff:
+  - Initial local rerun failed with 14 failures.
+  - Failure classes:
+    - `.venv` Python had no pip, while packaging helper tried `sys.executable -m pip` instead of target venv / wrapper Python.
+    - checked-in dogfooding fixture expected values did not include current `epic-00158` issue nodes and dependencies.
+    - pytest API conversion around `pytest.raises` / `ExceptionInfo` needed focused verification.
+  - Focused fixes were made in `tests/unit/infra/test_init_update.py`, then representative failing tests passed.
+
+#### レビュー / コミットゲート
+- Delegated implementation:
+  - dev-coder `019e9c26-8832-7b70-b2bb-c766bd370435`
+  - changed files: S05 target files only.
+  - worker verification reported: scoped grep no output; `uv run pytest tests/unit/infra` -> 217 passed; `uv run pytest tests/unit` -> 428 passed; `git diff --check` -> pass.
+- Orchestrator verification:
+  - `uv run pytest tests/unit/infra` -> 217 passed in 74.29s.
+  - `uv run pytest tests/unit` -> 428 passed in 79.29s.
+  - `git diff --check` -> pass.
+- Initial S05 code-reviewer gate: fail.
+  - P1: S05 closure evidence was missing from `report.md`.
+- Follow-up:
+  - This S05 section records Step Contract Closure, Test Contract Closure, delegated worker evidence adoption, reviewer gate state, and commit gate status.
+- Fresh S05 code-reviewer gate: pass.
+  - reviewer: `019e9c31-7940-74d3-87d3-a037d28a7b0f`
+  - review_status: pass
+  - summary: no remaining actionable S05 correctness issues; report now records delegated adoption, D-015/D-016, Step/Test Contract Closure, and scoped grep plus infra/unit pytest evidence.
+- Commit gate: pending at time of report update.
+
+#### 仕様解釈 / 判断記録
+
+| ID | 状態 | 種別 | 判断者 | トピック | トリガー | 採用判断 | 根拠 | 影響ファイル | フォローアップ |
+|---|---|---|---|---|---|---|---|---|---|
+| D-015 | resolved | implementation | dev-coder + orchestrator | Packaging helper target Python under pytest / uv | `uv run pytest` の `.venv` Python に pip がなく、issue-69 packaging helper が `sys.executable -m pip` へ依存して失敗した | `_issue_69_install_target_packages` に `python_executable` を渡し、対象 venv / wrapper Python に対して pip または `uv pip install --target ... --python <target>` を使う | test helper の目的は isolated wheel / sdist artifact surface を検証することであり、product code を変えずに test isolation を保つ必要がある | `tests/unit/infra/test_init_update.py` | none |
+| D-016 | resolved | test-strategy | dev-coder + orchestrator | Dogfooding snapshot fixture refresh | 現行 branch の checked-in dogfooding tree に `epic-00158` issue nodes and dependencies が追加され、固定 snapshot が stale になった | `_CHECKED_IN_DOGFOODING_META_JSON_PATHS`, `_CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH`, `_CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP` を現行 tree に合わせて更新する | fixture は checked-in dogfooding state の drift 検出が目的であり、現行 issue set を固定値に反映しないと正しい drift test にならない | `tests/unit/infra/test_init_update.py` | future dogfooding node additions must update this snapshot intentionally |
+
+#### 証跡採用台帳（S05 delegated evidence adoption）
+
+| 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
+|---|---|---|---|---|---|---|
+| EAL-S05-001 | adopted | dev-coder `019e9c26-8832-7b70-b2bb-c766bd370435` | S05 implementation and report evidence | Worker stayed within S05 target files, reported Red / Green evidence, and identified material helper / snapshot decisions. Orchestrator re-ran focused failing tests plus infra/unit lanes and adopted the implementation with D-015/D-016. | worker final summary; scoped grep no output; `uv run pytest tests/unit/infra` -> 217 passed; `uv run pytest tests/unit` -> 428 passed; `git diff --check` -> pass | fresh S05 code-reviewer re-review |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S05 | `tc-007`, `tc-004`, `tc-005` | infra unit lane and all unit tests pass under pytest; unittest dependency is removed; former subTest / exception expectation strength is preserved | scoped grep no output; `uv run pytest tests/unit/infra` -> 217 passed; `uv run pytest tests/unit` -> 428 passed; `git diff --check` pass; fresh code-reviewer pass `019e9c31-7940-74d3-87d3-a037d28a7b0f` | passed | code-reviewer P1 report gap fixed; final S05 reviewer gate passed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-007` | S05 | yes | red-required | infra tests used `unittest.TestCase`, `unittest.mock.patch`, `self.assert*`, `self.subTest`, `self.skipTest`, and `unittest.main`; pre-migration pytest failed broadly | scoped grep; `uv run pytest tests/unit/infra`; `uv run pytest tests/unit`; `git diff --check` | passed: infra 217 passed; unit 428 passed; grep no output | Large infra lane migrated |
+| `tc-004` | S05 | yes | covered-existing | former `subTest` loops existed in infra tests | case labels / assertion messages; infra/unit pytest; code-reviewer focus | passed | Fresh review found no remaining actionable S05 correctness issues |
+| `tc-005` | S05 | yes | covered-existing | `assertRaises*` / exception expectations were unittest-style | pytest-native exception assertions; scoped grep; infra/unit pytest | passed | no `assertRaises` grep output remains |
+
+#### 変更したファイル
+- `tests/unit/infra/test_active_store.py`
+- `tests/unit/infra/test_fake_gh_harness.py`
+- `tests/unit/infra/test_init_update.py`
+
 ### 実装ステップ S06 — Integration lane migration
 
 #### 対象
