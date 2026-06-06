@@ -2968,7 +2968,8 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "- `tc-s01-001` acceptance: <短い説明>" in issue_plan_authoring
             assert "concrete test case id" in issue_plan_authoring
             assert "関連 closure id" in issue_plan_authoring
-            assert "この文書を入口として読んだあと" in issue_plan_authoring
+            assert "`spec-dock-issue-planning` skill を operational entrypoint / first-read spine" in \
+                issue_plan_authoring
             assert "複数の closure id または複数の concrete test case" in issue_plan_authoring
             self._assert_concrete_test_cases_nested_list_contract(
                 issue_plan_authoring,
@@ -3130,7 +3131,7 @@ class TestInitUpdate(CliRuntimeHarness):
 
             plan_text = (issue_templates_dir / "plan.md").read_text(encoding="utf-8")
             assert "update_plan" not in plan_text
-            assert "このテンプレートは最小 scaffold" in plan_text
+            assert "このテンプレートは executable scaffold" in plan_text
             assert "## 実行ルール（全ステップ共通）" in plan_text
             assert "workflow_issue.md" in plan_text
             assert "phase_plan_issue.md" in plan_text
@@ -4259,7 +4260,7 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "user confirmation points" not in issue_design
         assert "## 要件 → 設計マッピング" in issue_design
         assert "## 要件 / 例外 -> 検証マッピング" in issue_design
-        assert "このテンプレートは最小 scaffold" in issue_plan
+        assert "このテンプレートは executable scaffold" in issue_plan
         assert "workflow_issue.md" in issue_plan
         assert "phase_plan_issue.md" in issue_plan
         assert "## 依存関係から導く実装順序" in issue_plan
@@ -10021,9 +10022,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         expected_fragments = {
             "workflow clarification": (
-                "first-class entrypoint",
+                "skill-owned workflow",
+                "artifact semantics",
                 "source-grounded read",
-                "decision tree traversal",
                 "一問ずつ",
                 "domain language",
                 "concrete scenario",
@@ -10037,17 +10038,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             ),
             "clarification skill": (
                 "spec-dock/docs/workflow_clarification.md",
-                "source-grounded questions",
+                "source-grounded grill loop",
                 "at most one essential question",
-                "unanswered `interview` artifact",
+                "create unanswered `interview`",
+                "gap classification",
                 "Evidence Adoption Ledger / Objective Alignment Ledger / Spec Authoring Gate",
-                "Specialist agents return question candidates to the orchestrator",
+                "Specialist agents may return question candidates",
             ),
             "interview template": (
                 "status: \"unanswered | answered | superseded | deferred\"",
                 "authority: \"proposed | user-approved | synthesized\"",
                 "adoption_status: \"unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked\"",
-                "一つの `interview` artifact には一つの本質的な質問だけを書く",
+                "一つの `interview` artifact には one essential question / 一つの本質的な質問だけを書く",
                 "## source-grounded context (必須)",
                 "## Codex の推奨案 (必須)",
                 "## ユーザー回答 (回答後に必須)",
@@ -10377,9 +10379,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         for skill_text in (issue_planning_text, issue_text, clarification_text, codex_adapter_text, copilot_adapter_text):
             if "./spec-dock/scripts/spec-dock" not in skill_text:
-                assert "spec-dock/docs/workflow_issue.md as the source of truth" in skill_text \
-                    or "spec-dock/docs/workflow_clarification.md` is the source of truth" in skill_text \
+                assert (
+                    "spec-dock/docs/workflow_issue.md as the source of truth" in skill_text
+                    or "spec-dock/docs/workflow_clarification.md` is the source of truth" in skill_text
+                    or "Use `spec-dock/docs/workflow_clarification.md` only for detailed artifact semantics" in skill_text
                     or "Primary lifecycle / execution workflow: `spec-dock/docs/workflow_issue.md`" in skill_text
+                )
             else:
                 assert "./spec-dock/scripts/spec-dock" in skill_text
             assert "./spec " not in skill_text
