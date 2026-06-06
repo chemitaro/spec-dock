@@ -1164,6 +1164,13 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00127-scoped-discussion-draft-authoring-correction/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00131-debug-codex-subagent-permission-profile-callability/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00138-split-issue-planning-execution-skills/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00159-make-issue-planning-skill-expose-mandatory-authoring-gates/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00162-align-skill-docs-template-context-surfaces/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00163-revise-spec-dock-clarification-as-skill-owned-grill-workflow/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00164-clarify-hub-and-leaf-skill-routing-surface/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00165-align-workflow-docs-with-skill-spine-boundary/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00166-align-templates-as-scaffolds-and-examples/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1304,6 +1311,13 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00127-scoped-discussion-draft-authoring-correction/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00131-debug-codex-subagent-permission-profile-callability/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00138-split-issue-planning-execution-skills/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00159-make-issue-planning-skill-expose-mandatory-authoring-gates/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00162-align-skill-docs-template-context-surfaces/.meta.json": ["iss-00159"],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00163-revise-spec-dock-clarification-as-skill-owned-grill-workflow/.meta.json": ["iss-00162"],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00164-clarify-hub-and-leaf-skill-routing-surface/.meta.json": ["iss-00159", "iss-00163"],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00165-align-workflow-docs-with-skill-spine-boundary/.meta.json": ["iss-00159", "iss-00163", "iss-00164"],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00166-align-templates-as-scaffolds-and-examples/.meta.json": ["iss-00162", "iss-00163", "iss-00165"],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -1325,6 +1339,11 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00123": ["iss-00120", "iss-00122"],
         "iss-00124": ["iss-00121", "iss-00122", "iss-00123"],
         "iss-00125": ["iss-00120", "iss-00121", "iss-00122", "iss-00123", "iss-00124"],
+        "iss-00162": ["iss-00159"],
+        "iss-00163": ["iss-00162"],
+        "iss-00164": ["iss-00159", "iss-00163"],
+        "iss-00165": ["iss-00159", "iss-00163", "iss-00164"],
+        "iss-00166": ["iss-00162", "iss-00163", "iss-00165"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
@@ -3056,7 +3075,7 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("- `tc-s01-001` acceptance: <短い説明>", issue_plan_authoring)
             self.assertIn("concrete test case id", issue_plan_authoring)
             self.assertIn("関連 closure id", issue_plan_authoring)
-            self.assertIn("この文書を入口として読んだあと", issue_plan_authoring)
+            self.assertIn("`spec-dock-issue-planning` skill を operational entrypoint / first-read spine", issue_plan_authoring)
             self.assertIn("複数の closure id または複数の concrete test case", issue_plan_authoring)
             self._assert_concrete_test_cases_nested_list_contract(
                 issue_plan_authoring,
@@ -3226,7 +3245,7 @@ class TestInitUpdate(CliRuntimeHarness):
 
             plan_text = (issue_templates_dir / "plan.md").read_text(encoding="utf-8")
             self.assertNotIn("update_plan", plan_text)
-            self.assertIn("このテンプレートは最小 scaffold", plan_text)
+            self.assertIn("このテンプレートは executable scaffold", plan_text)
             self.assertIn("## 実行ルール（全ステップ共通）", plan_text)
             self.assertIn("workflow_issue.md", plan_text)
             self.assertIn("phase_plan_issue.md", plan_text)
@@ -4420,7 +4439,7 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertNotIn("user confirmation points", issue_design)
         self.assertIn("## 要件 → 設計マッピング", issue_design)
         self.assertIn("## 要件 / 例外 -> 検証マッピング", issue_design)
-        self.assertIn("このテンプレートは最小 scaffold", issue_plan)
+        self.assertIn("このテンプレートは executable scaffold", issue_plan)
         self.assertIn("workflow_issue.md", issue_plan)
         self.assertIn("phase_plan_issue.md", issue_plan)
         self.assertIn("## 依存関係から導く実装順序", issue_plan)
@@ -10225,9 +10244,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         expected_fragments = {
             "workflow clarification": (
-                "first-class entrypoint",
+                "skill-owned workflow",
+                "artifact semantics",
                 "source-grounded read",
-                "decision tree traversal",
                 "一問ずつ",
                 "domain language",
                 "concrete scenario",
@@ -10241,17 +10260,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             ),
             "clarification skill": (
                 "spec-dock/docs/workflow_clarification.md",
-                "source-grounded questions",
+                "source-grounded grill loop",
                 "at most one essential question",
-                "unanswered `interview` artifact",
+                "create unanswered `interview`",
+                "gap classification",
                 "Evidence Adoption Ledger / Objective Alignment Ledger / Spec Authoring Gate",
-                "Specialist agents return question candidates to the orchestrator",
+                "Specialist agents may return question candidates",
             ),
             "interview template": (
                 "status: \"unanswered | answered | superseded | deferred\"",
                 "authority: \"proposed | user-approved | synthesized\"",
                 "adoption_status: \"unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked\"",
-                "一つの `interview` artifact には一つの本質的な質問だけを書く",
+                "一つの `interview` artifact には one essential question / 一つの本質的な質問だけを書く",
                 "## source-grounded context (必須)",
                 "## Codex の推奨案 (必須)",
                 "## ユーザー回答 (回答後に必須)",
@@ -10600,6 +10620,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 self.assertTrue(
                     "spec-dock/docs/workflow_issue.md as the source of truth" in skill_text
                     or "spec-dock/docs/workflow_clarification.md` is the source of truth" in skill_text
+                    or "Use `spec-dock/docs/workflow_clarification.md` only for detailed artifact semantics" in skill_text
                     or "Primary lifecycle / execution workflow: `spec-dock/docs/workflow_issue.md`" in skill_text
                 )
             else:
