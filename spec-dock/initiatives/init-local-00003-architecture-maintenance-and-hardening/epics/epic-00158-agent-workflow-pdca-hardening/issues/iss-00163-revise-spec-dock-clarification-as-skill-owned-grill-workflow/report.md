@@ -18,10 +18,7 @@ ID: "iss-00163"
 
 `report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
 
-Material な判断がない場合もこの section は残し、次を明示する。
-
-- No material interpretation changes.
-- No decision entries.
+この issue では material な scope decision が発生したため、D-001 に記録する。
 
 Ledger entry は次の契約値を使う。
 
@@ -620,29 +617,16 @@ pass: diff-check had no output; status and diff stat were clean.
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S90 | pending-commit | report S90 evidence only | pending | pending | sync produced no working tree diff | generated projections under `spec-dock/.agent/`, `spec-dock/*.puml`, `spec-dock/dashboard.md` | `git status --short`; `git diff --stat` | clean before report update |
+| S90 | committed | report S90 evidence only | `2edb46bc` | `git status --short` -> clean | sync produced no working tree diff | generated projections under `spec-dock/.agent/`, `spec-dock/*.puml`, `spec-dock/dashboard.md` | `git status --short`; `git diff --stat` | clean before report update |
 
 #### 変更したファイル
 - `spec-dock/active/issue/report.md` - S90 verification evidence.
 
 #### コミット
-- pending S90 commit.
+- `2edb46bc` `docs(clarification): docs impact resolutionの証跡を記録`
 
 #### メモ
 - No user interview blocker was found for S90.
-
----
-
-### セッションログ（2026-06-06 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
-
----
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
@@ -654,32 +638,32 @@ pass: diff-check had no output; status and diff stat were clean.
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer `019e9b79-e271-7a33-9a6e-503ea51d5fc3` | whole issue obligation coverage | already sufficient for docs-only / inspect-only change after report fixes | Re-review passed after S90 commit evidence and final gate rows were corrected. | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer `019e9b7a-0186-7e91-b12c-6822d39296e2` | issue-wide integrated diff | Re-review passed after S90 commit evidence was corrected; provider/mirror parity and shipped Markdown shape remained consistent. | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer `019e9b7f-dab9-7611-b23a-07f456935676` | requirement / design / plan / report / implementation / tests / docs alignment | Final confirmation passed after S90 commit evidence, S99 gate rows, and D-001 decision ledger wording were corrected. | 3 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| final report ledger passed by QA/code/spec reviewers | report final gate evidence only | final response after final report commit and issue finish | ready for final report commit |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: S90 / S99 review で report に stale pending commit evidence と placeholder rows が残っていることを検出した。
+  - 解決: S02 / S03 / S90 commit evidence を実コミットへ更新し、final gate rows を observed reviewer outcomes に置換した。
 
 ## 学んだこと (任意)
-- ...
+- Step commit 後の report section は、後続 step へ進む前に session-local commit subsection と Step Commit Gate の両方を実コミットに揃える必要がある。
 
 ## 今後の推奨事項 (任意)
-- ...
+- Final gate 前に `pending-commit` / template placeholder / stale reviewer pending wording を機械検索する。
 
 ## 省略/例外メモ (必須)
 - 該当なし
