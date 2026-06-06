@@ -49,7 +49,7 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | orchestrator | This issue must avoid absorbing clarification, hub, workflow-docs, and template rewrite scopes | Option A: inventory plus bounded first cleanup; Option B: rewrite all surfaces in one issue | Use this issue as T2 inventory / consistency baseline and pass concrete rewrites to owner issues | Epic plan and ADR split first-wave work into inventory, clarification, hub, docs, and templates lanes | applied | `requirement.md`; draft requirement discussion | No follow-up; owner issues are already created |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -61,9 +61,9 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 - Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
 - Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
 
-| 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
-|---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| ID | adoption_status | source | source_role | claim | target_artifact | target_section | rationale | evidence_strength | evidence_path | adopter | reviewer | blocking | next_action |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| EAL-001 | adopted | draft-requirement discussion | orchestrator-authored draft | Epic ADR boundary and issue decomposition define T2 inventory / consistency lane | `requirement.md` | purpose / scope / AC / EC | Draft requirement captured the Epic ADR boundary and first-wave issue split; canonical requirement adopted it with added AC-005 and explicit downstream owner boundaries | strong | `discussions/20260606t024137z-draft-requirement-align-skill-docs-template-context-surfaces-draft-requirement.md`; `requirement.md` | main orchestrator | fresh requirement spec-reviewer `019e9b04-9894-7a00-a5b6-881b03d597a8` | no | Promote to design phase |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +71,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | Requirement keeps the primary objective on cross-surface ownership inventory and consistency baseline | Follow-up rewrites are explicitly assigned to `iss-00163` / `iss-00164` / `iss-00165` / `iss-00166` instead of being absorbed here | low | pending fresh `spec-reviewer` |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +79,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | Epic requirement/design/plan; ADR `20260605t080509z-adr`; ADR `20260605t080509z-02`; `iss-00159` requirement; draft requirement discussion | none | adopted draft requirement into canonical requirement with downstream owner boundaries | fresh `spec-reviewer` pass by agent `019e9b04-9894-7a00-a5b6-881b03d597a8`; P2 EAL auditability cleanup fixed in report | no | Promote to design phase |
+| design | Provider skills/docs/templates inventory precheck; requirement; Epic ADRs; `iss-00159` specimen | none | design authored from passed requirement; first review failed on missing `sync` evidence and hub cleanup boundary; fixed by adding `sync` verification and explicit `iss-00164` no-consume boundary | fresh re-review pass by agent `019e9b0b-34c9-7d22-a5ac-d1c360db9a11`; findings: none | no | Promote to plan phase |
+| plan | Passed requirement/design; `phase_plan_issue.md`; `docs/authoring/issue-plan.md` | none | plan authored for inventory matrix, bounded hub cleanup, S90, S99; first review failed on incomplete delegation contracts, discussion direct-write constraints, and generic closure destinations; fixed by adding input docs, stop conditions, direct-write provenance/diff guard/fallback/report destinations, exact report ledger destinations, and P2 negative stale-wording inspection | fresh re-review pass by agent `019e9b11-d595-74b2-a7c8-0163211a12e3`; P2 verification precision improvement addressed in plan | no | Promote to execution handoff |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
