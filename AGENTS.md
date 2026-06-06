@@ -86,7 +86,7 @@ Read it like this:
 - Change business rules or models: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/`.
 - Change filesystem/git/github/persistence behavior: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/`.
 - Change JSON/markdown/PUML/CLI output: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/`.
-- Choose tests by surface: installer in `tests/test_cli.py` and `tests/test_init_update.py`, runtime in `tests/cli_runtime/`, domain in `tests/domain_runtime/`, presentation in `tests/presentation_runtime/`.
+- Choose tests by surface: installer/scaffold in `tests/unit/infra/`, runtime in `tests/cli_runtime/`, application/domain/presentation in `tests/unit/{application,domain,presentation}/`, and external boundary smoke in `tests/integration/`.
 
 ### Runtime Architecture
 
@@ -127,8 +127,17 @@ Do not collapse new work back into monolithic command files when a layer-specifi
 ## Build, Test, and Development Commands
 
 ```bash
+# Daily local unit suite
+uv run pytest tests/unit
+
+# Optional integration suite for real external boundaries
+uv run pytest tests/integration
+
+# Runtime / CLI regression lane
+uv run pytest tests/cli_runtime
+
 # Full baseline
-python -m unittest discover -v
+uv run pytest
 
 # Run installer locally from the current checkout
 uvx --from . spec-dock init /tmp/target-repo
@@ -144,9 +153,10 @@ python -m spec_dock.cli init /tmp/target-repo
 
 ## Testing Guidelines
 
-- Framework: `unittest`.
-- Installer/scaffold coverage: `tests/test_cli.py`, `tests/test_init_update.py`.
-- Runtime coverage: `tests/cli_runtime/`, `tests/domain_runtime/`, `tests/presentation_runtime/`.
+- Framework: `pytest`.
+- Installer/scaffold coverage: `tests/unit/infra/`.
+- Runtime / CLI coverage: `tests/cli_runtime/`.
+- Application/domain/presentation coverage: `tests/unit/{application,domain,presentation}/`.
 - Keep tests hermetic: use temp directories and `gh` stubs instead of live network calls.
 - When changing shipped scaffold behavior, update or add assertions for generated file structure, content, and runtime behavior.
 

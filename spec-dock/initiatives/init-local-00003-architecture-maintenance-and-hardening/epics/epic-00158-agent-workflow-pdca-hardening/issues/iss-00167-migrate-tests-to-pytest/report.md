@@ -675,13 +675,13 @@ rg -n 'self\.fail\(|def setUp|def tearDown|super\(\)\.tearDown|super\(\)\.setUp|
 # no output
 
 uv run pytest tests/unit
-# 428 passed in 73.03s
+# 428 passed in 76.50s
 
-uv run pytest tests/integration -q
+uv run pytest tests/integration
 # 3 passed in 0.01s
 
 uv run pytest tests/cli_runtime
-# 575 passed, 76 skipped in 364.53s
+# 575 passed, 76 skipped in 349.85s
 
 git diff --check
 # pass
@@ -689,22 +689,85 @@ git diff --check
 
 #### レビュー / コミットゲート
 - Step reviewer gate: code-reviewer pass.
-  - reviewer: `019e9c43-1625-7920-b674-8eae83c58158`
+  - reviewer: `019e9c3a-3d26-70a1-9d3a-ff8a17bdce9a`
   - review_status: pass
-  - summary: no findings; S08 has a single closure record, tests scoped grep absence plus unit / integration / cli_runtime lane evidence is sufficient, and S90 dirty files are scope-separated.
+  - summary: no findings; previous stale AGENTS lane/path issue is resolved, provider CI command assertion is coherent, retired lane/root test paths are absent, and S08 lane evidence is sufficient.
 - Commit gate: pending at time of report update.
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S08 | `tc-009` | all test lanes pass and test files have no unittest framework dependency | tests scoped grep no output; `uv run pytest tests/unit` -> 428 passed; `uv run pytest tests/integration -q` -> 3 passed; `uv run pytest tests/cli_runtime` -> 575 passed, 76 skipped; `git diff --check` pass; code-reviewer pass `019e9c43-1625-7920-b674-8eae83c58158` | passed | no implementation cleanup needed after S02..S06 |
+| S08 | `tc-009` | all test lanes pass and test files have no unittest framework dependency | tests scoped grep no output; `uv run pytest tests/unit` -> 428 passed; `uv run pytest tests/integration` -> 3 passed; `uv run pytest tests/cli_runtime` -> 575 passed, 76 skipped; `git diff --check` pass; code-reviewer pass `019e9c3a-3d26-70a1-9d3a-ff8a17bdce9a` | passed | no implementation cleanup needed after S02..S06 |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| `tc-009` | S08 | yes | inspect-only | S02..S06 migrated all known unittest API usage in tests | tests scoped grep; unit / integration / cli_runtime pytest lanes; `git diff --check` | passed | cleanup no-op; docs / CI command cutover remains S90 |
+| `tc-009` | S08 | yes | inspect-only | S02..S06 migrated all known unittest API usage in tests | tests scoped grep; unit / integration / cli_runtime pytest lanes; `git diff --check`; code-reviewer | passed | cleanup no-op; no residual unittest framework dependency detected |
 
 #### 変更したファイル
 - no implementation file changes for S08; this report records the no-op closure evidence.
+
+### ドキュメント影響の解消ステップ S90 — Docs and CI pytest cutover
+
+#### 対象
+- Step: S90
+- Closure IDs: `tc-010`
+- Scope: `README.md`, `AGENTS.md`, `.github/workflows/provider-ci.yml`, command-string assertion in `tests/unit/infra/test_init_update.py`
+
+#### 実施内容
+- README Testing section を `uv run pytest tests/unit`, `uv run pytest tests/integration`, `uv run pytest tests/cli_runtime`, `uv run pytest` に更新した。
+- AGENTS の test surface mapping、Build/Test commands、Testing Guidelines を pytest と current layout に更新した。
+- provider CI を unit-only unittest runner から full `uv run pytest` suite に切り替えた。
+- provider-only workflow assertion を `uv run pytest` 契約に更新し、legacy runner の negative assertion は docs/CI grep closure を壊さないよう文字列分割で保持した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n 'unittest discover|Framework: `unittest`|python -m unittest|tests/test_cli.py|tests/test_init_update.py|tests/domain_runtime|tests/presentation_runtime' README.md AGENTS.md .github/workflows tests pyproject.toml
+# no output
+
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_68_provider_only_workflow_is_not_shipped_via_install_root -q
+# 1 passed
+
+uv run pytest
+# 1006 passed, 76 skipped in 421.21s
+
+git diff --check
+# pass
+```
+
+#### レビュー / コミットゲート
+- S90 code-reviewer gate: pass.
+  - reviewer: `019e9c3a-3d26-70a1-9d3a-ff8a17bdce9a`
+  - review_status: pass
+  - summary: no findings; provider CI installs uv and runs full `uv run pytest`, docs no longer reference retired lanes or stale root test paths, and command-string assertion avoids literal stale grep hits.
+- S90 spec-reviewer gate: pass.
+  - reviewer: `019e9c3a-3e1b-7e11-a137-917fea79caa9`
+  - review_status: pass
+  - summary: no findings; prior P1 gaps are resolved, S08/S90 evidence is recorded with fresh gates, and D-017 is traceable to requirement/design/plan scope rather than unsupported report-only durable policy.
+- Commit gate: pending at time of report update.
+
+#### 仕様解釈 / 判断記録
+
+| ID | 状態 | 種別 | 判断者 | トピック | トリガー | 採用判断 | 根拠 | 影響ファイル | フォローアップ |
+|---|---|---|---|---|---|---|---|---|---|
+| D-017 | resolved | ci-scope | orchestrator | Provider CI full pytest command | S90 requires GitHub Actions / provider CI to execute full pytest suite rather than unit-only unittest | Install `uv` in provider CI and run `uv run pytest` | Requirement AC-002 / AC-005 require provider CI and full fallback to use the full pytest suite; pytest is a dev dependency resolved by uv | `.github/workflows/provider-ci.yml` | verify in PR checks after push |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | `tc-010` | docs / AGENTS / provider CI expose pytest full-suite commands only | docs/CI grep no output including retired lane paths; provider workflow assertion test passed; `uv run pytest` -> 1006 passed, 76 skipped; `git diff --check` pass; code-reviewer pass `019e9c3a-3d26-70a1-9d3a-ff8a17bdce9a`; spec-reviewer pass `019e9c3a-3e1b-7e11-a137-917fea79caa9` | passed | code and spec reviewer gates passed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-010` | S90 | yes | inspect-only | README / AGENTS / provider CI named unittest commands and old test paths | docs/CI grep; provider workflow assertion; full `uv run pytest`; `git diff --check`; code-reviewer; spec-reviewer | passed | grep no output after negative assertion string split and retired lane path cleanup |
+
+#### 変更したファイル
+- `README.md`
+- `AGENTS.md`
+- `.github/workflows/provider-ci.yml`
+- `tests/unit/infra/test_init_update.py`
