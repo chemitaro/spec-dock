@@ -72,7 +72,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | Requirement keeps the primary objective on cross-surface ownership inventory and consistency baseline | Follow-up rewrites are explicitly assigned to `iss-00163` / `iss-00164` / `iss-00165` / `iss-00166` instead of being absorbed here | low | requirement/design/plan reviewer gates passed; S01 reviewer pending |
+| OAL-001 | Requirement keeps the primary objective on cross-surface ownership inventory and consistency baseline | Follow-up rewrites are explicitly assigned to `iss-00163` / `iss-00164` / `iss-00165` / `iss-00166` instead of being absorbed here | low | requirement/design/plan reviewer gates passed; S01 fresh re-review passed; S02 reviewer passed with P2 cleanup recorded |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -110,7 +110,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| doc-writer | iss-00162 | `discussions/20260606t040013z-disc-context-surface-inventory.md` | `requirement.md`; `design.md`; `plan.md`; `workflow_issue.md`; `docs/authoring/issue-plan.md`; Epic ADRs; provider skills/docs/templates; dogfooding mirrors | `report.md` Evidence Adoption Ledger / Delegated Draft Evidence / Step Contract Closure / Test Contract Closure / Closure Coverage / Closure Delta | unreviewed by source, adopted by parent in EAL-002 | `report.md` evidence ledgers only; no canonical docs or provider implementation | parent verified exactly one new direct-child discussion Markdown file, no staged changes, and no provider/source/test/runtime edits | integrated as S01 evidence | none | none | pending S01 spec-reviewer | eligible for S01 commit only after fresh S01 spec-reviewer pass |
+| doc-writer | iss-00162 | `discussions/20260606t040013z-disc-context-surface-inventory.md` | `requirement.md`; `design.md`; `plan.md`; `workflow_issue.md`; `docs/authoring/issue-plan.md`; Epic ADRs; provider skills/docs/templates; dogfooding mirrors | `report.md` Evidence Adoption Ledger / Delegated Draft Evidence / Step Contract Closure / Test Contract Closure / Closure Coverage / Closure Delta | unreviewed by source, adopted by parent in EAL-002 | `report.md` evidence ledgers only; no canonical docs or provider implementation | parent verified exactly one new direct-child discussion Markdown file, no staged changes, and no provider/source/test/runtime edits | integrated as S01 evidence | none | none | fresh S01 re-review passed | S01 evidence committed in `b39e36ec` |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -240,23 +240,25 @@ pass: no missing provider template paths.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated | multi-surface shipped scaffold inventory and pattern analysis | doc-writer | create one S01 context surface inventory discussion under active issue | provider source of truth under `src/spec_dock/assets/...`; active issue requirement/design/plan | exactly one new flat Markdown file under `spec-dock/active/issue/discussions/` | canonical docs, provider source, tests, runtime, GitHub metadata, nested dirs, non-Markdown files, symlinks, deletes, renames, staged changes | file list commands, matrix column inspection, downstream owner row inspection, parent diff guard | input docs conflict; scope cannot fit one discussion; provider source changes required; provenance/diff guard cannot be met | discussion path, coverage summary, unresolved risks, ledger note | pass; parent verified output and adopted it as S01 evidence pending reviewer |
+| S01 | delegated | multi-surface shipped scaffold inventory and pattern analysis | doc-writer | create one S01 context surface inventory discussion under active issue | provider source of truth under `src/spec_dock/assets/...`; active issue requirement/design/plan | exactly one new flat Markdown file under `spec-dock/active/issue/discussions/` | canonical docs, provider source, tests, runtime, GitHub metadata, nested dirs, non-Markdown files, symlinks, deletes, renames, staged changes | file list commands, matrix column inspection, downstream owner row inspection, parent diff guard | input docs conflict; scope cannot fit one discussion; provider source changes required; provenance/diff guard cannot be met | discussion path, coverage summary, unresolved risks, ledger note | pass; parent verified output, adopted it as S01 evidence, fixed first review finding, and obtained fresh re-review pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | doc-writer | Created representative provider skills/docs/templates and dogfooding mirror inventory / trace matrix with ownership, contradiction, downstream owner issue, action/deferred, and evidence columns | `spec-dock/active/issue/discussions/20260606t040013z-disc-context-surface-inventory.md` | worker-reported file list commands pass; parent `sed`/`rg`/`git status` inspections pass | pending S01 spec-reviewer | matrix is representative; exact wording rewrites deferred to `iss-00163`..`iss-00166` | accepted as S01 evidence, not canonical rewrite authority |
+| S01 | doc-writer | Created representative provider skills/docs/templates and dogfooding mirror inventory / trace matrix with ownership, contradiction, downstream owner issue, action/deferred, and evidence columns | `spec-dock/active/issue/discussions/20260606t040013z-disc-context-surface-inventory.md` | worker-reported file list commands pass; parent `sed`/`rg`/`git status` inspections pass | fresh S01 re-review passed | matrix is representative; exact wording rewrites deferred to `iss-00163`..`iss-00166` | accepted as S01 evidence, not canonical rewrite authority |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | not applicable; delegation succeeded | not applicable | not applicable | not applicable | not applicable | parent inspections recorded above | S01 spec-reviewer pending | not applicable |
+| S01 | not applicable; delegation succeeded | not applicable | not applicable | not applicable | not applicable | parent inspections recorded above | fresh S01 re-review passed | not applicable |
+| S02 | parent performed a narrow two-file mirror wording edit because the approved plan already fixed exact files, forbidden areas, and verification; no user-intent clarification or external proxy decision was needed | user-approved workflow execution for active issue; risk acceptance limited to parent local edit with fresh S02 spec-reviewer gate | `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md`; `.agents/skills/spec-driven-tdd-workflow/SKILL.md` | bounded wording cleanup only | revert the two hub skill files to pre-S02 diff if reviewer fails | `cmp`; stale phrase negative `rg`; route table/routing `rg`; targeted parity unittest | S02 spec-reviewer pending | no waiver; block if reviewer finds the parent-local edit invalid |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | S01 | step reviewer | spec-reviewer | fresh | failed | no | blocked until cl-001 coverage fix and fresh re-review pass | Agent `019e9b1c-1d5a-78e3-a4f6-b7b53f0b5c4c` found provider surface classification was representative but not exhaustive enough for cl-001 |
 | S01 | step reviewer re-review | spec-reviewer | fresh | passed | no | proceed to S01 commit | Agent `019e9b20-2c4b-7c33-92ba-5fa7ebd3e341`; findings none; reviewed exhaustive provider surface coverage appendix, EAL-002, Delegated Draft Evidence, cl-001..cl-004 evidence, no downstream scope absorption |
+| S02 | step reviewer | spec-reviewer | fresh | passed | no | proceed to S02 commit after P2 cleanup | Agent `019e9b25-65ed-7233-8b5a-4a6e1977a94f`; S02 gate passed; P2 stale S01 pending statuses fixed in this report update |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -275,14 +277,97 @@ pass: no missing provider template paths.
 
 ---
 
-### セッションログ（2026-06-06 HH:MM - HH:MM）
+### セッションログ（2026-06-06 04:25 - 04:50）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S02
+- AC/EC: AC-002, AC-003, AC-004
+- 計画上の出典（Planned source）:
+  - `plan.md` section: 実装ステップ S02 — Bounded hub wording cleanup
+  - closure ids: cl-005, cl-006, cl-007
 
 #### 実施内容
-- ...
+- Provider hub skill and dogfooding mirror hub skill の冒頭 ownership wording を、skill first-read workflow spine / docs detailed semantics / templates scaffold の境界に合わせた。
+- Route table、clarification routing、leaf ownership restructuring は変更しなかった。
+- Provider/mirror parity、stale wording negative inspection、targeted parity unittest を確認した。
+
+#### 実行コマンド / 結果
+```bash
+cmp -s src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md .agents/skills/spec-driven-tdd-workflow/SKILL.md
+
+pass
+```
+
+```bash
+rg -n 'skills stay concise|workflow explanations in `spec-dock/docs/`|docs remain the source of truth for the rule itself' src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md .agents/skills/spec-driven-tdd-workflow/SKILL.md
+
+pass: no stale phrase matches; command exited 1 because no matches were found.
+```
+
+```bash
+python -m unittest tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets
+
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.012s
+
+OK
+```
+
+```bash
+git diff -- src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md .agents/skills/spec-driven-tdd-workflow/SKILL.md
+
+pass: diff is limited to hub introductory ownership wording and one Quick reminders boundary sentence; route table entries were not changed.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only | pre-change hub text had stale wording: skills stay concise, workflow explanations in docs, docs remain source of truth for rule itself | pre-change `rg` and S01 inventory row | pass | docs-only text change; no code red test required |
+| S02 | 緑フェーズ（Green） | hub wording reflects boundary | Updated text says skills carry first-read workflow spine, docs carry detailed semantics, templates carry scaffold/evidence/examples | `rg 'first-read workflow spine|detailed semantics|minimum authoring scaffolds' ...` | pass | provider and mirror both contain new wording |
+| S02 | リファクタリング（Refactor） | no `iss-00164` scope absorption and provider/mirror parity | route table entries unchanged; `cmp` pass; targeted parity unittest pass | diff inspection, `cmp`, `python -m unittest ...` | pass | broader hub routing remains for `iss-00164` |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | Parent-local edit used instead of delegated doc-writer implementation for a narrow two-file wording change | execution | recorded in Parent Implementation Exception and kept S02 blocked on fresh spec-reviewer | cl-005, cl-006, cl-007 | no | Parent Implementation Exception row; pending S02 reviewer gate |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | cl-005, cl-006, cl-007 | hub wording cleanup passes; route table / clarification routing / leaf ownership restructuring unchanged; provider/mirror parity passes | new wording in both files; stale phrase negative `rg` has no matches; route entries still present; `cmp` and targeted parity unittest pass | pass | Fresh S02 spec-reviewer passed; P2 stale S01 pending statuses fixed before commit |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s02-001 | S02 | yes | inspect-only | stale hub wording existed before S02 | `rg 'first-read workflow spine|detailed semantics|minimum authoring scaffolds' ...` | pass | resolves cl-005 after reviewer pass |
+| tc-s02-002 | S02 | yes | inspect-only | route table existed before S02 | `git diff -- ...spec-driven-tdd-workflow/SKILL.md`; `rg 'Route to leaf skills|spec-dock-clarification|spec-dock-issue-planning|spec-dock-issue-execution' ...` | pass | resolves cl-006 after reviewer pass |
+| tc-s02-003 | S02 | yes | covered-existing | provider/mirror parity existed before S02 | `cmp -s ...`; `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets` | pass | resolves cl-007 after reviewer pass |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-005 | S02 | hub wording says skill first-read spine / docs detailed semantics / templates scaffold | pass | reviewer pending |
+| cl-006 | S02 | diff inspection shows no route table / clarification routing / leaf ownership restructuring changes | pass | reviewer pending |
+| cl-007 | S02 | provider/mirror `cmp` and targeted parity unittest | pass | reviewer pending |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | cl-005 | tc-s02-001 | cl-005 | plan の concrete test case id を Test Contract Closure の test id として使用 | no | no |
+| alias-mapped | cl-006 | tc-s02-002 | cl-006 | plan の concrete test case id を Test Contract Closure の test id として使用 | no | no |
+| alias-mapped | cl-007 | tc-s02-003 | cl-007 | plan の concrete test case id を Test Contract Closure の test id として使用 | no | no |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md` - Provider hub skill first-read ownership wording.
+- `.agents/skills/spec-driven-tdd-workflow/SKILL.md` - Dogfooding mirror hub skill parity update.
+- `spec-dock/active/issue/report.md` - S02 evidence and reviewer gate records.
+
+#### コミット
+- pending S02 commit.
+
+#### メモ
+- No user interview blocker was found for S02. The user correction remains active: if user-intent clarification becomes blocking, stop and ask the user directly.
 
 ---
 
