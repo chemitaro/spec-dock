@@ -17,6 +17,9 @@ dependencies = [
 [dependency-groups]
 dev = ["pytest>=8.0"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [project.scripts]
 spec-dock = "spec_dock.cli:main"
 
