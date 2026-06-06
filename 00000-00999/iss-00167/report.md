@@ -244,3 +244,64 @@ git diff --check
 #### 変更したファイル
 - `pyproject.toml` - `dependency-groups.dev` に pytest を追加。
 - `uv.lock` - pytest と通常の推移依存を lock。
+
+### 実装ステップ S02 — Runtime harness pytest-native conversion
+
+#### 対象
+- Step: S02
+- Closure IDs: `tc-002`
+- Scope: `tests/cli_runtime/harness.py`
+
+#### 実施内容
+- `CliRuntimeHarness` から `unittest.TestCase` 継承を削除した。
+- `harness.py` の `unittest` import と `self.assert*` / `skipTest` 依存を削除した。
+- harness 内部の assertion helper を plain `AssertionError` / `assert` helper へ置換した。
+- git が必要な helper の skip は `pytest.skip(...)` に移行した。
+- Downstream runtime tests の `self.assert*` / `subTest` / `skipTest` 依存は S03 対象として残した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n 'unittest|TestCase|assertRaises|subTest|skipTest|assertTrue|assertFalse|assertEqual|assertNotEqual|assertIn|assertNotIn|assertIs|assertIsNone|assertIsNotNone|assertIsInstance|assertGreater|assertGreaterEqual|assertLess|assertRegex' tests/cli_runtime/harness.py
+# no output
+
+uv run pytest tests/cli_runtime --collect-only
+# collected 628 items
+
+python -m py_compile tests/cli_runtime/harness.py
+# pass
+
+git diff --check
+# pass
+```
+
+#### レビュー / コミットゲート
+- Initial step reviewer gate: code-reviewer fail.
+  - Finding: harness 内の一時互換 shim が `assertRaises` / `subTest` / `assert*` API を残し、pytest-native helper boundary と AC-006 grep target に反していた。
+- Follow-up:
+  - `tests/cli_runtime/harness.py` から一時互換 shim を削除し、S03 で downstream tests を移行する責務境界へ戻した。
+- Fresh step reviewer gate: code-reviewer pass.
+  - findings: none
+  - review_status: pass
+  - notes: previous shim finding resolved; scope is harness-only; replacement assertions preserve checked conditions; downstream migration remains S03 risk.
+- Commit gate: pending at time of report update.
+
+#### 仕様解釈 / 判断記録
+
+| ID | 状態 | 種別 | 判断者 | トピック | トリガー | 採用判断 | 根拠 | 影響ファイル | フォローアップ |
+|---|---|---|---|---|---|---|---|---|---|
+| D-006 | resolved | implementation | orchestrator + code-reviewer | S02 harness transition compatibility | 初回 dev-coder が downstream tests を通すために旧 API 互換 shim を harness に追加し、code-reviewer が P1 fail を返した | 旧 API 互換 shim は不採用。S02 は harness boundary の pytest-native 化に閉じ、downstream tests の旧 API 除去は S03 に残す | AC-006 は permanent `unittest` runner / assertion / fixture API dependency 除去を要求し、S02 は helper boundary から旧 API を外す段階。互換 shim は移行を隠すため不適合 | `tests/cli_runtime/harness.py` | S03 で `tests/cli_runtime/test_*.py` の `self.assert*` / `assertRaises` / `subTest` / `skipTest` を除去 |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | `tc-002` | runtime helper no longer requires `unittest.TestCase` inheritance and harness has no unittest-style helper dependency | scoped grep no output; `uv run pytest tests/cli_runtime --collect-only` -> 628 items; `python -m py_compile tests/cli_runtime/harness.py`; fresh code-reviewer pass | passed | downstream runtime tests intentionally remain for S03 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-002` | S02 | yes | red-required | harness had `import unittest`, `CliRuntimeHarness(unittest.TestCase)`, `self.assert*`, and `self.skipTest` dependencies | scoped grep; `uv run pytest tests/cli_runtime --collect-only`; `python -m py_compile tests/cli_runtime/harness.py`; `git diff --check` | passed | `uv run pytest tests/cli_runtime/test_new.py -q` is not claimed as S02 closure after shim removal; full runtime pass belongs to S03 |
+
+#### 変更したファイル
+- `tests/cli_runtime/harness.py` - runtime harness を pytest-native plain helper に移行。
