@@ -5,9 +5,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import unittest
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+
+import pytest
 
 try:
     from spec_dock.cli import main
@@ -48,10 +49,40 @@ _EXPECTED_MANAGED_SKILL_NAMES = (
 )
 
 
-class CliRuntimeHarness(unittest.TestCase):
+def _assert_is_file(path: Path, message: str | None = None) -> None:
+    if not path.is_file():
+        raise AssertionError(message or f"expected file to exist: {path}")
+
+
+def _assert_equal(actual: object, expected: object, message: str | None = None) -> None:
+    if actual != expected:
+        raise AssertionError(message or f"{actual!r} != {expected!r}")
+
+
+def _assert_is_instance(value: object, expected_type: type[object]) -> None:
+    if not isinstance(value, expected_type):
+        raise AssertionError(f"{value!r} is not an instance of {expected_type!r}")
+
+
+def _assert_is_not_none(value: object, message: str | None = None) -> None:
+    if value is None:
+        raise AssertionError(message or "unexpected None")
+
+
+def _assert_in(needle: str, haystack: str, message: str | None = None) -> None:
+    if needle not in haystack:
+        raise AssertionError(message or f"{needle!r} not found")
+
+
+def _assert_not_in(needle: str, haystack: str, message: str | None = None) -> None:
+    if needle in haystack:
+        raise AssertionError(message or f"{needle!r} unexpectedly found")
+
+
+class CliRuntimeHarness:
     def _init_origin_repo(self, target: Path, *, owner: str = "example", repo: str = "repo") -> None:
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
         self._run_git(target, ["init"])
         self._run_git(target, ["config", "gc.auto", "0"])
         self._run_git(target, ["config", "maintenance.auto", "false"])
@@ -138,7 +169,7 @@ class CliRuntimeHarness(unittest.TestCase):
 
     def _run_runtime(self, target: Path, args: list[str], *, env: dict[str, str] | None = None) -> None:
         script = target / "spec-dock" / "scripts" / "spec-dock"
-        self.assertTrue(script.is_file(), f"runtime script missing: {script}")
+        _assert_is_file(script, f"runtime script missing: {script}")
 
         merged_env = self._runtime_env(target, env)
 
@@ -159,7 +190,7 @@ class CliRuntimeHarness(unittest.TestCase):
 
     def _run_runtime_expect_fail(self, target: Path, args: list[str], *, env: dict[str, str] | None = None) -> None:
         script = target / "spec-dock" / "scripts" / "spec-dock"
-        self.assertTrue(script.is_file(), f"runtime script missing: {script}")
+        _assert_is_file(script, f"runtime script missing: {script}")
 
         merged_env = self._runtime_env(target, env)
 
@@ -182,7 +213,7 @@ class CliRuntimeHarness(unittest.TestCase):
         self, target: Path, args: list[str], *, env: dict[str, str] | None = None
     ) -> subprocess.CompletedProcess[str]:
         script = target / "spec-dock" / "scripts" / "spec-dock"
-        self.assertTrue(script.is_file(), f"runtime script missing: {script}")
+        _assert_is_file(script, f"runtime script missing: {script}")
 
         merged_env = self._runtime_env(target, env)
 
@@ -267,7 +298,7 @@ class CliRuntimeHarness(unittest.TestCase):
         env: dict[str, str] | None = None,
         cwd: Path | None = None,
     ) -> subprocess.CompletedProcess[str]:
-        self.assertTrue(script.is_file(), f"wrapper script missing: {script}")
+        _assert_is_file(script, f"wrapper script missing: {script}")
         merged_env = os.environ.copy()
         if env:
             merged_env.update(env)
@@ -286,7 +317,7 @@ class CliRuntimeHarness(unittest.TestCase):
             return (direct / rel_file).read_text(encoding="utf-8")
 
         pathfile = active_dir / f"{pointer}.path"
-        self.assertTrue(pathfile.is_file(), f"missing pointer: {pointer} or {pointer}.path")
+        _assert_is_file(pathfile, f"missing pointer: {pointer} or {pointer}.path")
         rel = pathfile.read_text(encoding="utf-8").strip()
         resolved = (active_dir / rel).resolve()
         return (resolved / rel_file).read_text(encoding="utf-8")
@@ -387,22 +418,22 @@ class CliRuntimeHarness(unittest.TestCase):
 
     def _assert_version_file(self, target: Path) -> None:
         version_file = target / "spec-dock" / "spec-dock.version"
-        self.assertTrue(version_file.is_file())
-        self.assertEqual(version_file.read_text(encoding="utf-8").strip(), _expected_spec_dock_version())
+        _assert_is_file(version_file)
+        _assert_equal(version_file.read_text(encoding="utf-8").strip(), _expected_spec_dock_version())
 
     def _assert_spec_dock_meta_marker(self, meta: dict[str, object]) -> None:
         marker = meta.get("_spec_dock")
-        self.assertIsInstance(marker, dict)
+        _assert_is_instance(marker, dict)
         marker_dict = marker
-        self.assertEqual(marker_dict.get("managed"), True)
-        self.assertEqual(marker_dict.get("do_not_edit"), True)
-        self.assertEqual(marker_dict.get("edit_via"), "spec-dock")
+        _assert_equal(marker_dict.get("managed"), True)
+        _assert_equal(marker_dict.get("do_not_edit"), True)
+        _assert_equal(marker_dict.get("edit_via"), "spec-dock")
 
     def _assert_readonly_on_posix(self, path: Path) -> None:
         if os.name != "posix":
             return
         mode = path.stat().st_mode
-        self.assertEqual(
+        _assert_equal(
             mode & 0o222,
             0,
             f"expected no write bits on POSIX: {path} (mode={oct(mode)})",
@@ -434,7 +465,7 @@ class CliRuntimeHarness(unittest.TestCase):
 
     def _to_local_compat_id(self, node_id: str, *, counters: dict[str, int]) -> str:
         match = re.fullmatch(r"(init|epic|iss)(-local)?-(\d{5})", node_id)
-        self.assertIsNotNone(match, f"unexpected node id format: {node_id}")
+        _assert_is_not_none(match, f"unexpected node id format: {node_id}")
         assert match is not None
 
         prefix, local_marker, number_text = match.groups()
@@ -457,16 +488,15 @@ class CliRuntimeHarness(unittest.TestCase):
         for meta_path in meta_paths:
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             node_id = meta.get("id")
-            self.assertIsInstance(node_id, str)
+            _assert_is_instance(node_id, str)
             assert isinstance(node_id, str)
             local_id = self._to_local_compat_id(node_id, counters=counters)
             mapping[node_id] = local_id
 
             node_dir = meta_path.parent
             old_prefix = f"{node_id}-"
-            self.assertTrue(
-                node_dir.name == node_id or node_dir.name.startswith(old_prefix),
-                f"unexpected node dir name for {node_id}: {node_dir}",
+            assert node_dir.name == node_id or node_dir.name.startswith(old_prefix), (
+                f"unexpected node dir name for {node_id}: {node_dir}"
             )
             if node_dir.name == node_id:
                 new_name = local_id
@@ -511,7 +541,7 @@ class CliRuntimeHarness(unittest.TestCase):
             for skill_file in self._installed_skill_files(target)
             if skill_file.split("/", 1)[0] in managed_names
         )
-        self.assertEqual(
+        _assert_equal(
             installed_managed,
             sorted(f"{name}/SKILL.md" for name in _EXPECTED_MANAGED_SKILL_NAMES),
         )
@@ -520,79 +550,79 @@ class CliRuntimeHarness(unittest.TestCase):
         out: dict[str, str] = {}
         for rel in rel_paths:
             path = base / rel
-            self.assertTrue(path.is_file(), f"missing guidance file: {path}")
+            _assert_is_file(path, f"missing guidance file: {path}")
             out[rel] = path.read_text(encoding="utf-8")
         return out
 
     def _assert_discussion_guidance_contract(self, text_map: dict[str, str]) -> None:
         combined = "\n".join(text_map.values())
 
-        self.assertIn("new doc adr", combined)
-        self.assertIn("new doc disc", combined)
-        self.assertIn("new doc research", combined)
-        self.assertIn("new doc interview", combined)
-        self.assertIn("new doc scratch", combined)
-        self.assertIn("new doc draft-requirement", combined)
-        self.assertIn("new doc draft-design", combined)
-        self.assertIn("new doc draft-plan", combined)
-        self.assertIn("canonical docs remain main-orchestrator-only", combined)
-        self.assertIn("<ts>-<kind>-<slug>.md", combined)
-        self.assertIn("<ts>-<nn>-<kind>-<slug>.md", combined)
-        self.assertIn("yyyymmddthhmmssz", combined)
-        self.assertIn("01..99", combined)
-        self.assertIn("doc_id", combined)
-        self.assertIn("grandfathered", combined)
-        self.assertIn("unrelated files", combined)
-        self.assertIn("explicit failure", combined)
-        self.assertIn("archive", combined)
+        _assert_in("new doc adr", combined)
+        _assert_in("new doc disc", combined)
+        _assert_in("new doc research", combined)
+        _assert_in("new doc interview", combined)
+        _assert_in("new doc scratch", combined)
+        _assert_in("new doc draft-requirement", combined)
+        _assert_in("new doc draft-design", combined)
+        _assert_in("new doc draft-plan", combined)
+        _assert_in("canonical docs remain main-orchestrator-only", combined)
+        _assert_in("<ts>-<kind>-<slug>.md", combined)
+        _assert_in("<ts>-<nn>-<kind>-<slug>.md", combined)
+        _assert_in("yyyymmddthhmmssz", combined)
+        _assert_in("01..99", combined)
+        _assert_in("doc_id", combined)
+        _assert_in("grandfathered", combined)
+        _assert_in("unrelated files", combined)
+        _assert_in("explicit failure", combined)
+        _assert_in("archive", combined)
 
-        self.assertNotIn("new adr --", combined)
-        self.assertNotIn("new doc note", combined)
-        self.assertNotIn("<type>-00001-<slug>.md", combined)
-        self.assertNotIn("<type>-xxxxx-<slug>.md", combined)
+        _assert_not_in("new adr --", combined)
+        _assert_not_in("new doc note", combined)
+        _assert_not_in("<type>-00001-<slug>.md", combined)
+        _assert_not_in("<type>-xxxxx-<slug>.md", combined)
         for rel_path, text in text_map.items():
             if rel_path.endswith("templates/README.md") or rel_path.endswith("scripts/README.md"):
-                self.assertIn(
+                _assert_in(
                     "<ts>-<kind>-<slug>.md",
                     text,
                     f"timestamp naming contract missing from {rel_path}",
                 )
-                self.assertIn(
+                _assert_in(
                     "yyyymmddthhmmssz",
                     text,
                     f"timestamp token guidance missing from {rel_path}",
                 )
-                self.assertNotIn(
+                _assert_not_in(
                     "NNN-type-slug.md",
                     text,
                     f"stale sequential naming guidance survived in {rel_path}",
                 )
-                self.assertIn(
+                _assert_in(
                     "unrelated files",
                     text,
                     f"unrelated-file guidance missing from {rel_path}",
                 )
-                self.assertIn(
+                _assert_in(
                     "grandfathered",
                     text,
                     f"legacy-grandfathering guidance missing from {rel_path}",
                 )
-                self.assertIn(
+                _assert_in(
                     "explicit failure",
                     text,
                     f"malformed-filename failure guidance missing from {rel_path}",
                 )
-                self.assertIn(
+                _assert_in(
                     "rules.md",
                     text,
                     f"rules.md ignore example missing from {rel_path}",
                 )
-                self.assertIn(
+                _assert_in(
                     "foo-adr-kickoff.md",
                     text,
                     f"malformed filename example missing from {rel_path}",
                 )
-                self.assertNotIn(
+                _assert_not_in(
                     "3-digit filename",
                     text,
                     f"stale sequential example survived in {rel_path}",
