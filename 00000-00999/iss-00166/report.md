@@ -322,6 +322,7 @@ result:
 | draft / ready decision | ready PR; local final gates had passed before PR creation |
 | head branch | `iss-00166-align-templates-as-scaffolds-and-examples` |
 | initial head SHA | `cc833cb4130d8f48efc8ace9ffb0bed53f855d8e` |
+| latest monitored head SHA | `5ab32ff1166a2afd2c27fbf6b990da91d24dffb6` |
 | issue linkage | `Closes #166`; `Refs #158`; closed sibling issues `#159/#162/#163/#164/#165` referenced |
 | push evidence | branch pushed to `origin/iss-00166-align-templates-as-scaffolds-and-examples` |
 
@@ -330,17 +331,20 @@ result:
 | 項目 | 証跡 |
 |---|---|
 | PR open state | open, ready PR |
-| monitor target | PR #168, initial head SHA `cc833cb4130d8f48efc8ace9ffb0bed53f855d8e` |
-| initial monitor status | not merge-prepared |
-| required check status | `validate` pass; `provider-tests` failure on initial head |
+| monitor target | PR #168, latest monitored head SHA `5ab32ff1166a2afd2c27fbf6b990da91d24dffb6` |
+| initial monitor status | not merge-prepared on initial head `cc833cb4130d8f48efc8ace9ffb0bed53f855d8e` |
+| required check status | initial head: `validate` pass and `provider-tests` failure; latest monitored head `5ab32ff1166a2afd2c27fbf6b990da91d24dffb6`: `validate` pass and `provider-tests` pass |
 | failure class | `check_failure:provider-tests` |
 | failure evidence | GitHub Actions job `27057305457` / `79863906790`; `python -m unittest discover -s tests/unit` failed |
 | failure cause | tests still expected old template / clarification / dogfooding snapshot contract after S01/S02/S90 context-surface changes |
 | repair action | updated `tests/test_init_update.py` scaffold wording, clarification contract fragments, routing contract allowance, and checked-in dogfooding snapshot constants |
 | local repair verification | pre-merge: `python -m unittest tests.test_init_update.TestInitUpdate.test_spec_document_templates_keep_policy_out_of_scaffold` pass; `python -m unittest discover -s tests -p 'test_init_update.py'` pass (`210 tests`). post-merge with `origin/main`: `python -m unittest discover -s tests/unit` pass (`421 tests`); `./spec-dock/scripts/spec-dock validate` pass (`nodes=86`); `git diff --check` pass |
 | fix loop count / history | 2 repair attempts: test contract update, then `origin/main` merge conflict resolution for the new `tests/unit` layout and `iss-00167` snapshot |
-| current merge-prepared decision | pending merge-resolution commit push and PR re-monitor |
-| unresolved review-thread limitation | not yet determined for repaired head |
+| non-required check status and waiver evidence | no failing non-required checks observed; no waiver used |
+| blocking review status | `latestReviews=[]`, `comments=[]`, `reviewDecision=""`; no blocking review feedback observed |
+| merge conflict / visible merge blocker status | `mergeStateStatus=CLEAN` on PR #168 after `origin/main` merge |
+| unresolved review-thread limitation | no review comments or reviews observed through `gh pr view`; no unresolved review-thread blocker visible |
+| current merge-prepared decision | merge-prepared: yes for monitored head `5ab32ff1166a2afd2c27fbf6b990da91d24dffb6`; final report commit hash and post-report-check result are external delivery evidence |
 
 ## 省略/例外メモ
 
