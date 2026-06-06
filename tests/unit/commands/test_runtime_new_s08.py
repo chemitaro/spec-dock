@@ -1,12 +1,12 @@
 import os
+from contextlib import contextmanager
 import shlex
 import threading
 import time
 import tempfile
 import sys
-import unittest
+import pytest
 from pathlib import Path
-from unittest.mock import patch
 
 
 def _runtime_modules():
@@ -56,6 +56,51 @@ def _runtime_modules_import():
 
 def _quoted_runtime_entrypoint(specdock_dir: Path) -> str:
     return shlex.quote(str((specdock_dir / "scripts" / "spec-dock").resolve()))
+
+@contextmanager
+def _case_label(**labels):
+    try:
+        yield
+    except AssertionError as exc:
+        label = ", ".join(f"{key}={value!r}" for key, value in labels.items())
+        raise AssertionError(f"case failed ({label}): {exc}") from exc
+
+
+@contextmanager
+def _patch_object(obj, name, *, new=None, side_effect=None):
+    original = getattr(obj, name)
+    if side_effect is not None:
+        def replacement(*_args, **_kwargs):
+            raise side_effect
+    else:
+        replacement = new
+    setattr(obj, name, replacement)
+    try:
+        yield
+    finally:
+        setattr(obj, name, original)
+
+
+@contextmanager
+def _patch_dict(mapping, values, *, clear=False):
+    original = dict(mapping) if clear else {key: mapping.get(key) for key in values}
+    missing = {key for key in values if key not in mapping}
+    if clear:
+        mapping.clear()
+    mapping.update(values)
+    try:
+        yield
+    finally:
+        if clear:
+            mapping.clear()
+            mapping.update(original)
+            return
+        for key, value in original.items():
+            if key in missing:
+                mapping.pop(key, None)
+            else:
+                mapping[key] = value
+
 
 
 def _record(
@@ -234,7 +279,7 @@ class _StubClock:
         return "2026-03-12"
 
 
-class TestRuntimeNewS08(unittest.TestCase):
+class TestRuntimeNewS08:
     def _prepare_templates(self, specdock_dir: Path) -> None:
         for kind in ("initiative", "epic", "issue"):
             template_root = specdock_dir / "templates" / kind
@@ -300,9 +345,9 @@ class TestRuntimeNewS08(unittest.TestCase):
         thread_b.start()
         thread_a.join(timeout=5.0)
         thread_b.join(timeout=5.0)
-        self.assertFalse(thread_a.is_alive(), "parallel create thread A did not finish")
-        self.assertFalse(thread_b.is_alive(), "parallel create thread B did not finish")
-        self.assertEqual(errors, [])
+        assert not thread_a.is_alive(), 'parallel create thread A did not finish'
+        assert not thread_b.is_alive(), 'parallel create thread B did not finish'
+        assert errors == []
         return sorted(node_ids)
 
     def test_planning_regression_create_plan_contains_all_candidates(self) -> None:
@@ -332,14 +377,14 @@ class TestRuntimeNewS08(unittest.TestCase):
                 current_repo_slug="example/repo",
             )
 
-            self.assertEqual(plan.meta.id, "init-00101")
-            self.assertEqual(plan.meta.kind, "initiative")
-            self.assertTrue(plan.dest_dir.as_posix().endswith("init-00101-auth-platform"))
-            self.assertEqual(plan.planned_paths[-1], plan.dest_dir / ".meta.json")
-            self.assertIn(plan.dest_dir / "README.md", plan.planned_paths)
-            self.assertIn(plan.dest_dir / "docs" / "checklist.md", plan.planned_paths)
-            self.assertIn(plan.dest_dir / "epics" / "rules.md", plan.planned_paths)
-            self.assertIn(plan.dest_dir / "discussions" / "rules.md", plan.planned_paths)
+            assert plan.meta.id == 'init-00101'
+            assert plan.meta.kind == 'initiative'
+            assert plan.dest_dir.as_posix().endswith('init-00101-auth-platform')
+            assert plan.planned_paths[-1] == plan.dest_dir / '.meta.json'
+            assert plan.dest_dir / 'README.md' in plan.planned_paths
+            assert plan.dest_dir / 'docs' / 'checklist.md' in plan.planned_paths
+            assert plan.dest_dir / 'epics' / 'rules.md' in plan.planned_paths
+            assert plan.dest_dir / 'discussions' / 'rules.md' in plan.planned_paths
 
     def test_execution_regression_and_write_order(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -369,13 +414,13 @@ class TestRuntimeNewS08(unittest.TestCase):
             )
             created_paths = app_create_node.execute_create_plan(plan, ports)
 
-            self.assertEqual(events[:2], ["copy_scaffolded_tree", "write_meta"])
-            self.assertEqual(created_paths[-1], plan.dest_dir / ".meta.json")
-            self.assertEqual(created_paths[:-1], sorted(created_paths[:-1], key=lambda p: p.as_posix()))
-            self.assertTrue((plan.dest_dir / ".meta.json").exists())
-            self.assertTrue((plan.dest_dir / "README.md").exists())
-            self.assertTrue((plan.dest_dir / "epics" / "rules.md").is_symlink())
-            self.assertTrue((plan.dest_dir / "discussions" / "rules.md").is_symlink())
+            assert events[:2] == ['copy_scaffolded_tree', 'write_meta']
+            assert created_paths[-1] == plan.dest_dir / '.meta.json'
+            assert created_paths[:-1] == sorted(created_paths[:-1], key=lambda p: p.as_posix())
+            assert (plan.dest_dir / '.meta.json').exists()
+            assert (plan.dest_dir / 'README.md').exists()
+            assert (plan.dest_dir / 'epics' / 'rules.md').is_symlink()
+            assert (plan.dest_dir / 'discussions' / 'rules.md').is_symlink()
 
     def test_full_candidate_set_no_write_preflight_collision(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -406,11 +451,11 @@ class TestRuntimeNewS08(unittest.TestCase):
             collision.parent.mkdir(parents=True, exist_ok=True)
             collision.write_text("existing", encoding="utf-8")
 
-            with self.assertRaisesRegex(RuntimeError, "Destination already exists"):
+            with pytest.raises(RuntimeError, match='Destination already exists'):
                 app_create_node.execute_create_plan(plan, ports)
 
-            self.assertEqual(events, [])
-            self.assertFalse((plan.dest_dir / ".meta.json").exists())
+            assert events == []
+            assert not (plan.dest_dir / '.meta.json').exists()
 
     def test_collision_on_meta_is_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -440,11 +485,11 @@ class TestRuntimeNewS08(unittest.TestCase):
             plan.dest_dir.mkdir(parents=True, exist_ok=True)
             (plan.dest_dir / ".meta.json").write_text("stale", encoding="utf-8")
 
-            with self.assertRaisesRegex(RuntimeError, "Destination already exists"):
+            with pytest.raises(RuntimeError, match='Destination already exists'):
                 app_create_node.execute_create_plan(plan, ports)
 
-            self.assertEqual(events, [])
-            self.assertFalse((plan.dest_dir / "README.md").exists())
+            assert events == []
+            assert not (plan.dest_dir / 'README.md').exists()
 
     def test_broken_rules_symlink_collision_is_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -475,12 +520,12 @@ class TestRuntimeNewS08(unittest.TestCase):
             broken_link.parent.mkdir(parents=True, exist_ok=True)
             os.symlink("../../../docs/rules/initiative/missing.md", broken_link)
 
-            with self.assertRaisesRegex(RuntimeError, "Destination already exists"):
+            with pytest.raises(RuntimeError, match='Destination already exists'):
                 app_create_node.execute_create_plan(plan, ports)
 
-            self.assertEqual(events, [])
-            self.assertFalse((plan.dest_dir / "README.md").exists())
-            self.assertFalse((plan.dest_dir / ".meta.json").exists())
+            assert events == []
+            assert not (plan.dest_dir / 'README.md').exists()
+            assert not (plan.dest_dir / '.meta.json').exists()
 
     def test_empty_rules_parent_path_collision_is_no_write_preflight(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -551,7 +596,7 @@ class TestRuntimeNewS08(unittest.TestCase):
         }
 
         for kind, (collision_name, sentinel_name) in collision_paths.items():
-            with self.subTest(kind=kind, collision=collision_name), tempfile.TemporaryDirectory() as tmp:
+            with _case_label(kind=kind, collision=collision_name), tempfile.TemporaryDirectory() as tmp:
                 repo_root = Path(tmp)
                 specdock_dir = repo_root / "spec-dock"
                 self._prepare_templates(specdock_dir)
@@ -576,12 +621,12 @@ class TestRuntimeNewS08(unittest.TestCase):
                 collision.parent.mkdir(parents=True, exist_ok=True)
                 collision.write_text("existing", encoding="utf-8")
 
-                with self.assertRaisesRegex(RuntimeError, rf"Destination already exists: .*{collision_name}"):
+                with pytest.raises(RuntimeError, match=f'Destination already exists: .*{collision_name}'):
                     app_create_node.execute_create_plan(plan, ports)
 
-                self.assertEqual(events, [])
-                self.assertEqual(collision.read_text(encoding="utf-8"), "existing")
-                self.assertFalse((plan.dest_dir / sentinel_name).exists())
+                assert events == []
+                assert collision.read_text(encoding='utf-8') == 'existing'
+                assert not (plan.dest_dir / sentinel_name).exists()
 
     def test_missing_rules_source_is_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -610,12 +655,12 @@ class TestRuntimeNewS08(unittest.TestCase):
             )
             (specdock_dir / "docs" / "rules" / "initiative" / "epics.md").unlink()
 
-            with self.assertRaisesRegex(RuntimeError, "Missing rules source"):
+            with pytest.raises(RuntimeError, match='Missing rules source'):
                 app_create_node.execute_create_plan(plan, ports)
 
-            self.assertEqual(events, [])
-            self.assertFalse((plan.dest_dir / "README.md").exists())
-            self.assertFalse((plan.dest_dir / ".meta.json").exists())
+            assert events == []
+            assert not (plan.dest_dir / 'README.md').exists()
+            assert not (plan.dest_dir / '.meta.json').exists()
 
     def test_symlink_creation_capability_preflight_fails_before_copy(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -643,17 +688,17 @@ class TestRuntimeNewS08(unittest.TestCase):
                 current_repo_slug="example/repo",
             )
 
-            with patch.object(app_create_node.os, "symlink", side_effect=OSError("operation not permitted")):
-                with self.assertRaisesRegex(RuntimeError, "Symlink creation preflight failed"):
+            with _patch_object(app_create_node.os, "symlink", side_effect=OSError("operation not permitted")):
+                with pytest.raises(RuntimeError, match='Symlink creation preflight failed'):
                     app_create_node.execute_create_plan(plan, ports)
 
-            self.assertEqual(events, [])
-            self.assertFalse((plan.dest_dir / "README.md").exists())
-            self.assertFalse((plan.dest_dir / ".meta.json").exists())
+            assert events == []
+            assert not (plan.dest_dir / 'README.md').exists()
+            assert not (plan.dest_dir / '.meta.json').exists()
 
     def test_symlinked_rules_parent_dir_collision_is_no_write_preflight(self) -> None:
         if os.name == "nt":
-            self.skipTest("symlink parent collision semantics vary on Windows")
+            pytest.skip("symlink parent collision semantics vary on Windows")
 
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
 
@@ -723,7 +768,7 @@ class TestRuntimeNewS08(unittest.TestCase):
         }
 
         for kind, collision_name in collision_paths.items():
-            with self.subTest(kind=kind, collision=collision_name), tempfile.TemporaryDirectory() as tmp:
+            with _case_label(kind=kind, collision=collision_name), tempfile.TemporaryDirectory() as tmp:
                 repo_root = Path(tmp)
                 specdock_dir = repo_root / "spec-dock"
                 self._prepare_templates(specdock_dir)
@@ -750,13 +795,13 @@ class TestRuntimeNewS08(unittest.TestCase):
                 collision.parent.mkdir(parents=True, exist_ok=True)
                 os.symlink(symlink_target, collision)
 
-                with self.assertRaisesRegex(RuntimeError, rf"Destination already exists: .*{collision_name}"):
+                with pytest.raises(RuntimeError, match=f'Destination already exists: .*{collision_name}'):
                     app_create_node.execute_create_plan(plan, ports)
 
-                self.assertEqual(events, [])
-                self.assertFalse((symlink_target / "rules.md").exists())
-                self.assertFalse((plan.dest_dir / "README.md").exists())
-                self.assertFalse((plan.dest_dir / ".meta.json").exists())
+                assert events == []
+                assert not (symlink_target / 'rules.md').exists()
+                assert not (plan.dest_dir / 'README.md').exists()
+                assert not (plan.dest_dir / '.meta.json').exists()
 
     def test_per_kind_parity_create_local(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -808,8 +853,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertEqual(init_result.node.kind, "initiative")
-            self.assertEqual(init_result.node.id, "init-00501")
+            assert init_result.node.kind == 'initiative'
+            assert init_result.node.id == 'init-00501'
 
             epic_result = app_create_node.create_epic(
                 app_contracts.CreateNodeRequest(
@@ -821,9 +866,9 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertEqual(epic_result.node.kind, "epic")
-            self.assertEqual(epic_result.node.parent_id, "init-local-00001")
-            self.assertEqual(epic_result.node.id, "epic-00502")
+            assert epic_result.node.kind == 'epic'
+            assert epic_result.node.parent_id == 'init-local-00001'
+            assert epic_result.node.id == 'epic-00502'
 
             issue_result = app_create_node.create_issue(
                 app_contracts.CreateNodeRequest(
@@ -835,10 +880,10 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertEqual(issue_result.node.kind, "issue")
-            self.assertEqual(issue_result.node.parent_id, "epic-local-00001")
-            self.assertEqual(issue_result.node.initiative_id, "init-local-00001")
-            self.assertEqual(issue_result.node.id, "iss-00603")
+            assert issue_result.node.kind == 'issue'
+            assert issue_result.node.parent_id == 'epic-local-00001'
+            assert issue_result.node.initiative_id == 'init-local-00001'
+            assert issue_result.node.id == 'iss-00603'
 
     def test_parallel_create_initiative_allocates_unique_github_ids(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -873,7 +918,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
             )
 
-            self.assertEqual(ids, ["init-00701", "init-00702"])
+            assert ids == ['init-00701', 'init-00702']
 
     def test_parallel_create_epic_allocates_unique_github_ids(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -922,7 +967,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
             )
 
-            self.assertEqual(ids, ["epic-00701", "epic-00702"])
+            assert ids == ['epic-00701', 'epic-00702']
 
     def test_parallel_create_issue_allocates_unique_github_ids(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -983,7 +1028,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
             )
 
-            self.assertEqual(ids, ["iss-00701", "iss-00702"])
+            assert ids == ['iss-00701', 'iss-00702']
 
     def test_github_issue_create_delay_does_not_block_parallel_link_existing_create(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -1049,7 +1094,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                     issue_errors.append(exc)
 
             issue_thread = threading.Thread(target=_run_issue_create)
-            with patch.dict(
+            with _patch_dict(
                 os.environ,
                 {
                     app_create_node._ENV_CREATE_LOCK_WAIT_SECONDS: "0.02",
@@ -1059,7 +1104,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 clear=False,
             ):
                 issue_thread.start()
-                self.assertTrue(started.wait(timeout=1.0), "issue_create was not called")
+                assert started.wait(timeout=1.0), 'issue_create was not called'
                 try:
                     local_result = app_create_node.create_initiative(
                         app_contracts.CreateNodeRequest(
@@ -1075,16 +1120,16 @@ class TestRuntimeNewS08(unittest.TestCase):
                     release.set()
                 issue_thread.join(timeout=5.0)
 
-            self.assertFalse(issue_thread.is_alive(), "github create thread did not finish")
-            self.assertEqual(issue_errors, [])
-            self.assertEqual(local_result.node.id, "init-00702")
-            self.assertIn("value", issue_result)
-            self.assertEqual(issue_result["value"].node.id, "iss-00701")
-            self.assertEqual(len(issue_gateway.calls), 1)
+            assert not issue_thread.is_alive(), 'github create thread did not finish'
+            assert issue_errors == []
+            assert local_result.node.id == 'init-00702'
+            assert 'value' in issue_result
+            assert issue_result['value'].node.id == 'iss-00701'
+            assert len(issue_gateway.calls) == 1
             body = issue_gateway.calls[0][2]
-            self.assertIn("Type: issue", body)
-            self.assertNotIn("Epic:", body)
-            self.assertNotIn("Initiative:", body)
+            assert 'Type: issue' in body
+            assert 'Epic:' not in body
+            assert 'Initiative:' not in body
 
     def test_github_issue_create_pre_lock_window_rerevalidates_parent_state(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -1152,22 +1197,22 @@ class TestRuntimeNewS08(unittest.TestCase):
 
             issue_thread = threading.Thread(target=_run_issue_create)
             issue_thread.start()
-            self.assertTrue(started.wait(timeout=1.0), "issue_create was not called")
+            assert started.wait(timeout=1.0), 'issue_create was not called'
             node_repo._records = [record for record in node_repo._records if record.id != "epic-local-00001"]
             release.set()
             issue_thread.join(timeout=5.0)
 
-            self.assertFalse(issue_thread.is_alive(), "github create thread did not finish")
-            self.assertEqual(len(errors), 1)
+            assert not issue_thread.is_alive(), 'github create thread did not finish'
+            assert len(errors) == 1
             message = str(errors[0])
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn("Epic not found: epic-local-00001", message)
-            self.assertIn("GitHub issue was created: #702", message)
-            self.assertIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
-            self.assertIn("--epic epic-local-00001", message)
-            self.assertIn("--github-issue 702", message)
-            self.assertEqual(events, [])
-            self.assertEqual(len(issue_gateway.calls), 1)
+            assert 'Epic not found: epic-local-00001' in message
+            assert 'GitHub issue was created: #702' in message
+            assert f"{runtime_cmd} new issue --title 'Refresh token'" in message
+            assert '--epic epic-local-00001' in message
+            assert '--github-issue 702' in message
+            assert events == []
+            assert len(issue_gateway.calls) == 1
 
     def test_github_issue_create_pre_lock_window_rerevalidates_github_uniqueness_state(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -1235,7 +1280,7 @@ class TestRuntimeNewS08(unittest.TestCase):
 
             issue_thread = threading.Thread(target=_run_issue_create)
             issue_thread.start()
-            self.assertTrue(started.wait(timeout=1.0), "issue_create was not called")
+            assert started.wait(timeout=1.0), 'issue_create was not called'
             node_repo._records.append(
                 _record(
                     infra_contracts,
@@ -1252,20 +1297,20 @@ class TestRuntimeNewS08(unittest.TestCase):
             release.set()
             issue_thread.join(timeout=5.0)
 
-            self.assertFalse(issue_thread.is_alive(), "github create thread did not finish")
-            self.assertEqual(len(errors), 1)
+            assert not issue_thread.is_alive(), 'github create thread did not finish'
+            assert len(errors) == 1
             message = str(errors[0])
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn("github linkage is already linked", message)
-            self.assertIn("github.issue_number=705", message)
-            self.assertIn("GitHub issue was created: #705", message)
-            self.assertIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
-            self.assertIn("--epic epic-local-00001", message)
-            self.assertIn("--github-issue 705", message)
-            self.assertIn("close/cleanup", message)
-            self.assertEqual(events, [])
-            self.assertEqual(len(issue_gateway.calls), 1)
-            self.assertFalse((epic_dir / "issues" / "iss-00705-refresh-token").exists())
+            assert 'github linkage is already linked' in message
+            assert 'github.issue_number=705' in message
+            assert 'GitHub issue was created: #705' in message
+            assert f"{runtime_cmd} new issue --title 'Refresh token'" in message
+            assert '--epic epic-local-00001' in message
+            assert '--github-issue 705' in message
+            assert 'close/cleanup' in message
+            assert events == []
+            assert len(issue_gateway.calls) == 1
+            assert not (epic_dir / 'issues' / 'iss-00705-refresh-token').exists()
 
     def test_issue_create_lock_failure_after_github_create_reports_retry_link_guidance(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -1317,7 +1362,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.dict(
+            with _patch_dict(
                 os.environ,
                 {
                     app_create_node._ENV_CREATE_LOCK_WAIT_SECONDS: "0.02",
@@ -1326,7 +1371,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 },
                 clear=False,
             ):
-                with self.assertRaisesRegex(RuntimeError, "GitHub issue was created: #703") as raised:
+                with pytest.raises(RuntimeError, match='GitHub issue was created: #703') as raised:
                     app_create_node.create_issue(
                         app_contracts.CreateNodeRequest(
                             title="Refresh token",
@@ -1338,19 +1383,19 @@ class TestRuntimeNewS08(unittest.TestCase):
                         ports,
                     )
 
-            message = str(raised.exception)
+            message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn("Outcome: post_github_remote_only_fail", message)
-            self.assertIn("create lock acquisition failed", message)
-            self.assertIn(f"{runtime_cmd} doctor", message)
-            self.assertIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
-            self.assertIn("--epic epic-local-00001", message)
-            self.assertIn("--github-issue 703", message)
-            self.assertIn("close/cleanup", message)
-            self.assertEqual(len(issue_gateway.calls), 1)
-            self.assertEqual(events, [])
-            self.assertFalse((epic_dir / "issues").exists())
-            self.assertTrue(lock_path.exists())
+            assert 'Outcome: post_github_remote_only_fail' in message
+            assert 'create lock acquisition failed' in message
+            assert f'{runtime_cmd} doctor' in message
+            assert f"{runtime_cmd} new issue --title 'Refresh token'" in message
+            assert '--epic epic-local-00001' in message
+            assert '--github-issue 703' in message
+            assert 'close/cleanup' in message
+            assert len(issue_gateway.calls) == 1
+            assert events == []
+            assert not (epic_dir / 'issues').exists()
+            assert lock_path.exists()
 
     def test_issue_create_write_seam_failure_after_github_create_reports_retry_link_guidance(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -1395,8 +1440,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                 issue_gateway=issue_gateway,
             )
 
-            with patch.object(app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated write failure")):
-                with self.assertRaisesRegex(RuntimeError, "GitHub issue was created: #704") as raised:
+            with _patch_object(app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated write failure")):
+                with pytest.raises(RuntimeError, match='GitHub issue was created: #704') as raised:
                     app_create_node.create_issue(
                         app_contracts.CreateNodeRequest(
                             title="Refresh token",
@@ -1408,16 +1453,16 @@ class TestRuntimeNewS08(unittest.TestCase):
                         ports,
                     )
 
-            message = str(raised.exception)
+            message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn("Outcome: post_github_local_write_fail", message)
-            self.assertIn("simulated write failure", message)
-            self.assertIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
-            self.assertIn("--epic epic-local-00001", message)
-            self.assertIn("--github-issue 704", message)
-            self.assertIn("close/cleanup", message)
-            self.assertEqual(len(issue_gateway.calls), 1)
-            self.assertEqual(events, [])
+            assert 'Outcome: post_github_local_write_fail' in message
+            assert 'simulated write failure' in message
+            assert f"{runtime_cmd} new issue --title 'Refresh token'" in message
+            assert '--epic epic-local-00001' in message
+            assert '--github-issue 704' in message
+            assert 'close/cleanup' in message
+            assert len(issue_gateway.calls) == 1
+            assert events == []
 
     def test_issue_create_partial_copy_failure_after_github_create_reports_doctor_first_guidance(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -1480,7 +1525,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 template_scaffolder=_PartialCopyFailureTemplateScaffolder(events=events),
             )
 
-            with self.assertRaisesRegex(RuntimeError, "GitHub issue was created: #712") as raised:
+            with pytest.raises(RuntimeError, match='GitHub issue was created: #712') as raised:
                 app_create_node.create_issue(
                     app_contracts.CreateNodeRequest(
                         title="Refresh token",
@@ -1492,16 +1537,16 @@ class TestRuntimeNewS08(unittest.TestCase):
                     ports,
                 )
 
-            message = str(raised.exception)
+            message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn("Outcome: post_github_local_write_fail", message)
-            self.assertIn("simulated partial copy failure", message)
-            self.assertIn("Do not rerun blindly", message)
-            self.assertIn(f"{runtime_cmd} doctor", message)
-            self.assertNotIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
-            self.assertEqual(len(issue_gateway.calls), 1)
-            self.assertTrue((epic_dir / "issues" / "iss-00712-refresh-token").exists())
-            self.assertFalse((epic_dir / "issues" / "iss-00712-refresh-token" / ".meta.json").exists())
+            assert 'Outcome: post_github_local_write_fail' in message
+            assert 'simulated partial copy failure' in message
+            assert 'Do not rerun blindly' in message
+            assert f'{runtime_cmd} doctor' in message
+            assert f"{runtime_cmd} new issue --title 'Refresh token'" not in message
+            assert len(issue_gateway.calls) == 1
+            assert (epic_dir / 'issues' / 'iss-00712-refresh-token').exists()
+            assert not (epic_dir / 'issues' / 'iss-00712-refresh-token' / '.meta.json').exists()
 
     def test_issue_create_meta_write_failure_after_github_create_reports_doctor_first_guidance(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -1554,7 +1599,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 node_repo=_MetaWriteFailureNodeRepo(records, events=events),
             )
 
-            with self.assertRaisesRegex(RuntimeError, "GitHub issue was created: #713") as raised:
+            with pytest.raises(RuntimeError, match='GitHub issue was created: #713') as raised:
                 app_create_node.create_issue(
                     app_contracts.CreateNodeRequest(
                         title="Refresh token",
@@ -1566,16 +1611,16 @@ class TestRuntimeNewS08(unittest.TestCase):
                     ports,
                 )
 
-            message = str(raised.exception)
+            message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn("Outcome: post_github_local_write_fail", message)
-            self.assertIn("simulated write_meta failure", message)
-            self.assertIn("Do not rerun blindly", message)
-            self.assertIn(f"{runtime_cmd} doctor", message)
-            self.assertNotIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
-            self.assertEqual(len(issue_gateway.calls), 1)
-            self.assertTrue((epic_dir / "issues" / "iss-00713-refresh-token" / "README.md").exists())
-            self.assertFalse((epic_dir / "issues" / "iss-00713-refresh-token" / ".meta.json").exists())
+            assert 'Outcome: post_github_local_write_fail' in message
+            assert 'simulated write_meta failure' in message
+            assert 'Do not rerun blindly' in message
+            assert f'{runtime_cmd} doctor' in message
+            assert f"{runtime_cmd} new issue --title 'Refresh token'" not in message
+            assert len(issue_gateway.calls) == 1
+            assert (epic_dir / 'issues' / 'iss-00713-refresh-token' / 'README.md').exists()
+            assert not (epic_dir / 'issues' / 'iss-00713-refresh-token' / '.meta.json').exists()
 
     def test_import_partial_write_failure_reports_doctor_first_guidance(self) -> None:
         app_contracts, app_create_node, app_import_node, app_ports, domain_models, infra_contracts = _runtime_modules_import()
@@ -1625,7 +1670,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 issue_gateway=issue_gateway,
             )
 
-            with patch.object(
+            with _patch_object(
                 app_import_node,
                 "execute_create_plan",
                 side_effect=app_create_node.CreatePlanExecutionError(
@@ -1633,7 +1678,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                     message="simulated import partial write",
                 ),
             ):
-                with self.assertRaisesRegex(RuntimeError, "Outcome: import_local_write_fail") as raised:
+                with pytest.raises(RuntimeError, match='Outcome: import_local_write_fail') as raised:
                     app_import_node.import_issue(
                         app_contracts.ImportNodeRequest(
                             issue_number=714,
@@ -1644,13 +1689,13 @@ class TestRuntimeNewS08(unittest.TestCase):
                         ports,
                     )
 
-            message = str(raised.exception)
+            message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn("simulated import partial write", message)
-            self.assertIn("Do not rerun blindly", message)
-            self.assertIn("local node `iss-00714`", message)
-            self.assertIn(f"{runtime_cmd} doctor", message)
-            self.assertNotIn("Recovery: rerun", message)
+            assert 'simulated import partial write' in message
+            assert 'Do not rerun blindly' in message
+            assert 'local node `iss-00714`' in message
+            assert f'{runtime_cmd} doctor' in message
+            assert 'Recovery: rerun' not in message
 
     def test_issue_create_cleanup_failure_after_local_write_reports_doctor_first_guidance(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -1703,10 +1748,10 @@ class TestRuntimeNewS08(unittest.TestCase):
                     raise OSError("permission denied")
                 return original_unlink(path_self, *args, **kwargs)
 
-            with patch.object(app_create_node.Path, "unlink", new=_unlink_with_failure):
-                with self.assertRaisesRegex(
+            with _patch_object(app_create_node.Path, "unlink", new=_unlink_with_failure):
+                with pytest.raises(
                     RuntimeError,
-                    "Outcome: post_github_local_write_success_cleanup_fail",
+                    match="Outcome: post_github_local_write_success_cleanup_fail",
                 ) as raised:
                     app_create_node.create_issue(
                         app_contracts.CreateNodeRequest(
@@ -1719,17 +1764,17 @@ class TestRuntimeNewS08(unittest.TestCase):
                         ports,
                     )
 
-            message = str(raised.exception)
+            message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn("GitHub issue was created: #708", message)
-            self.assertIn("create lock release failed", message)
-            self.assertIn("Create may already have succeeded", message)
-            self.assertIn("Do not rerun blindly", message)
-            self.assertIn("local node `iss-00708`", message)
-            self.assertIn(f"{runtime_cmd} doctor", message)
-            self.assertNotIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
-            self.assertEqual(len(issue_gateway.calls), 1)
-            self.assertTrue((epic_dir / "issues" / "iss-00708-refresh-token" / ".meta.json").exists())
+            assert 'GitHub issue was created: #708' in message
+            assert 'create lock release failed' in message
+            assert 'Create may already have succeeded' in message
+            assert 'Do not rerun blindly' in message
+            assert 'local node `iss-00708`' in message
+            assert f'{runtime_cmd} doctor' in message
+            assert f"{runtime_cmd} new issue --title 'Refresh token'" not in message
+            assert len(issue_gateway.calls) == 1
+            assert (epic_dir / 'issues' / 'iss-00708-refresh-token' / '.meta.json').exists()
 
     def test_issue_create_body_and_cleanup_failure_keeps_outcome_guidance(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -1782,9 +1827,9 @@ class TestRuntimeNewS08(unittest.TestCase):
                     raise OSError("permission denied")
                 return original_unlink(path_self, *args, **kwargs)
 
-            with patch.object(app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated write failure")):
-                with patch.object(app_create_node.Path, "unlink", new=_unlink_with_failure):
-                    with self.assertRaisesRegex(RuntimeError, "Outcome: post_github_body_and_cleanup_fail") as raised:
+            with _patch_object(app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated write failure")):
+                with _patch_object(app_create_node.Path, "unlink", new=_unlink_with_failure):
+                    with pytest.raises(RuntimeError, match='Outcome: post_github_body_and_cleanup_fail') as raised:
                         app_create_node.create_issue(
                             app_contracts.CreateNodeRequest(
                                 title="Refresh token",
@@ -1796,18 +1841,18 @@ class TestRuntimeNewS08(unittest.TestCase):
                             ports,
                         )
 
-            message = str(raised.exception)
+            message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn("Primary local failure: simulated write failure", message)
-            self.assertIn("Cleanup failure: create lock release failed", message)
-            self.assertIn("GitHub issue was created: #709", message)
-            self.assertIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
-            self.assertIn("--epic epic-local-00001", message)
-            self.assertIn("--github-issue 709", message)
-            self.assertIn("close/cleanup", message)
-            self.assertEqual(len(issue_gateway.calls), 1)
-            self.assertEqual(events, [])
-            self.assertFalse((epic_dir / "issues" / "iss-00709-refresh-token").exists())
+            assert 'Primary local failure: simulated write failure' in message
+            assert 'Cleanup failure: create lock release failed' in message
+            assert 'GitHub issue was created: #709' in message
+            assert f"{runtime_cmd} new issue --title 'Refresh token'" in message
+            assert '--epic epic-local-00001' in message
+            assert '--github-issue 709' in message
+            assert 'close/cleanup' in message
+            assert len(issue_gateway.calls) == 1
+            assert events == []
+            assert not (epic_dir / 'issues' / 'iss-00709-refresh-token').exists()
 
     def test_issue_create_post_write_guard_failure_after_local_write_reports_doctor_first_guidance(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -1852,12 +1897,12 @@ class TestRuntimeNewS08(unittest.TestCase):
                 issue_gateway=issue_gateway,
             )
 
-            with patch.object(
+            with _patch_object(
                 app_create_node,
                 "_post_write_duplicate_guard",
                 side_effect=RuntimeError("simulated post-write duplicate guard failure"),
             ):
-                with self.assertRaisesRegex(RuntimeError, "Outcome: post_github_local_write_fail") as raised:
+                with pytest.raises(RuntimeError, match='Outcome: post_github_local_write_fail') as raised:
                     app_create_node.create_issue(
                         app_contracts.CreateNodeRequest(
                             title="Refresh token",
@@ -1869,18 +1914,18 @@ class TestRuntimeNewS08(unittest.TestCase):
                         ports,
                     )
 
-            message = str(raised.exception)
+            message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn("simulated post-write duplicate guard failure", message)
-            self.assertIn("GitHub issue was created: #711", message)
-            self.assertIn("Create may already have succeeded", message)
-            self.assertIn("Do not rerun blindly", message)
-            self.assertIn("local node `iss-00711`", message)
-            self.assertIn(f"{runtime_cmd} doctor", message)
-            self.assertNotIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
-            self.assertNotIn("close/cleanup", message)
-            self.assertEqual(len(issue_gateway.calls), 1)
-            self.assertTrue((epic_dir / "issues" / "iss-00711-refresh-token" / ".meta.json").exists())
+            assert 'simulated post-write duplicate guard failure' in message
+            assert 'GitHub issue was created: #711' in message
+            assert 'Create may already have succeeded' in message
+            assert 'Do not rerun blindly' in message
+            assert 'local node `iss-00711`' in message
+            assert f'{runtime_cmd} doctor' in message
+            assert f"{runtime_cmd} new issue --title 'Refresh token'" not in message
+            assert 'close/cleanup' not in message
+            assert len(issue_gateway.calls) == 1
+            assert (epic_dir / 'issues' / 'iss-00711-refresh-token' / '.meta.json').exists()
 
     def test_issue_create_post_write_guard_and_cleanup_failure_reports_doctor_first_guidance(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -1933,13 +1978,13 @@ class TestRuntimeNewS08(unittest.TestCase):
                     raise OSError("permission denied")
                 return original_unlink(path_self, *args, **kwargs)
 
-            with patch.object(
+            with _patch_object(
                 app_create_node,
                 "_post_write_duplicate_guard",
                 side_effect=RuntimeError("simulated post-write duplicate guard failure"),
             ):
-                with patch.object(app_create_node.Path, "unlink", new=_unlink_with_failure):
-                    with self.assertRaisesRegex(RuntimeError, "Outcome: post_github_body_and_cleanup_fail") as raised:
+                with _patch_object(app_create_node.Path, "unlink", new=_unlink_with_failure):
+                    with pytest.raises(RuntimeError, match='Outcome: post_github_body_and_cleanup_fail') as raised:
                         app_create_node.create_issue(
                             app_contracts.CreateNodeRequest(
                                 title="Refresh token",
@@ -1951,18 +1996,18 @@ class TestRuntimeNewS08(unittest.TestCase):
                             ports,
                         )
 
-            message = str(raised.exception)
+            message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn("Primary local failure: simulated post-write duplicate guard failure", message)
-            self.assertIn("Cleanup failure: create lock release failed", message)
-            self.assertIn("GitHub issue was created: #710", message)
-            self.assertIn("Create may already have succeeded", message)
-            self.assertIn("Do not rerun blindly", message)
-            self.assertIn("local node `iss-00710`", message)
-            self.assertIn(f"{runtime_cmd} doctor", message)
-            self.assertNotIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
-            self.assertEqual(len(issue_gateway.calls), 1)
-            self.assertTrue((epic_dir / "issues" / "iss-00710-refresh-token" / ".meta.json").exists())
+            assert 'Primary local failure: simulated post-write duplicate guard failure' in message
+            assert 'Cleanup failure: create lock release failed' in message
+            assert 'GitHub issue was created: #710' in message
+            assert 'Create may already have succeeded' in message
+            assert 'Do not rerun blindly' in message
+            assert 'local node `iss-00710`' in message
+            assert f'{runtime_cmd} doctor' in message
+            assert f"{runtime_cmd} new issue --title 'Refresh token'" not in message
+            assert len(issue_gateway.calls) == 1
+            assert (epic_dir / 'issues' / 'iss-00710-refresh-token' / '.meta.json').exists()
 
     def test_issue_create_pure_input_validation_fails_before_github_create(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -2017,7 +2062,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
             ]
             for case_name, overrides, expected_error in cases:
-                with self.subTest(case=case_name):
+                with _case_label(case=case_name):
                     issue_gateway = _StubIssueGateway([799])
                     ports = self._ports(
                         app_ports,
@@ -2036,14 +2081,14 @@ class TestRuntimeNewS08(unittest.TestCase):
                         "github_repo_name": None,
                     }
                     request_kwargs.update(overrides)
-                    with self.assertRaisesRegex(RuntimeError, expected_error) as raised:
+                    with pytest.raises(RuntimeError, match=expected_error) as raised:
                         app_create_node.create_issue(
                             app_contracts.CreateNodeRequest(**request_kwargs),
                             ports,
                         )
-                    self.assertIn("Outcome: pre_github_fail", str(raised.exception))
-                    self.assertNotIn("GitHub issue was created:", str(raised.exception))
-                    self.assertEqual(issue_gateway.calls, [])
+                    assert 'Outcome: pre_github_fail' in str(raised.value)
+                    assert 'GitHub issue was created:' not in str(raised.value)
+                    assert issue_gateway.calls == []
 
     def test_issue_create_repo_scope_precheck_failures_happen_before_github_create_or_local_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -2093,7 +2138,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
             ]
             for case_name, git_error in cases:
-                with self.subTest(case=case_name):
+                with _case_label(case=case_name):
                     events: list[str] = []
                     issue_gateway = _StubIssueGateway([799])
                     git_gateway = _StubGitGateway(error=git_error)
@@ -2105,7 +2150,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                         issue_gateway=issue_gateway,
                         git_gateway=git_gateway,
                     )
-                    with self.assertRaisesRegex(RuntimeError, git_error):
+                    with pytest.raises(RuntimeError, match=git_error):
                         app_create_node.create_issue(
                             app_contracts.CreateNodeRequest(
                                 title="Refresh token",
@@ -2116,10 +2161,10 @@ class TestRuntimeNewS08(unittest.TestCase):
                             ),
                             ports,
                         )
-                    self.assertEqual(issue_gateway.calls, [])
-                    self.assertEqual(events, [])
-                    self.assertFalse((epic_dir / "issues").exists())
-                    self.assertEqual(git_gateway.calls, [str(repo_root)])
+                    assert issue_gateway.calls == []
+                    assert events == []
+                    assert not (epic_dir / 'issues').exists()
+                    assert git_gateway.calls == [str(repo_root)]
 
     def test_issue_create_with_canonical_origin_scope_still_succeeds(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -2178,16 +2223,16 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ports,
             )
 
-            self.assertEqual(result.node.id, "iss-00812")
-            self.assertEqual(result.node.github_issue_number, 812)
-            self.assertEqual(len(issue_gateway.calls), 1)
-            self.assertEqual(issue_gateway.calls[0][0], str(repo_root))
-            self.assertEqual(issue_gateway.calls[0][1], "Refresh token")
-            self.assertIn("Type: issue", issue_gateway.calls[0][2])
-            self.assertEqual(git_gateway.calls[0], str(repo_root))
+            assert result.node.id == 'iss-00812'
+            assert result.node.github_issue_number == 812
+            assert len(issue_gateway.calls) == 1
+            assert issue_gateway.calls[0][0] == str(repo_root)
+            assert issue_gateway.calls[0][1] == 'Refresh token'
+            assert 'Type: issue' in issue_gateway.calls[0][2]
+            assert git_gateway.calls[0] == str(repo_root)
             created_record = node_repo._records[-1]
-            self.assertEqual(created_record.github_repo_owner, "example")
-            self.assertEqual(created_record.github_repo_name, "repo")
+            assert created_record.github_repo_owner == 'example'
+            assert created_record.github_repo_name == 'repo'
 
     def test_initiative_link_existing_first_node_binds_current_repo_scope(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -2217,12 +2262,12 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ports,
             )
 
-            self.assertEqual(result.node.id, "init-00811")
+            assert result.node.id == 'init-00811'
             created_record = node_repo._records[-1]
-            self.assertEqual(created_record.github_issue_number, 811)
-            self.assertEqual(created_record.github_repo_owner, "example")
-            self.assertEqual(created_record.github_repo_name, "repo")
-            self.assertEqual(git_gateway.calls, [str(repo_root)])
+            assert created_record.github_issue_number == 811
+            assert created_record.github_repo_owner == 'example'
+            assert created_record.github_repo_name == 'repo'
+            assert git_gateway.calls == [str(repo_root)]
 
     def test_issue_link_existing_same_repo_scope_succeeds_and_persists_canonical_scope(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -2280,11 +2325,11 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ports,
             )
 
-            self.assertEqual(result.node.id, "iss-00812")
+            assert result.node.id == 'iss-00812'
             created_record = node_repo._records[-1]
-            self.assertEqual(created_record.github_repo_owner, "example")
-            self.assertEqual(created_record.github_repo_name, "repo")
-            self.assertEqual(git_gateway.calls, [str(repo_root)])
+            assert created_record.github_repo_owner == 'example'
+            assert created_record.github_repo_name == 'repo'
+            assert git_gateway.calls == [str(repo_root)]
 
     def test_issue_link_existing_rejects_explicit_cross_repo_target(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -2329,9 +2374,9 @@ class TestRuntimeNewS08(unittest.TestCase):
                 issue_gateway=issue_gateway,
             )
 
-            with self.assertRaisesRegex(
+            with pytest.raises(
                 RuntimeError,
-                "cross-repo GitHub linkage is not supported: requested repo=other/repo current repo=example/repo",
+                match="cross-repo GitHub linkage is not supported: requested repo=other/repo current repo=example/repo",
             ):
                 app_create_node.create_issue(
                     app_contracts.CreateNodeRequest(
@@ -2345,8 +2390,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                     ),
                     ports,
                 )
-            self.assertEqual(issue_gateway.calls, [])
-            self.assertEqual(git_gateway.calls, [str(repo_root)])
+            assert issue_gateway.calls == []
+            assert git_gateway.calls == [str(repo_root)]
 
     def test_plan_node_creation_rejects_cross_repo_overlap_without_local_fallback(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -2374,7 +2419,7 @@ class TestRuntimeNewS08(unittest.TestCase):
             ports = self._ports(app_ports, specdock_dir=specdock_dir, records=records)
             graph = app_create_node.load_graph(ports, validate=False)
 
-            with self.assertRaisesRegex(RuntimeError, "cross-repo GitHub linkage is not supported"):
+            with pytest.raises(RuntimeError, match='cross-repo GitHub linkage is not supported'):
                 app_create_node.plan_node_creation(
                     app_contracts.CreateNodeRequest(
                         title="Payments",
@@ -2438,7 +2483,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 events=events,
                 issue_gateway=issue_gateway,
             )
-            with self.assertRaisesRegex(RuntimeError, "simulated issue_create failure") as raised:
+            with pytest.raises(RuntimeError, match='simulated issue_create failure') as raised:
                 app_create_node.create_issue(
                     app_contracts.CreateNodeRequest(
                         title="Refresh token",
@@ -2450,10 +2495,10 @@ class TestRuntimeNewS08(unittest.TestCase):
                     ports,
                 )
 
-            self.assertIn("Outcome: pre_github_fail", str(raised.exception))
-            self.assertNotIn("GitHub issue was created:", str(raised.exception))
-            self.assertEqual(len(issue_gateway.calls), 1)
-            self.assertEqual(events, [])
+            assert 'Outcome: pre_github_fail' in str(raised.value)
+            assert 'GitHub issue was created:' not in str(raised.value)
+            assert len(issue_gateway.calls) == 1
+            assert events == []
 
     def test_github_create_parent_precheck_fails_before_github_create(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -2504,7 +2549,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
             ]
             for case_name, create_fn, request_kwargs, expected_error in cases:
-                with self.subTest(case=case_name):
+                with _case_label(case=case_name):
                     issue_gateway = _StubIssueGateway([798])
                     ports = self._ports(
                         app_ports,
@@ -2513,16 +2558,16 @@ class TestRuntimeNewS08(unittest.TestCase):
                         events=events,
                         issue_gateway=issue_gateway,
                     )
-                    with self.assertRaisesRegex(RuntimeError, expected_error) as raised:
+                    with pytest.raises(RuntimeError, match=expected_error) as raised:
                         create_fn(app_contracts.CreateNodeRequest(**request_kwargs), ports)
-                    self.assertIn("Outcome: pre_github_fail", str(raised.exception))
-                    self.assertNotIn("GitHub issue was created:", str(raised.exception))
-                    self.assertEqual(issue_gateway.calls, [])
+                    assert 'Outcome: pre_github_fail' in str(raised.value)
+                    assert 'GitHub issue was created:' not in str(raised.value)
+                    assert issue_gateway.calls == []
 
     def test_github_create_local_parent_path_collision_fails_before_github_create(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         for case_name in ("initiative", "epic", "issue"):
-            with self.subTest(case=case_name), tempfile.TemporaryDirectory() as tmp:
+            with _case_label(case=case_name), tempfile.TemporaryDirectory() as tmp:
                 repo_root = Path(tmp)
                 specdock_dir = repo_root / "spec-dock"
                 self._prepare_templates(specdock_dir)
@@ -2597,15 +2642,15 @@ class TestRuntimeNewS08(unittest.TestCase):
                 collision_path.parent.mkdir(parents=True, exist_ok=True)
                 collision_path.write_text("existing-collision\n", encoding="utf-8")
 
-                with self.assertRaisesRegex(RuntimeError, "Destination already exists") as raised:
+                with pytest.raises(RuntimeError, match='Destination already exists') as raised:
                     create_fn(request, ports)
 
-                self.assertIn("Outcome: pre_github_fail", str(raised.exception))
-                self.assertNotIn("GitHub issue was created:", str(raised.exception))
-                self.assertEqual(issue_gateway.calls, [])
-                self.assertEqual(events, [])
-                self.assertEqual(collision_path.read_text(encoding="utf-8"), "existing-collision\n")
-                self.assertFalse((specdock_dir / "system" / ".runtime" / "create.lock").exists())
+                assert 'Outcome: pre_github_fail' in str(raised.value)
+                assert 'GitHub issue was created:' not in str(raised.value)
+                assert issue_gateway.calls == []
+                assert events == []
+                assert collision_path.read_text(encoding='utf-8') == 'existing-collision\n'
+                assert not (specdock_dir / 'system' / '.runtime' / 'create.lock').exists()
 
     def test_github_create_missing_rules_source_fails_before_github_create(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -2679,7 +2724,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
             ]
             for case_name, create_fn, request_kwargs, missing_rules_path in cases:
-                with self.subTest(case=case_name):
+                with _case_label(case=case_name):
                     self._prepare_templates(specdock_dir)
                     missing_rules_path.unlink()
                     events: list[str] = []
@@ -2692,13 +2737,13 @@ class TestRuntimeNewS08(unittest.TestCase):
                         issue_gateway=issue_gateway,
                     )
 
-                    with self.assertRaisesRegex(RuntimeError, "Missing rules source") as raised:
+                    with pytest.raises(RuntimeError, match='Missing rules source') as raised:
                         create_fn(app_contracts.CreateNodeRequest(**request_kwargs), ports)
 
-                    self.assertIn("Outcome: pre_github_fail", str(raised.exception))
-                    self.assertNotIn("GitHub issue was created:", str(raised.exception))
-                    self.assertEqual(issue_gateway.calls, [])
-                    self.assertEqual(events, [])
+                    assert 'Outcome: pre_github_fail' in str(raised.value)
+                    assert 'GitHub issue was created:' not in str(raised.value)
+                    assert issue_gateway.calls == []
+                    assert events == []
 
     def test_github_create_symlink_preflight_fails_before_github_create(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -2772,7 +2817,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
             ]
             for case_name, create_fn, records, request_kwargs in cases:
-                with self.subTest(case=case_name):
+                with _case_label(case=case_name):
                     events: list[str] = []
                     issue_gateway = _StubIssueGateway([795])
                     ports = self._ports(
@@ -2783,14 +2828,14 @@ class TestRuntimeNewS08(unittest.TestCase):
                         issue_gateway=issue_gateway,
                     )
 
-                    with patch.object(app_create_node.os, "symlink", side_effect=OSError("operation not permitted")):
-                        with self.assertRaisesRegex(RuntimeError, "Symlink creation preflight failed") as raised:
+                    with _patch_object(app_create_node.os, "symlink", side_effect=OSError("operation not permitted")):
+                        with pytest.raises(RuntimeError, match='Symlink creation preflight failed') as raised:
                             create_fn(app_contracts.CreateNodeRequest(**request_kwargs), ports)
 
-                    self.assertIn("Outcome: pre_github_fail", str(raised.exception))
-                    self.assertNotIn("GitHub issue was created:", str(raised.exception))
-                    self.assertEqual(issue_gateway.calls, [])
-                    self.assertEqual(events, [])
+                    assert 'Outcome: pre_github_fail' in str(raised.value)
+                    assert 'GitHub issue was created:' not in str(raised.value)
+                    assert issue_gateway.calls == []
+                    assert events == []
 
     def test_github_create_graph_preflight_fails_before_github_create_for_initiative(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -2835,7 +2880,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 events=events,
                 issue_gateway=issue_gateway,
             )
-            with self.assertRaisesRegex(RuntimeError, "(?i)duplicate id") as raised:
+            with pytest.raises(RuntimeError, match='(?i)duplicate id') as raised:
                 app_create_node.create_initiative(
                     app_contracts.CreateNodeRequest(
                         title="Payments",
@@ -2846,9 +2891,9 @@ class TestRuntimeNewS08(unittest.TestCase):
                     ),
                     ports,
                 )
-            self.assertIn("Outcome: pre_github_fail", str(raised.exception))
-            self.assertNotIn("GitHub issue was created:", str(raised.exception))
-            self.assertEqual(issue_gateway.calls, [])
+            assert 'Outcome: pre_github_fail' in str(raised.value)
+            assert 'GitHub issue was created:' not in str(raised.value)
+            assert issue_gateway.calls == []
 
     def test_initiative_and_epic_post_create_failures_report_retry_link_guidance(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -2874,7 +2919,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.dict(
+            with _patch_dict(
                 os.environ,
                 {
                     app_create_node._ENV_CREATE_LOCK_WAIT_SECONDS: "0.02",
@@ -2883,7 +2928,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 },
                 clear=False,
             ):
-                with self.assertRaisesRegex(RuntimeError, "GitHub issue was created: #706") as raised:
+                with pytest.raises(RuntimeError, match='GitHub issue was created: #706') as raised:
                     app_create_node.create_initiative(
                         app_contracts.CreateNodeRequest(
                             title="Auth platform",
@@ -2895,15 +2940,15 @@ class TestRuntimeNewS08(unittest.TestCase):
                         ports,
                     )
 
-            message = str(raised.exception)
+            message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn("Outcome: post_github_remote_only_fail", message)
-            self.assertIn("create lock acquisition failed", message)
-            self.assertIn(f"{runtime_cmd} new initiative --title 'Auth platform'", message)
-            self.assertIn("--github-issue 706", message)
-            self.assertIn("close/cleanup", message)
-            self.assertEqual(len(issue_gateway.calls), 1)
-            self.assertEqual(events, [])
+            assert 'Outcome: post_github_remote_only_fail' in message
+            assert 'create lock acquisition failed' in message
+            assert f"{runtime_cmd} new initiative --title 'Auth platform'" in message
+            assert '--github-issue 706' in message
+            assert 'close/cleanup' in message
+            assert len(issue_gateway.calls) == 1
+            assert events == []
 
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -2933,8 +2978,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                 issue_gateway=issue_gateway,
             )
 
-            with patch.object(app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated epic write failure")):
-                with self.assertRaisesRegex(RuntimeError, "GitHub issue was created: #707") as raised:
+            with _patch_object(app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated epic write failure")):
+                with pytest.raises(RuntimeError, match='GitHub issue was created: #707') as raised:
                     app_create_node.create_epic(
                         app_contracts.CreateNodeRequest(
                             title="JWT auth",
@@ -2946,16 +2991,16 @@ class TestRuntimeNewS08(unittest.TestCase):
                         ports,
                     )
 
-            message = str(raised.exception)
+            message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn("Outcome: post_github_local_write_fail", message)
-            self.assertIn("simulated epic write failure", message)
-            self.assertIn(f"{runtime_cmd} new epic --title 'JWT auth'", message)
-            self.assertIn("--initiative init-local-00001", message)
-            self.assertIn("--github-issue 707", message)
-            self.assertIn("close/cleanup", message)
-            self.assertEqual(len(issue_gateway.calls), 1)
-            self.assertEqual(events, [])
+            assert 'Outcome: post_github_local_write_fail' in message
+            assert 'simulated epic write failure' in message
+            assert f"{runtime_cmd} new epic --title 'JWT auth'" in message
+            assert '--initiative init-local-00001' in message
+            assert '--github-issue 707' in message
+            assert 'close/cleanup' in message
+            assert len(issue_gateway.calls) == 1
+            assert events == []
 
     def test_create_lock_contention_timeout_is_no_write_and_reports_metadata(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -2972,7 +3017,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.dict(
+            with _patch_dict(
                 os.environ,
                 {
                     app_create_node._ENV_CREATE_LOCK_WAIT_SECONDS: "0.02",
@@ -2981,7 +3026,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 },
                 clear=False,
             ):
-                with self.assertRaisesRegex(RuntimeError, "create lock acquisition failed") as raised:
+                with pytest.raises(RuntimeError, match='create lock acquisition failed') as raised:
                     app_create_node.create_initiative(
                         app_contracts.CreateNodeRequest(
                             title="Auth platform",
@@ -2993,15 +3038,15 @@ class TestRuntimeNewS08(unittest.TestCase):
                         ports,
                     )
 
-            message = str(raised.exception)
+            message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn("wait_s=", message)
-            self.assertIn(lock_path.as_posix(), message)
-            self.assertIn("user=lock-holder", message)
-            self.assertIn(f"{runtime_cmd} doctor", message)
-            self.assertEqual(events, [])
-            self.assertFalse((specdock_dir / "initiatives").exists())
-            self.assertTrue(lock_path.exists())
+            assert 'wait_s=' in message
+            assert lock_path.as_posix() in message
+            assert 'user=lock-holder' in message
+            assert f'{runtime_cmd} doctor' in message
+            assert events == []
+            assert not (specdock_dir / 'initiatives').exists()
+            assert lock_path.exists()
 
     def test_create_lock_stale_is_no_write_and_reports_metadata(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -3018,7 +3063,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.dict(
+            with _patch_dict(
                 os.environ,
                 {
                     app_create_node._ENV_CREATE_LOCK_WAIT_SECONDS: "0.2",
@@ -3027,7 +3072,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 },
                 clear=False,
             ):
-                with self.assertRaisesRegex(RuntimeError, "create lock acquisition failed") as raised:
+                with pytest.raises(RuntimeError, match='create lock acquisition failed') as raised:
                     app_create_node.create_initiative(
                         app_contracts.CreateNodeRequest(
                             title="Auth platform",
@@ -3039,15 +3084,15 @@ class TestRuntimeNewS08(unittest.TestCase):
                         ports,
                     )
 
-            message = str(raised.exception)
+            message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn("stale=true", message)
-            self.assertIn(lock_path.as_posix(), message)
-            self.assertIn("created_iso=1970-01-01", message)
-            self.assertIn(f"{runtime_cmd} doctor", message)
-            self.assertEqual(events, [])
-            self.assertFalse((specdock_dir / "initiatives").exists())
-            self.assertTrue(lock_path.exists())
+            assert 'stale=true' in message
+            assert lock_path.as_posix() in message
+            assert 'created_iso=1970-01-01' in message
+            assert f'{runtime_cmd} doctor' in message
+            assert events == []
+            assert not (specdock_dir / 'initiatives').exists()
+            assert lock_path.exists()
 
     def test_create_lock_metadata_write_failure_cleans_orphan_lock(self) -> None:
         _runtime_app, _app_contracts, app_create_node, _app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -3059,16 +3104,16 @@ class TestRuntimeNewS08(unittest.TestCase):
                 os.close(fd)
                 raise OSError("disk full")
 
-            with patch.object(app_create_node, "_write_create_lock_payload", side_effect=_raise_write_failure):
-                with self.assertRaisesRegex(RuntimeError, "create lock metadata write failed") as raised:
+            with _patch_object(app_create_node, "_write_create_lock_payload", side_effect=_raise_write_failure):
+                with pytest.raises(RuntimeError, match='create lock metadata write failed') as raised:
                     app_create_node._acquire_create_lock(specdock_dir)
 
-            message = str(raised.exception)
+            message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn(lock_path.as_posix(), message)
-            self.assertIn("cleanup_unlink=ok", message)
-            self.assertIn(f"{runtime_cmd} doctor", message)
-            self.assertFalse(lock_path.exists())
+            assert lock_path.as_posix() in message
+            assert 'cleanup_unlink=ok' in message
+            assert f'{runtime_cmd} doctor' in message
+            assert not lock_path.exists()
 
     def test_create_fails_when_release_unlink_fails(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -3085,8 +3130,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                     raise OSError("permission denied")
                 return original_unlink(path_self, missing_ok=missing_ok)
 
-            with patch.object(app_create_node.Path, "unlink", new=_unlink_with_failure):
-                with self.assertRaisesRegex(RuntimeError, "create lock release failed") as raised:
+            with _patch_object(app_create_node.Path, "unlink", new=_unlink_with_failure):
+                with pytest.raises(RuntimeError, match='create lock release failed') as raised:
                     app_create_node.create_initiative(
                         app_contracts.CreateNodeRequest(
                             title="Auth platform",
@@ -3098,12 +3143,12 @@ class TestRuntimeNewS08(unittest.TestCase):
                         ports,
                     )
 
-            message = str(raised.exception)
+            message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
-            self.assertIn(lock_path.as_posix(), message)
-            self.assertIn(f"{runtime_cmd} doctor", message)
-            self.assertTrue((specdock_dir / "initiatives").exists())
-            self.assertTrue(lock_path.exists())
+            assert lock_path.as_posix() in message
+            assert f'{runtime_cmd} doctor' in message
+            assert (specdock_dir / 'initiatives').exists()
+            assert lock_path.exists()
 
     def test_github_mode_default_create_matrix(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -3166,7 +3211,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertEqual(len(issue_gateway.calls), 2)
+            assert len(issue_gateway.calls) == 2
 
             issue_result = app_create_node.create_issue(
                 app_contracts.CreateNodeRequest(
@@ -3178,8 +3223,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertEqual(len(issue_gateway.calls), 3)
-            self.assertEqual(issue_result.node.id, "iss-00703")
+            assert len(issue_gateway.calls) == 3
+            assert issue_result.node.id == 'iss-00703'
 
     def test_execute_create_plan_reuse_seam(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -3214,8 +3259,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                 app_create_node.execute_create_plan = original_execute
                 app_create_node._post_write_duplicate_guard = original_guard
 
-            self.assertEqual(len(calls), 1)
-            self.assertEqual(result.created_paths[-1].name, ".meta.json")
+            assert len(calls) == 1
+            assert result.created_paths[-1].name == '.meta.json'
 
     def test_renderer_text_regression(self) -> None:
         _runtime_app, app_contracts, _app_create_node, _app_ports, _new_commands, _infra_contracts, presentation_cli_text = _runtime_modules()
@@ -3237,17 +3282,14 @@ class TestRuntimeNewS08(unittest.TestCase):
         )
         result = app_contracts.CreateNodeResult(node=node, created_paths=[], warnings=[])
         text = presentation_cli_text.render_new_node_text(result)
-        self.assertEqual(
-            text.stdout_lines,
-            [
+        assert text.stdout_lines == [
                 (
                     "spec-dock: ok (new issue) "
                     "id=iss-00123 epic=epic-00001 initiative=init-00001 "
                     "path=spec-dock/initiatives/init-00001-auth/epics/epic-00001-jwt/issues/iss-00123-add-refresh-token "
                     "github=#123"
                 )
-            ],
-        )
+            ]
 
     def test_command_new_initiative_smoke(self) -> None:
         _runtime_app, app_contracts, _app_create_node, _app_ports, new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -3297,11 +3339,7 @@ class TestRuntimeNewS08(unittest.TestCase):
             use_cases,
         )
 
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0].github_mode, "create")
-        self.assertEqual(outcome.exit_code, 0)
-        self.assertIn("spec-dock: ok (new initiative)", "\n".join(outcome.text.stdout_lines))
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert len(calls) == 1
+        assert calls[0].github_mode == 'create'
+        assert outcome.exit_code == 0
+        assert 'spec-dock: ok (new initiative)' in '\n'.join(outcome.text.stdout_lines)

@@ -1,6 +1,7 @@
 import sys
-import unittest
 from pathlib import Path
+
+import pytest
 
 
 def _runtime_modules():
@@ -148,7 +149,7 @@ class _StubGitGateway:
         self.current_branch = branch
 
 
-class TestSetActiveApplication(unittest.TestCase):
+class TestSetActiveApplication:
     def _records(self, infra_contracts):
         root = Path("/repo/spec-dock/initiatives/init-00101-auth-platform")
         epic = root / "epics" / "epic-00201-jwt-auth"
@@ -277,9 +278,9 @@ class TestSetActiveApplication(unittest.TestCase):
             self._request(app_contracts, target=self._node_id_target(app_contracts, "iss-302"), force=True),
             ports,
         )
-        self.assertEqual(by_id.selection.issue_id, "iss-00302")
-        self.assertEqual(active_store.written[-1].issue.id, "iss-00302")
-        self.assertEqual(active_store.written[-1].issue.path, "spec-dock/initiatives/init-00101-auth-platform/epics/epic-00201-jwt-auth/issues/iss-00302-target-issue")
+        assert by_id.selection.issue_id == "iss-00302"
+        assert active_store.written[-1].issue.id == "iss-00302"
+        assert active_store.written[-1].issue.path == "spec-dock/initiatives/init-00101-auth-platform/epics/epic-00201-jwt-auth/issues/iss-00302-target-issue"
 
         by_github = app_set_active.set_active(
             self._request(
@@ -289,7 +290,7 @@ class TestSetActiveApplication(unittest.TestCase):
             ),
             ports,
         )
-        self.assertEqual(by_github.selection.issue_id, "iss-00301")
+        assert by_github.selection.issue_id == "iss-00301"
 
     def test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli(self) -> None:
         app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
@@ -302,20 +303,20 @@ class TestSetActiveApplication(unittest.TestCase):
             derived_state_reader=_StubDerivedStateReader({"iss-00301": "open", "iss-00302": "open"}),
         )
 
-        with self.assertRaisesRegex(RuntimeError, "active set blocked"):
+        with pytest.raises(RuntimeError, match="active set blocked"):
             app_set_active.set_active(
                 self._request(app_contracts, target=self._node_id_target(app_contracts, "iss-00302")),
                 ports,
             )
-        self.assertEqual(active_store.written, [])
+        assert active_store.written == []
 
         forced = app_set_active.set_active(
             self._request(app_contracts, target=self._node_id_target(app_contracts, "iss-00302"), force=True),
             ports,
         )
-        self.assertEqual(forced.selection.issue_id, "iss-00302")
-        self.assertIn("deps_blocked", "\n".join(forced.warnings))
-        self.assertEqual(active_store.written[-1].issue.id, "iss-00302")
+        assert forced.selection.issue_id == "iss-00302"
+        assert "deps_blocked" in "\n".join(forced.warnings)
+        assert active_store.written[-1].issue.id == "iss-00302"
 
     def test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli(self) -> None:
         app_contracts, app_ports, app_set_active, domain_models, infra_contracts = _runtime_modules()
@@ -343,8 +344,8 @@ class TestSetActiveApplication(unittest.TestCase):
             ),
             ports,
         )
-        self.assertEqual(live.selection.issue_id, "iss-00302")
-        self.assertEqual(gateway.issue_index_calls, [(Path("/repo"), 10000)])
+        assert live.selection.issue_id == "iss-00302"
+        assert gateway.issue_index_calls == [(Path("/repo"), 10000)]
 
         cache_only_store = _StubActiveStateStore()
         cache_only_ports = self._ports(
@@ -359,8 +360,8 @@ class TestSetActiveApplication(unittest.TestCase):
             self._request(app_contracts, target=self._node_id_target(app_contracts, "iss-00302")),
             cache_only_ports,
         )
-        self.assertEqual(cache_only.selection.issue_id, "iss-00302")
-        self.assertEqual(cache_only_ports.issue_gateway.issue_index_calls, [])
+        assert cache_only.selection.issue_id == "iss-00302"
+        assert cache_only_ports.issue_gateway.issue_index_calls == []
 
     def test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git(self) -> None:
         app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
@@ -377,11 +378,7 @@ class TestSetActiveApplication(unittest.TestCase):
             ports,
         )
 
-        self.assertEqual(result.branch.desired, "iss-00302-target-issue")
-        self.assertIn(("require_clean_working_tree", None), git_gateway.calls)
-        self.assertIn(("checkout_branch", "iss-00302-target-issue"), git_gateway.calls)
-        self.assertNotIn(("create_and_checkout_branch", "iss-00302-target-issue"), git_gateway.calls)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert result.branch.desired == "iss-00302-target-issue"
+        assert ("require_clean_working_tree", None) in git_gateway.calls
+        assert ("checkout_branch", "iss-00302-target-issue") in git_gateway.calls
+        assert ("create_and_checkout_branch", "iss-00302-target-issue") not in git_gateway.calls
