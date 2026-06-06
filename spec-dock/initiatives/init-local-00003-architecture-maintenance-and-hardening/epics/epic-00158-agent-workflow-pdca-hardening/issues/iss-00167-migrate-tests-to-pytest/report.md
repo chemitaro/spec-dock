@@ -3,7 +3,7 @@
 ID: "iss-00167"
 タイトル: "Migrate Tests To Pytest"
 関連GitHub: ["#167"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-06"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -12,268 +12,146 @@ ID: "iss-00167"
 
 # iss-00167 Migrate Tests To Pytest — 実装報告（観測証跡台帳 / Observed Evidence Ledger）
 
-> `report.md` は観測証跡台帳（observed evidence ledger）です。planned requirements、evidence destination、closure 条件は `plan.md` が所有し、この文書は実際の Red / Green / Refactor evidence、発見された tests、closure delta、reviewer status、commit/no-op evidence を記録する。
+> `report.md` は観測証跡台帳（observed evidence ledger）です。planned requirements、evidence destination、closure 条件は `plan.md` が所有し、この文書は調査、採用判断、reviewer status、実装中の Red / Green / Refactor evidence、closure delta、commit/no-op evidence を記録する。
 
 ## 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger / 必須）
 
-`report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
-
-Material な判断がない場合もこの section は残し、次を明示する。
-
-- No material interpretation changes.
-- No decision entries.
-
-Ledger entry は次の契約値を使う。
-
-- `Status`: `open` / `resolved` / `superseded`
-- `Type`: `interpretation` / `scope` / `implementation` / `compatibility` / `test-strategy` / `operation` / `deviation` / `follow-up`
-- `Disposition`: `applied` / `rejected` / `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` / `converted_to_followup` / `deferred` / `no_action` / `superseded`
-
-完了時の意味論（completion semantics）:
-- issue completion 前に `Status=open` の entry を残してはならない。
-- `Status=resolved` は `Disposition`、evidence、必要な follow-up を持つ。
-- `Status=superseded` または `Disposition=superseded` は置換先 entry ID を持つ。
-- `Disposition=promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` は昇格先 artifact と evidence を持つ。
-- `Disposition=converted_to_followup` は follow-up issue / discussion / ADR candidate の参照を持つ。
-- `Disposition=deferred` は scope 外である理由、blocking でない根拠、revisit 条件を持つ。
-- `Disposition=no_action` は issue-local な判断で追加対応不要である理由を持つ。将来も効く durable decision を `report.md` だけに閉じ込めてはならない。
-
-Disposition ごとの必須証跡:
-- `applied`: 変更した artifact / 実装証跡と、issue-local 適用で十分な理由。
-- `rejected`: 却下した選択肢、理由、blocking impact が残らない根拠。
-- `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan`: 昇格先 artifact 参照と証跡。
-- `converted_to_followup`: follow-up issue / discussion / ADR candidate 参照と blocking / non-blocking の分類。
-- `deferred`: scope-out 理由、non-blocking の根拠、revisit 条件。
-- `no_action`: 判断が issue-local で durable ではない理由。
-- `superseded`: 置換先 entry ID と置換理由。
-
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | user / orchestrator | `iss-00160` merge 前提が後から満たされ、旧前提の planning が無効になった | 旧 layout 前提で続行; 現行 main merge 後の layout で requirement から作り直す | 現行 branch の `iss-00160` merge 後状態を正として requirement から再作成する | `tests/unit` / `tests/integration` / `tests/cli_runtime` の現行配置、README / AGENTS / CI の unittest 契約を確認済み | applied | `git log --oneline --decorate --graph -12`; `git diff --name-status --find-renames 7ea10f7c..2a27a8eb -- tests`; `find tests -type f -name '*.py'` | none |
+| D-002 | resolved | test-strategy | user | pytest 互換実行だけにするか、完全移行にするか | A: pytest runner のみ導入; B: unittest tests を pytest collection 互換で温存; C: unittest runner / API 依存を除去する完全移行 | C を採用し、`unittest.TestCase`、`self.assert*`、`unittest.main()`、`unittest.mock` 依存の除去を requirement に入れる | ユーザーが「オプションC」「完全に pytest に移行」を明示済み | applied | user instruction; `requirement.md` Scope / AC-006 | none |
+| D-003 | resolved | scope | spec-reviewer | Requirement review で、pytest migration が親 Epic の first-wave context-surface scope へ trace できないと指摘された | A: 親 Epic first-wave issue として扱う; B: 親 Epic scope 外として re-parent / parent update を要求する; C: 親 Epic の deferred testing / regression infrastructure lane として位置づけ、first-wave を置き換えないことを requirement に明示する | C を採用。ユーザーがこの active issue で pytest migration を進める意図を示しており、親 Epic plan には regression / harness / runtime gate の deferred work が存在するため、この Issue は後段 testing infrastructure lane として固定する | 親 Epic first-wave closure を変更せず、pytest migration が後続の deterministic test evidence / regression lane の土台になることを明示すれば、親 Epic trace と scope control を両立できる | applied | requirement review finding REQ-001; `spec-dock/active/epic/plan.md` Deferred work; `spec-dock/active/epic/discussions/20260605t034636z-01-research-branch-d-codex-eval-ci-harness-patterns-deep-research-report.md`; `requirement.md` Parent Epic trace / AC-009 | none |
+| D-004 | resolved | ci-scope | user | ユーザー確認により、GitHub Actions / provider CI は unit-only ではなく全テストを実行してほしいと明示された | A: previous plan の unit-only provider CI を維持; B: provider CI を `uv run pytest tests/unit` + 別 job で段階実行; C: provider CI / GitHub Actions の標準 test step を `uv run pytest` full suite にする | C を採用。GitHub Actions は pytest collection 対象の unit / integration / cli_runtime を含む full suite を実行する。個別 lane command は local / step-level verification として残す | ユーザーの最新指示が CI scope の source of truth であり、「すべてのテストを実行」が明確。unit-only 前提は requirement/design/plan ともに修正し、前回 pass は substantive change により stale と扱う | applied | user instruction 2026-06-06; `.github/workflows/provider-ci.yml` current state still `python -m unittest discover -s tests/unit`; updated `requirement.md`, `design.md`, `plan.md`; fresh requirement/design/plan reviews passed | none |
+| D-005 | resolved | plan-scope | spec-reviewer | Plan re-review failed because `tests/unit/commands/test_runtime_new_s08.py` contains unittest dependencies but S04/S05/S08 did not provide an allowed migration step for `tests/unit/commands/**` | A: leave commands cleanup to S08; B: absorb commands into S05 infra step; C: add `tests/unit/commands/**` to S04 small / medium unit migration with focused verification | C を採用。commands package is a unit package outside the large infra file, so S04 owns its pytest migration and verification. S08 remains cleanup/consolidation only. | This keeps step ownership aligned with design's unit lane file plan and lets AC-006 / AC-008 close without expanding infra scope or overloading cleanup. | applied | plan review finding 2026-06-06; `tests/unit/commands/test_runtime_new_s08.py`; updated `plan.md` S04 / AC mapping / tc-006; fresh plan review passed | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
-Delegated draft、worker note、research、reviewer finding、discussion、command output を canonical artifact や実装判断へ取り込む場合、この台帳に採用判断を記録する。raw transcript ではなく、orchestrator が検証した採否・理由・証跡・次アクションだけを記録する。
-
-- `adoption_status`: `adopted` / `partially_adopted` / `rejected` / `deferred` / `stale` / `blocked`
-- `blocked` または `stale` の unresolved entry は promotion / implementation start / issue ready / issue finish / phase completion を止める。
-- `deferred` は blocking でない根拠と revisit 条件を持つ場合だけ完了時に残せる。
-- Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
-- Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
-
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | command / local inspection | `requirement.md` 背景・現状 / スコープ / AC | `iss-00160` 後の現行 test topology と stale docs / CI 契約を一次情報として採用 | `find tests -type f -name '*.py'`; `rg -n "unittest\|self\\.assert\|assertRaises\|subTest\|unittest\\.main\|from unittest\|import unittest" tests README.md AGENTS.md .github/workflows pyproject.toml`; `rg -n "pytest" uv.lock pyproject.toml tests README.md AGENTS.md .github/workflows src/spec_dock/assets/install_root/.github/workflows` | requirement review |
+| EAL-002 | partially_adopted | repo-analyst | `requirement.md` 背景・現状 / 前提 / edge cases | Read-only analysis の事実部分を採用。推奨スコープのうち「unittest-style tests を温存する狭い migration」はユーザー意図と衝突するため不採用 | repo-analyst final summary 2026-06-06; `README.md`; `AGENTS.md`; `.github/workflows/provider-ci.yml`; `pyproject.toml` | requirement review |
+| EAL-003 | adopted | user instruction | `requirement.md` 目的 / スコープ / 未確定事項 | ユーザーが完全移行を明示したため、追加 interview なしで scope / non-scope / AC を固定できる | user instruction: 「オプションC」「完全に pytest に移行」 | requirement review |
+| EAL-004 | adopted | spec-reviewer finding / parent epic docs | `requirement.md` 親 Epic trace / 対象外 / AC-009; `report.md` D-003 | Requirement review の REQ-001 は親 Epic trace の実欠落だったため採用。親 Epic first-wave を置き換えず、deferred testing / regression infrastructure lane として位置づける修正を行った | requirement review JSON; `spec-dock/active/epic/plan.md`; `spec-dock/active/epic/discussions/20260605t034636z-01-research-branch-d-codex-eval-ci-harness-patterns-deep-research-report.md` | fresh requirement re-review |
+| EAL-005 | partially_adopted | spec-dock-system-architect draft | `design.md` 採用方針 / 依存関係分析 / interface contract / file plan / risk | Draft の harness-first migration、test lane preservation、docs / CI contract、risk framing を採用。pytest dependency は orchestrator が `dependency-groups.dev` に固定。Draft / previous integration の provider CI unit-only 判断はユーザー補正により不採用へ変更し、full-suite CI contract に差し替えた。`unittest.mock` 温存案は不採用 | `spec-dock/active/issue/discussions/20260606t045218z-disc-pytest-complete-migration-design-proposal.md`; user correction D-004; updated `design.md`; fresh design review passed | none |
+| EAL-006 | partially_adopted | spec-dock-implementation-planner draft | `plan.md` step order / closure index / delegation contract / test seeds / review gates; `report.md` delegated evidence | Draft の S00/S01/S02/S03/S04/S05/S06/S08/S90/S99 ordering、44 files unittest dependency finding、large infra file risk、review gate structure を採用。Canonical `plan.md` では issue-plan schema に合わせて再構成し、D-004 により S90 / AC-002 / final gates を full-suite GitHub Actions contract へ変更し、D-005 により `tests/unit/commands/**` を S04 に追加した | `spec-dock/active/issue/discussions/20260606t050446z-disc-pytest-migration-plan-proposal.md`; user correction D-004; plan review finding D-005; updated `plan.md`; fresh plan review passed | none |
+| EAL-007 | adopted | user correction / local CI inspection | `requirement.md`, `design.md`, `plan.md`, `report.md` CI scope | 現行 spec は provider CI unit-only 前提だったが、ユーザーは GitHub Actions で全テストを実行することを要求したため、CI scope を full pytest suite に修正した | `.github/workflows/provider-ci.yml` currently runs `python -m unittest discover -s tests/unit`; user instruction; updated canonical docs; fresh requirement/design/plan reviews passed | none |
+| EAL-008 | adopted | spec-reviewer plan review finding | `plan.md` S04 scope / closure index / step mapping | `tests/unit/commands/**` が実行計画から漏れており、完全移行の grep closure を閉じられないという指摘は現物に基づく blocking gap だったため採用 | plan review fail 2026-06-06; `plan.md` update; D-005; fresh plan review passed | none |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
-主要目的と副次要件の主従が逆転していないことを記録する。特に clarification / authoring / handoff の変更では、primary objective evidence、secondary requirement evidence、inversion risk、reviewer verdict を残す。
-
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | pytest 完全移行を runner / dependency / tests / docs / CI まで固定 | `iss-00160` 後の test layout 維持、GitHub Actions full pytest suite、heavy runtime lane の pytest 実行可能性 | low: runtime 性能改善や layout 再編を scope 外に置いた | pass: fresh requirement re-review after D-004 |
+| OAL-002 | 親 Epic first-wave を置き換えず、後段 testing / regression infrastructure lane として扱う | 親 Epic の deferred regression / harness / runtime gate 記述、deterministic test evidence research | medium before fix; low after Parent Epic trace / AC-009 added | pass: fresh requirement re-review |
+| OAL-003 | Design keeps pytest complete migration as the primary objective and expresses it through dependency / runner / harness / test idiom / docs / CI contracts | Provider CI / GitHub Actions now runs full pytest suite; product runtime and parent Epic first-wave work remain unchanged | low: Python version matrix expansion and runtime optimization remain out of scope | pass: fresh design re-review after D-004 |
+| OAL-004 | Plan turns complete pytest migration into ordered executable steps with closure evidence, delegation boundaries, S90 docs/CI cutover, and S99 final gates | Large unittest-dependent files are isolated into dedicated slices; parent Epic boundary is reserved for final spec review | low: plan forbids unittest exception, CI scope reduction below full suite, product source change, assertion weakening, and test deletion without amendment | pass: fresh plan re-review after D-005 |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
-Requirement / design / plan の phase promotion ごとに、調査、未確定事項、回答、採用判断、reviewer verdict、blocking / non-blocking、次アクションを記録する。
-
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | Active issue / parent epic / workflow docs / current branch status / `iss-00160` diff / current test topology / README / AGENTS / provider CI / pyproject / lock / repo-analyst read-only analysis / parent Epic plan deferred work / deterministic gate research / D-004 CI scope correction | Blocking question: none. ユーザーは完全移行と GitHub Actions full-suite execution を明示済み。Requirement review REQ-001 は親 Epic trace 欠落として採用し修正済み。 | adopted / partially_adopted per EAL-001..004, EAL-007 | pass: fresh re-review after D-004 | no known blocker | Promoted to design re-review |
+| design | Approved requirement, system-architect draft, `pyproject.toml`, `README.md`, `AGENTS.md`, provider CI, representative tests / harness, phase_design / workflow_issue, D-004 CI scope correction | Blocking question: none. Dependency source is fixed to `dependency-groups.dev`; `unittest.mock` is forbidden with all other `unittest` imports; provider CI / GitHub Actions runs full pytest suite. | partially_adopted per EAL-005 and EAL-007; canonical design authored by orchestrator | pass: fresh re-review after D-004 | no known blocker | Promoted to plan re-review |
+| plan | Approved requirement/design, implementation-planner draft, issue-plan authoring docs, phase_plan_issue, workflow_issue, current unittest dependency evidence, user CI correction D-004, plan-scope correction D-005 | Blocking question: none. Plan assumes hard pytest cutover, step commits, delegated implementation, per-step code/spec review, S90 docs/CI full-suite cutover, S04 commands package migration, and S99 final QA/code/spec gates. | partially_adopted per EAL-006..008; canonical plan authored by orchestrator | pass: fresh re-review after D-005 | no known blocker | Ready for execution handoff |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
-- 委任 authoring の使用:
-  - used / not used
-- 未使用の場合:
-  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
-- lifecycle state（契約値）:
-  - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
-- 昇格不可 state:
-  - `stale`, `rejected`, `superseded`, `blocked`
-- 標準出力先:
-  - 対象 scope の `discussions/` direct child にある flat Markdown
-  - filename: `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md`
-- 軽量 provenance:
-  - `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, fallback decision, report evidence destination, adoption ledger note
-  - 互換 label: source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
-- 禁止 self-claim:
-  - `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`, reviewer pass, phase completion, implementation readiness
-- 禁止 wildcard token:
-  - `*`, `grants.*`, `all`
-- 標準必須にしない field:
-  - task manifest hash, Permission Profile hash, session invocation hash, probe run id, session hash
-- historical note:
-  - 既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない。
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| repo-analyst | iss-00167 | N/A（read-only analysis; discussion direct-write not used） | current repo files / active issue docs / test layout | `requirement.md`, `report.md` | partially_adopted | `requirement.md`, `report.md` | N/A | 事実部分を canonical docs へ統合 | unittest-style tests 温存を前提にした狭い推奨は不採用 | none | N/A | delegated draft ではなく read-only evidence として採用 |
+| spec-dock-system-architect | iss-00167 | `spec-dock/active/issue/discussions/20260606t045218z-disc-pytest-complete-migration-design-proposal.md` | active issue docs, parent docs, workflow docs, `pyproject.toml`, README / AGENTS / provider CI, tests topology, representative tests / harness | `design.md`, `plan.md`, `report.md` | partially_adopted via EAL-005 | `design.md`, `report.md` | manual_guard_passed: formal baseline-status was not captured before delegation; post-run status showed only canonical issue docs plus one new issue discussion | Adopted after orchestrator rewrite into canonical design; D-004 later changed CI scope to full suite and fresh design review passed | optional extra / narrow mock retention uncertainty was resolved differently: `dependency-groups.dev`, no `unittest.mock`; unit-only provider CI now rejected | none | pass after D-004 design re-review | promoted to plan re-review |
+| spec-dock-implementation-planner | iss-00167 | `spec-dock/active/issue/discussions/20260606t050446z-disc-pytest-migration-plan-proposal.md` | active issue docs, parent epic docs, workflow / phase / authoring docs, current pytest/unittest config, docs, CI, representative tests | `plan.md`, `report.md` | partially_adopted via EAL-006 and supplemented by EAL-008 | `plan.md`, `report.md` | manual_guard_passed: formal baseline had pre-existing dirty canonical docs and untracked design discussion; post-run added exactly the expected plan discussion | Adopted after orchestrator rewrite into canonical issue-plan schema; D-004 changed CI scope to full suite; D-005 added `tests/unit/commands/**` to S04; fresh plan review passed | Draft's caveat language and proposal authority were not copied as plan authority; unit-only CI assumption rejected; initial commands package omission fixed by D-005 | none | pass after D-005 plan re-review | ready for execution handoff |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
+
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
 |---|---|---|---|---|
-| 同意なし（missing consent） | blocked / incomplete | 範囲付き同意を取得する、または手動 authoring に戻す | この section | ineligible |
-| 前段 reviewer pass 不足 / stale（missing/stale previous reviewer pass） | blocked / incomplete | レビューゲートを再実行する（rerun reviewer gate） | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
-| 設計中の要件 gap（requirement gap during design） | blocked / incomplete | requirement phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| 計画中の設計 gap（design gap during plan） | blocked / incomplete | design phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| ロール利用不可（role unavailable） | blocked / manual path | 利用不可を記録し、妥当なら手動で続行する | この section | ineligible |
-| 禁止行為の試行（forbidden action attempt） | rejected | ドラフトを破棄し incident を記録する | この section / decision ledger | ineligible |
-| 古いドラフト（stale draft） | stale | 再生成または差分調整する | この section | ineligible |
-| 置換済みドラフト（superseded draft） | superseded | 置換先ドラフトを参照する | この section | ineligible |
-| 委任使用主張に対する証跡不足（missing draft evidence when delegated use is claimed） | incomplete | 証跡を追加する、または委任使用 claim を外す | この section | ineligible |
-| reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
+| missing/stale previous reviewer pass | blocked / incomplete | 該当 phase の reviewer gate を再実行する | Spec Authoring Gate | ineligible |
+| requirement gap during design | blocked / incomplete | requirement phase へ戻す | Spec Interpretation / Decision Ledger | ineligible |
+| design gap during plan | blocked / incomplete | design phase へ戻す | Spec Interpretation / Decision Ledger | ineligible |
+| reviewer unavailable/denied/waived/provisional | blocked / incomplete | fresh passed reviewer を取得する | Spec Authoring Gate / Reviewer Gate Status | ineligible |
 
-## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
-
-## 実装記録（セッションログ） (必須)
-
-### セッションログ（2026-06-06 HH:MM - HH:MM）
-
-#### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
-
-#### 実施内容
-- ...
-
-#### 実行コマンド / 結果
-```bash
-<command>
-
-<result>
-```
-
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
-
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
-
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
-
-#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
-`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
+## ワークフロー委任同意の証跡（Workflow Delegation Consent）
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00167 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction: 「適切なサブエージェントを利用」 | `/Users/iwasawayuuta/.codex/worktrees/cfd8/spec-dock` | iss-00167 | current session | repo-analyst, spec-reviewer, later code-reviewer / qa-reviewer / dev-coder / doc-writer as plan requires | same repo, active issue, current session, named role; no destructive action, publishing, credentialed access, scope expansion, or canonical doc write by sub-agent | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed with required fresh reviewer gates |
 
-#### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
+## 実装サマリー
+- Planning phase complete after D-004 CI scope correction and D-005 plan-scope correction. Implementation has not started.
+- Requirement, design, and plan were recreated from the post-`iss-00160` test topology and the user-selected complete pytest migration scope.
+- D-004 corrected the GitHub Actions / provider CI scope from unit-only pytest to `uv run pytest` full suite. Fresh requirement, design, and plan reviewer gates passed in phase order.
+- D-005 corrected the plan execution scope so `tests/unit/commands/**` is owned by S04 and full migration closure can be reached.
 
-| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+## 実装記録（セッションログ）
 
-#### 委任 worker 証跡（Delegated Worker Evidence）
-| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
-|---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
-
-#### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
-
-#### レビューゲート状態（Reviewer Gate Status）
-| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
-
-#### ステップ commit ゲート（Step Commit Gate）
-| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
-
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
-
-#### コミット
-- <hash> <message>
-
-#### メモ
-- ...
-
----
-
-### セッションログ（2026-06-06 HH:MM - HH:MM）
+### セッションログ（2026-06-06）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Phase: requirement authoring
+- AC/EC: requirement candidate only
+- 計画上の出典（Planned source）:
+  - `workflow_spec_authoring.md`
+  - `workflow_clarification.md`
+  - `phase_requirement.md`
+  - `workflow_issue.md`
 
 #### 実施内容
-- ...
+- Active issue と親 Epic を確認した。
+- `iss-00160` merge 後の test topology、README / AGENTS / CI / pyproject / lock の current contract を確認した。
+- ユーザーの完全移行指示と repo-analyst の read-only facts を統合し、要件定義書を再作成した。
+- Blocking clarification question はなしと判断したため、formal interview artifact は作成していない。
+- Requirement re-review pass 後、system-architect draft を委任して設計論点を作成し、採用 / 不採用を整理して設計書へ統合した。
+- Design review pass 後、implementation-planner draft を委任して plan step ordering / closure / gate proposal を作成し、採用 / 不採用を整理して実装計画書へ統合した。
+- ユーザー確認により GitHub Actions / provider CI は unit-only ではなく全テスト実行が必要と判明したため、D-004 として requirement / design / plan を `uv run pytest` full suite 契約へ修正し、requirement -> design -> plan の順で fresh re-review を通した。
+- Plan re-review で `tests/unit/commands/**` の実行範囲漏れが見つかったため、D-005 として S04 に追加し、fresh plan re-review を通した。
 
----
+#### 実行コマンド / 結果
+```bash
+./spec-dock/scripts/spec-dock active show
+# initiative: init-local-00003
+# epic: epic-00158
+# issue: iss-00167
 
-## 最終品質ゲート（Final Quality Gate / 必須）
+git status --short --branch
+# ## iss-00167-migrate-tests-to-pytest
 
-### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
-| 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
-|---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+sed -n '1,140p' .github/workflows/provider-ci.yml
+# current implementation still runs: python -m unittest discover -s tests/unit
 
-### 最終 QA ゲート（Final QA Gate）
-| レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
-|---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+git diff --check
+# pass
 
-### 最終コードレビューゲート（Final Code Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
-|---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=86
+```
 
-### 最終 spec review ゲート（Final Spec Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
-|---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+#### レビューゲート状態（Reviewer Gate Status）
 
-### 最終 commit（Final Commit）
-| 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
-|---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| requirement | requirement spec authoring gate | spec-reviewer | fresh after D-004 CI scope correction | pass | N/A | promoted to design re-review | Fresh re-review confirmed GitHub Actions / provider CI full pytest suite via `uv run pytest` |
+| design | design spec authoring gate | spec-reviewer | fresh after D-004 CI scope correction | pass | N/A | promoted to plan re-review | Fresh re-review confirmed provider CI full pytest suite design contract |
+| plan | plan spec authoring gate | spec-reviewer | fresh after D-005 plan-scope correction | pass | N/A | ready for execution handoff | Fresh re-review confirmed `tests/unit/commands/**` S04 ownership and provider CI full pytest suite contract |
 
-## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+#### ステップ契約の完了証跡（Step Contract Closure）
 
-## 学んだこと (任意)
-- ...
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| planning-requirement | N/A | requirement candidate created from current facts and fresh reviewer pass | `requirement.md`, this report, fresh requirement re-review after D-004 | passed | promoted to design re-review |
+| planning-design | N/A | design candidate created from approved requirement and fresh reviewer pass | `design.md`, this report, fresh design re-review after D-004 | passed | promoted to plan re-review |
+| planning-plan | N/A | executable plan candidate created from approved design and fresh reviewer pass | `plan.md`, this report, fresh plan re-review after D-005 | passed | ready for execution handoff |
 
-## 今後の推奨事項 (任意)
-- ...
+#### テスト契約の完了証跡（Test Contract Closure）
 
-## 省略/例外メモ (必須)
-- 該当なし
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| N/A | planning-spec-authoring | no | inspect-only | current docs / test topology inspection | fresh `spec-reviewer` requirement/design/plan re-reviews after D-004/D-005 | passed | implementation tests are planned in `plan.md`; execution has not started |
+
+#### 変更したファイル
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/requirement.md` - post-`iss-00160` 前提の pytest 完全移行要件を作成。
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/design.md` - pytest 完全移行の設計、依存順序、interface contract、test / docs / CI 変更境界を作成。
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/plan.md` - pytest 完全移行の実行順序、closure index、delegation contract、step-local concrete tests、S90/S99 gate を作成。
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/report.md` - 調査、採用判断、委任同意、requirement / design gate 証跡を記録。
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/discussions/20260606t045218z-disc-pytest-complete-migration-design-proposal.md` - system-architect delegated design draft。
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/discussions/20260606t050446z-disc-pytest-migration-plan-proposal.md` - implementation-planner delegated plan draft。
