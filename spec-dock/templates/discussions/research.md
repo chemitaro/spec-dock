@@ -17,6 +17,7 @@ reflected_to: []
 ## 位置づけ
 - 用途: 外部仕様、実装事実、先例、制約、用語衝突、edge case など、検証可能な根拠を整理する。
 - authority default: `synthesized`。通常は doc type から推定し、例外時だけ front matter の `authority` で override する。
+- この artifact は source-grounded research evidence surface であり、main orchestrator が canonical docs / accepted ADR / `report.md` Evidence Adoption Ledger へ採用するまでは canonical authority ではない。
 - 調査結果が選択肢比較を必要とする場合は `disc`、長期判断を支える場合は `adr`、人間判断を必要とする場合は `interview` へつなぐ。
 - 事実、推測、未検証事項、用語衝突、edge case、判断への含意を混ぜない。
 - local context で解ける疑問は人間に聞かず、この artifact に source-grounding を残す。
