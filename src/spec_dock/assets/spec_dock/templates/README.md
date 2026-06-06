@@ -1,7 +1,7 @@
 # テンプレート一覧（spec-dock/templates）
 
 このディレクトリは、ローカルスクリプト `./spec-dock/scripts/spec-dock new ...` が
-新規ノードを作成する際に参照するテンプレート群です。
+新規ノードを作成する際に参照するテンプレート群です。Templates are scaffold / evidence slot / good example surfaces only; workflow authority and detailed field semantics live in skills, docs, accepted ADRs, canonical artifacts, reviewer gates, and report ledgers.
 
 - `initiative/` → `initiatives/init-xxxx-<slug>/`
 - `epic/` → `.../epics/epic-xxxx-<slug>/`
@@ -25,13 +25,13 @@
 - legacy sequential discussion docs（`<nnn>-<kind>-<slug>.md`）は grandfathered artifact として許容されますが、自動 rename や basename 再利用はしません。
 - ただし discussion-doc intent を持つ malformed basename は explicit failure です（例: `foo-adr-kickoff.md`, `bogus-01-adr-kickoff.md`, `20260329x-adr-kickoff.md`）。
 - same-second collision suffix が `99` まで埋まった場合は失敗します。follow-up issue で archive または contract 拡張を判断してください。
-- 生成後のファイルは自由に編集して構いません（テンプレは雛形）。
+- 生成後のファイルは自由に編集して構いません（テンプレは starting scaffold であり、placeholder は completion evidence ではありません）。
 - authority は通常 doc type から推定します。例外時だけ front matter の `authority` で override し、全 artifact に明示必須化しません。
 - discussion docs は作業面です。必要な文脈だけを新しい `adr`、または `requirement.md` / `design.md` / `plan.md` へ反映します。
 - 命名規則は **全て小文字**（macOS のケース非区別FS対策）。
 - `new/import {initiative,epic,issue}` の `--slug` は kebab-case（小文字英数字 + `-`）です。`--slug` 省略時は `--title` から合成されます（詳細は `spec-dock/docs/reference_naming.md`）。
 - 各ノードの子スコープ配下には canonical guidance への `rules.md` symlink が含まれます（例: `epics/rules.md`, `issues/rules.md`, `discussions/rules.md`）。`rules.md` は入口/ナビゲーション用です。
-- 作成/運用ルールの正本は `spec-dock/docs/rules/**` です。runtime command はサポートされた実行経路です。
+- 作成/運用ルールの詳細参照先は `spec-dock/docs/rules/**` です。runtime command はサポートされた実行経路です。
 - 新規ノードにはテンプレ由来の `README.md` は生成されません。
 
 更新:
