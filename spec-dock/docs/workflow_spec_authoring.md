@@ -1,7 +1,8 @@
 # 仕様 authoring ワークフロー（workflow: spec authoring）
 
 Initiative / Epic / Issue の requirement / design / plan を作成・更新する共通 workflow です。
-scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_epic.md` / `workflow_issue.md` が所有し、この文書は仕様書作成そのものの phase promotion gate を正本として扱います。
+Operational entrypoint / first-read spine は `spec-dock-initiative-planning`、`spec-dock-epic-planning`、`spec-dock-issue-planning` などの planning skill が所有します。
+scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_epic.md` / `workflow_issue.md` が detail / reference semantics を持ち、この文書は仕様書作成そのものの phase promotion gate、delegated evidence、hard cases の詳細参照として扱います。
 
 関連:
 - 総合: [guide.md](guide.md)
@@ -133,7 +134,7 @@ Historical `iss-00126` task manifest / Permission Profile / probe / session arti
 1. 対象 scope と既存 node を確認する。
 2. 対象 artifact に対応する `docs/authoring/<scope>-<phase>.md` がある場合は最初に読む。
 3. 対象 scope の `workflow_*.md` と phase playbook を読む。
-4. 調査結果、仮説、選択肢、質問を必要に応じて `discussions/` に分離する。raw capture は `scratch`、人間への正式質問は一問一答の `interview`、事実調査は `research`、論点整理 / synthesis は `disc`、長期判断は `adr` を使う。formal question trigger と lightweight chat question の境界は `workflow_clarification.md` を正本にする。
+4. 調査結果、仮説、選択肢、質問を必要に応じて `discussions/` に分離する。raw capture は `scratch`、人間への正式質問は一問一答の `interview`、事実調査は `research`、論点整理 / synthesis は `disc`、長期判断は `adr` を使う。formal question trigger と lightweight chat question の境界は `workflow_clarification.md` の bridge/reference detail を参照する。
 5. 対象 artifact を更新する。
 6. fresh `spec-reviewer` を起動し、対象 artifact と upstream artifact を review する。
 7. `fail` なら修正し、fresh `spec-reviewer` で再レビューする。
