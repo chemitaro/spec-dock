@@ -429,7 +429,7 @@ rg -n 'self\.fail\(|def tearDown|super\(\)\.tearDown|import unittest|from unitte
 # no output
 
 uv run pytest tests/unit/application tests/unit/cli tests/unit/commands tests/unit/domain tests/unit/presentation tests/unit/test_discovery.py
-# 211 passed in 2.32s
+# 211 passed in 2.29s
 
 git diff --check
 # pass
@@ -448,11 +448,19 @@ git diff --check
     - `uv run pytest tests/unit/test_discovery.py -q` -> 1 passed in 0.01s
     - `uv run pytest tests/unit/application tests/unit/cli tests/unit/commands tests/unit/domain tests/unit/presentation tests/unit/test_discovery.py` -> 211 passed in 2.32s
     - `git diff --check` -> pass
-- Fresh step reviewer gate: code-reviewer pass after discovery fix.
+- Later S04 code-reviewer gate: fail.
+  - P1: `tests/unit/cli/test_cli_smoke.py` still had `setUp`, which pytest does not call for a plain class.
+- Follow-up:
+  - `setUp` was converted to `setup_method`, preserving the existing Windows / bash unavailable skip guard under pytest lifecycle.
+  - Focused follow-up verification:
+    - `rg -n 'def setUp|skipTest|unittest|self\.assert|assertRaises|subTest|mock\.' tests/unit/cli/test_cli_smoke.py` -> no output
+    - `uv run pytest tests/unit/cli/test_cli_smoke.py` -> 2 passed in 1.21s
+    - `git diff --check` -> pass
+- Fresh step reviewer gate: code-reviewer pass after `setup_method` lifecycle follow-up.
   - reviewer: `019e9c1f-550b-7da3-bcea-e0f28059f2c4`
   - review_status: pass
-  - summary: no P0/P1 blocking findings remain; previous pytest discovery regression is fixed; S04 scoped unittest/API grep is clean; report evidence reflects the updated 211-test S04 run.
-- Commit gate: pending at time of report update.
+  - summary: HEAD `30e4a4c6` plus the report-only working tree diff has no remaining actionable findings; `setup_method` resolves the CLI smoke lifecycle concern and the remaining diff is suitable as S04 gate evidence.
+- Commit gate: implementation commit `30e4a4c6`; report-only gate evidence commit pending at time of this report update.
 
 #### 仕様解釈 / 判断記録
 
@@ -461,12 +469,13 @@ git diff --check
 | D-010 | resolved | implementation | dev-coder + orchestrator | Runtime shell inventory class name | `tests/unit/cli/test_cli.py` の inventory が旧 `RuntimeShellS11Tests` を参照したが、S03 後の runtime lane は `TestRuntimeShellS11` を公開していた | inventory 側を現行 class 名 `TestRuntimeShellS11` に更新 | inventory test の目的は runtime lane の重要 class / method が存在することの確認であり、現行 source の定義名へ追随するのが最小変更 | `tests/unit/cli/test_cli.py` | なし |
 | D-011 | resolved | implementation | code-reviewer + dev-coder + orchestrator | Former `subTest` case visibility in S04 unit packages | 初回 S04 review が plain loop 化による failure case visibility 低下を P2 として指摘した | former `subTest` loop は parametrization または case label / assertion message で可視性を維持する | EC-002 は former `subTest` cases の visibility 維持を要求する。pytest-native 移行後も失敗ケース特定性を落とさない必要がある | `tests/unit/application/test_validate.py`, `tests/unit/domain/test_authority.py`, `tests/unit/domain/test_delegated_authoring.py`, `tests/unit/domain/test_runtime_domain_s03.py` | S04 fresh review で再確認 |
 | D-012 | resolved | implementation | code-reviewer + orchestrator | Pytest class discovery for unit discovery smoke | S04 fresh review found that removing `unittest.TestCase` from `UnitDiscoverySmokeTest` made the class invisible to pytest default discovery | Rename the class to `TestUnitDiscoverySmoke` so pytest collects the existing package marker smoke test | AC-008 requires coverage intent preservation; a migrated class test must still be collected after dropping `unittest.TestCase` inheritance | `tests/unit/test_discovery.py` | S04 fresh review で再確認 |
+| D-013 | resolved | implementation | code-reviewer + dev-coder + orchestrator | Pytest lifecycle for CLI smoke skip guard | S04 review found that plain-class `setUp` was not called by pytest, bypassing the existing Windows / bash unavailable skip guard | Convert `setUp` to `setup_method` and keep the existing skip conditions and reasons | AC-008 requires preserving existing test hermeticity and environment guards after dropping `unittest.TestCase` inheritance | `tests/unit/cli/test_cli_smoke.py` | S04 fresh review で再確認 |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S04 | `tc-006`, `tc-004`, `tc-005` | small / medium unit packages pass under pytest idioms; former subTest and exception expectation visibility / strength are preserved | scoped grep no output; `uv run pytest tests/unit/test_discovery.py -q` -> 1 passed; `uv run pytest tests/unit/application tests/unit/cli tests/unit/commands tests/unit/domain tests/unit/presentation tests/unit/test_discovery.py` -> 211 passed; `git diff --check` pass; fresh code-reviewer pass `019e9c1f-550b-7da3-bcea-e0f28059f2c4` | passed | initial reviewer P2 fixed; fresh reviewer P1 discovery finding fixed; final S04 reviewer gate passed |
+| S04 | `tc-006`, `tc-004`, `tc-005` | small / medium unit packages pass under pytest idioms; former subTest and exception expectation visibility / strength are preserved | scoped grep no output; `uv run pytest tests/unit/test_discovery.py -q` -> 1 passed; `uv run pytest tests/unit/cli/test_cli_smoke.py` -> 2 passed; `uv run pytest tests/unit/application tests/unit/cli tests/unit/commands tests/unit/domain tests/unit/presentation tests/unit/test_discovery.py` -> 211 passed; `git diff --check` pass; fresh code-reviewer pass `019e9c1f-550b-7da3-bcea-e0f28059f2c4` | passed | initial reviewer P2 fixed; discovery P1 and setup lifecycle P1 fixed; final S04 reviewer gate passed; implementation commit `30e4a4c6` |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 
