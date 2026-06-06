@@ -9356,8 +9356,20 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 f"{install_root_provider_workflow}"
             )
         workflow_text = repo_root_provider_workflow.read_text(encoding="utf-8")
-        assert "python -m pip install -e ." in workflow_text
-        assert "python -m unittest discover -s tests/unit" in workflow_text
+        assert "python -m pip install uv" in workflow_text
+        workflow_lines = workflow_text.splitlines()
+        step_index = workflow_lines.index("      - name: Run provider pytest suite")
+        provider_pytest_run = None
+        for line in workflow_lines[step_index + 1:]:
+            if line.startswith("      - "):
+                break
+            if line.startswith("        run: "):
+                provider_pytest_run = line.removeprefix("        run: ")
+                break
+
+        assert provider_pytest_run == "uv run pytest"
+        legacy_runner = "python -m " + "unit" + "test discover"
+        assert legacy_runner not in workflow_text
 
     def test_issue_68_legacy_codex_skills_tree_is_retired(self) -> None:
         legacy_root = self._ISSUE_68_RETIRED_LEGACY_ROOT
