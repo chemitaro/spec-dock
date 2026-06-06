@@ -72,7 +72,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | Primary objective is the clarification-specific skill-owned grill workflow | Secondary requirements cover bridge doc and clarification-specific template slots without absorbing hub/global template issues | low | requirement and design reviewers passed; plan reviewer pending |
+| OAL-001 | Primary objective is the clarification-specific skill-owned grill workflow | Secondary requirements cover bridge doc and clarification-specific template slots without absorbing hub/global template issues | low | requirement/design/plan reviewers passed; S01 reviewer passed |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -127,106 +127,145 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- S01 で `spec-dock-clarification` skill を source-grounded grill loop の first-read workflow に更新した。
+- Provider と dogfooding mirror は byte-equivalent に保ち、stale source-of-truth wording を削除した。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-06-06 HH:MM - HH:MM）
+### セッションログ（2026-06-06 05:00 - 05:20）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01
+- AC/EC: AC-001, AC-005, EC-002, EC-003
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: 実装ステップ S01 — Skill-owned clarification grill spine
+  - closure ids: cl-001, cl-002, cl-003, cl-004
 
 #### 実施内容
-- ...
+- Provider and mirror `spec-dock-clarification/SKILL.md` を first-read source-grounded grill loop に更新した。
+- Stale wording `Keep this skill concise` / `workflow_clarification.md is the source of truth` を削除した。
+- Direct-user-only blocker、analysis-only / draft-only / canonical authoring modes、answer adoption / handoff を skill に追加した。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+rg -n 'source-grounded grill loop' src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md .agents/skills/spec-dock-clarification/SKILL.md
+rg -n 'provisional understanding' src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md .agents/skills/spec-dock-clarification/SKILL.md
+rg -n 'gap classification' src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md .agents/skills/spec-dock-clarification/SKILL.md
+rg -n 'pressure-test question' src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md .agents/skills/spec-dock-clarification/SKILL.md
+rg -n 'artifact capture' src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md .agents/skills/spec-dock-clarification/SKILL.md
+rg -n 'answer adoption' src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md .agents/skills/spec-dock-clarification/SKILL.md
+rg -n 'iterate|handoff' src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md .agents/skills/spec-dock-clarification/SKILL.md
 
-<result>
+pass: all required loop terms found in provider and mirror.
+```
+
+```bash
+rg -n 'ask the user directly' src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md .agents/skills/spec-dock-clarification/SKILL.md
+rg -n 'analysis-only' src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md .agents/skills/spec-dock-clarification/SKILL.md
+rg -n 'draft-only' src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md .agents/skills/spec-dock-clarification/SKILL.md
+rg -n 'canonical authoring' src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md .agents/skills/spec-dock-clarification/SKILL.md
+
+pass: direct-user blocker and modes found in provider and mirror.
+```
+
+```bash
+rg -n 'workflow_clarification[.]md.*source of truth|Keep this skill concise' src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md .agents/skills/spec-dock-clarification/SKILL.md
+
+pass: no matches; command exited 1.
+```
+
+```bash
+cmp -s src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md .agents/skills/spec-dock-clarification/SKILL.md
+python -m unittest tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets
+
+pass: cmp exited 0; unittest OK.
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only | pre-change skill contained stale source-of-truth wording and lacked full first-read loop | pre-change read and S01 negative command detected stale wording before edit | pass | docs-only skill text change |
+| S01 | 緑フェーズ（Green） | per-term loop/mode/direct-user checks, stale negative check, parity | all required terms found; stale wording absent; provider/mirror parity passed | `rg`, `cmp`, `python -m unittest ...` | pass | cl-001..cl-004 evidence recorded |
+| S01 | リファクタリング（Refactor） | no outside-path changes | diff limited to two clarification skill files before report update | `git diff --stat`, diff inspection | pass | no route table / docs / templates / runtime changes in S01 |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | none | implementation | no action | cl-001..cl-004 | no | S01 commands above |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | cl-001, cl-002, cl-003, cl-004 | full skill loop terms, direct-user boundary, modes, stale negative, provider/mirror parity, fresh spec-reviewer | implementation evidence passes; fresh S01 spec-reviewer passed | pass | ready for S01 commit |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-s01-001 | S01 | yes | inspect-only | stale thin skill | per-term loop `rg` commands | pass | resolves cl-001 |
+| tc-s01-002 | S01 | yes | inspect-only | stale thin skill | direct-user/mode `rg` commands and stale negative command | pass | resolves cl-002, cl-003 |
+| tc-s01-003 | S01 | yes | covered-existing | provider/mirror parity existed before S01 | `cmp`; targeted agent-tooling parity unittest | pass | resolves cl-004 |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| cl-001 | S01 | full grill loop per-term `rg` commands | pass | fresh S01 spec-reviewer passed |
+| cl-002 | S01 | `ask the user directly` and stale-proxy boundary wording | pass | fresh S01 spec-reviewer passed |
+| cl-003 | S01 | `analysis-only`, `draft-only`, `canonical authoring` commands | pass | fresh S01 spec-reviewer passed |
+| cl-004 | S01 | provider/mirror `cmp` and targeted parity unittest | pass | fresh S01 spec-reviewer passed |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| alias-mapped | cl-001 | tc-s01-001 | cl-001 | plan concrete test id used as test id | no | no |
+| alias-mapped | cl-002, cl-003 | tc-s01-002 | cl-002, cl-003 | plan concrete test id used as test id | no | no |
+| alias-mapped | cl-004 | tc-s01-003 | cl-004 | plan concrete test id used as test id | no | no |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00163 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction to use issue planning/execution workflow and subagents; follow-up correction forbids deep-consultant as user proxy | `/Users/iwasawayuuta/.codex/worktrees/8d9b/spec-dock` | iss-00163 | current session | spec-reviewer, code-reviewer, qa-reviewer, read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use; ask user directly if user-intent clarification becomes blocking | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed with S01 commit |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | approved-local-execution | narrow two-file mirror skill edit; plan allowed parent-local docs edit and required fresh spec-reviewer gate | N/A | provider/mirror clarification skill spine update | `requirement.md`; `design.md`; `plan.md`; provider source under `src/spec_dock/assets/install_root/.agents/skills/` | two S01 target skill files only | docs, templates, runtime, hub route table, other skills | S01 per-term `rg`, stale negative `rg`, `cmp`, targeted agent-tooling parity unittest, diff inspection | hub route changes required; user-intent clarification blocking; provider/mirror parity cannot be preserved | changed files, verification result, unresolved risks | pass; fresh S01 spec-reviewer passed with P2 audit cleanup |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | N/A | No delegated worker used; parent orchestrator performed the narrow approved-local text edit | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md`; `.agents/skills/spec-dock-clarification/SKILL.md` | S01 `rg` checks pass; stale negative pass; `cmp` pass; targeted parity unittest pass | fresh S01 spec-reviewer pass by `019e9b5a-e70d-7670-bf97-7adf11011f34` | none | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01 | delegation not required; parent-local edit was explicitly allowed by `plan.md` | user-approved workflow execution; no waiver | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md`; `.agents/skills/spec-dock-clarification/SKILL.md` | bounded text edit | revert the two skill files to pre-S01 state if reviewer fails | S01 planned commands -> pass | spec-reviewer `019e9b5a-e70d-7670-bf97-7adf11011f34` passed | no unavailable/denied/host conflict remained |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step reviewer | spec-reviewer | fresh | passed | no | proceed to S01 commit | Agent `019e9b5a-e70d-7670-bf97-7adf11011f34`; P2 report placeholder cleanup fixed before commit |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | ready to commit | two clarification skill files + report S01 evidence | pending commit | pending | not applicable | not applicable | not applicable | not applicable |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md` - Provider clarification skill first-read grill loop.
+- `.agents/skills/spec-dock-clarification/SKILL.md` - Dogfooding mirror clarification skill parity update.
+- `spec-dock/active/issue/report.md` - S01 evidence and reviewer gate records.
 
 #### コミット
-- <hash> <message>
+- pending S01 commit.
 
 #### メモ
-- ...
+- No user interview blocker was found for S01.
 
 ---
 
