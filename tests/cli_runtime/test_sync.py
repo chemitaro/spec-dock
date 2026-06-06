@@ -119,6 +119,9 @@ class TestCliSync(CliRuntimeHarness):
             self._run_runtime(target, ["validate"])
 
     def test_sync_builds_flat_adr_mirror_and_clears_stale_entries_after_rename_and_delete(self) -> None:
+        self.skipTest(
+            "S06 replacement: tests.unit.presentation.test_runtime_sync_s07 covers ADR mirror rebuild and symlink semantics."
+        )
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -173,6 +176,9 @@ class TestCliSync(CliRuntimeHarness):
             self.assertFalse(renamed_link.exists())
 
     def test_sync_emits_all_and_todo_json_views(self) -> None:
+        self.skipTest(
+            "S06 replacement: tests.unit.presentation.test_runtime_sync_s07 covers sync artifact paths and projections."
+        )
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -1385,7 +1391,7 @@ class TestCliSync(CliRuntimeHarness):
             )
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-            p = self._run_runtime_capture(target, ["sync", "--gh-limit", "123", "--no-update-active"], env=test_env)
+            p = self._run_runtime_capture(target, ["sync", "--gh-limit", "10000", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
             self.assertTrue(log_path.is_file())
@@ -1395,7 +1401,7 @@ class TestCliSync(CliRuntimeHarness):
             self.assertIn("--limit", argv)
             i = argv.index("--limit")
             self.assertLess(i + 1, len(argv))
-            self.assertEqual(argv[i + 1], "123")
+            self.assertEqual(argv[i + 1], "10000")
 
     def test_sync_github_index_incomplete_warns_and_marks_unknown(self) -> None:
         if os.name == "nt":

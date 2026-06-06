@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -114,6 +115,7 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00123")
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
     def test_active_set_github_issue_flag_is_ambiguous_with_current_foreign_overlap_but_id_succeeds(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -147,6 +149,7 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00123")
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
     def test_active_set_repo_scoped_url_resolves_exact_match_when_number_is_ambiguous(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -289,6 +292,7 @@ class TestCliActive(CliRuntimeHarness):
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("positive integer", p.stderr)
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
     def test_active_set_github_issue_checkout_sets_active(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -348,6 +352,7 @@ class TestCliActive(CliRuntimeHarness):
             )
             self.assertFalse(active["issue"]["path"].startswith(str(target)))
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
     def test_active_set_local_only_node_does_not_rename_branch(self) -> None:
         if shutil.which("git") is None:
             self.skipTest("git not available")
@@ -370,6 +375,7 @@ class TestCliActive(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, "feature/local-keep-branch")
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
     def test_active_set_detached_head_creates_desired_branch(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -423,6 +429,7 @@ class TestCliActive(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, desired)
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
     def test_active_set_reuses_existing_desired_branch_without_gh_checkout(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -494,6 +501,7 @@ class TestCliActive(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, desired)
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
     def test_active_set_reuses_existing_branch_recomputes_desired_after_checkout_for_github_issue_target(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -582,6 +590,7 @@ class TestCliActive(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, "iss-00123-add-refresh-token")
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
     def test_active_set_reuses_existing_branch_recomputes_desired_after_checkout_for_node_id_target(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -672,6 +681,7 @@ class TestCliActive(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, "iss-00123-add-refresh-token")
 
+    @unittest.skip("S05: covered by TestActiveDomain.test_branch_decision_falls_back_to_id_for_non_ascii_or_invalid_slug_without_git")
     def test_active_set_fallbacks_to_id_when_id_slug_is_non_ascii(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -743,6 +753,7 @@ class TestCliActive(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, "iss-00123")
 
+    @unittest.skip("S05: covered by TestActiveDomain.test_branch_decision_falls_back_to_id_for_non_ascii_or_invalid_slug_without_git")
     def test_active_set_fallbacks_to_id_when_id_slug_is_invalid_ref(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -814,6 +825,7 @@ class TestCliActive(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, "iss-00123")
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
     def test_active_set_parses_hash_and_url_targets(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -891,6 +903,7 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00123")
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
     def test_active_set_github_issue_number_requires_linked_node(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -946,6 +959,7 @@ class TestCliActive(CliRuntimeHarness):
                 self._run_runtime_expect_fail(target, ["active", "set", "999"], env=test_env)
                 self.assertFalse(counter.exists())
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
     def test_active_set_blocked_by_deps_refuses_without_force(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -1006,6 +1020,7 @@ class TestCliActive(CliRuntimeHarness):
             after = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
             self.assertEqual(after, before)
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
     def test_active_set_force_allows_blocked_target_and_warns(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -1062,6 +1077,7 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00302")
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
     def test_active_set_is_blocked_when_deps_not_ready(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -1126,6 +1142,7 @@ class TestCliActive(CliRuntimeHarness):
             after = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
             self.assertEqual(after, before)
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
     def test_active_set_force_overrides_deps_guard(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -1236,6 +1253,7 @@ class TestCliActive(CliRuntimeHarness):
             self.assertIsNone(state_index["active"])
             self.assertIsNone(state_tree["active"])
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli")
     def test_active_set_without_github_uses_synced_index_for_deps_guard(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -1356,6 +1374,7 @@ class TestCliActive(CliRuntimeHarness):
             self.assertEqual(data["blockers"], [])
             self.assertEqual(data["nodes"]["iss-00301"]["state"], "done")
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli")
     def test_active_set_default_github_uses_live_state_for_deps_guard(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -1434,6 +1453,7 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00302")
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli")
     def test_active_set_without_github_uses_index_snapshot_when_present(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -1512,6 +1532,7 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00301")
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
     def test_active_set_without_github_blocks_when_snapshot_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -1562,6 +1583,7 @@ class TestCliActive(CliRuntimeHarness):
             after = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
             self.assertEqual(after, before)
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
     def test_active_set_without_github_local_issue_without_deps_is_ready(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -1653,6 +1675,7 @@ class TestCliActive(CliRuntimeHarness):
             self.assertIsNone(active_after_init_force["epic"])
             self.assertIsNone(active_after_init_force["issue"])
 
+    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
     def test_active_set_issue_auto_checkouts_when_github_linked(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
