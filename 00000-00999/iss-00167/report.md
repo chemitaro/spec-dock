@@ -305,3 +305,104 @@ git diff --check
 
 #### 変更したファイル
 - `tests/cli_runtime/harness.py` - runtime harness を pytest-native plain helper に移行。
+
+### 実装ステップ S03 — Runtime / CLI regression lane migration
+
+#### 対象
+- Step: S03
+- Closure IDs: `tc-003`, `tc-004`, `tc-005`
+- Scope: `tests/cli_runtime/test_*.py`
+
+#### 実施内容
+- `tests/cli_runtime/test_*.py` 25ファイルを pytest-native に移行した。
+- `import unittest`, `from unittest`, `unittest.TestCase`, `unittest.skip`, `unittest.main`, `unittest.mock`, `self.assert*`, `self.fail(...)`, `assertRaises*`, `subTest`, `skipTest` を runtime lane から除去した。
+- 既存 skip は `pytest.mark.skip` / `pytest.skip` として理由を維持した。
+- `unittest.mock` は pytest-native local fake/context または direct monkeypatch-style helper に置換した。
+- 旧 `subTest` 由来のケースは `pytest.mark.parametrize` または case label 付き assertion message へ移行し、ケース可視性を維持した。
+- pytest lifecycle では呼ばれない `tearDown` を `teardown_method` に移行した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n 'self\.fail\(|def tearDown|super\(\)\.tearDown|import unittest|from unittest|unittest\.|self\.assert|assertRaises|subTest|skipTest|unittest\.main|mock\.' tests/cli_runtime
+# no output
+
+uv run pytest tests/cli_runtime --collect-only
+# collected 651 items
+
+uv run pytest tests/cli_runtime/test_new.py -q
+# 38 passed, 5 skipped
+
+uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py -q
+# 26 passed
+
+uv run pytest tests/cli_runtime/test_import.py tests/cli_runtime/test_deps.py tests/cli_runtime/test_worktree.py -q
+# 168 passed, 10 skipped
+
+uv run pytest tests/cli_runtime
+# 575 passed, 76 skipped in 359.74s
+
+git diff --check
+# pass
+```
+
+#### レビュー / コミットゲート
+- Initial S03 code-reviewer gates returned pass with P2 findings.
+- All P2 findings were fixed before commit:
+  - locked worktree returncode assertion restored to success/failure equivalence check.
+  - former `subTest` loops in `test_deps.py`, `test_import.py`, `test_worktree.py`, and `test_new.py` were parametrized or given explicit case labels.
+  - `TestDelegatedAuthoringCli.tearDown` was converted to `teardown_method`.
+  - leftover `self.fail(...)` calls in `test_runtime_doctor_s04.py` were replaced with `pytest.fail(...)`.
+- Fresh final step reviewer gate: code-reviewer pass.
+  - findings: none
+  - review_status: pass
+  - notes: no P0/P1/P2 finding; no old unittest API residue; no test function deletion; no out-of-scope diff; no new xfail; S03 step commit possible.
+- Commit gate: pending at time of report update.
+
+#### 仕様解釈 / 判断記録
+
+| ID | 状態 | 種別 | 判断者 | トピック | トリガー | 採用判断 | 根拠 | 影響ファイル | フォローアップ |
+|---|---|---|---|---|---|---|---|---|---|
+| D-007 | resolved | implementation | orchestrator + code-reviewer | Former `subTest` case visibility | S03 review が plain loop 化により failure case identity / coverage が落ちる P2 を複数回指摘した | `pytest.mark.parametrize` が自然な箇所は parametrization、共有 fixture / side effect が大きい箇所は case label 付き assertion message で補強 | EC-002 は former `subTest` cases の visibility 維持を要求する。全て parametrize に寄せるより、副作用の大きい loop は case label で可視性を保つ方が最小安全 | `tests/cli_runtime/test_deps.py`, `test_import.py`, `test_worktree.py`, `test_new.py` | S99 QA で EC-002 closure を再確認 |
+| D-008 | resolved | implementation | orchestrator + code-reviewer | Pytest lifecycle cleanup | `tearDown` は plain class 化後に pytest から呼ばれず、TemporaryDirectory cleanup が per-test lifecycle から外れる P2 が出た | `tearDown` を `teardown_method` へ移行し、`super().tearDown()` を削除 | S03 は runtime lane の pytest-native migration であり、cleanup lifecycle も pytest の実行規約に合わせる必要がある | `tests/cli_runtime/test_delegated_authoring.py` | なし |
+| D-009 | resolved | implementation | orchestrator + code-reviewer | Residual `self.fail(...)` | `self.fail(...)` が grep baseline から漏れたが、plain class では `unittest.TestCase.fail` が存在しない P2 が出た | `self.fail(...)` を `pytest.fail(...)` に置換し、future grep に `self\.fail\(` を追加 | AC-006 は unittest assertion API dependency の除去を要求する。`self.fail` も assertion API とみなす | `tests/cli_runtime/test_runtime_doctor_s04.py` | S08/S99 grep へ `self\.fail\(` を含める |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | `tc-003`, `tc-004`, `tc-005` | runtime lane passes under pytest and has no unittest dependency; former subTest / exception expectations retain visibility and strength | scoped grep no output; collect-only 651 items; full `uv run pytest tests/cli_runtime` -> 575 passed, 76 skipped; final code-reviewer pass with no findings | passed | runtime lane duration 359.74s recorded for EC-005 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-003` | S03 | yes | red-required | S02 後は runtime test bodies に `self.assert*` / `subTest` / `skipTest` / `unittest` API が残り、initial runtime run は多数 failure | `uv run pytest tests/cli_runtime`; scoped grep | passed: 575 passed, 76 skipped; grep no output | full runtime lane migrated |
+| `tc-004` | S03 | yes | covered-existing | Former `subTest` cases existed across deps/import/worktree/new loops | parametrization / case label assertions; code-reviewer re-review | passed | P2 findings were fixed before final review |
+| `tc-005` | S03 | yes | covered-existing | `assertRaises*` / exception message checks were unittest-style | pytest-native exception assertions; full runtime lane | passed | no `assertRaises` grep output remains |
+
+#### 変更したファイル
+- `tests/cli_runtime/test_active.py`
+- `tests/cli_runtime/test_close.py`
+- `tests/cli_runtime/test_delegated_authoring.py`
+- `tests/cli_runtime/test_delete.py`
+- `tests/cli_runtime/test_deps.py`
+- `tests/cli_runtime/test_import.py`
+- `tests/cli_runtime/test_issue_lifecycle.py`
+- `tests/cli_runtime/test_new.py`
+- `tests/cli_runtime/test_post_mutation_sync_s01.py`
+- `tests/cli_runtime/test_runtime_active_s05.py`
+- `tests/cli_runtime/test_runtime_active_s06.py`
+- `tests/cli_runtime/test_runtime_close_s12.py`
+- `tests/cli_runtime/test_runtime_delete_s13.py`
+- `tests/cli_runtime/test_runtime_deps_s04.py`
+- `tests/cli_runtime/test_runtime_doctor_s04.py`
+- `tests/cli_runtime/test_runtime_import_s10.py`
+- `tests/cli_runtime/test_runtime_new_doc_s09.py`
+- `tests/cli_runtime/test_runtime_shell_s11.py`
+- `tests/cli_runtime/test_runtime_validate_s02.py`
+- `tests/cli_runtime/test_sync.py`
+- `tests/cli_runtime/test_uninstall.py`
+- `tests/cli_runtime/test_update.py`
+- `tests/cli_runtime/test_validate.py`
+- `tests/cli_runtime/test_worktree.py`
+- `tests/cli_runtime/test_wrappers.py`
