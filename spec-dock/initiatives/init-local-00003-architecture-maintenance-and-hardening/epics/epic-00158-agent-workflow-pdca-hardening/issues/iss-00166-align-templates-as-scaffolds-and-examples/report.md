@@ -51,7 +51,8 @@ ID: "iss-00166"
 ## 実装サマリー
 
 - Planning / spec authoring is complete and committed at `f7413abf`.
-- S01 template boundary / evidence-slot alignment is implemented in provider and dogfooding mirror templates; S01 review and commit are pending.
+- S01 template boundary / evidence-slot alignment is implemented and committed at `54e8ea40`.
+- S02 discussion template evidence-flow alignment is implemented in provider and dogfooding mirror templates; S02 review and commit are pending.
 
 ## 実装記録（セッションログ）
 
@@ -124,17 +125,53 @@ result:
 - Initiative / Epic / Issue report evidence slots remain present.
 ```
 
+### セッションログ（2026-06-06 / S02）
+
+#### 対象
+- Step: S02 Discussion Template Evidence Flow.
+- AC/EC: AC-002, AC-006, EC-002.
+- Closure ids: cl-004, cl-005.
+
+#### 実施内容
+- Delegated S02 discussion template update to `doc-writer` sub-agent `019e9bf1-f818-7001-a0d2-5e0ca5db6a54`.
+- Updated `interview`, `research`, and `disc` discussion templates as non-canonical evidence surfaces.
+- Preserved `interview` one-question flow, answer capture, adoption target, and reflection fields.
+- Preserved `research` facts / inference / unverified / question-candidate separation.
+- Preserved `disc` synthesis, reflection proposal, adoption target, and ADR triage support.
+- Kept S02 scope to provider discussion templates and exact dogfooding mirror equivalents.
+
+#### 実行コマンド / 結果
+
+```bash
+git diff --name-only
+git diff --check
+diff -q src/spec_dock/assets/spec_dock/templates/discussions/interview.md spec-dock/templates/discussions/interview.md
+diff -q src/spec_dock/assets/spec_dock/templates/discussions/research.md spec-dock/templates/discussions/research.md
+diff -q src/spec_dock/assets/spec_dock/templates/discussions/disc.md spec-dock/templates/discussions/disc.md
+rg -n "one essential question|answer capture|source-grounded context|adoption target|reflection|facts /|inference /|unverified /|question candidates|synthesis|ADR triage|ADR candidate triage|non-canonical evidence surface|evidence surface" <S02 changed templates>
+rg -n "canonical source of truth|accepted authority|compliance authority|phase promotion|正本|採用済み|確定証跡|確定する|決定する" <S02 changed templates>
+
+result:
+- changed paths are limited to 6 S02 provider/mirror discussion template files before report evidence.
+- `git diff --check` passed.
+- all 3 provider/mirror discussion template pairs matched.
+- positive source-grounded / answer-capture / facts-inference / synthesis / ADR-triage wording was present.
+- accepted/canonical authority claim wording was not found.
+```
+
 ## 実装委任ゲート（Implementation Delegation Gate）
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | shipped templates / persistent workflow text changes are docs/template worker work | doc-writer `019e9be9-7282-7291-8f3b-56a27c952661` | canonical template README, report templates, Epic design template, Issue plan template | approved requirement/design/plan; S01 target templates | S01 provider templates and exact dogfooding mirror equivalents | skills, docs, runtime, tests, GitHub state, issue metadata, S02 discussion templates | scope guard, positive/negative `rg`, provider/mirror parity, `git diff --check` | need for skill/doc/runtime/test change; user intent clarification; verification cannot run | changed files, verification result, unresolved risks, ledger note | pass; worker changed only S01 allowed templates and returned no material decision |
+| S02 | delegated | shipped discussion template text changes are docs/template worker work | doc-writer `019e9bf1-f818-7001-a0d2-5e0ca5db6a54` | interview / research / disc discussion templates | approved requirement/design/plan; S02 target discussion templates | S02 provider discussion templates and exact dogfooding mirror equivalents | skills, docs, runtime, tests, GitHub state, issue metadata, S01 canonical templates | scope guard, positive/negative `rg`, provider/mirror parity, `git diff --check` | need for clarification skill/workflow/runtime change; user intent clarification; verification cannot run | changed files, verification result, unresolved risks, ledger note | pass; worker changed only S02 allowed templates and returned no material decision |
 
 ## 委任 worker 証跡（Delegated Worker Evidence）
 
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
 | S01 | doc-writer `019e9be9-7282-7291-8f3b-56a27c952661` | Added scaffold / evidence slot / good example boundary wording; preserved report evidence ledgers; routed workflow authority to skills/docs/reviewer gates | 12 S01 provider/mirror template files | worker reported positive/negative `rg`, report-slot `rg`, 6 provider/mirror `diff -q`, scope guard, `git diff --check` all pass | pending step spec-reviewer | none | accepted after parent re-ran scope, parity, `rg`, and whitespace checks |
+| S02 | doc-writer `019e9bf1-f818-7001-a0d2-5e0ca5db6a54` | Added non-canonical evidence-surface wording to interview/research/disc templates and preserved source-grounded evidence fields | 6 S02 provider/mirror discussion template files | worker reported positive/negative `rg`, 3 provider/mirror `diff -q`, scope guard, `git diff --check` all pass | pending step spec-reviewer | none | accepted after parent re-ran scope, parity, `rg`, and whitespace checks |
 
 ## ステップ契約の完了証跡（Step Contract Closure）
 
@@ -148,6 +185,7 @@ result:
 | planning-plan | reviewer-finding-003 | doc-writer handoff must include step scope, acceptance criteria, and reviewer focus | S01/S02 delegation contracts now include step scope, acceptance criteria, reviewer focus, and explicit closure IDs | pass | fixes P1 delegation handoff finding |
 | planning-plan | reviewer-finding-004 | report evidence destinations must be explicit per step | S01/S02/S90/S99 now list report destinations for delegation, closure, reviewer, commit, and final-gate evidence | pass | fixes P2 report evidence destination finding |
 | S01 | cl-001, cl-002, cl-003, cl-005 | S01 templates identify scaffold / evidence / example boundaries, preserve report slots, route plan detail to skills/docs, and stay in S01 scope | worker output; parent `git diff --name-only`; positive/negative `rg`; report-slot `rg`; 6 provider/mirror `diff -q`; `git diff --check`; spec-reviewer `019e9bef-59aa-78b0-8aed-959c201a3630` | pass | reviewer passed with one P3 wording correction, applied |
+| S02 | cl-004, cl-005 | Discussion templates support source-grounded question, facts/inference separation, synthesis, adoption target, reflection, ADR triage, and stay in S02 scope | worker output; parent `git diff --name-only`; positive/negative `rg`; 3 provider/mirror `diff -q`; `git diff --check`; spec-reviewer `019e9bf5-628e-7771-85fb-98eea5a92640` | pass | reviewer passed with no findings |
 
 ## テスト契約の完了証跡（Test Contract Closure）
 
@@ -157,6 +195,9 @@ result:
 | cl-002 / tc-s01-002 | S01 | yes | inspect-only | report templates contained required evidence ledger slots before S01 | `rg` for Evidence Adoption Ledger, Delegated Draft Evidence, Spec Authoring Gate, Reviewer Gate Status, closure/follow-up terms | pass | Initiative / Epic / Issue report slots remain present |
 | cl-003 / tc-s01-003 | S01 | yes | inspect-only | Issue plan template previously used source-of-truth wording for writing policy | `rg` and diff inspection of `templates/issue/plan.md` provider/mirror pair | pass | Issue plan template is an executable scaffold and routes authority / field semantics to skills/docs |
 | cl-005 / tc-s01-004 | S01 | yes | inspect-only | clean worktree after planning commit `f7413abf` | `git diff --name-only` and path comparison against S01 allowed paths | pass | only S01 provider/mirror templates plus issue report evidence changed |
+| cl-004 / tc-s02-001 | S02 | yes | inspect-only | `interview.md` already had source-grounded context and answer fields before S02 | `rg` for one essential question, source-grounded context, answer capture, adoption target, reflection; diff inspection | pass | interview template is a non-canonical evidence surface for one-question user interviews |
+| cl-004 / tc-s02-002 | S02 | yes | inspect-only | `research.md` and `disc.md` already separated research and synthesis fields before S02 | `rg` for facts / inference / unverified / question candidates / synthesis / adoption target / ADR triage; diff inspection | pass | research and disc templates preserve evidence separation and adoption routing |
+| cl-005 / tc-s02-003 | S02 | yes | inspect-only | clean worktree after S01 commit `54e8ea40` | `git diff --name-only` and path comparison against S02 allowed paths | pass | only S02 provider/mirror discussion templates changed before report evidence |
 
 ## クロージャ網羅（Closure Coverage）
 
@@ -166,6 +207,8 @@ result:
 | cl-002 | S01 | report-slot `rg` across Initiative / Epic / Issue report templates | pass | evidence slots preserved |
 | cl-003 | S01 | issue plan template `rg` and diff inspection | pass | policy/detail routing points to skills/docs |
 | cl-005 | S01 | `git diff --name-only`; `git diff --check`; provider/mirror `diff -q` | pass | S01 scope contained |
+| cl-004 | S02 | positive/negative `rg`; diff inspection; provider/mirror `diff -q` | pass | discussion templates support source-grounded evidence flow |
+| cl-005 | S02 | `git diff --name-only`; `git diff --check`; provider/mirror `diff -q` | pass | S02 scope contained |
 
 ## レビューゲート状態（Reviewer Gate Status）
 
@@ -175,13 +218,15 @@ result:
 | design | phase reviewer | spec-reviewer `019e9bdc-d8dd-7b00-a467-f1dea73d8531` | fresh | pass | no | promoted to plan | no findings |
 | plan | phase reviewer | spec-reviewer `019e9bdf-9f9e-7d83-8ce3-672c6231b5f4` | fresh after fix | pass | no | promoted to issue execution | no findings; plan ready for execution handoff |
 | S01 | step reviewer | spec-reviewer `019e9bef-59aa-78b0-8aed-959c201a3630` | fresh | pass | no | commit S01 | one P3 report wording correction applied |
+| S02 | step reviewer | spec-reviewer `019e9bf5-628e-7771-85fb-98eea5a92640` | fresh | pass | no | commit S02 | no findings |
 
 ## ステップ commit ゲート（Step Commit Gate）
 
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） |
 |---|---|---|---|---|
 | planning-requirement/design/plan | committed | requirement/design/plan/report authoring evidence | `f7413abf` | clean before S01 delegation |
-| S01 | pending commit | S01 provider/mirror template changes + report evidence | pending | pending |
+| S01 | committed | S01 provider/mirror template changes + report evidence | `54e8ea40` | clean before S02 delegation |
+| S02 | pending commit | S02 provider/mirror discussion template changes + report evidence | pending | pending |
 
 ## 最終品質ゲート（Final Quality Gate）
 
