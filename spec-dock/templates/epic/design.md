@@ -12,6 +12,8 @@ ID: "<EPIC_ID>"
 
 # <EPIC_ID> <EPIC_TITLE> — 設計（どう実現するか）
 
+> このテンプレートは design scaffold / good example surface です。必要な境界、図、契約、未確定事項を書き始めるための starting shape であり、workflow / compliance authority ではありません。詳細な lifecycle policy や field semantics は skills / docs / accepted ADRs / reviewer gates を参照します。
+
 ## 全体像
 - 対象境界:
   - ...
@@ -100,7 +102,7 @@ ID: "<EPIC_ID>"
   - ペイロード:
 
 ### データ境界
-- 正本:
+- データの authoritative source / system of record:
   - ...
 - 一貫性モデル:
   - ...
