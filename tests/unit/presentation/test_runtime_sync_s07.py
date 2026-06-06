@@ -14,7 +14,7 @@ _REQUIRED_NODE_DOCS = ("requirement.md", "design.md", "plan.md", "report.md")
 
 def _runtime_modules():
     runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
+        Path(__file__).resolve().parents[3]
         / "src"
         / "spec_dock"
         / "assets"
