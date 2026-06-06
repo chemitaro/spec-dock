@@ -3,267 +3,200 @@
 ID: "iss-00165"
 タイトル: "Align Workflow Docs With Skill Spine Boundary"
 関連GitHub: ["#165"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-06"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00158", "init-local-00003"]
 ---
 
-# iss-00165 Align Workflow Docs With Skill Spine Boundary — 実装計画（実行契約 / Execution Contract）
-
-> このテンプレートは最小 scaffold です。`plan.md` は計画済み契約（planned contract）を所有し、実装者が step を上から順に実行できる command queue として書く。実行結果、逸脱、発見された tests、reviewer verdict、commit/no-op evidence は `report.md` の観測証跡台帳（observed evidence ledger）に記録する。実行 policy は `workflow_issue.md`、Issue 計画の書き方は `phase_plan_issue.md` と `docs/authoring/issue-plan.md` を正本にする。
+# iss-00165 Align Workflow Docs With Skill Spine Boundary — 実装計画
 
 ## この計画で満たす要件ID
+
 - AC:
-  - ...
+  - AC-001 docs are not the only mandatory first-read workflow surface.
+  - AC-002 docs retain detailed semantics / hard cases / policy detail.
+  - AC-003 clarification docs are bridge/reference for `spec-dock-clarification`.
+  - AC-004 provider/mirror validation evidence.
+  - AC-005 no scope absorption into skills/templates/runtime.
 - EC:
-  - ...
-- 制約:
-  - ...
+  - EC-001 keep long policy detail in docs when moving it would bloat skills.
+  - EC-002 update bridge/link wording safely.
+  - EC-003 record follow-up instead of absorbing skill rewrite if needed.
 
 ## 依存関係から導く実装順序
-- 依存関係の正本:
-  - `design.md` の依存関係、図、ファイル変更計画
-- 順序ルール:
-  - prerequisite / lower-dependency slice から先に閉じる
-  - downstream slice は前提が固定されてから置く
-- step 依存サマリー:
-  - S01:
-    - 依存:
-    - unblock:
-    - 対象ファイル:
 
-## ステップ一覧
-- S01:
-  - 観測可能な振る舞い:
-  - 依存:
-  - unblock:
-  - 対象ファイル:
-  - 閉じる要件:
-  - レビューゲート:
-- S02:
-  - ...
-
-## 要件 ↔ ステップ対応
-- AC-001 -> S01
-- EC-001 -> S02
+- S01 updates provider docs and dogfooding mirror docs together as one docs-only wording slice.
+- S90 runs sync / validate / docs impact inspection after S01 commit.
+- S99 runs final QA/code/spec review and final report commit.
+- `iss-00163` / `iss-00164` completion is a prerequisite for provider docs wording changes.
 
 ## 仕様固定クロージャ索引（Spec-Locked Closure Index）
 
-> これは Issue 全体のテスト一覧ではなく、仕様を縮小解釈・後付けテスト・過剰実装しないための coverage ledger です。実際の step-local obligation と concrete seeds は各 implementation step の `具体テストケース一覧` に置く。
-
-| 識別子（ID） | ステップ（step） | スライス（slice） | 種別（type） | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル（evidence level） | クロージャ証跡（closure evidence） |
+| 識別子（ID） | ステップ | スライス | 種別 | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル | クロージャ証跡 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | <behavior> | 受け入れ（acceptance） | AC-001 | ... | ... | 仕様 drift（spec drift） | yes | red-required | ステップ完了証跡（report step closure） |
-| tc-002 | S01 | <behavior> | 否定系（negative） | EC-001 | ... | ... | 沈黙失敗（silent failure） | yes | inspect-only | ステップ完了証跡（report step closure） |
+| cl-001 | S01 | docs boundary wording | acceptance | AC-001 | Docs identify skills as operational entrypoints / first-read workflow spine and docs as detail/reference layer | provider docs diff | hidden mandatory workflow remains docs-only | yes | inspect-only | report Step/Test Closure |
+| cl-002 | S01 | detail retention | acceptance | AC-002, EC-001 | Workflow / phase / authoring docs retain detailed semantics, lifecycle policy, hard cases, and field meanings | manual read-through / diff inspection | over-thinning docs | yes | inspect-only | report Step/Test Closure |
+| cl-003 | S01 | clarification bridge | acceptance | AC-003, EC-002 | Clarification docs and entry docs point to `spec-dock-clarification` as skill-owned workflow and docs as bridge/reference | targeted `rg` | clarification workflow becomes docs-owned again | yes | inspect-only | report Step/Test Closure |
+| cl-004 | S01 | scope boundary | regression | AC-005, EC-003 | No skill/template/runtime changes are included; any required skill rewrite is recorded as follow-up / no-op rationale | `git diff --name-only` | scope absorption | yes | inspect-only | report Closure Coverage |
+| cl-005 | S01 | prerequisite evidence | prerequisite | AC-001, AC-003 | `iss-00163` and `iss-00164` completion evidence exists before docs wording changes | GitHub / git log inspection | docs alignment based on incomplete prior surfaces | yes | inspect-only | report Step Closure |
+| cl-006 | S90 | provider/mirror validation | regression | AC-004 | `sync`, `validate`, mirror inspection, and diff-check pass; generated changes are recorded | commands and status | provider/mirror drift | yes | manual-required | Docs Impact Resolution |
+| cl-007 | S99 | final gate | final | all AC/EC | QA/code/spec reviewers pass and final report ledger is committed | reviewers / commands / commit | incomplete issue finish evidence | yes | manual-required | Final Quality Gate |
 
-- 証跡レベル（evidence level）:
-  - red-required: 実装前に失敗する新規 test / characterization を固定する。
-  - covered-existing: 既存 test が対象 behavior を検出できる根拠を固定する。
-  - inspect-only: docs / template / config などを inspection、structural assertion、review evidence で閉じる。
-  - manual-required: 自動化できない確認手順、期待結果、記録先を固定する。
-- 詳細化方針:
-  - 件数ではなく、AC、changed contract、failure mode、regression risk、invariant、manual / integration risk から必要な obligation を決める。
-  - private method、実装アルゴリズム、mock 構造、assert 細部は原則固定しない。
+## 実装ステップ S01 — Workflow Docs Boundary Wording
 
-## レビュー / QA ゲート方針
-- RG1 step review:
-  - 実施タイミング: 各 implementation step の commit 前
-  - reviewer: code-reviewer（code / runtime / tests / scaffold behavior）; spec-reviewer（docs-only / template-only / skill-text-only）
-  - pass 条件: review_status: pass
-- QG1 final QA:
-  - reviewer: qa-reviewer
-  - 範囲: Issue 全体の obligation coverage、missing high-value tests、manual / integration test 要否
-- SG1 final spec review:
-  - reviewer: spec-reviewer
-  - 範囲: requirement / design / plan / report / docs 整合
-
-## 実行ルール（全ステップ共通）
-- 各 implementation step は原則として 1 behavior slice / 1 review scope / 1 commit boundary とする。
-- `plan.md` には planned requirements、evidence destination、closure 条件だけを書く。observed result は `report.md` に書く。
-- docs-only / inspect-only / manual-required step は code test 前提にせず、代替 evidence path と rationale を implementation 前に固定する。
-- implementation 中に新しい仕様、bug class、外部 contract risk、未計画の closure が見つかった場合は、report 記録だけで足りるか、plan amendment と re-review が必要かを判断する。
-
-## 実装ステップ
-
-### 実装ステップ S01 — <観測可能な振る舞い>
-- 振る舞いの目標（behavior goal）:
-  - ...
+- 振る舞いの目標:
+  - Workflow / phase / authoring / entry docs are readable as detail/reference surfaces reached from skill-owned operational entrypoints.
 - design 参照:
-  - ...
+  - Boundary Wording Contract。
 - 依存:
-  - ...
-- unblock:
-  - ...
+  - `iss-00163` and `iss-00164` completed.
 - 対象ファイル:
-  - ...
-- 計画済み契約（planned contract）:
-  - scope:
-    - 実装・文書化する範囲:
-  - テスト義務（test obligation）:
-    - closure id:
-      - tc-001
-    - coverage rationale:
-      - AC / changed contract / failure mode / regression risk / invariant / manual risk から必要性を書く:
-  - Red / 代替証跡の要件:
-    - red-required / covered-existing:
-      - 実装前に確認する failing test、characterization、または既存 test sensitivity:
-    - docs-only / inspect-only / manual-required:
-      - code test を置かない理由:
-      - 代替 evidence path:
-      - manual 手順と期待結果:
-  - 実装範囲（implementation scope）:
-    - allowed paths:
-      - ...
-    - forbidden changes:
-      - ...
-  - Green 検証:
-    - command / inspection / manual evidence:
-      - ...
-  - Refactor / cleanup ガードレール:
-    - 目的:
-    - 禁止する広がり:
-  - closure 証跡要件:
-    - Step Contract Closure:
-    - Test Contract Closure:
-    - Closure Coverage:
-  - report 証跡の記録先:
-    - `report.md` の対象 section / ledger:
-  - amendment trigger（plan amendment が必要になる契機）:
-    - plan amendment と re-review が必要になる発見:
+  - `src/spec_dock/assets/spec_dock/docs/README.md`
+  - `src/spec_dock/assets/spec_dock/docs/guide.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow_clarification.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+  - `src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md`
+  - `src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md`
+  - dogfooding mirror equivalents under `spec-dock/docs/`
+- planned contract:
+  - allowed paths:
+    - Provider docs and dogfooding mirror docs listed above.
+    - `report.md` evidence.
+  - forbidden changes:
+    - `.agents/skills/`, `src/spec_dock/assets/install_root/.agents/skills/`
+    - `src/spec_dock/assets/spec_dock/templates/`, `spec-dock/templates/`
+    - runtime scripts / Python code / tests.
+  - Red / alternative evidence:
+    - Inspect old entry docs and workflow docs for wording that can read as docs-only mandatory workflow authority.
+    - Confirm completion of prerequisite issues.
+  - Green verification:
+    - Positive `rg` for skill-first / detail-reference / bridge wording.
+    - Negative `rg` for stale clarification docs-as-source-of-truth wording.
+    - `git diff --name-only` scope check.
+    - `git diff --check`.
+  - closure ids:
+    - cl-001..cl-005.
+  - amendment trigger:
+    - A required change touches skills/templates/runtime.
+    - A lifecycle policy change is needed rather than wording alignment.
+    - `workflow_clarification.md` full retirement becomes necessary.
 
-#### 委任契約（delegation contract）
-- 委任ロール（delegated role）:
-  - dev-coder / doc-writer / other named worker / N/A
-- 入力 docs:
-  - `requirement.md`
-  - `design.md`
-  - `plan.md`
-  - workflow / authoring docs:
-  - current target files:
-- 許可 paths:
-  - ...
-- 禁止 changes:
-  - ...
-- 受け入れ条件:
-  - closure id / step close condition:
-- 必須 tests または docs-only verification:
-  - targeted command / inspection / docs diff / manual evidence:
-- reviewer focus:
-  - code-reviewer（code / runtime / tests / scaffold behavior）; spec-reviewer（docs-only / template-only / skill-text-only docs/spec alignment）
-- 必須出力（output required）:
-  - changed files:
-  - verification result:
-  - report evidence to update:
-  - unresolved risks:
-- 停止条件（stop conditions）:
-  - input docs conflict / path outside allowed scope / verification cannot run / acceptance cannot be met:
+### S01 delegation contract
 
-#### 具体テストケース一覧
+- delegated role:
+  - `doc-writer`
+- required reason:
+  - shipped docs / workflow text changes are delegated worker work under `workflow_issue.md`.
+- source of truth:
+  - approved requirement / design / plan.
+  - Epic ADRs and `iss-00162` inventory.
+  - provider docs under `src/spec_dock/assets/spec_dock/docs/`.
+- allowed changes:
+  - S01 target provider docs and dogfooding mirror docs.
+- forbidden changes:
+  - skills, templates, runtime, tests, GitHub state, issue metadata.
+- required verification:
+  - changed file list, targeted positive / negative `rg`, `git diff --check`.
+- required output:
+  - changed files, verification result, unresolved risks, and `Ledger Note` or `No material implementation decisions beyond the approved plan.`
+- stop conditions:
+  - Need for skill/template/runtime change.
+  - Need for user intent clarification.
+  - Verification cannot run.
 
-> この欄は full test inventory ではありません。step-local obligation と concrete red / characterization / inspect / manual seeds を、実装前に固定するための欄です。
+### S01 concrete checks
 
-- `tc-s01-001` acceptance: <短い説明>
-  - 前提: ...
-  - 操作: ...
-  - 期待結果: ...
-  - 失敗検出: ...
-  - 検証方法: ...
-  - 関連 closure id: tc-001
+- `tc-s01-001` inspect-only: docs boundary positive wording
+  - expected: changed docs include skill-first operational entrypoint wording and docs detail/reference wording.
+  - verification: targeted `rg` over provider and mirror docs.
+  - related closure id: cl-001.
+- `tc-s01-002` inspect-only: detail retention
+  - expected: workflow policy/detail sections remain present; diff does not delete lifecycle semantics wholesale.
+  - verification: diff inspection and manual read-through.
+  - related closure id: cl-002.
+- `tc-s01-003` inspect-only: clarification bridge
+  - expected: `workflow_clarification.md` and entry docs mention `spec-dock-clarification` as skill-owned / entry workflow and docs as bridge/reference.
+  - verification: targeted `rg`.
+  - related closure id: cl-003.
+- `tc-s01-004` inspect-only: scope boundary
+  - expected: no skills/templates/runtime files changed.
+  - verification: `git diff --name-only`.
+  - related closure id: cl-004.
+- `tc-s01-005` inspect-only: prerequisites
+  - expected: GitHub issues #163 and #164 are closed and local history has their final gate commits.
+  - verification: `gh issue view 163`, `gh issue view 164`, `git log --grep`.
+  - related closure id: cl-005.
 
-- `tc-s01-002` inspect-only / manual-required: <短い説明>
-  - テスト不要理由: <自動テスト不要の理由>
-  - 代替検証方法: <確認手順>
-  - 期待結果: <期待される状態>
-  - 記録先: <証跡の保存先>
-  - 関連 closure id: tc-002
+### S01 step gate
 
-#### ステップ完了契約（step closure contract）
-- closure id:
-  - tc-001
-- close 条件:
-  - ...
-- 検証 evidence:
-  - targeted command / inspection / manual evidence:
-- report evidence:
-  - Step Contract Closure:
-  - Test Contract Closure:
-  - Closure Coverage:
-  - Closure Delta:
-- 残リスク:
-  - ...
+- reviewer:
+  - `spec-reviewer`
+- pass condition:
+  - `review_status: pass`
+- commit boundary:
+  - docs changes + report S01 evidence.
 
-#### ステップゲート（step gate）
-- step reviewer gate:
-  - reviewer:
-  - review 範囲:
-  - pass 条件: review_status: pass
-  - re-review rule: 指摘を修正し pass まで再実行
-- commit / no-op gate:
-  - closure 状態: committed / approved-no-op
-  - commit 範囲:
-  - no-op の場合の確認対象、差分なし確認コマンド、read-only evidence:
+## ドキュメント影響の解消ステップ S90
 
-### 実装ステップ Sxx — <次に観測可能な振る舞い>
-- S01 の subsections を複製して記入する。
-- `planned contract`、`delegation contract`、`具体テストケース一覧`、`step closure contract`、`step gate` がない implementation step は implementation-ready ではない。
-
-### ドキュメント影響の解消ステップ S90（docs impact resolution / docs refresh）
 - 対象:
-  - docs / templates / README / workflow / skill / migration notes / none
+  - generated projections / dogfooding mirror after docs change.
 - 対応:
-  - ...
-- doc update owner:
-  - doc-writer when updates are required
+  - `./spec-dock/scripts/spec-dock sync`
+  - `./spec-dock/scripts/spec-dock validate`
+  - `git diff --check`
+  - `git status --short`
+  - mirror docs inspection for changed provider docs.
 - spec/doc review:
-  - reviewer: spec-reviewer
-  - pass 条件: docs が requirement / design / plan と整合し、未解決の必須 docs 影響が残っていない
+  - reviewer: `spec-reviewer`
+  - pass 条件: cl-006 pass.
+- allowed paths:
+  - `spec-dock/.agent/*`, `spec-dock/*.puml`, `spec-dock/dashboard.md`, `report.md` evidence only if sync rewrites projections.
+- forbidden changes:
+  - Additional provider docs / skills / templates / runtime changes after S01 without returning to S01.
+- concrete check:
+  - `tc-s90-001` manual-required: sync / validate / mirror validation.
+  - related closure id: cl-006.
 
-### 最終品質ゲートステップ S99（final quality gate）
+## 最終品質ゲートステップ S99
+
 - branch diff 範囲:
-  - ...
+  - issue planning commit to HEAD.
 - 必須 validation:
-  - ...
+  - `./spec-dock/scripts/spec-dock validate`
+  - `git diff --check`
+  - final `git status --short`
+  - issue-wide diff inspection.
 - final QA gate:
-  - reviewer: qa-reviewer
-  - 範囲: Issue 全体の obligation coverage と integration test 要否
-  - pass 条件: reviewer pass
-- final code review ゲート:
-  - reviewer: code-reviewer
-  - 範囲: issue-wide integrated diff、構造、責務境界、回帰リスク、保守性
-  - pass 条件: review_status: pass
-- final spec review ゲート:
-  - reviewer: spec-reviewer
-  - 範囲: requirement / design / plan / report / implementation / tests / docs 整合
-  - pass 条件: reviewer pass
+  - reviewer: `qa-reviewer`
+  - scope: obligation coverage and verification adequacy.
+- final code review:
+  - reviewer: `code-reviewer`
+  - scope: issue-wide integrated diff, scope boundary, markdown safety.
+- final spec review:
+  - reviewer: `spec-reviewer`
+  - scope: requirement / design / plan / report / implementation / docs alignment.
 - final commit gate:
-  - commit 範囲:
-  - final report ledger:
-  - post-commit external evidence destination:
+  - final report ledger committed.
+- concrete check:
+  - `tc-s99-001` manual-required: final gates and report commit.
+  - related closure id: cl-007.
 
 ## 未確定事項
-- Q-001:
-  - 質問:
-  - 推奨案:
-  - 影響範囲:
+
+- Blocking question:
+  - なし。
+- Amendment trigger:
+  - Required scope expands into skills/templates/runtime.
+  - Lifecycle policy semantics must change rather than wording boundary.
+  - Full retirement of `workflow_clarification.md` becomes necessary.
 
 ## 最終完了条件
-- AC/EC 達成:
-  - ...
-- docs 影響解決:
-  - ...
-- 全 implementation step 完了:
-  - committed / approved-no-op:
-- final quality gate pass:
-  - qa-reviewer:
-  - issue-wide code-reviewer:
-  - spec-reviewer:
-- final commit 完了:
-  - ...
-- 必須 closure id 完了:
-  - Step Contract Closure:
-  - Test Contract Closure:
-  - Closure Coverage:
-- final clean state:
-  - no unintended staged / unstaged changes:
+
+- AC-001..AC-005 / EC-001..EC-003 達成。
+- cl-001..cl-007 pass。
+- S01/S90/S99 reviewer gates pass。
+- Final report commit complete。
+- `issue finish` succeeds。
