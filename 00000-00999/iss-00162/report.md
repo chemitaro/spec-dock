@@ -251,7 +251,7 @@ pass: no missing provider template paths.
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | not applicable; delegation succeeded | not applicable | not applicable | not applicable | not applicable | parent inspections recorded above | fresh S01 re-review passed | not applicable |
-| S02 | parent performed a narrow two-file mirror wording edit because the approved plan already fixed exact files, forbidden areas, and verification; no user-intent clarification or external proxy decision was needed | user-approved workflow execution for active issue; risk acceptance limited to parent local edit with fresh S02 spec-reviewer gate | `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md`; `.agents/skills/spec-driven-tdd-workflow/SKILL.md` | bounded wording cleanup only | revert the two hub skill files to pre-S02 diff if reviewer fails | `cmp`; stale phrase negative `rg`; route table/routing `rg`; targeted parity unittest | S02 spec-reviewer pending | no waiver; block if reviewer finds the parent-local edit invalid |
+| S02 | parent performed a narrow two-file mirror wording edit because the approved plan already fixed exact files, forbidden areas, and verification; no user-intent clarification or external proxy decision was needed | user-approved workflow execution for active issue; risk acceptance limited to parent local edit with fresh S02 spec-reviewer gate | `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md`; `.agents/skills/spec-driven-tdd-workflow/SKILL.md` | bounded wording cleanup only | revert the two hub skill files to pre-S02 diff if reviewer fails | `cmp`; stale phrase negative `rg`; route table/routing `rg`; targeted parity unittest | fresh S02 spec-reviewer passed | no waiver; no unavailable/denied/host conflict remained |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
@@ -331,7 +331,7 @@ pass: diff is limited to hub introductory ownership wording and one Quick remind
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S02 | Parent-local edit used instead of delegated doc-writer implementation for a narrow two-file wording change | execution | recorded in Parent Implementation Exception and kept S02 blocked on fresh spec-reviewer | cl-005, cl-006, cl-007 | no | Parent Implementation Exception row; pending S02 reviewer gate |
+| S02 | Parent-local edit used instead of delegated doc-writer implementation for a narrow two-file wording change | execution | recorded in Parent Implementation Exception and closed by fresh S02 spec-reviewer pass | cl-005, cl-006, cl-007 | no | Parent Implementation Exception row; fresh S02 reviewer pass |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
@@ -348,9 +348,9 @@ pass: diff is limited to hub introductory ownership wording and one Quick remind
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| cl-005 | S02 | hub wording says skill first-read spine / docs detailed semantics / templates scaffold | pass | reviewer pending |
-| cl-006 | S02 | diff inspection shows no route table / clarification routing / leaf ownership restructuring changes | pass | reviewer pending |
-| cl-007 | S02 | provider/mirror `cmp` and targeted parity unittest | pass | reviewer pending |
+| cl-005 | S02 | hub wording says skill first-read spine / docs detailed semantics / templates scaffold | pass | fresh S02 spec-reviewer passed |
+| cl-006 | S02 | diff inspection shows no route table / clarification routing / leaf ownership restructuring changes | pass | fresh S02 spec-reviewer passed |
+| cl-007 | S02 | provider/mirror `cmp` and targeted parity unittest | pass | fresh S02 spec-reviewer passed |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -435,7 +435,7 @@ git status --short
 - `spec-dock/active/issue/report.md` - S02 commit evidence and S90 docs impact evidence.
 
 #### コミット
-- pending S90 commit.
+- `f0af6518` `docs(context-surface): docs impact検証証跡を記録`
 
 #### メモ
 - No user interview blocker was found for S90.
@@ -452,32 +452,34 @@ git status --short
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer `019e9b2d-0aaf-78c2-a251-b2a8b082c3b7` | whole issue obligation coverage | already sufficient for docs/skill-only changes | S01 inventory, S02 bounded hub wording, S90 docs impact checks, provider/mirror parity, stale wording inspection, targeted parity unittest; P2/P3 audit-trail findings fixed before final spec review | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer `019e9b2d-0b5d-74e2-b84f-bb08a790c0a4`; re-review `019e9b30-6f5b-7b51-afc7-188859022037` | issue-wide integrated diff | First review failed on stale S90 commit evidence; fixed S90 commit row and stale S02 reviewer-pending rows. Re-review found no findings. | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer `019e9b33-022e-7113-94a4-444db81ff376` | requirement / design / plan / report / implementation / tests / docs alignment | findings none; AC-001..AC-005 / EC-001..EC-003 traced through S01/S02/S90, provider/mirror parity and route-scope preservation accepted | 0 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| pending final report commit | final gate report updates only | issue finish / final response | ready |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: S01 review initially failed because inventory coverage was representative rather than exhaustive.
+  - 解決: Added exhaustive provider skills/docs/templates coverage appendix and re-ran fresh S01 spec-reviewer to pass.
+- 問題: Final code/QA review found stale report ledger rows for S90 commit and S02 pending reviewer state.
+  - 解決: Updated the report ledger to match committed S90 evidence and fresh S02 reviewer pass, then re-ran code review to pass.
 
 ## 学んだこと (任意)
-- ...
+- Provider/mirror hub wording can be corrected narrowly without absorbing broader `iss-00164` routing work when the diff avoids route table and clarification routing changes.
 
 ## 今後の推奨事項 (任意)
-- ...
+- Use the S01 inventory appendix as handoff evidence for `iss-00163`, `iss-00164`, `iss-00165`, and `iss-00166`.
 
 ## 省略/例外メモ (必須)
 - 該当なし
