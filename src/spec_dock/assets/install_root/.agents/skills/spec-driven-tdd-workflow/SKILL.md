@@ -5,16 +5,17 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 
 # Spec-driven TDD Workflow (Hub)
 
-- Use this as the entry/routing skill for spec-dock work.
+- Use this as the entry/routing skill, route selector, and global invariant surface for spec-dock work.
 - Use skills for the first-read workflow spine: mandatory next actions, stop conditions, reviewer gates, and handoff boundaries an agent must know before following links.
 - Use `spec-dock/docs/` for detailed semantics, field meanings, lifecycle policy, hard cases, and reference material.
 - Use templates as minimum authoring scaffolds, evidence slots, and examples. Templates are not compliance authorities.
 - Route to docs for detailed explanations instead of copying schema or policy into skills.
 - Use `spec-dock/docs/workflow_spec_authoring.md` for detailed requirement / design / plan phase promotion semantics across Initiative, Epic, and Issue.
-- Use `spec-dock/docs/workflow_clarification.md` and `spec-dock-clarification` when the request is to clarify ambiguous requirements, sharpen domain language, prepare one-question-at-a-time interviews, or work in analysis-only / draft-only mode before canonical authoring.
+- Use `spec-dock-clarification` for skill-owned, source-grounded clarification when the request is to clarify ambiguous requirements, sharpen domain language, prepare one-question-at-a-time interviews, or work in analysis-only / draft-only mode before canonical authoring; use `spec-dock/docs/workflow_clarification.md` for artifact semantics and reference details.
 - In spec authoring mode, each artifact must pass a fresh `spec-reviewer` (`review_status: pass`) before the next phase starts; fix findings and re-run a fresh reviewer until pass.
 - In spec authoring or issue execution mode, honor workflow-scoped delegation consent before routing reviewer work: if the current user request or active report evidence grants issue-scoped consent, the orchestrator may invoke named reviewer / read-only specialist roles within that scope without per-phase confirmation.
 - Missing, stale, failed, unavailable, denied, waived, or provisional reviewer results are not `review_status: pass`. Do not route to implementation or completion by treating them as degraded success.
+- Canonical docs are main orchestrator-owned; sub-agent, external, and discussion outputs remain evidence until adopted into canonical docs with `report.md` evidence.
 - Agents may add, remove, merge, reorder, or rewrite template sections when it improves correctness, human understanding, or agent executability for the specific project.
 - Use `spec-dock/docs/phase_design.md` as the source of truth for optional diagram choices. Add useful UML / PlantUML / table sections from the catalog, or project-specific sections outside the catalog, when they clarify structure, boundaries, responsibility, flow, state, or dependency.
 - Route once the main output is clear; leaf skills own the first-read spine for their workflow and docs own detailed semantics.
@@ -46,7 +47,7 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 
 - Do not default to create/import for initiative/epic; inspect existing nodes first.
 - Keep boundary rationale in `discussions/`; docs carry detailed rule semantics while skills expose the operational steps needed before consulting them.
-- Put interview and investigation notes under `discussions/` in the active node. Important questions use unanswered `interview` first; lightweight chat questions stay one-at-a-time and return to `interview` if they become specification decisions.
+- Route clarification work to `spec-dock-clarification`; keep detailed clarification artifact semantics in `spec-dock/docs/workflow_clarification.md`.
 - Sub-agent authoring outputs may be direct-written under the target scope `discussions/` direct child, but they do not become canonical authority until the main orchestrator adopts them in canonical docs and records the adoption in `report.md`.
 - Record `Spec Authoring Gate` evidence in the active node's `report.md` for each requirement / design / plan promotion.
 - For issue work, route requirement/design/plan authoring and unresolved source-grounded ambiguity to `spec-dock-issue-planning` with `spec-dock-clarification` as needed before execution.
