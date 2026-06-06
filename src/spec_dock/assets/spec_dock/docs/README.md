@@ -1,13 +1,14 @@
 # 文書入口（spec-dock docs）
 
 このディレクトリは `spec-dock init/update` により導入先リポジトリへ配置されます。  
-まず `guide.md` で全体像を掴み、曖昧さの明確化は `workflow_clarification.md`、仕様書作成は `workflow_spec_authoring.md`、scope 固有の lifecycle / governance は対象 scope の `workflow_*.md` を入口にしてください。
+Agent の operational entrypoint / first-read spine は導入済み skill です。まず skill で実行順序、停止条件、reviewer gate を確認し、docs は detail / reference layer として artifact semantics、policy detail、hard cases を調べるために参照します。
+全体像は `guide.md`、曖昧さの明確化の bridge/reference は `workflow_clarification.md`、仕様書作成の phase promotion semantics は `workflow_spec_authoring.md`、scope 固有の lifecycle / governance detail は対象 scope の `workflow_*.md` を参照してください。
 plan だけは `phase_plan.md` の shared axiom と `phase_plan_<scope>.md` の scope-specific playbook を合わせて参照します。
 runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` です。
 
 ## エージェント起点
 
-`spec-dock init/update` は次の skill を導入します。
+`spec-dock init/update` は次の skill を導入します。これらが operational entrypoint / first-read spine であり、docs は skill から到達する detail / reference surface です。
 
 - Hub: `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
 - Clarification: `.agents/skills/spec-dock-clarification/SKILL.md`
@@ -76,8 +77,8 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 ## 高頻度ルール
 
 - Initiative / Epic は `new` / `import` の前に既存ノード再利用を確認する
-- Requirement / design / plan 作成は `workflow_spec_authoring.md` の phase promotion gate を正本にし、fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
-- 仕様書作成前後の曖昧さ、用語衝突、責務境界、正式質問は `workflow_clarification.md` を正本にし、`spec-dock-clarification` skill を入口にして一問ずつ扱う
+- Requirement / design / plan 作成は対応 planning skill を operational entrypoint にし、`workflow_spec_authoring.md` の phase promotion detail を参照して、fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
+- 仕様書作成前後の曖昧さ、用語衝突、責務境界、正式質問は `spec-dock-clarification` skill を operational entrypoint にし、`workflow_clarification.md` を bridge/reference として一問ずつ扱う
 - plan は shared `phase_plan.md` の後に対象 scope の `phase_plan_<scope>.md` を読む
 - `new initiative` / `new epic` / `new issue` はデフォルトで GitHub Issue を作る。node create/import で local-only create へ自動フォールバックしない
 - `new issue --create-github-issue` は default create の explicit alias
@@ -91,5 +92,5 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 - `./spec-dock/scripts/spec-dock update [path]` は repo-local self-update path で、target 省略時は current directory を更新する。明示 path を渡すとその managed repo を更新する
 - runtime update は installer update の wrapper であり、固定 upstream `git+https://github.com/chemitaro/spec-dock` を `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock update <target>` として実行する。arbitrary source / cache / `--force` option は公開しない
 - update は managed files/docs/templates/scripts/skills の更新であり、`init --force` でも old workspace の in-place migration ツールでもない。current contract mismatch は手動 normalize / rebuild が必要な場合がある
-- Issue plan は agent-native / behavior-slice based execution contract を持つが、cadence policy の正本は `workflow_issue.md`
+- Issue plan は agent-native / behavior-slice based execution contract を持つが、cadence policy の detail/reference は `workflow_issue.md`
 - naming 制約、GitHub 副作用、deps / sync の詳細は `reference_*.md` を参照する
