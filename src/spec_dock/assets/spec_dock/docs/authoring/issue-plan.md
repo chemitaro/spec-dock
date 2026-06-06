@@ -1,12 +1,12 @@
 # 課題 plan 作成（authoring: issue plan）
 
-Issue の `plan.md` を作成・更新するときの agent-facing entrypoint です。
-共通正本は `workflow_spec_authoring.md`、`phase_plan.md`、`phase_plan_issue.md`、`workflow_issue.md` です。
-この文書は Issue plan の field semantics と executable step schema の正本です。Lifecycle / execution / reviewer / completion policy は `workflow_issue.md`、plan philosophy と review checklist は `phase_plan_issue.md` を参照します。
+Issue の `plan.md` を作成・更新するときに、`spec-dock-issue-planning` skill から到達する detail / reference surface です。
+共通参照は `workflow_spec_authoring.md`、`phase_plan.md`、`phase_plan_issue.md`、`workflow_issue.md` です。
+この文書は Issue plan の field semantics と executable step schema の詳細参照です。Lifecycle / execution / reviewer / completion policy は `workflow_issue.md`、plan philosophy と review checklist は `phase_plan_issue.md` を参照します。
 
 ## 読む順序
 
-この文書を入口として読んだあと、次の共通正本へ進む。
+`spec-dock-issue-planning` skill を operational entrypoint / first-read spine として読んだあと、この文書で schema semantics を確認し、次の共通参照へ進む。
 
 1. `workflow_spec_authoring.md`
 2. `phase_plan.md`
