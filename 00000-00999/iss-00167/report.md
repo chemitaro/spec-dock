@@ -195,3 +195,52 @@ rg -n 'UnitTestCase|python -m unittest discover|Framework: `unittest`' README.md
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/report.md` - 調査、採用判断、委任同意、requirement / design gate 証跡を記録。
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/discussions/20260606t045218z-disc-pytest-complete-migration-design-proposal.md` - system-architect delegated design draft。
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/discussions/20260606t050446z-disc-pytest-migration-plan-proposal.md` - implementation-planner delegated plan draft。
+
+### 実装ステップ S01 — Pytest dependency and collection contract
+
+#### 対象
+- Step: S01
+- Closure IDs: `tc-001`
+- Scope: `pyproject.toml`, `uv.lock`
+
+#### 実施内容
+- `dependency-groups.dev` に `pytest>=8.0` を追加した。
+- `uv.lock` に pytest 9.0.3 と通常の推移依存を記録した。
+- pytest plugin は追加していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest --version
+# pytest 9.0.3
+
+uv run pytest --collect-only
+# collected 1065 items
+# tests/cli_runtime, tests/integration, tests/unit are included in collection.
+
+git diff --check
+# pass
+```
+
+#### レビュー / コミットゲート
+- Step reviewer gate: code-reviewer fresh pass.
+- Reviewer verdict:
+  - findings: none
+  - review_status: pass
+  - notes: scope verified as `pyproject.toml` and `uv.lock` only; pytest is in `dependency-groups.dev`; no pytest plugins; version and collect-only commands pass.
+- Commit gate: pending at time of report update.
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S01 | `tc-001` | pytest is available through `uv run` and collects current lanes | `uv run pytest --version` -> pytest 9.0.3; `uv run pytest --collect-only` -> 1065 items; code-reviewer pass | passed | dependency contract only; no tests/docs/CI changed in this step |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-001` | S01 | yes | covered-existing | S00 では local environment の pytest は起動できたが dependency contract が repo に存在しなかった | `uv run pytest --version`; `uv run pytest --collect-only`; `git diff --check` | passed | `pyproject.toml` / `uv.lock` に pytest dependency contract を固定 |
+
+#### 変更したファイル
+- `pyproject.toml` - `dependency-groups.dev` に pytest を追加。
+- `uv.lock` - pytest と通常の推移依存を lock。
