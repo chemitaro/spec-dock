@@ -272,11 +272,13 @@ pass: cmp exited 0; unittest OK; diff-check had no output.
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | S01 | step reviewer | spec-reviewer `019e9ba0-fe42-75f3-ba65-a04439bdf61d` | fresh | pass | no | proceed to S01 commit | no findings |
+| S90 | docs impact reviewer | spec-reviewer `019e9ba5-fb61-7611-b700-66099b094af7` | fresh | pass | no | proceed to S90 commit | sync / validate / diff-check passed; no generated diff remained; no findings |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | pass | two hub skill files + report S01 evidence | pending | pending | not applicable | not applicable | not applicable | not applicable |
+| S01 | pass | two hub skill files + report S01 evidence | `0c16edb2 docs(hub-routing): hub skillの経路選択面を明確化` | `git status --short` clean before S90 report update | not applicable | not applicable | not applicable | not applicable |
+| S90 | pass | report S90 evidence only; `sync` produced no persisted generated diff | pending | pending | generated projections already matched after sync | `spec-dock/.agent/*`, `spec-dock/*.puml`, `spec-dock/dashboard.md` | `git status --short`; `git diff --name-only` | clean before S90 report update; S90 spec-reviewer pass |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md` - Provider hub route selector / global invariant wording.
@@ -284,7 +286,8 @@ pass: cmp exited 0; unittest OK; diff-check had no output.
 - `spec-dock/active/issue/report.md` - S01 evidence and reviewer pass records.
 
 #### コミット
-- pending S01 commit.
+- S01: `0c16edb2 docs(hub-routing): hub skillの経路選択面を明確化`
+- S90: pending commit after spec-reviewer `019e9ba5-fb61-7611-b700-66099b094af7` pass.
 
 #### メモ
 - No user interview blocker was found for S01.
@@ -296,7 +299,8 @@ pass: cmp exited 0; unittest OK; diff-check had no output.
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| generated projections (`spec-dock/.agent/*`, `spec-dock/*.puml`, `spec-dock/dashboard.md`) | no persisted diff | N/A | `./spec-dock/scripts/spec-dock sync` exited 0 and reported generated outputs; `git status --short`, `git diff --stat`, and `git diff --name-only` were clean afterward | spec-reviewer `019e9ba5-fb61-7611-b700-66099b094af7` pass |
+| docs / templates / README / workflow docs / leaf skills / runtime / migration notes | no | N/A | S01 changed only hub skill provider/mirror text; no leaf/docs/templates/runtime diff remained after sync; `./spec-dock/scripts/spec-dock validate` exited 0 (`nodes=84`); `git diff --check` exited 0 | spec-reviewer `019e9ba5-fb61-7611-b700-66099b094af7` pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
