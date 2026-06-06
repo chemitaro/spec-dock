@@ -247,7 +247,7 @@ result: pass
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed after this ledger update | provider/mirror skill text plus issue planning/report evidence | commit hash recorded after commit as external evidence | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S01 | committed | provider/mirror skill text plus issue planning/report evidence | `7ea10f7c` `docs(issue-planning): Issue計画スキルに必須authoring gateを追加` | `git status --short` after commit -> clean before S90 report-only update | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` - provider-side skill first-read workflow spine
@@ -255,7 +255,7 @@ result: pass
 - `spec-dock/active/issue/report.md` - S01 evidence ledger
 
 #### コミット
-- pending `git commit`; exact hash is post-commit external evidence
+- `7ea10f7c` `docs(issue-planning): Issue計画スキルに必須authoring gateを追加`
 
 #### メモ
 - Worker returned: `No material implementation decisions beyond the approved plan.`
@@ -265,37 +265,40 @@ result: pass
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| skill | yes | doc-writer | S01 updated provider and dogfooding mirror `spec-dock-issue-planning/SKILL.md`; `cmp`, `rg`, targeted parity unittest, `git diff --check`, and `./spec-dock/scripts/spec-dock validate` passed | fresh S90 `spec-reviewer` pass by agent `019e9afb-37c7-7661-a8e8-64c8011fa628`; findings: none |
+| docs / templates / README / workflow / migration notes | no | N/A | Issue scope intentionally changes only the skill first-read surface and issue docs/report. `git show --name-only --format= 7ea10f7c` shows changed production surfaces are the two skill files; workflow docs/templates/runtime are unchanged by design. | fresh S90 `spec-reviewer` pass by agent `019e9afb-37c7-7661-a8e8-64c8011fa628`; no-change rationale accepted |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | already sufficient; no new integration test needed for docs/skill-text-only change | agent `019e9afd-917e-7f83-a9f9-dced8c03ff88`; cl-001..cl-007 covered by inspection, cl-008 by byte parity and existing parity unittest, cl-009 by S90, cl-010 by S99 validation commands | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | P2 report auditability cleanup: record S01 commit hash and post-commit clean evidence. Fixed in this final report update. No source-of-truth violation, scope creep, or parity failure. | 0 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | agent `019e9afe-1b59-7f42-94a5-06f3e6ff6259`; findings: none; issue may proceed to final report update, final commit, PR delivery gate, and issue finish | 0 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S01, S90, S99 reviewer results and code-reviewer P2 cleanup recorded | final report-only commit after this update | final response / epic PR body / issue finish evidence | ready |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: Initial S01 step review failed because `report.md` still had placeholder S01 closure evidence.
+  - 解決: Actual `rg`, `cmp`, targeted unittest, `git diff --check`, delegation, closure, worker, and reviewer evidence were recorded; fresh S01 step re-review passed.
+- 問題: Final code review found S01 commit evidence was not yet recorded in the report.
+  - 解決: `7ea10f7c` and the post-commit clean check evidence were recorded before the final report commit.
 
 ## 学んだこと (任意)
-- ...
+- For skill-text-only issues, the text diff may be correct while the issue remains incomplete if report closure evidence is not auditable.
 
 ## 今後の推奨事項 (任意)
-- ...
+- Later PDCA issues should reuse this report evidence pattern when they touch shipped skills and dogfooding mirrors.
 
 ## 省略/例外メモ (必須)
 - 該当なし
