@@ -254,7 +254,7 @@ pass: cmp exited 0; unittest OK.
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | ready to commit | two clarification skill files + report S01 evidence | pending commit | pending | not applicable | not applicable | not applicable | not applicable |
+| S01 | committed | two clarification skill files + report S01 evidence | `a5de9139` | `git status --short` -> clean | not applicable | not applicable | not applicable | not applicable |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md` - Provider clarification skill first-read grill loop.
@@ -262,7 +262,7 @@ pass: cmp exited 0; unittest OK.
 - `spec-dock/active/issue/report.md` - S01 evidence and reviewer gate records.
 
 #### コミット
-- pending S01 commit.
+- `a5de9139` `docs(clarification): skillにgrill workflow spineを追加`
 
 #### メモ
 - No user interview blocker was found for S01.
