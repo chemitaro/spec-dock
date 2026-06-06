@@ -200,8 +200,8 @@ result:
 
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | doc-writer `019e9be9-7282-7291-8f3b-56a27c952661` | Added scaffold / evidence slot / good example boundary wording; preserved report evidence ledgers; routed workflow authority to skills/docs/reviewer gates | 12 S01 provider/mirror template files | worker reported positive/negative `rg`, report-slot `rg`, 6 provider/mirror `diff -q`, scope guard, `git diff --check` all pass | pending step spec-reviewer | none | accepted after parent re-ran scope, parity, `rg`, and whitespace checks |
-| S02 | doc-writer `019e9bf1-f818-7001-a0d2-5e0ca5db6a54` | Added non-canonical evidence-surface wording to interview/research/disc templates and preserved source-grounded evidence fields | 6 S02 provider/mirror discussion template files | worker reported positive/negative `rg`, 3 provider/mirror `diff -q`, scope guard, `git diff --check` all pass | pending step spec-reviewer | none | accepted after parent re-ran scope, parity, `rg`, and whitespace checks |
+| S01 | doc-writer `019e9be9-7282-7291-8f3b-56a27c952661` | Added scaffold / evidence slot / good example boundary wording; preserved report evidence ledgers; routed workflow authority to skills/docs/reviewer gates | 12 S01 provider/mirror template files | worker reported positive/negative `rg`, report-slot `rg`, 6 provider/mirror `diff -q`, scope guard, `git diff --check` all pass | pass by spec-reviewer `019e9bef-59aa-78b0-8aed-959c201a3630` | none | accepted after parent re-ran scope, parity, `rg`, and whitespace checks |
+| S02 | doc-writer `019e9bf1-f818-7001-a0d2-5e0ca5db6a54` | Added non-canonical evidence-surface wording to interview/research/disc templates and preserved source-grounded evidence fields | 6 S02 provider/mirror discussion template files | worker reported positive/negative `rg`, 3 provider/mirror `diff -q`, scope guard, `git diff --check` all pass | pass by spec-reviewer `019e9bf5-628e-7771-85fb-98eea5a92640` | none | accepted after parent re-ran scope, parity, `rg`, and whitespace checks |
 
 ## ステップ契約の完了証跡（Step Contract Closure）
 
@@ -217,6 +217,7 @@ result:
 | S01 | cl-001, cl-002, cl-003, cl-005 | S01 templates identify scaffold / evidence / example boundaries, preserve report slots, route plan detail to skills/docs, and stay in S01 scope | worker output; parent `git diff --name-only`; positive/negative `rg`; report-slot `rg`; 6 provider/mirror `diff -q`; `git diff --check`; spec-reviewer `019e9bef-59aa-78b0-8aed-959c201a3630` | pass | reviewer passed with one P3 wording correction, applied |
 | S02 | cl-004, cl-005 | Discussion templates support source-grounded question, facts/inference separation, synthesis, adoption target, reflection, ADR triage, and stay in S02 scope | worker output; parent `git diff --name-only`; positive/negative `rg`; 3 provider/mirror `diff -q`; `git diff --check`; spec-reviewer `019e9bf5-628e-7771-85fb-98eea5a92640` | pass | reviewer passed with no findings |
 | S90 | cl-006 | sync / validate / whitespace / status / provider-mirror parity pass, and projection diff is limited to allowed paths or no-op | `./spec-dock/scripts/spec-dock sync`; `./spec-dock/scripts/spec-dock validate`; `git diff --check`; `git status --short`; 9 provider/mirror `diff -q` | pass | no generated projection diff remained |
+| S99 | cl-007 | final validation, whitespace check, clean status, issue-wide diff inspection, final QA/code/spec pass, and final review loop recorded | `validate`; `git diff --check HEAD~4..HEAD`; `git status --short`; final QA/code reviewer pass; final spec reviewer initial fail, report-ledger fix, and re-review pass | pass | final spec re-review passed |
 
 ## テスト契約の完了証跡（Test Contract Closure）
 
@@ -230,6 +231,7 @@ result:
 | cl-004 / tc-s02-002 | S02 | yes | inspect-only | `research.md` and `disc.md` already separated research and synthesis fields before S02 | `rg` for facts / inference / unverified / question candidates / synthesis / adoption target / ADR triage; diff inspection | pass | research and disc templates preserve evidence separation and adoption routing |
 | cl-005 / tc-s02-003 | S02 | yes | inspect-only | clean worktree after S01 commit `54e8ea40` | `git diff --name-only` and path comparison against S02 allowed paths | pass | only S02 provider/mirror discussion templates changed before report evidence |
 | cl-006 / tc-s90-001 | S90 | yes | manual-required | clean worktree after S02 commit `736679d9` | `sync`, `validate`, `git diff --check`, `git status --short`, 9 provider/mirror `diff -q` checks | pass | sync/validate passed and no projection diff remained |
+| cl-007 / tc-s99-001 | S99 | yes | manual-required | clean worktree after S90 commit `8cef1cd7` | final `validate`, `git diff --check HEAD~4..HEAD`, final `git status --short`, issue-wide diff inspection, final QA/code/spec reviewer outputs | pass | QA/code passed; final spec reviewer passed after ledger refresh |
 
 ## クロージャ網羅（Closure Coverage）
 
@@ -242,6 +244,7 @@ result:
 | cl-004 | S02 | positive/negative `rg`; diff inspection; provider/mirror `diff -q` | pass | discussion templates support source-grounded evidence flow |
 | cl-005 | S02 | `git diff --name-only`; `git diff --check`; provider/mirror `diff -q` | pass | S02 scope contained |
 | cl-006 | S90 | `sync`, `validate`, whitespace check, clean status, 9 provider/mirror parity checks | pass | provider/mirror validation and generated projection check passed |
+| cl-007 | S99 | final validation, whitespace check, clean status, issue-wide diff inspection, QA/code/spec pass, final spec review loop | pass | report ledger refreshed after final spec P1 and re-review passed |
 
 ## レビューゲート状態（Reviewer Gate Status）
 
@@ -253,6 +256,9 @@ result:
 | S01 | step reviewer | spec-reviewer `019e9bef-59aa-78b0-8aed-959c201a3630` | fresh | pass | no | commit S01 | one P3 report wording correction applied |
 | S02 | step reviewer | spec-reviewer `019e9bf5-628e-7771-85fb-98eea5a92640` | fresh | pass | no | commit S02 | no findings |
 | S90 | docs impact reviewer | spec-reviewer `019e9bf9-31e4-76b2-a50f-7c4cddc9c20a` | fresh | pass | no | commit S90 report evidence | one P2 stale-summary correction applied |
+| S99 | final QA gate | qa-reviewer `019e9bfd-6b79-76c3-b83b-4c0646055b85` | fresh | pass | no | final gate can proceed after report cleanup | one P2 S90 commit-row cleanup requested |
+| S99 | final code review gate | code-reviewer `019e9bfd-6c22-7c42-8640-e019ffeed7eb` | fresh | pass | no | final gate can proceed after report cleanup | one P2 S90 commit-row cleanup requested |
+| S99 | final spec review gate | spec-reviewer `019e9bfd-6d10-73e2-ae5d-2250df1308ee` | fresh after report refresh | pass | no | final report commit | initial P1 final report closure ledger refresh fixed; re-review passed |
 
 ## ステップ commit ゲート（Step Commit Gate）
 
@@ -261,11 +267,47 @@ result:
 | planning-requirement/design/plan | committed | requirement/design/plan/report authoring evidence | `f7413abf` | clean before S01 delegation |
 | S01 | committed | S01 provider/mirror template changes + report evidence | `54e8ea40` | clean before S02 delegation |
 | S02 | committed | S02 provider/mirror discussion template changes + report evidence | `736679d9` | clean before S90 |
-| S90 | approved-no-op pending commit | sync / validate / parity evidence only | report evidence commit pending | clean after sync / validate |
+| S90 | committed | sync / validate / parity evidence only | `8cef1cd7` | clean before S99 |
+| S99 | pending final commit | final report ledger refresh | final commit pending | pending final commit |
 
 ## 最終品質ゲート（Final Quality Gate）
 
-- Not started. Final QA/code/spec gates run after implementation and docs impact are committed.
+### Final Validation
+
+- `./spec-dock/scripts/spec-dock validate`:
+  - pass: `nodes=84`.
+- `git diff --check HEAD~4..HEAD`:
+  - pass.
+- `git status --short` before final report ledger update:
+  - clean.
+- issue-wide diff inspection:
+  - changed paths are limited to active issue docs/report and provider/mirror templates.
+
+### Final QA Gate
+
+- reviewer: qa-reviewer `019e9bfd-6b79-76c3-b83b-4c0646055b85`.
+- result: pass.
+- summary: inspect-only/manual-required evidence is adequate for docs/template-only changes; no additional integration test is required because runtime, CLI, renderer, and scaffold-copying behavior were not changed.
+- finding handled: S90 commit gate row was stale; fixed in Step Commit Gate.
+
+### Final Code Review Gate
+
+- reviewer: code-reviewer `019e9bfd-6c22-7c42-8640-e019ffeed7eb`.
+- result: pass.
+- summary: issue-wide diff stays within issue docs and provider/mirror templates; provider/mirror pairs match; no runtime, tests, skills, workflow docs, or GitHub metadata changes were included.
+- finding handled: S90 commit gate row was stale; fixed in Step Commit Gate.
+
+### Final Spec Review Gate
+
+- reviewer: spec-reviewer `019e9bfd-6d10-73e2-ae5d-2250df1308ee`.
+- initial result: fail.
+- finding handled: refreshed final report closure ledger by updating S01/S02 reviewer verdicts, S90 commit evidence, cl-007 closure/test/coverage rows, and final gate evidence.
+- re-review: pass.
+
+### Final Commit
+
+- final report ledger commit:
+  - pending now; final commit hash will be external delivery evidence after commit.
 
 ## 省略/例外メモ
 
