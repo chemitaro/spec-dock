@@ -11773,6 +11773,7 @@ exit 44
             tmp_path = Path(tmp_dir)
             fake_bin = tmp_path / "bin"
             fake_bin.mkdir()
+            out_dir = tmp_path / "out"
             fake_gh = fake_bin / "gh"
             gh_log = tmp_path / "gh.log"
             fake_gh.write_text(
@@ -12635,6 +12636,676 @@ esac
             assert payload["summary"]["ci"] == "passed"
             assert payload["ci"]["status"] == "passed"
             assert "commits/aaaaaaa/check-runs --paginate" in gh_log.read_text(encoding="utf-8")
+
+    def test_issue_75_pr_observation_review_collector_explicit_trigger_body_caps_and_threads(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            gh_log = tmp_path / "gh.log"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$GH_FAKE_LOG"
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":50,"user":{"login":"codex"},"created_at":"2026-06-08T00:00:00Z","body":"@codex review old trigger"},{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review please"},{"id":100,"user":{"login":"alice"},"created_at":"2026-06-08T01:00:00Z","body":"same timestamp body after trigger"},{"id":101,"user":{"login":"codex"},"created_at":"2026-06-08T01:05:00Z","body":"codex follow up body after trigger"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"alice"},"state":"CHANGES_REQUESTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"please fix this old-trigger-free review body"},{"id":202,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:07:00Z","body":"codex review comment body that is long enough to be truncated in default mode"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"codex"},"pull_request_review_id":202,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:08:00Z","path":"app.py","line":12,"body":"inline body from codex after trigger"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[{"login":"codex"}],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_kw_unresolved","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_1","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:08:00Z","body":"thread body should not duplicate old bodies"}]}},{"id":"RT_kw_resolved","isResolved":true,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_2","databaseId":302,"author":{"login":"alice"},"createdAt":"2026-06-08T01:09:00Z","body":"resolved thread body"}]}},{"id":"RT_kw_outdated","isResolved":false,"isOutdated":true,"comments":{"nodes":[{"id":"RTC_3","databaseId":303,"author":{"login":"alice"},"createdAt":"2026-06-08T01:10:00Z","body":"outdated thread body"}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            review = payload["review"]
+            assert review["status"] == "unresolved"
+            assert review["statuses"] == [
+                "unknown",
+                "none",
+                "requested",
+                "commented",
+                "approved",
+                "changes_requested",
+                "unresolved",
+            ]
+            assert review["summary"]["all"]["total"] == 8
+            assert review["summary"]["all"]["review_requests"] == 1
+            assert review["summary"]["codex_authored"]["total"] == 6
+            assert review["review_requests"] == [
+                {
+                    "kind": "review_request",
+                    "target_type": "user",
+                    "target": "codex",
+                    "codex_authored": True,
+                    "state": "requested",
+                }
+            ]
+            assert review["threads"]["unresolved"] == 1
+            assert review["threads"]["resolved"] == 1
+            assert review["threads"]["outdated"] == 1
+            assert review["body_mode"]["mode"] == "trigger-window-truncated"
+            assert review["body_mode"]["item_count_omitted"] >= 1
+            assert all("body_sha256" in item for item in review["signals"])
+            included_bodies = [
+                item.get("body")
+                for item in review["signals"]
+                if item.get("body") is not None
+            ]
+            assert "same timestamp body after trigger" in included_bodies
+            assert all("old trigger" not in body for body in included_bodies)
+            assert any(item.get("body_truncated") for item in review["signals"])
+            assert [item["code"] for item in payload["limitations"]] == []
+            gh_calls = gh_log.read_text(encoding="utf-8")
+            assert "api repos/owner/repo/issues/13/comments --paginate" in gh_calls
+            assert "api repos/owner/repo/pulls/13/reviews --paginate" in gh_calls
+            assert "api repos/owner/repo/pulls/13/comments --paginate" in gh_calls
+            assert "api graphql " in gh_calls
+
+    def test_issue_75_pr_observation_review_collector_inferred_and_unknown_trigger_body_safety(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":10,"user":{"login":"codex"},"created_at":"2026-06-08T00:00:00Z","body":"@codex review first"},{"id":11,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review latest"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":20,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:01:00Z","body":"latest codex body"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            inferred = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert inferred.returncode == 0, inferred.stdout + inferred.stderr
+            inferred_payload = json.loads(inferred.stdout)
+            assert inferred_payload["trigger"]["source"] == "inferred"
+            assert inferred_payload["trigger"]["comment_id"] == 11
+            assert "trigger_inferred" in [
+                item["code"] for item in inferred_payload["limitations"]
+            ]
+            assert any(
+                item.get("body") == "latest codex body"
+                for item in inferred_payload["review"]["signals"]
+            )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            out_dir = tmp_path / "out"
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":20,"user":{"login":"alice"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:01:00Z","body":"must not dump without trigger"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            unknown = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--body-mode",
+                    "out-only",
+                    "--out",
+                    str(out_dir),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert unknown.returncode == 0, unknown.stdout + unknown.stderr
+            unknown_payload = json.loads(unknown.stdout)
+            assert unknown_payload["trigger"]["source"] == "unknown"
+            assert "trigger_unknown" in [
+                item["code"] for item in unknown_payload["limitations"]
+            ]
+            assert all(
+                item.get("body") is None
+                for item in unknown_payload["review"]["signals"]
+            )
+            raw_bodies = json.loads((out_dir / "raw" / "review_bodies.json").read_text(encoding="utf-8"))
+            assert raw_bodies == []
+
+    def test_issue_75_pr_observation_review_collector_thread_state_unavailable_is_limitation(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review please"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"alice"},"state":"APPROVED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"looks good"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    printf 'graphql unavailable\\n' >&2
+    exit 44
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["review"]["status"] == "unknown"
+            assert payload["review"]["threads"]["state_available"] is False
+            assert "thread_state_unavailable" in [
+                item["code"] for item in payload["limitations"]
+            ]
+
+    def test_issue_75_pr_observation_review_collector_paginates_review_threads(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            gh_log = tmp_path / "gh.log"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$GH_FAKE_LOG"
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  *"api graphql"*"after=CURSOR1"*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[{"id":"RT_page_2_unresolved","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_2","databaseId":402,"author":{"login":"alice"},"createdAt":"2026-06-08T01:01:00Z","body":"second page unresolved"}]}}]}}}}}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":true,"endCursor":"CURSOR1"},"nodes":[{"id":"RT_page_1_resolved","isResolved":true,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_1","databaseId":401,"author":{"login":"alice"},"createdAt":"2026-06-08T01:00:00Z","body":"first page resolved"}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13"],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["review"]["status"] == "unresolved"
+            assert payload["review"]["threads"]["total"] == 2
+            assert payload["review"]["threads"]["unresolved"] == 1
+            gh_calls = gh_log.read_text(encoding="utf-8")
+            assert "after=CURSOR1" in gh_calls
+
+    def test_issue_75_pr_observation_review_collector_ignores_trigger_only_comments_for_status(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13"],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["trigger"]["source"] == "inferred"
+            assert payload["review"]["status"] == "none"
+            assert payload["review"]["signals"][0]["trigger_command"] is True
+
+    def test_issue_75_pr_observation_review_collector_out_only_writes_raw_bodies(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            out_dir = tmp_path / "out"
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"alice"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"raw review body must be in artifact only"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                    "--body-mode",
+                    "out-only",
+                    "--out",
+                    str(out_dir),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert all("body" not in item for item in payload["review"]["signals"])
+            raw_bodies = json.loads((out_dir / "raw" / "review_bodies.json").read_text(encoding="utf-8"))
+            assert raw_bodies == [
+                {
+                    "body": "raw review body must be in artifact only",
+                    "body_sha256": payload["review"]["signals"][1]["body_sha256"],
+                    "id": 201,
+                    "kind": "pull_review",
+                },
+            ]
+
+    def test_issue_75_pr_observation_snapshot_includes_s04_review_collector_result(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
+    cat <<'JSON'
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{"total_count":1,"check_runs":[{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{"state":"success","statuses":[]}
+JSON
+    ;;
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review please"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"alice"},"state":"APPROVED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"looks good"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["summary"]["ci"] == "passed"
+            assert payload["summary"]["review"] == "approved"
+            assert payload["review"]["status"] == "approved"
+            assert payload["review"]["collector"] == "s04"
+            assert "review_collector_pending_s04" not in [
+                item["code"] for item in payload["limitations"]
+            ]
 
     def test_issue_75_pr_observation_snapshot_scripts_are_bash_32_compatible(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
