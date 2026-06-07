@@ -11783,9 +11783,10 @@ if log_path:
     with open(log_path, "a", encoding="utf-8") as log:
         log.write(" ".join(args) + "\\n")
 
-if args[:2] == ["pr", "view"]:
-    poll += 1
-    state_path.write_text(str(poll), encoding="utf-8")
+if args[:5] == ["pr", "view", "13", "--repo", "owner/repo"]:
+    if "--json" in args and "headRefOid,url,state,isDraft,number" in args:
+        poll += 1
+        state_path.write_text(str(poll), encoding="utf-8")
 elif poll == 0:
     poll = 1
 
@@ -11801,7 +11802,7 @@ if hang_seconds is not None:
 def emit(payload):
     print(json.dumps(payload, separators=(",", ":")))
 
-if args[:2] == ["pr", "view"]:
+if args[:2] == ["pr", "view"] and "--json" in args and "headRefOid,url,state,isDraft,number" in args:
     poll_delay_seconds = current.get("poll_delay_seconds")
     if poll_delay_seconds is not None:
         time.sleep(float(poll_delay_seconds))
@@ -11811,6 +11812,11 @@ if args[:2] == ["pr", "view"]:
         "state": "OPEN",
         "isDraft": False,
         "number": 13,
+    })
+elif args[:2] == ["pr", "view"] and "--json" in args and "mergeStateStatus,statusCheckRollup" in args:
+    emit({
+        "mergeStateStatus": current.get("merge_state_status", "CLEAN"),
+        "statusCheckRollup": current.get("status_check_rollup", []),
     })
 elif args[:2] == ["api", f"repos/owner/repo/commits/{head}/check-runs"]:
             if ci == "passed":
@@ -12230,6 +12236,380 @@ esac
             assert payload["normalized_status"] == "human_gate"
             assert payload["recommended_next_action"] == "address_review_feedback"
             assert payload["observation_complete"] is True
+
+    def test_issue_170_pr_observation_snapshot_blocks_draft_and_non_open_prs(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
+    cat <<JSON
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"${PR_STATE:-OPEN}","isDraft":${PR_IS_DRAFT:-false},"number":13}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{"total_count":1,"check_runs":[{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{"state":"success","statuses":[]}
+JSON
+    ;;
+  "api repos/owner/repo/issues/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"alice"},"state":"APPROVED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"looks good"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":"APPROVED","reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            draft_result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env={**env, "PR_IS_DRAFT": "true"},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert draft_result.returncode == 0, draft_result.stdout + draft_result.stderr
+            draft_payload = json.loads(draft_result.stdout)
+            assert draft_payload["summary"]["ci"] == "passed"
+            assert draft_payload["summary"]["review"] == "approved"
+            assert draft_payload["normalized_status"] == "human_gate"
+            assert draft_payload["recommended_next_action"] == "mark_pr_ready_for_review"
+            assert draft_payload["observation_complete"] is False
+
+            closed_result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env={**env, "PR_STATE": "CLOSED"},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert closed_result.returncode == 0, closed_result.stdout + closed_result.stderr
+            closed_payload = json.loads(closed_result.stdout)
+            assert closed_payload["normalized_status"] == "human_gate"
+            assert closed_payload["recommended_next_action"] == "reopen_or_use_open_pr"
+            assert closed_payload["observation_complete"] is False
+
+    def test_issue_170_pr_observation_wait_preserves_latest_payload_on_late_poll_timeout(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            out_dir = tmp_path / "out"
+            scenario_path = tmp_path / "scenario.json"
+            state_path = tmp_path / "state.txt"
+            scenario_path.write_text(
+                json.dumps([
+                    {"head": "a" * 40, "ci": "passed", "review": "approved"},
+                    {"head": "a" * 40, "ci": "passed", "review": "approved", "hang_seconds": 10},
+                ]),
+                encoding="utf-8",
+            )
+            self._issue_75_write_pr_observation_wait_fake_gh(
+                fake_gh,
+                scenario_path=scenario_path,
+                state_path=state_path,
+            )
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_WAIT_SCENARIO": str(scenario_path),
+                "GH_FAKE_WAIT_STATE": str(state_path),
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--timeout-seconds",
+                    "2",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "2",
+                    "--out",
+                    str(out_dir),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=6,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "timeout"
+            assert payload["summary"]["ci"] == "passed"
+            assert payload["summary"]["review"] == "approved"
+            assert payload["ci"]["status"] == "passed"
+            assert payload["review"]["status"] == "approved"
+            assert "snapshot_poll_timeout" in [item["code"] for item in payload["limitations"]]
+            assert payload["recommended_next_action"] == "wait_or_rerun"
+            latest_payload = json.loads((out_dir / "latest.json").read_text(encoding="utf-8"))
+            assert latest_payload["summary"]["ci"] == "passed"
+            assert latest_payload["summary"]["review"] == "approved"
+
+    def test_issue_170_pr_observation_checks_collector_blocks_missing_required_checks(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{"total_count":1,"check_runs":[{"id":1,"name":"observed","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{"state":"success","statuses":[]}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"BLOCKED","statusCheckRollup":[{"name":"observed","status":"COMPLETED","conclusion":"SUCCESS"}]}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "pending"
+            assert payload["ci"]["progress_status"] == "pending"
+            assert payload["ci"]["required_check_state"]["merge_state_status"] == "BLOCKED"
+            assert "required_checks_missing_or_pending" in [
+                item["code"] for item in payload["limitations"]
+            ]
+
+    def test_issue_170_pr_observation_snapshot_keeps_required_checks_pending_as_wait(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            scenario_path = tmp_path / "scenario.json"
+            state_path = tmp_path / "state.txt"
+            scenario_path.write_text(
+                json.dumps([
+                    {
+                        "head": "a" * 40,
+                        "ci": "passed",
+                        "review": "approved",
+                        "merge_state_status": "BLOCKED",
+                        "status_check_rollup": [
+                            {"name": "test", "status": "COMPLETED", "conclusion": "SUCCESS"}
+                        ],
+                    },
+                ]),
+                encoding="utf-8",
+            )
+            self._issue_75_write_pr_observation_wait_fake_gh(
+                fake_gh,
+                scenario_path=scenario_path,
+                state_path=state_path,
+            )
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_WAIT_SCENARIO": str(scenario_path),
+                "GH_FAKE_WAIT_STATE": str(state_path),
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "pending"
+            assert payload["normalized_status"] == "pending"
+            assert payload["recommended_next_action"] == "wait"
+            assert payload["observation_complete"] is False
+            assert "required_checks_missing_or_pending" in [
+                item["code"] for item in payload["limitations"]
+            ]
+
+    def test_issue_170_pr_observation_wait_keeps_required_checks_pending_as_wait(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            out_dir = tmp_path / "out"
+            scenario_path = tmp_path / "scenario.json"
+            state_path = tmp_path / "state.txt"
+            scenario_path.write_text(
+                json.dumps([
+                    {
+                        "head": "a" * 40,
+                        "ci": "passed",
+                        "review": "approved",
+                        "merge_state_status": "BLOCKED",
+                        "status_check_rollup": [
+                            {"name": "test", "status": "COMPLETED", "conclusion": "SUCCESS"}
+                        ],
+                    },
+                ]),
+                encoding="utf-8",
+            )
+            self._issue_75_write_pr_observation_wait_fake_gh(
+                fake_gh,
+                scenario_path=scenario_path,
+                state_path=state_path,
+            )
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_WAIT_SCENARIO": str(scenario_path),
+                "GH_FAKE_WAIT_STATE": str(state_path),
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--timeout-seconds",
+                    "2",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "1",
+                    "--out",
+                    str(out_dir),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=6,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            events = [
+                json.loads(line)
+                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
+            ]
+            assert events[0]["normalized_status"] == "pending"
+            assert events[0]["ci"] == "pending"
+            assert "phase=wait ci=pending" in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "timeout"
+            assert payload["recommended_next_action"] == "wait_or_rerun"
+            assert "required_checks_missing_or_pending" in [
+                item["code"] for item in payload["limitations"]
+            ]
 
     def test_issue_75_pr_observation_wait_stdout_stderr_progress_and_out_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -15085,6 +15465,228 @@ esac
             payload = json.loads(result.stdout)
             assert payload["review"]["status"] == "unresolved"
             assert payload["review"]["threads"]["items"][0]["activity_at"] == "2026-06-08T00:30:00Z"
+
+    def test_issue_170_pr_review_collector_current_issue_comment_overrides_approval(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"alice"},"created_at":"2026-06-08T01:10:00Z","body":"nit: please update docs"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"alice"},"state":"APPROVED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"looks good"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":"APPROVED","reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["review"]["status"] == "commented"
+            assert any(
+                item["kind"] == "issue_comment" and item["id"] == 100
+                for item in payload["review"]["signals"]
+            )
+
+    def test_issue_170_pr_review_collector_review_required_decision_is_requested(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":"REVIEW_REQUIRED","reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["review"]["status"] == "requested"
+            assert payload["review"]["review_decision"] == "REVIEW_REQUIRED"
+            assert payload["review"]["review_requests"] == []
+
+    def test_issue_170_pr_review_collector_resolves_explicit_trigger_timestamp_from_comment_id(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"alice"},"created_at":"2026-06-08T01:10:00Z","body":"current issue feedback"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["trigger"] == {
+                "source": "explicit",
+                "comment_id": 99,
+                "created_at": "2026-06-08T01:00:00Z",
+            }
+            assert payload["review"]["status"] == "commented"
+            assert "trigger_timestamp_unresolved" not in [
+                item["code"] for item in payload["limitations"]
+            ]
 
     def test_issue_75_pr_observation_review_collector_uses_inline_comment_update_for_current_window(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]

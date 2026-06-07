@@ -153,9 +153,12 @@ ID: "iss-00170"
   - 必要に応じて `reviewers`, `changes`
 - CI status:
   - `unknown`, `none`, `pending`, `running`, `passed`, `failed`
+  - `passed` は observed checks/statuses だけでなく、GitHub の merge-state / required-check view が未充足を示していないことを前提にする。
+  - `gh pr view --json mergeStateStatus,statusCheckRollup` で required checks 未充足または missing/pending を示す merge state が取れる場合、observed checks が success/skipped/neutral だけでも `pending` 相当として扱う。
 - Review status:
   - `unknown`, `none`, `pending`, `requested`, `commented`, `approved`, `changes_requested`, `unresolved`
   - `dismissed` は個別 review signal state として保持するが、aggregate review status としては単独で block しない。
+  - `reviewDecision=REVIEW_REQUIRED` は、明示的な review request signal がなくても `requested` 相当として扱う。
 
 ## Final JSON 詳細要件
 
@@ -171,6 +174,7 @@ ID: "iss-00170"
     - unresolved かつ non-outdated の visible review thread は、trigger window より前に開始していても active blocker として扱う。
     - PR conversation comments で同一 timestamp の場合は `id > trigger_comment_id` のものだけを trigger 後として扱う。
     - expected head SHA と一致しない review / check detail は stale として分離する。
+    - `--trigger-comment-id` だけが渡され `--trigger-created-at` が省略された場合、固定 issue comments 取得結果から該当 comment id の `created_at` を解決する。解決できない場合は trigger unknown / informational limitation とし、body payload を全件化しない。
   - Body mode:
     - `none`:
       - metadata と `body_sha256` のみ。
@@ -237,6 +241,7 @@ ID: "iss-00170"
     - 失敗・pending・running がなく、観測対象が terminal non-blocking なら `ci=passed` 相当になる。
     - skipped / neutral は、それだけを理由に unknown にしない。
     - failure 系がある場合は、取得可能な workflow / run / job / failed step detail を final JSON に出す。
+    - required checks / merge state が未充足を示す場合は、observed check run がすべて terminal non-blocking でも `ci=pending` 相当になり、`required_checks_missing_or_pending` limitation と required check state metadata を返す。
 - AC-005:
   - アクター:
     - wait wrapper。
@@ -254,6 +259,8 @@ ID: "iss-00170"
     - all signals と Codex-authored subset が分離される。
     - review-related progress status は GitHub から機械的に取れる `unknown|none|pending|requested|commented|approved|changes_requested|unresolved` だけを使う。
     - P1/P2 など本文解釈由来の priority は progress status にしない。
+    - `reviewDecision=REVIEW_REQUIRED` は `requested` に反映され、`reviewDecision=APPROVED` は current issue comments / unresolved threads / changes requested より優先されない。
+    - current trigger window 内の issue comment は、approval より後段の軽微情報ではなく、approval を上書きし得る current review signal として扱う。
     - review thread state が利用可能な場合は unresolved / resolved / outdated が machine-readable に出力される。
     - trigger window 内の review/comment body は body mode に従って final JSON に出力される。
     - trigger window 外の古い review/comment body は current-window payload に含まれない。
@@ -321,6 +328,7 @@ ID: "iss-00170"
     - trigger 前の old review/comment body は final JSON の current trigger-window payload に含まれない。
     - trigger 後の body は `--body-mode` と cap に従って final JSON に含まれる。
     - cap 超過時は truncation / overflow metadata を出す。
+    - explicit trigger comment id だけが渡された場合も、issue comments 内の同 id から trigger timestamp を解決できれば explicit trigger window として扱う。
 - AC-013:
   - アクター:
     - wait wrapper / review collector。
@@ -368,6 +376,14 @@ ID: "iss-00170"
   - progress output が多くなりすぎる。
   - 期待:
     - stderr は bounded にし、詳細は final JSON または optional `--out` debug/audit artifacts に残す。
+- EC-007:
+  - PR が draft、closed、または merged 等の non-open 状態である。
+  - 期待:
+    - CI / review が green に見えても merge-prepared success とせず、`human_gate` と `mark_pr_ready_for_review` / `reopen_or_use_open_pr` 相当の recommended next action を返す。
+- EC-008:
+  - wait 終盤の snapshot poll が timeout するが、直前に有効な latest payload がある。
+  - 期待:
+    - 直前の CI / review summary と artifacts を破棄して synthetic unknown へ落とさず、latest payload に `snapshot_poll_timeout` limitation を付与し、`normalized_status=timeout` として返す。
 
 ## 確定済み補足
 
