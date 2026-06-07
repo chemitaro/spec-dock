@@ -141,7 +141,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
         discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
-        discussion.write_text(_draft_text("# draft", role="spec-dock-implementation-planner"), encoding="utf-8")
+        discussion.write_text(_draft_text("# draft", role="implementation-planner"), encoding="utf-8")
 
         p = self._run_runtime_capture(
             target,
@@ -1491,7 +1491,7 @@ def _external_baseline_path() -> Path:
     return Path(tempfile.mkdtemp(prefix="spec-dock-baseline-")) / "baseline-status.txt"
 
 
-def _draft_text(body: str, *, role: str = "spec-dock-system-architect") -> str:
+def _draft_text(body: str, *, role: str = "system-architect") -> str:
     return (
         "---\n"
         f"created_by_role: {role}\n"
