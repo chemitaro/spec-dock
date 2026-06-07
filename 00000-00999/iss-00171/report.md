@@ -28,6 +28,8 @@ ID: "iss-00171"
 | D-010 | resolved | test-contract | spec-reviewer | role skill deletion and provenance migration can leave tests encoding the old contract | A: rely on text inspection only; B: explicitly include affected tests and focused pytest in S04/S99 | B を採用する | Current repository tests reference deleted role skill paths and old `created_by_role: spec-dock-*` values; implementation must update tests with the contract | promoted_to_plan | spec-reviewer finding P1 from agent `019ea14a-9057-7502-a78d-3742decd9f7b` | none |
 | D-011 | resolved | test-strategy | spec-reviewer | design.md still said code-level red/green tests were generally unnecessary after runtime/test scope was added | A: leave because plan is authoritative; B: align design test strategy with S04/S99 focused pytest | B を採用する | Design should not make runtime/test verification appear optional | completed | spec-reviewer finding P2 from agent `019ea150-0e73-7562-ba59-e9bafa25a0ad` | none |
 | D-012 | resolved | test-contract | spec-reviewer | S04 tests did not explicitly prove deleted role skill files stay absent from provider/mirror/init/update outputs | A: rely on managed skill list omission; B: add explicit absence assertions | B を採用する | Omission from expected managed skills would not fail if stale deleted role skill files were reintroduced alongside current skills | completed | spec-reviewer finding P1 from agent `019ea233-bf5e-7283-90e9-17cb8f81de48` | none |
+| D-013 | resolved | upgrade-compatibility | code-reviewer / qa-reviewer | Existing consumer repos could keep stale deleted role skill files after `spec-dock update` because obsolete cleanup inventory did not list them | A: rely on legacy managed skill names; B: add exact obsolete managed paths and update regression | B を採用する | `update` prunes only manifest `obsolete_exact_file_paths`; legacy names alone do not remove files | completed | code-reviewer `019ea241-f819-7f90-9d2e-79cad6f9d741`; qa-reviewer `019ea241-bbed-77f0-b75f-01bea9c8307b` | none |
+| D-014 | resolved | auditability | spec-reviewer | Step Commit Gate used ambiguous `this commit` placeholders for multiple completed commits | A: leave placeholders; B: replace with concrete commit hashes | B を採用する | Final report should let later reviewers map S01-S04 to durable commits | completed | spec-reviewer P2 from agent `019ea242-31f8-7f93-a8af-b6bd0474a942` | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger）
 
@@ -161,6 +163,7 @@ ok
 | S02 | green | dogfooding mirror matches provider issue-planning skill | `.agents/skills/spec-dock-issue-planning/SKILL.md` copied from provider source | `diff -u`, spec-reviewer | pass | S02 reviewer passed |
 | S03 | green | delegated authoring roles are agent-only | provider/mirror agent TOML are self-contained and role skill directories are deleted | targeted `rg`, `test ! -e`, provider/mirror `diff -u`, spec-reviewer | pass | S03 reviewer passed |
 | S04 | green | surrounding runtime/tests/hub surfaces match agent-only role model | runtime provenance accepts `system-architect` / `implementation-planner`, managed skill inventory excludes deleted role skills, role skill cleanup remains legacy-managed, affected tests use agent role provenance, and deleted role skill files are explicitly asserted absent | targeted `rg`, focused pytest, spec-reviewer | pass | Re-review passed after P1 fix |
+| S90/S99 | green | final validation and reviewer gates can be evaluated from current state | SpecDock validate/sync, whitespace check, and focused pytest passed after S04 commit and after reviewer P1/P2 fixes | `validate`, `sync`, `git diff --check`, focused pytest | pass | Final re-review pending after P1/P2 fixes |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 
@@ -184,6 +187,8 @@ ok
 | S02 | tc-006 | Dogfooding mirror matches provider-side issue-planning skill | `diff -u src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md .agents/skills/spec-dock-issue-planning/SKILL.md` returned no diff; spec-reviewer passed | pass | Ready to commit |
 | S03 | tc-007, tc-008 | Agent role contracts are self-contained and role skill directories are removed | agent TOML stale skill path search returned no matches; four role skill directories are absent; provider/mirror TOML diffs are empty; spec-reviewer passed | pass | Ready to commit |
 | S04 | tc-009, tc-010, tc-011 | Surrounding surfaces no longer contradict actor workflow / agent-only role model | hub skill routes to `system-architect` / `implementation-planner` agent roles; runtime delegated authoring provenance uses agent role names; installer/tests no longer require deleted role skill files; focused pytest and spec-reviewer passed | pass | Ready to commit |
+| S90 | tc-012 | SpecDock validation/sync succeeds from current active issue state | `./spec-dock/scripts/spec-dock validate` -> ok nodes=87; `./spec-dock/scripts/spec-dock sync` -> ok active unchanged | pass | No projection drift after sync |
+| S99 | all AC/EC | Final verification bundle passes before final reviewer gates | `git diff --check` -> ok; focused pytest -> `253 passed, 31 skipped` | pass | Final QA/code/spec review passed after P1/P2 cleanup |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 
@@ -197,7 +202,8 @@ ok
 | tc-008 | S03 | yes | inspect-only | role skill directories existed | `test ! -e` for provider/mirror role skill dirs | pass | four role skill directories absent |
 | tc-009 | S04 | yes | inspect-only | hub/runtime/tests still referenced deleted role skill names | targeted `rg` over provider/mirror skill, agent, runtime, and focused test surfaces | pass | no active stale role skill references remained in target surfaces |
 | tc-010 | S04 | yes | focused test / inspect | runtime allowed `created_by_role: spec-dock-*` values | domain and mirror runtime now require `created_by_role: system-architect` / `implementation-planner`; focused pytest passed | pass | fresh provenance now uses agent role names |
-| tc-011 | S04 | yes | focused pytest | installer/runtime tests expected deleted role skills and old provenance | updated `tests/unit/infra/test_init_update.py`, `tests/unit/domain/test_delegated_authoring.py`, `tests/cli_runtime/test_delegated_authoring.py`, `tests/cli_runtime/harness.py`; added explicit provider/mirror/init/update absence assertions for deleted role skill files | pass | `252 passed, 31 skipped` |
+| tc-011 | S04 | yes | focused pytest | installer/runtime tests expected deleted role skills and old provenance | updated `tests/unit/infra/test_init_update.py`, `tests/unit/domain/test_delegated_authoring.py`, `tests/cli_runtime/test_delegated_authoring.py`, `tests/cli_runtime/harness.py`; added explicit provider/mirror/init/update/update-prune absence assertions for deleted role skill files | pass | `253 passed, 31 skipped` |
+| tc-012 | S90/S99 | yes | inspect-only / focused pytest | S04 changed shipped assets, runtime mirror, and tests | `validate`, `sync`, `git diff --check`, focused pytest | pass | final reviewer gates pending |
 
 #### クロージャ網羅（Closure Coverage）
 
@@ -215,7 +221,8 @@ ok
 | tc-008 | S03 | role skill directories absent | pass | provider-side and dogfooding mirror role skill directories removed |
 | tc-009 | S04 | targeted stale role skill search | pass | `rg -n "spec-dock-system-architect|spec-dock-implementation-planner" ...` returned no active references in target surfaces except negative test assertions |
 | tc-010 | S04 | runtime delegated authoring provenance tests | pass | `created_by_role` fresh values are agent role names |
-| tc-011 | S04 | focused pytest for installer/domain/CLI runtime contracts | pass | `uv run pytest tests/unit/infra/test_init_update.py tests/unit/domain/test_delegated_authoring.py tests/cli_runtime/test_delegated_authoring.py` -> `252 passed, 31 skipped` |
+| tc-011 | S04 | focused pytest for installer/domain/CLI runtime contracts | pass | `uv run pytest tests/unit/infra/test_init_update.py tests/unit/domain/test_delegated_authoring.py tests/cli_runtime/test_delegated_authoring.py` -> `253 passed, 31 skipped` |
+| tc-012 | S90/S99 | SpecDock validation/sync plus focused regression suite | pass | `validate` ok nodes=87; `sync` ok active unchanged; `git diff --check` ok; focused pytest `253 passed, 31 skipped` |
 
 #### クロージャ差分（Closure Delta）
 
@@ -259,6 +266,9 @@ ok
 | S02 | issue-planning mirror sync review | spec-reviewer | fresh | pass | no | commit S02 | Reviewer agent `019ea219-c047-74b2-b786-edecde247d91` returned `review_status: pass` |
 | S03 | agent role encapsulation review | spec-reviewer | fresh | pass | no | commit S03 | Reviewer agent `019ea21f-cd3d-7491-b68e-25cf30eff188` returned `review_status: pass` |
 | S04 | surrounding surface / runtime / test contract review | spec-reviewer | fresh after P1 fix | pass | no | commit S04 | Reviewer agent `019ea233-bf5e-7283-90e9-17cb8f81de48` returned P1 for missing deleted-role-skill absence tests; explicit absence assertions added; re-review returned `review_status: pass` |
+| S99 | final QA gate | qa-reviewer | fresh after P1 fix | pass | no | final commit | Reviewer `019ea241-bbed-77f0-b75f-01bea9c8307b` returned P1 for missing update cleanup regression; obsolete cleanup path/test added; re-review returned `review_status: pass` with P3 count cleanup fixed |
+| S99 | final code review gate | code-reviewer | fresh after P1 fix | pass | no | final commit | Reviewer `019ea241-f819-7f90-9d2e-79cad6f9d741` returned P1 for missing obsolete cleanup inventory; manifest paths and regression test added; re-review returned `review_status: pass` with P2 count cleanup fixed |
+| S99 | final spec review gate | spec-reviewer | fresh after P2 fix | pass | no | final commit | Reviewer `019ea242-31f8-7f93-a8af-b6bd0474a942` returned pass with P2 commit-gate auditability cleanup and changed-file-list cleanup; both fixed |
 
 #### ステップ commit ゲート（Step Commit Gate）
 
@@ -266,10 +276,10 @@ ok
 |---|---|---|---|---|---|---|---|---|
 | pre-start scaffold | committed | issue scaffold and existing first-wave research | `a7bd1077` | not checked after later edits | N/A | N/A | N/A | N/A |
 | planning authoring | no commit requested | issue-local research and planning docs | final ledger in this report | validate/sync/diff-check passed after edits | N/A | N/A | N/A | N/A |
-| S01 | committed | provider issue-planning skill and report evidence | this commit | clean after commit | N/A | N/A | N/A | N/A |
-| S02 | committed | dogfooding issue-planning skill mirror and report evidence | this commit | clean after commit | N/A | N/A | N/A | N/A |
-| S03 | committed | agent TOML self-contained contracts, deleted role skills, and report evidence | this commit | clean after commit | N/A | N/A | N/A | N/A |
-| S04 | committed | runtime provenance, managed skill inventory, hub route, affected tests, and report evidence | this commit | clean after commit | N/A | N/A | N/A | N/A |
+| S01 | committed | provider issue-planning skill and report evidence | `d9df8fa2` | clean after commit | N/A | N/A | N/A | N/A |
+| S02 | committed | dogfooding issue-planning skill mirror and report evidence | `d3371e94` | clean after commit | N/A | N/A | N/A | N/A |
+| S03 | committed | agent TOML self-contained contracts, deleted role skills, and report evidence | `72ab74ce` | clean after commit | N/A | N/A | N/A | N/A |
+| S04 | committed | runtime provenance, managed skill inventory, hub route, affected tests, and report evidence | `2886d45a` | clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 
@@ -291,6 +301,8 @@ ok
 - `.agents/skills/spec-dock-implementation-planner/SKILL.md`
 - `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md`
 - `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+- `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json`
+- `.agents/host-adapters/meta.json`
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/delegated_authoring.py`
 - `spec-dock/scripts/spec_dock_runtime/domain/delegated_authoring.py`
 - `src/spec_dock/cli.py`
