@@ -343,84 +343,78 @@ P1/P2 など本文上の優先度は text interpretation なので progress stat
 ### Review signal schema
 
 review collector は、PR 上の review-related signals を「全体」と「Codex-authored subset」に分けて出力する。
-全体 view は observation / blocker classification の primary source であり、Codex subset は Codex review reporting と Codex-specific findings summary のための subset である。
-final JSON には、status summary とは別に `@codex review` trigger 後の body payload を `reviews.trigger_window` として含める。
+全体 view は observation / blocker classification の primary source であり、Codex subset は `review.codex_authored` として
+同じ flat signal schema から導出する。
+final JSON では top-level `review` object の `signals`、`review_requests`、`codex_authored`、`threads`、`body_mode` を正規 schema とする。
+trigger window 後の body payload は `review.signals[]` の各 item に body mode / cap に従って含め、別の
+`reviews.trigger_window` object は作らない。
 
 ```json
 {
-  "reviews": {
-    "collection_status": "success",
-    "thread_state_available": true,
-    "review_decision": "APPROVED",
-    "progress_status": "approved",
-    "body_mode": "trigger-window-truncated",
-    "trigger_window": {
-      "cutoff_created_at": "2026-06-08T01:23:45Z",
-      "items": [],
-      "overflow": {
-        "item_count_omitted": 0,
-        "body_chars_omitted": 0
-      }
-    },
-    "signals": {
+  "review": {
+    "collector": "s04",
+    "status": "none|requested|commented|approved|changes_requested|unresolved|unknown",
+    "progress_status": "commented",
+    "signals": [],
+    "review_requests": [],
+    "codex_authored": [],
+    "summary": {
       "all": {
-        "issue_comments": [],
-        "review_comments": [],
-        "reviews": [],
-        "review_requests": [],
-        "review_threads": []
+        "total": 0,
+        "issue_comments": 0,
+        "reviews": 0,
+        "review_comments": 0,
+        "review_requests": 0
       },
-      "codex": {
-        "issue_comments": [],
-        "review_comments": [],
-        "reviews": [],
-        "review_requests": [],
-        "review_threads": []
-      },
-      "humans": {
-        "issue_comments": [],
-        "review_comments": [],
-        "reviews": [],
-        "review_requests": [],
-        "review_threads": []
-      },
-      "bots": {
-        "issue_comments": [],
-        "review_comments": [],
-        "reviews": [],
-        "review_requests": [],
-        "review_threads": []
+      "codex_authored": {
+        "total": 0
       }
     },
-    "authorship": {
-      "codex_author_logins": ["codex"],
-      "bot_author_types": ["Bot"],
-      "classification_rule": "author login/type based, with raw author fields preserved per signal"
+    "threads": {
+      "total": 0,
+      "unresolved": 0,
+      "resolved": 0,
+      "outdated": 0,
+      "state_available": true,
+      "items": []
+    },
+    "body_mode": {
+      "mode": "trigger-window-truncated",
+      "item_body_char_cap": 12000,
+      "total_body_char_cap": 120000,
+      "item_count_cap": 50,
+      "included_count": 0,
+      "included_chars": 0,
+      "item_count_omitted": 0,
+      "body_chars_omitted": 0
     }
   }
 }
 ```
 
-各 signal item は、少なくとも次を持つ。
+各 signal item は、`kind` ごとの GitHub source 差を保ったうえで、実装済み collector の field 名を contract とする。
 
 ```json
 {
+  "kind": "issue_comment|pull_review|pull_review_comment",
   "id": "string-or-number",
-  "node_id": "optional-node-id",
-  "author_login": "octocat",
-  "author_type": "User|Bot|Unknown",
-  "is_codex_authored": false,
+  "author": "octocat",
+  "codex_authored": false,
   "created_at": "2026-06-07T00:00:00Z",
-  "updated_at": "2026-06-07T00:00:00Z",
-  "state": "APPROVED|CHANGES_REQUESTED|COMMENTED|OPEN|RESOLVED|UNKNOWN",
-  "thread_state": "unresolved|resolved|outdated|unknown",
+  "submitted_at": "optional-review-submitted-at",
+  "updated_at": "optional-inline-comment-updated-at",
+  "state": "commented|approved|changes_requested|unknown",
+  "commit_id": "optional-review-or-comment-head-sha",
+  "original_commit_id": "optional-inline-original-sha",
+  "stale": false,
+  "trigger_command": false,
   "path": "optional/file/path",
-  "position": null,
-  "html_url": "optional-url",
+  "line": 12,
   "body": "included only when item belongs to trigger_window and body_mode includes body",
   "body_truncated": false,
   "body_original_length": 0,
-  "body_hash": "sha256:..."
+  "body_sha256": "hex-sha256",
+  "omitted_reason": "optional-body-omission-reason"
 }
 ```
 
@@ -462,7 +456,7 @@ Window 判定:
 Body mode:
 
 - `none`:
-  - stdout final JSON は metadata と `body_hash` のみ。
+  - stdout final JSON は metadata と `body_sha256` のみ。
 - `trigger-window-truncated`:
   - default。
   - trigger window 内の body を stdout final JSON に含める。
@@ -472,7 +466,7 @@ Body mode:
   - trigger window 内の body を可能な範囲で全文出力する。
   - stdout 肥大化 risk を `limitations` または `body_policy` に出す。
 - `out-only`:
-  - stdout final JSON は metadata と `body_hash` のみ。
+  - stdout final JSON は metadata と `body_sha256` のみ。
   - `--out` 指定時だけ raw body artifact に保存する。
 
 Default cap:
@@ -487,10 +481,10 @@ cap 超過時も valid JSON を保つ。
 
 Fingerprint participation rule:
 
-- observation fingerprint には `reviews.signals.all` を primary として含める。
-- Codex subset は `all` から導出できるが、Codex-specific reporting drift を検出するため `reviews.signals.codex` の ids / updated_at / state / thread_state / body_hash も fingerprint field list に明示する。
-- raw body は fingerprint に直接含めず、`body_hash` を含める。
-- trigger window payload も fingerprint では raw body ではなく `body_hash` と truncation metadata を使う。
+- observation fingerprint には top-level `review.signals[]` を primary として含める。
+- Codex subset は `review.signals[]` から導出できるが、Codex-specific reporting drift を検出するため `review.codex_authored` の ids / updated_at / state / thread_state / `body_sha256` も fingerprint field list に明示する。
+- raw body は fingerprint に直接含めず、`body_sha256` を含める。
+- trigger window payload も fingerprint では raw body ではなく `body_sha256` と truncation metadata を使う。
 - outstanding `review_requests` は default では success blocker ではないが、fingerprint と counts には含める。
 - `thread_state_available=false` の場合、visible signals が0件でも `review_state_unknown` / limitation が fingerprint と final classification に参加する。
 
@@ -571,32 +565,27 @@ CI logs の全文取得は通常 path には含めない。
 
 ```json
 {
-  "schema_version": "github-pr-observation.wait.v1",
+  "script": "wait_pr_observation.sh",
+  "status": "passed|failed|pending|running|none|timeout|stale_head|unknown|human_gate",
+  "overall_status": "passed|failed|pending|running|none|timeout|stale_head|unknown|human_gate",
+  "normalized_status": "passed|failed|pending|running|none|timeout|stale_head|unknown|human_gate",
+  "observation_complete": true,
+  "observed_at": "2026-06-08T01:23:45Z",
   "repo": "OWNER/REPO",
   "pr": 123,
-  "head": {
-    "expected_sha": "abc123",
-    "observed_sha": "abc123",
-    "matches_expected": true
+  "expected_head_sha": "abc123",
+  "current_head_sha": "abc123",
+  "head_matches_expected": true,
+  "fingerprint": "sha256-or-hex-fingerprint",
+  "summary": {
+    "head": "matched|observed|stale|unknown",
+    "ci": "passed|failed|pending|running|none|unknown",
+    "review": "none|requested|commented|approved|changes_requested|unresolved|unknown"
   },
-  "trigger": {
-    "source": "explicit",
-    "comment_id": 123456,
-    "created_at": "2026-06-08T01:23:45Z",
-    "body_match": "@codex review"
-  },
-  "normalized_status": "ready|attention_required|timeout|stale_head|unknown",
-  "overall_status": "success|action_required|timeout|stale|unknown",
-  "observation_complete": true,
-  "progress_summary": {
-    "phase": "observing",
-    "ci": "passed",
-    "review": "none",
-    "polls": 9,
-    "elapsed_seconds": 810,
-    "quiet_seconds": 240
-  },
+  "limitations": [],
+  "recommended_next_action": "merge_prepared|address_review_feedback|fix_ci|wait|wait_or_rerun|rerun_for_current_head|human_gate",
   "ci": {
+    "status": "passed|failed|pending|running|none|unknown",
     "progress_status": "passed",
     "check_runs": {
       "total": 7,
@@ -617,37 +606,88 @@ CI logs の全文取得は通常 path には含めない。
     },
     "failures": []
   },
-  "reviews": {
+  "review": {
+    "collector": "s04",
+    "status": "none|requested|commented|approved|changes_requested|unresolved|unknown",
     "progress_status": "none",
-    "body_mode": "trigger-window-truncated",
-    "thread_state_available": true,
-    "trigger_window": {
-      "cutoff_created_at": "2026-06-08T01:23:45Z",
-      "items": [],
-      "overflow": {
-        "item_count_omitted": 0,
-        "body_chars_omitted": 0
+    "statuses": [
+      "none",
+      "requested",
+      "commented",
+      "approved",
+      "changes_requested",
+      "unresolved",
+      "unknown"
+    ],
+    "signals": [],
+    "review_requests": [],
+    "codex_authored": [],
+    "summary": {
+      "all": {
+        "total": 0,
+        "issue_comments": 0,
+        "reviews": 0,
+        "review_comments": 0,
+        "review_requests": 0
+      },
+      "codex_authored": {
+        "total": 0
       }
     },
-    "signals": {
-      "all": {},
-      "codex": {},
-      "humans": {},
-      "bots": {}
+    "threads": {
+      "total": 0,
+      "unresolved": 0,
+      "resolved": 0,
+      "outdated": 0,
+      "state_available": true,
+      "items": [],
+      "limitations": []
+    },
+    "body_mode": {
+      "mode": "none|trigger-window-truncated|trigger-window-full|out-only",
+      "item_body_char_cap": 12000,
+      "total_body_char_cap": 120000,
+      "item_count_cap": 50,
+      "included_count": 0,
+      "included_chars": 0,
+      "item_count_omitted": 0,
+      "body_chars_omitted": 0
     }
   },
-  "stability": {
-    "same_fingerprint_count": 2,
-    "quiet_seconds": 240,
-    "fingerprint": "sha256:..."
+  "trigger": {
+    "source": "explicit|inferred|none|unknown",
+    "comment_id": 123456,
+    "created_at": "2026-06-08T01:23:45Z"
   },
-  "limitations": [],
-  "summary": "Checks are passed for the expected head SHA and no review signals were observed.",
-  "recommended_next_action": "Report merge-prepared evidence to the human owner.",
-  "artifacts": null
+  "body_mode": "none|trigger-window-truncated|trigger-window-full|out-only",
+  "wait": {
+    "polls": 9,
+    "timeout_seconds": 1800,
+    "poll_interval_seconds": 30,
+    "quiet_seconds_required": 90,
+    "quiet_seconds_observed": 120,
+    "same_fingerprint_required": 2,
+    "same_fingerprint_observed": 2,
+    "zero_check_grace_polls": 2,
+    "latest_change_poll": 8,
+    "deadline_reached": false,
+    "contract_phase": "s05_stable_wait_loop"
+  },
+  "artifacts": {
+    "result_json": null,
+    "events_ndjson": null,
+    "latest_json": null,
+    "latest_delta_json": null,
+    "snapshots_dir": null
+  },
+  "pr_metadata": {}
 }
 ```
 
+`fetch_pr_observation_snapshot.sh` の snapshot JSON も同じ top-level contract を返すが、`script` は
+`fetch_pr_observation_snapshot.sh`、`observation_complete` は常に `false`、`wait` は含まない。
+`wait_pr_observation.sh` が stable / terminal / timeout 判定後に final JSON を stdout へ 1 回だけ出力する。
+`--out` 未指定時、`artifacts` の値は `null` で、通常 caller は stdout JSON を唯一の判断 source とする。
 `--out` 指定時だけ `artifacts` に path を入れる。
 
 ```json
@@ -663,7 +703,11 @@ CI logs の全文取得は通常 path には含めない。
 ```
 
 `overall_status` は既存 caller がある場合の互換 field として残す。
-新しい caller は `normalized_status`、`observation_complete`、`progress_summary.ci`、`progress_summary.review`、`limitations`、`recommended_next_action` を優先する。
+新しい caller は `normalized_status`、`observation_complete`、`summary.ci`、`summary.review`、`limitations`、
+`recommended_next_action` を優先する。
+`normalized_status=human_gate` は観測が安定完了したが review / thread / human signal 対応が必要な状態を表す。
+その場合 `observation_complete=true` と `recommended_next_action=address_review_feedback|human_gate` を返し、
+script failure ではなく人間または実装 agent への handoff 状態として扱う。
 
 ## 判定フロー
 
@@ -685,7 +729,7 @@ CI logs の全文取得は通常 path には含めない。
    - CI を `unknown|none|failed|running|pending|passed` に集約する。
    - Review を `unknown|unresolved|changes_requested|requested|commented|approved|none` に集約する。
 5. Fingerprint:
-   - head SHA、checks/statuses normalized state、review ids/states/thread states/body_hash/review requests、limitations を含める。
+   - head SHA、checks/statuses normalized state、review ids/states/thread states/`body_sha256`/review requests、limitations を含める。
    - raw body は含めない。
 6. Progress:
    - poll ごとに stderr へ current-state summary を最大1行出す。
@@ -778,14 +822,14 @@ CI logs の全文取得は通常 path には含めない。
   - visible review signals がなければ `review=none`。
   - P1/P2 や body text interpretation を progress status に使わない。
 - Trigger window / body payload tests:
-  - explicit trigger 指定時、trigger 前の old review/comment body は `reviews.trigger_window.items[]` に出ない。
+  - explicit trigger 指定時、trigger 前の old review/comment body は `review.signals[]` の body payload に出ず、`omitted_reason=outside_trigger_window` と body metadata のみに留まる。
   - trigger 後の PR conversation comment body、inline review comment body、review body が body mode に応じて出る。
   - PR conversation comment が trigger と同一 timestamp の場合、`id > trigger_comment_id` のものだけ含まれる。
   - expected head SHA と一致しない review/comment は stale / prior-head signal として分離される。
   - explicit trigger がない場合、最新 `@codex review` comment が inferred trigger になり、`trigger_inferred` limitation が出る。
   - trigger が見つからない場合、body payload が全件化されず、trigger unknown limitation と recommended next action が出る。
   - `trigger-window-truncated` で per-item / total cap 超過時も valid JSON が出て、truncation / overflow metadata が付く。
-  - `none` では body が出ず、metadata と body hash のみになる。
+  - `none` では body が出ず、metadata と `body_sha256` のみになる。
   - `out-only` では stdout に body が出ず、`--out` 指定時だけ raw body artifact が作られる。
   - stderr progress に body、URL、reviewer 名、job 名が出ない。
 - Integration / scaffold tests:
