@@ -155,6 +155,12 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - S03 の final re-review は P2 として accepted abbreviated `--head-sha` を stale 扱いする点を指摘した。snapshot と checks collector を lower-case prefix match に修正し regression test を追加した。
 - S03 の final re-review は P2 として `head_matches_expected` が abbreviated SHA prefix match と不整合になる点を指摘した。final JSON boolean も同じ prefix-match semantics に揃えた。
 - S03 の final fresh code-reviewer は P2 report cleanup のみで `review_status=pass`。CL-EC-003 の ledger 表現を plan に合わせて修正した。
+- S04 では review/comment/thread collector と snapshot integration を実装し、trigger window、Codex-authored subset、thread-state limitation、body cap/truncation の focused coverage を追加した。
+- S04 の初回 code-reviewer は GraphQL reviewThreads pagination 不足を P1、trigger command comment の status 汚染と out-only artifact body 欠落を P2 として fail した。修正を dev-coder に委任した。
+- S04 の初回 code-reviewer findings は、GraphQL reviewThreads pagination、trigger command comment の status 判定除外、`out-only` raw body artifact 保持の regression tests と実装修正で対応した。fresh code-reviewer re-review 待ち。
+- S04 の re-review は、unknown trigger 時に `--out` raw artifact が過去本文を保存し得る P1 を検出した。raw artifact も trigger window boundary を守る修正を dev-coder に委任した。
+- S04 の re-review P1 は、raw artifact を stdout body と同じ trigger window boundary に揃え、unknown trigger では `raw/review_bodies.json` を empty array にする regression test で修正した。fresh code-reviewer re-review 待ち。
+- S04 の final fresh code-reviewer は findings なし / `review_status=pass`。S04 diff は commit ready。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -548,6 +554,138 @@ git diff --check
 #### メモ
 - S03 intentionally leaves review/comment/thread collection to S04 and quiet-window / final merge-prepared status to S05.
 - `plan.md` front matter remains `draft`, but the user explicitly instructed issue execution; current branch already contains committed S01/S02 execution steps. Treat as workflow risk, not a reason to stop this bounded S03 fix/review loop.
+
+---
+
+### セッションログ（2026-06-08 S04）
+
+#### 対象
+- Step: S04 Review/comment/thread collector
+- AC/EC: CL-AC-006, CL-AC-008, CL-AC-009, CL-AC-012, CL-AC-013, CL-EC-004, CL-EC-005
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `### S04 Review/comment/thread collector`
+  - closure ids: CL-AC-006, CL-AC-008, CL-AC-009, CL-AC-012, CL-AC-013, CL-EC-004, CL-EC-005
+
+#### 実施内容
+- dev-coder が `fetch_pr_review_snapshot.sh` を placeholder から fixed read-only review/comment/thread collector に更新した。
+- fixed REST GET で issue comments、pull reviews、pull review comments、pull request review requests を収集する。
+- fixed GraphQL query で review thread state を収集し、取得できない場合は `thread_state_unavailable` limitation として出力する。
+- explicit / inferred / unknown trigger window と body-mode cap/truncation metadata を実装し、unknown trigger では body を dump しない。
+- all signals と Codex-authored subset を分離し、snapshot JSON の `review` / `summary.review` に S04 collector result を統合した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_75_pr_observation_review_collector or issue_75_pr_observation_snapshot_includes_s04'
+# red evidence before S04 implementation: 3 failed
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_75_pr_observation_review_collector or issue_75_pr_observation_snapshot_includes_s04'
+# 7 passed
+
+uv run pytest tests/unit/infra/test_init_update.py -k issue_75
+# 27 passed
+
+bash -n src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh
+# pass
+
+bash -n src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh
+# pass
+
+diff -r src/spec_dock/assets/install_root/.agents/skills/github-pr-observation .agents/skills/github-pr-observation
+# no output; parity OK
+
+git diff --check
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | 赤フェーズ（Red） | review collector / snapshot integration tests must fail against placeholder | S04 focused tests failed with `not_implemented` / missing `summary.review` integration | `uv run pytest ... -k 'issue_75_pr_observation_review_collector or issue_75_pr_observation_snapshot_includes_s04'` | pass | red evidence reported by dev-coder |
+| S04 | 緑フェーズ（Green） | review taxonomy / trigger window / body safety / thread limitation / snapshot integration | focused S04 7 passed; broader `issue_75` 27 passed; syntax/parity/diff-check pass | pytest + shell syntax + `diff -r` + `git diff --check` | pass | includes regression coverage for GraphQL pagination, trigger-only status exclusion, and out-only raw body artifact |
+| S04 | リファクタリング（Refactor） | guardrail satisfied | `git diff --check` pass; final fresh code-reviewer pass | command | pass | S05 wait/stability intentionally untouched |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | `plan.md` front matter remains `状態: "draft"` while user explicitly instructed issue execution | dev-coder | user instruction and committed S01-S03 execution historyを優先し、workflow risk として記録 | none | no | no code impact; proceed within bounded approved user scope |
+| S04 | GraphQL reviewThreads が first page だけで pagination されず unresolved thread を見落とし得る | code-reviewer | GraphQL reviewThreads を `pageInfo.hasNextPage/endCursor` で pagination するよう修正し regression test を追加 | CL-AC-008, CL-AC-009, CL-EC-004, CL-EC-005 | no | fixed; focused S04 7 passed; re-review pending |
+| S04 | trigger command comment だけで `review=commented` になる | code-reviewer | `@codex review` trigger command comment を `trigger_command: true` として signal には残し、review status 判定から除外する regression test を追加 | CL-AC-008, CL-AC-013 | no | fixed; focused S04 7 passed; re-review pending |
+| S04 | `--body-mode out-only --out` の raw artifact に body が残らない | code-reviewer | stdout は metadata-only のまま、`--out DIR/raw/review_bodies.json` に raw bodies を保持する regression test を追加 | CL-AC-006, CL-AC-012 | no | fixed; focused S04 7 passed; re-review pending |
+| S04 | unknown trigger 時に `--out` raw artifact が trigger window 外の過去本文を保存し得る | code-reviewer | raw artifact も stdout body と同じ trigger window boundary に揃え、unknown trigger では `raw/review_bodies.json` が empty array になる regression test を追加 | CL-AC-006, CL-AC-013, CL-EC-006 | no | fixed; focused S04 7 passed; re-review pending |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | CL-AC-006, CL-AC-008, CL-AC-009, CL-AC-012, CL-AC-013, CL-EC-004, CL-EC-005 | fixed REST/GraphQL collection、review taxonomy、Codex subset、trigger-window body、body suppression、thread limitation、snapshot integration | focused tests 7 passed; `issue_75` 27 passed; syntax/parity/check pass; re-review P1 raw artifact body leak fixed; final fresh code-reviewer pass | pass | S05 intentionally pending |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| CL-AC-006 | S04 | yes | red-required + focused contract | S04 focused tests failed against placeholder | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_75_pr_observation_review_collector or issue_75_pr_observation_snapshot_includes_s04'` | pass | trigger-window bodies with caps |
+| CL-AC-008 | S04 | yes | focused contract | S04 focused tests failed against placeholder | same | pass | unresolved / changes requested / comments reflected in status |
+| CL-AC-009 | S04 | yes | focused contract | S04 focused tests failed against placeholder | same | pass | thread state unavailable as limitation |
+| CL-AC-012 | S04 | yes | focused contract | S04 focused tests failed against placeholder | same | pass | explicit trigger id/time window only |
+| CL-AC-013 | S04 | yes | focused contract | S04 focused tests failed against placeholder | same | pass | inferred trigger limitation and unknown trigger body suppression |
+| CL-EC-004 | S04 | yes | focused contract | S04 focused tests failed against placeholder | same | pass | resolved/outdated/unresolved thread separation |
+| CL-EC-005 | S04 | yes | focused contract | S04 focused tests failed against placeholder | same | pass | GraphQL/auth/rate/schema failure limitation |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| CL-AC-006 | S04 | explicit trigger body caps fixture | pass | default truncated mode keeps JSON valid |
+| CL-AC-008 | S04 | explicit trigger + unresolved thread fixture | pass | review status can become unresolved |
+| CL-AC-009 | S04 | thread state unavailable fixture | pass | limitation emitted |
+| CL-AC-012 | S04 | explicit trigger id/time fixture | pass | old-trigger body omitted |
+| CL-AC-013 | S04 | inferred/unknown trigger fixture | pass | inferred limitation; unknown suppresses bodies |
+| CL-EC-004 | S04 | resolved/outdated/unresolved thread fixture | pass | thread states separated |
+| CL-EC-005 | S04 | GraphQL failure fixture | pass | thread state unavailable limitation |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | CL-AC-006, CL-AC-008, CL-AC-009, CL-AC-012, CL-AC-013, CL-EC-004, CL-EC-005 | S04 focused issue_75 tests | same | 計画内の review/comment/thread collector contract を具体化しただけで closure semantics は変更なし | no | yes |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
+
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/3b01/spec-dock` | iss-00170 | current session | dev-coder, code-reviewer | same repo, active issue, S04 bounded implementation/review; no commit/publish by worker | issue complete / scope change / user revocation | none | review |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
+
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | delegated | review collector / tests | dev-coder | S04 review/comment/thread collector only | `plan.md`; provider install_root; dogfooding mirror | review collector, snapshot integration, focused tests | S05 wait loop, arbitrary GraphQL/query args, priority text interpretation, old-trigger body mixing | focused pytest, syntax check, parity, `git diff --check`, code-reviewer | scope expansion / reviewer fail | worker summary / changed files / verification / risks | final fresh code-reviewer pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 | dev-coder | Review/comment/thread collector added; GraphQL thread pagination、trigger-only status exclusion、out-only raw body artifact、unknown trigger raw artifact suppression を reviewer findings 後に修正した。 | `.agents/skills/github-pr-observation/`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/`; `tests/unit/infra/test_init_update.py` | red focused tests 3 failed before implementation; S04 focused 7 passed; `issue_75` 27 passed; `bash -n` pass; parity pass; `git diff --check` pass | pass | S05 stable wait remains pending | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | code-reviewer | fresh | passed | N/A | commit S04 | final fresh code-reviewer pass; reviewer pytest rerun hit local uv issue but orchestrator pytest evidence is pass |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | ready_to_commit | S04 source/test/report diff | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh` - review/comment/thread collector.
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh` - snapshot review integration.
+- `.agents/skills/github-pr-observation/` - dogfooding mirror parity.
+- `tests/unit/infra/test_init_update.py` - focused S04 contract tests.
+
+#### コミット
+- pending: ready_to_commit after final fresh code-reviewer pass
+
+#### メモ
+- S04 intentionally leaves quiet-window / final merge-prepared status to S05.
+- `plan.md` front matter remains `draft`, but the user explicitly instructed issue execution; current branch already contains committed S01-S03 execution steps. Treat as workflow risk, not a reason to stop this bounded S04 review loop.
 
 ---
 
