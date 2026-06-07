@@ -104,6 +104,30 @@ def gh_api(path):
         }
 
 
+def gh_pr_view():
+    command = ["gh", "pr", "view", str(pr), "--repo", repo, "--json", "mergeStateStatus,statusCheckRollup"]
+    completed = subprocess.run(command, capture_output=True, text=True, check=False)
+    if completed.returncode != 0:
+        return {}, {
+            "code": "pr_required_check_state_unavailable",
+            "source": "gh_pr_view",
+            "severity": "informational",
+            "message": "fixed read-only PR required check state collection failed",
+            "exit_code": completed.returncode,
+            "stderr_sha256": hashlib.sha256(completed.stderr.encode()).hexdigest(),
+        }
+    try:
+        payload = json.loads(completed.stdout or "{}")
+    except json.JSONDecodeError:
+        return {}, {
+            "code": "pr_required_check_state_unavailable",
+            "source": "gh_pr_view",
+            "severity": "informational",
+            "message": "fixed read-only PR required check state returned non-JSON output",
+        }
+    return payload if isinstance(payload, dict) else {}, None
+
+
 def parse_gh_paginated_stdout(stdout):
     text = stdout or "{}"
     decoder = json.JSONDecoder()
@@ -222,9 +246,12 @@ statuses_payload, limitation = gh_api(f"repos/{repo}/commits/{expected_head_sha}
 if limitation:
     limitations.append(limitation)
     statuses_payload = {}
+pr_view_payload, limitation = gh_pr_view()
 
 check_runs = as_list(check_runs_payload, "check_runs")
 statuses = as_list(statuses_payload, "statuses")
+status_check_rollup = as_list(pr_view_payload, "statusCheckRollup")
+merge_state_status = str(pr_view_payload.get("mergeStateStatus") or "").upper()
 
 check_counts = {
     "total": len(check_runs),
@@ -290,6 +317,23 @@ if stale_checks:
             "severity": "blocking",
             "message": "check run head SHA did not match expected head SHA",
             "count": len(stale_checks),
+        }
+    )
+
+required_check_state = {
+    "available": limitation is None,
+    "merge_state_status": merge_state_status or None,
+    "status_check_rollup_total": len(status_check_rollup),
+    "status_check_rollup_states": [],
+}
+for item in status_check_rollup:
+    state = str(item.get("state") or item.get("status") or "").upper()
+    conclusion = str(item.get("conclusion") or "").upper()
+    required_check_state["status_check_rollup_states"].append(
+        {
+            "name": item.get("name") or item.get("context"),
+            "state": state or None,
+            "conclusion": conclusion or None,
         }
     )
 
@@ -359,13 +403,31 @@ for check in failed_checks:
             }
         )
 
+required_checks_missing_or_pending = (
+    bool(merge_state_status)
+    and merge_state_status not in {"CLEAN", "HAS_HOOKS"}
+    and not (check_counts["failed"] or status_counts["failure"] or status_counts["error"] or check_counts["stale"])
+    and not (check_counts["running"] or check_counts["pending"] or status_counts["pending"])
+)
+
+if required_checks_missing_or_pending:
+    limitations.append(
+        {
+            "code": "required_checks_missing_or_pending",
+            "source": "gh_pr_view.mergeStateStatus",
+            "severity": "blocking",
+            "message": "PR merge state indicates required checks are not yet satisfied",
+            "merge_state_status": merge_state_status,
+        }
+    )
+
 if check_counts["failed"] or status_counts["failure"] or status_counts["error"] or check_counts["stale"]:
     ci_status = "failed"
 elif limitations and any(item.get("severity") == "blocking" and item.get("code", "").startswith("github_api") for item in limitations):
     ci_status = "unknown"
 elif check_counts["running"]:
     ci_status = "running"
-elif check_counts["pending"] or status_counts["pending"]:
+elif check_counts["pending"] or status_counts["pending"] or required_checks_missing_or_pending:
     ci_status = "pending"
 elif check_counts["total"] == 0 and status_counts["total"] == 0:
     ci_status = "none"
@@ -432,6 +494,7 @@ fingerprint_source = {
         for item in sanitized_statuses
     ],
     "limitations": [item.get("code") for item in limitations],
+    "required_check_state": required_check_state,
 }
 
 payload = {
@@ -450,6 +513,7 @@ payload = {
         "statuses": sanitized_statuses,
         "failures": failures,
         "collector": "s03",
+        "required_check_state": required_check_state,
     },
     "limitations": limitations,
     "fingerprint": hashlib.sha256(

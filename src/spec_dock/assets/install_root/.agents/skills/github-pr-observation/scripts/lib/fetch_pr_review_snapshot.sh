@@ -218,6 +218,7 @@ def gh_graphql_threads():
 query($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
+      reviewDecision
       reviewThreads(first: 100, after: $after) {
         pageInfo {
           hasNextPage
@@ -244,6 +245,7 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
 }
 """.strip()
     nodes = []
+    review_decision = None
     after = None
     for _ in range(100):
         command = [
@@ -263,7 +265,7 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
             command.extend(["-F", "after=" + after])
         completed = subprocess.run(command, capture_output=True, text=True, check=False)
         if completed.returncode != 0:
-            return [], {
+            return [], review_decision, {
                 "code": "thread_state_unavailable",
                 "source": "graphql.reviewThreads",
                 "severity": "blocking",
@@ -274,17 +276,20 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
         try:
             payload = json.loads(completed.stdout or "{}")
         except json.JSONDecodeError:
-            return [], {
+            return [], review_decision, {
                 "code": "thread_state_unavailable",
                 "source": "graphql.reviewThreads",
                 "severity": "blocking",
                 "message": "fixed GraphQL review thread state returned non-JSON output",
             }
         try:
-            review_threads = payload["data"]["repository"]["pullRequest"]["reviewThreads"]
+            pull_request = payload["data"]["repository"]["pullRequest"]
+            if review_decision is None:
+                review_decision = pull_request.get("reviewDecision")
+            review_threads = pull_request["reviewThreads"]
             page_nodes = review_threads["nodes"]
         except (KeyError, TypeError):
-            return [], {
+            return [], review_decision, {
                 "code": "thread_state_unavailable",
                 "source": "graphql.reviewThreads",
                 "severity": "blocking",
@@ -294,16 +299,16 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
             nodes.extend(page_nodes)
         page_info = review_threads.get("pageInfo") if isinstance(review_threads, dict) else {}
         if not isinstance(page_info, dict) or not page_info.get("hasNextPage"):
-            return nodes, None
+            return nodes, review_decision, None
         after = page_info.get("endCursor")
         if not after:
-            return nodes, {
+            return nodes, review_decision, {
                 "code": "thread_state_partial",
                 "source": "graphql.reviewThreads",
                 "severity": "blocking",
                 "message": "fixed GraphQL review thread pagination had no next cursor",
             }
-    return nodes, {
+    return nodes, review_decision, {
         "code": "thread_state_partial",
         "source": "graphql.reviewThreads",
         "severity": "blocking",
@@ -488,7 +493,7 @@ pull_payload, limitation = gh_api(f"repos/{repo}/pulls/{pr}")
 if limitation:
     limitations.append(limitation)
     pull_payload = {}
-thread_nodes, thread_limitation = gh_graphql_threads()
+thread_nodes, review_decision, thread_limitation = gh_graphql_threads()
 if thread_limitation:
     limitations.append(thread_limitation)
 
@@ -498,8 +503,28 @@ review_comments = as_list(review_comments_payload)
 requested_reviewers = as_list(pull_payload, "requested_reviewers")
 requested_teams = as_list(pull_payload, "requested_teams")
 
+if trigger_comment_id and not trigger_created_at:
+    for comment in issue_comments:
+        try:
+            if int(comment.get("id") or 0) == trigger_comment_id:
+                trigger_created_at = comment.get("created_at")
+                break
+        except (TypeError, ValueError):
+            continue
+    if not trigger_created_at:
+        limitations.append(
+            {
+                "code": "trigger_timestamp_unresolved",
+                "source": "issue_comments",
+                "severity": "informational",
+                "message": "explicit trigger comment id did not resolve to an issue comment timestamp",
+            }
+        )
+
 trigger_source = "none"
-if trigger_comment_id or trigger_created_at:
+if trigger_comment_id and not trigger_created_at:
+    trigger_source = "unknown"
+elif trigger_comment_id or trigger_created_at:
     trigger_source = "explicit"
 elif issue_comments:
     inferred_candidates = []
@@ -631,6 +656,11 @@ for team in requested_teams:
             "state": "requested",
         }
     )
+
+review_decision_requires_review = (
+    str(review_decision or "").upper() == "REVIEW_REQUIRED"
+    and not review_request_signals
+)
 
 threads = []
 thread_comment_states = {}
@@ -788,12 +818,14 @@ elif any(item.get("state") == "changes_requested" for item in active_review_sign
     status = "changes_requested"
 elif review_request_signals:
     status = "requested"
+elif review_decision_requires_review:
+    status = "requested"
 elif any(item.get("state") == "commented" for item in active_review_signals) or active_comment_signals:
+    status = "commented"
+elif any(item.get("state") == "commented" and item.get("kind") == "issue_comment" for item in status_signals):
     status = "commented"
 elif any(item.get("state") == "approved" for item in active_review_signals):
     status = "approved"
-elif any(item.get("state") == "commented" and item.get("kind") == "issue_comment" for item in status_signals):
-    status = "commented"
 elif any(item.get("state") == "pending" for item in status_signals):
     status = "pending"
 elif any(item.get("state") == "unknown" for item in status_signals):
@@ -853,6 +885,7 @@ fingerprint_source = {
         if item.get("codex_authored")
     ],
     "review_requests": review_request_signals,
+    "review_decision": review_decision,
     "threads": [fingerprint_thread(item) for item in threads],
     "body_mode": {
         "mode": body_mode,
@@ -882,6 +915,7 @@ payload = {
         "statuses": STATUSES,
         "signals": signals,
         "review_requests": review_request_signals,
+        "review_decision": review_decision,
         "codex_authored": [
             item for item in signals + review_request_signals if item.get("codex_authored")
         ],

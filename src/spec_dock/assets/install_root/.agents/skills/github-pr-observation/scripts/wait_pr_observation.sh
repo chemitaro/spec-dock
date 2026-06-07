@@ -349,6 +349,37 @@ def timeout_snapshot(timeout_seconds: float, stdout_text: object, stderr_text: o
     }
 
 
+def append_snapshot_poll_timeout_limitation(
+    payload: dict,
+    timeout_seconds: float,
+    stdout_text: object,
+    stderr_text: object,
+) -> None:
+    if isinstance(stdout_text, bytes):
+        stdout_text = stdout_text.decode(errors="replace")
+    if isinstance(stderr_text, bytes):
+        stderr_text = stderr_text.decode(errors="replace")
+    stdout_text = "" if stdout_text is None else str(stdout_text)
+    stderr_text = "" if stderr_text is None else str(stderr_text)
+    limitations = payload.setdefault("limitations", [])
+    if any(
+        isinstance(item, dict) and item.get("code") == "snapshot_poll_timeout"
+        for item in limitations
+    ):
+        return
+    limitations.append(
+        {
+            "code": "snapshot_poll_timeout",
+            "source": "fetch_pr_observation_snapshot.sh",
+            "severity": "blocking",
+            "message": "snapshot poll exceeded the remaining wait deadline",
+            "timeout_seconds": timeout_seconds,
+            "stdout_sha256": hashlib.sha256(stdout_text.encode()).hexdigest(),
+            "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
+        }
+    )
+
+
 def terminate_process_group(proc: subprocess.Popen[str]) -> None:
     try:
         pgid = os.getpgid(proc.pid)
@@ -437,12 +468,14 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
         if poll < zero_check_grace_polls:
             return "none", "none", "wait", False, False
         return "unknown", "unknown", "human_gate", False, True
-    if has_blocking_limitation(payload):
-        return "unknown", "unknown", "human_gate", False, True
     if ci_status == "failed":
         return "failed", "failed", "fix_ci", False, True
     if ci_status in {"pending", "running", "none"}:
+        if has_blocking_limitation(payload, ignored_codes={"required_checks_missing_or_pending"}):
+            return "unknown", "unknown", "human_gate", False, True
         return ci_status, ci_status, "wait", False, False
+    if has_blocking_limitation(payload):
+        return "unknown", "unknown", "human_gate", False, True
     if ci_status != "passed":
         return "unknown", "unknown", "human_gate", False, True
     if review_status in {"none", "approved"}:
@@ -556,7 +589,17 @@ while True:
         poll_snapshot_args,
         snapshot_timeout,
     )
-    if snapshot_poll_timed_out:
+    if snapshot_poll_timed_out and latest_payload is not None:
+        payload = latest_payload
+        append_snapshot_poll_timeout_limitation(
+            payload,
+            snapshot_timeout,
+            snapshot_stdout,
+            snapshot_stderr,
+        )
+        mark_latest_timeout(payload, latest_change_monotonic, same_count)
+        snapshot_text = latest_snapshot_text
+    elif snapshot_poll_timed_out:
         payload = timeout_snapshot(snapshot_timeout, snapshot_stdout, snapshot_stderr)
         snapshot_text = json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n"
     else:

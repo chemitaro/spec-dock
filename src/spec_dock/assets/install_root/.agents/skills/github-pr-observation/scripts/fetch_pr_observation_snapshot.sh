@@ -241,9 +241,11 @@ recommended_next_action = "human_gate"
 observation_complete = False
 
 
-def has_blocking_limitation():
+def has_blocking_limitation(ignored_codes=None):
+    ignored_codes = ignored_codes or set()
     return any(
         item.get("severity") == "blocking"
+        and item.get("code") not in ignored_codes
         for item in limitations
         if isinstance(item, dict)
     )
@@ -254,12 +256,18 @@ def classify_snapshot():
     review_status = review_payload.get("status") or summary.get("review") or "unknown"
     if head_matches_expected is False or normalized_status == "stale_head":
         return "stale_head", "rerun_for_current_head", False
-    if has_blocking_limitation():
-        return "unknown", "human_gate", False
+    if metadata.get("isDraft") is True:
+        return "human_gate", "mark_pr_ready_for_review", False
+    if metadata.get("state") and str(metadata.get("state") or "").upper() != "OPEN":
+        return "human_gate", "reopen_or_use_open_pr", False
     if ci_status == "failed":
         return "failed", "fix_ci", False
     if ci_status in {"pending", "running", "none"}:
+        if has_blocking_limitation(ignored_codes={"required_checks_missing_or_pending"}):
+            return "unknown", "human_gate", False
         return ci_status, "wait", False
+    if has_blocking_limitation():
+        return "unknown", "human_gate", False
     if ci_status != "passed":
         return "unknown", "human_gate", False
     if review_status in {"none", "approved"}:
