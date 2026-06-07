@@ -148,6 +148,13 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - S02 の fresh re-review は `review_status=pass` で、P2 として `--trigger-created-at` suffix validation の anchor 漏れを指摘した。provider/mirror 両方で修正し、focused tests / syntax / parity / `git diff --check` を再実行した。
 - S02 の最終 re-review は `review_status=pass` で、P2 として default progress が single poll に2行出る点を指摘した。terminal progress 1行へ修正し、stderr 行数 assertion を追加した。
 - S02 の最終 fresh code-reviewer は findings なし / `review_status=pass`。
+- S03 では CI/check/status collector と snapshot integration を実装し、CI taxonomy、zero-check non-success、stale head check、Actions failed step detail、check-run fallback の focused coverage を追加した。
+- S03 の初回 code-reviewer は paginated `gh api --paginate` parsing、Bash 3.2 非互換 lowercase expansion、S03 report ledger 未記録を P1 として fail した。report ledger を追加し、code P1 は dev-coder が修正した。
+- S03 の re-review は、failed check run があるのに Actions jobs detail collection failure で `ci.status=unknown` へ落ちる P1 を検出した。failed signal を limitation より優先する修正と regression test を追加した。
+- S03 の pass re-review は P2 として `check_run_url` suffix 誤一致を指摘した。terminal path segment exact match に修正し regression test を追加した。
+- S03 の final re-review は P2 として accepted abbreviated `--head-sha` を stale 扱いする点を指摘した。snapshot と checks collector を lower-case prefix match に修正し regression test を追加した。
+- S03 の final re-review は P2 として `head_matches_expected` が abbreviated SHA prefix match と不整合になる点を指摘した。final JSON boolean も同じ prefix-match semantics に揃えた。
+- S03 の final fresh code-reviewer は P2 report cleanup のみで `review_status=pass`。CL-EC-003 の ledger 表現を plan に合わせて修正した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -394,6 +401,153 @@ uv run pytest tests/unit/infra/test_init_update.py
 #### メモ
 - S02 intentionally leaves CI/check/status collection to S03, review/comment/thread collection to S04, and quiet-window / stable wait finalization to S05.
 - Full `tests/unit/infra/test_init_update.py` currently has an out-of-scope dogfooding `.meta.json` snapshot mismatch; focused S02 closure tests pass.
+
+---
+
+### セッションログ（2026-06-08 S03）
+
+#### 対象
+- Step: S03 CI/check/status collector
+- AC/EC: CL-AC-002, CL-AC-004, CL-AC-007, CL-AC-014, CL-EC-002, CL-EC-003
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `### S03 CI/check/status collector`
+  - closure ids: CL-AC-002, CL-AC-004, CL-AC-007, CL-AC-014, CL-EC-002, CL-EC-003
+
+#### 実施内容
+- dev-coder が `fetch_pr_checks_snapshot.sh` を placeholder から fixed read-only CI/check/status collector に更新した。
+- collector は expected head SHA を入力必須とし、check runs、commit statuses、GitHub Actions job / failed steps を fixed `gh api` calls で収集する。
+- `fetch_pr_observation_snapshot.sh` は PR head が expected head と一致する場合に S03 collector を呼び、`ci` と `summary.ci` を final snapshot JSON に統合する。
+- CI taxonomy として `unknown`, `none`, `pending`, `running`, `passed`, `failed` を使い、S05 前の zero checks は `none` + blocking limitation として non-success に留める。
+- expected head SHA と異なる check run は stale evidence として扱い、green evidence としては使わない。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_75_pr_observation_checks_collector or issue_75_pr_observation_snapshot_includes_s03'
+# red evidence before S03 implementation: 3 failed
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_75_pr_observation_checks_collector or issue_75_pr_observation_snapshot_includes_s03'
+# 7 passed
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'accepts_abbreviated_head_sha_prefix'
+# 2 passed
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_75_pr_observation_checks_collector or issue_75_pr_observation_snapshot_includes_s03 or issue_75_pr_observation_snapshot'
+# 12 passed
+
+uv run pytest tests/unit/infra/test_init_update.py -k issue_75
+# 20 passed
+
+bash -n src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh
+# pass
+
+bash -n src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh
+# pass
+
+diff -r src/spec_dock/assets/install_root/.agents/skills/github-pr-observation .agents/skills/github-pr-observation
+# no output; parity OK
+
+rg -n '\$\{[A-Za-z_][A-Za-z0-9_]*,,\}' src/spec_dock/assets/install_root/.agents/skills/github-pr-observation .agents/skills/github-pr-observation
+# no output; Bash 4 lowercase expansion absent
+
+git diff --check
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ（Red） | CI collector / snapshot integration tests must fail against placeholder | S03 focused tests failed with `not_implemented` / missing `summary.ci` integration | `uv run pytest ... -k 'issue_75_pr_observation_checks_collector or issue_75_pr_observation_snapshot_includes_s03'` | pass | red evidence reported by dev-coder |
+| S03 | 緑フェーズ（Green） | CI taxonomy / failure detail / stale head / zero checks / snapshot integration | focused S03 7 passed; abbreviation subset 2 passed; snapshot lane 12 passed; broader `issue_75` 20 passed; syntax/parity/lowercase-grep/diff-check pass | pytest + shell syntax + `diff -r` + `rg` + `git diff --check` | pass | CL-AC-002, CL-AC-004, CL-AC-007, CL-AC-014, CL-EC-002, CL-EC-003 |
+| S03 | リファクタリング（Refactor） | guardrail satisfied | code-reviewer P1/P2 issues fixed; final fresh code-reviewer pass; final P2 report cleanup applied | reviewer + command | pass | pagination / Bash 3.2 / failed-status-priority / exact URL segment / abbreviated SHA / report ledger fixes applied |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | `gh api --paginate` stdout が複数 JSON object の場合に単一 JSON として parse してしまう | code-reviewer | JSON stream decode + list field merge を追加し、paginated check-runs/status/jobs fixture を追加 | CL-AC-002, CL-AC-014 | no | `uv run pytest ... -k ...` -> 5 passed |
+| S03 | `${var,,}` が Bash 4 専用で macOS Bash 3.2 では runtime fail する | code-reviewer | `tr '[:upper:]' '[:lower:]'` 比較へ変更し、lowercase expansion absence grep を追加確認 | CL-AC-001, CL-AC-002 | no | `rg -n '\\$\\{[A-Za-z_][A-Za-z0-9_]*,,\\}' ...` -> no output |
+| S03 | failed check run があるのに Actions jobs detail collection failure により `ci.status=unknown` になる | code-reviewer | failed check/status/stale を GitHub detail limitation より優先する修正と regression test を追加 | CL-AC-004, CL-AC-014 | no | `uv run pytest ... -k ...` -> 6 passed |
+| S03 | `check_run_url` が `/1101` の job を check id `101` に suffix 誤一致させる | code-reviewer | terminal path segment exact match に修正し、`/1101` は除外して `/101` job を選ぶ regression test を追加 | CL-AC-014 | no | `uv run pytest ... -k ...` -> 7 passed |
+| S03 | accepted abbreviated `--head-sha` が full head と同じ prefix でも stale になる | code-reviewer | snapshot と checks collector の SHA 比較を lower-case prefix match に修正し、abbreviation regression tests を追加 | CL-AC-002, CL-EC-003 | no | `uv run pytest ... -k 'accepts_abbreviated_head_sha_prefix'` -> 2 passed |
+| S03 | abbreviated `--head-sha` で `summary.head=matched` なのに `head_matches_expected=false` になる | code-reviewer | final JSON boolean も prefix-match predicate を使うよう修正し、abbreviation regression assertion を追加 | CL-AC-002 | no | `uv run pytest ... -k 'accepts_abbreviated_head_sha_prefix'` -> 2 passed |
+| S03 | report ledger 未記録だと step closure を検証できない | code-reviewer | 本 S03 session log / closure / delegation / reviewer gate 証跡を追記 | all S03 closure ids | no | initial code-reviewer P1; report fix complete |
+| S03 | `plan.md` front matter remains `状態: "draft"` while user explicitly instructed issue execution | dev-coder | user instruction and committed S01/S02 execution historyを優先し、workflow risk として記録 | none | no | no code impact; proceed within bounded approved user scope |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | CL-AC-002, CL-AC-004, CL-AC-007, CL-AC-014, CL-EC-002, CL-EC-003 | expected head SHA bound CI collection、taxonomy、failure detail、zero-check non-success、stale head handling、read-only fixed API | focused tests 7 passed; abbreviation subset 2 passed; snapshot lane 12 passed; `issue_75` 20 passed; syntax/parity/lowercase-grep/check pass; final fresh code-reviewer pass | pass | S04/S05 intentionally pending |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| CL-AC-002 | S03 | yes | red-required + focused contract | S03 focused tests failed against placeholder | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_75_pr_observation_checks_collector or issue_75_pr_observation_snapshot_includes_s03'` | pass | expected head SHA bound collector |
+| CL-AC-004 | S03 | yes | focused contract | S03 focused tests failed against placeholder | same | pass | failure/error conclusion and commit status failure taxonomy |
+| CL-AC-007 | S03 | yes | focused contract | S03 focused tests failed against placeholder | same | pass | zero checks non-success limitation until S05 |
+| CL-AC-014 | S03 | yes | focused contract | S03 focused tests failed against placeholder | same | pass | CI failure detail, Actions jobs/steps, fallback |
+| CL-EC-002 | S03 | yes | focused contract | S03 focused tests failed against placeholder | same | pass | pending/running taxonomy |
+| CL-EC-003 | S03 | yes | focused contract | S03 focused tests failed against placeholder | same | pass | skipped / neutral terminal non-blocking checks fold to passed when pending/failure are absent |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| CL-AC-002 | S03 | `test_issue_75_pr_observation_checks_collector_ci_taxonomy`; snapshot integration test | pass | final reviewer pending after P1 fixes |
+| CL-AC-004 | S03 | failure with Actions steps; check-run fallback; commit status failure taxonomy | pass | final reviewer pending after P1 fixes |
+| CL-AC-007 | S03 | zero checks taxonomy case | pass | S05 grace/deadline intentionally pending |
+| CL-AC-014 | S03 | `test_issue_75_pr_observation_checks_collector_classifies_failure_with_actions_steps`; fallback test; exact URL segment test | pass | failure detail evidence retained without false job match |
+| CL-EC-002 | S03 | pending status taxonomy case | pass | required/path-filter-like pending remains pending |
+| CL-EC-003 | S03 | skipped/neutral/success taxonomy case | pass | skipped / neutral terminal non-blocking checks fold to passed when pending/failure are absent |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | CL-AC-002, CL-AC-004, CL-AC-007, CL-AC-014, CL-EC-002, CL-EC-003 | S03 focused issue_75 tests | same | 計画内の CI/check/status collector contract を具体化しただけで closure semantics は変更なし | no | yes |
+| regression | CL-AC-002, CL-AC-014 | paginated JSON regression | same | reviewer P1 に対する regression coverage 追加であり closure semantics 変更なし | no | yes |
+| regression | CL-AC-004, CL-AC-014 | failed status priority regression | same | reviewer P1 に対する regression coverage 追加であり closure semantics 変更なし | no | yes |
+| regression | CL-AC-014 | exact check_run_url path segment regression | same | reviewer P2 に対する regression coverage 追加であり closure semantics 変更なし | no | yes |
+| regression | CL-AC-002, CL-EC-003 | abbreviated head SHA prefix regression | same | reviewer P2 に対する regression coverage 追加であり closure semantics 変更なし | no | completed |
+| regression | CL-AC-002 | abbreviated head match boolean regression | same | reviewer P2 に対する regression coverage 追加であり closure semantics 変更なし | no | yes |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
+
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/3b01/spec-dock` | iss-00170 | current session | dev-coder, code-reviewer | same repo, active issue, S03 bounded implementation/review; no commit/publish by worker | issue complete / scope change / user revocation | none | re-review |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
+
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | CI collector / tests | dev-coder | S03 CI/check/status collector only | `plan.md`; provider install_root; dogfooding mirror | CI collector, snapshot integration, focused tests | S04/S05 behavior, logs full-text default, repository-specific policy engine, write operations | focused pytest, syntax check, parity, `git diff --check`, code-reviewer | scope expansion / reviewer fail | worker summary / changed files / verification / risks | implementation complete; initial reviewer fail on P1 |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | CI/check/status collector added; S03 taxonomy, stale head, zero-check, Actions failed steps, fallback, snapshot integration, paginated JSON parsing, Bash 3.2 compatibility, failed-status priority, exact check_run_url segment matching, abbreviated SHA prefix matching, and `head_matches_expected` consistency covered. | `.agents/skills/github-pr-observation/`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/`; `tests/unit/infra/test_init_update.py` | red focused tests 3 failed before implementation; reviewer regression tests failed before fixes; S03 focused 7 passed; abbreviation subset 2 passed; snapshot lane 12 passed; `issue_75` 20 passed; `bash -n` pass; parity pass; lowercase grep no output; `git diff --check` pass | pass | S04/S05 remain pending | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | fresh | passed | N/A | proceed | P1 fixes completed; P2 exact URL segment, abbreviated SHA, `head_matches_expected`, and report cleanup fixed |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | ready_to_commit | S03 source/test/report diff | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh` - CI/check/status collector.
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh` - snapshot CI integration.
+- `.agents/skills/github-pr-observation/` - dogfooding mirror parity.
+- `tests/unit/infra/test_init_update.py` - focused S03 contract tests.
+
+#### コミット
+- pending
+
+#### メモ
+- S03 intentionally leaves review/comment/thread collection to S04 and quiet-window / final merge-prepared status to S05.
+- `plan.md` front matter remains `draft`, but the user explicitly instructed issue execution; current branch already contains committed S01/S02 execution steps. Treat as workflow risk, not a reason to stop this bounded S03 fix/review loop.
 
 ---
 
