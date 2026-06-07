@@ -143,6 +143,11 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ## 実装サマリー (任意)
 - S01 では provider-side source of truth と dogfooding mirror から `pr-monitor` agent assets と `github-codex-pr-review-comments` skill を退役し、`github-pr-observation` skill scaffold を追加した。
 - 初回 code-reviewer は command rules の prefix pattern 破損と obsolete skill の空 directory 残りを検出した。修正後の fresh code-reviewer は findings なし / `review_status=pass`。
+- S02 では `github-pr-observation` の public script contract を実装し、fixed CLI / input validation / stdout JSON only / stderr progress / optional `--out` artifact boundary を追加した。
+- S02 の初回 code-reviewer は code defect なしとしつつ、report ledger 未記録を P1 として fail した。本 report に S02 証跡を追加した。
+- S02 の fresh re-review は `review_status=pass` で、P2 として `--trigger-created-at` suffix validation の anchor 漏れを指摘した。provider/mirror 両方で修正し、focused tests / syntax / parity / `git diff --check` を再実行した。
+- S02 の最終 re-review は `review_status=pass` で、P2 として default progress が single poll に2行出る点を指摘した。terminal progress 1行へ修正し、stderr 行数 assertion を追加した。
+- S02 の最終 fresh code-reviewer は findings なし / `review_status=pass`。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -263,6 +268,132 @@ codex exec --ephemeral --sandbox read-only -C . "Reply only: ok"
 
 #### メモ
 - `github-pr-creator` / `github-pr-merge-preparer` / orchestrator guidance に残る `pr-monitor` 文言は S06 の計画対象。
+
+---
+
+### セッションログ（2026-06-08 S02）
+
+#### 対象
+- Step: S02 Public script contract and stdout/stderr boundary
+- AC/EC: CL-AC-001, CL-AC-010, CL-EC-006
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `### S02 Public script contract and stdout/stderr boundary`
+  - closure ids: CL-AC-001, CL-AC-010, CL-EC-006
+
+#### 実施内容
+- dev-coder が `fetch_pr_observation_snapshot.sh` の public CLI を placeholder から fixed read-only snapshot contract に更新した。
+- dev-coder が `wait_pr_observation.sh` の public CLI、default `--progress stderr-summary`、`--progress none`、single-snapshot S02 wait boundary、optional `--out` artifact boundary を実装した。
+- provider-side `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/` と dogfooding mirror `.agents/skills/github-pr-observation/` の parity を維持した。
+- invalid repo / PR / SHA / timing / progress / unsafe raw options は fake `gh` を呼ぶ前に `64` で落ちる regression coverage を追加した。
+- GitHub auth / rate / schema / collection failure は stdout の JSON limitation + non-success result として表現する contract を追加した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_75_pr_observation_snapshot_reports_collection_failure_as_json or issue_75_pr_observation_wait_stdout_stderr_progress_and_out_contract'
+# red evidence before S02 implementation: 2 failed
+
+uv run pytest tests/unit/infra/test_init_update.py -k issue_75
+# 10 passed
+
+bash -n src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh
+# pass
+
+bash -n src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh
+# pass
+
+diff -r src/spec_dock/assets/install_root/.agents/skills/github-pr-observation .agents/skills/github-pr-observation
+# no output; parity OK
+
+git diff --check
+# pass
+
+uv run pytest tests/unit/infra/test_init_update.py
+# 214 passed, 1 failed
+# failure: test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+# classification: out-of-scope existing checked-in dogfooding .meta.json snapshot mismatch
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ（Red） | stdout/stderr / `--out` contract must fail against S01 placeholder | S02 focused tests failed with `not_implemented` / unsupported `--out` | `uv run pytest ... -k 'issue_75_pr_observation_snapshot_reports_collection_failure_as_json or issue_75_pr_observation_wait_stdout_stderr_progress_and_out_contract'` | pass | red evidence reported by dev-coder |
+| S02 | 緑フェーズ（Green） | fixed CLI / validation / stdout JSON / stderr progress / optional artifacts | `issue_75` focused suite 10 passed; `bash -n` 2 scripts pass; mirror parity pass | pytest + shell syntax + `diff -r` | pass | CL-AC-001, CL-AC-010, CL-EC-006 |
+| S02 | リファクタリング（Refactor） | guardrail satisfied | `git diff --check` pass; P2 timestamp/progress findings fixed; final fresh code-reviewer findingsなし | command + reviewer | pass | initial reviewer fail was report-ledger-only |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | report ledger 未記録だと step closure を検証できない | code-reviewer | 本 S02 session log / closure / delegation / reviewer gate 証跡を追記 | CL-AC-001, CL-AC-010, CL-EC-006 | no | initial code-reviewer `review_status=fail`; re-review required |
+| S02 | full `tests/unit/infra/test_init_update.py` has one out-of-scope dogfooding meta snapshot failure | dev-coder | S02 対象外として分類し、focused `issue_75` suite と syntax/parity/check を closure evidence に採用 | none | no | `214 passed, 1 failed`; failure is not in S02 changed contract |
+| S02 | `--trigger-created-at` validation が timestamp prefix + invalid suffix を通してしまう | code-reviewer | regex を end-anchored ISO8601 seconds with optional `Z` / offset に修正し、snapshot/wait invalid cases を追加 | CL-EC-006 | no | `uv run pytest ... -k issue_75` -> 10 passed |
+| S02 | default progress が single poll に2行出る | code-reviewer | pre-snapshot progress を削除し terminal progress 1行に統一、stderr line count assertion を追加 | CL-AC-010 | no | `uv run pytest ... -k issue_75` -> 10 passed |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | CL-AC-001, CL-AC-010, CL-EC-006 | fixed CLI、invalid input pre-gh validation、stdout JSON only、stderr progress、`--progress none`、optional `--out` without `summary.md`、collection failure as JSON limitation | focused tests 10 passed; `bash -n` 2 scripts pass; provider/mirror parity; `git diff --check` pass; final fresh code-reviewer findingsなし | pass | P2 timestamp validation and one-line progress fixed before commit |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| CL-AC-001 | S02 | yes | red-required + focused contract | S02 focused tests failed against placeholder | `uv run pytest tests/unit/infra/test_init_update.py -k issue_75` | pass | stdout/stderr and public CLI contract |
+| CL-AC-010 | S02 | yes | focused contract | S02 focused tests failed against placeholder | `uv run pytest tests/unit/infra/test_init_update.py -k issue_75`; `diff -r ...` | pass | optional `--out` writes JSON/debug artifacts only; no `summary.md` |
+| CL-EC-006 | S02 | yes | focused contract | S02 focused tests failed against placeholder | invalid argument cases in `test_issue_75_pr_review_wrapper_rejects_unsafe_inputs_before_gh_api` | pass | unsafe raw args rejected before fake `gh` call |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| CL-AC-001 | S02 | `test_issue_75_pr_observation_snapshot_reports_collection_failure_as_json`; `test_issue_75_pr_observation_wait_stdout_stderr_progress_and_out_contract`; `bash -n` | pass | stdout JSON only; progress on stderr |
+| CL-AC-010 | S02 | `test_issue_75_pr_observation_wait_stdout_stderr_progress_and_out_contract`; `diff -r` parity | pass | `result.json` stdout copy; no `summary.md` |
+| CL-EC-006 | S02 | invalid snapshot/wait args in `test_issue_75_pr_review_wrapper_rejects_unsafe_inputs_before_gh_api` | pass | no raw endpoint/method/query/header/body/jq/gh args accepted |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | CL-AC-001, CL-AC-010, CL-EC-006 | S02 focused issue_75 tests | same | 計画内の script contract を具体化しただけで closure semantics は変更なし | no | completed |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
+
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/3b01/spec-dock` | iss-00170 | current session | dev-coder, code-reviewer | same repo, active issue, S02 bounded implementation/review; no commit/publish by worker | issue complete / scope change / user revocation | none | re-review |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
+
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | script contract / tests | dev-coder | S02 public contract only | `plan.md`; provider install_root; dogfooding mirror | new skill scripts, skill guidance, focused tests | S03-S05 collector/wait semantics, raw gh args, write operations, `summary.md`, canonical docs | focused pytest, syntax check, parity, `git diff --check`, code-reviewer | scope expansion / reviewer fail | worker summary / changed files / verification / risks | implementation pass; initial reviewer fail on report evidence |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Public script contract added for snapshot/wait; invalid inputs rejected before fake `gh`; stdout/stderr boundary and optional `--out` behavior covered; P2 timestamp validation and progress line count fixed after re-review. | `.agents/skills/github-pr-observation/`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/`; `tests/unit/infra/test_init_update.py` | red focused tests 2 failed before implementation; `issue_75` 10 passed; `bash -n` 2 pass; parity pass; `git diff --check` pass | pass | CI collector, review collector, stable wait loop remain for S03-S05 | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | passed | N/A | proceed | initial report-ledger fail fixed; P2 findings fixed; final fresh review findingsなし |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | ready_to_commit | S02 source/test/report diff | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md` - public contract guidance.
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh` - fixed snapshot CLI and stdout JSON limitation result.
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` - fixed wait CLI, progress contract, optional `--out` result artifacts.
+- `.agents/skills/github-pr-observation/` - dogfooding mirror parity.
+- `tests/unit/infra/test_init_update.py` - focused S02 contract tests.
+
+#### コミット
+- pending
+
+#### メモ
+- S02 intentionally leaves CI/check/status collection to S03, review/comment/thread collection to S04, and quiet-window / stable wait finalization to S05.
+- Full `tests/unit/infra/test_init_update.py` currently has an out-of-scope dogfooding `.meta.json` snapshot mismatch; focused S02 closure tests pass.
 
 ---
 
