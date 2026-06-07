@@ -32,6 +32,8 @@
     "obsolete_exact_file_paths": [
       ".codex/agents/spec-dock.toml",
       ".github/agents/spec-dock.agent.md",
+      ".agents/skills/spec-dock-system-architect/SKILL.md",
+      ".agents/skills/spec-dock-implementation-planner/SKILL.md",
       ".codex/agents/spec-dock-codex-adapter.toml",
       ".github/agents/spec-dock-copilot-adapter.agent.md",
       ".codex/agents/code_reviewer.toml",
