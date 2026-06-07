@@ -31,9 +31,9 @@ REQUIRED_DISCUSSION_FRONTMATTER_RE: dict[str, re.Pattern[str]] = {
     "created_by_role": re.compile(
         r"(?m)^\s*created_by_role\s*:\s*"
         r"(?:"
-        r"spec-dock-system-architect|spec-dock-implementation-planner|"
-        r"\"(?:spec-dock-system-architect|spec-dock-implementation-planner)\"|"
-        r"'(?:spec-dock-system-architect|spec-dock-implementation-planner)'"
+        r"system-architect|implementation-planner|"
+        r"\"(?:system-architect|implementation-planner)\"|"
+        r"'(?:system-architect|implementation-planner)'"
         r")\s*$"
     ),
     "scope_id": re.compile(r"(?m)^\s*scope_id\s*:\s*(?:\S+|\"[^\"]+\"|'[^']+')\s*$"),
@@ -46,8 +46,8 @@ REQUIRED_DISCUSSION_FRONTMATTER_RE: dict[str, re.Pattern[str]] = {
     ),
 }
 AUTHORIZED_ROLE_FRONTMATTER: dict[str, str] = {
-    "system-architect": "spec-dock-system-architect",
-    "implementation-planner": "spec-dock-implementation-planner",
+    "system-architect": "system-architect",
+    "implementation-planner": "implementation-planner",
 }
 
 
