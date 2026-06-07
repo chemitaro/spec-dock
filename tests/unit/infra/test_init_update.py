@@ -709,6 +709,8 @@ class TestInitUpdate(CliRuntimeHarness):
             "obsolete_exact_file_paths": [
                 ".codex/agents/spec-dock.toml",
                 ".github/agents/spec-dock.agent.md",
+                ".agents/skills/spec-dock-system-architect/SKILL.md",
+                ".agents/skills/spec-dock-implementation-planner/SKILL.md",
                 ".codex/agents/spec-dock-codex-adapter.toml",
                 ".github/agents/spec-dock-copilot-adapter.agent.md",
                 ".codex/agents/code_reviewer.toml",
@@ -9396,6 +9398,32 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
                 assert not provider_path.exists(), f"deleted role skill asset must stay absent: {provider_path}"
                 assert not mirror_path.exists(), f"deleted role skill mirror must stay absent: {mirror_path}"
+
+    def test_update_prunes_deleted_role_skill_files_from_existing_install(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            custom_skill = target / ".agents" / "skills" / "my-custom-skill" / "SKILL.md"
+            custom_skill.parent.mkdir(parents=True, exist_ok=True)
+            custom_skill.write_text("# custom\n", encoding="utf-8")
+
+            deleted_role_paths = [
+                target / ".agents" / "skills" / skill_name / "SKILL.md"
+                for skill_name in _DELETED_ROLE_SKILL_NAMES
+            ]
+            for deleted_role_path in deleted_role_paths:
+                deleted_role_path.parent.mkdir(parents=True, exist_ok=True)
+                deleted_role_path.write_text("# stale deleted role skill\n", encoding="utf-8")
+                assert deleted_role_path.is_file()
+
+            assert main(["update", str(target)]) == 0
+
+            for deleted_role_path in deleted_role_paths:
+                assert not deleted_role_path.exists(), \
+                    f"deleted role skill must be pruned on update: {deleted_role_path}"
+            assert custom_skill.read_text(encoding="utf-8") == "# custom\n"
+            self._assert_managed_skills_installed(target)
 
     def test_bundled_native_shim_assets_satisfy_static_delegation_only_contract(self) -> None:
         import spec_dock.cli as cli
