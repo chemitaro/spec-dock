@@ -247,6 +247,8 @@ if limitation:
     limitations.append(limitation)
     statuses_payload = {}
 pr_view_payload, limitation = gh_pr_view()
+if limitation:
+    limitations.append(limitation)
 
 check_runs = as_list(check_runs_payload, "check_runs")
 statuses = as_list(statuses_payload, "statuses")
@@ -337,6 +339,11 @@ for item in status_check_rollup:
         }
     )
 
+required_check_rollup_pending = any(
+    item.get("state") in {"EXPECTED", "IN_PROGRESS", "PENDING", "QUEUED", "REQUESTED", "WAITING"}
+    for item in required_check_state["status_check_rollup_states"]
+)
+
 failures = []
 for status in statuses:
     if normalize_status_state(status) == "failed":
@@ -404,8 +411,15 @@ for check in failed_checks:
         )
 
 required_checks_missing_or_pending = (
+    merge_state_status == "BLOCKED"
+    and required_check_rollup_pending
+    and not (check_counts["failed"] or status_counts["failure"] or status_counts["error"] or check_counts["stale"])
+    and not (check_counts["running"] or check_counts["pending"] or status_counts["pending"])
+)
+merge_state_blocking = (
     bool(merge_state_status)
     and merge_state_status not in {"CLEAN", "HAS_HOOKS"}
+    and not required_checks_missing_or_pending
     and not (check_counts["failed"] or status_counts["failure"] or status_counts["error"] or check_counts["stale"])
     and not (check_counts["running"] or check_counts["pending"] or status_counts["pending"])
 )
@@ -420,6 +434,16 @@ if required_checks_missing_or_pending:
             "merge_state_status": merge_state_status,
         }
     )
+elif merge_state_blocking:
+    limitations.append(
+        {
+            "code": "pr_merge_state_blocking",
+            "source": "gh_pr_view.mergeStateStatus",
+            "severity": "blocking",
+            "message": "PR merge state requires human or branch action before merge",
+            "merge_state_status": merge_state_status,
+        }
+    )
 
 if check_counts["failed"] or status_counts["failure"] or status_counts["error"] or check_counts["stale"]:
     ci_status = "failed"
@@ -429,6 +453,10 @@ elif check_counts["running"]:
     ci_status = "running"
 elif check_counts["pending"] or status_counts["pending"] or required_checks_missing_or_pending:
     ci_status = "pending"
+elif merge_state_blocking or (
+    not required_check_state["available"] and (check_counts["total"] or status_counts["total"])
+):
+    ci_status = "unknown"
 elif check_counts["total"] == 0 and status_counts["total"] == 0:
     ci_status = "none"
     limitations.append(

@@ -154,7 +154,9 @@ ID: "iss-00170"
 - CI status:
   - `unknown`, `none`, `pending`, `running`, `passed`, `failed`
   - `passed` は observed checks/statuses だけでなく、GitHub の merge-state / required-check view が未充足を示していないことを前提にする。
-  - `gh pr view --json mergeStateStatus,statusCheckRollup` で required checks 未充足または missing/pending を示す merge state が取れる場合、observed checks が success/skipped/neutral だけでも `pending` 相当として扱う。
+  - `gh pr view --json mergeStateStatus,statusCheckRollup` で `mergeStateStatus=BLOCKED` かつ required check rollup に `EXPECTED` / `IN_PROGRESS` / `PENDING` / `QUEUED` / `REQUESTED` / `WAITING` が見える場合、observed checks が success/skipped/neutral だけでも required checks 未充足として `pending` 相当として扱う。
+  - `DIRTY` / `BEHIND` など、check の完了待ちではなく人間または branch action が必要な merge state は `pending` へ畳まず、`ci=unknown` と blocking limitation / human gate 相当で返す。
+  - required-check metadata の取得に失敗した場合は `pr_required_check_state_unavailable` limitation を final JSON に含め、checks/statuses が観測されている場合でも observed checks だけで `passed` / merge-prepared と誤判定しない。
 - Review status:
   - `unknown`, `none`, `pending`, `requested`, `commented`, `approved`, `changes_requested`, `unresolved`
   - `dismissed` は個別 review signal state として保持するが、aggregate review status としては単独で block しない。
@@ -241,7 +243,9 @@ ID: "iss-00170"
     - 失敗・pending・running がなく、観測対象が terminal non-blocking なら `ci=passed` 相当になる。
     - skipped / neutral は、それだけを理由に unknown にしない。
     - failure 系がある場合は、取得可能な workflow / run / job / failed step detail を final JSON に出す。
-    - required checks / merge state が未充足を示す場合は、observed check run がすべて terminal non-blocking でも `ci=pending` 相当になり、`required_checks_missing_or_pending` limitation と required check state metadata を返す。
+    - `mergeStateStatus=BLOCKED` かつ required check rollup に pending / expected 系 state がある場合は、observed check run がすべて terminal non-blocking でも `ci=pending` 相当になり、`required_checks_missing_or_pending` limitation と required check state metadata を返す。
+    - `DIRTY` / `BEHIND` など polling では解消しない merge state は `required_checks_missing_or_pending` に混ぜず、`pr_merge_state_blocking` limitation と `ci=unknown` / human gate 相当を返す。
+    - required-check metadata が取得できない場合は `pr_required_check_state_unavailable` limitation を返し、checks/statuses が存在する限り observed green だけで `passed` 相当にしない。
 - AC-005:
   - アクター:
     - wait wrapper。
@@ -381,9 +385,15 @@ ID: "iss-00170"
   - 期待:
     - CI / review が green に見えても merge-prepared success とせず、`human_gate` と `mark_pr_ready_for_review` / `reopen_or_use_open_pr` 相当の recommended next action を返す。
 - EC-008:
-  - wait 終盤の snapshot poll が timeout するが、直前に有効な latest payload がある。
+  - wait 終盤の snapshot poll、または quiet / same-fingerprint 安定待ちの最中に wait deadline が timeout するが、直前に有効な latest payload がある。
   - 期待:
     - 直前の CI / review summary と artifacts を破棄して synthetic unknown へ落とさず、latest payload に `snapshot_poll_timeout` limitation を付与し、`normalized_status=timeout` として返す。
+- EC-009:
+  - GitHub PR merge state または required-check metadata が、polling 継続だけでは安全に merge-prepared と判断できない状態を示す。
+  - 期待:
+    - `mergeStateStatus=BLOCKED` かつ required check rollup が pending / expected の場合は `ci=pending` / wait 相当として扱う。
+    - `DIRTY` / `BEHIND` など non-CI merge state は `ci=pending` ではなく `ci=unknown` / `pr_merge_state_blocking` / human gate 相当として扱う。
+    - required-check metadata 取得失敗は `pr_required_check_state_unavailable` limitation として保持し、observed checks だけの false pass を防ぐ。
 
 ## 確定済み補足
 

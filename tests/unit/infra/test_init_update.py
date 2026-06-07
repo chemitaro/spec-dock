@@ -1,4 +1,5 @@
 import ast
+import hashlib
 import io
 import json
 import os
@@ -12089,6 +12090,11 @@ JSON
 {"state":"success","statuses":[]}
 JSON
     ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"CLEAN","statusCheckRollup":[{"name":"test","status":"COMPLETED","conclusion":"SUCCESS"}]}
+JSON
+    ;;
   "api repos/owner/repo/issues/13/comments --paginate")
     printf '[]\\n'
     ;;
@@ -12170,6 +12176,11 @@ JSON
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
     cat <<'JSON'
 {"state":"success","statuses":[]}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"CLEAN","statusCheckRollup":[{"name":"test","status":"COMPLETED","conclusion":"SUCCESS"}]}
 JSON
     ;;
   "api repos/owner/repo/issues/13/comments --paginate")
@@ -12436,7 +12447,7 @@ JSON
     ;;
   "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
     cat <<'JSON'
-{"mergeStateStatus":"BLOCKED","statusCheckRollup":[{"name":"observed","status":"COMPLETED","conclusion":"SUCCESS"}]}
+{"mergeStateStatus":"BLOCKED","statusCheckRollup":[{"name":"required","status":"PENDING","conclusion":null}]}
 JSON
     ;;
   *)
@@ -12470,6 +12481,136 @@ esac
                 item["code"] for item in payload["limitations"]
             ]
 
+    def test_issue_170_pr_observation_checks_collector_treats_dirty_merge_state_as_human_gate(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{"total_count":1,"check_runs":[{"id":1,"name":"observed","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{"state":"success","statuses":[]}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"DIRTY","statusCheckRollup":[{"name":"observed","status":"COMPLETED","conclusion":"SUCCESS"}]}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "unknown"
+            assert payload["ci"]["progress_status"] == "unknown"
+            limitation_codes = [item["code"] for item in payload["limitations"]]
+            assert "required_checks_missing_or_pending" not in limitation_codes
+            assert "pr_merge_state_blocking" in limitation_codes
+            assert payload["limitations"][0]["merge_state_status"] == "DIRTY"
+
+    def test_issue_170_pr_observation_checks_collector_surfaces_required_check_metadata_failure(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{"total_count":1,"check_runs":[{"id":1,"name":"observed","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{"state":"success","statuses":[]}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    printf 'required check metadata unavailable\\n' >&2
+    exit 44
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 45
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "unknown"
+            assert payload["ci"]["progress_status"] == "unknown"
+            assert payload["ci"]["required_check_state"]["available"] is False
+            assert payload["limitations"] == [
+                {
+                    "code": "pr_required_check_state_unavailable",
+                    "exit_code": 44,
+                    "message": "fixed read-only PR required check state collection failed",
+                    "severity": "informational",
+                    "source": "gh_pr_view",
+                    "stderr_sha256": hashlib.sha256(
+                        b"required check metadata unavailable\n"
+                    ).hexdigest(),
+                }
+            ]
+
     def test_issue_170_pr_observation_snapshot_keeps_required_checks_pending_as_wait(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -12492,7 +12633,7 @@ esac
                         "review": "approved",
                         "merge_state_status": "BLOCKED",
                         "status_check_rollup": [
-                            {"name": "test", "status": "COMPLETED", "conclusion": "SUCCESS"}
+                            {"name": "test", "status": "PENDING", "conclusion": None}
                         ],
                     },
                 ]),
@@ -12551,7 +12692,7 @@ esac
                         "review": "approved",
                         "merge_state_status": "BLOCKED",
                         "status_check_rollup": [
-                            {"name": "test", "status": "COMPLETED", "conclusion": "SUCCESS"}
+                            {"name": "test", "status": "PENDING", "conclusion": None}
                         ],
                     },
                 ]),
@@ -12778,6 +12919,11 @@ exit 44
             assert payload["observation_complete"] is False
             assert payload["normalized_status"] == "timeout"
             assert payload["wait"]["same_fingerprint_observed"] >= 1
+            timeout_limitation = next(
+                item for item in payload["limitations"] if item["code"] == "snapshot_poll_timeout"
+            )
+            assert timeout_limitation["source"] == "wait_pr_observation.sh"
+            assert timeout_limitation["deadline_reached"] is True
 
     def test_issue_75_pr_observation_wait_applies_zero_check_grace_before_human_gate(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -13594,6 +13740,11 @@ JSON
 {"state":"success","statuses":[]}
 JSON
     ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"CLEAN","statusCheckRollup":[{"name":"test","status":"COMPLETED","conclusion":"SUCCESS"}]}
+JSON
+    ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2
     exit 44
@@ -13747,6 +13898,11 @@ JSON
 {"state":"success","statuses":[]}
 JSON
     ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"CLEAN","statusCheckRollup":[{"name":"test","status":"COMPLETED","conclusion":"SUCCESS"}]}
+JSON
+    ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2
     exit 44
@@ -13813,6 +13969,11 @@ JSON
   "api repos/owner/repo/actions/runs/202/jobs --paginate")
     printf 'jobs endpoint unavailable\\n' >&2
     exit 44
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}
+JSON
     ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2
@@ -13916,6 +14077,11 @@ JSON
 {statuses_json}
 JSON
     ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}}
+JSON
+    ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2
     exit 44
@@ -13974,6 +14140,11 @@ JSON
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
     cat <<'JSON'
 {"state":"success","statuses":[]}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"CLEAN","statusCheckRollup":[{"name":"test","status":"COMPLETED","conclusion":"SUCCESS"}]}
 JSON
     ;;
   *)
@@ -14040,6 +14211,11 @@ JSON
   "api repos/owner/repo/commits/aaaaaaa/status --paginate")
     cat <<'JSON'
 {"state":"success","statuses":[]}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"CLEAN","statusCheckRollup":[{"name":"test","status":"COMPLETED","conclusion":"SUCCESS"}]}
 JSON
     ;;
   *)
@@ -16059,6 +16235,11 @@ JSON
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
     cat <<'JSON'
 {"state":"success","statuses":[]}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"CLEAN","statusCheckRollup":[{"name":"test","status":"COMPLETED","conclusion":"SUCCESS"}]}
 JSON
     ;;
   "api repos/owner/repo/issues/13/comments --paginate")
