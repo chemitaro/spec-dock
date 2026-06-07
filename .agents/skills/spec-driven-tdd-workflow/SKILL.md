@@ -27,8 +27,8 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 - `spec-dock-issue-planning`: issue-level requirement/design/plan planning, review readiness, and implementation handoff readiness.
 - `spec-dock-issue-execution`: issue-level TDD execution and report updates after approved / reviewer-pass planning artifacts and an executable `plan.md` are ready.
 - `spec-dock-clarification`: first-class docs-aware clarification companion for planning, source-grounded ambiguity, one-question-at-a-time user clarification through the orchestrator, and analysis-only / authoring handoff.
-- `spec-dock-system-architect`: delegated architecture analysis and draft design evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only.
-- `spec-dock-implementation-planner`: delegated planning analysis and draft plan evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only.
+- `system-architect` agent role: delegated architecture analysis and draft design evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/system-architect.toml`, not in a skill.
+- `implementation-planner` agent role: delegated planning analysis and draft plan evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/implementation-planner.toml`, not in a skill.
 - `spec-dock-adr-facilitation`: ADR drafting/decision facilitation linked to the current workflow.
 
 ## Direct references
