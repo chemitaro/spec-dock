@@ -730,6 +730,11 @@ class TestInitUpdate(CliRuntimeHarness):
                 ".github/agents/repo_analyst.agent.md",
                 ".github/agents/spec_reviewer.agent.md",
                 ".github/agents/utility_worker.agent.md",
+                ".agents/skills/github-codex-pr-review-comments/SKILL.md",
+                ".agents/skills/github-codex-pr-review-comments/agents/openai.yaml",
+                ".agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh",
+                ".codex/agents/pr-monitor.toml",
+                ".github/agents/pr-monitor.agent.md",
             ]
         },
         "generated_by": "spec-dock update",
@@ -741,9 +746,11 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/git-commit-conventional-ja/SKILL.md",
         ".agents/skills/git-commit-conventional-ja/agents/openai.yaml",
         ".agents/skills/git-commit-conventional-ja/references/conventional-commits-v1.0.0.md",
-        ".agents/skills/github-codex-pr-review-comments/SKILL.md",
-        ".agents/skills/github-codex-pr-review-comments/agents/openai.yaml",
-        ".agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh",
+        ".agents/skills/github-pr-observation/SKILL.md",
+        ".agents/skills/github-pr-observation/scripts/wait_pr_observation.sh",
+        ".agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh",
+        ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh",
+        ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh",
         ".agents/skills/github-pr-creator/SKILL.md",
         ".agents/skills/github-pr-creator/agents/openai.yaml",
         ".agents/skills/github-pr-merge-preparer/SKILL.md",
@@ -771,7 +778,6 @@ class TestInitUpdate(CliRuntimeHarness):
         ".codex/agents/doc-writer.toml",
         ".codex/agents/explorer.toml",
         ".codex/agents/implementation-planner.toml",
-        ".codex/agents/pr-monitor.toml",
         ".codex/agents/qa-reviewer.toml",
         ".codex/agents/repo-analyst.toml",
         ".codex/agents/researcher.toml",
@@ -786,7 +792,6 @@ class TestInitUpdate(CliRuntimeHarness):
         ".github/agents/dev-coder.agent.md",
         ".github/agents/doc-writer.agent.md",
         ".github/agents/orchestrator.agent.md",
-        ".github/agents/pr-monitor.agent.md",
         ".github/agents/qa-reviewer.agent.md",
         ".github/agents/repo-analyst.agent.md",
         ".github/agents/researcher.agent.md",
@@ -800,9 +805,11 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/git-commit-conventional-ja/SKILL.md",
             ".agents/skills/git-commit-conventional-ja/agents/openai.yaml",
             ".agents/skills/git-commit-conventional-ja/references/conventional-commits-v1.0.0.md",
-            ".agents/skills/github-codex-pr-review-comments/SKILL.md",
-            ".agents/skills/github-codex-pr-review-comments/agents/openai.yaml",
-            ".agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh",
+            ".agents/skills/github-pr-observation/SKILL.md",
+            ".agents/skills/github-pr-observation/scripts/wait_pr_observation.sh",
+            ".agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh",
+            ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh",
+            ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh",
             ".agents/skills/github-pr-creator/SKILL.md",
             ".agents/skills/github-pr-creator/agents/openai.yaml",
             ".agents/skills/github-pr-merge-preparer/SKILL.md",
@@ -829,7 +836,6 @@ class TestInitUpdate(CliRuntimeHarness):
             ".codex/agents/doc-writer.toml",
             ".codex/agents/explorer.toml",
             ".codex/agents/implementation-planner.toml",
-            ".codex/agents/pr-monitor.toml",
             ".codex/agents/qa-reviewer.toml",
             ".codex/agents/repo-analyst.toml",
             ".codex/agents/researcher.toml",
@@ -846,7 +852,6 @@ class TestInitUpdate(CliRuntimeHarness):
             ".github/agents/dev-coder.agent.md",
             ".github/agents/doc-writer.agent.md",
             ".github/agents/orchestrator.agent.md",
-            ".github/agents/pr-monitor.agent.md",
             ".github/agents/qa-reviewer.agent.md",
             ".github/agents/repo-analyst.agent.md",
             ".github/agents/researcher.agent.md",
@@ -1001,7 +1006,6 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec_dock/assets/install_root/.codex/agents/doc-writer.toml",
         "spec_dock/assets/install_root/.codex/agents/explorer.toml",
         "spec_dock/assets/install_root/.codex/agents/implementation-planner.toml",
-        "spec_dock/assets/install_root/.codex/agents/pr-monitor.toml",
         "spec_dock/assets/install_root/.codex/agents/qa-reviewer.toml",
         "spec_dock/assets/install_root/.codex/agents/repo-analyst.toml",
         "spec_dock/assets/install_root/.codex/agents/researcher.toml",
@@ -1016,7 +1020,6 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec_dock/assets/install_root/.github/agents/dev-coder.agent.md",
         "spec_dock/assets/install_root/.github/agents/doc-writer.agent.md",
         "spec_dock/assets/install_root/.github/agents/orchestrator.agent.md",
-        "spec_dock/assets/install_root/.github/agents/pr-monitor.agent.md",
         "spec_dock/assets/install_root/.github/agents/qa-reviewer.agent.md",
         "spec_dock/assets/install_root/.github/agents/repo-analyst.agent.md",
         "spec_dock/assets/install_root/.github/agents/researcher.agent.md",
@@ -2275,9 +2278,12 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "uvx --from . spec-dock update ." in \
             text, \
             f"codex command rules missing installer-command guard ({shim_label})"
-        assert 'pattern = [["./.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"]]' in \
+        assert '["./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"]' in \
             text, \
-            f"codex command rules missing PR review wrapper allow prefix ({shim_label})"
+            f"codex command rules missing PR observation wait wrapper allow prefix ({shim_label})"
+        assert '["./.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"]' in \
+            text, \
+            f"codex command rules missing PR observation snapshot wrapper allow prefix ({shim_label})"
         assert "gh api repos/owner/repo/pulls/13/comments" in \
             text, \
             f"codex command rules missing direct gh api guard ({shim_label})"
@@ -9539,7 +9545,6 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "code-reviewer",
             "qa-reviewer",
             "spec-reviewer",
-            "pr-monitor",
             "spark-worker",
         )
         workspace_write_workers = ("dev-coder", "doc-writer", "utility-worker", "worker")
@@ -11329,6 +11334,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 ".github/agents/spec-dock.agent.md",
                 ".codex/agents/spec-dock-codex-adapter.toml",
                 ".github/agents/spec-dock-copilot-adapter.agent.md",
+                ".agents/skills/github-codex-pr-review-comments/SKILL.md",
+                ".agents/skills/github-codex-pr-review-comments/agents/openai.yaml",
+                ".agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh",
+                ".codex/agents/pr-monitor.toml",
+                ".github/agents/pr-monitor.agent.md",
             )
             for rel_path in obsolete_paths:
                 obsolete_path = target_repo / rel_path
@@ -11628,81 +11638,100 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     for fragment in forbidden_fragments:
                         assert fragment not in prompt_text
 
-    def test_issue_75_pr_monitor_guidance_uses_repo_relative_helper_path(self) -> None:
+    def test_issue_75_pr_monitor_assets_retired_and_observation_scaffold_present(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
-        expected_helper_path = (
-            "./.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"
-        )
-        legacy_helper_path = (
-            "/srv/mount/.codex/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"
-        )
-        guidance_files = (
+        retired_paths = (
+            "src/spec_dock/assets/install_root/.agents/skills/github-codex-pr-review-comments/SKILL.md",
+            "src/spec_dock/assets/install_root/.agents/skills/github-codex-pr-review-comments/agents/openai.yaml",
+            "src/spec_dock/assets/install_root/.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh",
             "src/spec_dock/assets/install_root/.codex/agents/pr-monitor.toml",
             "src/spec_dock/assets/install_root/.github/agents/pr-monitor.agent.md",
+            ".agents/skills/github-codex-pr-review-comments/SKILL.md",
+            ".agents/skills/github-codex-pr-review-comments/agents/openai.yaml",
+            ".agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh",
             ".codex/agents/pr-monitor.toml",
             ".github/agents/pr-monitor.agent.md",
         )
+        scaffold_paths = (
+            ".agents/skills/github-pr-observation/SKILL.md",
+            ".agents/skills/github-pr-observation/scripts/wait_pr_observation.sh",
+            ".agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh",
+            ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh",
+            ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh",
+        )
 
-        for rel_path in guidance_files:
+        for rel_path in retired_paths:
             with _case(rel_path=rel_path):
-                content = (repo_root / rel_path).read_text(encoding="utf-8")
-                assert expected_helper_path in \
-                    content, \
-                    f"issue-75 guidance missing repo-relative helper path in: {rel_path}"
-                assert legacy_helper_path not in \
-                    content, \
-                    f"issue-75 guidance still contains legacy absolute helper path in: {rel_path}"
-                assert "always use the approved read-only wrapper" in \
-                    content, \
-                    f"issue-75 guidance must require the read-only wrapper in: {rel_path}"
-                for forbidden_fallback in (
-                    "direct `gh api`",
-                    "direct `curl`",
-                    "GraphQL",
-                    "POST / PATCH / PUT / DELETE",
-                    "Do not request approval or fall back to direct GitHub API calls.",
-                ):
-                    assert forbidden_fallback in \
-                        content, \
-                        f"issue-75 guidance missing forbidden fallback '{forbidden_fallback}' in: {rel_path}"
+                assert not (repo_root / rel_path).exists(), f"retired asset still exists: {rel_path}"
 
-    def test_issue_75_pr_review_wrapper_uses_fixed_read_only_gh_api_endpoints(self) -> None:
+        for rel_path in scaffold_paths:
+            with _case(rel_path=rel_path):
+                provider_path = repo_root / "src" / "spec_dock" / "assets" / "install_root" / rel_path
+                mirror_path = repo_root / rel_path
+                assert provider_path.is_file(), f"missing provider observation scaffold: {rel_path}"
+                assert mirror_path.is_file(), f"missing dogfooding observation scaffold: {rel_path}"
+                assert mirror_path.read_bytes() == provider_path.read_bytes()
+                if rel_path.endswith(".sh"):
+                    assert os.access(provider_path, os.X_OK), f"provider script not executable: {rel_path}"
+                    assert os.access(mirror_path, os.X_OK), f"mirror script not executable: {rel_path}"
+
+    def test_issue_75_update_prunes_empty_obsolete_pr_review_skill_dirs_only(self) -> None:
+        obsolete_paths = (
+            ".agents/skills/github-codex-pr-review-comments/SKILL.md",
+            ".agents/skills/github-codex-pr-review-comments/agents/openai.yaml",
+            ".agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh",
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            old_skill_dir = target / ".agents" / "skills" / "github-codex-pr-review-comments"
+            for rel_path in obsolete_paths:
+                (target / rel_path).parent.mkdir(parents=True, exist_ok=True)
+                self._write_text_force(target / rel_path, f"stale old review skill file: {rel_path}\n")
+
+            assert old_skill_dir.is_dir()
+            assert main(["update", str(target)]) == 0
+
+            assert not old_skill_dir.exists(), "empty obsolete review skill directory must be pruned"
+            assert (target / ".agents" / "skills").is_dir(), "managed skills root must remain"
+            assert (target / ".agents" / "skills" / "github-pr-observation").is_dir(), \
+                "current managed observation skill parent must remain"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            old_skill_dir = target / ".agents" / "skills" / "github-codex-pr-review-comments"
+            custom_file = old_skill_dir / "scripts" / "custom-note.md"
+            for rel_path in obsolete_paths:
+                (target / rel_path).parent.mkdir(parents=True, exist_ok=True)
+                self._write_text_force(target / rel_path, f"stale old review skill file: {rel_path}\n")
+            custom_file.parent.mkdir(parents=True, exist_ok=True)
+            self._write_text_force(custom_file, "# custom review note must survive\n")
+
+            assert main(["update", str(target)]) == 0
+
+            for rel_path in obsolete_paths:
+                assert not (target / rel_path).exists(), f"obsolete exact file must be pruned: {rel_path}"
+            assert custom_file.read_text(encoding="utf-8") == "# custom review note must survive\n"
+            assert old_skill_dir.is_dir(), "directory with unmanaged custom content must remain"
+
+    def test_issue_75_pr_observation_placeholder_fails_without_gh_api(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
-            / "src/spec_dock/assets/install_root/.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
         )
-
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
             fake_bin = tmp_path / "bin"
             fake_bin.mkdir()
             fake_gh = fake_bin / "gh"
             gh_log = tmp_path / "gh.log"
-            out_dir = tmp_path / "out"
             fake_gh.write_text(
                 """#!/usr/bin/env bash
-set -euo pipefail
 printf '%s\\n' "$*" >> "$GH_FAKE_LOG"
-case "$*" in
-  *"--method GET"* ) ;;
-  *) echo "missing GET method" >&2; exit 42 ;;
-esac
-case "$*" in
-  *"repos/owner/repo/issues/13/comments?per_page=100"*)
-    printf '%s\\n' '[{"id":1,"user":{"login":"codex-reviewer"},"body":"conversation"}]'
-    ;;
-  *"repos/owner/repo/pulls/13/comments?per_page=100"*)
-    printf '%s\\n' '[{"id":2,"user":{"login":"codex-reviewer"},"body":"inline","path":"src/app.py","line":10}]'
-    ;;
-  *"repos/owner/repo/pulls/13/reviews?per_page=100"*)
-    printf '%s\\n' '[{"id":3,"user":{"login":"codex-reviewer"},"body":"review","state":"COMMENTED"}]'
-    ;;
-  *)
-    echo "unexpected endpoint: $*" >&2
-    exit 43
-    ;;
-esac
+exit 44
 """,
                 encoding="utf-8",
             )
@@ -11714,44 +11743,24 @@ esac
             }
 
             result = subprocess.run(
-                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--out", str(out_dir)],
+                [str(script_path), "--repo", "owner/repo", "--pr", "13"],
                 env=env,
                 capture_output=True,
                 text=True,
                 check=False,
             )
 
-            assert result.returncode == 0, result.stdout + result.stderr
-            gh_calls = gh_log.read_text(encoding="utf-8").splitlines()
-            assert len(gh_calls) == 3, gh_calls
-            for call in gh_calls:
-                assert "--method GET" in call
-                assert "--paginate" in call
-                assert "--slurp" in call
-                assert "--jq" not in call
-                assert "--method POST" not in call
-                assert "graphql" not in call.lower()
-
-            assert any("repos/owner/repo/issues/13/comments?per_page=100" in call for call in gh_calls), \
-                gh_calls
-            assert any("repos/owner/repo/pulls/13/comments?per_page=100" in call for call in gh_calls), \
-                gh_calls
-            assert any("repos/owner/repo/pulls/13/reviews?per_page=100" in call for call in gh_calls), \
-                gh_calls
-
-            review_data = json.loads((out_dir / "review_data.json").read_text(encoding="utf-8"))
-            assert review_data["meta"]["transport"] == "gh api --method GET"
-            assert len(review_data["issue_comments"]) == 1
-            assert len(review_data["review_comments"]) == 1
-            assert len(review_data["reviews"]) == 1
-            assert len(review_data["codex"]["issue_comments"]) == 1
-            assert "inline review comments: 1" in (out_dir / "codex_report.md").read_text(encoding="utf-8")
+            assert result.returncode == 70, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["status"] == "not_implemented"
+            assert payload["script"] == "fetch_pr_observation_snapshot.sh"
+            assert not gh_log.exists(), "S01 placeholder must not call gh"
 
     def test_issue_75_pr_review_wrapper_rejects_unsafe_inputs_before_gh_api(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
-            / "src/spec_dock/assets/install_root/.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
         )
 
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -11776,10 +11785,8 @@ exit 44
 
             invalid_args = (
                 ("--repo", "owner/repo", "--pr", "13", "--endpoint", "repos/owner/repo/issues"),
-                ("--repo", "owner/repo", "--pr", "13;rm"),
-                ("--repo", "owner/repo/extra", "--pr", "13"),
-                ("--repo", "owner/../repo", "--pr", "13"),
-                ("--repo", "owner/repo", "--pr", "0"),
+                ("--repo", "owner/repo", "--head-sha", "abc123"),
+                ("--pr", "13"),
             )
             for args in invalid_args:
                 with _case(args=args):
@@ -11792,7 +11799,7 @@ exit 44
                         text=True,
                         check=False,
                     )
-                    assert result.returncode != 0, result.stdout + result.stderr
+                    assert result.returncode == 64, result.stdout + result.stderr
                     assert not gh_log.exists(), "unsafe input reached fake gh api"
 
     def test_issue_71_upstream_handoff_reports_expose_evidence_bearing_sections(self) -> None:
