@@ -134,11 +134,13 @@ out_dir = os.environ["OBS_OUT_DIR"]
 STATUSES = [
     "unknown",
     "none",
+    "pending",
     "requested",
     "commented",
     "approved",
     "changes_requested",
     "unresolved",
+    "dismissed",
 ]
 ITEM_BODY_CAP = 12000
 TOTAL_BODY_CAP = 120000
@@ -350,7 +352,11 @@ def normalize_review_state(state):
         return "changes_requested"
     if normalized == "commented":
         return "commented"
-    return "commented" if normalized else "commented"
+    if normalized == "dismissed":
+        return "dismissed"
+    if normalized == "pending":
+        return "pending"
+    return "unknown"
 
 
 def signal_time(signal):
@@ -627,6 +633,7 @@ for team in requested_teams:
     )
 
 threads = []
+thread_comment_states = {}
 for thread in thread_nodes:
     comments = thread_comment_nodes(thread)
     first_comment = comments[0] if comments else {}
@@ -644,6 +651,17 @@ for thread in thread_nodes:
     resolved = bool(thread.get("isResolved"))
     outdated = bool(thread.get("isOutdated"))
     state = "resolved" if resolved else "outdated" if outdated else "unresolved"
+    comment_ids = []
+    for comment in comments:
+        comment_id = comment.get("databaseId")
+        if comment_id is None:
+            comment_id = comment.get("id")
+        if comment_id is not None:
+            comment_ids.append(comment_id)
+            thread_comment_states[str(comment_id)] = {
+                "thread_id": thread.get("id"),
+                "state": state,
+            }
     threads.append(
         {
             "id": thread.get("id"),
@@ -651,6 +669,7 @@ for thread in thread_nodes:
             "is_resolved": resolved,
             "is_outdated": outdated,
             "comment_count": len(comments),
+            "comment_ids": comment_ids,
             "first_comment_id": first_comment.get("databaseId") or first_comment.get("id"),
             "first_comment_author": user_login(first_comment),
             "first_comment_created_at": first_comment.get("createdAt"),
@@ -670,6 +689,11 @@ body_state = {
 }
 for signal in signals:
     add_body_metadata(signal, body_state)
+    if signal.get("kind") == "pull_review_comment":
+        thread_state = thread_comment_states.get(str(signal.get("id")))
+        if thread_state:
+            signal["thread_id"] = thread_state.get("thread_id")
+            signal["thread_state"] = thread_state.get("state")
 
 raw_body_artifacts = [
     {
@@ -737,37 +761,43 @@ def is_current_status_signal(item):
     return item.get("kind") in {"pull_review", "pull_review_comment"} and bool(expected_head_sha)
 
 
-def is_current_thread(item):
-    if trigger_source not in {"explicit", "inferred"}:
-        return True
-    if not body_state["trigger_known"]:
-        return False
-    return is_after_trigger(
-        {
-            "kind": "thread",
-            "id": item.get("first_comment_id"),
-            "created_at": item.get("activity_at"),
-        }
-    )
-
-
 status_signals = [item for item in signals if is_current_status_signal(item)]
-current_threads = [item for item in threads if is_current_thread(item)]
+current_review_by_author = {}
+for item in status_signals:
+    if item.get("kind") != "pull_review":
+        continue
+    if item.get("state") == "dismissed":
+        continue
+    author_key = item.get("author") or f"id:{item.get('id')}"
+    previous = current_review_by_author.get(author_key)
+    if previous is None or (signal_activity_time(item) or "") >= (signal_activity_time(previous) or ""):
+        current_review_by_author[author_key] = item
+active_review_signals = list(current_review_by_author.values())
+active_comment_signals = [
+    item
+    for item in status_signals
+    if item.get("kind") == "pull_review_comment"
+    and item.get("thread_state") not in {"resolved", "outdated"}
+]
 
 if blocking_collection_failure:
     status = "unknown"
-elif any(item.get("state") == "unresolved" for item in current_threads):
+elif any(item.get("state") == "unresolved" for item in threads):
     status = "unresolved"
-elif any(item.get("state") == "changes_requested" and not item.get("stale") for item in status_signals):
+elif any(item.get("state") == "changes_requested" for item in active_review_signals):
     status = "changes_requested"
 elif review_request_signals:
     status = "requested"
-elif any(item.get("state") == "commented" and item.get("kind") != "issue_comment" for item in status_signals):
+elif any(item.get("state") == "commented" for item in active_review_signals) or active_comment_signals:
     status = "commented"
-elif any(item.get("state") == "approved" and not item.get("stale") for item in status_signals):
+elif any(item.get("state") == "approved" for item in active_review_signals):
     status = "approved"
-elif status_signals:
+elif any(item.get("state") == "commented" and item.get("kind") == "issue_comment" for item in status_signals):
     status = "commented"
+elif any(item.get("state") == "pending" for item in status_signals):
+    status = "pending"
+elif any(item.get("state") == "unknown" for item in status_signals):
+    status = "unknown"
 else:
     status = "none"
 
@@ -789,6 +819,8 @@ def fingerprint_signal(item):
         "trigger_command": item.get("trigger_command"),
         "path": item.get("path"),
         "line": item.get("line"),
+        "thread_id": item.get("thread_id"),
+        "thread_state": item.get("thread_state"),
         "body_sha256": item.get("body_sha256"),
         "body_truncated": item.get("body_truncated"),
         "body_original_length": item.get("body_original_length"),
@@ -803,6 +835,7 @@ def fingerprint_thread(item):
         "is_resolved": item.get("is_resolved"),
         "is_outdated": item.get("is_outdated"),
         "comment_count": item.get("comment_count"),
+        "comment_ids": item.get("comment_ids"),
         "first_comment_id": item.get("first_comment_id"),
         "first_comment_created_at": item.get("first_comment_created_at"),
         "latest_comment_created_at": item.get("latest_comment_created_at"),

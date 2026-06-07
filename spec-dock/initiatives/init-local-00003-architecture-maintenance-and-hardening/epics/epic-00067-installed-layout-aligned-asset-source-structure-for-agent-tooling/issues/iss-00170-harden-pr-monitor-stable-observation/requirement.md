@@ -154,7 +154,8 @@ ID: "iss-00170"
 - CI status:
   - `unknown`, `none`, `pending`, `running`, `passed`, `failed`
 - Review status:
-  - `unknown`, `none`, `requested`, `commented`, `approved`, `changes_requested`, `unresolved`
+  - `unknown`, `none`, `pending`, `requested`, `commented`, `approved`, `changes_requested`, `unresolved`
+  - `dismissed` は個別 review signal state として保持するが、aggregate review status としては単独で block しない。
 
 ## Final JSON 詳細要件
 
@@ -166,7 +167,8 @@ ID: "iss-00170"
     - explicit trigger がない場合は、fixed logic で PR conversation comments から最新の `@codex review` comment を推定してよい。
     - 推定した場合は `trigger.source=inferred` と `limitations` に `trigger_inferred` を出す。
   - window boundary:
-    - review / comment / thread / workflow signal は `trigger_created_at` 以後を current trigger window とする。
+    - review / comment / workflow signal の body / current signal inclusion は `trigger_created_at` 以後を current trigger window とする。
+    - unresolved かつ non-outdated の visible review thread は、trigger window より前に開始していても active blocker として扱う。
     - PR conversation comments で同一 timestamp の場合は `id > trigger_comment_id` のものだけを trigger 後として扱う。
     - expected head SHA と一致しない review / check detail は stale として分離する。
   - Body mode:
@@ -250,7 +252,7 @@ ID: "iss-00170"
     - issue comments、inline review comments、review bodies、reviewDecision、reviewRequests、reviewThreads を取得する。
   - 期待結果:
     - all signals と Codex-authored subset が分離される。
-    - review-related progress status は GitHub から機械的に取れる `unknown|none|requested|commented|approved|changes_requested|unresolved` だけを使う。
+    - review-related progress status は GitHub から機械的に取れる `unknown|none|pending|requested|commented|approved|changes_requested|unresolved` だけを使う。
     - P1/P2 など本文解釈由来の priority は progress status にしない。
     - review thread state が利用可能な場合は unresolved / resolved / outdated が machine-readable に出力される。
     - trigger window 内の review/comment body は body mode に従って final JSON に出力される。
