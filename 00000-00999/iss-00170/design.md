@@ -243,6 +243,7 @@ script 内部の GitHub 取得は fixed read-only calls に限定する。
 
 - PR metadata:
   - fixed REST GET for current PR head SHA / PR node id。
+  - fixed `gh pr view --json headRefOid,url,state,isDraft,number` で current head と PR lifecycle metadata を取得する。
 - PR conversation comments:
   - fixed REST GET for issue comments on the PR。
 - Pull request reviews:
@@ -254,6 +255,7 @@ script 内部の GitHub 取得は fixed read-only calls に限定する。
   - caller-provided GraphQL query は受け付けない。
 - Checks:
   - fixed REST GET for check runs / commit statuses for the expected head SHA。
+  - fixed `gh pr view --json mergeStateStatus,statusCheckRollup` で required checks / merge state の補助情報を取得する。
 - GitHub Actions failure detail:
   - fixed REST GET for workflow runs by head SHA。
   - fixed REST GET for workflow jobs / job steps for failed or relevant runs。
@@ -313,9 +315,13 @@ CI status は GitHub から機械的に取れる checks / commit statuses の観
   - failed / running / pending がなく、観測対象が merge-blocking ではない終端状態。
   - `success` だけでなく、GitHub上で終端済みとして扱われる `skipped` / `neutral` もここに含める。
   - workflow 自体が path filtering 等で skip され、required check が Pending のまま残る場合は `passed` ではなく `pending` とする。
+  - `mergeStateStatus` が `CLEAN` または `HAS_HOOKS` 以外で、observed checks/statuses に failure/running/pending が見えない場合も required checks missing/pending として `ci=pending` に畳む。
 
 `mixed` と `inconclusive` は default progress status として採用しない。
 1件でも失敗系があれば `ci=failed`、未完了があれば `ci=running` / `ci=pending` とする。
+
+CI collector は `ci.required_check_state` に `available`、`merge_state_status`、`status_check_rollup_total`、`status_check_rollup_states[]` を保持する。
+`required_checks_missing_or_pending` は blocking limitation として出し、`pr_required_check_state_unavailable` は informational limitation として扱う。
 
 ### Review status taxonomy
 
@@ -345,6 +351,13 @@ P1/P2 など本文上の優先度は text interpretation なので progress stat
 
 `review=blocked` は採用しない。
 何が block かは branch protection、required review、draft、merge conflict、thread resolution などの合成であり、review単体の GitHub field から安全に言い切れないため。
+
+Status precedence:
+
+- `unresolved` / `changes_requested` は approval より優先する。
+- active review request または `reviewDecision=REVIEW_REQUIRED` は `requested` とする。
+- current trigger window 内の issue comment は approval より優先して `commented` として扱い、approval だけで merge-prepared と誤判定しない。
+- dismissed review は signal として保持するが、最新 non-dismissed reviewer state と unresolved / current comment がない場合に限り block しない。
 
 ### Review signal schema
 
@@ -437,6 +450,8 @@ Trigger window は `@codex review` command comment を基準にする。
 - explicit trigger:
   - caller が `--trigger-comment-id` と `--trigger-created-at` を渡す。
   - この mode が最も正確であり、推奨 path とする。
+  - caller が `--trigger-comment-id` だけを渡した場合、review collector は固定 issue comments 取得結果から同 id の `created_at` を解決する。
+  - id から timestamp を解決できない場合は `trigger.source=unknown` とし、`trigger_timestamp_unresolved` informational limitation を出す。
 - inferred trigger:
   - explicit trigger がない場合、script は fixed logic で PR conversation comments から最新の `@codex review` comment を探してよい。
   - 推定した場合は `trigger.source=inferred` と `limitations` に `trigger_inferred` を出す。
@@ -612,7 +627,13 @@ CI logs の全文取得は通常 path には含めない。
       "pending": 0,
       "error": 0
     },
-    "failures": []
+    "failures": [],
+    "required_check_state": {
+      "available": true,
+      "merge_state_status": "CLEAN",
+      "status_check_rollup_total": 0,
+      "status_check_rollup_states": []
+    }
   },
   "review": {
     "collector": "s04",
@@ -631,6 +652,7 @@ CI logs の全文取得は通常 path には含めない。
     ],
     "signals": [],
     "review_requests": [],
+    "review_decision": "APPROVED|CHANGES_REQUESTED|REVIEW_REQUIRED|null",
     "codex_authored": [],
     "summary": {
       "all": {
@@ -699,7 +721,13 @@ CI logs の全文取得は通常 path には含めない。
 `normalized_status`、`recommended_next_action`、`observation_complete` を導出する。head mismatch、
 blocking limitation、CI failure / pending / running / none、review human gate を wait wrapper と同じ top-level
 意味へ正規化するが、quiet window / same fingerprint の安定判定は wait wrapper だけが担う。
+PR metadata の `isDraft=true` は `normalized_status=human_gate` / `recommended_next_action=mark_pr_ready_for_review`、
+`state != OPEN` は `normalized_status=human_gate` / `recommended_next_action=reopen_or_use_open_pr` として扱い、
+CI / review が green に見えても merge-prepared success にしない。
 `wait_pr_observation.sh` が stable / terminal / timeout 判定後に final JSON を stdout へ 1 回だけ出力する。
+timeout 判定時、直前に有効な `latest_payload` がある場合は、CI / review summary と artifacts を保持したまま
+`snapshot_poll_timeout` limitation を追加し、`normalized_status=timeout` / `observation_complete=false` に更新する。
+直前 payload がない場合だけ synthetic timeout snapshot を作る。
 `--out` 未指定時、`artifacts` の値は `null` で、通常 caller は stdout JSON を唯一の判断 source とする。
 `--out` 指定時だけ `artifacts` に path を入れる。
 

@@ -17,7 +17,7 @@ ID: "iss-00170"
 - AC:
   - AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-012, AC-013, AC-014
 - EC:
-  - EC-001, EC-002, EC-003, EC-004, EC-005, EC-006
+  - EC-001, EC-002, EC-003, EC-004, EC-005, EC-006, EC-007, EC-008
 - 非交渉制約:
   - `pr-monitor` sub-agent は完全廃止する。
   - `github-codex-pr-review-comments` skill は削除し、compatibility shim は残さない。
@@ -71,6 +71,8 @@ ID: "iss-00170"
 | EC-004 | S04 | S05 | resolved/outdated thread と unresolved thread を分離する fixture test |
 | EC-005 | S04 | S02, S05 | thread-state wrapper の missing/auth/rate/schema failure は limitation + `review=unknown` / human gate になる fixture test |
 | EC-006 | S02 | S05 | progress output が bounded stderr に留まり、詳細は final JSON / optional artifacts に残る fixture test |
+| EC-007 | S05 | S03, S04 | draft / non-open PR が human_gate になり merge-prepared にならない fixture test |
+| EC-008 | S05 | S02 | late snapshot poll timeout が latest payload を保持しつつ timeout limitation を付ける fixture test |
 
 ## 仕様固定クロージャ索引（Spec-Locked Closure Index）
 
@@ -96,6 +98,8 @@ ID: "iss-00170"
 | CL-EC-004 | S04 | EC-004 | resolved/outdated と unresolved を分離 | stale comment blocker | yes | red-required |
 | CL-EC-005 | S04/S05 | EC-005 | thread-state wrapper failure は limitation + `review=unknown` / human gate | hidden collection failure | yes | red-required |
 | CL-EC-006 | S02/S05 | EC-006 | progress は bounded stderr、詳細は final JSON / optional artifacts | progress flood / stdout contamination | yes | red-required |
+| CL-EC-007 | S05 | EC-007 | draft / non-open PR は human_gate | draft/closed false merge-prepared | yes | red-required |
+| CL-EC-008 | S05 | EC-008 | late poll timeout は latest payload を保持 | timeout synthetic unknown loss | yes | red-required |
 
 ## 実装ステップ
 
@@ -162,11 +166,12 @@ ID: "iss-00170"
   - role: dev-coder
   - allowed changes: CI collector, shared schema helpers inside new skill scripts, focused tests.
   - forbidden: logs full-text collection as default path, repository-specific policy engine, write operations.
-- 必須検証:
-  - statuses: `unknown`, `none`, `pending`, `running`, `passed`, `failed`.
-  - any failure/error/cancelled/timed_out/action_required/startup_failure/stale yields `failed`.
-  - success + skipped + neutral can yield `passed` when no blocking pending/failure remains.
-  - required pending / path-filter pending remains `pending`.
+  - 必須検証:
+    - statuses: `unknown`, `none`, `pending`, `running`, `passed`, `failed`.
+    - any failure/error/cancelled/timed_out/action_required/startup_failure/stale yields `failed`.
+    - success + skipped + neutral can yield `passed` when no blocking pending/failure remains.
+    - required pending / path-filter pending remains `pending`.
+    - `gh pr view --json mergeStateStatus,statusCheckRollup` indicates missing/pending required checks as `required_checks_missing_or_pending` and `ci=pending`.
   - zero checks remain non-success until grace/deadline semantics allow a limitation result.
   - `ci.failures[]` includes workflow/run/job/failed steps when obtainable, otherwise check-run fallback.
 - reviewer gate:
@@ -186,12 +191,15 @@ ID: "iss-00170"
   - role: dev-coder
   - allowed changes: review collector, shared schema helpers inside new skill scripts, focused tests.
   - forbidden: arbitrary GraphQL query/endpoint, P1/P2 text interpretation, old-trigger body mixing, reviewer identity in stderr progress.
-- 必須検証:
-  - fixed REST GET reads issue comments, pull reviews, pull review comments.
-  - fixed GraphQL query reads review thread state when available; unavailable thread state becomes limitation.
-  - review statuses are limited to `unknown`, `none`, `requested`, `commented`, `approved`, `changes_requested`, `unresolved`.
-  - all review signals and Codex-authored subset are both represented.
-  - explicit `--trigger-comment-id` / `--trigger-created-at` includes only trigger-window bodies.
+  - 必須検証:
+    - fixed REST GET reads issue comments, pull reviews, pull review comments.
+    - fixed GraphQL query reads review thread state and `reviewDecision` when available; unavailable thread state becomes limitation.
+    - review statuses are limited to `unknown`, `none`, `requested`, `commented`, `approved`, `changes_requested`, `unresolved`.
+    - `reviewDecision=REVIEW_REQUIRED` maps to `requested` even without explicit review-request nodes.
+    - current trigger-window issue comments override approval for aggregate status.
+    - all review signals and Codex-authored subset are both represented.
+    - explicit `--trigger-comment-id` / `--trigger-created-at` includes only trigger-window bodies.
+    - explicit `--trigger-comment-id` without `--trigger-created-at` resolves timestamp from issue comments or records `trigger_timestamp_unresolved`.
   - inferred trigger emits `trigger_inferred` limitation.
   - unknown trigger does not dump all bodies.
   - `body-mode` cap/truncation metadata preserves valid JSON.
@@ -212,16 +220,18 @@ ID: "iss-00170"
   - role: dev-coder
   - allowed changes: new skill scripts and focused tests.
   - forbidden: infinite waits, model/agent-side polling fallback, progress-as-authority.
-- 必須検証:
+  - 必須検証:
   - default `timeout=1800`, `poll_interval=30`, `quiet=90`, `same_fingerprint_count=2` are exposed and overrideable.
   - quiet window and same fingerprint count are required before `observation_complete=true`.
   - head SHA changes reset or terminate as stale/non-success.
-  - CI green followed by late review feedback waits for review stability.
-  - terminal stdout JSON includes `overall_status`, `normalized_status`, `observation_complete`, `summary`, `limitations`, `recommended_next_action`, `ci`, `review`, `trigger`, `artifacts`.
+    - CI green followed by late review feedback waits for review stability.
+    - draft and non-open PRs return `human_gate` with PR-state-specific recommended next action instead of merge-prepared success.
+    - late snapshot poll timeout with a prior valid payload preserves latest CI/review summary and appends `snapshot_poll_timeout`.
+    - terminal stdout JSON includes `overall_status`, `normalized_status`, `observation_complete`, `summary`, `limitations`, `recommended_next_action`, `ci`, `review`, `trigger`, `artifacts`.
 - reviewer gate:
   - code-reviewer.
 - closure:
-  - CL-AC-001, CL-AC-003, CL-AC-005, CL-AC-010, CL-EC-001, CL-EC-005, CL-EC-006.
+  - CL-AC-001, CL-AC-003, CL-AC-005, CL-AC-010, CL-EC-001, CL-EC-005, CL-EC-006, CL-EC-007, CL-EC-008.
 
 ### S06 Workflow skill guidance and dogfooding parity
 
