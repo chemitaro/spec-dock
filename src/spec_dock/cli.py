@@ -37,7 +37,7 @@ _MANAGED_SKILL_NAMES = (
     "spec-dock-codex-adapter",
     "spec-dock-copilot-adapter",
     "git-commit-conventional-ja",
-    "github-codex-pr-review-comments",
+    "github-pr-observation",
     "github-pr-creator",
     "github-pr-merge-preparer",
 )
@@ -793,6 +793,47 @@ def _is_path_prefix(prefix: Path, candidate: Path) -> bool:
     prefix_parts = prefix.parts
     candidate_parts = candidate.parts
     return len(prefix_parts) < len(candidate_parts) and candidate_parts[: len(prefix_parts)] == prefix_parts
+
+
+def _managed_obsolete_cleanup_boundary(rel_path: Path) -> Path | None:
+    for prefix in _MANAGED_OBSOLETE_EXACT_PATH_PREFIXES:
+        boundary = Path(prefix.rstrip("/"))
+        if boundary.parts == rel_path.parts[: len(boundary.parts)]:
+            return boundary
+    return None
+
+
+def _parent_dirs_for(rel_path: Path) -> tuple[Path, ...]:
+    parents: list[Path] = []
+    current = rel_path.parent
+    while current.parts not in {(), (".",)}:
+        parents.append(current)
+        current = current.parent
+    return tuple(parents)
+
+
+def _prune_empty_obsolete_parent_dirs(
+    target_root: Path,
+    obsolete_rel: Path,
+    *,
+    protected_rel_dirs: set[Path],
+) -> None:
+    boundary = _managed_obsolete_cleanup_boundary(obsolete_rel)
+    if boundary is None:
+        return
+
+    current = obsolete_rel.parent
+    while len(boundary.parts) < len(current.parts):
+        if current in protected_rel_dirs:
+            return
+        target_path = target_root / current
+        if not target_path.exists() or not target_path.is_dir() or target_path.is_symlink():
+            return
+        try:
+            target_path.rmdir()
+        except OSError:
+            return
+        current = current.parent
 
 
 class _ManagedCurrentFileMapping(NamedTuple):
@@ -1997,6 +2038,9 @@ def _apply_managed_skill_install_plan(
         raise RuntimeError(f"managed current sync incomplete (missing target): {joined}")
 
     current_target_rel_path_set = {target_rel for target_rel, _src, _dest in current_sync_plan}
+    protected_current_parent_dirs: set[Path] = set()
+    for current_target_rel in current_target_rel_path_set:
+        protected_current_parent_dirs.update(_parent_dirs_for(current_target_rel))
     for obsolete_rel in obsolete_target_rel_paths:
         if obsolete_rel in current_target_rel_path_set:
             continue
@@ -2005,6 +2049,11 @@ def _apply_managed_skill_install_plan(
             continue
         if obsolete_path.is_symlink() or obsolete_path.is_file():
             obsolete_path.unlink(missing_ok=True)
+            _prune_empty_obsolete_parent_dirs(
+                target_root,
+                obsolete_rel,
+                protected_rel_dirs=protected_current_parent_dirs,
+            )
             continue
         if obsolete_path.is_dir():
             raise RuntimeError(
