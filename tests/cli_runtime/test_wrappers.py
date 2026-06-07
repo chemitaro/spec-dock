@@ -5,11 +5,12 @@ from pathlib import Path
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
+import re
 class TestCliRulesContract(CliRuntimeHarness):
     def test_new_nodes_create_rules_symlinks_and_no_wrappers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -26,19 +27,19 @@ class TestCliRulesContract(CliRuntimeHarness):
                 issue_dir / "discussions" / "rules.md": target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md",
             }
             for link_path, target_path in expected_rules_links.items():
-                self.assertTrue(link_path.is_symlink(), f"missing rules symlink: {link_path}")
-                self.assertEqual(link_path.resolve(), target_path.resolve())
-                self.assertEqual(os.readlink(link_path), os.path.relpath(target_path, start=link_path.parent))
+                assert link_path.is_symlink(), f"missing rules symlink: {link_path}"
+                assert link_path.resolve() == target_path.resolve()
+                assert os.readlink(link_path) == os.path.relpath(target_path, start=link_path.parent)
 
-            self.assertFalse((init_dir / "epics" / "new-epic").exists())
-            self.assertFalse((epic_dir / "issues" / "new-issue").exists())
-            self.assertEqual(list((init_dir / "epics").glob("new-*")), [])
-            self.assertEqual(list((epic_dir / "issues").glob("new-*")), [])
+            assert not (init_dir / "epics" / "new-epic").exists()
+            assert not (epic_dir / "issues" / "new-issue").exists()
+            assert list((init_dir / "epics").glob("new-*")) == []
+            assert list((epic_dir / "issues").glob("new-*")) == []
 
     def test_scaffold_docs_point_to_runtime_commands_and_rules_docs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             templates_readme = (target / "spec-dock" / "templates" / "README.md").read_text(encoding="utf-8")
             workflow_initiative = (
@@ -84,32 +85,26 @@ class TestCliRulesContract(CliRuntimeHarness):
                 target / ".agents" / "skills" / "spec-dock-copilot-adapter" / "SKILL.md"
             ).read_text(encoding="utf-8")
 
-            self.assertIn("`spec-dock/docs/rules/**`", templates_readme)
-            self.assertIn("`rules.md` symlink", templates_readme)
-            self.assertIn("./spec-dock/scripts/spec-dock", templates_readme)
-            self.assertNotIn("./spec ", templates_readme)
-            self.assertNotIn("epics/new-epic", templates_readme)
-            self.assertNotIn("issues/new-issue", templates_readme)
+            assert "`spec-dock/docs/rules/**`" in templates_readme
+            assert "`rules.md` symlink" in templates_readme
+            assert "./spec-dock/scripts/spec-dock" in templates_readme
+            assert "./spec " not in templates_readme
+            assert "epics/new-epic" not in templates_readme
+            assert "issues/new-issue" not in templates_readme
 
-            self.assertIn("`spec-dock/docs/rules/initiative/epics.md`", workflow_initiative)
-            self.assertIn(
-                "`./spec-dock/scripts/spec-dock new epic --initiative <initiative-id> --title \"...\"`",
-                workflow_initiative,
-            )
-            self.assertIn("./spec-dock/scripts/spec-dock validate", workflow_initiative)
-            self.assertIn("./spec-dock/scripts/spec-dock sync", workflow_initiative)
-            self.assertNotIn("./spec ", workflow_initiative)
-            self.assertNotIn("epics/new-epic", workflow_initiative)
+            assert "`spec-dock/docs/rules/initiative/epics.md`" in workflow_initiative
+            assert "`./spec-dock/scripts/spec-dock new epic --initiative <initiative-id> --title \"...\"`" in workflow_initiative
+            assert "./spec-dock/scripts/spec-dock validate" in workflow_initiative
+            assert "./spec-dock/scripts/spec-dock sync" in workflow_initiative
+            assert "./spec " not in workflow_initiative
+            assert "epics/new-epic" not in workflow_initiative
 
-            self.assertIn("`spec-dock/docs/rules/epic/issues.md`", workflow_epic)
-            self.assertIn(
-                "`./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title \"...\"`",
-                workflow_epic,
-            )
-            self.assertIn("./spec-dock/scripts/spec-dock validate", workflow_epic)
-            self.assertIn("./spec-dock/scripts/spec-dock sync", workflow_epic)
-            self.assertNotIn("./spec ", workflow_epic)
-            self.assertNotIn("issues/new-issue", workflow_epic)
+            assert "`spec-dock/docs/rules/epic/issues.md`" in workflow_epic
+            assert "`./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title \"...\"`" in workflow_epic
+            assert "./spec-dock/scripts/spec-dock validate" in workflow_epic
+            assert "./spec-dock/scripts/spec-dock sync" in workflow_epic
+            assert "./spec " not in workflow_epic
+            assert "issues/new-issue" not in workflow_epic
 
             for command in (
                 "./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title \"...\"",
@@ -120,29 +115,23 @@ class TestCliRulesContract(CliRuntimeHarness):
                 "./spec-dock/scripts/spec-dock validate",
                 "./spec-dock/scripts/spec-dock sync",
             ):
-                self.assertIn(command, workflow_issue)
-            self.assertIn("spec-dock-issue-planning", workflow_issue)
-            self.assertIn("spec-dock-issue-execution", workflow_issue)
-            self.assertIn("workflow_spec_authoring.md", issue_planning_skill)
-            self.assertIn("workflow_clarification.md", issue_planning_skill)
-            self.assertIn("workflow_issue.md", issue_planning_skill)
-            self.assertNotIn("./spec ", workflow_issue)
-            self.assertNotIn("issues/new-issue", workflow_issue)
-            self.assertNotIn(
-                "./spec-dock/scripts/spec-dock new issue --no-github --epic <epic-id> --title \"...\"",
-                workflow_issue,
-            )
+                assert command in workflow_issue
+            assert "spec-dock-issue-planning" in workflow_issue
+            assert "spec-dock-issue-execution" in workflow_issue
+            assert "workflow_spec_authoring.md" in issue_planning_skill
+            assert "workflow_clarification.md" in issue_planning_skill
+            assert "workflow_issue.md" in issue_planning_skill
+            assert "./spec " not in workflow_issue
+            assert "issues/new-issue" not in workflow_issue
+            assert "./spec-dock/scripts/spec-dock new issue --no-github --epic <epic-id> --title \"...\"" not in workflow_issue
 
-            self.assertIn("`spec-dock/docs/rules/**`", reference_github)
-            self.assertIn(
-                "`--no-github` は node creation option ではありません",
-                reference_github,
-            )
-            self.assertIn("`--create-github-issue`", reference_github)
-            self.assertIn("`--github-issue <n>`", reference_github)
-            self.assertIn("./spec-dock/scripts/spec-dock", reference_github)
-            self.assertNotIn("./spec ", reference_github)
-            self.assertNotIn("issues/new-issue", reference_github)
+            assert "`spec-dock/docs/rules/**`" in reference_github
+            assert "`--no-github` は node creation option ではありません" in reference_github
+            assert "`--create-github-issue`" in reference_github
+            assert "`--github-issue <n>`" in reference_github
+            assert "./spec-dock/scripts/spec-dock" in reference_github
+            assert "./spec " not in reference_github
+            assert "issues/new-issue" not in reference_github
 
             for text, expected_command in (
                 (
@@ -166,40 +155,40 @@ class TestCliRulesContract(CliRuntimeHarness):
                     "`./spec-dock/scripts/spec-dock new doc adr --issue <id> --title \"<title>\"`",
                 ),
             ):
-                self.assertIn("spec-dock/docs/", text)
-                self.assertIn(expected_command, text)
-                self.assertNotIn("./spec ", text)
+                assert "spec-dock/docs/" in text
+                assert expected_command in text
+                assert "./spec " not in text
             for skill_text in (hub_skill, issue_skill, codex_adapter_skill, copilot_adapter_skill):
-                self.assertIn("./spec-dock/scripts/spec-dock", skill_text)
-                self.assertNotIn("./spec ", skill_text)
+                assert "./spec-dock/scripts/spec-dock" in skill_text
+                assert "./spec " not in skill_text
 
-            self.assertIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", issue_skill)
-            self.assertIn("./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>", issue_skill)
-            self.assertIn("./spec-dock/scripts/spec-dock deps check <target>", issue_skill)
-            self.assertIn("./spec-dock/scripts/spec-dock validate", issue_skill)
-            self.assertIn("./spec-dock/scripts/spec-dock sync", issue_skill)
-            self.assertIn("--no-github", issue_skill)
+            assert "./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>" in issue_skill
+            assert "./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>" in issue_skill
+            assert "./spec-dock/scripts/spec-dock deps check <target>" in issue_skill
+            assert "./spec-dock/scripts/spec-dock validate" in issue_skill
+            assert "./spec-dock/scripts/spec-dock sync" in issue_skill
+            assert "--no-github" in issue_skill
 
             for skill_text in (hub_skill, codex_adapter_skill, copilot_adapter_skill):
-                self.assertNotIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", skill_text)
-                self.assertNotIn("./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>", skill_text)
-                self.assertNotIn("./spec-dock/scripts/spec-dock deps check <target>", skill_text)
-                self.assertNotIn("./spec-dock/scripts/spec-dock validate", skill_text)
-                self.assertNotIn("./spec-dock/scripts/spec-dock sync", skill_text)
+                assert "./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>" not in skill_text
+                assert "./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>" not in skill_text
+                assert "./spec-dock/scripts/spec-dock deps check <target>" not in skill_text
+                assert "./spec-dock/scripts/spec-dock validate" not in skill_text
+                assert "./spec-dock/scripts/spec-dock sync" not in skill_text
 
-            self.assertIn("`spec-dock/docs/reference_deps.md`", hub_skill)
-            self.assertIn("`spec-dock/docs/reference_sync.md`", hub_skill)
-            self.assertIn("`spec-dock/docs/reference_deps.md`", codex_adapter_skill)
-            self.assertIn("`spec-dock/docs/reference_sync.md`", codex_adapter_skill)
-            self.assertIn("`spec-dock/docs/reference_deps.md`", copilot_adapter_skill)
-            self.assertIn("`spec-dock/docs/reference_sync.md`", copilot_adapter_skill)
+            assert "`spec-dock/docs/reference_deps.md`" in hub_skill
+            assert "`spec-dock/docs/reference_sync.md`" in hub_skill
+            assert "`spec-dock/docs/reference_deps.md`" in codex_adapter_skill
+            assert "`spec-dock/docs/reference_sync.md`" in codex_adapter_skill
+            assert "`spec-dock/docs/reference_deps.md`" in copilot_adapter_skill
+            assert "`spec-dock/docs/reference_sync.md`" in copilot_adapter_skill
 
-            self.assertNotIn("--no-github", initiative_epics_rules)
+            assert "--no-github" not in initiative_epics_rules
 
     def test_new_doc_numbering_and_validate_ignore_initiative_discussion_rules_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
@@ -209,35 +198,28 @@ class TestCliRulesContract(CliRuntimeHarness):
             rules_target = target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
 
             rules_link = discussions_dir / "rules.md"
-            self.assertTrue(rules_link.is_symlink(), f"missing rules symlink: {rules_link}")
-            self.assertEqual(rules_link.resolve(), rules_target.resolve())
+            assert rules_link.is_symlink(), f"missing rules symlink: {rules_link}"
+            assert rules_link.resolve() == rules_target.resolve()
 
             self._run_runtime(target, ["new", "doc", "adr", "--initiative", "1", "--title", "Decision one"])
             self._run_runtime(target, ["new", "doc", "disc", "--initiative", "1", "--title", "Why now"])
 
             adr_files = sorted(discussions_dir.glob("*-adr-decision-one.md"))
             disc_files = sorted(discussions_dir.glob("*-disc-why-now.md"))
-            self.assertEqual(len(adr_files), 1)
-            self.assertEqual(len(disc_files), 1)
-            self.assertRegex(adr_files[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$")
-            self.assertRegex(disc_files[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-why-now\.md$")
-            self.assertEqual(
-                sorted(path.name for path in discussions_dir.iterdir()),
-                sorted([adr_files[0].name, disc_files[0].name, "rules.md"]),
-            )
+            assert len(adr_files) == 1
+            assert len(disc_files) == 1
+            assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$", adr_files[0].name)
+            assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-why-now\.md$", disc_files[0].name)
+            assert sorted(path.name for path in discussions_dir.iterdir()) == sorted([adr_files[0].name, disc_files[0].name, "rules.md"])
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(
-                validate_result.returncode,
-                0,
-                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
-            )
-            self.assertIn("spec-dock: ok (validate)", validate_result.stdout)
+            assert validate_result.returncode == 0, f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            assert "spec-dock: ok (validate)" in validate_result.stdout
 
     def test_new_doc_numbering_and_validate_ignore_epic_discussion_rules_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
@@ -254,35 +236,28 @@ class TestCliRulesContract(CliRuntimeHarness):
             discussions_dir = epic_dir / "discussions"
             rules_target = target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md"
             rules_link = discussions_dir / "rules.md"
-            self.assertTrue(rules_link.is_symlink(), f"missing rules symlink: {rules_link}")
-            self.assertEqual(rules_link.resolve(), rules_target.resolve())
+            assert rules_link.is_symlink(), f"missing rules symlink: {rules_link}"
+            assert rules_link.resolve() == rules_target.resolve()
 
             self._run_runtime(target, ["new", "doc", "adr", "--epic", "2", "--title", "Decision one"])
             self._run_runtime(target, ["new", "doc", "disc", "--epic", "2", "--title", "Why now"])
 
             adr_files = sorted(discussions_dir.glob("*-adr-decision-one.md"))
             disc_files = sorted(discussions_dir.glob("*-disc-why-now.md"))
-            self.assertEqual(len(adr_files), 1)
-            self.assertEqual(len(disc_files), 1)
-            self.assertRegex(adr_files[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$")
-            self.assertRegex(disc_files[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-why-now\.md$")
-            self.assertEqual(
-                sorted(path.name for path in discussions_dir.iterdir()),
-                sorted([adr_files[0].name, disc_files[0].name, "rules.md"]),
-            )
+            assert len(adr_files) == 1
+            assert len(disc_files) == 1
+            assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$", adr_files[0].name)
+            assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-why-now\.md$", disc_files[0].name)
+            assert sorted(path.name for path in discussions_dir.iterdir()) == sorted([adr_files[0].name, disc_files[0].name, "rules.md"])
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(
-                validate_result.returncode,
-                0,
-                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
-            )
-            self.assertIn("spec-dock: ok (validate)", validate_result.stdout)
+            assert validate_result.returncode == 0, f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            assert "spec-dock: ok (validate)" in validate_result.stdout
 
     def test_new_doc_numbering_and_validate_ignore_issue_discussion_rules_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -299,41 +274,34 @@ class TestCliRulesContract(CliRuntimeHarness):
             discussions_dir = issue_dir / "discussions"
             rules_target = target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md"
             rules_link = discussions_dir / "rules.md"
-            self.assertTrue(rules_link.is_symlink(), f"missing rules symlink: {rules_link}")
-            self.assertEqual(rules_link.resolve(), rules_target.resolve())
+            assert rules_link.is_symlink(), f"missing rules symlink: {rules_link}"
+            assert rules_link.resolve() == rules_target.resolve()
 
             self._run_runtime(target, ["new", "doc", "adr", "--issue", "3", "--title", "Decision one"])
             self._run_runtime(target, ["new", "doc", "disc", "--issue", "3", "--title", "Why now"])
 
             adr_files = sorted(discussions_dir.glob("*-adr-decision-one.md"))
             disc_files = sorted(discussions_dir.glob("*-disc-why-now.md"))
-            self.assertEqual(len(adr_files), 1)
-            self.assertEqual(len(disc_files), 1)
-            self.assertRegex(adr_files[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$")
-            self.assertRegex(disc_files[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-why-now\.md$")
-            self.assertEqual(
-                sorted(path.name for path in discussions_dir.iterdir()),
-                sorted([adr_files[0].name, disc_files[0].name, "rules.md"]),
-            )
+            assert len(adr_files) == 1
+            assert len(disc_files) == 1
+            assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$", adr_files[0].name)
+            assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-why-now\.md$", disc_files[0].name)
+            assert sorted(path.name for path in discussions_dir.iterdir()) == sorted([adr_files[0].name, disc_files[0].name, "rules.md"])
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(
-                validate_result.returncode,
-                0,
-                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
-            )
-            self.assertIn("spec-dock: ok (validate)", validate_result.stdout)
+            assert validate_result.returncode == 0, f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            assert "spec-dock: ok (validate)" in validate_result.stdout
 
     def test_runtime_entrypoint_fails_fast_when_runtime_module_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             runtime_app = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "app.py"
             runtime_backup = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "app.py.bak"
             runtime_app.rename(runtime_backup)
 
             p = self._run_runtime_capture(target, ["sync"])
-            self.assertNotEqual(p.returncode, 0)
-            self.assertIn("runtime module missing", p.stderr)
-            self.assertIn("spec-dock update", p.stderr)
+            assert p.returncode != 0
+            assert "runtime module missing" in p.stderr
+            assert "spec-dock update" in p.stderr

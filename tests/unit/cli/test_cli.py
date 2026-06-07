@@ -1,9 +1,8 @@
 import ast
-import unittest
 from pathlib import Path
 
 
-class TestCliTestTreeSplitS12(unittest.TestCase):
+class TestCliTestTreeSplitS12:
     def test_test_module_inventory_exists(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         expected = [
@@ -26,7 +25,7 @@ class TestCliTestTreeSplitS12(unittest.TestCase):
             repo_root / "tests" / "unit" / "presentation" / "test_runtime_sync_s07.py",
         ]
         for path in expected:
-            self.assertTrue(path.is_file(), f"missing test module: {path}")
+            assert path.is_file(), f"missing test module: {path}"
 
     def test_regular_package_discovery_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -37,14 +36,14 @@ class TestCliTestTreeSplitS12(unittest.TestCase):
             repo_root / "tests" / "unit" / "presentation" / "__init__.py",
         ]
         for path in package_inits:
-            self.assertTrue(path.is_file(), f"missing package init: {path}")
+            assert path.is_file(), f"missing package init: {path}"
         for path in (repo_root / "tests").rglob("test_*.py"):
             text = path.read_text(encoding="utf-8")
             module = ast.parse(text)
             has_load_tests = any(
                 isinstance(node, ast.FunctionDef) and node.name == "load_tests" for node in module.body
             )
-            self.assertFalse(has_load_tests, f"load_tests must not be used: {path}")
+            assert not has_load_tests, f"load_tests must not be used: {path}"
 
     def test_command_grouping_contains_critical_inventory(self) -> None:
         from tests.cli_runtime import (
@@ -72,7 +71,7 @@ class TestCliTestTreeSplitS12(unittest.TestCase):
             test_new.TestCliNew: ["test_new_doc_adr_increments_id_within_scope_discussions"],
             test_sync.TestCliSync: ["test_sync_emits_deps_issues_json_and_puml_todo_only"],
             test_validate.TestCliValidate: ["test_validate_detects_broken_parent_id"],
-            test_runtime_shell_s11.RuntimeShellS11Tests: ["test_staged_delegation_path_regression"],
+            test_runtime_shell_s11.TestRuntimeShellS11: ["test_staged_delegation_path_regression"],
             test_runtime_active_s05.TestRuntimeActiveS05: [
                 "test_show_active_reads_agent_manifest_into_active_view_result"
             ],
@@ -91,4 +90,4 @@ class TestCliTestTreeSplitS12(unittest.TestCase):
         for test_class, required_methods in groups.items():
             available = set(dir(test_class))
             for method_name in required_methods:
-                self.assertIn(method_name, available)
+                assert method_name in available

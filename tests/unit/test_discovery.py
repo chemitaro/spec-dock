@@ -1,8 +1,7 @@
 from pathlib import Path
-import unittest
 
 
-class UnitDiscoverySmokeTest(unittest.TestCase):
+class TestUnitDiscoverySmoke:
     def test_unit_package_markers_exist(self) -> None:
         tests_root = Path(__file__).resolve().parents[1]
 
@@ -16,9 +15,4 @@ class UnitDiscoverySmokeTest(unittest.TestCase):
             "unit/presentation",
         ):
             marker = tests_root / relative_path / "__init__.py"
-            with self.subTest(path=relative_path):
-                self.assertTrue(marker.is_file())
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert marker.is_file(), f"missing package marker: {relative_path}"

@@ -4,22 +4,58 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from unittest import mock
 from pathlib import Path
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
+
+
+import contextlib
+import pytest
+_MISSING = object()
+
+
+class _CallProbe:
+    def __init__(self, *, side_effect=_MISSING, return_value=_MISSING):
+        self.calls = []
+        self._side_effect = side_effect
+        self._return_value = return_value
+
+    def __call__(self, *args, **kwargs):
+        self.calls.append((args, kwargs))
+        if self._side_effect is not _MISSING:
+            if isinstance(self._side_effect, BaseException):
+                raise self._side_effect
+            return self._side_effect(*args, **kwargs)
+        if self._return_value is not _MISSING:
+            return self._return_value
+        return None
+
+    def assert_called_once_with(self, *args, **kwargs):
+        assert self.calls == [(args, kwargs)]
+
+
+@contextlib.contextmanager
+def _patch_object(target, name, replacement=_MISSING, *, side_effect=_MISSING, return_value=_MISSING):
+    original = getattr(target, name)
+    if replacement is _MISSING:
+        replacement = _CallProbe(side_effect=side_effect, return_value=return_value)
+    setattr(target, name, replacement)
+    try:
+        yield replacement
+    finally:
+        setattr(target, name, original)
 class TestCliWorktree(CliRuntimeHarness):
     def _worktree_env(self, root: Path | str) -> dict[str, str]:
         return {"SPEC_DOCK_WORKTREE_ROOT": str(root)}
 
     def _assert_no_sibling_container(self, target: Path) -> None:
-        self.assertFalse((target.parent / f"{target.name}-worktrees").exists())
+        assert not (target.parent / f"{target.name}-worktrees").exists()
 
     def _run_runtime_capture_exact_env(self, target: Path, args: list[str], env: dict[str, str]) -> subprocess.CompletedProcess[str]:
         script = target / "spec-dock" / "scripts" / "spec-dock"
-        self.assertTrue(script.is_file(), f"runtime script missing: {script}")
+        assert script.is_file(), f"runtime script missing: {script}"
         return subprocess.run(
             [sys.executable, str(script), *args],
             cwd=str(target),
@@ -30,8 +66,8 @@ class TestCliWorktree(CliRuntimeHarness):
 
     def _prepare_git_repo(self, target: Path) -> None:
         if shutil.which("git") is None:
-            self.skipTest("git not available")
-        self.assertEqual(main(["init", str(target)]), 0)
+            pytest.skip("git not available")
+        assert main(["init", str(target)]) == 0
         self._run_git(target, ["init"])
         self._run_git(target, ["add", "-A"])
         self._run_git(
@@ -42,12 +78,13 @@ class TestCliWorktree(CliRuntimeHarness):
     def _add_external_worktree(self, target: Path, path: Path, branch: str = "manual") -> None:
         self._run_git(target, ["worktree", "add", "-b", branch, str(path)])
 
-    def _assert_unavailable_classification(self, item: dict[str, object], reason: str) -> None:
-        self.assertIs(type(item["managed"]), bool)
-        self.assertFalse(item["managed"])
-        self.assertFalse(item["managed_classification_available"])
-        self.assertEqual(item["classification_reason"], reason)
-        self.assertEqual(item["origin"], "classification_unavailable")
+    def _assert_unavailable_classification(self, item: dict[str, object], reason: str, label: str = "") -> None:
+        case_label = label or f"reason={reason}"
+        assert type(item["managed"]) is bool, case_label
+        assert not item["managed"], case_label
+        assert not item["managed_classification_available"], case_label
+        assert item["classification_reason"] == reason, case_label
+        assert item["origin"] == "classification_unavailable", case_label
 
     def test_worktree_record_payload_includes_classification_diagnostics(self) -> None:
         runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
@@ -129,13 +166,13 @@ class TestCliWorktree(CliRuntimeHarness):
         ]
 
         for record, expected_reason, expected_origin in cases:
-            with self.subTest(record=record.id):
-                payload = cli_text._worktree_payload(record)
+            case_label = f"record_id={record.id}"
+            payload = cli_text._worktree_payload(record)
 
-                self.assertIs(type(payload["managed"]), bool)
-                self.assertIs(type(payload["managed_classification_available"]), bool)
-                self.assertEqual(payload["classification_reason"], expected_reason)
-                self.assertEqual(payload["origin"], expected_origin)
+            assert type(payload["managed"]) is bool, case_label
+            assert type(payload["managed_classification_available"]) is bool, case_label
+            assert payload["classification_reason"] == expected_reason, case_label
+            assert payload["origin"] == expected_origin, case_label
 
     def test_worktree_create_requires_env_without_side_effects(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -147,12 +184,12 @@ class TestCliWorktree(CliRuntimeHarness):
             env.pop("SPEC_DOCK_WORKTREE_ROOT", None)
             p = self._run_runtime_capture_exact_env(target, ["worktree", "create"], env=env)
 
-            self.assertNotEqual(p.returncode, 0)
-            self.assertIn("SPEC_DOCK_WORKTREE_ROOT is required", p.stderr)
-            self.assertIn("export SPEC_DOCK_WORKTREE_ROOT", p.stderr)
+            assert p.returncode != 0
+            assert "SPEC_DOCK_WORKTREE_ROOT is required" in p.stderr
+            assert "export SPEC_DOCK_WORKTREE_ROOT" in p.stderr
             self._assert_no_sibling_container(target)
-            self.assertFalse((Path(tmp) / "worktrees").exists())
-            self.assertNotIn("-wt1", self._run_git(target, ["branch", "--list"]).stdout)
+            assert not (Path(tmp) / "worktrees").exists()
+            assert "-wt1" not in self._run_git(target, ["branch", "--list"]).stdout
 
     def test_worktree_create_rejects_blank_env_without_side_effects(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -162,10 +199,10 @@ class TestCliWorktree(CliRuntimeHarness):
 
             p = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env("   "))
 
-            self.assertNotEqual(p.returncode, 0)
-            self.assertIn("SPEC_DOCK_WORKTREE_ROOT is required", p.stderr)
+            assert p.returncode != 0
+            assert "SPEC_DOCK_WORKTREE_ROOT is required" in p.stderr
             self._assert_no_sibling_container(target)
-            self.assertNotIn("-wt1", self._run_git(target, ["branch", "--list"]).stdout)
+            assert "-wt1" not in self._run_git(target, ["branch", "--list"]).stdout
 
     def test_worktree_create_uses_central_root_auto_id_and_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -176,18 +213,18 @@ class TestCliWorktree(CliRuntimeHarness):
 
             p = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env(central_root))
 
-            self.assertEqual(p.returncode, 0, p.stderr)
+            assert p.returncode == 0, p.stderr
             current_branch = self._run_git(target, ["branch", "--show-current"]).stdout.strip()
             expected_path = central_root / "sample-repo" / "sample-repo-wt1"
-            self.assertIn(f"id=wt1", p.stdout)
-            self.assertIn(f"path={expected_path}", p.stdout)
-            self.assertIn("bootstrap status=skipped", p.stdout)
-            self.assertTrue(expected_path.is_dir())
-            self.assertTrue((expected_path / "spec-dock" / "scripts" / "spec-dock").is_file())
+            assert f"id=wt1" in p.stdout
+            assert f"path={expected_path}" in p.stdout
+            assert "bootstrap status=skipped" in p.stdout
+            assert expected_path.is_dir()
+            assert (expected_path / "spec-dock" / "scripts" / "spec-dock").is_file()
             self._assert_no_sibling_container(target)
             worktree_list = self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
-            self.assertIn(str(expected_path.resolve()), worktree_list)
-            self.assertIn(f"branch refs/heads/{current_branch}-wt1", worktree_list)
+            assert str(expected_path.resolve()) in worktree_list
+            assert f"branch refs/heads/{current_branch}-wt1" in worktree_list
 
     def test_worktree_create_retries_collisions_and_accepts_label(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -198,11 +235,11 @@ class TestCliWorktree(CliRuntimeHarness):
             first = self._run_runtime_capture(target, ["worktree", "create", "feature"], env=self._worktree_env(central_root))
             second = self._run_runtime_capture(target, ["worktree", "create", "feature"], env=self._worktree_env(central_root))
 
-            self.assertEqual(first.returncode, 0, first.stderr)
-            self.assertEqual(second.returncode, 0, second.stderr)
+            assert first.returncode == 0, first.stderr
+            assert second.returncode == 0, second.stderr
             current_branch = self._run_git(target, ["branch", "--show-current"]).stdout.strip()
-            self.assertIn(f"id=feature branch={current_branch}-feature", first.stdout)
-            self.assertIn(f"id=feature2 branch={current_branch}-feature2", second.stdout)
+            assert f"id=feature branch={current_branch}-feature" in first.stdout
+            assert f"id=feature2 branch={current_branch}-feature2" in second.stdout
 
     def test_worktree_create_retries_auto_id_collisions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -213,11 +250,11 @@ class TestCliWorktree(CliRuntimeHarness):
             first = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env(central_root))
             second = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env(central_root))
 
-            self.assertEqual(first.returncode, 0, first.stderr)
-            self.assertEqual(second.returncode, 0, second.stderr)
+            assert first.returncode == 0, first.stderr
+            assert second.returncode == 0, second.stderr
             current_branch = self._run_git(target, ["branch", "--show-current"]).stdout.strip()
-            self.assertIn(f"id=wt1 branch={current_branch}-wt1", first.stdout)
-            self.assertIn(f"id=wt2 branch={current_branch}-wt2", second.stdout)
+            assert f"id=wt1 branch={current_branch}-wt1" in first.stdout
+            assert f"id=wt2 branch={current_branch}-wt2" in second.stdout
 
     def test_worktree_create_rejects_relative_root_without_side_effects(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -227,11 +264,11 @@ class TestCliWorktree(CliRuntimeHarness):
 
             p = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env("relative/worktrees"))
 
-            self.assertNotEqual(p.returncode, 0)
-            self.assertIn("invalid SPEC_DOCK_WORKTREE_ROOT", p.stderr)
-            self.assertIn("raw='relative/worktrees'", p.stderr)
-            self.assertIn("cause=path is relative", p.stderr)
-            self.assertIn("export SPEC_DOCK_WORKTREE_ROOT", p.stderr)
+            assert p.returncode != 0
+            assert "invalid SPEC_DOCK_WORKTREE_ROOT" in p.stderr
+            assert "raw='relative/worktrees'" in p.stderr
+            assert "cause=path is relative" in p.stderr
+            assert "export SPEC_DOCK_WORKTREE_ROOT" in p.stderr
             self._assert_no_sibling_container(target)
 
     def test_worktree_create_rejects_file_root_without_side_effects(self) -> None:
@@ -244,11 +281,11 @@ class TestCliWorktree(CliRuntimeHarness):
 
             p = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env(root_file))
 
-            self.assertNotEqual(p.returncode, 0)
-            self.assertIn("invalid SPEC_DOCK_WORKTREE_ROOT", p.stderr)
-            self.assertIn("cause=path is not a directory", p.stderr)
-            self.assertIn(str(root_file), p.stderr)
-            self.assertFalse((Path(tmp) / "root-file" / "sample-repo").exists())
+            assert p.returncode != 0
+            assert "invalid SPEC_DOCK_WORKTREE_ROOT" in p.stderr
+            assert "cause=path is not a directory" in p.stderr
+            assert str(root_file) in p.stderr
+            assert not (Path(tmp) / "root-file" / "sample-repo").exists()
 
     def test_worktree_create_rejects_broken_symlink_root_without_side_effects(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -256,16 +293,16 @@ class TestCliWorktree(CliRuntimeHarness):
             target.mkdir()
             self._prepare_git_repo(target)
             if not self._can_create_symlink(Path(tmp)):
-                self.skipTest("symlink not available")
+                pytest.skip("symlink not available")
             broken = Path(tmp) / "broken-root"
             os.symlink(Path(tmp) / "missing-root", broken)
 
             p = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env(broken))
 
-            self.assertNotEqual(p.returncode, 0)
-            self.assertIn("invalid SPEC_DOCK_WORKTREE_ROOT", p.stderr)
-            self.assertIn("cause=path is a broken symlink", p.stderr)
-            self.assertFalse((Path(tmp) / "missing-root").exists())
+            assert p.returncode != 0
+            assert "invalid SPEC_DOCK_WORKTREE_ROOT" in p.stderr
+            assert "cause=path is a broken symlink" in p.stderr
+            assert not (Path(tmp) / "missing-root").exists()
 
     def test_worktree_create_accepts_directory_symlink_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -276,15 +313,15 @@ class TestCliWorktree(CliRuntimeHarness):
             real_root.mkdir()
             self._prepare_git_repo(target)
             if not self._can_create_symlink(Path(tmp)):
-                self.skipTest("symlink not available")
+                pytest.skip("symlink not available")
             os.symlink(real_root, symlink_root)
 
             p = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env(symlink_root))
 
             expected_path = symlink_root / "sample-repo" / "sample-repo-wt1"
-            self.assertEqual(p.returncode, 0, p.stderr)
-            self.assertIn(f"path={expected_path}", p.stdout)
-            self.assertTrue(expected_path.is_dir())
+            assert p.returncode == 0, p.stderr
+            assert f"path={expected_path}" in p.stdout
+            assert expected_path.is_dir()
 
     def test_worktree_create_expands_tilde_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -300,9 +337,9 @@ class TestCliWorktree(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["worktree", "create"], env=env)
 
             expected_path = root / "sample-repo" / "sample-repo-wt1"
-            self.assertEqual(p.returncode, 0, p.stderr)
-            self.assertIn(f"path={expected_path}", p.stdout)
-            self.assertTrue(expected_path.is_dir())
+            assert p.returncode == 0, p.stderr
+            assert f"path={expected_path}" in p.stdout
+            assert expected_path.is_dir()
 
     def test_worktree_create_rejects_invalid_labels_without_creating_worktree(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -323,19 +360,19 @@ class TestCliWorktree(CliRuntimeHarness):
                 "bad$label",
                 "bad&label",
             ):
-                with self.subTest(label=label):
-                    p = self._run_runtime_capture(
-                        target,
-                        ["worktree", "create", label],
-                        env=self._worktree_env(central_root),
-                    )
+                p = self._run_runtime_capture(
+                    target,
+                    ["worktree", "create", label],
+                    env=self._worktree_env(central_root),
+                )
 
-                    self.assertNotEqual(p.returncode, 0)
-                    self.assertIn("invalid worktree label", p.stderr)
-                    self.assertFalse((central_root / "sample-repo").exists())
-                    self.assertFalse((target / ".init-ran").exists())
+                case_label = f"label={label!r}"
+                assert p.returncode != 0, case_label
+                assert "invalid worktree label" in p.stderr, case_label
+                assert not (central_root / "sample-repo").exists(), case_label
+                assert not (target / ".init-ran").exists(), case_label
             self._assert_no_sibling_container(target)
-            self.assertNotIn("-bad", self._run_git(target, ["branch", "--list"]).stdout)
+            assert "-bad" not in self._run_git(target, ["branch", "--list"]).stdout
 
     def test_worktree_create_help_exposes_optional_label(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -345,9 +382,9 @@ class TestCliWorktree(CliRuntimeHarness):
 
             p = self._run_runtime_capture(target, ["worktree", "create", "--help"])
 
-            self.assertEqual(p.returncode, 0, p.stderr)
-            self.assertIn("worktree create [-h] [label]", p.stdout)
-            self.assertIn("Optional lowercase label", p.stdout)
+            assert p.returncode == 0, p.stderr
+            assert "worktree create [-h] [label]" in p.stdout
+            assert "Optional lowercase label" in p.stdout
 
     def test_worktree_remove_help_uses_all_worktree_wording(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -358,16 +395,16 @@ class TestCliWorktree(CliRuntimeHarness):
             top = self._run_runtime_capture(target, ["worktree", "--help"])
             leaf = self._run_runtime_capture(target, ["worktree", "remove", "--help"])
 
-            self.assertEqual(top.returncode, 0, top.stderr)
-            self.assertEqual(leaf.returncode, 0, leaf.stderr)
-            self.assertIn("Remove a Git worktree without deleting its branch", top.stdout)
-            self.assertNotIn("Remove a managed Git worktree", top.stdout)
-            self.assertIn("Worktree id, absolute path, or directory basename", leaf.stdout)
-            self.assertIn("Compatibility input", leaf.stdout)
-            self.assertIn("fully deleted by", leaf.stdout)
-            self.assertIn("default.", leaf.stdout)
-            self.assertNotIn("Pass --force to git worktree remove", leaf.stdout)
-            self.assertNotIn("Managed worktree id", leaf.stdout)
+            assert top.returncode == 0, top.stderr
+            assert leaf.returncode == 0, leaf.stderr
+            assert "Remove a Git worktree without deleting its branch" in top.stdout
+            assert "Remove a managed Git worktree" not in top.stdout
+            assert "Worktree id, absolute path, or directory basename" in leaf.stdout
+            assert "Compatibility input" in leaf.stdout
+            assert "fully deleted by" in leaf.stdout
+            assert "default." in leaf.stdout
+            assert "Pass --force to git worktree remove" not in leaf.stdout
+            assert "Managed worktree id" not in leaf.stdout
 
     def test_worktree_create_uses_current_branch_with_slash_for_branch_prefix(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -379,12 +416,12 @@ class TestCliWorktree(CliRuntimeHarness):
 
             p = self._run_runtime_capture(target, ["worktree", "create", "slice"], env=self._worktree_env(central_root))
 
-            self.assertEqual(p.returncode, 0, p.stderr)
-            self.assertIn("id=slice branch=feature/base-slice", p.stdout)
+            assert p.returncode == 0, p.stderr
+            assert "id=slice branch=feature/base-slice" in p.stdout
 
     def test_worktree_create_runs_make_init_when_available(self) -> None:
         if shutil.which("make") is None:
-            self.skipTest("make not available")
+            pytest.skip("make not available")
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "sample-repo"
             central_root = Path(tmp) / "central-worktrees"
@@ -395,13 +432,13 @@ class TestCliWorktree(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["worktree", "create", "setup"], env=self._worktree_env(central_root))
 
             worktree_path = central_root / "sample-repo" / "sample-repo-setup"
-            self.assertEqual(p.returncode, 0, p.stderr)
-            self.assertIn("bootstrap status=succeeded", p.stdout)
-            self.assertEqual((worktree_path / ".init-ran").read_text(encoding="utf-8").strip(), "initialized")
+            assert p.returncode == 0, p.stderr
+            assert "bootstrap status=succeeded" in p.stdout
+            assert (worktree_path / ".init-ran").read_text(encoding="utf-8").strip() == "initialized"
 
     def test_worktree_create_keeps_worktree_when_make_init_fails(self) -> None:
         if shutil.which("make") is None:
-            self.skipTest("make not available")
+            pytest.skip("make not available")
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "sample-repo"
             central_root = Path(tmp) / "central-worktrees"
@@ -412,19 +449,16 @@ class TestCliWorktree(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["worktree", "create", "setup"], env=self._worktree_env(central_root))
 
             worktree_path = central_root / "sample-repo" / "sample-repo-setup"
-            self.assertEqual(p.returncode, 0, p.stderr)
-            self.assertIn("bootstrap status=failed", p.stdout)
-            self.assertIn("spec-dock: (warn) make init failed:", p.stderr)
-            self.assertTrue(worktree_path.is_dir())
+            assert p.returncode == 0, p.stderr
+            assert "bootstrap status=failed" in p.stdout
+            assert "spec-dock: (warn) make init failed:" in p.stderr
+            assert worktree_path.is_dir()
             current_branch = self._run_git(target, ["branch", "--show-current"]).stdout.strip()
-            self.assertIn(
-                f"branch refs/heads/{current_branch}-setup",
-                self._run_git(target, ["worktree", "list", "--porcelain"]).stdout,
-            )
+            assert f"branch refs/heads/{current_branch}-setup" in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
 
     def test_worktree_create_keeps_worktree_when_make_init_detection_fails(self) -> None:
         if shutil.which("make") is None:
-            self.skipTest("make not available")
+            pytest.skip("make not available")
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "sample-repo"
             central_root = Path(tmp) / "central-worktrees"
@@ -435,10 +469,10 @@ class TestCliWorktree(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["worktree", "create", "detect"], env=self._worktree_env(central_root))
 
             worktree_path = central_root / "sample-repo" / "sample-repo-detect"
-            self.assertEqual(p.returncode, 0, p.stderr)
-            self.assertIn("bootstrap status=detection_failed", p.stdout)
-            self.assertIn("spec-dock: (warn) make init detection failed:", p.stderr)
-            self.assertTrue(worktree_path.is_dir())
+            assert p.returncode == 0, p.stderr
+            assert "bootstrap status=detection_failed" in p.stdout
+            assert "spec-dock: (warn) make init detection failed:" in p.stderr
+            assert worktree_path.is_dir()
 
     def test_worktree_create_fails_from_detached_head(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -451,21 +485,21 @@ class TestCliWorktree(CliRuntimeHarness):
 
             p = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env(central_root))
 
-            self.assertNotEqual(p.returncode, 0)
-            self.assertIn("detached HEAD is not supported", p.stderr)
-            self.assertFalse((target.parent / "sample-repo-worktrees").exists())
+            assert p.returncode != 0
+            assert "detached HEAD is not supported" in p.stderr
+            assert not (target.parent / "sample-repo-worktrees").exists()
 
     def test_worktree_create_fails_outside_git_repo(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "plain-dir"
             central_root = Path(tmp) / "central-worktrees"
             target.mkdir()
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             p = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env(central_root))
 
-            self.assertNotEqual(p.returncode, 0)
-            self.assertIn("git failed: git rev-parse --abbrev-ref HEAD", p.stderr)
+            assert p.returncode != 0
+            assert "git failed: git rev-parse --abbrev-ref HEAD" in p.stderr
 
     def test_worktree_create_fails_when_namespace_path_is_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -478,11 +512,11 @@ class TestCliWorktree(CliRuntimeHarness):
 
             p = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env(central_root))
 
-            self.assertNotEqual(p.returncode, 0)
-            self.assertIn("failed to create worktree container", p.stderr)
-            self.assertIn("SPEC_DOCK_WORKTREE_ROOT", p.stderr)
-            self.assertIn("artifact_state=path_exists:False,branch_exists:False,record_exists:False", p.stderr)
-            self.assertFalse((central_root / "sample-repo" / "sample-repo-wt1").exists())
+            assert p.returncode != 0
+            assert "failed to create worktree container" in p.stderr
+            assert "SPEC_DOCK_WORKTREE_ROOT" in p.stderr
+            assert "artifact_state=path_exists:False,branch_exists:False,record_exists:False" in p.stderr
+            assert not (central_root / "sample-repo" / "sample-repo-wt1").exists()
 
     def test_worktree_create_treats_non_collision_git_add_failure_as_fatal(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -545,14 +579,14 @@ class TestCliWorktree(CliRuntimeHarness):
                 environment_gateway=FakeEnvironmentGateway(),
             )
 
-            with self.assertRaises(RuntimeError) as raised:
+            with pytest.raises(RuntimeError) as raised:
                 app_worktree.worktree_create(app_contracts.WorktreeCreateRequest(), ports)
 
-            message = str(raised.exception)
-            self.assertIn("non-retryable", message)
-            self.assertIn("cannot lock ref", message)
-            self.assertIn("artifact_state=path_exists:False,branch_exists:False,record_exists:True", message)
-            self.assertNotIn("exhausted candidate attempts", message)
+            message = str(raised.value)
+            assert "non-retryable" in message
+            assert "cannot lock ref" in message
+            assert "artifact_state=path_exists:False,branch_exists:False,record_exists:True" in message
+            assert "exhausted candidate attempts" not in message
 
     def test_worktree_create_retries_git_add_collision(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -615,15 +649,12 @@ class TestCliWorktree(CliRuntimeHarness):
 
             result = app_worktree.worktree_create(app_contracts.WorktreeCreateRequest(), ports)
 
-            self.assertEqual(result.id, "wt2")
-            self.assertEqual([branch for _, branch in git_gateway.add_calls], ["main-wt1", "main-wt2"])
-            self.assertEqual(
-                [path for path, _ in git_gateway.add_calls],
-                [
+            assert result.id == "wt2"
+            assert [branch for _, branch in git_gateway.add_calls] == ["main-wt1", "main-wt2"]
+            assert [path for path, _ in git_gateway.add_calls] == [
                     Path(tmp) / "central-worktrees" / "repo" / "repo-wt1",
                     Path(tmp) / "central-worktrees" / "repo" / "repo-wt2",
-                ],
-            )
+                ]
 
     def test_worktree_create_normalizes_container_from_linked_worktree(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -632,7 +663,7 @@ class TestCliWorktree(CliRuntimeHarness):
             target.mkdir()
             self._prepare_git_repo(target)
             first = self._run_runtime_capture(target, ["worktree", "create", "outer"], env=self._worktree_env(central_root))
-            self.assertEqual(first.returncode, 0, first.stderr)
+            assert first.returncode == 0, first.stderr
             linked = central_root / "sample-repo" / "sample-repo-outer"
             env = os.environ.copy()
             env["SPEC_DOCK_WORKTREE_ROOT"] = str(central_root)
@@ -646,11 +677,11 @@ class TestCliWorktree(CliRuntimeHarness):
             )
 
             expected = central_root / "sample-repo" / "sample-repo-inner"
-            self.assertEqual(p.returncode, 0, p.stderr)
-            self.assertIn(f"path={expected}", p.stdout)
+            assert p.returncode == 0, p.stderr
+            assert f"path={expected}" in p.stdout
             current_branch = self._run_git(linked, ["branch", "--show-current"]).stdout.strip()
-            self.assertIn(f"branch={current_branch}-inner", p.stdout)
-            self.assertTrue(expected.is_dir())
+            assert f"branch={current_branch}-inner" in p.stdout
+            assert expected.is_dir()
 
     def test_worktree_list_and_show_json_resolve_agent_targets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -662,45 +693,46 @@ class TestCliWorktree(CliRuntimeHarness):
             self._prepare_git_repo(target)
 
             create = self._run_runtime_capture(target, ["worktree", "create", "alpha"], env=self._worktree_env(central_root))
-            self.assertEqual(create.returncode, 0, create.stderr)
+            assert create.returncode == 0, create.stderr
 
             listed = self._run_runtime_capture(target, ["worktree", "list", "--json"], env=self._worktree_env(central_root))
-            self.assertEqual(listed.returncode, 0, listed.stderr)
+            assert listed.returncode == 0, listed.stderr
             payload = json.loads(listed.stdout)
-            self.assertEqual(payload["status"], "ok")
+            assert payload["status"] == "ok"
             alpha = next(item for item in payload["worktrees"] if item["id"] == "alpha")
-            self.assertTrue(alpha["managed"])
-            self.assertFalse(alpha["main"])
-            self.assertFalse(alpha["current"])
-            self.assertTrue(alpha["removable"])
+            assert alpha["managed"]
+            assert not alpha["main"]
+            assert not alpha["current"]
+            assert alpha["removable"]
             text_listed = self._run_runtime_capture(target, ["worktree", "list"], env=self._worktree_env(central_root))
-            self.assertEqual(text_listed.returncode, 0, text_listed.stderr)
-            self.assertIn("id=alpha", text_listed.stdout)
-            self.assertIn("managed=true", text_listed.stdout)
-            self.assertIn("origin=spec_dock_managed", text_listed.stdout)
-            self.assertIn("classification_reason=root_valid", text_listed.stdout)
-            self.assertIn("removable=true", text_listed.stdout)
+            assert text_listed.returncode == 0, text_listed.stderr
+            assert "id=alpha" in text_listed.stdout
+            assert "managed=true" in text_listed.stdout
+            assert "origin=spec_dock_managed" in text_listed.stdout
+            assert "classification_reason=root_valid" in text_listed.stdout
+            assert "removable=true" in text_listed.stdout
 
             for selector in (alpha["id"], alpha["path"]):
                 shown = self._run_runtime_capture(target, ["worktree", "show", selector, "--json"], env=self._worktree_env(central_root))
-                self.assertEqual(shown.returncode, 0, shown.stderr)
+                case_label = f"selector={selector}"
+                assert shown.returncode == 0, f"{case_label}: {shown.stderr}"
                 shown_payload = json.loads(shown.stdout)
-                self.assertEqual(shown_payload["worktree"]["path"], alpha["path"])
+                assert shown_payload["worktree"]["path"] == alpha["path"], case_label
 
             text_shown = self._run_runtime_capture(target, ["worktree", "show", alpha["id"]], env=self._worktree_env(central_root))
-            self.assertEqual(text_shown.returncode, 0, text_shown.stderr)
-            self.assertIn("id=alpha", text_shown.stdout)
-            self.assertIn("managed=true", text_shown.stdout)
-            self.assertIn("origin=spec_dock_managed", text_shown.stdout)
-            self.assertIn("classification_reason=root_valid", text_shown.stdout)
+            assert text_shown.returncode == 0, text_shown.stderr
+            assert "id=alpha" in text_shown.stdout
+            assert "managed=true" in text_shown.stdout
+            assert "origin=spec_dock_managed" in text_shown.stdout
+            assert "classification_reason=root_valid" in text_shown.stdout
 
             shown_by_basename = self._run_runtime_capture(
                 target,
                 ["worktree", "show", alpha["basename"], "--json"],
                 env=self._worktree_env(central_root),
             )
-            self.assertEqual(shown_by_basename.returncode, 0, shown_by_basename.stderr)
-            self.assertEqual(json.loads(shown_by_basename.stdout)["worktree"]["path"], alpha["path"])
+            assert shown_by_basename.returncode == 0, shown_by_basename.stderr
+            assert json.loads(shown_by_basename.stdout)["worktree"]["path"] == alpha["path"]
 
             duplicate_parent.mkdir(parents=True)
             self._run_git(target, ["worktree", "add", "-b", "manual-alpha", str(duplicate)])
@@ -710,26 +742,26 @@ class TestCliWorktree(CliRuntimeHarness):
                 ["worktree", "show", alpha["basename"], "--json"],
                 env=self._worktree_env(central_root),
             )
-            self.assertNotEqual(ambiguous.returncode, 0)
+            assert ambiguous.returncode != 0
             ambiguous_payload = json.loads(ambiguous.stdout)
-            self.assertEqual(ambiguous_payload["status"], "error")
-            self.assertEqual(ambiguous_payload["error"]["code"], "ambiguous_target")
-            self.assertEqual({item["id"] for item in ambiguous_payload["candidates"]}, {"alpha", "alpha~2"})
-            self.assertTrue(all(item["basename"] == alpha["basename"] for item in ambiguous_payload["candidates"]))
+            assert ambiguous_payload["status"] == "error"
+            assert ambiguous_payload["error"]["code"] == "ambiguous_target"
+            assert {item["id"] for item in ambiguous_payload["candidates"]} == {"alpha", "alpha~2"}
+            assert all(item["basename"] == alpha["basename"] for item in ambiguous_payload["candidates"])
             for candidate in ambiguous_payload["candidates"]:
-                self.assertIn("managed_classification_available", candidate)
-                self.assertIn("classification_reason", candidate)
-                self.assertIn("origin", candidate)
+                assert "managed_classification_available" in candidate
+                assert "classification_reason" in candidate
+                assert "origin" in candidate
 
             branch_only = self._run_runtime_capture(
                 target,
                 ["worktree", "show", alpha["branch"], "--json"],
                 env=self._worktree_env(central_root),
             )
-            self.assertNotEqual(branch_only.returncode, 0)
+            assert branch_only.returncode != 0
             error_payload = json.loads(branch_only.stdout)
-            self.assertEqual(error_payload["status"], "error")
-            self.assertEqual(error_payload["error"]["code"], "unsupported_branch_target")
+            assert error_payload["status"] == "error"
+            assert error_payload["error"]["code"] == "unsupported_branch_target"
 
     def test_worktree_list_and_show_json_succeed_when_root_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -743,19 +775,19 @@ class TestCliWorktree(CliRuntimeHarness):
             env.pop("SPEC_DOCK_WORKTREE_ROOT", None)
             listed = self._run_runtime_capture_exact_env(target, ["worktree", "list", "--json"], env=env)
 
-            self.assertEqual(listed.returncode, 0, listed.stderr)
+            assert listed.returncode == 0, listed.stderr
             payload = json.loads(listed.stdout)
-            self.assertEqual(payload["status"], "ok")
-            self.assertEqual({item["basename"] for item in payload["worktrees"]}, {"sample-repo", "manual-worktree"})
+            assert payload["status"] == "ok"
+            assert {item["basename"] for item in payload["worktrees"]} == {"sample-repo", "manual-worktree"}
             for item in payload["worktrees"]:
                 self._assert_unavailable_classification(item, "root_missing")
 
             shown = self._run_runtime_capture_exact_env(target, ["worktree", "show", external.name, "--json"], env=env)
 
-            self.assertEqual(shown.returncode, 0, shown.stderr)
+            assert shown.returncode == 0, shown.stderr
             shown_payload = json.loads(shown.stdout)
             self._assert_unavailable_classification(shown_payload["worktree"], "root_missing")
-            self.assertEqual(shown_payload["worktree"]["basename"], external.name)
+            assert shown_payload["worktree"]["basename"] == external.name
 
     def test_worktree_json_commands_report_unavailable_classification_for_invalid_root_variants(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -767,7 +799,7 @@ class TestCliWorktree(CliRuntimeHarness):
             root_file = Path(tmp) / "root-file"
             root_file.write_text("not a directory\n", encoding="utf-8")
             if not self._can_create_symlink(Path(tmp)):
-                self.skipTest("symlink unavailable")
+                pytest.skip("symlink unavailable")
             symlink_root = Path(tmp) / "symlink-root"
             symlink_root.mkdir()
             os.symlink(Path(tmp) / "escaped-namespace", symlink_root / "sample-repo")
@@ -781,32 +813,30 @@ class TestCliWorktree(CliRuntimeHarness):
             base_env.pop("SPEC_DOCK_WORKTREE_ROOT", None)
 
             for label, env_update, expected_reason in cases:
+                case_label = f"variant={label}"
                 env = dict(base_env)
                 env.update(env_update)
-                with self.subTest(root=label, command="list"):
-                    listed = self._run_runtime_capture_exact_env(target, ["worktree", "list", "--json"], env=env)
-                    self.assertEqual(listed.returncode, 0, listed.stderr)
-                    payload = json.loads(listed.stdout)
-                    self.assertEqual(payload["status"], "ok")
-                    external_record = next(item for item in payload["worktrees"] if item["basename"] == external.name)
-                    self._assert_unavailable_classification(external_record, expected_reason)
+                listed = self._run_runtime_capture_exact_env(target, ["worktree", "list", "--json"], env=env)
+                assert listed.returncode == 0, f"{case_label}: {listed.stderr}"
+                payload = json.loads(listed.stdout)
+                assert payload["status"] == "ok", case_label
+                external_record = next(item for item in payload["worktrees"] if item["basename"] == external.name)
+                self._assert_unavailable_classification(external_record, expected_reason, case_label)
 
-                with self.subTest(root=label, command="show"):
-                    shown = self._run_runtime_capture_exact_env(target, ["worktree", "show", external.name, "--json"], env=env)
-                    self.assertEqual(shown.returncode, 0, shown.stderr)
-                    self._assert_unavailable_classification(json.loads(shown.stdout)["worktree"], expected_reason)
+                shown = self._run_runtime_capture_exact_env(target, ["worktree", "show", external.name, "--json"], env=env)
+                assert shown.returncode == 0, f"{case_label}: {shown.stderr}"
+                self._assert_unavailable_classification(json.loads(shown.stdout)["worktree"], expected_reason, case_label)
 
-                with self.subTest(root=label, command="remove"):
-                    removable = Path(tmp) / f"manual-remove-{label}"
-                    self._add_external_worktree(target, removable, branch=f"manual-remove-{label}")
-                    removed = self._run_runtime_capture_exact_env(target, ["worktree", "remove", removable.name, "--json"], env=env)
-                    self.assertEqual(removed.returncode, 0, removed.stderr)
-                    removed_payload = json.loads(removed.stdout)
-                    self.assertEqual(removed_payload["status"], "ok")
-                    self.assertTrue(removed_payload["removed_record"])
-                    self.assertFalse(removed_payload["branch_deleted"])
-                    self._assert_unavailable_classification(removed_payload["resolved_target"], expected_reason)
-                    self.assertNotIn(str(removable), self._run_git(target, ["worktree", "list", "--porcelain"]).stdout)
+                removable = Path(tmp) / f"manual-remove-{label}"
+                self._add_external_worktree(target, removable, branch=f"manual-remove-{label}")
+                removed = self._run_runtime_capture_exact_env(target, ["worktree", "remove", removable.name, "--json"], env=env)
+                assert removed.returncode == 0, f"{case_label}: {removed.stderr}"
+                removed_payload = json.loads(removed.stdout)
+                assert removed_payload["status"] == "ok", case_label
+                assert removed_payload["removed_record"], case_label
+                assert not removed_payload["branch_deleted"], case_label
+                self._assert_unavailable_classification(removed_payload["resolved_target"], expected_reason, case_label)
+                assert str(removable) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout, case_label
 
     def test_worktree_list_json_classifies_unmanaged_worktree(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -819,18 +849,18 @@ class TestCliWorktree(CliRuntimeHarness):
 
             listed = self._run_runtime_capture(target, ["worktree", "list", "--json"], env=self._worktree_env(central_root))
 
-            self.assertEqual(listed.returncode, 0, listed.stderr)
+            assert listed.returncode == 0, listed.stderr
             payload = json.loads(listed.stdout)
             manual = next(item for item in payload["worktrees"] if item["basename"] == "manual-worktree")
-            self.assertFalse(manual["managed"])
-            self.assertTrue(manual["removable"])
-            self.assertEqual(manual["remove_blockers"], [])
-            self.assertEqual(manual["origin"], "external")
+            assert not manual["managed"]
+            assert manual["removable"]
+            assert manual["remove_blockers"] == []
+            assert manual["origin"] == "external"
 
             text_listed = self._run_runtime_capture(target, ["worktree", "list"], env=self._worktree_env(central_root))
-            self.assertEqual(text_listed.returncode, 0, text_listed.stderr)
-            self.assertIn("origin=external", text_listed.stdout)
-            self.assertIn("classification_reason=root_valid", text_listed.stdout)
+            assert text_listed.returncode == 0, text_listed.stderr
+            assert "origin=external" in text_listed.stdout
+            assert "classification_reason=root_valid" in text_listed.stdout
 
     def test_worktree_remove_clean_managed_target_keeps_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -841,7 +871,7 @@ class TestCliWorktree(CliRuntimeHarness):
             self._prepare_git_repo(target)
 
             created = self._run_runtime_capture(target, ["worktree", "create", "done"], env=self._worktree_env(central_root))
-            self.assertEqual(created.returncode, 0, created.stderr)
+            assert created.returncode == 0, created.stderr
             worktree_path = central_root / "sample-repo" / "sample-repo-done"
             branch = self._run_git(target, ["branch", "--list", "*-done", "--format=%(refname:short)"]).stdout.strip()
 
@@ -851,24 +881,24 @@ class TestCliWorktree(CliRuntimeHarness):
                 env=self._worktree_env(central_root),
             )
 
-            self.assertEqual(removed.returncode, 0, removed.stderr)
+            assert removed.returncode == 0, removed.stderr
             payload = json.loads(removed.stdout)
-            self.assertEqual(payload["status"], "ok")
-            self.assertTrue(payload["removed_record"])
-            self.assertTrue(payload["removed_directory"])
-            self.assertFalse(payload["branch_deleted"])
-            self.assertFalse(worktree_path.exists())
-            self.assertNotIn(str(worktree_path), self._run_git(target, ["worktree", "list", "--porcelain"]).stdout)
-            self.assertIn(branch, self._run_git(target, ["branch", "--list", branch]).stdout)
+            assert payload["status"] == "ok"
+            assert payload["removed_record"]
+            assert payload["removed_directory"]
+            assert not payload["branch_deleted"]
+            assert not worktree_path.exists()
+            assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
+            assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
 
             created_again = self._run_runtime_capture(target, ["worktree", "create", "done2"], env=self._worktree_env(central_root))
-            self.assertEqual(created_again.returncode, 0, created_again.stderr)
+            assert created_again.returncode == 0, created_again.stderr
             text_removed = self._run_runtime_capture(target, ["worktree", "remove", "done2"], env=self._worktree_env(central_root))
-            self.assertEqual(text_removed.returncode, 0, text_removed.stderr)
-            self.assertIn("managed=true", text_removed.stdout)
-            self.assertIn("origin=spec_dock_managed", text_removed.stdout)
-            self.assertIn("classification_reason=root_valid", text_removed.stdout)
-            self.assertIn("remove_blockers=-", text_removed.stdout)
+            assert text_removed.returncode == 0, text_removed.stderr
+            assert "managed=true" in text_removed.stdout
+            assert "origin=spec_dock_managed" in text_removed.stdout
+            assert "classification_reason=root_valid" in text_removed.stdout
+            assert "remove_blockers=-" in text_removed.stdout
 
     def test_worktree_remove_untracked_default_removes_directory_and_keeps_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -878,10 +908,10 @@ class TestCliWorktree(CliRuntimeHarness):
             self._prepare_git_repo(target)
 
             created = self._run_runtime_capture(target, ["worktree", "create", "dirty"], env=self._worktree_env(central_root))
-            self.assertEqual(created.returncode, 0, created.stderr)
+            assert created.returncode == 0, created.stderr
             worktree_path = central_root / "sample-repo" / "sample-repo-dirty"
             branch = self._run_git(target, ["branch", "--list", "*-dirty", "--format=%(refname:short)"]).stdout.strip()
-            self.assertTrue(branch)
+            assert branch
             (worktree_path / "cache.tmp").write_text("dirty\n", encoding="utf-8")
 
             removed = self._run_runtime_capture(
@@ -889,15 +919,15 @@ class TestCliWorktree(CliRuntimeHarness):
                 ["worktree", "remove", "dirty", "--json"],
                 env=self._worktree_env(central_root),
             )
-            self.assertEqual(removed.returncode, 0, removed.stderr or removed.stdout)
+            assert removed.returncode == 0, removed.stderr or removed.stdout
             payload = json.loads(removed.stdout)
-            self.assertEqual(payload["status"], "ok")
-            self.assertTrue(payload["removed_record"])
-            self.assertTrue(payload["removed_directory"])
-            self.assertFalse(payload["branch_deleted"])
-            self.assertFalse(worktree_path.exists())
-            self.assertNotIn(str(worktree_path), self._run_git(target, ["worktree", "list", "--porcelain"]).stdout)
-            self.assertIn(branch, self._run_git(target, ["branch", "--list", branch]).stdout)
+            assert payload["status"] == "ok"
+            assert payload["removed_record"]
+            assert payload["removed_directory"]
+            assert not payload["branch_deleted"]
+            assert not worktree_path.exists()
+            assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
+            assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
 
     def test_worktree_remove_tracked_modification_default_removes_directory_and_keeps_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -907,10 +937,10 @@ class TestCliWorktree(CliRuntimeHarness):
             self._prepare_git_repo(target)
 
             created = self._run_runtime_capture(target, ["worktree", "create", "modified"], env=self._worktree_env(central_root))
-            self.assertEqual(created.returncode, 0, created.stderr)
+            assert created.returncode == 0, created.stderr
             worktree_path = central_root / "sample-repo" / "sample-repo-modified"
             branch = self._run_git(target, ["branch", "--list", "*-modified", "--format=%(refname:short)"]).stdout.strip()
-            self.assertTrue(branch)
+            assert branch
             tracked_file = worktree_path / "tracked.txt"
             tracked_file.write_text("tracked\n", encoding="utf-8")
             self._run_git(worktree_path, ["add", "tracked.txt"])
@@ -925,15 +955,15 @@ class TestCliWorktree(CliRuntimeHarness):
                 ["worktree", "remove", "modified", "--json"],
                 env=self._worktree_env(central_root),
             )
-            self.assertEqual(removed.returncode, 0, removed.stderr or removed.stdout)
+            assert removed.returncode == 0, removed.stderr or removed.stdout
             payload = json.loads(removed.stdout)
-            self.assertEqual(payload["status"], "ok")
-            self.assertTrue(payload["removed_record"])
-            self.assertTrue(payload["removed_directory"])
-            self.assertFalse(payload["branch_deleted"])
-            self.assertFalse(worktree_path.exists())
-            self.assertNotIn(str(worktree_path), self._run_git(target, ["worktree", "list", "--porcelain"]).stdout)
-            self.assertIn(branch, self._run_git(target, ["branch", "--list", branch]).stdout)
+            assert payload["status"] == "ok"
+            assert payload["removed_record"]
+            assert payload["removed_directory"]
+            assert not payload["branch_deleted"]
+            assert not worktree_path.exists()
+            assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
+            assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
 
     def test_worktree_remove_force_compatibility_removes_dirty_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -943,10 +973,10 @@ class TestCliWorktree(CliRuntimeHarness):
             self._prepare_git_repo(target)
 
             created = self._run_runtime_capture(target, ["worktree", "create", "dirty"], env=self._worktree_env(central_root))
-            self.assertEqual(created.returncode, 0, created.stderr)
+            assert created.returncode == 0, created.stderr
             worktree_path = central_root / "sample-repo" / "sample-repo-dirty"
             branch = self._run_git(target, ["branch", "--list", "*-dirty", "--format=%(refname:short)"]).stdout.strip()
-            self.assertTrue(branch)
+            assert branch
             (worktree_path / "cache.tmp").write_text("dirty\n", encoding="utf-8")
 
             removed = self._run_runtime_capture(
@@ -954,15 +984,15 @@ class TestCliWorktree(CliRuntimeHarness):
                 ["worktree", "remove", "dirty", "--force", "--json"],
                 env=self._worktree_env(central_root),
             )
-            self.assertEqual(removed.returncode, 0, removed.stderr or removed.stdout)
+            assert removed.returncode == 0, removed.stderr or removed.stdout
             payload = json.loads(removed.stdout)
-            self.assertEqual(payload["status"], "ok")
-            self.assertTrue(payload["removed_record"])
-            self.assertTrue(payload["removed_directory"])
-            self.assertFalse(payload["branch_deleted"])
-            self.assertFalse(worktree_path.exists())
-            self.assertNotIn(str(worktree_path), self._run_git(target, ["worktree", "list", "--porcelain"]).stdout)
-            self.assertIn(branch, self._run_git(target, ["branch", "--list", branch]).stdout)
+            assert payload["status"] == "ok"
+            assert payload["removed_record"]
+            assert payload["removed_directory"]
+            assert not payload["branch_deleted"]
+            assert not worktree_path.exists()
+            assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
+            assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
 
     def test_worktree_remove_locked_default_and_force_share_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -974,25 +1004,26 @@ class TestCliWorktree(CliRuntimeHarness):
             cases = (("locked-default", []), ("locked-force", ["--force"]))
             results: list[tuple[str, Path, subprocess.CompletedProcess[str], dict[str, object]]] = []
             for label, extra_args in cases:
+                case_label = f"remove_case={label}"
                 created = self._run_runtime_capture(target, ["worktree", "create", label], env=self._worktree_env(central_root))
-                self.assertEqual(created.returncode, 0, created.stderr)
+                assert created.returncode == 0, f"{case_label}: {created.stderr}"
                 worktree_path = central_root / "sample-repo" / f"sample-repo-{label}"
                 lock = self._run_git(target, ["worktree", "lock", str(worktree_path)], check=False)
                 if lock.returncode != 0:
-                    self.skipTest(f"git worktree lock unavailable: {lock.stderr}")
+                    pytest.skip(f"git worktree lock unavailable: {lock.stderr}")
 
                 listed = self._run_runtime_capture(target, ["worktree", "list", "--json"], env=self._worktree_env(central_root))
-                self.assertEqual(listed.returncode, 0, listed.stderr)
+                assert listed.returncode == 0, f"{case_label}: {listed.stderr}"
                 listed_payload = json.loads(listed.stdout)
                 listed_record = next(item for item in listed_payload["worktrees"] if item["id"] == label)
-                self.assertTrue(listed_record["removable"])
-                self.assertEqual(listed_record["remove_blockers"], [])
+                assert listed_record["removable"], case_label
+                assert listed_record["remove_blockers"] == [], case_label
 
                 shown = self._run_runtime_capture(target, ["worktree", "show", label, "--json"], env=self._worktree_env(central_root))
-                self.assertEqual(shown.returncode, 0, shown.stderr)
+                assert shown.returncode == 0, f"{case_label}: {shown.stderr}"
                 shown_record = json.loads(shown.stdout)["worktree"]
-                self.assertTrue(shown_record["removable"])
-                self.assertEqual(shown_record["remove_blockers"], [])
+                assert shown_record["removable"], case_label
+                assert shown_record["remove_blockers"] == [], case_label
 
                 removed = self._run_runtime_capture(
                     target,
@@ -1003,20 +1034,22 @@ class TestCliWorktree(CliRuntimeHarness):
 
             default_result = results[0][2]
             force_result = results[1][2]
-            self.assertEqual(default_result.returncode == 0, force_result.returncode == 0)
+            assert (default_result.returncode == 0) == (force_result.returncode == 0)
 
             if default_result.returncode == 0:
                 for _label, worktree_path, _removed, payload in results:
-                    self.assertEqual(payload["status"], "ok")
-                    self.assertTrue(payload["removed_record"])
-                    self.assertTrue(payload["removed_directory"])
-                    self.assertTrue(payload["resolved_target"]["removable"])
-                    self.assertEqual(payload["resolved_target"]["remove_blockers"], [])
-                    self.assertFalse(worktree_path.exists())
+                    case_label = f"remove_case={_label}"
+                    assert payload["status"] == "ok", case_label
+                    assert payload["removed_record"], case_label
+                    assert payload["removed_directory"], case_label
+                    assert payload["resolved_target"]["removable"], case_label
+                    assert payload["resolved_target"]["remove_blockers"] == [], case_label
+                    assert not worktree_path.exists(), case_label
             else:
                 for _label, worktree_path, _removed, payload in results:
-                    self.assertTrue(worktree_path.exists())
-                    self.assertEqual(payload["error"]["code"], "git_worktree_remove_failed")
+                    case_label = f"remove_case={_label}"
+                    assert worktree_path.exists(), case_label
+                    assert payload["error"]["code"] == "git_worktree_remove_failed", case_label
 
     def test_worktree_remove_rejects_branch_target_and_invalid_root_without_side_effects(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1025,7 +1058,7 @@ class TestCliWorktree(CliRuntimeHarness):
             target.mkdir()
             self._prepare_git_repo(target)
             created = self._run_runtime_capture(target, ["worktree", "create", "branchy"], env=self._worktree_env(central_root))
-            self.assertEqual(created.returncode, 0, created.stderr)
+            assert created.returncode == 0, created.stderr
             listed = self._run_runtime_capture(target, ["worktree", "list", "--json"], env=self._worktree_env(central_root))
             branchy = next(item for item in json.loads(listed.stdout)["worktrees"] if item["id"] == "branchy")
 
@@ -1034,11 +1067,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 ["worktree", "remove", branchy["branch"], "--json"],
                 env=self._worktree_env(central_root),
             )
-            self.assertNotEqual(branch_target.returncode, 0)
+            assert branch_target.returncode != 0
             branch_payload = json.loads(branch_target.stdout)
-            self.assertEqual(branch_payload["error"]["code"], "unsupported_branch_target")
-            self.assertTrue(Path(branchy["path"]).exists())
-            self.assertIn(branchy["path"], self._run_git(target, ["worktree", "list", "--porcelain"]).stdout)
+            assert branch_payload["error"]["code"] == "unsupported_branch_target"
+            assert Path(branchy["path"]).exists()
+            assert branchy["path"] in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
 
     def test_worktree_remove_rejects_main_and_delete_alias(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1052,15 +1085,15 @@ class TestCliWorktree(CliRuntimeHarness):
                 ["worktree", "remove", "main", "--force", "--json"],
                 env=self._worktree_env(central_root),
             )
-            self.assertNotEqual(main_remove.returncode, 0)
+            assert main_remove.returncode != 0
             payload = json.loads(main_remove.stdout)
-            self.assertEqual(payload["error"]["code"], "remove_blocked")
-            self.assertIn("main_worktree", payload["remove_blockers"])
-            self.assertTrue(target.exists())
+            assert payload["error"]["code"] == "remove_blocked"
+            assert "main_worktree" in payload["remove_blockers"]
+            assert target.exists()
 
             delete_alias = self._run_runtime_capture(target, ["worktree", "delete", "main"], env=self._worktree_env(central_root))
-            self.assertNotEqual(delete_alias.returncode, 0)
-            self.assertIn("invalid choice", delete_alias.stderr)
+            assert delete_alias.returncode != 0
+            assert "invalid choice" in delete_alias.stderr
 
     def test_worktree_remove_rejects_current_unmanaged_and_ambiguous_targets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1074,7 +1107,7 @@ class TestCliWorktree(CliRuntimeHarness):
             self._prepare_git_repo(target)
 
             first = self._run_runtime_capture(target, ["worktree", "create", "current"], env=self._worktree_env(central_root))
-            self.assertEqual(first.returncode, 0, first.stderr)
+            assert first.returncode == 0, first.stderr
             current_path = central_root / "sample-repo" / "sample-repo-current"
             env = self._worktree_env(central_root)
             current_remove = subprocess.run(
@@ -1084,14 +1117,14 @@ class TestCliWorktree(CliRuntimeHarness):
                 capture_output=True,
                 text=True,
             )
-            self.assertNotEqual(current_remove.returncode, 0)
+            assert current_remove.returncode != 0
             current_payload = json.loads(current_remove.stdout)
-            self.assertEqual(current_payload["error"]["code"], "remove_blocked")
-            self.assertIn("current_worktree", current_payload["remove_blockers"])
-            self.assertIn("managed_classification_available", current_payload["worktree"])
-            self.assertIn("classification_reason", current_payload["worktree"])
-            self.assertIn("origin", current_payload["worktree"])
-            self.assertTrue(current_path.exists())
+            assert current_payload["error"]["code"] == "remove_blocked"
+            assert "current_worktree" in current_payload["remove_blockers"]
+            assert "managed_classification_available" in current_payload["worktree"]
+            assert "classification_reason" in current_payload["worktree"]
+            assert "origin" in current_payload["worktree"]
+            assert current_path.exists()
 
             self._run_git(target, ["worktree", "add", "-b", "manual", str(unmanaged)])
             unmanaged_remove = self._run_runtime_capture(
@@ -1099,32 +1132,32 @@ class TestCliWorktree(CliRuntimeHarness):
                 ["worktree", "remove", unmanaged.name, "--json"],
                 env=self._worktree_env(central_root),
             )
-            self.assertEqual(unmanaged_remove.returncode, 0, unmanaged_remove.stderr)
+            assert unmanaged_remove.returncode == 0, unmanaged_remove.stderr
             unmanaged_payload = json.loads(unmanaged_remove.stdout)
-            self.assertEqual(unmanaged_payload["status"], "ok")
-            self.assertTrue(unmanaged_payload["removed_record"])
-            self.assertTrue(unmanaged_payload["removed_directory"])
-            self.assertFalse(unmanaged_payload["branch_deleted"])
-            self.assertFalse(unmanaged_payload["resolved_target"]["managed"])
-            self.assertTrue(unmanaged_payload["resolved_target"]["managed_classification_available"])
-            self.assertEqual(unmanaged_payload["resolved_target"]["classification_reason"], "root_valid")
-            self.assertEqual(unmanaged_payload["resolved_target"]["origin"], "external")
-            self.assertFalse(unmanaged.exists())
-            self.assertNotIn(str(unmanaged), self._run_git(target, ["worktree", "list", "--porcelain"]).stdout)
-            self.assertIn("manual", self._run_git(target, ["branch", "--list", "manual"]).stdout)
+            assert unmanaged_payload["status"] == "ok"
+            assert unmanaged_payload["removed_record"]
+            assert unmanaged_payload["removed_directory"]
+            assert not unmanaged_payload["branch_deleted"]
+            assert not unmanaged_payload["resolved_target"]["managed"]
+            assert unmanaged_payload["resolved_target"]["managed_classification_available"]
+            assert unmanaged_payload["resolved_target"]["classification_reason"] == "root_valid"
+            assert unmanaged_payload["resolved_target"]["origin"] == "external"
+            assert not unmanaged.exists()
+            assert str(unmanaged) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
+            assert "manual" in self._run_git(target, ["branch", "--list", "manual"]).stdout
 
             dupe_created = self._run_runtime_capture(target, ["worktree", "create", "dupe"], env=self._worktree_env(central_root))
-            self.assertEqual(dupe_created.returncode, 0, dupe_created.stderr)
+            assert dupe_created.returncode == 0, dupe_created.stderr
             self._run_git(target, ["worktree", "add", "-b", "dupe", str(duplicate)])
             stable_id_remove = self._run_runtime_capture(
                 target,
                 ["worktree", "remove", "dupe", "--json"],
                 env=self._worktree_env(central_root),
             )
-            self.assertEqual(stable_id_remove.returncode, 0, stable_id_remove.stderr)
+            assert stable_id_remove.returncode == 0, stable_id_remove.stderr
             stable_payload = json.loads(stable_id_remove.stdout)
-            self.assertEqual(stable_payload["resolved_target"]["id"], "dupe")
-            self.assertTrue(duplicate.exists())
+            assert stable_payload["resolved_target"]["id"] == "dupe"
+            assert duplicate.exists()
 
     def test_worktree_remove_external_paths_are_not_blocked_by_managed_namespace_containment(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1150,7 +1183,7 @@ class TestCliWorktree(CliRuntimeHarness):
             namespace.mkdir(parents=True)
             escaped.mkdir()
             if not self._can_create_symlink(Path(tmp)):
-                self.skipTest("symlink unavailable")
+                pytest.skip("symlink unavailable")
             symlink_path = namespace / "repo-escape"
             os.symlink(escaped, symlink_path)
             central_sentinel = central_root / "sentinel"
@@ -1205,12 +1238,12 @@ class TestCliWorktree(CliRuntimeHarness):
                 ports,
             )
 
-            self.assertTrue(result.removed_record)
-            self.assertEqual(git_gateway.remove_calls, [(symlink_path, True)])
-            self.assertFalse(os.path.lexists(symlink_path))
-            self.assertTrue(escaped.exists())
-            self.assertTrue(central_sentinel.exists())
-            self.assertTrue(namespace_sentinel.exists())
+            assert result.removed_record
+            assert git_gateway.remove_calls == [(symlink_path, True)]
+            assert not os.path.lexists(symlink_path)
+            assert escaped.exists()
+            assert central_sentinel.exists()
+            assert namespace_sentinel.exists()
 
             for target, record_path, force in (
                 (str(central_root), central_root, False),
@@ -1218,6 +1251,7 @@ class TestCliWorktree(CliRuntimeHarness):
                 (str(namespace), namespace, False),
                 (str(namespace), namespace, True),
             ):
+                case_label = f"target={target}, force={force}"
                 git_gateway = FakeGitGateway(
                     [
                         app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
@@ -1232,15 +1266,15 @@ class TestCliWorktree(CliRuntimeHarness):
                     filesystem_gateway=FakeFilesystemGateway(),
                 )
 
-                with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
+                with pytest.raises(app_contracts.WorktreeCommandError) as raised:
                     app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target=target, force=force), ports)
 
-                self.assertEqual(raised.exception.code, "remove_blocked")
-                self.assertIn("protected_cleanup_path", raised.exception.remove_blockers)
-                self.assertEqual(git_gateway.remove_calls, [])
-                self.assertTrue(record_path.exists())
-                self.assertTrue(central_sentinel.exists())
-                self.assertTrue(namespace_sentinel.exists())
+                assert raised.value.code == "remove_blocked", case_label
+                assert "protected_cleanup_path" in raised.value.remove_blockers, case_label
+                assert git_gateway.remove_calls == [], case_label
+                assert record_path.exists(), case_label
+                assert central_sentinel.exists(), case_label
+                assert namespace_sentinel.exists(), case_label
 
             ancestor_worktree = Path(tmp) / "ancestor-worktree"
             nested_central_root = ancestor_worktree / "worktrees"
@@ -1264,17 +1298,17 @@ class TestCliWorktree(CliRuntimeHarness):
             )
 
             for force in (False, True):
-                with self.subTest(target="ancestor_worktree", force=force):
-                    with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
-                        app_worktree.worktree_remove(
-                            app_contracts.WorktreeRemoveRequest(target=str(ancestor_worktree), force=force),
-                            ports,
-                        )
+                case_label = f"ancestor_force={force}"
+                with pytest.raises(app_contracts.WorktreeCommandError) as raised:
+                    app_worktree.worktree_remove(
+                        app_contracts.WorktreeRemoveRequest(target=str(ancestor_worktree), force=force),
+                        ports,
+                    )
 
-                    self.assertEqual(raised.exception.code, "remove_blocked")
-                    self.assertIn("protected_cleanup_path", raised.exception.remove_blockers)
-                    self.assertEqual(git_gateway.remove_calls, [])
-                    self.assertTrue(nested_sentinel.exists())
+                assert raised.value.code == "remove_blocked", case_label
+                assert "protected_cleanup_path" in raised.value.remove_blockers, case_label
+                assert git_gateway.remove_calls == [], case_label
+                assert nested_sentinel.exists(), case_label
 
             symlink_root = Path(tmp) / "central-with-symlink-namespace"
             symlink_root.mkdir()
@@ -1297,17 +1331,17 @@ class TestCliWorktree(CliRuntimeHarness):
             )
 
             for force in (False, True):
-                with self.subTest(target="namespace_symlink_record", force=force):
-                    with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
-                        app_worktree.worktree_remove(
-                            app_contracts.WorktreeRemoveRequest(target=str(namespace_symlink_record), force=force),
-                            ports,
-                        )
+                case_label = f"namespace_symlink_force={force}"
+                with pytest.raises(app_contracts.WorktreeCommandError) as raised:
+                    app_worktree.worktree_remove(
+                        app_contracts.WorktreeRemoveRequest(target=str(namespace_symlink_record), force=force),
+                        ports,
+                    )
 
-                    self.assertEqual(raised.exception.code, "remove_blocked")
-                    self.assertIn("protected_cleanup_path", raised.exception.remove_blockers)
-                    self.assertEqual(git_gateway.remove_calls, [])
-                    self.assertTrue(namespace_symlink_record.exists())
+                assert raised.value.code == "remove_blocked", case_label
+                assert "protected_cleanup_path" in raised.value.remove_blockers, case_label
+                assert git_gateway.remove_calls == [], case_label
+                assert namespace_symlink_record.exists(), case_label
 
     def test_worktree_remove_cleans_leftover_directory_and_reports_cleanup_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1373,10 +1407,10 @@ class TestCliWorktree(CliRuntimeHarness):
 
             result = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), ports)
 
-            self.assertTrue(result.removed_record)
-            self.assertTrue(result.removed_directory)
-            self.assertEqual(git_gateway.remove_calls, [(worktree_path, True)])
-            self.assertEqual(filesystem_gateway.remove_calls, [worktree_path])
+            assert result.removed_record
+            assert result.removed_directory
+            assert git_gateway.remove_calls == [(worktree_path, True)]
+            assert filesystem_gateway.remove_calls == [worktree_path]
 
             failing_fs = FakeFilesystemGateway(fail=True)
             failing_ports = app_ports.Ports(
@@ -1387,13 +1421,13 @@ class TestCliWorktree(CliRuntimeHarness):
                 filesystem_gateway=failing_fs,
             )
 
-            with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
+            with pytest.raises(app_contracts.WorktreeCommandError) as raised:
                 app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), failing_ports)
 
-            self.assertEqual(raised.exception.code, "post_remove_cleanup_failed")
-            self.assertTrue(raised.exception.removed_record)
-            self.assertFalse(raised.exception.removed_directory)
-            self.assertEqual(failing_fs.remove_calls, [worktree_path])
+            assert raised.value.code == "post_remove_cleanup_failed"
+            assert raised.value.removed_record
+            assert not raised.value.removed_directory
+            assert failing_fs.remove_calls == [worktree_path]
 
     def test_worktree_remove_git_failure_does_not_cleanup_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1451,11 +1485,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 filesystem_gateway=CleanupMustNotRun(),
             )
 
-            with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
+            with pytest.raises(app_contracts.WorktreeCommandError) as raised:
                 app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), ports)
 
-            self.assertEqual(raised.exception.code, "git_worktree_remove_failed")
-            self.assertEqual(git_gateway.remove_calls, [(worktree_path, True)])
+            assert raised.value.code == "git_worktree_remove_failed"
+            assert git_gateway.remove_calls == [(worktree_path, True)]
 
     def test_worktree_remove_locked_default_uses_force_equivalent_git_call(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1514,10 +1548,10 @@ class TestCliWorktree(CliRuntimeHarness):
 
             result = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="locked"), ports)
 
-            self.assertTrue(result.removed_record)
-            self.assertTrue(result.resolved_target.removable)
-            self.assertEqual(result.resolved_target.remove_blockers, [])
-            self.assertEqual(git_gateway.remove_calls, [(worktree_path, True)])
+            assert result.removed_record
+            assert result.resolved_target.removable
+            assert result.resolved_target.remove_blockers == []
+            assert git_gateway.remove_calls == [(worktree_path, True)]
 
     def test_worktree_remove_uses_target_only_cleanup_for_remaining_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1588,13 +1622,13 @@ class TestCliWorktree(CliRuntimeHarness):
 
             result = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), ports)
 
-            self.assertTrue(result.removed_record)
-            self.assertTrue(result.removed_directory)
-            self.assertEqual(git_gateway.remove_calls, [(worktree_path, True)])
-            self.assertEqual(filesystem_gateway.remove_calls, [worktree_path])
-            self.assertFalse(worktree_path.exists())
+            assert result.removed_record
+            assert result.removed_directory
+            assert git_gateway.remove_calls == [(worktree_path, True)]
+            assert filesystem_gateway.remove_calls == [worktree_path]
+            assert not worktree_path.exists()
             for sentinel in (parent_sentinel, root_sentinel, namespace_sentinel):
-                self.assertTrue(sentinel.exists())
+                assert sentinel.exists(), f"sentinel={sentinel.name}"
 
     def test_worktree_remove_reports_target_cleanup_failures(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1651,26 +1685,26 @@ class TestCliWorktree(CliRuntimeHarness):
                     raise RuntimeError(messages[self.mode])
 
             for mode in ("unsupported", "lstat", "unlink", "rmtree", "race"):
-                with self.subTest(mode=mode):
-                    ports = app_ports.Ports(
-                        node_reader=object(),
-                        repo_root=repo_root,
-                        git_gateway=FakeGitGateway(),
-                        environment_gateway=FakeEnvironmentGateway(),
-                        filesystem_gateway=FailingFilesystemGateway(mode),
-                    )
+                case_label = f"cleanup_mode={mode}"
+                ports = app_ports.Ports(
+                    node_reader=object(),
+                    repo_root=repo_root,
+                    git_gateway=FakeGitGateway(),
+                    environment_gateway=FakeEnvironmentGateway(),
+                    filesystem_gateway=FailingFilesystemGateway(mode),
+                )
 
-                    with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
-                        app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), ports)
+                with pytest.raises(app_contracts.WorktreeCommandError) as raised:
+                    app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), ports)
 
-                    self.assertEqual(raised.exception.code, "post_remove_cleanup_failed")
-                    self.assertTrue(raised.exception.removed_record)
-                    self.assertFalse(raised.exception.removed_directory)
+                assert raised.value.code == "post_remove_cleanup_failed", case_label
+                assert raised.value.removed_record, case_label
+                assert not raised.value.removed_directory, case_label
 
     def test_fs_remove_target_unlinks_symlink_broken_symlink_and_regular_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             if not self._can_create_symlink(Path(tmp)):
-                self.skipTest("symlink unavailable")
+                pytest.skip("symlink unavailable")
             runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
             sys_path_inserted = False
 
@@ -1695,18 +1729,18 @@ class TestCliWorktree(CliRuntimeHarness):
             regular_file = base / "target-file"
             regular_file.write_text("remove\n", encoding="utf-8")
 
-            self.assertTrue(fs_cli.path_exists(symlink_path))
-            self.assertTrue(fs_cli.path_exists(broken_symlink))
-            self.assertTrue(fs_cli.path_exists(regular_file))
+            assert fs_cli.path_exists(symlink_path)
+            assert fs_cli.path_exists(broken_symlink)
+            assert fs_cli.path_exists(regular_file)
 
             fs_cli.remove_target(symlink_path)
             fs_cli.remove_target(broken_symlink)
             fs_cli.remove_target(regular_file)
 
-            self.assertFalse(os.path.lexists(symlink_path))
-            self.assertFalse(os.path.lexists(broken_symlink))
-            self.assertFalse(regular_file.exists())
-            self.assertTrue(target_sentinel.exists())
+            assert not os.path.lexists(symlink_path)
+            assert not os.path.lexists(broken_symlink)
+            assert not regular_file.exists()
+            assert target_sentinel.exists()
 
     def test_fs_remove_target_reports_lstat_unlink_rmtree_and_unsupported_failures(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1723,34 +1757,34 @@ class TestCliWorktree(CliRuntimeHarness):
                     sys.path.pop(0)
 
             base = Path(tmp)
-            with self.assertRaises(RuntimeError) as missing:
+            with pytest.raises(RuntimeError) as missing:
                 fs_cli.remove_target(base / "missing")
-            self.assertIn("failed to inspect target path", str(missing.exception))
+            assert "failed to inspect target path" in str(missing.value)
 
             regular_file = base / "target-file"
             regular_file.write_text("remove\n", encoding="utf-8")
-            with mock.patch.object(Path, "unlink", side_effect=OSError("denied")):
-                with self.assertRaises(RuntimeError) as unlink_failed:
+            with _patch_object(Path, "unlink", side_effect=OSError("denied")):
+                with pytest.raises(RuntimeError) as unlink_failed:
                     fs_cli.remove_target(regular_file)
-            self.assertIn("failed to remove target path", str(unlink_failed.exception))
+            assert "failed to remove target path" in str(unlink_failed.value)
 
             target_dir = base / "target-dir"
             target_dir.mkdir()
-            with mock.patch.object(fs_cli.shutil, "rmtree", side_effect=OSError("denied")):
-                with self.assertRaises(RuntimeError) as rmtree_failed:
+            with _patch_object(fs_cli.shutil, "rmtree", side_effect=OSError("denied")):
+                with pytest.raises(RuntimeError) as rmtree_failed:
                     fs_cli.remove_target(target_dir)
-            self.assertIn("failed to remove directory tree", str(rmtree_failed.exception))
+            assert "failed to remove directory tree" in str(rmtree_failed.value)
 
             if not hasattr(os, "mkfifo"):
-                self.skipTest("mkfifo unavailable")
+                pytest.skip("mkfifo unavailable")
             fifo_path = base / "target-fifo"
             os.mkfifo(fifo_path)
             try:
-                with self.assertRaises(RuntimeError) as unsupported:
+                with pytest.raises(RuntimeError) as unsupported:
                     fs_cli.remove_target(fifo_path)
             finally:
                 fifo_path.unlink(missing_ok=True)
-            self.assertIn("unsupported target path type", str(unsupported.exception))
+            assert "unsupported target path type" in str(unsupported.value)
 
     def test_worktree_remove_ambiguous_basename_stops_before_git_remove(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1830,16 +1864,16 @@ class TestCliWorktree(CliRuntimeHarness):
                 filesystem_gateway=FakeFilesystemGateway(),
             )
 
-            with mock.patch.object(app_worktree, "_build_inventory", return_value=inventory):
-                with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
+            with _patch_object(app_worktree, "_build_inventory", return_value=inventory):
+                with pytest.raises(app_contracts.WorktreeCommandError) as raised:
                     app_worktree.worktree_remove(
                         app_contracts.WorktreeRemoveRequest(target="repo-first", force=True),
                         ports,
                     )
 
-            self.assertEqual(raised.exception.code, "ambiguous_target")
-            self.assertEqual(len(raised.exception.candidates), 2)
-            self.assertEqual(git_gateway.remove_calls, [])
+            assert raised.value.code == "ambiguous_target"
+            assert len(raised.value.candidates) == 2
+            assert git_gateway.remove_calls == []
 
     def test_worktree_remove_re_resolves_target_after_final_git_refresh(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1919,26 +1953,26 @@ class TestCliWorktree(CliRuntimeHarness):
                 ),
             )
             for label, refreshed_records, expected_code, expected_blocker in cases:
-                with self.subTest(label=label):
-                    git_gateway = FakeGitGateway(refreshed_records)
-                    ports = app_ports.Ports(
-                        node_reader=object(),
-                        repo_root=repo_root,
-                        git_gateway=git_gateway,
-                        environment_gateway=FakeEnvironmentGateway(),
-                        filesystem_gateway=FakeFilesystemGateway(),
+                case_label = f"refresh_case={label}"
+                git_gateway = FakeGitGateway(refreshed_records)
+                ports = app_ports.Ports(
+                    node_reader=object(),
+                    repo_root=repo_root,
+                    git_gateway=git_gateway,
+                    environment_gateway=FakeEnvironmentGateway(),
+                    filesystem_gateway=FakeFilesystemGateway(),
+                )
+
+                with pytest.raises(app_contracts.WorktreeCommandError) as raised:
+                    app_worktree.worktree_remove(
+                        app_contracts.WorktreeRemoveRequest(target="repo-managed", force=True),
+                        ports,
                     )
 
-                    with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
-                        app_worktree.worktree_remove(
-                            app_contracts.WorktreeRemoveRequest(target="repo-managed", force=True),
-                            ports,
-                        )
-
-                    self.assertEqual(raised.exception.code, expected_code)
-                    if expected_blocker is not None:
-                        self.assertIn(expected_blocker, raised.exception.remove_blockers)
-                    self.assertEqual(git_gateway.remove_calls, [])
+                assert raised.value.code == expected_code, case_label
+                if expected_blocker is not None:
+                    assert expected_blocker in raised.value.remove_blockers, case_label
+                assert git_gateway.remove_calls == [], case_label
 
     def test_worktree_remove_hard_blockers_stop_before_git_remove_even_with_force(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2010,31 +2044,31 @@ class TestCliWorktree(CliRuntimeHarness):
             )
             for label, target, records_by_call, expected_blocker in cases:
                 for force in (False, True):
-                    with self.subTest(label=label, force=force):
-                        git_gateway = FakeGitGateway(records_by_call)
-                        repo_for_case = managed if label == "current" else repo_root
-                        ports = app_ports.Ports(
-                            node_reader=object(),
-                            repo_root=repo_for_case,
-                            git_gateway=git_gateway,
-                            environment_gateway=FakeEnvironmentGateway(),
-                            filesystem_gateway=FakeFilesystemGateway(),
+                    case_label = f"blocker_case={label}, force={force}"
+                    git_gateway = FakeGitGateway(records_by_call)
+                    repo_for_case = managed if label == "current" else repo_root
+                    ports = app_ports.Ports(
+                        node_reader=object(),
+                        repo_root=repo_for_case,
+                        git_gateway=git_gateway,
+                        environment_gateway=FakeEnvironmentGateway(),
+                        filesystem_gateway=FakeFilesystemGateway(),
+                    )
+
+                    with pytest.raises(app_contracts.WorktreeCommandError) as raised:
+                        app_worktree.worktree_remove(
+                            app_contracts.WorktreeRemoveRequest(target=target, force=force),
+                            ports,
                         )
 
-                        with self.assertRaises(app_contracts.WorktreeCommandError) as raised:
-                            app_worktree.worktree_remove(
-                                app_contracts.WorktreeRemoveRequest(target=target, force=force),
-                                ports,
-                            )
-
-                        self.assertEqual(raised.exception.code, "remove_blocked")
-                        self.assertIn(expected_blocker, raised.exception.remove_blockers)
-                        self.assertEqual(git_gateway.remove_calls, [])
+                    assert raised.value.code == "remove_blocked", case_label
+                    assert expected_blocker in raised.value.remove_blockers, case_label
+                    assert git_gateway.remove_calls == [], case_label
 
     def test_worktree_remove_treats_broken_symlink_target_as_existing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             if not self._can_create_symlink(Path(tmp)):
-                self.skipTest("symlink unavailable")
+                pytest.skip("symlink unavailable")
             runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
             sys_path_inserted = False
 
@@ -2092,11 +2126,11 @@ class TestCliWorktree(CliRuntimeHarness):
 
             result = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target=str(broken)), ports)
 
-            self.assertTrue(result.removed_record)
-            self.assertTrue(result.resolved_target.path_exists)
-            self.assertEqual(result.resolved_target.remove_blockers, [])
-            self.assertEqual(git_gateway.remove_calls, [broken])
-            self.assertFalse(os.path.lexists(broken))
+            assert result.removed_record
+            assert result.resolved_target.path_exists
+            assert result.resolved_target.remove_blockers == []
+            assert git_gateway.remove_calls == [broken]
+            assert not os.path.lexists(broken)
 
     def test_worktree_invalid_root_reads_git_records_before_classification(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2157,31 +2191,31 @@ class TestCliWorktree(CliRuntimeHarness):
                 (str(root_file), "root_invalid"),
             )
             for value, expected_reason in cases:
-                with self.subTest(value=value):
-                    git_gateway = FakeGitGateway()
-                    ports = app_ports.Ports(
-                        node_reader=object(),
-                        repo_root=repo_root,
-                        git_gateway=git_gateway,
-                        environment_gateway=FakeEnvironmentGateway(value),
-                        filesystem_gateway=FakeFilesystemGateway(),
-                    )
+                case_label = f"root_value={value!r}"
+                git_gateway = FakeGitGateway()
+                ports = app_ports.Ports(
+                    node_reader=object(),
+                    repo_root=repo_root,
+                    git_gateway=git_gateway,
+                    environment_gateway=FakeEnvironmentGateway(value),
+                    filesystem_gateway=FakeFilesystemGateway(),
+                )
 
-                    listed = app_worktree.worktree_list(app_contracts.WorktreeListRequest(), ports)
-                    shown = app_worktree.worktree_show(app_contracts.WorktreeShowRequest(target="manual"), ports)
-                    removed = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="manual"), ports)
+                listed = app_worktree.worktree_list(app_contracts.WorktreeListRequest(), ports)
+                shown = app_worktree.worktree_show(app_contracts.WorktreeShowRequest(target="manual"), ports)
+                removed = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="manual"), ports)
 
-                    self.assertEqual(git_gateway.calls, 4)
-                    self.assertEqual(git_gateway.remove_calls, [manual])
-                    for worktree in listed.worktrees:
-                        self.assertFalse(worktree.managed)
-                        self.assertFalse(worktree.managed_classification_available)
-                        self.assertEqual(worktree.classification_reason, expected_reason)
-                        self.assertEqual(worktree.origin, "classification_unavailable")
-                    self.assertEqual(shown.worktree.path, manual)
-                    self.assertEqual(shown.worktree.classification_reason, expected_reason)
-                    self.assertTrue(removed.removed_record)
-                    self.assertEqual(removed.resolved_target.classification_reason, expected_reason)
+                assert git_gateway.calls == 4, case_label
+                assert git_gateway.remove_calls == [manual], case_label
+                for worktree in listed.worktrees:
+                    assert not worktree.managed, case_label
+                    assert not worktree.managed_classification_available, case_label
+                    assert worktree.classification_reason == expected_reason, case_label
+                    assert worktree.origin == "classification_unavailable", case_label
+                assert shown.worktree.path == manual, case_label
+                assert shown.worktree.classification_reason == expected_reason, case_label
+                assert removed.removed_record, case_label
+                assert removed.resolved_target.classification_reason == expected_reason, case_label
 
     def test_worktree_inventory_reports_stale_records_and_duplicate_ids(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2234,15 +2268,15 @@ class TestCliWorktree(CliRuntimeHarness):
             result = app_worktree.worktree_list(app_contracts.WorktreeListRequest(), ports)
 
             ids = [item.id for item in result.worktrees]
-            self.assertEqual(len(ids), len(set(ids)))
-            self.assertIn("dupe", ids)
-            self.assertIn("dupe~2", ids)
+            assert len(ids) == len(set(ids))
+            assert "dupe" in ids
+            assert "dupe~2" in ids
             stale_view = next(item for item in result.worktrees if item.id == "stale")
-            self.assertFalse(stale_view.path_exists)
-            self.assertTrue(stale_view.record_exists)
-            self.assertIn("path_missing", stale_view.remove_blockers)
+            assert not stale_view.path_exists
+            assert stale_view.record_exists
+            assert "path_missing" in stale_view.remove_blockers
 
             shown = app_worktree.worktree_show(app_contracts.WorktreeShowRequest(target="dupe~2"), ports)
-            self.assertEqual(shown.worktree.path, duplicate_b)
+            assert shown.worktree.path == duplicate_b
             unsuffixed = app_worktree.worktree_show(app_contracts.WorktreeShowRequest(target="dupe"), ports)
-            self.assertEqual(unsuffixed.worktree.path, duplicate_a)
+            assert unsuffixed.worktree.path == duplicate_a

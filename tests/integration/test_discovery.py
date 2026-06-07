@@ -1,20 +1,18 @@
 from pathlib import Path
-import unittest
+
+import pytest
 
 
-class IntegrationDiscoverySmokeTest(unittest.TestCase):
-    def test_integration_package_markers_exist(self) -> None:
+@pytest.mark.parametrize(
+    "relative_path",
+    (
+        "integration",
+        "integration/git_remote",
+        "integration/github",
+    ),
+)
+class TestIntegrationDiscoverySmoke:
+    def test_integration_package_markers_exist(self, relative_path: str) -> None:
         tests_root = Path(__file__).resolve().parents[1]
-
-        for relative_path in (
-            "integration",
-            "integration/git_remote",
-            "integration/github",
-        ):
-            marker = tests_root / relative_path / "__init__.py"
-            with self.subTest(path=relative_path):
-                self.assertTrue(marker.is_file())
-
-
-if __name__ == "__main__":
-    unittest.main()
+        marker = tests_root / relative_path / "__init__.py"
+        assert marker.is_file(), f"missing package marker for path={relative_path}"

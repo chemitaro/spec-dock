@@ -1,7 +1,8 @@
 import ast
 import sys
-import unittest
 from pathlib import Path
+
+import pytest
 
 
 def _runtime_modules():
@@ -167,7 +168,7 @@ def _issue_status_snapshot(
     )
 
 
-class TestRuntimeDomainS03(unittest.TestCase):
+class TestRuntimeDomainS03:
     def test_validate_graph_rejects_local_only_initiative_under_github_mandatory_contract(self) -> None:
         domain_models, domain_tree, domain_validation = _runtime_validation_modules()
         graph = domain_tree.build_graph(
@@ -189,8 +190,8 @@ class TestRuntimeDomainS03(unittest.TestCase):
 
         report = domain_validation.validate_graph(graph, repo_root=Path("/repo"))
 
-        self.assertTrue(report.errors)
-        self.assertIn("initiative missing github.issue_number", report.errors[0])
+        assert report.errors
+        assert "initiative missing github.issue_number" in report.errors[0]
 
     def test_validate_graph_rejects_legacy_unscoped_issue_linkage(self) -> None:
         domain_models, domain_tree, domain_validation = _runtime_validation_modules()
@@ -245,8 +246,8 @@ class TestRuntimeDomainS03(unittest.TestCase):
 
         report = domain_validation.validate_graph(graph, repo_root=Path("/repo"))
 
-        self.assertTrue(report.errors)
-        self.assertIn("legacy unscoped github linkage", report.errors[0])
+        assert report.errors
+        assert "legacy unscoped github linkage" in report.errors[0]
 
     def test_validate_graph_rejects_partially_scoped_issue_linkage(self) -> None:
         domain_models, domain_tree, domain_validation = _runtime_validation_modules()
@@ -259,62 +260,62 @@ class TestRuntimeDomainS03(unittest.TestCase):
             {"github_repo_owner": "example", "github_repo_name": ""},
             {"github_repo_owner": "example", "github_repo_name": "   "},
         ):
-            with self.subTest(github_fields=github_fields):
-                graph = domain_tree.build_graph(
-                    [
-                        domain_models.SpecNodeSeed(
-                            kind="initiative",
-                            id="init-00001",
-                            title="Platform",
-                            slug="platform",
-                            path=Path("/repo/spec-dock/initiatives/init-00001-platform"),
-                            meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/.meta.json"),
-                            parent_id=None,
-                            initiative_id=None,
-                            epic_id=None,
-                            github_issue_number=1,
-                            github_repo_owner="example",
-                            github_repo_name="repo",
+            case = f"github_fields={github_fields!r}"
+            graph = domain_tree.build_graph(
+                [
+                    domain_models.SpecNodeSeed(
+                        kind="initiative",
+                        id="init-00001",
+                        title="Platform",
+                        slug="platform",
+                        path=Path("/repo/spec-dock/initiatives/init-00001-platform"),
+                        meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/.meta.json"),
+                        parent_id=None,
+                        initiative_id=None,
+                        epic_id=None,
+                        github_issue_number=1,
+                        github_repo_owner="example",
+                        github_repo_name="repo",
+                    ),
+                    domain_models.SpecNodeSeed(
+                        kind="epic",
+                        id="epic-00002",
+                        title="Delivery",
+                        slug="delivery",
+                        path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery"),
+                        meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/.meta.json"),
+                        parent_id="init-00001",
+                        initiative_id="init-00001",
+                        epic_id=None,
+                        github_issue_number=2,
+                        github_repo_owner="example",
+                        github_repo_name="repo",
+                    ),
+                    domain_models.SpecNodeSeed(
+                        kind="issue",
+                        id="iss-00003",
+                        title="Current issue",
+                        slug="current-issue",
+                        path=Path(
+                            "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue"
                         ),
-                        domain_models.SpecNodeSeed(
-                            kind="epic",
-                            id="epic-00002",
-                            title="Delivery",
-                            slug="delivery",
-                            path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery"),
-                            meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/.meta.json"),
-                            parent_id="init-00001",
-                            initiative_id="init-00001",
-                            epic_id=None,
-                            github_issue_number=2,
-                            github_repo_owner="example",
-                            github_repo_name="repo",
+                        meta_path=Path(
+                            "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue/.meta.json"
                         ),
-                        domain_models.SpecNodeSeed(
-                            kind="issue",
-                            id="iss-00003",
-                            title="Current issue",
-                            slug="current-issue",
-                            path=Path(
-                                "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue"
-                            ),
-                            meta_path=Path(
-                                "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue/.meta.json"
-                            ),
-                            parent_id="epic-00002",
-                            initiative_id="init-00001",
-                            epic_id="epic-00002",
-                            github_issue_number=3,
-                            **github_fields,
-                        ),
-                    ]
-                )
+                        parent_id="epic-00002",
+                        initiative_id="init-00001",
+                        epic_id="epic-00002",
+                        github_issue_number=3,
+                        **github_fields,
+                    ),
+                ]
+            )
 
-                report = domain_validation.validate_graph(graph, repo_root=Path("/repo"))
+            report = domain_validation.validate_graph(graph, repo_root=Path("/repo"))
 
-                self.assertTrue(report.errors)
-                self.assertIn("invalid github linkage", report.errors[0])
-                self.assertIn("github.repo_owner and github.repo_name must be provided together", report.errors[0])
+            assert report.errors, case
+            assert "invalid github linkage" in report.errors[0], case
+            assert "github.repo_owner and github.repo_name must be provided together" in report.errors[0], case
 
     def test_validate_graph_relaxed_mode_still_rejects_partially_scoped_issue_linkage(self) -> None:
         domain_models, domain_tree, domain_validation = _runtime_validation_modules()
@@ -323,66 +324,66 @@ class TestRuntimeDomainS03(unittest.TestCase):
             {"github_repo_owner": "example", "github_repo_name": None},
             {"github_repo_owner": "   ", "github_repo_name": "repo"},
         ):
-            with self.subTest(github_fields=github_fields):
-                graph = domain_tree.build_graph(
-                    [
-                        domain_models.SpecNodeSeed(
-                            kind="initiative",
-                            id="init-00001",
-                            title="Platform",
-                            slug="platform",
-                            path=Path("/repo/spec-dock/initiatives/init-00001-platform"),
-                            meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/.meta.json"),
-                            parent_id=None,
-                            initiative_id=None,
-                            epic_id=None,
-                            github_issue_number=1,
-                            github_repo_owner="example",
-                            github_repo_name="repo",
+            case = f"github_fields={github_fields!r}"
+            graph = domain_tree.build_graph(
+                [
+                    domain_models.SpecNodeSeed(
+                        kind="initiative",
+                        id="init-00001",
+                        title="Platform",
+                        slug="platform",
+                        path=Path("/repo/spec-dock/initiatives/init-00001-platform"),
+                        meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/.meta.json"),
+                        parent_id=None,
+                        initiative_id=None,
+                        epic_id=None,
+                        github_issue_number=1,
+                        github_repo_owner="example",
+                        github_repo_name="repo",
+                    ),
+                    domain_models.SpecNodeSeed(
+                        kind="epic",
+                        id="epic-00002",
+                        title="Delivery",
+                        slug="delivery",
+                        path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery"),
+                        meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/.meta.json"),
+                        parent_id="init-00001",
+                        initiative_id="init-00001",
+                        epic_id=None,
+                        github_issue_number=2,
+                        github_repo_owner="example",
+                        github_repo_name="repo",
+                    ),
+                    domain_models.SpecNodeSeed(
+                        kind="issue",
+                        id="iss-00003",
+                        title="Current issue",
+                        slug="current-issue",
+                        path=Path(
+                            "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue"
                         ),
-                        domain_models.SpecNodeSeed(
-                            kind="epic",
-                            id="epic-00002",
-                            title="Delivery",
-                            slug="delivery",
-                            path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery"),
-                            meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/.meta.json"),
-                            parent_id="init-00001",
-                            initiative_id="init-00001",
-                            epic_id=None,
-                            github_issue_number=2,
-                            github_repo_owner="example",
-                            github_repo_name="repo",
+                        meta_path=Path(
+                            "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue/.meta.json"
                         ),
-                        domain_models.SpecNodeSeed(
-                            kind="issue",
-                            id="iss-00003",
-                            title="Current issue",
-                            slug="current-issue",
-                            path=Path(
-                                "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue"
-                            ),
-                            meta_path=Path(
-                                "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue/.meta.json"
-                            ),
-                            parent_id="epic-00002",
-                            initiative_id="init-00001",
-                            epic_id="epic-00002",
-                            github_issue_number=3,
-                            **github_fields,
-                        ),
-                    ]
-                )
+                        parent_id="epic-00002",
+                        initiative_id="init-00001",
+                        epic_id="epic-00002",
+                        github_issue_number=3,
+                        **github_fields,
+                    ),
+                ]
+            )
 
-                report = domain_validation.validate_graph(
-                    graph,
-                    repo_root=Path("/repo"),
-                    enforce_github_mandatory_linkage=False,
-                )
+            report = domain_validation.validate_graph(
+                graph,
+                repo_root=Path("/repo"),
+                enforce_github_mandatory_linkage=False,
+            )
 
-                self.assertTrue(report.errors)
-                self.assertIn("invalid github linkage", report.errors[0])
-                self.assertIn("github.repo_owner and github.repo_name must be provided together", report.errors[0])
+            assert report.errors, case
+            assert "invalid github linkage" in report.errors[0], case
+            assert "github.repo_owner and github.repo_name must be provided together" in report.errors[0], case
 
     def test_validate_graph_allows_explicit_foreign_issue_linkage(self) -> None:
         domain_models, domain_tree, domain_validation = _runtime_validation_modules()
@@ -439,7 +440,7 @@ class TestRuntimeDomainS03(unittest.TestCase):
 
         report = domain_validation.validate_graph(graph, repo_root=Path("/repo"))
 
-        self.assertEqual(report.errors, [])
+        assert report.errors == []
 
     def _branch_inference_overlap_graph(self):
         _domain_deps, domain_models, _domain_status, domain_tree = _runtime_modules()
@@ -651,10 +652,10 @@ class TestRuntimeDomainS03(unittest.TestCase):
             current_repo_slug="current/repo",
         )
 
-        self.assertIsNotNone(node)
         assert node is not None
-        self.assertEqual(node.id, "iss-local-00001")
-        self.assertEqual(reason, "matched github.issue_number=123 from branch")
+        assert node is not None
+        assert node.id == "iss-local-00001"
+        assert reason == "matched github.issue_number=123 from branch"
 
     def test_infer_active_node_from_branch_keeps_fail_closed_when_current_repo_unknown(self) -> None:
         domain_active = _runtime_active_module()
@@ -666,11 +667,8 @@ class TestRuntimeDomainS03(unittest.TestCase):
             current_repo_slug=None,
         )
 
-        self.assertIsNone(node)
-        self.assertEqual(
-            reason,
-            "ambiguous github issue numbers [123]: issue:iss-local-00001, issue:iss-local-00002",
-        )
+        assert node is None
+        assert reason == "ambiguous github issue numbers [123]: issue:iss-local-00001, issue:iss-local-00002"
 
     def test_infer_active_node_from_branch_keeps_explicit_id_priority_over_numeric_fallback(self) -> None:
         domain_active = _runtime_active_module()
@@ -682,10 +680,10 @@ class TestRuntimeDomainS03(unittest.TestCase):
             current_repo_slug="current/repo",
         )
 
-        self.assertIsNotNone(node)
         assert node is not None
-        self.assertEqual(node.id, "iss-local-00002")
-        self.assertEqual(reason, "matched id in branch: iss-local-00002")
+        assert node is not None
+        assert node.id == "iss-local-00002"
+        assert reason == "matched id in branch: iss-local-00002"
 
     def test_infer_active_node_from_branch_fails_closed_on_foreign_only_numeric_match_with_known_scope(self) -> None:
         domain_active = _runtime_active_module()
@@ -697,13 +695,10 @@ class TestRuntimeDomainS03(unittest.TestCase):
             current_repo_slug="current/repo",
         )
 
-        self.assertIsNone(node)
-        self.assertEqual(
-            reason,
-            (
-                "no current-repo matches for github issue numbers [123] "
-                "in scope (current/repo); refusing foreign fallback: issue:iss-local-00001"
-            ),
+        assert node is None
+        assert reason == (
+            "no current-repo matches for github issue numbers [123] "
+            "in scope (current/repo); refusing foreign fallback: issue:iss-local-00001"
         )
 
     def test_infer_active_node_from_branch_fails_closed_on_scoped_numeric_ambiguity(self) -> None:
@@ -716,13 +711,10 @@ class TestRuntimeDomainS03(unittest.TestCase):
             current_repo_slug="current/repo",
         )
 
-        self.assertIsNone(node)
-        self.assertEqual(
-            reason,
-            (
-                "ambiguous github issue numbers [123] in current repo scope (current/repo): "
-                "issue:iss-local-00001, issue:iss-local-00002"
-            ),
+        assert node is None
+        assert reason == (
+            "ambiguous github issue numbers [123] in current repo scope (current/repo): "
+            "issue:iss-local-00001, issue:iss-local-00002"
         )
 
     def test_resolve_issue_statuses_selects_source(self) -> None:
@@ -751,14 +743,14 @@ class TestRuntimeDomainS03(unittest.TestCase):
             issue_snapshots=snapshots,
             cached_issue_status_by_id=cached,
         )
-        self.assertEqual(github_statuses["iss-local-00001"].authority, "github")
-        self.assertEqual(github_statuses["iss-local-00001"].effective_status, "done")
-        self.assertEqual(github_statuses["iss-local-00001"].source, "github")
-        self.assertFalse(github_statuses["iss-local-00001"].stale)
-        self.assertEqual(github_statuses["iss-local-00001"].last_sync_at, "2026-01-01T00:00:00Z")
-        self.assertEqual(github_statuses["iss-local-00002"].effective_status, "unknown")
-        self.assertEqual(github_statuses["iss-local-00002"].source, "unknown")
-        self.assertTrue(github_statuses["iss-local-00002"].stale)
+        assert github_statuses["iss-local-00001"].authority == "github"
+        assert github_statuses["iss-local-00001"].effective_status == "done"
+        assert github_statuses["iss-local-00001"].source == "github"
+        assert not github_statuses["iss-local-00001"].stale
+        assert github_statuses["iss-local-00001"].last_sync_at == "2026-01-01T00:00:00Z"
+        assert github_statuses["iss-local-00002"].effective_status == "unknown"
+        assert github_statuses["iss-local-00002"].source == "unknown"
+        assert github_statuses["iss-local-00002"].stale
 
         cache_statuses = domain_status.resolve_issue_statuses(
             graph,
@@ -766,13 +758,13 @@ class TestRuntimeDomainS03(unittest.TestCase):
             issue_snapshots=snapshots,
             cached_issue_status_by_id=cached,
         )
-        self.assertEqual(cache_statuses["iss-local-00001"].authority, "github")
-        self.assertEqual(cache_statuses["iss-local-00001"].effective_status, "open")
-        self.assertEqual(cache_statuses["iss-local-00001"].source, "cache")
-        self.assertTrue(cache_statuses["iss-local-00001"].stale)
-        self.assertEqual(cache_statuses["iss-local-00002"].effective_status, "done")
-        self.assertEqual(cache_statuses["iss-local-00002"].source, "cache")
-        self.assertTrue(cache_statuses["iss-local-00002"].stale)
+        assert cache_statuses["iss-local-00001"].authority == "github"
+        assert cache_statuses["iss-local-00001"].effective_status == "open"
+        assert cache_statuses["iss-local-00001"].source == "cache"
+        assert cache_statuses["iss-local-00001"].stale
+        assert cache_statuses["iss-local-00002"].effective_status == "done"
+        assert cache_statuses["iss-local-00002"].source == "cache"
+        assert cache_statuses["iss-local-00002"].stale
 
     def test_build_progress_map_aggregates_counts(self) -> None:
         _domain_deps, domain_models, domain_status, domain_tree = _runtime_modules()
@@ -806,9 +798,9 @@ class TestRuntimeDomainS03(unittest.TestCase):
         }
 
         progress = domain_status.build_progress_map(graph, issue_statuses)
-        self.assertEqual(progress.by_node_id["epic-local-00001"], {"total": 3, "done": 1, "open": 1, "unknown": 1})
-        self.assertEqual(progress.by_node_id["init-local-00001"], {"total": 3, "done": 1, "open": 1, "unknown": 1})
-        self.assertEqual(progress.counts, {"total": 3, "done": 1, "open": 1, "unknown": 1})
+        assert progress.by_node_id["epic-local-00001"] == {"total": 3, "done": 1, "open": 1, "unknown": 1}
+        assert progress.by_node_id["init-local-00001"] == {"total": 3, "done": 1, "open": 1, "unknown": 1}
+        assert progress.counts == {"total": 3, "done": 1, "open": 1, "unknown": 1}
 
     def test_resolve_issue_statuses_local_only_is_deterministic_open(self) -> None:
         _domain_deps, domain_models, domain_status, domain_tree = _runtime_modules()
@@ -866,11 +858,11 @@ class TestRuntimeDomainS03(unittest.TestCase):
             cached_issue_status_by_id={},
         )
         issue = statuses["iss-local-00001"]
-        self.assertEqual(issue.authority, "local")
-        self.assertEqual(issue.effective_status, "open")
-        self.assertEqual(issue.source, "local")
-        self.assertFalse(issue.stale)
-        self.assertIsNone(issue.last_sync_at)
+        assert issue.authority == "local"
+        assert issue.effective_status == "open"
+        assert issue.source == "local"
+        assert not issue.stale
+        assert issue.last_sync_at is None
 
     def test_build_effective_deps_map_merges_parent_dependencies(self) -> None:
         domain_deps, domain_models, _domain_status, domain_tree = _runtime_modules()
@@ -883,7 +875,7 @@ class TestRuntimeDomainS03(unittest.TestCase):
         }
 
         effective = domain_deps.build_effective_deps_map(graph, issue_depends_on_map)
-        self.assertEqual(effective["iss-local-00003"], ["iss-local-00001", "iss-local-00002"])
+        assert effective["iss-local-00003"] == ["iss-local-00001", "iss-local-00002"]
 
     def test_evaluate_readiness_uses_explicit_issue_depends_on_map(self) -> None:
         domain_deps, domain_models, _domain_status, domain_tree = _runtime_modules()
@@ -924,11 +916,11 @@ class TestRuntimeDomainS03(unittest.TestCase):
             domain_models.NodeId("iss-local-00003"),
             issue_statuses,
         )
-        self.assertFalse(result.ready)
-        self.assertEqual(result.guard_reason, "blocked")
-        self.assertEqual(result.blockers, ["iss-local-00001", "iss-local-00002"])
-        self.assertEqual(result.blockers_top, ["iss-local-00001", "iss-local-00002"])
-        self.assertEqual(result.closure, ["iss-local-00001", "iss-local-00002"])
+        assert not result.ready
+        assert result.guard_reason == "blocked"
+        assert result.blockers == ["iss-local-00001", "iss-local-00002"]
+        assert result.blockers_top == ["iss-local-00001", "iss-local-00002"]
+        assert result.closure == ["iss-local-00001", "iss-local-00002"]
 
     def test_evaluate_readiness_reports_unknown_guard_reason(self) -> None:
         domain_deps, domain_models, _domain_status, domain_tree = _runtime_modules()
@@ -969,8 +961,8 @@ class TestRuntimeDomainS03(unittest.TestCase):
             domain_models.NodeId("iss-local-00003"),
             issue_statuses,
         )
-        self.assertFalse(result.ready)
-        self.assertEqual(result.guard_reason, "unknown")
+        assert not result.ready
+        assert result.guard_reason == "unknown"
 
     def test_inspect_target_deps_active_decoration_only(self) -> None:
         domain_deps, domain_models, _domain_status, domain_tree = _runtime_modules()
@@ -1020,19 +1012,16 @@ class TestRuntimeDomainS03(unittest.TestCase):
             active_issue_id="iss-local-00001",
         )
 
-        self.assertEqual(without_active.evaluation, with_active.evaluation)
-        self.assertNotEqual(
-            without_active.node_states["iss-local-00001"].status,
-            with_active.node_states["iss-local-00001"].status,
-        )
-        self.assertEqual(with_active.node_states["iss-local-00001"].status, "doing")
+        assert without_active.evaluation == with_active.evaluation
+        assert without_active.node_states["iss-local-00001"].status != with_active.node_states["iss-local-00001"].status
+        assert with_active.node_states["iss-local-00001"].status == "doing"
 
     def test_build_deps_state_and_cycle_validation(self) -> None:
         domain_deps, domain_models, _domain_status, domain_tree = _runtime_modules()
 
         graph = _shared_graph(domain_models, domain_tree)
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             domain_deps.validate_deps_cycles(
                 {
                     "iss-local-00001": ["iss-local-00002"],
@@ -1078,12 +1067,12 @@ class TestRuntimeDomainS03(unittest.TestCase):
             ),
             warnings=["gh_index_incomplete"],
         )
-        self.assertEqual(state.warnings, ["gh_index_incomplete"])
+        assert state.warnings == ["gh_index_incomplete"]
         by_id = {node.node_id: node for node in state.nodes}
-        self.assertEqual(by_id["iss-local-00001"].status, "doing")
-        self.assertTrue(by_id["iss-local-00001"].ready)
-        self.assertEqual(by_id["iss-local-00003"].status, "blocked")
-        self.assertFalse(by_id["iss-local-00003"].ready)
+        assert by_id["iss-local-00001"].status == "doing"
+        assert by_id["iss-local-00001"].ready
+        assert by_id["iss-local-00003"].status == "blocked"
+        assert not by_id["iss-local-00003"].ready
 
     def test_domain_modules_have_no_shell_io_imports(self) -> None:
         domain_deps, _domain_models, domain_status, _domain_tree = _runtime_modules()
@@ -1108,13 +1097,9 @@ class TestRuntimeDomainS03(unittest.TestCase):
                 if isinstance(node, ast.Import):
                     for alias in node.names:
                         root = alias.name.split(".", 1)[0]
-                        self.assertNotIn(root, forbidden_import_roots, f"Forbidden import '{root}' in {module_path}")
+                        assert root not in forbidden_import_roots, f"Forbidden import '{root}' in {module_path}"
                 elif isinstance(node, ast.ImportFrom):
                     if node.module is None:
                         continue
                     root = node.module.split(".", 1)[0]
-                    self.assertNotIn(root, forbidden_import_roots, f"Forbidden import '{root}' in {module_path}")
-
-
-if __name__ == "__main__":
-    unittest.main()
+                    assert root not in forbidden_import_roots, f"Forbidden import '{root}' in {module_path}"

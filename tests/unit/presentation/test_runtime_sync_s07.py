@@ -5,9 +5,10 @@ import json
 import os
 import sys
 import tempfile
-import unittest
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 _REQUIRED_NODE_DOCS = ("requirement.md", "design.md", "plan.md", "report.md")
 
@@ -265,7 +266,7 @@ class _LegacySyncRunner:
         return self.result
 
 
-class TestRuntimeSyncS07(unittest.TestCase):
+class TestRuntimeSyncS07:
     def _materialize_required_artifacts(self, records) -> None:
         for record in records:
             node_dir = Path(record.path)
@@ -504,18 +505,12 @@ class TestRuntimeSyncS07(unittest.TestCase):
             state = app_sync_state.collect_sync_state(self._request(app_contracts), ports)
             sources = app_sync_state._collect_adr_mirror_sources(state.graph)
 
-            self.assertEqual(
-                {source.source_path for source in sources},
-                {initiative_doc, epic_doc, issue_doc},
-            )
-            self.assertEqual(
-                {source.basename for source in sources},
-                {
+            assert {source.source_path for source in sources} == {initiative_doc, epic_doc, issue_doc}
+            assert {source.basename for source in sources} == {
                     "20260312t010203z-adr-init-decision.md",
                     "20260312t010204z-adr-epic-decision.md",
                     "20260312t010205z-01-adr-issue-decision.md",
-                },
-            )
+            }
 
     def test_sync_fails_before_write_on_adr_mirror_basename_collision_and_preserves_adrs(self) -> None:
         (
@@ -572,19 +567,19 @@ class TestRuntimeSyncS07(unittest.TestCase):
 
             result = app_sync_state.sync(self._request(app_contracts, update_active=True), ports)
 
-            self.assertFalse(spy_writer.called)
-            self.assertIsNotNone(result.artifact_failure)
-            self.assertEqual(result.artifact_failure.status, "failed_before_write")
-            self.assertIn("ADR mirror basename collision", result.artifact_failure.reason)
-            self.assertIn(basename, result.artifact_failure.reason)
-            self.assertIsNone(result.active_update)
-            self.assertIsNone(result.state.active)
-            self.assertEqual(sentinel.read_text(encoding="utf-8"), "keep-me\n")
-            self.assertEqual(sorted(path.name for path in adrs_dir.iterdir()), ["keep.txt"])
-            self.assertEqual(events, ["active.load.migrate"])
+            assert not spy_writer.called
+            assert result.artifact_failure is not None
+            assert result.artifact_failure.status == "failed_before_write"
+            assert "ADR mirror basename collision" in result.artifact_failure.reason
+            assert basename in result.artifact_failure.reason
+            assert result.active_update is None
+            assert result.state.active is None
+            assert sentinel.read_text(encoding="utf-8") == "keep-me\n"
+            assert sorted(path.name for path in adrs_dir.iterdir()) == ["keep.txt"]
+            assert events == ["active.load.migrate"]
             rendered = presentation_cli_text.render_sync_text(result)
-            self.assertIn("failed (sync)", rendered.stderr_lines[0])
-            self.assertIn("ADR mirror basename collision", rendered.stderr_lines[0])
+            assert "failed (sync)" in rendered.stderr_lines[0]
+            assert "ADR mirror basename collision" in rendered.stderr_lines[0]
 
     def test_sync_builds_flat_adr_mirror_symlinks_on_success(self) -> None:
         (
@@ -633,18 +628,15 @@ class TestRuntimeSyncS07(unittest.TestCase):
 
             result = app_sync_state.sync(self._request(app_contracts), ports)
 
-            self.assertIsNone(result.artifact_failure)
+            assert result.artifact_failure is None
             adrs_dir = specdock_dir / "adrs"
-            self.assertTrue(adrs_dir.is_dir())
-            self.assertEqual(
-                sorted(path.name for path in adrs_dir.iterdir()),
-                [initiative_doc.name, issue_doc.name],
-            )
+            assert adrs_dir.is_dir()
+            assert sorted(path.name for path in adrs_dir.iterdir()) == [initiative_doc.name, issue_doc.name]
             for source in (initiative_doc, issue_doc):
                 link_path = adrs_dir / source.name
-                self.assertTrue(link_path.is_symlink(), f"missing ADR mirror symlink: {link_path}")
-                self.assertFalse(os.readlink(link_path).startswith("/"), os.readlink(link_path))
-                self.assertEqual(link_path.resolve(), source.resolve())
+                assert link_path.is_symlink(), f"missing ADR mirror symlink: {link_path}"
+                assert not os.readlink(link_path).startswith("/"), os.readlink(link_path)
+                assert link_path.resolve() == source.resolve()
 
     def test_sync_warns_and_succeeds_with_empty_adrs_when_symlinks_are_unsupported(self) -> None:
         (
@@ -695,17 +687,17 @@ class TestRuntimeSyncS07(unittest.TestCase):
             finally:
                 app_sync_state.os.symlink = original_symlink
 
-            self.assertIsNone(result.artifact_failure)
-            self.assertIsNotNone(result.write_result)
-            self.assertIn("adr_mirror_symlink_unsupported", result.state.warnings)
+            assert result.artifact_failure is None
+            assert result.write_result is not None
+            assert "adr_mirror_symlink_unsupported" in result.state.warnings
             index_todo = json.loads((specdock_dir / ".agent" / "index.json").read_text(encoding="utf-8"))
             index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
-            self.assertIn("adr_mirror_symlink_unsupported", index_todo["warnings"])
-            self.assertIn("adr_mirror_symlink_unsupported", index_all["warnings"])
-            self.assertTrue(adrs_dir.is_dir())
-            self.assertEqual(list(adrs_dir.iterdir()), [])
+            assert "adr_mirror_symlink_unsupported" in index_todo["warnings"]
+            assert "adr_mirror_symlink_unsupported" in index_all["warnings"]
+            assert adrs_dir.is_dir()
+            assert list(adrs_dir.iterdir()) == []
             rendered = presentation_cli_text.render_sync_text(result)
-            self.assertIn("adr_mirror_symlink_unsupported", rendered.warnings)
+            assert "adr_mirror_symlink_unsupported" in rendered.warnings
 
     def test_sync_failure_keeps_symlink_unsupported_warning_in_result_state(self) -> None:
         (
@@ -766,26 +758,26 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 infra_artifact_writer._write_text = original_write_text
                 app_sync_state.os.symlink = original_symlink
 
-            self.assertIsNone(result.write_result)
-            self.assertIsNotNone(result.artifact_failure)
-            self.assertEqual(result.artifact_failure.status, "failed_partial_or_stale")
-            self.assertEqual(result.artifact_failure.reason, "read-only fs")
+            assert result.write_result is None
+            assert result.artifact_failure is not None
+            assert result.artifact_failure.status == "failed_partial_or_stale"
+            assert result.artifact_failure.reason == "read-only fs"
             persisted_paths = {path.relative_to(specdock_dir).as_posix() for path in write_calls}
             expected_paths = self._expected_sync_artifact_relpaths()
-            self.assertTrue(persisted_paths)
-            self.assertTrue(persisted_paths.issubset(expected_paths))
-            self.assertNotEqual(persisted_paths, expected_paths)
-            self.assertTrue(expected_paths - persisted_paths)
+            assert persisted_paths
+            assert persisted_paths.issubset(expected_paths)
+            assert persisted_paths != expected_paths
+            assert expected_paths - persisted_paths
             persisted_index_paths = [
                 path for path in write_calls if path.relative_to(specdock_dir).as_posix() in
                 {".agent/index-all.json", ".agent/index.json"}
             ]
             for persisted_index_path in persisted_index_paths:
                 payload = json.loads(persisted_index_path.read_text(encoding="utf-8"))
-                self.assertIn("adr_mirror_symlink_unsupported", payload["warnings"])
-            self.assertIn("adr_mirror_symlink_unsupported", result.state.warnings)
+                assert "adr_mirror_symlink_unsupported" in payload["warnings"]
+            assert "adr_mirror_symlink_unsupported" in result.state.warnings
             rendered = presentation_cli_text.render_sync_text(result)
-            self.assertEqual(rendered.warnings, result.state.warnings)
+            assert rendered.warnings == result.state.warnings
 
     def test_sync_active_update_render_failure_preserves_symlink_warning_and_reports_non_atomic(
         self,
@@ -846,21 +838,21 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 app_sync_state.os.symlink = original_symlink
                 app_sync_state.render_dashboard = original_render_dashboard
 
-            self.assertFalse(spy_writer.called)
-            self.assertIsNone(result.write_result)
-            self.assertIsNotNone(result.artifact_failure)
-            self.assertEqual(result.artifact_failure.status, "failed_partial_or_stale")
-            self.assertEqual(result.artifact_failure.reason, "render failed")
-            self.assertIsNotNone(result.active_update)
-            self.assertTrue(result.active_update.applied)
-            self.assertEqual(result.state.active.issue_id, "iss-local-00001")
-            self.assertIn("active.write", events)
-            self.assertIn("adr_mirror_symlink_unsupported", result.state.warnings)
+            assert not spy_writer.called
+            assert result.write_result is None
+            assert result.artifact_failure is not None
+            assert result.artifact_failure.status == "failed_partial_or_stale"
+            assert result.artifact_failure.reason == "render failed"
+            assert result.active_update is not None
+            assert result.active_update.applied
+            assert result.state.active.issue_id == "iss-local-00001"
+            assert "active.write" in events
+            assert "adr_mirror_symlink_unsupported" in result.state.warnings
             rendered = presentation_cli_text.render_sync_text(result)
-            self.assertEqual(rendered.warnings, result.state.warnings)
-            self.assertIn("failed (sync)", rendered.stderr_lines[0])
-            self.assertIn("status=failed_partial_or_stale", rendered.stderr_lines[0])
-            self.assertIn("adr_mirror_symlink_unsupported", rendered.warnings)
+            assert rendered.warnings == result.state.warnings
+            assert "failed (sync)" in rendered.stderr_lines[0]
+            assert "status=failed_partial_or_stale" in rendered.stderr_lines[0]
+            assert "adr_mirror_symlink_unsupported" in rendered.warnings
 
     def test_sync_symlink_probe_preserves_existing_repo_files_with_legacy_probe_name(self) -> None:
         (
@@ -904,11 +896,11 @@ class TestRuntimeSyncS07(unittest.TestCase):
 
             result = app_sync_state.sync(self._request(app_contracts), ports)
 
-            self.assertIsNone(result.artifact_failure)
-            self.assertEqual(legacy_probe_path.read_text(encoding="utf-8"), "user data\n")
+            assert result.artifact_failure is None
+            assert legacy_probe_path.read_text(encoding="utf-8") == "user data\n"
             mirror_path = specdock_dir / "adrs" / doc.name
-            self.assertTrue(mirror_path.is_symlink())
-            self.assertEqual(mirror_path.resolve(), doc.resolve())
+            assert mirror_path.is_symlink()
+            assert mirror_path.resolve() == doc.resolve()
 
     def test_sync_recovers_dangling_adrs_symlink_before_probe_and_rebuilds_mirror(self) -> None:
         (
@@ -938,7 +930,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 os.symlink("missing-generated-adrs-dir", adrs_dir)
             except OSError as error:
                 if app_sync_state._is_environment_symlink_unsupported(error):
-                    self.skipTest("symlinks not supported in test environment")
+                    pytest.skip("symlinks not supported in test environment")
                 raise
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(records),
@@ -957,14 +949,14 @@ class TestRuntimeSyncS07(unittest.TestCase):
 
             result = app_sync_state.sync(self._request(app_contracts), ports)
 
-            self.assertIsNone(result.artifact_failure)
-            self.assertIsNotNone(result.write_result)
-            self.assertTrue(adrs_dir.is_dir())
-            self.assertFalse(adrs_dir.is_symlink())
-            self.assertEqual(sorted(path.name for path in adrs_dir.iterdir()), [doc.name])
+            assert result.artifact_failure is None
+            assert result.write_result is not None
+            assert adrs_dir.is_dir()
+            assert not adrs_dir.is_symlink()
+            assert sorted(path.name for path in adrs_dir.iterdir()) == [doc.name]
             mirror_path = adrs_dir / doc.name
-            self.assertTrue(mirror_path.is_symlink())
-            self.assertEqual(mirror_path.resolve(), doc.resolve())
+            assert mirror_path.is_symlink()
+            assert mirror_path.resolve() == doc.resolve()
 
     def test_sync_treats_live_adrs_symlink_as_unsafe_for_probe_and_replaces_it(self) -> None:
         (
@@ -998,7 +990,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 os.symlink(managed_target_dir, adrs_dir)
             except OSError as error:
                 if app_sync_state._is_environment_symlink_unsupported(error):
-                    self.skipTest("symlinks not supported in test environment")
+                    pytest.skip("symlinks not supported in test environment")
                 raise
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(records),
@@ -1028,23 +1020,23 @@ class TestRuntimeSyncS07(unittest.TestCase):
             finally:
                 app_sync_state.os.symlink = original_symlink
 
-            self.assertIsNone(result.artifact_failure)
-            self.assertIsNotNone(result.write_result)
-            self.assertGreaterEqual(len(symlink_calls), 2)
+            assert result.artifact_failure is None
+            assert result.write_result is not None
+            assert len(symlink_calls) >= 2
             probe_path = symlink_calls[0][1]
             mirror_path = adrs_dir / doc.name
-            self.assertEqual(probe_path.parent, specdock_dir)
-            self.assertTrue(probe_path.name.startswith(".spec-dock-adr-mirror-probe-"))
-            self.assertFalse(probe_path.exists())
-            self.assertEqual(symlink_calls[1][1], mirror_path)
-            self.assertTrue(adrs_dir.is_dir())
-            self.assertFalse(adrs_dir.is_symlink())
-            self.assertTrue(mirror_path.is_symlink())
-            self.assertEqual(mirror_path.resolve(), doc.resolve())
-            self.assertTrue(managed_target_dir.is_dir())
-            self.assertEqual(sorted(path.name for path in managed_target_dir.iterdir()), ["preserve.txt"])
-            self.assertEqual(preserved.read_text(encoding="utf-8"), "keep-me\n")
-            self.assertFalse((managed_target_dir / doc.name).exists())
+            assert probe_path.parent == specdock_dir
+            assert probe_path.name.startswith(".spec-dock-adr-mirror-probe-")
+            assert not probe_path.exists()
+            assert symlink_calls[1][1] == mirror_path
+            assert adrs_dir.is_dir()
+            assert not adrs_dir.is_symlink()
+            assert mirror_path.is_symlink()
+            assert mirror_path.resolve() == doc.resolve()
+            assert managed_target_dir.is_dir()
+            assert sorted(path.name for path in managed_target_dir.iterdir()) == ["preserve.txt"]
+            assert preserved.read_text(encoding="utf-8") == "keep-me\n"
+            assert not (managed_target_dir / doc.name).exists()
 
     def test_resolve_adr_mirror_probe_location_falls_back_when_adrs_is_not_a_directory(self) -> None:
         (
@@ -1065,8 +1057,8 @@ class TestRuntimeSyncS07(unittest.TestCase):
 
             location = app_sync_state._resolve_adr_mirror_probe_location(specdock_dir)
 
-            self.assertEqual(location.probe_dir, specdock_dir)
-            self.assertFalse(location.remove_probe_dir_after)
+            assert location.probe_dir == specdock_dir
+            assert not location.remove_probe_dir_after
 
     def test_sync_uses_specdock_dir_for_probe_when_existing_adrs_dir_is_not_probe_writable(self) -> None:
         (
@@ -1129,18 +1121,18 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 if adrs_dir.exists() and not adrs_dir.is_symlink():
                     os.chmod(adrs_dir, 0o755)
 
-            self.assertIsNone(result.artifact_failure)
-            self.assertIsNotNone(result.write_result)
-            self.assertGreaterEqual(len(symlink_calls), 2)
+            assert result.artifact_failure is None
+            assert result.write_result is not None
+            assert len(symlink_calls) >= 2
             probe_path = symlink_calls[0][1]
             mirror_path = adrs_dir / doc.name
-            self.assertEqual(probe_path.parent, specdock_dir)
-            self.assertTrue(probe_path.name.startswith(".spec-dock-adr-mirror-probe-"))
-            self.assertFalse(probe_path.exists())
-            self.assertEqual(symlink_calls[1][1], mirror_path)
-            self.assertTrue(adrs_dir.is_dir())
-            self.assertTrue(mirror_path.is_symlink())
-            self.assertEqual(mirror_path.resolve(), doc.resolve())
+            assert probe_path.parent == specdock_dir
+            assert probe_path.name.startswith(".spec-dock-adr-mirror-probe-")
+            assert not probe_path.exists()
+            assert symlink_calls[1][1] == mirror_path
+            assert adrs_dir.is_dir()
+            assert mirror_path.is_symlink()
+            assert mirror_path.resolve() == doc.resolve()
 
     def test_sync_ignores_non_utf8_timestamp_adr_candidates(self) -> None:
         (
@@ -1184,10 +1176,10 @@ class TestRuntimeSyncS07(unittest.TestCase):
 
             result = app_sync_state.sync(self._request(app_contracts), ports)
 
-            self.assertIsNone(result.artifact_failure)
+            assert result.artifact_failure is None
             adrs_dir = specdock_dir / "adrs"
-            self.assertEqual(sorted(path.name for path in adrs_dir.iterdir()), [valid_doc.name])
-            self.assertFalse((adrs_dir / invalid_doc.name).exists())
+            assert sorted(path.name for path in adrs_dir.iterdir()) == [valid_doc.name]
+            assert not (adrs_dir / invalid_doc.name).exists()
 
     def test_sync_leaves_empty_adrs_without_warning_when_no_adr_sources_exist(self) -> None:
         (
@@ -1231,13 +1223,13 @@ class TestRuntimeSyncS07(unittest.TestCase):
             finally:
                 app_sync_state.os.symlink = original_symlink
 
-            self.assertIsNone(result.artifact_failure)
-            self.assertIsNotNone(result.write_result)
-            self.assertTrue(adrs_dir.is_dir())
-            self.assertEqual(list(adrs_dir.iterdir()), [])
-            self.assertNotIn("adr_mirror_symlink_unsupported", result.state.warnings)
+            assert result.artifact_failure is None
+            assert result.write_result is not None
+            assert adrs_dir.is_dir()
+            assert list(adrs_dir.iterdir()) == []
+            assert "adr_mirror_symlink_unsupported" not in result.state.warnings
             rendered = presentation_cli_text.render_sync_text(result)
-            self.assertNotIn("adr_mirror_symlink_unsupported", rendered.warnings)
+            assert "adr_mirror_symlink_unsupported" not in rendered.warnings
 
     def test_sync_keeps_symlink_probe_failures_hard_when_not_classified_as_unsupported(self) -> None:
         (
@@ -1285,12 +1277,12 @@ class TestRuntimeSyncS07(unittest.TestCase):
             finally:
                 app_sync_state.os.symlink = original_symlink
 
-            self.assertIsNotNone(result.artifact_failure)
-            self.assertEqual(result.artifact_failure.status, "failed_before_write")
-            self.assertIn("operation not permitted", result.artifact_failure.reason)
-            self.assertNotIn("adr_mirror_symlink_unsupported", result.state.warnings)
+            assert result.artifact_failure is not None
+            assert result.artifact_failure.status == "failed_before_write"
+            assert "operation not permitted" in result.artifact_failure.reason
+            assert "adr_mirror_symlink_unsupported" not in result.state.warnings
             rendered = presentation_cli_text.render_sync_text(result)
-            self.assertIn("failed (sync)", rendered.stderr_lines[0])
+            assert "failed (sync)" in rendered.stderr_lines[0]
 
     def test_sync_active_update_probe_failure_is_non_atomic(self) -> None:
         (
@@ -1343,17 +1335,17 @@ class TestRuntimeSyncS07(unittest.TestCase):
             finally:
                 app_sync_state.os.symlink = original_symlink
 
-            self.assertIsNone(result.write_result)
-            self.assertIsNotNone(result.artifact_failure)
-            self.assertEqual(result.artifact_failure.status, "failed_partial_or_stale")
-            self.assertIn("operation not permitted", result.artifact_failure.reason)
-            self.assertIsNotNone(result.active_update)
-            self.assertTrue(result.active_update.applied)
-            self.assertIn("active.write", events)
-            self.assertNotIn("adr_mirror_symlink_unsupported", result.state.warnings)
+            assert result.write_result is None
+            assert result.artifact_failure is not None
+            assert result.artifact_failure.status == "failed_partial_or_stale"
+            assert "operation not permitted" in result.artifact_failure.reason
+            assert result.active_update is not None
+            assert result.active_update.applied
+            assert "active.write" in events
+            assert "adr_mirror_symlink_unsupported" not in result.state.warnings
             rendered = presentation_cli_text.render_sync_text(result)
-            self.assertIn("failed (sync)", rendered.stderr_lines[0])
-            self.assertNotIn("adr_mirror_symlink_unsupported", rendered.warnings)
+            assert "failed (sync)" in rendered.stderr_lines[0]
+            assert "adr_mirror_symlink_unsupported" not in rendered.warnings
 
     def test_sync_keeps_actual_adr_mirror_symlink_failures_hard_after_probe_success(self) -> None:
         (
@@ -1412,22 +1404,19 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 app_sync_state.os.symlink = original_symlink
 
             probe_path = symlink_calls[0][1]
-            self.assertEqual(
-                [path.name for _, path in symlink_calls],
-                [probe_path.name, mirror_path.name],
-            )
-            self.assertEqual(probe_path.parent, adrs_dir)
-            self.assertTrue(probe_path.name.startswith(".spec-dock-adr-mirror-probe-"))
-            self.assertFalse(probe_path.exists())
-            self.assertFalse(mirror_path.exists())
-            self.assertIsNone(result.write_result)
-            self.assertIsNotNone(result.artifact_failure)
-            self.assertEqual(result.artifact_failure.status, "failed_partial_or_stale")
-            self.assertIn("operation not permitted", result.artifact_failure.reason)
-            self.assertNotIn("adr_mirror_symlink_unsupported", result.state.warnings)
+            assert [path.name for _, path in symlink_calls] == [probe_path.name, mirror_path.name]
+            assert probe_path.parent == adrs_dir
+            assert probe_path.name.startswith(".spec-dock-adr-mirror-probe-")
+            assert not probe_path.exists()
+            assert not mirror_path.exists()
+            assert result.write_result is None
+            assert result.artifact_failure is not None
+            assert result.artifact_failure.status == "failed_partial_or_stale"
+            assert "operation not permitted" in result.artifact_failure.reason
+            assert "adr_mirror_symlink_unsupported" not in result.state.warnings
             rendered = presentation_cli_text.render_sync_text(result)
-            self.assertNotIn("adr_mirror_symlink_unsupported", rendered.warnings)
-            self.assertIn("failed (sync)", rendered.stderr_lines[0])
+            assert "adr_mirror_symlink_unsupported" not in rendered.warnings
+            assert "failed (sync)" in rendered.stderr_lines[0]
 
     def test_is_environment_symlink_unsupported_covers_remaining_classified_branches(self) -> None:
         (
@@ -1449,18 +1438,17 @@ class TestRuntimeSyncS07(unittest.TestCase):
         app_sync_state.errno.EOPNOTSUPP = 9001
         app_sync_state.errno.ENOTSUP = 9002
         try:
-            with self.subTest("EOPNOTSUPP"):
-                self.assertTrue(
-                    app_sync_state._is_environment_symlink_unsupported(
-                        OSError(app_sync_state.errno.EOPNOTSUPP, "symlink unsupported")
-                    )
-                )
-            with self.subTest("ENOTSUP"):
-                self.assertTrue(
-                    app_sync_state._is_environment_symlink_unsupported(
-                        OSError(app_sync_state.errno.ENOTSUP, "symlink unsupported")
-                    )
-                )
+            for case_label, error in (
+                (
+                    "EOPNOTSUPP",
+                    OSError(app_sync_state.errno.EOPNOTSUPP, "symlink unsupported"),
+                ),
+                (
+                    "ENOTSUP",
+                    OSError(app_sync_state.errno.ENOTSUP, "symlink unsupported"),
+                ),
+            ):
+                assert app_sync_state._is_environment_symlink_unsupported(error), case_label
         finally:
             for name, value in original_codes.items():
                 if value is sentinel:
@@ -1473,12 +1461,9 @@ class TestRuntimeSyncS07(unittest.TestCase):
             def winerror(self):
                 return 1314
 
-        with self.subTest("winerror_1314"):
-            self.assertTrue(
-                app_sync_state._is_environment_symlink_unsupported(
-                    _WindowsPrivilegeError(errno.EPERM, "privilege not held")
-                )
-            )
+        assert app_sync_state._is_environment_symlink_unsupported(
+            _WindowsPrivilegeError(errno.EPERM, "privilege not held")
+        ), "winerror_1314"
 
     def test_sync_use_case_writes_artifacts_and_paths(self) -> None:
         (
@@ -1516,31 +1501,25 @@ class TestRuntimeSyncS07(unittest.TestCase):
             )
 
             result = app_sync_state.sync(self._request(app_contracts), ports)
-            self.assertIsNone(result.artifact_failure)
-            self.assertIsNotNone(result.write_result)
-            self.assertEqual(result.state.generated_at, "2026-03-12T00:00:00Z")
-            self.assertEqual(
-                result.write_result.index_all_path,
-                "spec-dock/.agent/index-all.json",
-            )
-            self.assertEqual(
-                result.write_result.dashboard_md_path,
-                "spec-dock/dashboard.md",
-            )
+            assert result.artifact_failure is None
+            assert result.write_result is not None
+            assert result.state.generated_at == "2026-03-12T00:00:00Z"
+            assert result.write_result.index_all_path == "spec-dock/.agent/index-all.json"
+            assert result.write_result.dashboard_md_path == "spec-dock/dashboard.md"
 
             index_todo = json.loads((specdock_dir / ".agent" / "index.json").read_text(encoding="utf-8"))
             index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             tree_todo = json.loads((specdock_dir / ".agent" / "tree.json").read_text(encoding="utf-8"))
             tree_all = json.loads((specdock_dir / ".agent" / "tree-all.json").read_text(encoding="utf-8"))
-            self.assertEqual(index_todo["projection"], "current-future")
-            self.assertNotIn("source", index_todo)
-            self.assertEqual(index_all["projection"], "full-history")
-            self.assertNotIn("source", index_all)
-            self.assertTrue(index_todo["deps"]["valid"])
-            self.assertIsNone(index_todo["deps"]["error"])
-            self.assertIn("iss-local-00001", index_todo["nodes"])
-            self.assertNotIn("iss-local-00002", index_todo["nodes"])
-            self.assertIn("iss-local-00002", index_all["nodes"])
+            assert index_todo["projection"] == "current-future"
+            assert "source" not in index_todo
+            assert index_all["projection"] == "full-history"
+            assert "source" not in index_all
+            assert index_todo["deps"]["valid"]
+            assert index_todo["deps"]["error"] is None
+            assert "iss-local-00001" in index_todo["nodes"]
+            assert "iss-local-00002" not in index_todo["nodes"]
+            assert "iss-local-00002" in index_all["nodes"]
 
             def _index_paths(payload: dict[str, object]) -> list[str]:
                 nodes = payload.get("nodes")
@@ -1580,28 +1559,25 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 + _tree_paths(tree_all)
                 + _tree_paths(tree_todo)
             )
-            self.assertTrue(node_paths)
+            assert node_paths
             for node_path in node_paths:
-                self.assertTrue(node_path.startswith("spec-dock/"), node_path)
-                self.assertFalse(Path(node_path).is_absolute(), node_path)
-                self.assertFalse(node_path.startswith(repo_root.as_posix()), node_path)
+                assert node_path.startswith("spec-dock/"), node_path
+                assert not Path(node_path).is_absolute(), node_path
+                assert not node_path.startswith(repo_root.as_posix()), node_path
 
             deps_issues = json.loads((specdock_dir / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
-            self.assertEqual(deps_issues["projection"], "open-issues-dependency-view")
-            self.assertEqual(
-                deps_issues["source"],
-                {"index": "spec-dock/.agent/index.json", "schema_version": 2},
-            )
-            self.assertTrue(deps_issues["deps"]["valid"])
-            self.assertIn("iss-local-00001", deps_issues["nodes"])
-            self.assertNotIn("iss-local-00002", deps_issues["nodes"])
+            assert deps_issues["projection"] == "open-issues-dependency-view"
+            assert deps_issues["source"] == {"index": "spec-dock/.agent/index.json", "schema_version": 2}
+            assert deps_issues["deps"]["valid"]
+            assert "iss-local-00001" in deps_issues["nodes"]
+            assert "iss-local-00002" not in deps_issues["nodes"]
 
             tree_puml = (specdock_dir / "tree.puml").read_text(encoding="utf-8")
             deps_puml = (specdock_dir / "deps-issues.puml").read_text(encoding="utf-8")
             dashboard = (specdock_dir / "dashboard.md").read_text(encoding="utf-8")
-            self.assertIn("@startuml", tree_puml)
-            self.assertIn("@startuml", deps_puml)
-            self.assertIn("## Ready", dashboard)
+            assert "@startuml" in tree_puml
+            assert "@startuml" in deps_puml
+            assert "## Ready" in dashboard
 
     def test_sync_deps_cycle_fail_fast_regression(self) -> None:
         (
@@ -1635,7 +1611,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 git_gateway=_StubGitGateway("main"),
                 clock=_StubClock(),
             )
-            with self.assertRaisesRegex(RuntimeError, "Dependency cycle detected"):
+            with pytest.raises(RuntimeError, match="Dependency cycle detected"):
                 app_sync_state.collect_sync_state(self._request(app_contracts), ports)
 
     def _assert_sync_force_placeholder_and_deps_error_regression(self) -> None:
@@ -1675,37 +1651,34 @@ class TestRuntimeSyncS07(unittest.TestCase):
             )
 
             result = app_sync_state.sync(self._request(app_contracts, force=True), ports)
-            self.assertIsNone(result.artifact_failure)
-            self.assertIsNotNone(result.write_result)
-            self.assertEqual(result.state.warnings, ["deps_preflight_failed"])
+            assert result.artifact_failure is None
+            assert result.write_result is not None
+            assert result.state.warnings == ["deps_preflight_failed"]
 
             index = json.loads((specdock_dir / ".agent" / "index.json").read_text(encoding="utf-8"))
-            self.assertEqual(index["projection"], "current-future")
-            self.assertNotIn("source", index)
-            self.assertFalse(index["deps"]["valid"])
-            self.assertIn("Dependency cycle detected", str(index["deps"]["error"]))
+            assert index["projection"] == "current-future"
+            assert "source" not in index
+            assert not index["deps"]["valid"]
+            assert "Dependency cycle detected" in str(index["deps"]["error"])
 
             index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
-            self.assertEqual(index_all["projection"], "full-history")
-            self.assertNotIn("source", index_all)
-            self.assertFalse(index_all["deps"]["valid"])
-            self.assertIn("Dependency cycle detected", str(index_all["deps"]["error"]))
+            assert index_all["projection"] == "full-history"
+            assert "source" not in index_all
+            assert not index_all["deps"]["valid"]
+            assert "Dependency cycle detected" in str(index_all["deps"]["error"])
 
             deps_issues = json.loads((specdock_dir / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
-            self.assertEqual(deps_issues["projection"], "open-issues-dependency-view")
-            self.assertEqual(
-                deps_issues["source"],
-                {"index": "spec-dock/.agent/index.json", "schema_version": 2},
-            )
-            self.assertFalse(deps_issues["deps"]["valid"])
-            self.assertIn("Dependency cycle detected", str(deps_issues["deps"]["error"]))
+            assert deps_issues["projection"] == "open-issues-dependency-view"
+            assert deps_issues["source"] == {"index": "spec-dock/.agent/index.json", "schema_version": 2}
+            assert not deps_issues["deps"]["valid"]
+            assert "Dependency cycle detected" in str(deps_issues["deps"]["error"])
 
             tree_puml = (specdock_dir / "tree.puml").read_text(encoding="utf-8")
             deps_puml = (specdock_dir / "deps-issues.puml").read_text(encoding="utf-8")
             dashboard = (specdock_dir / "dashboard.md").read_text(encoding="utf-8")
             for text in (tree_puml, deps_puml, dashboard):
-                self.assertIn("DEPS_DISABLED", text)
-                self.assertIn("sync --force", text)
+                assert "DEPS_DISABLED" in text
+                assert "sync --force" in text
 
     def test_sync_force_placeholder_and_deps_error_regression(self) -> None:
         self._assert_sync_force_placeholder_and_deps_error_regression()
@@ -1805,18 +1778,18 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertIsNone(result.artifact_failure)
+            assert result.artifact_failure is None
             status = result.state.issue_statuses["iss-local-00001"]
-            self.assertEqual(status.source, "github")
-            self.assertEqual(status.effective_status, "done")
-            self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "other/repo")])
+            assert status.source == "github"
+            assert status.effective_status == "done"
+            assert issue_gateway.view_calls == [(str(repo_root), 301, "other/repo")]
 
             index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             issue_payload = index_all["nodes"]["iss-local-00001"]["github"]
-            self.assertEqual(issue_payload["url"], "https://github.com/other/repo/issues/301")
-            self.assertEqual(issue_payload["state"], "CLOSED")
-            self.assertEqual(issue_payload["repo_owner"], "other")
-            self.assertEqual(issue_payload["repo_name"], "repo")
+            assert issue_payload["url"] == "https://github.com/other/repo/issues/301"
+            assert issue_payload["state"] == "CLOSED"
+            assert issue_payload["repo_owner"] == "other"
+            assert issue_payload["repo_name"] == "repo"
 
     def test_sync_skips_same_repo_repo_scoped_view_fetch_when_index_contains_key(self) -> None:
         (
@@ -1898,11 +1871,11 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertIsNone(result.artifact_failure)
-            self.assertEqual(issue_gateway.view_calls, [])
+            assert result.artifact_failure is None
+            assert issue_gateway.view_calls == []
             status = result.state.issue_statuses["iss-local-00001"]
-            self.assertEqual(status.source, "github")
-            self.assertEqual(status.effective_status, "open")
+            assert status.source == "github"
+            assert status.effective_status == "open"
 
     def test_sync_falls_back_to_same_repo_repo_scoped_view_fetch_when_index_missing_key(self) -> None:
         (
@@ -1986,13 +1959,28 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertIsNone(result.artifact_failure)
-            self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "current/repo")])
+            assert result.artifact_failure is None
+            assert issue_gateway.view_calls == [(str(repo_root), 301, "current/repo")]
             status = result.state.issue_statuses["iss-local-00001"]
-            self.assertEqual(status.source, "github")
-            self.assertEqual(status.effective_status, "done")
+            assert status.source == "github"
+            assert status.effective_status == "done"
 
-    def test_sync_fails_preflight_for_malformed_partial_repo_scope_linkage(self) -> None:
+    @pytest.mark.parametrize("force", [False, True], ids=["force_false", "force_true"])
+    @pytest.mark.parametrize(
+        ("repo_owner", "repo_name"),
+        [
+            pytest.param("current", None, id="missing_repo_name"),
+            pytest.param(None, "repo", id="missing_repo_owner"),
+            pytest.param("   ", "repo", id="blank_repo_owner"),
+            pytest.param("current", "   ", id="blank_repo_name"),
+        ],
+    )
+    def test_sync_fails_preflight_for_malformed_partial_repo_scope_linkage(
+        self,
+        force,
+        repo_owner,
+        repo_name,
+    ) -> None:
         (
             _runtime_app,
             app_contracts,
@@ -2003,74 +1991,69 @@ class TestRuntimeSyncS07(unittest.TestCase):
             infra_contracts,
             _presentation_cli_text,
         ) = _runtime_modules()
-        partial_scopes = (("current", None), (None, "repo"), ("   ", "repo"), ("current", "   "))
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            records[2] = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00001",
+                title="API",
+                path=Path(records[2].path),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=301,
+                github_repo_owner=repo_owner,
+                github_repo_name=repo_name,
+            )
+            records[3] = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00002",
+                title="DB",
+                path=Path(records[3].path),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=None,
+            )
+            issue_gateway = _StubIssueGateway(snapshots=[])
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader(
+                    {"iss-local-00001": "open", "iss-local-00002": "open"}
+                ),
+                issue_gateway=issue_gateway,
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
 
-        for force in (False, True):
-            for repo_owner, repo_name in partial_scopes:
-                with self.subTest(force=force, repo_owner=repo_owner, repo_name=repo_name):
-                    with tempfile.TemporaryDirectory() as td:
-                        repo_root = Path(td)
-                        specdock_dir = repo_root / "spec-dock"
-                        specdock_dir.mkdir(parents=True, exist_ok=True)
-                        records = self._records(infra_contracts, repo_root)
-                        records[2] = _record(
-                            infra_contracts,
-                            kind="issue",
-                            node_id="iss-local-00001",
-                            title="API",
-                            path=Path(records[2].path),
-                            parent_id="epic-local-00001",
-                            initiative_id="init-local-00001",
-                            epic_id="epic-local-00001",
-                            github_issue_number=301,
-                            github_repo_owner=repo_owner,
-                            github_repo_name=repo_name,
-                        )
-                        records[3] = _record(
-                            infra_contracts,
-                            kind="issue",
-                            node_id="iss-local-00002",
-                            title="DB",
-                            path=Path(records[3].path),
-                            parent_id="epic-local-00001",
-                            initiative_id="init-local-00001",
-                            epic_id="epic-local-00001",
-                            github_issue_number=None,
-                        )
-                        issue_gateway = _StubIssueGateway(snapshots=[])
-                        ports = app_ports.Ports(
-                            node_reader=_StubNodeReader(records),
-                            repo_root=repo_root,
-                            specdock_dir=specdock_dir,
-                            deps_topology_reader=_StubDepsTopologyReader(
-                                infra_contracts,
-                                {"iss-local-00001": [], "iss-local-00002": []},
-                            ),
-                            derived_state_reader=_StubDerivedStateReader(
-                                {"iss-local-00001": "open", "iss-local-00002": "open"}
-                            ),
-                            issue_gateway=issue_gateway,
-                            active_state_store=_StubActiveStateStore(infra_contracts, []),
-                            git_gateway=_StubGitGateway("main"),
-                            artifact_writer=infra_artifact_writer.FileArtifactWriter(),
-                            clock=_StubClock(),
-                        )
-
-                        with self.assertRaisesRegex(
-                            RuntimeError,
-                            "preflight validate failed: issue has invalid github linkage",
-                        ):
-                            app_sync_state.sync(
-                                app_contracts.SyncRequest(
-                                    force=force,
-                                    github_enabled=True,
-                                    issue_limit=10000,
-                                    update_active_from_branch=False,
-                                ),
-                                ports,
-                            )
-                        self.assertEqual(issue_gateway.index_calls, [])
-                        self.assertEqual(issue_gateway.view_calls, [])
+            with pytest.raises(
+                RuntimeError,
+                match="preflight validate failed: issue has invalid github linkage",
+            ):
+                app_sync_state.sync(
+                    app_contracts.SyncRequest(
+                        force=force,
+                        github_enabled=True,
+                        issue_limit=10000,
+                        update_active_from_branch=False,
+                    ),
+                    ports,
+                )
+            assert issue_gateway.index_calls == []
+            assert issue_gateway.view_calls == []
 
     def test_sync_falls_back_to_current_repo_view_for_unscoped_linked_epic_when_index_missing_key(self) -> None:
         (
@@ -2168,13 +2151,13 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertIsNone(result.artifact_failure)
-            self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 201, "current/repo")])
+            assert result.artifact_failure is None
+            assert issue_gateway.view_calls == [(str(repo_root), 201, "current/repo")]
             epic_status = result.state.issue_statuses["epic-local-00001"]
-            self.assertEqual(epic_status.source, "github")
-            self.assertEqual(epic_status.effective_status, "done")
-            self.assertFalse(epic_status.stale)
-            self.assertNotIn("gh_fetch_failed", result.state.warnings)
+            assert epic_status.source == "github"
+            assert epic_status.effective_status == "done"
+            assert not epic_status.stale
+            assert "gh_fetch_failed" not in result.state.warnings
 
     def test_sync_mixed_same_repo_and_foreign_repo_scoped_targets_keeps_foreign_fetch(self) -> None:
         (
@@ -2271,14 +2254,14 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertIsNone(result.artifact_failure)
-            self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "other/repo")])
+            assert result.artifact_failure is None
+            assert issue_gateway.view_calls == [(str(repo_root), 301, "other/repo")]
             current_status = result.state.issue_statuses["iss-local-00001"]
             foreign_status = result.state.issue_statuses["iss-local-00002"]
-            self.assertEqual(current_status.source, "github")
-            self.assertEqual(current_status.effective_status, "open")
-            self.assertEqual(foreign_status.source, "github")
-            self.assertEqual(foreign_status.effective_status, "done")
+            assert current_status.source == "github"
+            assert current_status.effective_status == "open"
+            assert foreign_status.source == "github"
+            assert foreign_status.effective_status == "done"
 
     def test_sync_does_not_mix_snapshots_when_current_and_foreign_share_same_issue_number(self) -> None:
         (
@@ -2362,31 +2345,31 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertIsNone(result.artifact_failure)
-            self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "other/repo")])
+            assert result.artifact_failure is None
+            assert issue_gateway.view_calls == [(str(repo_root), 301, "other/repo")]
 
             current_status = result.state.issue_statuses["iss-local-00001"]
             foreign_status = result.state.issue_statuses["iss-local-00002"]
-            self.assertEqual(current_status.source, "github")
-            self.assertEqual(current_status.effective_status, "open")
-            self.assertEqual(foreign_status.source, "github")
-            self.assertEqual(foreign_status.effective_status, "done")
-            self.assertEqual(
-                result.state.github_snapshot_by_repo_and_issue_number[("current/repo", 301)].url,
-                "https://github.com/current/repo/issues/301",
+            assert current_status.source == "github"
+            assert current_status.effective_status == "open"
+            assert foreign_status.source == "github"
+            assert foreign_status.effective_status == "done"
+            assert (
+                result.state.github_snapshot_by_repo_and_issue_number[("current/repo", 301)].url
+                == "https://github.com/current/repo/issues/301"
             )
-            self.assertEqual(
-                result.state.github_snapshot_by_repo_and_issue_number[("other/repo", 301)].url,
-                "https://github.com/other/repo/issues/301",
+            assert (
+                result.state.github_snapshot_by_repo_and_issue_number[("other/repo", 301)].url
+                == "https://github.com/other/repo/issues/301"
             )
 
             index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             current_payload = index_all["nodes"]["iss-local-00001"]["github"]
             foreign_payload = index_all["nodes"]["iss-local-00002"]["github"]
-            self.assertEqual(current_payload["url"], "https://github.com/current/repo/issues/301")
-            self.assertEqual(current_payload["state"], "OPEN")
-            self.assertEqual(foreign_payload["url"], "https://github.com/other/repo/issues/301")
-            self.assertEqual(foreign_payload["state"], "CLOSED")
+            assert current_payload["url"] == "https://github.com/current/repo/issues/301"
+            assert current_payload["state"] == "OPEN"
+            assert foreign_payload["url"] == "https://github.com/other/repo/issues/301"
+            assert foreign_payload["state"] == "CLOSED"
 
     def test_sync_does_not_apply_foreign_snapshot_to_current_unscoped_issue_when_current_snapshot_missing(self) -> None:
         (
@@ -2470,32 +2453,29 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertIsNone(result.artifact_failure)
-            self.assertIn("gh_index_incomplete", result.state.warnings)
-            self.assertIn("gh_fetch_failed", result.state.warnings)
-            self.assertEqual(
-                issue_gateway.view_calls,
-                [
+            assert result.artifact_failure is None
+            assert "gh_index_incomplete" in result.state.warnings
+            assert "gh_fetch_failed" in result.state.warnings
+            assert issue_gateway.view_calls == [
                     (str(repo_root), 301, "current/repo"),
                     (str(repo_root), 301, "other/repo"),
-                ],
-            )
+            ]
 
             current_status = result.state.issue_statuses["iss-local-00001"]
             foreign_status = result.state.issue_statuses["iss-local-00002"]
-            self.assertEqual(current_status.source, "unknown")
-            self.assertEqual(current_status.effective_status, "unknown")
-            self.assertEqual(foreign_status.source, "github")
-            self.assertEqual(foreign_status.effective_status, "done")
+            assert current_status.source == "unknown"
+            assert current_status.effective_status == "unknown"
+            assert foreign_status.source == "github"
+            assert foreign_status.effective_status == "done"
 
             index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             current_payload = index_all["nodes"]["iss-local-00001"]["github"]
             foreign_payload = index_all["nodes"]["iss-local-00002"]["github"]
-            self.assertEqual(current_payload["issue_number"], 301)
-            self.assertNotIn("url", current_payload)
-            self.assertNotIn("state", current_payload)
-            self.assertEqual(foreign_payload["url"], "https://github.com/other/repo/issues/301")
-            self.assertEqual(foreign_payload["state"], "CLOSED")
+            assert current_payload["issue_number"] == 301
+            assert "url" not in current_payload
+            assert "state" not in current_payload
+            assert foreign_payload["url"] == "https://github.com/other/repo/issues/301"
+            assert foreign_payload["state"] == "CLOSED"
 
     def test_sync_prefers_foreign_repo_snapshot_for_foreign_linked_initiative_and_epic(self) -> None:
         (
@@ -2632,22 +2612,19 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertIsNone(result.artifact_failure)
-            self.assertEqual(
-                issue_gateway.view_calls,
-                [
+            assert result.artifact_failure is None
+            assert issue_gateway.view_calls == [
                     (str(repo_root), 101, "upstream/product"),
                     (str(repo_root), 201, "upstream/product"),
-                ],
-            )
+            ]
 
             index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             init_payload = index_all["nodes"]["init-local-00001"]["github"]
             epic_payload = index_all["nodes"]["epic-local-00001"]["github"]
-            self.assertEqual(init_payload["url"], "https://github.com/upstream/product/issues/101")
-            self.assertEqual(init_payload["state"], "CLOSED")
-            self.assertEqual(epic_payload["url"], "https://github.com/upstream/product/issues/201")
-            self.assertEqual(epic_payload["state"], "CLOSED")
+            assert init_payload["url"] == "https://github.com/upstream/product/issues/101"
+            assert init_payload["state"] == "CLOSED"
+            assert epic_payload["url"] == "https://github.com/upstream/product/issues/201"
+            assert epic_payload["state"] == "CLOSED"
 
     def test_sync_keeps_local_issue_snapshot_when_foreign_repo_uses_same_issue_number(self) -> None:
         (
@@ -2751,19 +2728,19 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertIsNone(result.artifact_failure)
-            self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "upstream/product")])
+            assert result.artifact_failure is None
+            assert issue_gateway.view_calls == [(str(repo_root), 301, "upstream/product")]
             issue_status = result.state.issue_statuses["iss-local-00001"]
-            self.assertEqual(issue_status.source, "github")
-            self.assertEqual(issue_status.effective_status, "open")
+            assert issue_status.source == "github"
+            assert issue_status.effective_status == "open"
 
             index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             issue_payload = index_all["nodes"]["iss-local-00001"]["github"]
             initiative_payload = index_all["nodes"]["init-local-00001"]["github"]
-            self.assertEqual(issue_payload["url"], "https://github.com/current/repo/issues/301")
-            self.assertEqual(issue_payload["state"], "OPEN")
-            self.assertEqual(initiative_payload["url"], "https://github.com/upstream/product/issues/301")
-            self.assertEqual(initiative_payload["state"], "CLOSED")
+            assert issue_payload["url"] == "https://github.com/current/repo/issues/301"
+            assert issue_payload["state"] == "OPEN"
+            assert initiative_payload["url"] == "https://github.com/upstream/product/issues/301"
+            assert initiative_payload["state"] == "CLOSED"
 
     def test_sync_does_not_fallback_to_same_number_other_repo_snapshot_in_json(self) -> None:
         (
@@ -2846,22 +2823,22 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertIsNone(result.artifact_failure)
-            self.assertIn("gh_fetch_failed", result.state.warnings)
-            self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "other/repo")])
+            assert result.artifact_failure is None
+            assert "gh_fetch_failed" in result.state.warnings
+            assert issue_gateway.view_calls == [(str(repo_root), 301, "other/repo")]
             issue_status = result.state.issue_statuses["iss-local-00001"]
-            self.assertEqual(issue_status.source, "unknown")
-            self.assertEqual(issue_status.effective_status, "unknown")
+            assert issue_status.source == "unknown"
+            assert issue_status.effective_status == "unknown"
 
             index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             issue_payload = index_all["nodes"]["iss-local-00001"]["github"]
-            self.assertEqual(issue_payload["issue_number"], 301)
-            self.assertEqual(issue_payload["repo_owner"], "other")
-            self.assertEqual(issue_payload["repo_name"], "repo")
-            self.assertNotIn("url", issue_payload)
-            self.assertNotIn("state", issue_payload)
-            self.assertNotIn("updated_at", issue_payload)
-            self.assertNotIn("labels", issue_payload)
+            assert issue_payload["issue_number"] == 301
+            assert issue_payload["repo_owner"] == "other"
+            assert issue_payload["repo_name"] == "repo"
+            assert "url" not in issue_payload
+            assert "state" not in issue_payload
+            assert "updated_at" not in issue_payload
+            assert "labels" not in issue_payload
 
     def test_sync_active_update_then_artifact_failure_is_non_atomic(self) -> None:
         (
@@ -2902,15 +2879,15 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 self._request(app_contracts, force=False, update_active=True),
                 ports,
             )
-            self.assertIsNotNone(result.artifact_failure)
-            self.assertEqual(result.artifact_failure.status, "failed_partial_or_stale")
-            self.assertEqual(result.artifact_failure.reason, "disk full")
-            self.assertIsNotNone(result.active_update)
-            self.assertTrue(result.active_update.applied)
-            self.assertEqual(result.state.active.issue_id, "iss-local-00001")
-            self.assertIn("active.write", events)
-            self.assertIn("artifact.write", events)
-            self.assertLess(events.index("active.write"), events.index("artifact.write"))
+            assert result.artifact_failure is not None
+            assert result.artifact_failure.status == "failed_partial_or_stale"
+            assert result.artifact_failure.reason == "disk full"
+            assert result.active_update is not None
+            assert result.active_update.applied
+            assert result.state.active.issue_id == "iss-local-00001"
+            assert "active.write" in events
+            assert "artifact.write" in events
+            assert events.index("active.write") < events.index("artifact.write")
 
     def test_sync_artifact_failure_contract_when_active_not_updated(self) -> None:
         (
@@ -2945,10 +2922,10 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 clock=_StubClock(),
             )
             result = app_sync_state.sync(self._request(app_contracts), ports)
-            self.assertIsNotNone(result.artifact_failure)
-            self.assertEqual(result.artifact_failure.status, "failed_partial_or_stale")
-            self.assertEqual(result.artifact_failure.reason, "read-only fs")
-            self.assertIsNone(result.active_update)
+            assert result.artifact_failure is not None
+            assert result.artifact_failure.status == "failed_partial_or_stale"
+            assert result.artifact_failure.reason == "read-only fs"
+            assert result.active_update is None
 
     def test_sync_prewrite_failure_contract_is_failed_before_write(self) -> None:
         (
@@ -2991,10 +2968,10 @@ class TestRuntimeSyncS07(unittest.TestCase):
             finally:
                 app_sync_state.render_dashboard = original_render_dashboard
 
-            self.assertFalse(spy_writer.called)
-            self.assertIsNotNone(result.artifact_failure)
-            self.assertEqual(result.artifact_failure.status, "failed_before_write")
-            self.assertEqual(result.artifact_failure.reason, "render failed")
+            assert not spy_writer.called
+            assert result.artifact_failure is not None
+            assert result.artifact_failure.status == "failed_before_write"
+            assert result.artifact_failure.reason == "render failed"
 
     def test_sync_prewrite_render_failure_keeps_symlink_warning_in_failed_before_write_result(
         self,
@@ -3053,13 +3030,13 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 app_sync_state.os.symlink = original_symlink
                 app_sync_state.render_dashboard = original_render_dashboard
 
-            self.assertFalse(spy_writer.called)
-            self.assertIsNotNone(result.artifact_failure)
-            self.assertEqual(result.artifact_failure.status, "failed_before_write")
-            self.assertEqual(result.artifact_failure.reason, "render failed")
-            self.assertIn("adr_mirror_symlink_unsupported", result.state.warnings)
+            assert not spy_writer.called
+            assert result.artifact_failure is not None
+            assert result.artifact_failure.status == "failed_before_write"
+            assert result.artifact_failure.reason == "render failed"
+            assert "adr_mirror_symlink_unsupported" in result.state.warnings
             rendered = presentation_cli_text.render_sync_text(result)
-            self.assertIn("adr_mirror_symlink_unsupported", rendered.warnings)
+            assert "adr_mirror_symlink_unsupported" in rendered.warnings
 
     def test_render_sync_text_regression(self) -> None:
         (
@@ -3102,12 +3079,9 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 artifact_failure=None,
             )
         )
-        self.assertIn("spec-dock/.agent/index-all.json", success.stdout_lines[0])
-        self.assertEqual(
-            success.stderr_lines,
-            ["spec-dock: sync: active unchanged (no match)"],
-        )
-        self.assertEqual(success.warnings, ["warn-1", "warn-2"])
+        assert "spec-dock/.agent/index-all.json" in success.stdout_lines[0]
+        assert success.stderr_lines == ["spec-dock: sync: active unchanged (no match)"]
+        assert success.warnings == ["warn-1", "warn-2"]
 
         failed = presentation_cli_text.render_sync_text(
             app_contracts.SyncCommandResult(
@@ -3120,8 +3094,8 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 ),
             )
         )
-        self.assertIn("status=failed_partial_or_stale", failed.stderr_lines[0])
-        self.assertIn("stale", failed.stderr_lines[1])
+        assert "status=failed_partial_or_stale" in failed.stderr_lines[0]
+        assert "stale" in failed.stderr_lines[1]
 
     def test_sync_exit_behavior_regression(self) -> None:
         (
@@ -3167,7 +3141,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
         original_find_specdock_dir = runtime_app._find_specdock_dir
         original_build_runtime = runtime_app._cli_build_runtime
         runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
-        self.assertFalse(hasattr(runtime_app, "_sync"))
+        assert not hasattr(runtime_app, "_sync")
         try:
             runtime_app._cli_build_runtime = lambda _specdock_dir, **_kwargs: SimpleNamespace(
                 use_cases=_build_use_cases(
@@ -3183,7 +3157,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
             err = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 exit_code_ok = runtime_app.main(["sync"])
-            self.assertEqual(exit_code_ok, 0)
+            assert exit_code_ok == 0
 
             runtime_app._cli_build_runtime = lambda _specdock_dir, **_kwargs: SimpleNamespace(
                 use_cases=_build_use_cases(
@@ -3209,8 +3183,8 @@ class TestRuntimeSyncS07(unittest.TestCase):
             err = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 exit_code_warn = runtime_app.main(["sync"])
-            self.assertEqual(exit_code_warn, 0)
-            self.assertIn("adr_mirror_symlink_unsupported", err.getvalue())
+            assert exit_code_warn == 0
+            assert "adr_mirror_symlink_unsupported" in err.getvalue()
 
             runtime_app._cli_build_runtime = lambda _specdock_dir, **_kwargs: SimpleNamespace(
                 use_cases=_build_use_cases(lambda _req: (_ for _ in ()).throw(RuntimeError("sync failed")))
@@ -3219,8 +3193,8 @@ class TestRuntimeSyncS07(unittest.TestCase):
             err = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 exit_code_ng = runtime_app.main(["sync"])
-            self.assertEqual(exit_code_ng, 1)
-            self.assertIn("error: sync failed", err.getvalue())
+            assert exit_code_ng == 1
+            assert "error: sync failed" in err.getvalue()
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             runtime_app._cli_build_runtime = original_build_runtime
@@ -3262,15 +3236,15 @@ class TestRuntimeSyncS07(unittest.TestCase):
         )
         req = self._request(app_contracts)
         result = app_sync_state.sync(req, ports)
-        self.assertIs(result, delegated_result)
-        self.assertEqual(len(runner.calls), 1)
-        self.assertEqual(runner.calls[0][1], "migrate")
+        assert result is delegated_result
+        assert len(runner.calls) == 1
+        assert runner.calls[0][1] == "migrate"
 
         app_sync_state.sync_after_import(ports)
-        self.assertEqual(len(runner.calls), 2)
+        assert len(runner.calls) == 2
         sync_after_req, mode = runner.calls[1]
-        self.assertEqual(mode, "no_migrate")
-        self.assertFalse(sync_after_req.update_active_from_branch)
+        assert mode == "no_migrate"
+        assert not sync_after_req.update_active_from_branch
 
     def test_sync_github_keeps_lone_unscoped_legacy_linkage_without_backfill(self) -> None:
         (
@@ -3315,8 +3289,8 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertIn("iss-local-00001", state.graph.nodes_by_id)
-            self.assertEqual(node_repo.backfill_calls, [])
+            assert "iss-local-00001" in state.graph.nodes_by_id
+            assert node_repo.backfill_calls == []
 
     def _s06_sync_result(self, app_contracts, domain_models, *, warnings=None, artifact_failure=None):
         return app_contracts.SyncCommandResult(
@@ -3424,11 +3398,11 @@ class TestRuntimeSyncS07(unittest.TestCase):
             _UseCases(),
         )
 
-        self.assertEqual(outcome.exit_code, 1)
-        self.assertIn("spec-dock: ok (new issue)", "\n".join(outcome.text.stdout_lines))
-        self.assertIn("spec-dock: failed (new issue auto-sync) id=iss-00093", outcome.text.stderr_lines)
-        self.assertTrue(any("mutation succeeded" in line for line in outcome.text.stderr_lines))
-        self.assertTrue(any("sync` to refresh" in line for line in outcome.text.stderr_lines))
+        assert outcome.exit_code == 1
+        assert "spec-dock: ok (new issue)" in "\n".join(outcome.text.stdout_lines)
+        assert "spec-dock: failed (new issue auto-sync) id=iss-00093" in outcome.text.stderr_lines
+        assert any("mutation succeeded" in line for line in outcome.text.stderr_lines)
+        assert any("sync` to refresh" in line for line in outcome.text.stderr_lines)
 
     def test_tc_s06_002_deps_fatal_github_warning_is_post_sync_failure_guidance(self) -> None:
         (
@@ -3465,15 +3439,13 @@ class TestRuntimeSyncS07(unittest.TestCase):
             _UseCases(),
         )
 
-        self.assertEqual(outcome.exit_code, 1)
-        self.assertIn("spec-dock: ok (deps add)", "\n".join(outcome.text.stdout_lines))
-        self.assertNotIn("spec-dock: ok (deps add auto-sync)", outcome.text.stdout_lines)
-        self.assertIn(
-            "spec-dock: failed (deps add auto-sync) from=iss-00093 to=iss-00094",
-            outcome.text.stderr_lines,
-        )
-        self.assertTrue(any("GitHub issue state fetch was incomplete" in line for line in outcome.text.stderr_lines))
-        self.assertEqual(outcome.text.warnings, ["gh_fetch_failed"])
+        assert outcome.exit_code == 1
+        assert "spec-dock: ok (deps add)" in "\n".join(outcome.text.stdout_lines)
+        assert "spec-dock: ok (deps add auto-sync)" not in outcome.text.stdout_lines
+        assert "spec-dock: failed (deps add auto-sync) from=iss-00093 to=iss-00094" in \
+            outcome.text.stderr_lines
+        assert any("GitHub issue state fetch was incomplete" in line for line in outcome.text.stderr_lines)
+        assert outcome.text.warnings == ["gh_fetch_failed"]
 
         success_result = app_contracts.MutateDepsResult(
             action="add",
@@ -3513,13 +3485,11 @@ class TestRuntimeSyncS07(unittest.TestCase):
             _SkipUseCases(),
         )
 
-        self.assertEqual(success_outcome.exit_code, 0)
-        self.assertIn("spec-dock: ok (deps add auto-sync)", success_outcome.text.stdout_lines)
-        self.assertEqual(skip_outcome.exit_code, 0)
-        self.assertIn(
-            "spec-dock: skipped (deps add auto-sync) reason=unchanged",
-            skip_outcome.text.stdout_lines,
-        )
+        assert success_outcome.exit_code == 0
+        assert "spec-dock: ok (deps add auto-sync)" in success_outcome.text.stdout_lines
+        assert skip_outcome.exit_code == 0
+        assert "spec-dock: skipped (deps add auto-sync) reason=unchanged" in \
+            skip_outcome.text.stdout_lines
 
     def test_tc_s06_003_delete_json_includes_post_sync_outcome_and_failure_exit(self) -> None:
         (
@@ -3565,24 +3535,24 @@ class TestRuntimeSyncS07(unittest.TestCase):
 
         success_outcome = delete_cmd._run_delete(delete_args, _UseCases(success))
         success_payload = json.loads(success_outcome.text.stdout_lines[0])
-        self.assertEqual(success_outcome.exit_code, 0)
-        self.assertEqual(success_payload["post_sync"]["status"], "success")
-        self.assertFalse(success_payload["post_sync"]["failed"])
+        assert success_outcome.exit_code == 0
+        assert success_payload["post_sync"]["status"] == "success"
+        assert not success_payload["post_sync"]["failed"]
 
         warning_outcome = delete_cmd._run_delete(delete_args, _UseCases(non_fatal_warning))
         warning_payload = json.loads(warning_outcome.text.stdout_lines[0])
-        self.assertEqual(warning_outcome.exit_code, 0)
-        self.assertEqual(warning_payload["post_sync"]["status"], "success")
-        self.assertFalse(warning_payload["post_sync"]["failed"])
-        self.assertEqual(warning_payload["post_sync"]["warnings"], ["gh_index_incomplete"])
-        self.assertEqual(warning_payload["post_sync"]["fatal_warnings"], [])
+        assert warning_outcome.exit_code == 0
+        assert warning_payload["post_sync"]["status"] == "success"
+        assert not warning_payload["post_sync"]["failed"]
+        assert warning_payload["post_sync"]["warnings"] == ["gh_index_incomplete"]
+        assert warning_payload["post_sync"]["fatal_warnings"] == []
 
         failure_outcome = delete_cmd._run_delete(delete_args, _UseCases(failure))
         failure_payload = json.loads(failure_outcome.text.stdout_lines[0])
-        self.assertEqual(failure_outcome.exit_code, 1)
-        self.assertEqual(failure_payload["post_sync"]["status"], "failed")
-        self.assertEqual(failure_payload["post_sync"]["fatal_warnings"], ["gh_fetch_failed"])
-        self.assertTrue(any("mutation succeeded" in line for line in failure_payload["post_sync"]["recovery_guidance"]))
+        assert failure_outcome.exit_code == 1
+        assert failure_payload["post_sync"]["status"] == "failed"
+        assert failure_payload["post_sync"]["fatal_warnings"] == ["gh_fetch_failed"]
+        assert any("mutation succeeded" in line for line in failure_payload["post_sync"]["recovery_guidance"])
 
     def test_tc_s06_004_mutation_parser_help_exposes_no_auto_sync_opt_out(self) -> None:
         (
@@ -3613,15 +3583,15 @@ class TestRuntimeSyncS07(unittest.TestCase):
         for argv in help_commands:
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
-                with self.assertRaises(SystemExit) as cm:
+                with pytest.raises(SystemExit) as cm:
                     parser.parse_args(argv)
-            self.assertEqual(cm.exception.code, 0)
+            assert cm.value.code == 0
             combined_help.append(stdout.getvalue())
 
         help_text = "\n".join(combined_help)
-        self.assertNotIn("--no-auto-sync", help_text)
-        self.assertNotIn("--disable-auto-sync", help_text)
-        self.assertNotIn("no_auto_sync", help_text)
+        assert "--no-auto-sync" not in help_text
+        assert "--disable-auto-sync" not in help_text
+        assert "no_auto_sync" not in help_text
 
     def test_sync_github_bulk_does_not_use_backfill_path_even_with_issue_index(self) -> None:
         (
@@ -3696,9 +3666,9 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 else:
                     delattr(app_sync_state, "collect_safe_current_repo_backfill_node_ids")
 
-            self.assertIn("iss-local-00001", state.graph.nodes_by_id)
-            self.assertEqual(len(issue_gateway.index_calls), 1)
-            self.assertFalse(collector_called)
+            assert "iss-local-00001" in state.graph.nodes_by_id
+            assert len(issue_gateway.index_calls) == 1
+            assert not collector_called
 
     def test_sync_github_keeps_foreign_coexistence_only_legacy_unscoped_without_backfill(self) -> None:
         (
@@ -3767,8 +3737,8 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertIn("iss-local-00001", state.graph.nodes_by_id)
-            self.assertEqual(node_repo.backfill_calls, [])
+            assert "iss-local-00001" in state.graph.nodes_by_id
+            assert node_repo.backfill_calls == []
 
     def test_collect_sync_state_force_hard_fails_for_partial_scope_backfill_candidates(self) -> None:
         (
@@ -3828,10 +3798,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 clock=_StubClock(),
             )
 
-            with self.assertRaisesRegex(
-                RuntimeError,
-                "preflight validate failed: issue has invalid github linkage",
-            ):
+            with pytest.raises(RuntimeError, match="preflight validate failed: issue has invalid github linkage"):
                 app_sync_state.collect_sync_state(
                     app_contracts.SyncRequest(
                         force=True,
@@ -3841,7 +3808,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
                     ),
                     ports,
                 )
-            self.assertEqual(node_repo.backfill_calls, [])
+            assert node_repo.backfill_calls == []
 
     def test_collect_sync_state_force_hard_fails_for_partial_scope_when_another_validation_error_exists(self) -> None:
         (
@@ -3901,10 +3868,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 clock=_StubClock(),
             )
 
-            with self.assertRaisesRegex(
-                RuntimeError,
-                "preflight validate failed: issue has invalid github linkage",
-            ):
+            with pytest.raises(RuntimeError, match="preflight validate failed: issue has invalid github linkage"):
                 app_sync_state.collect_sync_state(
                     app_contracts.SyncRequest(
                         force=True,
@@ -3914,9 +3878,9 @@ class TestRuntimeSyncS07(unittest.TestCase):
                     ),
                     ports,
                 )
-            self.assertEqual(node_repo.backfill_calls, [])
-            self.assertEqual(issue_gateway.index_calls, [])
-            self.assertEqual(issue_gateway.view_calls, [])
+            assert node_repo.backfill_calls == []
+            assert issue_gateway.index_calls == []
+            assert issue_gateway.view_calls == []
 
     def test_sync_github_skips_backfill_when_current_repo_slug_is_unknown(self) -> None:
         (
@@ -3960,5 +3924,5 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertIn("iss-local-00001", state.graph.nodes_by_id)
-            self.assertEqual(node_repo.backfill_calls, [])
+            assert "iss-local-00001" in state.graph.nodes_by_id
+            assert node_repo.backfill_calls == []

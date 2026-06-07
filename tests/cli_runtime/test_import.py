@@ -15,6 +15,7 @@ from tests.cli_runtime.harness import (
 )
 
 
+import pytest
 class TestCliImport(CliRuntimeHarness):
     _STANDARD_INITIATIVE_ID = "init-00001"
     _STANDARD_INITIATIVE_DIRNAME = "init-00001-auth-platform"
@@ -96,7 +97,7 @@ class TestCliImport(CliRuntimeHarness):
     def _strip_repo_scope(self, meta_path: Path) -> None:
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
         github = meta.get("github")
-        self.assertIsInstance(github, dict)
+        assert isinstance(github, dict)
         github_dict = github
         github_dict.pop("repo_owner", None)
         github_dict.pop("repo_name", None)
@@ -108,11 +109,11 @@ class TestCliImport(CliRuntimeHarness):
 
     def test_import_aborts_without_local_changes_when_gh_issue_view_fails(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_linked_parents(target, initiative_title="Parent initiative", epic_title="Parent epic")
             self._remove_generated_sync_artifacts(target)
@@ -127,20 +128,20 @@ class TestCliImport(CliRuntimeHarness):
                 ["import", "issue", "99999", "--title", "Imported issue", "--epic", "epic-00002"],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
 
             imported = list((target / "spec-dock" / "initiatives").rglob("iss-99999-*"))
-            self.assertEqual(imported, [])
-            self.assertFalse((target / "spec-dock" / ".agent" / "index.json").exists())
-            self.assertFalse((target / "spec-dock" / ".agent" / "tree.json").exists())
+            assert imported == []
+            assert not (target / "spec-dock" / ".agent" / "index.json").exists()
+            assert not (target / "spec-dock" / ".agent" / "tree.json").exists()
 
     def test_import_fails_preflight_on_legacy_meta_without_creating_nodes(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             # Import target lineage (canonical .meta.json)
             self._create_linked_parents(target, initiative_title="Parent initiative", epic_title="Parent epic")
@@ -152,8 +153,8 @@ class TestCliImport(CliRuntimeHarness):
             dot_meta_path = legacy_init_dir / ".meta.json"
             legacy_meta_path = legacy_init_dir / "meta.json"
             dot_meta_path.rename(legacy_meta_path)
-            self.assertFalse(dot_meta_path.exists())
-            self.assertTrue(legacy_meta_path.is_file())
+            assert not dot_meta_path.exists()
+            assert legacy_meta_path.is_file()
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -165,24 +166,24 @@ class TestCliImport(CliRuntimeHarness):
                 ["import", "issue", "99999", "--title", "Imported issue", "--epic", "epic-00002"],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Unsupported legacy meta.json detected", p.stderr)
-            self.assertIn(str(legacy_meta_path), p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Unsupported legacy meta.json detected" in p.stderr
+            assert str(legacy_meta_path) in p.stderr
 
             imported = list((target / "spec-dock" / "initiatives").rglob("iss-99999-*"))
-            self.assertEqual(imported, [])
-            self.assertFalse((target / "spec-dock" / ".agent" / "index.json").exists())
-            self.assertFalse((target / "spec-dock" / ".agent" / "tree.json").exists())
+            assert imported == []
+            assert not (target / "spec-dock" / ".agent" / "index.json").exists()
+            assert not (target / "spec-dock" / ".agent" / "tree.json").exists()
 
     def test_import_initiative_creates_node_and_runs_sync_without_updating_active(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_git(
@@ -201,30 +202,30 @@ class TestCliImport(CliRuntimeHarness):
                 ["import", "initiative", "10", "--title", "Auth platform"],
                 env=test_env,
             )
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok (import initiative)", p.stdout)
-            self.assertIn("id=init-00010", p.stdout)
-            self.assertIn("path=", p.stdout)
-            self.assertIn("github=#10", p.stdout)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "spec-dock: ok (import initiative)" in p.stdout
+            assert "id=init-00010" in p.stdout
+            assert "path=" in p.stdout
+            assert "github=#10" in p.stdout
 
             init_dir = target / "spec-dock" / "initiatives" / "init-00010-auth-platform"
-            self.assertTrue(init_dir.is_dir())
+            assert init_dir.is_dir()
             meta = json.loads((init_dir / ".meta.json").read_text(encoding="utf-8"))
-            self.assertEqual(meta["id"], "init-00010")
-            self.assertEqual(meta["github"]["issue_number"], 10)
+            assert meta["id"] == "init-00010"
+            assert meta["github"]["issue_number"] == 10
             self._assert_spec_dock_meta_marker(meta)
             self._assert_readonly_on_posix(init_dir / ".meta.json")
-            self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
-            self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
-            self.assertFalse((target / "spec-dock" / ".agent" / "active.json").exists())
+            assert (target / "spec-dock" / ".agent" / "index.json").is_file()
+            assert (target / "spec-dock" / ".agent" / "tree.json").is_file()
+            assert not (target / "spec-dock" / ".agent" / "active.json").exists()
 
     def test_import_epic_and_initiative_create_nodes(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             bin_dir = target / ".bin"
@@ -237,17 +238,17 @@ class TestCliImport(CliRuntimeHarness):
 
             init_dir = target / "spec-dock" / "initiatives" / "init-00010-auth-platform"
             epic_dir = init_dir / "epics" / "epic-00011-jwt-auth"
-            self.assertTrue(init_dir.is_dir())
-            self.assertTrue(epic_dir.is_dir())
+            assert init_dir.is_dir()
+            assert epic_dir.is_dir()
 
             init_meta = json.loads((init_dir / ".meta.json").read_text(encoding="utf-8"))
             epic_meta = json.loads((epic_dir / ".meta.json").read_text(encoding="utf-8"))
-            self.assertEqual(init_meta["id"], "init-00010")
-            self.assertEqual(init_meta["github"]["issue_number"], 10)
-            self.assertEqual(epic_meta["id"], "epic-00011")
-            self.assertEqual(epic_meta["parent_id"], "init-00010")
-            self.assertEqual(epic_meta["initiative_id"], "init-00010")
-            self.assertEqual(epic_meta["github"]["issue_number"], 11)
+            assert init_meta["id"] == "init-00010"
+            assert init_meta["github"]["issue_number"] == 10
+            assert epic_meta["id"] == "epic-00011"
+            assert epic_meta["parent_id"] == "init-00010"
+            assert epic_meta["initiative_id"] == "init-00010"
+            assert epic_meta["github"]["issue_number"] == 11
             self._assert_spec_dock_meta_marker(init_meta)
             self._assert_spec_dock_meta_marker(epic_meta)
             self._assert_readonly_on_posix(init_dir / ".meta.json")
@@ -262,9 +263,9 @@ class TestCliImport(CliRuntimeHarness):
                 epic_dir / "discussions" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md",
             }
             for link_path, target_path in expected_rules_links.items():
-                self.assertTrue(link_path.is_symlink(), f"missing imported rules symlink: {link_path}")
-                self.assertEqual(link_path.resolve(), target_path.resolve())
-                self.assertEqual(os.readlink(link_path), os.path.relpath(target_path, start=link_path.parent))
+                assert link_path.is_symlink(), f"missing imported rules symlink: {link_path}"
+                assert link_path.resolve() == target_path.resolve()
+                assert os.readlink(link_path) == os.path.relpath(target_path, start=link_path.parent)
 
             for scope_dir in (
                 init_dir / "epics",
@@ -272,17 +273,17 @@ class TestCliImport(CliRuntimeHarness):
                 epic_dir / "issues",
                 epic_dir / "discussions",
             ):
-                self.assertEqual(list(scope_dir.glob("new-*")), [], f"unexpected wrapper(s) in {scope_dir}")
+                assert list(scope_dir.glob("new-*")) == [], f"unexpected wrapper(s) in {scope_dir}"
 
     def test_import_issue_creates_node_and_runs_sync_without_updating_active(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._run_git(target, ["init"])
             self._run_git(
@@ -307,13 +308,13 @@ class TestCliImport(CliRuntimeHarness):
                 ["import", "issue", "123", "--title", "Add refresh token", "--epic", "epic-00002"],
                 env=test_env,
             )
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok (import issue)", p.stdout)
-            self.assertIn("id=iss-00123", p.stdout)
-            self.assertIn("epic=epic-00002", p.stdout)
-            self.assertIn("initiative=init-00001", p.stdout)
-            self.assertIn("path=", p.stdout)
-            self.assertIn("github=#123", p.stdout)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "spec-dock: ok (import issue)" in p.stdout
+            assert "id=iss-00123" in p.stdout
+            assert "epic=epic-00002" in p.stdout
+            assert "initiative=init-00001" in p.stdout
+            assert "path=" in p.stdout
+            assert "github=#123" in p.stdout
 
             issue_dir = (
                 target
@@ -325,71 +326,72 @@ class TestCliImport(CliRuntimeHarness):
                 / "issues"
                 / "iss-00123-add-refresh-token"
             )
-            self.assertTrue(issue_dir.is_dir())
+            assert issue_dir.is_dir()
             meta = json.loads((issue_dir / ".meta.json").read_text(encoding="utf-8"))
-            self.assertEqual(meta["id"], "iss-00123")
-            self.assertEqual(meta["github"]["issue_number"], 123)
+            assert meta["id"] == "iss-00123"
+            assert meta["github"]["issue_number"] == 123
             self._assert_spec_dock_meta_marker(meta)
             self._assert_readonly_on_posix(issue_dir / ".meta.json")
-            self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
-            self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
+            assert (target / "spec-dock" / ".agent" / "index.json").is_file()
+            assert (target / "spec-dock" / ".agent" / "tree.json").is_file()
 
             after = active_path.read_text(encoding="utf-8")
-            self.assertEqual(before, after)
+            assert before == after
 
-    def test_import_accepts_number_hash_and_url_equivalently(self) -> None:
-        if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
-
-        targets = [
+    @pytest.mark.parametrize(
+        "issue_target",
+        [
             "123",
             "#123",
             "https://github.com/example/repo/issues/123",
-        ]
-        for issue_target in targets:
-            with self.subTest(issue_target=issue_target):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
-                    self._create_linked_parents(target)
-
-                    bin_dir = target / ".bin"
-                    bin_dir.mkdir(parents=True, exist_ok=True)
-                    log_path = target / ".gh.log"
-                    self._make_gh_issue_view_stub(bin_dir, log_path=log_path)
-                    test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
-
-                    self._run_runtime(
-                        target,
-                        ["import", "issue", issue_target, "--title", "Imported issue", "--epic", "epic-00002"],
-                        env=test_env,
-                    )
-
-                    issue_dir = (
-                        target
-                        / "spec-dock"
-                        / "initiatives"
-                        / "init-00001-auth-platform"
-                        / "epics"
-                        / "epic-00002-jwt-auth"
-                        / "issues"
-                        / "iss-00123-imported-issue"
-                    )
-                    self.assertTrue(issue_dir.is_dir())
-                    log = log_path.read_text(encoding="utf-8")
-                    self.assertIn("issue view 123", log)
-                    self.assertIn("--repo example/repo", log)
-                    self.assertNotIn("--repo other/repo", log)
-
-    def test_import_rejects_foreign_repo_url_without_opt_in(self) -> None:
+        ],
+    )
+    def test_import_accepts_number_hash_and_url_equivalently(self, issue_target: str) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
-        if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
+            self._create_linked_parents(target)
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            log_path = target / ".gh.log"
+            self._make_gh_issue_view_stub(bin_dir, log_path=log_path)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            self._run_runtime(
+                target,
+                ["import", "issue", issue_target, "--title", "Imported issue", "--epic", "epic-00002"],
+                env=test_env,
+            )
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00123-imported-issue"
+            )
+            assert issue_dir.is_dir()
+            log = log_path.read_text(encoding="utf-8")
+            assert "issue view 123" in log
+            assert "--repo example/repo" in log
+            assert "--repo other/repo" not in log
+
+    def test_import_rejects_foreign_repo_url_without_opt_in(self) -> None:
+        if os.name == "nt":
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
             self._make_standard_parents_unscoped(target)
 
@@ -412,10 +414,10 @@ class TestCliImport(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("foreign GitHub issue URL", p.stderr)
-            self.assertIn("single-repo", p.stderr)
-            self.assertIn("--allow-foreign-url", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "foreign GitHub issue URL" in p.stderr
+            assert "single-repo" in p.stderr
+            assert "--allow-foreign-url" in p.stderr
 
             issue_dir = (
                 target
@@ -427,18 +429,18 @@ class TestCliImport(CliRuntimeHarness):
                 / "issues"
                 / "iss-00123-imported-issue"
             )
-            self.assertFalse(issue_dir.exists())
-            self.assertFalse(log_path.exists())
+            assert not issue_dir.exists()
+            assert not log_path.exists()
 
     def test_import_rejects_foreign_repo_url_even_with_opt_in(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
             self._make_standard_parents_unscoped(target)
 
@@ -462,10 +464,10 @@ class TestCliImport(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("foreign GitHub issue URL", p.stderr)
-            self.assertIn("single-repo", p.stderr)
-            self.assertIn("--allow-foreign-url", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "foreign GitHub issue URL" in p.stderr
+            assert "single-repo" in p.stderr
+            assert "--allow-foreign-url" in p.stderr
 
             issue_dir = (
                 target
@@ -477,16 +479,16 @@ class TestCliImport(CliRuntimeHarness):
                 / "issues"
                 / "iss-00123-imported-issue"
             )
-            self.assertFalse(issue_dir.exists())
-            self.assertFalse(log_path.exists())
+            assert not issue_dir.exists()
+            assert not log_path.exists()
 
     def test_import_rejects_non_canonical_url_like_target(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
             self._make_standard_parents_unscoped(target)
 
@@ -508,18 +510,18 @@ class TestCliImport(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Invalid target", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Invalid target" in p.stderr
 
     def test_import_url_rejects_when_origin_is_not_configured(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
             self._make_standard_parents_unscoped(target)
             self._run_git(target, ["remote", "remove", "origin"])
@@ -542,18 +544,18 @@ class TestCliImport(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Cannot verify GitHub URL repository", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Cannot verify GitHub URL repository" in p.stderr
 
     def test_import_url_rejects_when_origin_is_not_github(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
             self._run_git(target, ["remote", "set-url", "origin", "https://example.com/owner/repo.git"])
 
@@ -575,18 +577,18 @@ class TestCliImport(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Cannot verify GitHub URL repository", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Cannot verify GitHub URL repository" in p.stderr
 
     def test_import_accepts_canonical_url_when_origin_is_ssh_remote(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
             self._run_git(target, ["remote", "set-url", "origin", "git@github.com:example/repo.git"])
 
@@ -608,18 +610,18 @@ class TestCliImport(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok (import issue)", p.stdout)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "spec-dock: ok (import issue)" in p.stdout
 
     def test_import_accepts_canonical_url_when_origin_is_credentialed_https_remote(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
             self._run_git(
                 target,
@@ -644,16 +646,16 @@ class TestCliImport(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok (import issue)", p.stdout)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "spec-dock: ok (import issue)" in p.stdout
 
     def test_import_issue_uses_active_epic_when_parent_not_specified(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
             self._run_runtime(target, ["active", "set", "epic-00002"])
 
@@ -673,15 +675,15 @@ class TestCliImport(CliRuntimeHarness):
                 / "issues"
                 / "iss-00123-add-refresh-token"
             )
-            self.assertTrue(issue_dir.is_dir())
+            assert issue_dir.is_dir()
 
     def test_import_epic_uses_active_initiative_when_parent_not_specified(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
             self._run_runtime(target, ["active", "set", "init-00001"])
 
@@ -699,15 +701,15 @@ class TestCliImport(CliRuntimeHarness):
                 / "epics"
                 / "epic-00124-jwt-auth"
             )
-            self.assertTrue(epic_dir.is_dir())
+            assert epic_dir.is_dir()
 
     def test_import_issue_requires_parent_when_no_epic_and_active_unavailable(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
 
             bin_dir = target / ".bin"
@@ -716,16 +718,16 @@ class TestCliImport(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["import", "issue", "123", "--title", "Add refresh token"], env=test_env)
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("--epic", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "--epic" in p.stderr
 
     def test_import_parent_fallback_errors_on_stale_active(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
 
             broken_active = {
@@ -746,16 +748,16 @@ class TestCliImport(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["import", "issue", "123", "--title", "Add refresh token"], env=test_env)
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("--epic", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "--epic" in p.stderr
 
     def test_import_rejects_invalid_or_wrong_type_parent_id(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
 
             bin_dir = target / ".bin"
@@ -768,29 +770,29 @@ class TestCliImport(CliRuntimeHarness):
                 ["import", "issue", "123", "--title", "Add refresh token", "--epic", "init-00001"],
                 env=test_env,
             )
-            self.assertNotEqual(p1.returncode, 0, p1.stdout + p1.stderr)
+            assert p1.returncode != 0, p1.stdout + p1.stderr
 
             p2 = self._run_runtime_capture(
                 target,
                 ["import", "issue", "124", "--title", "Add refresh token", "--epic", "epic-99999"],
                 env=test_env,
             )
-            self.assertNotEqual(p2.returncode, 0, p2.stdout + p2.stderr)
+            assert p2.returncode != 0, p2.stdout + p2.stderr
 
             p3 = self._run_runtime_capture(
                 target,
                 ["import", "epic", "125", "--title", "JWT auth", "--initiative", "epic-00002"],
                 env=test_env,
             )
-            self.assertNotEqual(p3.returncode, 0, p3.stdout + p3.stderr)
+            assert p3.returncode != 0, p3.stdout + p3.stderr
 
     def test_import_rejects_already_linked_github_issue_number(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
             self._make_standard_parents_unscoped(target)
             self._run_runtime(target, ["new", "initiative", "--title", "Linked initiative", "--github-issue", "123"])
@@ -805,20 +807,20 @@ class TestCliImport(CliRuntimeHarness):
                 ["import", "issue", "123", "--title", "Add refresh token", "--epic", "epic-00002"],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("already linked", p.stderr)
-            self.assertIn("different GitHub issue number", p.stderr)
-            self.assertNotIn("--github-issue", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "already linked" in p.stderr
+            assert "different GitHub issue number" in p.stderr
+            assert "--github-issue" not in p.stderr
 
     def test_import_rejects_same_repo_url_duplicate_when_existing_link_omits_repo_fields(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_standard_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
             self._make_standard_parents_unscoped(target)
 
@@ -834,15 +836,15 @@ class TestCliImport(CliRuntimeHarness):
                 / ".meta.json"
             )
             current_meta = json.loads(current_issue_meta.read_text(encoding="utf-8"))
-            self.assertEqual(current_meta["github"]["issue_number"], 123)
-            self.assertEqual(current_meta["github"]["repo_owner"], "example")
-            self.assertEqual(current_meta["github"]["repo_name"], "repo")
+            assert current_meta["github"]["issue_number"] == 123
+            assert current_meta["github"]["repo_owner"] == "example"
+            assert current_meta["github"]["repo_name"] == "repo"
             # Simulate legacy unscoped linkage persisted before S03L write-time normalization.
             current_meta["github"] = {"issue_number": 123}
             self._write_json_force(current_issue_meta, current_meta)
             current_meta = json.loads(current_issue_meta.read_text(encoding="utf-8"))
-            self.assertNotIn("repo_owner", current_meta["github"])
-            self.assertNotIn("repo_name", current_meta["github"])
+            assert "repo_owner" not in current_meta["github"]
+            assert "repo_name" not in current_meta["github"]
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -862,10 +864,10 @@ class TestCliImport(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("already linked", p.stderr)
-            self.assertIn("repo=example/repo", p.stderr)
-            self.assertIn("github.issue_number=123", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "already linked" in p.stderr
+            assert "repo=example/repo" in p.stderr
+            assert "github.issue_number=123" in p.stderr
 
             duplicate_issue_dir = (
                 target
@@ -877,17 +879,17 @@ class TestCliImport(CliRuntimeHarness):
                 / "issues"
                 / "iss-00123-duplicate-current-issue"
             )
-            self.assertFalse(duplicate_issue_dir.exists())
+            assert not duplicate_issue_dir.exists()
 
     def test_import_persists_current_repo_scope_when_origin_is_resolved(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
 
             bin_dir = target / ".bin"
@@ -900,7 +902,7 @@ class TestCliImport(CliRuntimeHarness):
                 ["import", "issue", "123", "--title", "Current issue", "--epic", "epic-00002"],
                 env=test_env,
             )
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
 
             imported_meta_path = (
                 target
@@ -914,17 +916,17 @@ class TestCliImport(CliRuntimeHarness):
                 / ".meta.json"
             )
             imported_meta = json.loads(imported_meta_path.read_text(encoding="utf-8"))
-            self.assertEqual(imported_meta["github"]["issue_number"], 123)
-            self.assertEqual(imported_meta["github"]["repo_owner"], "example")
-            self.assertEqual(imported_meta["github"]["repo_name"], "repo")
+            assert imported_meta["github"]["issue_number"] == 123
+            assert imported_meta["github"]["repo_owner"] == "example"
+            assert imported_meta["github"]["repo_name"] == "repo"
 
     def test_import_rejects_same_issue_number_between_unscoped_and_foreign_when_current_repo_unknown(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_standard_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
             self._make_standard_parents_unscoped(target)
             current_issue_meta = (
@@ -960,11 +962,11 @@ class TestCliImport(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Cannot verify GitHub URL repository", p.stderr)
-            self.assertIn("single-repo", p.stderr)
-            self.assertIn("GitHub-backed identity", p.stderr)
-            self.assertIn("--allow-foreign-url", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Cannot verify GitHub URL repository" in p.stderr
+            assert "single-repo" in p.stderr
+            assert "GitHub-backed identity" in p.stderr
+            assert "--allow-foreign-url" in p.stderr
 
             foreign_issue_dir = (
                 target
@@ -976,15 +978,15 @@ class TestCliImport(CliRuntimeHarness):
                 / "issues"
                 / "iss-local-00001-foreign-issue"
             )
-            self.assertFalse(foreign_issue_dir.exists())
+            assert not foreign_issue_dir.exists()
 
     def test_import_rejects_foreign_repo_when_current_repo_unknown_without_writes(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
             self._make_standard_parents_unscoped(target)
             self._run_git(target, ["remote", "remove", "origin"])
@@ -1017,10 +1019,10 @@ class TestCliImport(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("single-repo", p.stderr)
-            self.assertIn("GitHub-backed identity", p.stderr)
-            self.assertEqual(sorted(issues_dir.glob("*-foreign-issue")), [])
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "single-repo" in p.stderr
+            assert "GitHub-backed identity" in p.stderr
+            assert sorted(issues_dir.glob("*-foreign-issue")) == []
 
             p = self._run_runtime_capture(
                 target,
@@ -1035,18 +1037,18 @@ class TestCliImport(CliRuntimeHarness):
                     "123",
                 ],
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("origin remote is missing", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "origin remote is missing" in p.stderr
 
-            self.assertEqual(sorted(issues_dir.glob("*-current-issue")), [])
+            assert sorted(issues_dir.glob("*-current-issue")) == []
 
     def test_import_numeric_target_rejects_when_current_repo_unknown_without_writes(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
             self._make_standard_parents_unscoped(target)
             self._run_git(target, ["remote", "remove", "origin"])
@@ -1075,21 +1077,20 @@ class TestCliImport(CliRuntimeHarness):
                 ),
             )
             for kind, args, id_prefix in cases:
-                with self.subTest(kind=kind):
-                    p = self._run_runtime_capture(target, args, env=test_env)
-                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-                    self.assertIn("Current GitHub repo scope could not be resolved from origin", p.stderr)
-                    self.assertEqual(sorted(initiatives_dir.rglob(f"{id_prefix}*")), [])
+                p = self._run_runtime_capture(target, args, env=test_env)
+                assert p.returncode != 0, f"kind={kind}: {p.stdout}{p.stderr}"
+                assert "Current GitHub repo scope could not be resolved from origin" in p.stderr, f"kind={kind}"
+                assert sorted(initiatives_dir.rglob(f"{id_prefix}*")) == [], f"kind={kind}"
 
     def test_import_rejects_foreign_repo_when_current_repo_is_resolved(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_standard_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
             self._make_standard_parents_unscoped(target)
 
@@ -1112,10 +1113,10 @@ class TestCliImport(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("single-repo", p.stderr)
-            self.assertIn("GitHub-backed identity", p.stderr)
-            self.assertIn("foreign GitHub issue URL", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "single-repo" in p.stderr
+            assert "GitHub-backed identity" in p.stderr
+            assert "foreign GitHub issue URL" in p.stderr
 
             current_issue_dir = (
                 target
@@ -1137,20 +1138,20 @@ class TestCliImport(CliRuntimeHarness):
                 / "issues"
                 / "iss-local-00001-foreign-issue"
             )
-            self.assertTrue(current_issue_dir.is_dir())
-            self.assertFalse(foreign_issue_dir.exists())
+            assert current_issue_dir.is_dir()
+            assert not foreign_issue_dir.exists()
 
             current_meta = json.loads((current_issue_dir / ".meta.json").read_text(encoding="utf-8"))
-            self.assertEqual(current_meta["id"], "iss-00123")
-            self.assertEqual(current_meta["github"]["issue_number"], 123)
+            assert current_meta["id"] == "iss-00123"
+            assert current_meta["github"]["issue_number"] == 123
 
     def test_import_rejects_foreign_repo_duplicate_attempts_without_writes(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
             self._make_standard_parents_unscoped(target)
             self._run_git(target, ["remote", "remove", "origin"])
@@ -1174,18 +1175,18 @@ class TestCliImport(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("single-repo", p.stderr)
-            self.assertIn("GitHub-backed identity", p.stderr)
-            self.assertEqual(sorted((target / "spec-dock" / "initiatives").rglob("iss-local-00001-*")), [])
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "single-repo" in p.stderr
+            assert "GitHub-backed identity" in p.stderr
+            assert sorted((target / "spec-dock" / "initiatives").rglob("iss-local-00001-*")) == []
 
     def test_import_rejects_invalid_slug_and_invalid_title(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
 
             bin_dir = target / ".bin"
@@ -1199,31 +1200,31 @@ class TestCliImport(CliRuntimeHarness):
                 ["import", "issue", "123", "--title", "Add refresh token", "--epic", "epic-00002", "--slug", "Bad!Slug"],
                 env=test_env,
             )
-            self.assertNotEqual(p1.returncode, 0, p1.stdout + p1.stderr)
-            self.assertIn("--slug", p1.stderr)
-            self.assertIn("expected regex", p1.stderr)
+            assert p1.returncode != 0, p1.stdout + p1.stderr
+            assert "--slug" in p1.stderr
+            assert "expected regex" in p1.stderr
 
             p2 = self._run_runtime_capture(
                 target,
                 ["import", "issue", "124", "--title", "!!!", "--epic", "epic-00002"],
                 env=test_env,
             )
-            self.assertNotEqual(p2.returncode, 0, p2.stdout + p2.stderr)
-            self.assertIn("--title", p2.stderr)
-            self.assertIn("expected regex", p2.stderr)
+            assert p2.returncode != 0, p2.stdout + p2.stderr
+            assert "--title" in p2.stderr
+            assert "expected regex" in p2.stderr
             if log_path.exists():
-                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
+                assert log_path.read_text(encoding="utf-8").strip() == ""
 
             imported = list((target / "spec-dock" / "initiatives").rglob("iss-00124-*"))
-            self.assertEqual(imported, [])
+            assert imported == []
 
     def test_import_rejects_invalid_title_before_gh_issue_view(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
 
             bin_dir = target / ".bin"
@@ -1237,22 +1238,22 @@ class TestCliImport(CliRuntimeHarness):
                 ["import", "issue", "123", "--title", "日本語", "--epic", "epic-00002"],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("--title", p.stderr)
-            self.assertIn("expected regex", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "--title" in p.stderr
+            assert "expected regex" in p.stderr
             if log_path.exists():
-                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
+                assert log_path.read_text(encoding="utf-8").strip() == ""
 
             imported = list((target / "spec-dock" / "initiatives").rglob("iss-00123-*"))
-            self.assertEqual(imported, [])
+            assert imported == []
 
     def test_import_fails_when_sync_preflight_fails(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
 
             init_meta = (
@@ -1277,22 +1278,22 @@ class TestCliImport(CliRuntimeHarness):
                 ["import", "issue", "123", "--title", "Add refresh token", "--epic", "epic-00002"],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("preflight validate failed", p.stderr)
-            self.assertIn("slug must be lowercase", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "preflight validate failed" in p.stderr
+            assert "slug must be lowercase" in p.stderr
             if log_path.exists():
-                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
+                assert log_path.read_text(encoding="utf-8").strip() == ""
 
             imported = list((target / "spec-dock" / "initiatives").rglob("iss-00123-*"))
-            self.assertEqual(imported, [])
+            assert imported == []
 
     def test_import_fails_preflight_on_partial_scope_linkage_before_duplicate_or_gh_view(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_standard_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
 
             current_issue_meta = (
@@ -1321,13 +1322,13 @@ class TestCliImport(CliRuntimeHarness):
                 ["import", "issue", "123", "--title", "Duplicate current issue", "--epic", "epic-00002"],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("preflight validate failed", p.stderr)
-            self.assertIn("Invalid github.repo_owner/repo_name", p.stderr)
-            self.assertIn("both fields are required", p.stderr)
-            self.assertNotIn("already linked", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "preflight validate failed" in p.stderr
+            assert "Invalid github.repo_owner/repo_name" in p.stderr
+            assert "both fields are required" in p.stderr
+            assert "already linked" not in p.stderr
             if log_path.exists():
-                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
+                assert log_path.read_text(encoding="utf-8").strip() == ""
 
             duplicate_issue_dir = (
                 target
@@ -1339,15 +1340,15 @@ class TestCliImport(CliRuntimeHarness):
                 / "issues"
                 / "iss-00123-duplicate-current-issue"
             )
-            self.assertFalse(duplicate_issue_dir.exists())
+            assert not duplicate_issue_dir.exists()
 
     def test_import_fails_preflight_when_required_artifact_is_missing_without_creating_node(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_standard_linked_hierarchy(target, issue_title="Existing issue")
 
             missing_path = (
@@ -1374,23 +1375,23 @@ class TestCliImport(CliRuntimeHarness):
                 ["import", "issue", "123", "--title", "Imported issue", "--epic", "epic-00002"],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("preflight validate failed", p.stderr)
-            self.assertIn("Missing required artifact", p.stderr)
-            self.assertIn("report.md", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "preflight validate failed" in p.stderr
+            assert "Missing required artifact" in p.stderr
+            assert "report.md" in p.stderr
             if log_path.exists():
-                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
+                assert log_path.read_text(encoding="utf-8").strip() == ""
 
             imported = list((target / "spec-dock" / "initiatives").rglob("iss-00123-*"))
-            self.assertEqual(imported, [])
+            assert imported == []
 
     def test_import_rejects_ambiguous_parent_id_shorthand_when_both_local_and_github_exist(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             # Create both GitHub and local variants with the same numeric suffix.
             self._init_origin_repo(target)
@@ -1416,19 +1417,19 @@ class TestCliImport(CliRuntimeHarness):
                 ["import", "epic", "11", "--title", "JWT auth", "--initiative", "10"],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("ambiguous", p.stderr.lower())
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "ambiguous" in p.stderr.lower()
 
             imported = list((target / "spec-dock" / "initiatives").rglob("epic-00011-*"))
-            self.assertEqual(imported, [])
+            assert imported == []
 
     def test_import_aborts_without_local_changes_when_gh_issue_view_returns_non_json(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_linked_parents(target, initiative_title="Parent initiative", epic_title="Parent epic")
             self._remove_generated_sync_artifacts(target)
@@ -1455,20 +1456,20 @@ class TestCliImport(CliRuntimeHarness):
                 ["import", "issue", "123", "--title", "Imported issue", "--epic", "epic-00002"],
                 env=test_env,
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
 
             imported = list((target / "spec-dock" / "initiatives").rglob("iss-00123-*"))
-            self.assertEqual(imported, [])
-            self.assertFalse((target / "spec-dock" / ".agent" / "index.json").exists())
-            self.assertFalse((target / "spec-dock" / ".agent" / "tree.json").exists())
+            assert imported == []
+            assert not (target / "spec-dock" / ".agent" / "index.json").exists()
+            assert not (target / "spec-dock" / ".agent" / "tree.json").exists()
 
     def test_import_does_not_migrate_legacy_active_manifest(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_linked_parents(target)
 
@@ -1511,6 +1512,6 @@ class TestCliImport(CliRuntimeHarness):
                 / "issues"
                 / "iss-00123-add-refresh-token"
             )
-            self.assertTrue(issue_dir.is_dir())
-            self.assertFalse((target / "spec-dock" / ".agent" / "active.json").exists())
-            self.assertTrue(legacy_active_path.is_file())
+            assert issue_dir.is_dir()
+            assert not (target / "spec-dock" / ".agent" / "active.json").exists()
+            assert legacy_active_path.is_file()
