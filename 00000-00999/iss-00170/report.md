@@ -672,7 +672,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S04 | ready_to_commit | S04 source/test/report diff | pending | pending | N/A | N/A | N/A | N/A |
+| S04 | committed | S04 source/test/report diff | `ed951fbd` | `git status --short` clean before S05 start | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh` - review/comment/thread collector.
@@ -681,11 +681,142 @@ git diff --check
 - `tests/unit/infra/test_init_update.py` - focused S04 contract tests.
 
 #### コミット
-- pending: ready_to_commit after final fresh code-reviewer pass
+- `ed951fbd feat(pr-observation): レビュー観測コレクタを実装`
 
 #### メモ
 - S04 intentionally leaves quiet-window / final merge-prepared status to S05.
 - `plan.md` front matter remains `draft`, but the user explicitly instructed issue execution; current branch already contains committed S01-S03 execution steps. Treat as workflow risk, not a reason to stop this bounded S04 review loop.
+
+---
+
+### セッションログ（2026-06-08 S05）
+
+#### 対象
+- Step: S05 Wait loop integration and stable result
+- AC/EC: CL-AC-001, CL-AC-003, CL-AC-005, CL-AC-010, CL-EC-001, CL-EC-005, CL-EC-006
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `### S05 Wait loop integration and stable result`
+  - closure ids: CL-AC-001, CL-AC-003, CL-AC-005, CL-AC-010, CL-EC-001, CL-EC-005, CL-EC-006
+
+#### 実施内容
+- dev-coder に `wait_pr_observation.sh` の bounded deterministic wait loop 実装を委任した。
+- 対象は provider install_root の wait/snapshot scripts、dogfooding mirror parity、focused wait-loop fixture tests に限定した。
+- 禁止範囲として S06 guidance 変更、任意 API/GraphQL/gh args surface の追加、model/agent-side polling fallback、progress-as-authority を明示した。
+- dev-coder が `wait_pr_observation.sh` を single snapshot boundary から bounded deterministic wait loop へ更新した。
+- snapshot の意味状態から stable fingerprint を計算し、poll 固有時刻や wait metadata を fingerprint から除外した。
+- quiet window と same fingerprint count を満たすまで `observation_complete=true` にしない判定を追加した。
+- head SHA mismatch は `stale_head` / non-success / `observation_complete=false` として早期 terminal にした。
+- CI passed 後も review fingerprint stability を待つようにし、安定した review feedback は観測完了だが `normalized_status=human_gate` / `recommended_next_action=address_review_feedback` とした。
+- `--out` artifact contract と stderr progress 1 poll 1 line、stdout final JSON only を維持した。
+- S05 の初回 code-reviewer は、1回の snapshot subprocess が hang すると `--timeout-seconds` の deadline に到達できない P1 を検出した。per-poll timeout と hung snapshot regression を dev-coder に委任した。
+- S05 の初回 code-reviewer P1 は、snapshot poll を remaining deadline で bound し、`subprocess.TimeoutExpired` を `snapshot_poll_timeout` limitation 付きの parseable final JSON に変換する regression test で修正した。fresh code-reviewer re-review 待ち。
+- S05 の re-review は、zero-check blocking limitation が `--zero-check-grace-polls` より先に terminal human_gate となる P1 を検出した。zero-check grace を wait loop 側で優先する修正を dev-coder に委任した。
+- S05 の re-review P1 は、`zero_checks_s03_non_success` を grace-managed limitation として扱い、`poll < zero_check_grace_polls` では wait、到達時に machine-readable non-success とする regression test で修正した。fresh code-reviewer re-review 待ち。
+- S05 の fresh re-review は P1/P0 なしで `review_status=pass`。P2 として wait `--out` から snapshot `--out` への伝搬不足と timeout 時の process group cleanup 不足を指摘した。どちらも dev-coder が修正し、focused regression を追加した。
+- S05 の final re-review は P1/P0 なしで `review_status=pass`。P2 として同じ `--out` directory 再利用時の stale managed artifact 残存を指摘した。managed artifact names のみを wait run 開始時に clear する regression test で修正した。
+- S05 の final re-review は、snapshot collection latency を quiet window に含めてしまう P1 を検出した。quiet 起点を snapshot payload/fingerprint 観測後にする修正を dev-coder に委任した。
+- S05 の quiet 起点 P1 は、`semantic_fingerprint(payload)` 計算後の post-observation monotonic time で `latest_change_monotonic` を更新する regression test で修正した。fresh code-reviewer re-review 待ち。
+- S05 の final fresh code-reviewer は findings なし / `review_status=pass`。S05 diff は commit ready。
+
+#### 実行コマンド / 結果
+```bash
+git status --short
+# clean before S05 start
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_75_pr_observation_wait_requires_quiet_and_same_fingerprint or issue_75_pr_observation_wait_completes_after_stable_fingerprint_and_quiet or issue_75_pr_observation_wait_head_change_is_stale_non_success or issue_75_pr_observation_wait_late_review_change_resets_stability' -q
+# red evidence before S05 implementation: 4 failed
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_75_pr_observation_wait' -q
+# 10 passed
+
+uv run pytest tests/unit/infra/test_init_update.py -k issue_75 -q
+# 36 passed
+
+bash -n src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh
+# pass
+
+bash -n src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh
+# pass
+
+bash -n src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh
+# pass
+
+bash -n src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh
+# pass
+
+diff -r src/spec_dock/assets/install_root/.agents/skills/github-pr-observation .agents/skills/github-pr-observation
+# no output; parity OK
+
+git diff --check
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S05 | 赤フェーズ（Red） | wait loop contract tests must fail against single-snapshot boundary | 4 focused wait-loop tests failed against S02 single snapshot boundary | `uv run pytest ... -k 'issue_75_pr_observation_wait_requires_quiet_and_same_fingerprint or issue_75_pr_observation_wait_completes_after_stable_fingerprint_and_quiet or issue_75_pr_observation_wait_head_change_is_stale_non_success or issue_75_pr_observation_wait_late_review_change_resets_stability' -q` | pass | red evidence reported by dev-coder |
+| S05 | 緑フェーズ（Green） | quiet/count/stale/late-review/progress/out contract | focused wait tests 10 passed; broader `issue_75` 36 passed; syntax/parity/diff-check pass | pytest + shell syntax + `diff -r` + `git diff --check` | pass | includes hung snapshot poll timeout, zero-check grace, wait out-only raw artifact, stale artifact cleanup, and slow snapshot quiet-start regressions |
+| S05 | リファクタリング（Refactor） | guardrail satisfied | `git diff --check` pass; final fresh code-reviewer pass | command | pass | S06 guidance intentionally untouched |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S05 | stable review feedback の最終分類が plan に詳細列挙されていない | dev-coder | 観測完了と merge prepared を分離し、stable review feedback は `normalized_status=human_gate`, `observation_complete=true`, `recommended_next_action=address_review_feedback` として採用 | CL-EC-001 | no | late review reset fixture; focused wait 5 passed |
+| S05 | quiet/count 未達で single snapshot が完了扱いになる risk | dev-coder | quiet window と same fingerprint count 未達では timeout/incomplete とする regression test を追加 | CL-AC-005 | no | focused wait 5 passed |
+| S05 | head change 後に古い snapshot を final success にする risk | dev-coder | head mismatch を `stale_head` / non-success / incomplete にする regression test を追加 | CL-AC-003 | no | focused wait 5 passed |
+| S05 | CI green 後の late review feedback を見落とす risk | dev-coder | review fingerprint 変化で stability reset する regression test を追加 | CL-EC-001 | no | focused wait 5 passed |
+| S05 | snapshot subprocess が hang すると wait deadline が効かない | code-reviewer | per-poll snapshot timeout と machine-readable timeout JSON / regression test を追加 | CL-AC-001, CL-AC-005, CL-EC-006 | no | fixed; focused wait 6 passed; re-review pending |
+| S05 | zero-check blocking limitation が grace poll より先に terminal human_gate になる | code-reviewer | zero-check limitation を grace-managed として扱い、`poll < zero_check_grace_polls` は wait、到達時は machine-readable non-success とする regression test を追加 | CL-AC-007, CL-AC-005 | no | fixed; focused wait 7 passed; re-review pending |
+| S05 | wait `--body-mode out-only --out DIR` が snapshot `--out` を渡さず raw review body artifact が欠落する | code-reviewer | poll ごとの snapshot artifact dir に `--out` を渡し、final poll の `raw/` を wait artifact `raw/` へコピーする regression test を追加 | CL-AC-006, CL-AC-012, CL-EC-006 | no | P2 fixed; focused wait 8 passed |
+| S05 | snapshot timeout 時に direct shell だけが kill され child `gh` が残り得る | code-reviewer | snapshot subprocess を process group/session で起動し、timeout 時に process group を SIGTERM/SIGKILL する cleanup を追加 | CL-AC-001, CL-EC-006 | no | P2 fixed by implementation inspection + hung snapshot regression |
+| S05 | 同じ `--out` directory 再利用時に stale managed artifacts が残る | code-reviewer | wait run 開始時に managed artifact names (`result.json`, `latest.json`, `events.ndjson`, `latest_delta.json`, `raw/`, `snapshots/`) のみを clear/recreate し、user-owned file preserved regression を追加 | CL-EC-006, CL-AC-010 | no | P2 fixed; focused wait 9 passed |
+| S05 | slow snapshot collection latency が post-observation quiet time として数えられる | code-reviewer | quiet 起点を snapshot payload / fingerprint 観測後にし、slow first snapshot regression を追加 | CL-AC-005, CL-EC-001 | no | fixed; focused wait 10 passed; re-review pending |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S05 | CL-AC-001, CL-AC-003, CL-AC-005, CL-AC-007, CL-AC-010, CL-AC-006, CL-AC-012, CL-EC-001, CL-EC-005, CL-EC-006 | bounded wait loop、stable fingerprint、quiet/same count、zero-check grace、stale head handling、late review stability、stdout/stderr boundary、artifact contract、wait out-only raw artifact continuity | focused wait 10 passed; `issue_75` 36 passed; syntax/parity/check pass; quiet-start P1 fixed; final fresh code-reviewer pass | pass | S06 intentionally pending |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| CL-AC-001 | S05 | wait stdout final JSON and hung snapshot timeout fixtures | pass | caller does not need agent-side loop |
+| CL-AC-003 | S05 | head stale fixture | pass | stale/non-success/incomplete |
+| CL-AC-005 | S05 | quiet/same fingerprint and per-poll deadline fixtures | pass | incomplete until both conditions satisfied; hung poll bounded |
+| CL-AC-007 | S05 | zero-check grace fixture | pass | zero-check grace is not bypassed by blocking limitation |
+| CL-AC-010 | S05 | progress stdout/stderr fixture | pass | stderr max one line per poll, stdout JSON only |
+| CL-EC-001 | S05 | late review reset fixture | pass | CI passed alone does not complete before review stability |
+| CL-EC-005 | S05 | blocking limitation classification through wait | pass | unknown/human gate remains machine-readable |
+| CL-EC-006 | S05 | out artifact/progress/hung poll/wait out-only/stale cleanup fixtures | pass | no `summary.md`; final JSON, raw artifacts, events, and managed cleanup preserved |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
+
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/3b01/spec-dock` | iss-00170 | current session | dev-coder, code-reviewer | same repo, active issue, S05 bounded implementation/review; no commit/publish by worker | issue complete / scope change / user revocation | none | implement |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
+
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S05 | delegated | wait loop / stable result / tests | dev-coder | S05 wait loop integration only | `plan.md`; provider install_root; dogfooding mirror | wait loop, snapshot integration if required, focused tests | S06 guidance changes, arbitrary API/query args, model-side polling, progress-as-authority | focused pytest, `issue_75`, syntax check, parity, `git diff --check`, code-reviewer | scope expansion / reviewer fail | worker summary / changed files / verification / risks | implementation complete; reviewer pending |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S05 | dev-coder | wait loop を bounded deterministic polling に更新し、semantic fingerprint、quiet/same count、stale head、late review reset、progress/artifact contract、hung snapshot poll timeout、zero-check grace、wait out-only raw artifact propagation、process-group timeout cleanup、managed artifact cleanup、post-observation quiet start を実装した。 | `.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`; `tests/unit/infra/test_init_update.py` | red focused tests 4 failed before implementation; focused wait 10 passed; `issue_75` 36 passed; `bash -n` pass; parity pass; `git diff --check` pass | pass | no live GitHub run; S06 guidance remains pending | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S05 | step reviewer | code-reviewer | fresh | passed | N/A | commit S05 | final fresh code-reviewer pass |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S05 | ready_to_commit | S05 source/test/report diff | pending | pending | N/A | N/A | N/A | N/A |
 
 ---
 
