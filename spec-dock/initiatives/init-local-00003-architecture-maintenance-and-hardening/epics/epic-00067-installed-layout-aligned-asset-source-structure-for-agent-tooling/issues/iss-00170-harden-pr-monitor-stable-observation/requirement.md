@@ -169,9 +169,9 @@ ID: "iss-00170"
     - review / comment / thread / workflow signal は `trigger_created_at` 以後を current trigger window とする。
     - PR conversation comments で同一 timestamp の場合は `id > trigger_comment_id` のものだけを trigger 後として扱う。
     - expected head SHA と一致しない review / check detail は stale として分離する。
-- Body mode:
-  - `none`:
-    - metadata と `body_hash` のみ。
+  - Body mode:
+    - `none`:
+      - metadata と `body_sha256` のみ。
   - `trigger-window-truncated`:
     - default。
     - trigger window 内の review/comment body を stdout final JSON に含める。
@@ -180,7 +180,7 @@ ID: "iss-00170"
     - 明示 opt-in。
     - stdout 肥大化 risk / limitation を final JSON に出す。
   - `out-only`:
-    - stdout は metadata + body hash。
+    - stdout は metadata + `body_sha256`。
     - `--out` 指定時だけ raw body artifact を保存する。
 - Body cap:
   - cap 超過時も JSON validity を保つ。
