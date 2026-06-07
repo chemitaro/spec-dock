@@ -157,6 +157,7 @@ ok
 | planning | alternative | current issue-planning workflow lacks actor sequence | current skill inspection showed `system-architect` / `implementation-planner` only in Authority section | `sed`, local inspection | pass | Justifies issue scope |
 | planning | green | issue docs use ChatGPT research and agent-role addendum directly | requirement/design/plan/report rewritten with research trace and agent-only role scope | docs inspection | pass | Fresh reviewer pending after redesign |
 | S01 | green | provider issue-planning skill contains actor workflow spine | provider skill now includes actor sequence, delegated design/plan draft sections, fallback, compatibility, and agent-role authority boundary | targeted `rg`, diff inspection, spec-reviewer | pass | S01 reviewer passed |
+| S02 | green | dogfooding mirror matches provider issue-planning skill | `.agents/skills/spec-dock-issue-planning/SKILL.md` copied from provider source | `diff -u`, spec-reviewer | pass | S02 reviewer passed |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 
@@ -177,6 +178,7 @@ ok
 |---|---|---|---|---|---|
 | planning | N/A | issue created, started, research captured, planning artifacts drafted | command output, changed files, local validation, spec-reviewer pass | pass | Ready for execution |
 | S01 | tc-001, tc-002, tc-003, tc-004, tc-005 | Provider-side skill reads as actor-based workflow spine | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` updated; targeted `rg` and spec-reviewer passed | pass | Ready to commit |
+| S02 | tc-006 | Dogfooding mirror matches provider-side issue-planning skill | `diff -u src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md .agents/skills/spec-dock-issue-planning/SKILL.md` returned no diff; spec-reviewer passed | pass | Ready to commit |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 
@@ -185,6 +187,7 @@ ok
 | planning-research | planning | yes | inspect-only | ChatGPT thread completed | research file created | pass | `discussions/20260607t074107z-research-chatgpt-actor-workflow-analysis.md` |
 | planning-agent-encapsulation | planning | yes | inspect-only | user追加要件 and local TOML/skill inspection completed | addendum research file created | pass | `discussions/20260607t084352z-research-agent-role-encapsulation-addendum.md` |
 | tc-001 through tc-005 | S01 | yes | inspect-only | old skill workflow only had phase order | targeted `rg` and diff inspection | pass | Provider-side only; mirror handled in S02 |
+| tc-006 | S02 | yes | inspect-only | mirror drifted after S01 provider change | `diff -u` provider vs mirror | pass | exact match |
 
 #### クロージャ網羅（Closure Coverage）
 
@@ -197,6 +200,7 @@ ok
 | tc-003 | S01 | provider skill delegated plan draft route | pass | `implementation-planner` request, diff guard, adoption, canonical plan integration, reviewer gate present |
 | tc-004 | S01 | provider skill authority wording | pass | Draft/adoption is not a reviewer pass |
 | tc-005 | S01 | provider skill fallback wording | pass | unavailable / denied / unsupported / manual fallback preserves reviewer gates |
+| tc-006 | S02 | provider/mirror `diff -u` | pass | exact match |
 
 #### クロージャ差分（Closure Delta）
 
@@ -237,6 +241,7 @@ ok
 | design | design authoring gate | spec-reviewer | fresh after P1/P2 fixes | pass | no | promoted for implementation | P2 test strategy wording fixed after pass |
 | plan | plan authoring gate | spec-reviewer | fresh after P1/P2 fixes | pass | no | promoted for implementation | S03/S04/S99 include agent encapsulation, runtime provenance, and focused tests |
 | S01 | provider issue-planning skill review | spec-reviewer | fresh | pass | no | commit S01 | Reviewer agent `019ea214-57d6-7cc1-8d85-4ce74ce92661` returned `review_status: pass` |
+| S02 | issue-planning mirror sync review | spec-reviewer | fresh | pass | no | commit S02 | Reviewer agent `019ea219-c047-74b2-b786-edecde247d91` returned `review_status: pass` |
 
 #### ステップ commit ゲート（Step Commit Gate）
 
@@ -245,6 +250,7 @@ ok
 | pre-start scaffold | committed | issue scaffold and existing first-wave research | `a7bd1077` | not checked after later edits | N/A | N/A | N/A | N/A |
 | planning authoring | no commit requested | issue-local research and planning docs | final ledger in this report | validate/sync/diff-check passed after edits | N/A | N/A | N/A | N/A |
 | S01 | committed | provider issue-planning skill and report evidence | this commit | clean after commit | N/A | N/A | N/A | N/A |
+| S02 | committed | dogfooding issue-planning skill mirror and report evidence | this commit | clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 
@@ -255,3 +261,4 @@ ok
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00171-improve-issue-planning-actor-workflow/plan.md`
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00171-improve-issue-planning-actor-workflow/report.md`
 - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md`
+- `.agents/skills/spec-dock-issue-planning/SKILL.md`
