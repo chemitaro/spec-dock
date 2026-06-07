@@ -49,7 +49,7 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | orchestrator | GPT-5.5 Pro 議事録は prompt-only 更新ではなく fixed read-only wrapper と stable snapshot 契約まで推奨していた。 | A: pr-monitor instructions だけを強化する; B: stable snapshot と wrapper output contract まで issue scope に含める; C: GraphQL/thread state は follow-up に分離する | 本 issue は B として、head-SHA-bound stable observation、all/Codex review signal separation、thread state limitation handling、fixed read-only wrapper を requirement scope に含める。 | 既存 `iss-00105` では review thread state は follow-up candidate だったが、今回のユーザー依頼はその改善案の実施であり、`github-pr-merge-preparer` も latest head SHA と unresolved-thread limitation を merge-prepared predicate に含めている。 | applied | `discussions/20260607t063203z-research-gpt55-pr-monitor-stable-observation-discussion.md`; `requirement.md` | design で wrapper 分割、GraphQL query、status mapping を具体化する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +63,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | user-provided GPT-5.5 Pro discussion captured as research | `requirement.md` | 議事録の主張を raw transcript ではなく facts / inference / edge cases に分けて保存し、requirement には WHAT / WHY / scope / AC として採用した。 | `discussions/20260607t063203z-research-gpt55-pr-monitor-stable-observation-discussion.md`; `requirement.md` | fresh `spec-reviewer` で requirement gate を確認する |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -79,7 +79,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | `spec-dock active show`; `src/spec_dock/assets/install_root/.codex/agents/pr-monitor.toml`; `src/spec_dock/assets/install_root/.github/agents/pr-monitor.agent.md`; `.agents/skills/github-pr-merge-preparer/SKILL.md`; `.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh`; `iss-00105` requirement / review-thread discussion; `discussions/20260607t063203z-research-gpt55-pr-monitor-stable-observation-discussion.md` | Blocking question: none. Non-blocking design questions remain in `requirement.md` for wrapper split, GraphQL query, status mapping, quiet window defaults, expected check handling. | adopted research into `requirement.md`; no user interview was required before requirement because the provided report and existing follow-up context made the scope clear enough. Initial fresh reviewer returned pass with P2 coverage finding; requirement added AC-009 for thread-state absence without visible comments; fresh re-review returned findings=[] and `review_status=pass`. | passed | no | requirement phase can promote to design |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
