@@ -3,267 +3,292 @@
 ID: "iss-00170"
 タイトル: "Harden Pr Monitor Stable Observation"
 関連GitHub: ["#170"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-06-07"
+最終更新: "2026-06-08"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00067", "init-local-00003"]
 ---
 
 # iss-00170 Harden Pr Monitor Stable Observation — 実装計画（実行契約 / Execution Contract）
 
-> このテンプレートは executable scaffold です。`plan.md` は計画済み契約（planned contract）と、実装者が step を上から順に実行できる command queue を書く場所です。実行結果、逸脱、発見された tests、reviewer verdict、commit/no-op evidence は `report.md` の観測証跡台帳（observed evidence ledger）に記録する。workflow authority は skills / `workflow_issue.md` が持ち、Issue 計画の field semantics と詳しい書き方は `phase_plan_issue.md` と `docs/authoring/issue-plan.md` を detail-reference として参照する。
-
 ## この計画で満たす要件ID
+
 - AC:
-  - ...
+  - AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-012, AC-013, AC-014
 - EC:
-  - ...
-- 制約:
-  - ...
+  - EC-001, EC-002, EC-003, EC-004, EC-005, EC-006
+- 非交渉制約:
+  - `pr-monitor` sub-agent は完全廃止する。
+  - `github-codex-pr-review-comments` skill は削除し、compatibility shim は残さない。
+  - 正規入口は `github-pr-observation` skill / scripts とする。
+  - wait / snapshot / collector は read-only fixed GitHub calls だけを使う。
+  - stdout final JSON text が唯一の primary result である。
+  - stderr progress は default で出すが non-authoritative である。
+  - latest / expected head SHA に束縛されない observation は merge-prepared evidence に使わない。
+  - `summary.md` は生成しない。
 
-## 依存関係から導く実装順序
-- 依存関係の参照元:
-  - `design.md` の依存関係、図、ファイル変更計画
-- 順序ルール:
-  - prerequisite / lower-dependency slice から先に閉じる
-  - downstream slice は前提が固定されてから置く
-- step 依存サマリー:
-  - S01:
-    - 依存:
-    - unblock:
-    - 対象ファイル:
+## 実装順序
 
-## ステップ一覧
-- S01:
-  - 観測可能な振る舞い:
-  - 依存:
-  - unblock:
-  - 対象ファイル:
-  - 閉じる要件:
-  - レビューゲート:
-- S02:
-  - ...
+1. S01 Asset retirement and observation skill scaffold:
+   - 旧 `pr-monitor` / `github-codex-pr-review-comments` の退役と、新 `github-pr-observation` skill の provider-side scaffold を固定する。
+2. S02 Public script contract and stdout/stderr boundary:
+   - `wait_pr_observation.sh` / `fetch_pr_observation_snapshot.sh` の CLI、入力検証、stdout final JSON、stderr progress、optional `--out` contract を実装する。
+3. S03 CI/check/status collector:
+   - CI status taxonomy、head SHA binding、zero-check grace、required pending、failure detail を実装する。
+4. S04 Review/comment/thread collector:
+   - review status taxonomy、Codex subset、trigger window、body modes/caps、fixed GraphQL thread state boundary を実装する。
+5. S05 Wait loop integration and stable result:
+   - snapshot fingerprint、quiet window、same fingerprint count、timeout、head-change reset、final normalized status を統合する。
+6. S06 Workflow skill guidance and dogfooding parity:
+   - `github-pr-merge-preparer` / `github-pr-creator` / host guidance から `pr-monitor` handoff を除き、dogfooding mirror と update cleanup を揃える。
+7. S90 Docs impact resolution:
+   - shipped skill docs / workflow guidance の整合性を確認し、必要な docs-only 更新を閉じる。
+8. S99 Final quality gates:
+   - closure evidence、tests、reviewer gates、report ledger を揃える。
 
 ## 要件 ↔ ステップ対応
-- AC-001 -> S01
-- EC-001 -> S02
+
+| 要件 | 主ステップ | 補助ステップ | 検証方針 |
+|---|---|---|---|
+| AC-001 | S02 | S05, S06 | caller が loop 判断せず、stdout JSON だけで最終判断する contract test / skill text inspection |
+| AC-002 | S03 | S05 | expected head SHA mismatch が non-success JSON になる fixture test |
+| AC-003 | S05 | S03 | monitoring 中の head change が stale/reset として扱われる fixture test |
+| AC-004 | S03 | S05 | failure 系 conclusion が1件でも CI failed になり、details が出る fixture test |
+| AC-005 | S05 | S02, S03, S04 | quiet / fingerprint / same count まで complete しない wait fixture test |
+| AC-006 | S04 | S05 | trigger-window review/comment body が body mode/cap 付きで出る fixture test |
+| AC-007 | S03 | S05 | zero-check grace 中は success にしない fixture test |
+| AC-008 | S04 | S05 | unresolved / changes requested / comments が review non-success または human action になる fixture test |
+| AC-009 | S04 | S05 | thread state unavailable は limitation として machine-readable に出る fixture test |
+| AC-010 | S02 | S05 | stderr progress が1 poll 最大1行、stdout に混ざらない test |
+| AC-011 | S01 | S06 | provider/mirror inventory と stale cleanup test |
+| AC-012 | S04 | S05 | explicit trigger id/time 後の本文だけを含む fixture test |
+| AC-013 | S04 | S05 | inferred/unknown trigger の limitation と body suppression test |
+| AC-014 | S03 | S05 | Actions job/step failure detail fallback test |
+| EC-001 | S05 | S03, S04 | checks green 後も review stability を待つ fixture test |
+| EC-002 | S03 | S05 | success + pending / required pending が pending になる fixture test |
+| EC-003 | S03 | S05 | skipped / neutral terminal non-blocking が pending/failed 不在なら passed になる fixture test |
+| EC-004 | S04 | S05 | resolved/outdated thread と unresolved thread を分離する fixture test |
+| EC-005 | S04 | S02, S05 | thread-state wrapper の missing/auth/rate/schema failure は limitation + `review=unknown` / human gate になる fixture test |
+| EC-006 | S02 | S05 | progress output が bounded stderr に留まり、詳細は final JSON / optional artifacts に残る fixture test |
 
 ## 仕様固定クロージャ索引（Spec-Locked Closure Index）
 
-> これは Issue 全体のテスト一覧ではなく、仕様を縮小解釈・後付けテスト・過剰実装しないための coverage ledger です。実際の step-local obligation と concrete seeds は各 implementation step の `具体テストケース一覧` に置く。
-
-| 識別子（ID） | ステップ（step） | スライス（slice） | 種別（type） | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル（evidence level） | クロージャ証跡（closure evidence） |
-|---|---|---|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | <behavior> | 受け入れ（acceptance） | AC-001 | ... | ... | 仕様 drift（spec drift） | yes | red-required | ステップ完了証跡（report step closure） |
-| tc-002 | S01 | <behavior> | 否定系（negative） | EC-001 | ... | ... | 沈黙失敗（silent failure） | yes | inspect-only | ステップ完了証跡（report step closure） |
-
-- 証跡レベル（evidence level）:
-  - red-required: 実装前に失敗する新規 test / characterization を固定する。
-  - covered-existing: 既存 test が対象 behavior を検出できる根拠を固定する。
-  - inspect-only: docs / template / config などを inspection、structural assertion、review evidence で閉じる。
-  - manual-required: 自動化できない確認手順、期待結果、記録先を固定する。
-- 詳細化方針:
-  - 件数ではなく、AC、changed contract、failure mode、regression risk、invariant、manual / integration risk から必要な obligation を決める。
-  - private method、実装アルゴリズム、mock 構造、assert 細部は原則固定しない。
-
-## レビュー / QA ゲート方針
-- RG1 step review:
-  - 実施タイミング: 各 implementation step の commit 前
-  - reviewer: code-reviewer（code / runtime / tests / scaffold behavior）; spec-reviewer（docs-only / template-only / skill-text-only）
-  - pass 条件: review_status: pass
-- QG1 final QA:
-  - reviewer: qa-reviewer
-  - 範囲: Issue 全体の obligation coverage、missing high-value tests、manual / integration test 要否
-- SG1 final spec review:
-  - reviewer: spec-reviewer
-  - 範囲: requirement / design / plan / report / docs 整合
-
-## 実行ルール（全ステップ共通）
-- 各 implementation step は原則として 1 behavior slice / 1 review scope / 1 commit boundary とする。
-- `plan.md` には planned requirements、evidence destination、closure 条件だけを書く。observed result は `report.md` に書く。
-- docs-only / inspect-only / manual-required step は code test 前提にせず、代替 evidence path と rationale を implementation 前に固定する。
-- implementation 中に新しい仕様、bug class、外部 contract risk、未計画の closure が見つかった場合は、report 記録だけで足りるか、plan amendment と re-review が必要かを判断する。
+| ID | ステップ | 仕様リンク | 固定する期待値 | 防ぐ bug class | 必須 | 証跡レベル |
+|---|---|---|---|---|---|---|
+| CL-AC-001 | S02/S05 | AC-001 | caller は polling loop を持たず、stdout final JSON が primary result | agent-side loop regression | yes | red-required + inspection |
+| CL-AC-002 | S03/S05 | AC-002 | head SHA mismatch は `stale_head` / non-success / `observation_complete=false` | stale green reuse | yes | red-required |
+| CL-AC-003 | S05 | AC-003 | monitoring 中の head change は old snapshot を final success にしない | mixed-SHA final result | yes | red-required |
+| CL-AC-004 | S03 | AC-004 | 1件でも failure 系なら CI status は `failed`、detail を保持 | mixed success/failure false pass | yes | red-required |
+| CL-AC-005 | S05 | AC-005 | quiet / fingerprint / same count を満たすまで complete しない | early success | yes | red-required |
+| CL-AC-006 | S04 | AC-006 | trigger-window body を default truncated mode で final JSON に含める | missing actionable review body | yes | red-required |
+| CL-AC-007 | S03/S05 | AC-007 | zero-check grace 未満は success にしない | no-check false green | yes | red-required |
+| CL-AC-008 | S04 | AC-008 | unresolved / changes requested / comments は review status に反映 | ignored blocker | yes | red-required |
+| CL-AC-009 | S04 | AC-009 | thread state unavailable は limitation として出す | hidden unresolved thread | yes | red-required |
+| CL-AC-010 | S02/S05 | AC-010 | progress は stderr、1 poll 最大1行、stdout JSON に混ざらない | unparsable stdout | yes | red-required |
+| CL-AC-011 | S01/S06 | AC-011 | new skill added、old agent/skill removed、shim なし、stale cleanup あり | duplicate/conflicting assets | yes | red-required + parity |
+| CL-AC-012 | S04 | AC-012 | explicit trigger 後の body だけを current payload に含める | old review noise | yes | red-required |
+| CL-AC-013 | S04 | AC-013 | inferred は limitation、unknown は body full output しない | unsafe body overcollection | yes | red-required |
+| CL-AC-014 | S03 | AC-014 | CI failure detail は workflow/run/job/step または check-run fallback で出す | insufficient fix context | yes | red-required |
+| CL-EC-001 | S05 | EC-001 | CI green 後も review stability を待つ | late review miss | yes | red-required |
+| CL-EC-002 | S03 | EC-002 | success + pending/status pending は pending | partial green | yes | red-required |
+| CL-EC-003 | S03 | EC-003 | skipped / neutral terminal non-blocking は unknown ではなく passed に畳める | skipped-as-unknown false block | yes | red-required |
+| CL-EC-004 | S04 | EC-004 | resolved/outdated と unresolved を分離 | stale comment blocker | yes | red-required |
+| CL-EC-005 | S04/S05 | EC-005 | thread-state wrapper failure は limitation + `review=unknown` / human gate | hidden collection failure | yes | red-required |
+| CL-EC-006 | S02/S05 | EC-006 | progress は bounded stderr、詳細は final JSON / optional artifacts | progress flood / stdout contamination | yes | red-required |
 
 ## 実装ステップ
 
-### 実装ステップ S01 — <観測可能な振る舞い>
-- 振る舞いの目標（behavior goal）:
-  - ...
-- design 参照:
-  - ...
-- 依存:
-  - ...
-- unblock:
-  - ...
+### S01 Asset retirement and observation skill scaffold
+
+- 目的:
+  - provider-side source of truth で、旧 `pr-monitor` agent assets と旧 `github-codex-pr-review-comments` skill を削除し、新 `github-pr-observation` skill scaffold を追加する。
 - 対象ファイル:
-  - ...
-- 計画済み契約（planned contract）:
-  - scope:
-    - 実装・文書化する範囲:
-  - テスト義務（test obligation）:
-    - closure id:
-      - tc-001
-    - coverage rationale:
-      - AC / changed contract / failure mode / regression risk / invariant / manual risk から必要性を書く:
-  - Red / 代替証跡の要件:
-    - red-required / covered-existing:
-      - 実装前に確認する failing test、characterization、または既存 test sensitivity:
-    - docs-only / inspect-only / manual-required:
-      - code test を置かない理由:
-      - 代替 evidence path:
-      - manual 手順と期待結果:
-  - 実装範囲（implementation scope）:
-    - allowed paths:
-      - ...
-    - forbidden changes:
-      - ...
-  - Green 検証:
-    - command / inspection / manual evidence:
-      - ...
-  - Refactor / cleanup ガードレール:
-    - 目的:
-    - 禁止する広がり:
-  - closure 証跡要件:
-    - Step Contract Closure:
-    - Test Contract Closure:
-    - Closure Coverage:
-  - report 証跡の記録先:
-    - `report.md` の対象 section / ledger:
-  - amendment trigger（plan amendment が必要になる契機）:
-    - plan amendment と re-review が必要になる発見:
+  - add: `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md`
+  - add: `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`
+  - add: `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh`
+  - add: `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh`
+  - add: `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh`
+  - remove: `src/spec_dock/assets/install_root/.codex/agents/pr-monitor.toml`
+  - remove: `src/spec_dock/assets/install_root/.github/agents/pr-monitor.agent.md`
+  - remove: `src/spec_dock/assets/install_root/.agents/skills/github-codex-pr-review-comments/`
+  - update tests that assert installed asset inventory / stale cleanup.
+- 委任:
+  - role: dev-coder
+  - allowed changes: listed provider asset files and focused inventory tests.
+  - forbidden: canonical docs, source outside installed asset/update tests, compatibility shim.
+- 必須検証:
+  - asset inventory test fails before adding new skill / removing old assets and passes after.
+  - update cleanup fixture proves stale `pr-monitor` / `github-codex-pr-review-comments` assets are removed.
+  - `rg 'pr-monitor|github-codex-pr-review-comments' src/spec_dock/assets/install_root tests -n` only finds deliberate retirement assertions or historical text.
+- reviewer gate:
+  - code-reviewer for asset/test diff.
+- closure:
+  - CL-AC-011.
 
-#### 委任契約（delegation contract）
-- 委任ロール（delegated role）:
-  - dev-coder / doc-writer / other named worker / N/A
-- 入力 docs:
-  - `requirement.md`
-  - `design.md`
-  - `plan.md`
-  - workflow / authoring docs:
-  - current target files:
-- 許可 paths:
-  - ...
-- 禁止 changes:
-  - ...
-- 受け入れ条件:
-  - closure id / step close condition:
-- 必須 tests または docs-only verification:
-  - targeted command / inspection / docs diff / manual evidence:
-- reviewer focus:
-  - code-reviewer（code / runtime / tests / scaffold behavior）; spec-reviewer（docs-only / template-only / skill-text-only docs/spec alignment）
-- 必須出力（output required）:
-  - changed files:
-  - verification result:
-  - report evidence to update:
-  - unresolved risks:
-- 停止条件（stop conditions）:
-  - input docs conflict / path outside allowed scope / verification cannot run / acceptance cannot be met:
+### S02 Public script contract and stdout/stderr boundary
 
-#### 具体テストケース一覧
+- 目的:
+  - public wait/snapshot scripts の fixed CLI、input validation、stdout/stderr separation、progress contract、optional `--out` behavior を実装する。
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh`
+  - focused shell/script contract tests.
+- 委任:
+  - role: dev-coder
+  - allowed changes: new skill scripts and tests.
+  - forbidden: caller-provided endpoint/method/query/header/body/jq/raw gh args, write operations, `summary.md`.
+- 必須検証:
+  - invalid repo/pr/head/options fail before any fake `gh` call.
+  - stdout contains valid JSON only; progress and diagnostics do not contaminate stdout.
+  - stderr default emits bounded key/value progress; `--progress none` suppresses progress.
+  - `--out` writes `result.json` only as stdout copy plus debug artifacts; no `summary.md`.
+  - auth/rate/schema collection failure can be represented as limitation + non-success when JSON generation is possible.
+- reviewer gate:
+  - code-reviewer.
+- closure:
+  - CL-AC-001, CL-AC-010, CL-EC-006.
 
-> この欄は full test inventory ではありません。step-local obligation と concrete red / characterization / inspect / manual seeds を、実装前に固定するための欄です。
+### S03 CI/check/status collector
 
-- `tc-s01-001` acceptance: <短い説明>
-  - 前提: ...
-  - 操作: ...
-  - 期待結果: ...
-  - 失敗検出: ...
-  - 検証方法: ...
-  - 関連 closure id: tc-001
+- 目的:
+  - expected head SHA に束縛した checks/statuses/Actions collection と CI taxonomy を実装する。
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh`
+  - public snapshot/wait scripts if integration fields are needed.
+  - focused CI fixture tests.
+- 委任:
+  - role: dev-coder
+  - allowed changes: CI collector, shared schema helpers inside new skill scripts, focused tests.
+  - forbidden: logs full-text collection as default path, repository-specific policy engine, write operations.
+- 必須検証:
+  - statuses: `unknown`, `none`, `pending`, `running`, `passed`, `failed`.
+  - any failure/error/cancelled/timed_out/action_required/startup_failure/stale yields `failed`.
+  - success + skipped + neutral can yield `passed` when no blocking pending/failure remains.
+  - required pending / path-filter pending remains `pending`.
+  - zero checks remain non-success until grace/deadline semantics allow a limitation result.
+  - `ci.failures[]` includes workflow/run/job/failed steps when obtainable, otherwise check-run fallback.
+- reviewer gate:
+  - code-reviewer.
+- closure:
+  - CL-AC-002, CL-AC-004, CL-AC-007, CL-AC-014, CL-EC-002, CL-EC-003.
 
-- `tc-s01-002` inspect-only / manual-required: <短い説明>
-  - テスト不要理由: <自動テスト不要の理由>
-  - 代替検証方法: <確認手順>
-  - 期待結果: <期待される状態>
-  - 記録先: <証跡の保存先>
-  - 関連 closure id: tc-002
+### S04 Review/comment/thread collector
 
-#### ステップ完了契約（step closure contract）
-- closure id:
-  - tc-001
-- close 条件:
-  - ...
-- 検証 evidence:
-  - targeted command / inspection / manual evidence:
-- report evidence:
-  - Step Contract Closure:
-  - Test Contract Closure:
-  - Closure Coverage:
-  - Closure Delta:
-- 残リスク:
-  - ...
+- 目的:
+  - review/comment/thread/review request collection、Codex subset、trigger window、body mode/cap、thread limitation を実装する。
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh`
+  - public snapshot/wait scripts if integration fields are needed.
+  - focused review fixture tests.
+- 委任:
+  - role: dev-coder
+  - allowed changes: review collector, shared schema helpers inside new skill scripts, focused tests.
+  - forbidden: arbitrary GraphQL query/endpoint, P1/P2 text interpretation, old-trigger body mixing, reviewer identity in stderr progress.
+- 必須検証:
+  - fixed REST GET reads issue comments, pull reviews, pull review comments.
+  - fixed GraphQL query reads review thread state when available; unavailable thread state becomes limitation.
+  - review statuses are limited to `unknown`, `none`, `requested`, `commented`, `approved`, `changes_requested`, `unresolved`.
+  - all review signals and Codex-authored subset are both represented.
+  - explicit `--trigger-comment-id` / `--trigger-created-at` includes only trigger-window bodies.
+  - inferred trigger emits `trigger_inferred` limitation.
+  - unknown trigger does not dump all bodies.
+  - `body-mode` cap/truncation metadata preserves valid JSON.
+- reviewer gate:
+  - code-reviewer.
+- closure:
+  - CL-AC-006, CL-AC-008, CL-AC-009, CL-AC-012, CL-AC-013, CL-EC-004, CL-EC-005.
 
-#### ステップゲート（step gate）
-- step reviewer gate:
-  - reviewer:
-  - review 範囲:
-  - pass 条件: review_status: pass
-  - re-review rule: 指摘を修正し pass まで再実行
-- commit / no-op gate:
-  - closure 状態: committed / approved-no-op
-  - commit 範囲:
-  - no-op の場合の確認対象、差分なし確認コマンド、read-only evidence:
+### S05 Wait loop integration and stable result
 
-### 実装ステップ Sxx — <次に観測可能な振る舞い>
-- S01 の subsections を複製して記入する。
-- `planned contract`、`delegation contract`、`具体テストケース一覧`、`step closure contract`、`step gate` がない implementation step は implementation-ready ではない。
+- 目的:
+  - snapshot collectors を bounded deterministic wait に統合し、stable fingerprint と final normalized result を返す。
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh`
+  - focused wait-loop fixture tests.
+- 委任:
+  - role: dev-coder
+  - allowed changes: new skill scripts and focused tests.
+  - forbidden: infinite waits, model/agent-side polling fallback, progress-as-authority.
+- 必須検証:
+  - default `timeout=1800`, `poll_interval=30`, `quiet=90`, `same_fingerprint_count=2` are exposed and overrideable.
+  - quiet window and same fingerprint count are required before `observation_complete=true`.
+  - head SHA changes reset or terminate as stale/non-success.
+  - CI green followed by late review feedback waits for review stability.
+  - terminal stdout JSON includes `overall_status`, `normalized_status`, `observation_complete`, `summary`, `limitations`, `recommended_next_action`, `ci`, `review`, `trigger`, `artifacts`.
+- reviewer gate:
+  - code-reviewer.
+- closure:
+  - CL-AC-001, CL-AC-003, CL-AC-005, CL-AC-010, CL-EC-001, CL-EC-005, CL-EC-006.
 
-### ドキュメント影響の解消ステップ S90（docs impact resolution / docs refresh）
-- 対象:
-  - docs / templates / README / workflow / skill / migration notes / none
-- 対応:
-  - ...
-- doc update owner:
-  - doc-writer when updates are required
-- spec/doc review:
-  - reviewer: spec-reviewer
-  - pass 条件: docs が requirement / design / plan と整合し、未解決の必須 docs 影響が残っていない
+### S06 Workflow skill guidance and dogfooding parity
 
-### 最終品質ゲートステップ S99（final quality gate）
-- branch diff 範囲:
-  - ...
-- 必須 validation:
-  - ...
-- final QA gate:
-  - reviewer: qa-reviewer
-  - 範囲: Issue 全体の obligation coverage と integration test 要否
-  - pass 条件: reviewer pass
-- final code review ゲート:
-  - reviewer: code-reviewer
-  - 範囲: issue-wide integrated diff、構造、責務境界、回帰リスク、保守性
-  - pass 条件: review_status: pass
-- final spec review ゲート:
-  - reviewer: spec-reviewer
-  - 範囲: requirement / design / plan / report / implementation / tests / docs 整合
-  - pass 条件: reviewer pass
-- final commit gate:
-  - commit 範囲:
-  - final report ledger:
-  - post-commit external evidence destination:
+- 目的:
+  - PR workflow skills / host guidance から `pr-monitor` role handoff を除き、`github-pr-observation` direct invocation に置き換える。provider と dogfooding mirror を一致させる。
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-creator/SKILL.md`
+  - provider host/role guidance files that mention `pr-monitor`
+  - dogfooding mirror `.agents/skills/github-pr-observation/`
+  - dogfooding removal targets `.codex/agents/pr-monitor.toml`, `.github/agents/pr-monitor.agent.md`, `.agents/skills/github-codex-pr-review-comments/`
+  - parity / install / update tests.
+- 委任:
+  - role: dev-coder for tests and scaffold parity; doc-writer may be used for text-only skill guidance if no script/test edits are needed.
+  - allowed changes: listed skill/guidance/mirror/test files.
+  - forbidden: recreating `pr-monitor`, leaving deprecated aliases, changing PR merge responsibility.
+- 必須検証:
+  - provider/mirror new skill files match expected installed content.
+  - old provider and mirror assets are absent.
+  - `github-pr-merge-preparer` no longer delegates to `pr-monitor`; it invokes `wait_pr_observation.sh` and consumes stdout JSON.
+  - `github-pr-creator` references snapshot/wait only as post-create observation support.
+  - role guidance contains no active `pr-monitor` routing.
+- reviewer gate:
+  - code-reviewer for tests/assets, spec-reviewer focus if skill prose changes material workflow semantics.
+- closure:
+  - CL-AC-011 plus regression coverage for AC-001.
 
-## 未確定事項
-- Q-001:
-  - 質問:
-  - 推奨案:
-  - 影響範囲:
+### S90 Docs impact resolution
 
-## 最終完了条件
-- AC/EC 達成:
-  - ...
-- docs 影響解決:
-  - ...
-- 全 implementation step 完了:
-  - committed / approved-no-op:
-- final quality gate pass:
-  - qa-reviewer:
-  - issue-wide code-reviewer:
-  - spec-reviewer:
-- final commit 完了:
-  - ...
-- 必須 closure id 完了:
-  - Step Contract Closure:
-  - Test Contract Closure:
-  - Closure Coverage:
-- final clean state:
-  - no unintended staged / unstaged changes:
+- 目的:
+  - shipped skill docs and workflow guidance changes are sufficient; unrelated docs/README are not changed unless they contain active `pr-monitor` routing.
+- 委任:
+  - role: doc-writer when non-issue permanent docs require updates.
+  - otherwise orchestrator records no-op evidence in `report.md`.
+- 必須検証:
+  - `rg 'pr-monitor|github-codex-pr-review-comments|github-pr-observation' src/spec_dock/assets/install_root spec-dock/docs .agents .codex .github -n` inspected.
+  - remaining old names are only historical issue docs, removal assertions, or intentionally quoted migration notes.
+- reviewer gate:
+  - spec-reviewer focus in final gate.
+
+### S99 Final quality gates
+
+- 目的:
+  - implementation evidence and authoring evidence are complete enough for issue execution / PR preparation.
+- 必須検証:
+  - focused tests from S01〜S06.
+  - `uv run pytest tests/unit/infra/test_init_update.py`
+  - any new focused test file added for scripts.
+  - `git diff --check`
+  - `./spec-dock/scripts/spec-dock sync --no-github`
+- reviewer gates:
+  - qa-reviewer: closure/test sufficiency.
+  - code-reviewer: issue-wide source/test diff.
+  - spec-reviewer: requirement/design/plan/report/implementation evidence alignment.
+
+## レビュー / QA ゲート方針
+
+- Each implementation step that changes scripts/tests requires a fresh code-reviewer pass before integration.
+- Material workflow prose changes require either code-reviewer inspection or spec-reviewer focus, depending on whether the risk is implementation or specification alignment.
+- Plan/design/requirement gates must be fresh after the latest substantive authoring change.
+- Waiver, unavailable, denied, or provisional reviewer states do not satisfy this plan unless the user explicitly accepts risk; the default is blocked/incomplete.
+
+## 実行ルール（全ステップ共通）
+
+- Main orchestrator records canonical issue evidence in `report.md`; source/test changes are delegated.
+- Do not start implementation from a stale pre-ADR plan.
+- Do not restore old `pr-monitor` or `github-codex-pr-review-comments` for compatibility.
+- Do not add arbitrary GitHub API passthrough to make collection easier.
+- If implementation discovers that fixed REST/GraphQL calls cannot technically provide a required field, stop and amend requirement/design before proceeding.
+- If a step adds or removes closure obligations, update this plan and rerun fresh spec-reviewer before continuing.
