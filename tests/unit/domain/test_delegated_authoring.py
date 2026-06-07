@@ -114,7 +114,7 @@ class TestDelegatedAuthoringRuntimeDomain:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
             discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
-            discussion.write_text(_draft_text("# draft", role="spec-dock-implementation-planner"), encoding="utf-8")
+            discussion.write_text(_draft_text("# draft", role="implementation-planner"), encoding="utf-8")
 
             result = domain.evaluate_diff_guard(
                 authorized_role="implementation-planner",
@@ -133,10 +133,10 @@ class TestDelegatedAuthoringRuntimeDomain:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
             discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
-            text = _draft_text("# draft", role="spec-dock-implementation-planner")
+            text = _draft_text("# draft", role="implementation-planner")
             text = text.replace(
-                "created_by_role: spec-dock-implementation-planner",
-                'created_by_role: "spec-dock-implementation-planner"',
+                "created_by_role: implementation-planner",
+                'created_by_role: "implementation-planner"',
             ).replace("scope_id: iss-00003", "scope_id: 'iss-00003'")
             discussion.write_text(text, encoding="utf-8")
 
@@ -157,7 +157,7 @@ class TestDelegatedAuthoringRuntimeDomain:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
             discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
-            discussion.write_text(_draft_text("# draft", role="spec-dock-implementation-planner"), encoding="utf-8")
+            discussion.write_text(_draft_text("# draft", role="implementation-planner"), encoding="utf-8")
 
             result = domain.evaluate_diff_guard(
                 authorized_role="system-architect",
@@ -343,7 +343,7 @@ class TestDelegatedAuthoringRuntimeDomain:
             ("scope", _draft_text("# draft").replace("scope_id: iss-00003", "scope_id: iss-99999"), "scope_id_mismatch"),
             (
                 "role",
-                _draft_text("# draft").replace("created_by_role: spec-dock-system-architect", "created_by_role: dev-coder"),
+                _draft_text("# draft").replace("created_by_role: system-architect", "created_by_role: dev-coder"),
                 "missing_provenance:created_by_role",
             ),
         )
@@ -404,7 +404,7 @@ class TestDelegatedAuthoringRuntimeDomain:
     def test_diff_guard_rejects_duplicate_frontmatter_provenance_keys(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         cases = (
-            ("created_by_role", "created_by_role: spec-dock-system-architect"),
+            ("created_by_role", "created_by_role: system-architect"),
             ("scope_id", "scope_id: iss-00003"),
             ("source_paths", "source_paths:\n  - spec-dock/active/issue/requirement.md"),
             ("intended_targets", "intended_targets:\n  - spec-dock/active/issue/design.md"),
@@ -642,7 +642,7 @@ def _make_issue_scope(repo_root: Path, *, scope_id: str = "iss-00003", slug: str
     return issue_dir
 
 
-def _draft_text(body: str, *, role: str = "spec-dock-system-architect") -> str:
+def _draft_text(body: str, *, role: str = "system-architect") -> str:
     return (
         "---\n"
         f"created_by_role: {role}\n"

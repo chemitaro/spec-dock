@@ -21,6 +21,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
 
 from tests.cli_runtime.harness import (
     CliRuntimeHarness,
+    _DELETED_ROLE_SKILL_NAMES,
     _EXPECTED_MANAGED_SKILL_NAMES,
     _expected_spec_dock_version,
     main,
@@ -443,12 +444,6 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-clarification/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md"
         ),
-        ".agents/skills/spec-dock-system-architect/SKILL.md": (
-            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md"
-        ),
-        ".agents/skills/spec-dock-implementation-planner/SKILL.md": (
-            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md"
-        ),
         ".agents/skills/github-pr-merge-preparer/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md"
         ),
@@ -758,8 +753,6 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-issue-planning/SKILL.md",
         ".agents/skills/spec-dock-issue-execution/SKILL.md",
         ".agents/skills/spec-dock-clarification/SKILL.md",
-        ".agents/skills/spec-dock-system-architect/SKILL.md",
-        ".agents/skills/spec-dock-implementation-planner/SKILL.md",
         ".agents/skills/spec-dock-codex-adapter/SKILL.md",
         ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
         ".codex/AGENTS.md",
@@ -819,8 +812,6 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/spec-dock-issue-planning/SKILL.md",
             ".agents/skills/spec-dock-issue-execution/SKILL.md",
             ".agents/skills/spec-dock-clarification/SKILL.md",
-            ".agents/skills/spec-dock-system-architect/SKILL.md",
-            ".agents/skills/spec-dock-implementation-planner/SKILL.md",
             ".agents/skills/spec-dock-codex-adapter/SKILL.md",
             ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
         ),
@@ -935,22 +926,6 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md",
-            ),
-        },
-        "spec-dock-system-architect skill": {
-            "search_globs": (
-                "**/spec-dock-system-architect/SKILL.md",
-            ),
-            "allowed_provider_paths": (
-                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md",
-            ),
-        },
-        "spec-dock-implementation-planner skill": {
-            "search_globs": (
-                "**/spec-dock-implementation-planner/SKILL.md",
-            ),
-            "allowed_provider_paths": (
-                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md",
             ),
         },
         "spec-dock-codex-adapter skill": {
@@ -1190,6 +1165,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00165-align-workflow-docs-with-skill-spine-boundary/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00166-align-templates-as-scaffolds-and-examples/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00171-improve-issue-planning-actor-workflow/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1354,6 +1330,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "iss-00165",
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00171-improve-issue-planning-actor-workflow/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -2168,7 +2145,6 @@ class TestInitUpdate(CliRuntimeHarness):
         text: str,
         shim_label: str,
         agent_name: str,
-        skill_name: str,
         draft_kind: str,
     ) -> None:
         parsed = tomllib.loads(text)
@@ -2184,12 +2160,11 @@ class TestInitUpdate(CliRuntimeHarness):
         assert parsed.get("features", {}).get("shell_tool") == True
         assert isinstance(parsed.get("developer_instructions"), str)
         assert f'name = "{agent_name}"' in text, f"delegated author adapter missing name ({shim_label})"
-        assert f".agents/skills/{skill_name}/SKILL.md" in \
-            text, \
-            f"delegated author adapter missing canonical role skill reference ({shim_label})"
+        assert ".agents/skills/spec-dock-system-architect/SKILL.md" not in text
+        assert ".agents/skills/spec-dock-implementation-planner/SKILL.md" not in text
         for fragment in (
-            "intentionally thin",
-            "source of",
+            "canonical role contract",
+            "intentionally agent-only",
             f"delegated draft {draft_kind} evidence only",
             "write-capable delegated authoring path",
             "uses guarded workspace-write",
@@ -9408,6 +9383,20 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert (assets_dir / "install_root" / ".github" / "agents" / "orchestrator.agent.md").is_file(), \
                 "missing bundled copilot native shim asset"
 
+    def test_deleted_role_skill_assets_stay_absent_from_provider_and_dogfooding_mirror(self) -> None:
+        import spec_dock.cli as cli
+
+        repo_root = Path(__file__).resolve().parents[3]
+        with cli._assets_dir() as assets_dir:
+            for skill_name in _DELETED_ROLE_SKILL_NAMES:
+                provider_path = (
+                    assets_dir / "install_root" / ".agents" / "skills" / skill_name / "SKILL.md"
+                )
+                mirror_path = repo_root / ".agents" / "skills" / skill_name / "SKILL.md"
+
+                assert not provider_path.exists(), f"deleted role skill asset must stay absent: {provider_path}"
+                assert not mirror_path.exists(), f"deleted role skill mirror must stay absent: {mirror_path}"
+
     def test_bundled_native_shim_assets_satisfy_static_delegation_only_contract(self) -> None:
         import spec_dock.cli as cli
 
@@ -9482,13 +9471,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "system architect": {
                 "path": Path(".codex/agents/system-architect.toml"),
                 "agent_name": "system-architect",
-                "skill_name": "spec-dock-system-architect",
                 "draft_kind": "architecture",
             },
             "implementation planner": {
                 "path": Path(".codex/agents/implementation-planner.toml"),
                 "agent_name": "implementation-planner",
-                "skill_name": "spec-dock-implementation-planner",
                 "draft_kind": "planning",
             },
         }
@@ -9503,7 +9490,6 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                         text=provider_path.read_text(encoding="utf-8"),
                         shim_label=f"provider {label}",
                         agent_name=expected["agent_name"],
-                        skill_name=expected["skill_name"],
                         draft_kind=expected["draft_kind"],
                     )
 
@@ -9912,11 +9898,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 / "skills"
                 / "spec-dock-issue-execution"
                 / "SKILL.md",
-                "system architect skill": install_root
-                / ".agents"
-                / "skills"
-                / "spec-dock-system-architect"
-                / "SKILL.md",
+                "system architect agent": install_root
+                / ".codex"
+                / "agents"
+                / "system-architect.toml",
             }
             texts = {label: path.read_text(encoding="utf-8") for label, path in asset_paths.items()}
 
@@ -9955,14 +9940,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "approved",
                 "`plan.md`",
             ),
-            "system architect skill": (
-                "deep module",
-                "interface as test surface",
+            "system architect agent": (
+                "Architecture heuristics",
+                "public contracts, observable behavior, CLI/API shape, and persisted",
+                "test surfaces",
                 "deletion test",
                 "locality",
                 "leverage",
-                "small, testable, and easy to change",
-                "Do not edit canonical docs or expand the scope",
+                "Never edit canonical docs",
             ),
         }
 
@@ -9996,16 +9981,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 / "skills"
                 / "spec-dock-clarification"
                 / "SKILL.md",
-                "system architect skill": install_root
-                / ".agents"
-                / "skills"
-                / "spec-dock-system-architect"
-                / "SKILL.md",
-                "implementation planner skill": install_root
-                / ".agents"
-                / "skills"
-                / "spec-dock-implementation-planner"
-                / "SKILL.md",
+                "system architect agent": install_root
+                / ".codex"
+                / "agents"
+                / "system-architect.toml",
+                "implementation planner agent": install_root
+                / ".codex"
+                / "agents"
+                / "implementation-planner.toml",
                 "issue execution skill": install_root
                 / ".agents"
                 / "skills"
@@ -10100,13 +10083,13 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "unresolved spec gap",
                 "Issue planning / execution split や PR / finish lifecycle の再設計で gap を吸収しない",
             ),
-            "system architect skill": (
+            "system architect agent": (
                 "Do not ask the user directly",
-                "return clarification question candidates",
+                "clarification candidates",
             ),
-            "implementation planner skill": (
+            "implementation planner agent": (
                 "Do not ask the user directly",
-                "return clarification question candidates",
+                "clarification candidates",
             ),
             "issue execution skill": (
                 "workflow_clarification.md",
@@ -10330,12 +10313,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             clarification_text = (skills_dir / "spec-dock-clarification" / "SKILL.md").read_text(
                 encoding="utf-8"
             )
-            system_architect_text = (skills_dir / "spec-dock-system-architect" / "SKILL.md").read_text(
+            agents_dir = assets_dir / "install_root" / ".codex" / "agents"
+            system_architect_text = (agents_dir / "system-architect.toml").read_text(encoding="utf-8")
+            implementation_planner_text = (agents_dir / "implementation-planner.toml").read_text(
                 encoding="utf-8"
             )
-            implementation_planner_text = (
-                skills_dir / "spec-dock-implementation-planner" / "SKILL.md"
-            ).read_text(encoding="utf-8")
             adr_text = (skills_dir / "spec-dock-adr-facilitation" / "SKILL.md").read_text(encoding="utf-8")
             codex_adapter_text = (skills_dir / "spec-dock-codex-adapter" / "SKILL.md").read_text(
                 encoding="utf-8"
@@ -10354,9 +10336,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             hub_text
         assert "`spec-dock-clarification`: first-class docs-aware clarification companion" in \
             hub_text
-        assert "`spec-dock-system-architect`: delegated architecture analysis and draft design evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only." in \
+        assert "`system-architect` agent role: delegated architecture analysis and draft design evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/system-architect.toml`, not in a skill." in \
             hub_text
-        assert "`spec-dock-implementation-planner`: delegated planning analysis and draft plan evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only." in \
+        assert "`implementation-planner` agent role: delegated planning analysis and draft plan evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/implementation-planner.toml`, not in a skill." in \
             hub_text
         assert "`spec-dock-adr-facilitation`: ADR drafting/decision facilitation linked to the current workflow." in \
             hub_text
@@ -10438,36 +10420,22 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Integration Notes for Main Orchestrator",
             "return a blocker to the main orchestrator",
             "Do not ask the user directly",
-            "create a new scope-local `discussions/<ts>-<kind>-<slug>.md` Markdown draft",
-            "Create exactly one new discussion Markdown file",
-            "same-second collision",
-            "YAML-style frontmatter delimited by `---` on line 1",
+            "Create exactly one new flat Markdown file",
+            "Begin the file with YAML-style frontmatter containing:",
             "lightweight provenance",
-            "created_by_role: spec-dock-system-architect",
-            "`source_paths`: non-empty block list",
-            "`intended_targets`: non-empty block list",
-            "inline scalars and empty lists",
-            "fail the post-run diff guard",
+            "created_by_role: system-architect",
+            "`source_paths`, non-empty block-list",
+            "`intended_targets`,",
             "adoption_status: unreviewed",
             "reflected_to: []",
             "diff_guard_result",
-            "post-run diff guard reads the frontmatter",
-            "Do not include standard requirements for task manifest hash",
             "No canonical edit, final authority, promotion, reviewer-pass, or user-dialogue ownership is claimed.",
-            "canonical artifacts edited: `none`",
-            "close, update, or mutate GitHub issues",
-            "run destructive commands",
-            "promote phases or mark work complete",
-            "bounded depth=2 leaf-only evidence",
-            "Allowed child roles are limited to",
-            "Maximum child calls",
-            "depth=3 / grandchild delegation",
-            "leaf-only evidence producer",
+            "close work, mutate GitHub issues",
+            "promote phases, close work",
+            "depth=2 leaf-only evidence",
             "Do not call peer authoring roles",
-            "do not call `dev-coder` as a child",
-            "final fresh reviewer gate remains independent",
-            "claim final authority, issue ready, issue finish, or phase completion",
-            "claim `spec-reviewer` pass",
+            "do not call `dev-coder`",
+            "fresh `spec-reviewer` pass remains required",
         ):
             assert fragment in system_architect_text
 
@@ -10486,40 +10454,26 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Integration Notes for Main Orchestrator",
             "`spec-dock/docs/workflow_issue.md`",
             "`spec-dock/docs/authoring/issue-plan.md`",
-            "issue plan field semantics",
-            "issue lifecycle, execution, validation, reviewer, and completion policy",
-            "return `Plan Blocked`",
+            "plan field semantics",
+            "lifecycle, execution, validation,",
+            "return a blocker",
             "Do not ask the user directly",
-            "create a new scope-local `discussions/<ts>-<kind>-<slug>.md` Markdown draft",
-            "Create exactly one new discussion Markdown file",
-            "same-second collision",
-            "YAML-style frontmatter delimited by `---` on line 1",
+            "Create exactly one new flat Markdown file",
+            "Begin the file with YAML-style frontmatter containing:",
             "lightweight provenance",
-            "created_by_role: spec-dock-implementation-planner",
-            "`source_paths`: non-empty block list",
-            "`intended_targets`: non-empty block list",
-            "inline scalars and empty lists",
-            "fail the post-run diff guard",
+            "created_by_role: implementation-planner",
+            "`source_paths`, non-empty block-list",
+            "`intended_targets`,",
             "adoption_status: unreviewed",
             "reflected_to: []",
             "diff_guard_result",
-            "post-run diff guard reads the frontmatter",
-            "Do not include standard requirements for task manifest hash",
             "No canonical edit, final authority, promotion, reviewer-pass, implementation-readiness, or user-dialogue ownership is claimed.",
-            "canonical artifacts edited: `none`",
-            "close, update, or mutate GitHub issues",
-            "run destructive commands",
-            "promote phases or mark work complete",
-            "bounded depth=2 leaf-only evidence",
-            "Allowed child roles are limited to",
-            "Maximum child calls",
-            "depth=3 / grandchild delegation",
-            "leaf-only evidence producer",
+            "close work, mutate GitHub issues",
+            "promote phases, close work",
+            "depth=2 leaf-only evidence",
             "Do not call peer authoring roles",
-            "do not call `dev-coder` as a child",
-            "final fresh reviewer gate remains independent",
-            "claim final authority, issue ready, issue finish, or phase completion",
-            "claim `spec-reviewer` pass",
+            "do not call `dev-coder`",
+            "fresh `spec-reviewer` pass remains required",
         ):
             assert fragment in implementation_planner_text
         for fragment in (
