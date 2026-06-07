@@ -11716,7 +11716,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert custom_file.read_text(encoding="utf-8") == "# custom review note must survive\n"
             assert old_skill_dir.is_dir(), "directory with unmanaged custom content must remain"
 
-    def test_issue_75_pr_observation_placeholder_fails_without_gh_api(self) -> None:
+    def test_issue_75_pr_observation_snapshot_uses_fixed_read_only_gh_call(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -11750,17 +11750,23 @@ exit 44
                 check=False,
             )
 
-            assert result.returncode == 70, result.stdout + result.stderr
+            assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["status"] == "not_implemented"
             assert payload["script"] == "fetch_pr_observation_snapshot.sh"
-            assert not gh_log.exists(), "S01 placeholder must not call gh"
+            assert payload["normalized_status"] == "unknown"
+            assert payload["observation_complete"] is False
+            assert payload["limitations"][0]["code"] == "pr_metadata_collection_failed"
+            assert gh_log.read_text(encoding="utf-8").startswith("pr view 13 --repo owner/repo --json ")
 
     def test_issue_75_pr_review_wrapper_rejects_unsafe_inputs_before_gh_api(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
             / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
+        )
+        wait_script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
         )
 
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -11785,6 +11791,7 @@ exit 44
 
             invalid_args = (
                 ("--repo", "owner/repo", "--pr", "13", "--endpoint", "repos/owner/repo/issues"),
+                ("--repo", "owner/repo", "--pr", "13", "--trigger-created-at", "2026-06-08T01:02:03not-iso"),
                 ("--repo", "owner/repo", "--head-sha", "abc123"),
                 ("--pr", "13"),
             )
@@ -11801,6 +11808,175 @@ exit 44
                     )
                     assert result.returncode == 64, result.stdout + result.stderr
                     assert not gh_log.exists(), "unsafe input reached fake gh api"
+
+            invalid_wait_args = (
+                ("--repo", "owner/repo", "--pr", "13", "--head-sha", "not-a-sha"),
+                ("--repo", "owner/repo", "--pr", "0", "--head-sha", "a" * 40),
+                ("--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40, "--progress", "verbose"),
+                ("--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40, "--timeout-seconds", "0"),
+                ("--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40, "--trigger-created-at", "2026-06-08T01:02:03not-iso"),
+                ("--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40, "--endpoint", "x"),
+            )
+            for args in invalid_wait_args:
+                with _case(args=args):
+                    if gh_log.exists():
+                        gh_log.unlink()
+                    result = subprocess.run(
+                        [str(wait_script_path), *args],
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    assert result.returncode == 64, result.stdout + result.stderr
+                    assert not gh_log.exists(), "unsafe wait input reached fake gh api"
+
+    def test_issue_75_pr_observation_snapshot_reports_collection_failure_as_json(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            gh_log = tmp_path / "gh.log"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$GH_FAKE_LOG"
+printf 'gh auth failed\\n' >&2
+exit 44
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["script"] == "fetch_pr_observation_snapshot.sh"
+            assert payload["normalized_status"] == "unknown"
+            assert payload["observation_complete"] is False
+            assert payload["limitations"][0]["code"] == "pr_metadata_collection_failed"
+            assert gh_log.read_text(encoding="utf-8").startswith("pr view 13 --repo owner/repo --json ")
+
+    def test_issue_75_pr_observation_wait_stdout_stderr_progress_and_out_contract(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            gh_log = tmp_path / "gh.log"
+            out_dir = tmp_path / "out"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$GH_FAKE_LOG"
+printf 'gh rate limited\\n' >&2
+exit 44
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "b" * 40,
+                    "--timeout-seconds",
+                    "1",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "1",
+                    "--zero-check-grace-polls",
+                    "1",
+                    "--out",
+                    str(out_dir),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["script"] == "wait_pr_observation.sh"
+            assert payload["normalized_status"] == "unknown"
+            assert payload["observation_complete"] is False
+            assert payload["limitations"][0]["code"] == "pr_metadata_collection_failed"
+            assert "poll=1" in result.stderr
+            assert "final=stdout_json" in result.stderr
+            assert len(result.stderr.strip().splitlines()) == 1
+            assert "gh rate limited" not in result.stdout
+            assert (out_dir / "result.json").read_text(encoding="utf-8") == result.stdout
+            assert (out_dir / "latest.json").is_file()
+            assert (out_dir / "events.ndjson").is_file()
+            assert not (out_dir / "summary.md").exists()
+
+            quiet_result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "b" * 40,
+                    "--timeout-seconds",
+                    "1",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "1",
+                    "--zero-check-grace-polls",
+                    "1",
+                    "--progress",
+                    "none",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert quiet_result.returncode == 0, quiet_result.stdout + quiet_result.stderr
+            json.loads(quiet_result.stdout)
+            assert quiet_result.stderr == ""
 
     def test_issue_71_upstream_handoff_reports_expose_evidence_bearing_sections(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
