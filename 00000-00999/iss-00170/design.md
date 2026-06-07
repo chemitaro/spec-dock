@@ -324,16 +324,22 @@ P1/P2 など本文上の優先度は text interpretation なので progress stat
 
 - `review=unknown`:
   - reviewDecision / reviews / comments / threads の取得が不完全。
+- `review=pending`:
+  - GitHub review state が `PENDING` として取得され、まだ active review conclusion として扱えない。
 - `review=unresolved`:
   - review thread に unresolved かつ non-outdated の thread があると取得できた場合。
+  - trigger window より前に開始した unresolved thread も、visible な限り active blocker として扱う。
 - `review=changes_requested`:
-  - `reviewDecision=CHANGES_REQUESTED` または有効 review state に CHANGES_REQUESTED がある。
+  - `reviewDecision=CHANGES_REQUESTED` または reviewer ごとの最新 non-dismissed review state に CHANGES_REQUESTED がある。
 - `review=requested`:
   - review request が残っている、または `reviewDecision=REVIEW_REQUIRED`。
 - `review=commented`:
   - COMMENTED review や comment があるが、changes requested / unresolved とは断定しない。
+  - resolved / outdated review thread に属する inline comment は metadata として残すが active feedback status には使わない。
 - `review=approved`:
-  - `reviewDecision=APPROVED` または有効 review state に APPROVED がある。
+  - `reviewDecision=APPROVED` または reviewer ごとの最新 non-dismissed review state に APPROVED がある。
+- `review=dismissed`:
+  - 個別 signal state として保持するが、active review status を単独では block しない。
 - `review=none`:
   - review、review comment、issue comment、review request が観測されない。
 
@@ -353,7 +359,7 @@ trigger window 後の body payload は `review.signals[]` の各 item に body m
 {
   "review": {
     "collector": "s04",
-    "status": "none|requested|commented|approved|changes_requested|unresolved|unknown",
+    "status": "none|pending|requested|commented|approved|changes_requested|unresolved|unknown",
     "progress_status": "commented",
     "signals": [],
     "review_requests": [],
@@ -403,13 +409,15 @@ trigger window 後の body payload は `review.signals[]` の各 item に body m
   "created_at": "2026-06-07T00:00:00Z",
   "submitted_at": "optional-review-submitted-at",
   "updated_at": "optional-inline-comment-updated-at",
-  "state": "commented|approved|changes_requested|unknown",
+  "state": "commented|approved|changes_requested|pending|dismissed|unknown",
   "commit_id": "optional-review-or-comment-head-sha",
   "original_commit_id": "optional-inline-original-sha",
   "stale": false,
   "trigger_command": false,
   "path": "optional/file/path",
   "line": 12,
+  "thread_id": "optional-review-thread-id",
+  "thread_state": "unresolved|resolved|outdated",
   "body": "included only when item belongs to trigger_window and body_mode includes body",
   "body_truncated": false,
   "body_original_length": 0,
@@ -608,15 +616,17 @@ CI logs の全文取得は通常 path には含めない。
   },
   "review": {
     "collector": "s04",
-    "status": "none|requested|commented|approved|changes_requested|unresolved|unknown",
+    "status": "none|pending|requested|commented|approved|changes_requested|unresolved|unknown",
     "progress_status": "none",
     "statuses": [
       "none",
+      "pending",
       "requested",
       "commented",
       "approved",
       "changes_requested",
       "unresolved",
+      "dismissed",
       "unknown"
     ],
     "signals": [],
@@ -685,7 +695,10 @@ CI logs の全文取得は通常 path には含めない。
 ```
 
 `fetch_pr_observation_snapshot.sh` の snapshot JSON も同じ top-level contract を返すが、`script` は
-`fetch_pr_observation_snapshot.sh`、`observation_complete` は常に `false`、`wait` は含まない。
+`fetch_pr_observation_snapshot.sh`、`wait` は含まない。snapshot は1回分の収集結果から
+`normalized_status`、`recommended_next_action`、`observation_complete` を導出する。head mismatch、
+blocking limitation、CI failure / pending / running / none、review human gate を wait wrapper と同じ top-level
+意味へ正規化するが、quiet window / same fingerprint の安定判定は wait wrapper だけが担う。
 `wait_pr_observation.sh` が stable / terminal / timeout 判定後に final JSON を stdout へ 1 回だけ出力する。
 `--out` 未指定時、`artifacts` の値は `null` で、通常 caller は stdout JSON を唯一の判断 source とする。
 `--out` 指定時だけ `artifacts` に path を入れる。
@@ -727,7 +740,7 @@ script failure ではなく人間または実装 agent への handoff 状態と�
    - review collector は trigger window に属する review/comment body を body mode に従って抽出する。
 4. Status normalization:
    - CI を `unknown|none|failed|running|pending|passed` に集約する。
-   - Review を `unknown|unresolved|changes_requested|requested|commented|approved|none` に集約する。
+   - Review を `unknown|unresolved|changes_requested|requested|commented|approved|pending|none` に集約する。
 5. Fingerprint:
    - head SHA、checks/statuses normalized state、review ids/states/thread states/`body_sha256`/review requests、limitations を含める。
    - raw body は含めない。
@@ -814,8 +827,10 @@ script failure ではなく人間または実装 agent への handoff 状態と�
   - job / step detail が取得できない場合、check-run level failure detail と limitation が出る。
 - Review normalization tests:
   - thread state 取得失敗は `review=unknown` と limitation。
-  - unresolved non-outdated thread が取れる場合は `review=unresolved`。
-  - `reviewDecision=CHANGES_REQUESTED` は `review=changes_requested`。
+  - unresolved non-outdated thread が取れる場合は trigger window 前から残る thread でも `review=unresolved`。
+  - `reviewDecision=CHANGES_REQUESTED` または reviewer ごとの最新 non-dismissed review state は `review=changes_requested`。
+  - dismissed review は signal として残すが active blocker にはしない。
+  - resolved / outdated thread に属する inline comment は active comment status から除外する。
   - review request / `REVIEW_REQUIRED` は `review=requested`。
   - COMMENTED review / comment presence は `review=commented`。
   - `reviewDecision=APPROVED` は `review=approved`。
