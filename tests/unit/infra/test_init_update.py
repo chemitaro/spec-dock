@@ -11676,6 +11676,44 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     assert os.access(provider_path, os.X_OK), f"provider script not executable: {rel_path}"
                     assert os.access(mirror_path, os.X_OK), f"mirror script not executable: {rel_path}"
 
+    def test_issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        mirrored_paths = (
+            ".agents/skills/github-pr-merge-preparer/SKILL.md",
+            ".agents/skills/github-pr-creator/SKILL.md",
+            ".codex/config.toml",
+            ".github/agents/orchestrator.agent.md",
+        )
+
+        for rel_path in mirrored_paths:
+            with _case(rel_path=rel_path):
+                provider_path = repo_root / "src" / "spec_dock" / "assets" / "install_root" / rel_path
+                mirror_path = repo_root / rel_path
+                assert provider_path.is_file(), f"missing provider workflow guidance: {rel_path}"
+                assert mirror_path.is_file(), f"missing dogfooding workflow guidance: {rel_path}"
+                assert mirror_path.read_bytes() == provider_path.read_bytes()
+                text = provider_path.read_text(encoding="utf-8")
+                assert "pr-monitor" not in text
+                assert "github-codex-pr-review-comments" not in text
+
+        merge_preparer_text = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md"
+        ).read_text(encoding="utf-8")
+        assert "./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh" in merge_preparer_text
+        assert "stdout final JSON" in merge_preparer_text
+        assert "latest head SHA" in merge_preparer_text
+
+        creator_text = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-creator/SKILL.md"
+        ).read_text(encoding="utf-8")
+        assert "github-pr-observation" in creator_text
+        assert (
+            "./.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh" in creator_text
+            or "./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh" in creator_text
+        )
+
     def test_issue_75_update_prunes_empty_obsolete_pr_review_skill_dirs_only(self) -> None:
         obsolete_paths = (
             ".agents/skills/github-codex-pr-review-comments/SKILL.md",
