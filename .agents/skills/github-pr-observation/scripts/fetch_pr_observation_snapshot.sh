@@ -238,6 +238,35 @@ head_matches_expected = (
 )
 normalized_status = "unknown"
 recommended_next_action = "human_gate"
+observation_complete = False
+
+
+def has_blocking_limitation():
+    return any(
+        item.get("severity") == "blocking"
+        for item in limitations
+        if isinstance(item, dict)
+    )
+
+
+def classify_snapshot():
+    ci_status = ci_payload.get("status") or summary.get("ci") or "unknown"
+    review_status = review_payload.get("status") or summary.get("review") or "unknown"
+    if head_matches_expected is False or normalized_status == "stale_head":
+        return "stale_head", "rerun_for_current_head", False
+    if has_blocking_limitation():
+        return "unknown", "human_gate", False
+    if ci_status == "failed":
+        return "failed", "fix_ci", False
+    if ci_status in {"pending", "running", "none"}:
+        return ci_status, "wait", False
+    if ci_status != "passed":
+        return "unknown", "human_gate", False
+    if review_status in {"none", "approved"}:
+        return "passed", "merge_prepared", True
+    if review_status in {"requested", "commented", "changes_requested", "unresolved"}:
+        return "human_gate", "address_review_feedback", True
+    return "unknown", "human_gate", False
 
 if gh_exit != 0:
     stderr_text = ""
@@ -346,6 +375,8 @@ else:
             }
         )
 
+normalized_status, recommended_next_action, observation_complete = classify_snapshot()
+
 fingerprint_source = {
     "repo": repo,
     "pr": pr,
@@ -383,7 +414,7 @@ payload = {
     "status": normalized_status,
     "overall_status": normalized_status,
     "normalized_status": normalized_status,
-    "observation_complete": False,
+    "observation_complete": observation_complete,
     "observed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     "repo": repo,
     "pr": pr,
