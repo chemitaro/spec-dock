@@ -186,6 +186,7 @@ OBS_REVIEW_STDERR_PATH="$review_stderr" \
 OBS_TRIGGER_COMMENT_ID="$trigger_comment_id" \
 OBS_TRIGGER_CREATED_AT="$trigger_created_at" \
 OBS_BODY_MODE="$body_mode" \
+OBS_OUT_DIR="$out_dir" \
 OBS_GH_EXIT="$gh_exit" \
 OBS_GH_STDERR_PATH="$gh_stderr" \
 OBS_METADATA_JSON="$metadata_json" \
@@ -363,6 +364,7 @@ fingerprint = hashlib.sha256(
 
 trigger_comment_id = os.environ["OBS_TRIGGER_COMMENT_ID"] or None
 trigger_created_at = os.environ["OBS_TRIGGER_CREATED_AT"] or None
+out_dir = os.environ["OBS_OUT_DIR"] or None
 trigger = {
     "source": (
         review_wrapper_payload.get("trigger", {}).get("source")
@@ -398,7 +400,13 @@ payload = {
     "review": review_payload,
     "trigger": trigger,
     "body_mode": body_mode,
-    "artifacts": {},
+    "artifacts": {
+        "result_json": f"{out_dir}/result.json" if out_dir else None,
+        "latest_json": f"{out_dir}/latest.json" if out_dir else None,
+        "events_ndjson": f"{out_dir}/events.ndjson" if out_dir else None,
+        "latest_delta_json": f"{out_dir}/latest_delta.json" if out_dir else None,
+        "snapshots_dir": f"{out_dir}/snapshots" if out_dir else None,
+    },
     "pr_metadata": metadata,
 }
 print(json.dumps(payload, sort_keys=True, separators=(",", ":")))

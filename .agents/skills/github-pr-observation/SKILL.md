@@ -69,12 +69,18 @@ non-authoritative.
   stdout and snapshot/debug files. These artifacts are optional and are not a
   separate authority.
 
-## Current Implementation Limit
+## Observation Semantics
 
-This step fixes the public script contract and stream boundary. Detailed CI,
-review, thread, body-window, quiet-window, timeout, and final status collection
-are implemented by later issue steps. Until then, fixed collection failures and
-pending collector details are represented as limitations and non-success JSON.
+Snapshot, wait CI, review, thread, body-window, quiet-window, timeout, and final
+status collection are implemented by the public scripts.
+
+- The final JSON written to `stdout` is authoritative.
+- `stderr` progress is bounded and non-authoritative.
+- `--out` artifacts are optional debug/audit copies.
+- Observation statuses include `passed`, `failed`, `pending`, `running`,
+  `none`, `timeout`, `stale_head`, `unknown`, and `human_gate`.
+- Review bodies are trigger-window scoped when body mode allows body
+  collection.
 
 ## Safety Boundary
 

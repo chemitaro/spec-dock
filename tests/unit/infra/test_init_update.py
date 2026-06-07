@@ -1141,6 +1141,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00134-matt-pocock-grill-skill-review-patterns/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00142-matt-pocock-skill-adoption-analysis/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00151-codex-agent-gpt55-low-reasoning/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00170-harden-pr-monitor-stable-observation/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json",
@@ -1256,6 +1257,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00134-matt-pocock-grill-skill-review-patterns/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00142-matt-pocock-skill-adoption-analysis/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00151-codex-agent-gpt55-low-reasoning/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00170-harden-pr-monitor-stable-observation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json": [],
@@ -13537,7 +13539,9 @@ JSON
     ;;
   "api repos/owner/repo/pulls/13/reviews --paginate")
     cat <<'JSON'
-[{"id":201,"user":{"login":"alice"},"state":"CHANGES_REQUESTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"please fix this old-trigger-free review body"},{"id":202,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:07:00Z","body":"codex review comment body that is long enough to be truncated in default mode"}]
+[{"id":201,"user":{"login":"alice"},"state":"CHANGES_REQUESTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"please fix this old-trigger-free review body"},{"id":202,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:07:00Z","body":"codex review comment body """
+                + ("x" * 12050)
+                + """"}]
 JSON
     ;;
   "api repos/owner/repo/pulls/13/comments --paginate")
@@ -13619,7 +13623,10 @@ esac
             assert review["threads"]["resolved"] == 1
             assert review["threads"]["outdated"] == 1
             assert review["body_mode"]["mode"] == "trigger-window-truncated"
-            assert review["body_mode"]["item_count_omitted"] >= 1
+            assert review["body_mode"]["item_body_char_cap"] == 12000
+            assert review["body_mode"]["total_body_char_cap"] == 120000
+            assert review["body_mode"]["item_count_cap"] == 50
+            assert review["body_mode"]["item_count_omitted"] == 0
             assert all("body_sha256" in item for item in review["signals"])
             included_bodies = [
                 item.get("body")
@@ -13934,6 +13941,335 @@ esac
             gh_calls = gh_log.read_text(encoding="utf-8")
             assert "after=CURSOR1" in gh_calls
 
+    def test_issue_75_pr_observation_review_collector_uses_thread_comment_activity_for_current_window(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_pre_trigger_with_new_reply","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_1","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T00:30:00Z","updatedAt":"2026-06-08T00:30:00Z","body":"old first comment"},{"id":"RTC_2","databaseId":302,"author":{"login":"bob"},"createdAt":"2026-06-08T01:10:00Z","updatedAt":"2026-06-08T01:12:00Z","body":"new reply after trigger"}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["review"]["status"] == "unresolved"
+            thread = payload["review"]["threads"]["items"][0]
+            assert thread["first_comment_created_at"] == "2026-06-08T00:30:00Z"
+            assert thread["latest_comment_created_at"] == "2026-06-08T01:10:00Z"
+            assert thread["latest_comment_updated_at"] == "2026-06-08T01:12:00Z"
+            assert thread["activity_at"] == "2026-06-08T01:12:00Z"
+
+    def test_issue_75_pr_observation_review_collector_uses_thread_comment_update_activity_for_current_window(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_updated_after_trigger","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_1","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T00:30:00Z","updatedAt":"2026-06-08T00:30:00Z","body":"old first comment"},{"id":"RTC_2","databaseId":302,"author":{"login":"bob"},"createdAt":"2026-06-08T01:00:00Z","updatedAt":"2026-06-08T01:12:00Z","body":"edited at trigger comment after trigger"}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["review"]["status"] == "unresolved"
+            thread = payload["review"]["threads"]["items"][0]
+            assert thread["first_comment_created_at"] == "2026-06-08T00:30:00Z"
+            assert thread["latest_comment_created_at"] == "2026-06-08T01:00:00Z"
+            assert thread["latest_comment_updated_at"] == "2026-06-08T01:12:00Z"
+            assert thread["activity_at"] == "2026-06-08T01:12:00Z"
+
+    def test_issue_75_pr_observation_review_collector_uses_latest_thread_comment_beyond_first_20(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            gh_log = tmp_path / "gh.log"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$GH_FAKE_LOG"
+if [[ "$*" == api\\ graphql* ]]; then
+  if [[ "$*" == *"comments(last: 100)"* ]]; then
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_more_than_20_comments","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_old_1","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T00:01:00Z","updatedAt":"2026-06-08T00:01:00Z","body":"old pre-trigger thread comment 1"},{"id":"RTC_old_2","databaseId":302,"author":{"login":"alice"},"createdAt":"2026-06-08T00:02:00Z","updatedAt":"2026-06-08T00:02:00Z","body":"old pre-trigger thread comment 2"},{"id":"RTC_old_3","databaseId":303,"author":{"login":"alice"},"createdAt":"2026-06-08T00:03:00Z","updatedAt":"2026-06-08T00:03:00Z","body":"old pre-trigger thread comment 3"},{"id":"RTC_old_4","databaseId":304,"author":{"login":"alice"},"createdAt":"2026-06-08T00:04:00Z","updatedAt":"2026-06-08T00:04:00Z","body":"old pre-trigger thread comment 4"},{"id":"RTC_old_5","databaseId":305,"author":{"login":"alice"},"createdAt":"2026-06-08T00:05:00Z","updatedAt":"2026-06-08T00:05:00Z","body":"old pre-trigger thread comment 5"},{"id":"RTC_old_6","databaseId":306,"author":{"login":"alice"},"createdAt":"2026-06-08T00:06:00Z","updatedAt":"2026-06-08T00:06:00Z","body":"old pre-trigger thread comment 6"},{"id":"RTC_old_7","databaseId":307,"author":{"login":"alice"},"createdAt":"2026-06-08T00:07:00Z","updatedAt":"2026-06-08T00:07:00Z","body":"old pre-trigger thread comment 7"},{"id":"RTC_old_8","databaseId":308,"author":{"login":"alice"},"createdAt":"2026-06-08T00:08:00Z","updatedAt":"2026-06-08T00:08:00Z","body":"old pre-trigger thread comment 8"},{"id":"RTC_old_9","databaseId":309,"author":{"login":"alice"},"createdAt":"2026-06-08T00:09:00Z","updatedAt":"2026-06-08T00:09:00Z","body":"old pre-trigger thread comment 9"},{"id":"RTC_old_10","databaseId":310,"author":{"login":"alice"},"createdAt":"2026-06-08T00:10:00Z","updatedAt":"2026-06-08T00:10:00Z","body":"old pre-trigger thread comment 10"},{"id":"RTC_old_11","databaseId":311,"author":{"login":"alice"},"createdAt":"2026-06-08T00:11:00Z","updatedAt":"2026-06-08T00:11:00Z","body":"old pre-trigger thread comment 11"},{"id":"RTC_old_12","databaseId":312,"author":{"login":"alice"},"createdAt":"2026-06-08T00:12:00Z","updatedAt":"2026-06-08T00:12:00Z","body":"old pre-trigger thread comment 12"},{"id":"RTC_old_13","databaseId":313,"author":{"login":"alice"},"createdAt":"2026-06-08T00:13:00Z","updatedAt":"2026-06-08T00:13:00Z","body":"old pre-trigger thread comment 13"},{"id":"RTC_old_14","databaseId":314,"author":{"login":"alice"},"createdAt":"2026-06-08T00:14:00Z","updatedAt":"2026-06-08T00:14:00Z","body":"old pre-trigger thread comment 14"},{"id":"RTC_old_15","databaseId":315,"author":{"login":"alice"},"createdAt":"2026-06-08T00:15:00Z","updatedAt":"2026-06-08T00:15:00Z","body":"old pre-trigger thread comment 15"},{"id":"RTC_old_16","databaseId":316,"author":{"login":"alice"},"createdAt":"2026-06-08T00:16:00Z","updatedAt":"2026-06-08T00:16:00Z","body":"old pre-trigger thread comment 16"},{"id":"RTC_old_17","databaseId":317,"author":{"login":"alice"},"createdAt":"2026-06-08T00:17:00Z","updatedAt":"2026-06-08T00:17:00Z","body":"old pre-trigger thread comment 17"},{"id":"RTC_old_18","databaseId":318,"author":{"login":"alice"},"createdAt":"2026-06-08T00:18:00Z","updatedAt":"2026-06-08T00:18:00Z","body":"old pre-trigger thread comment 18"},{"id":"RTC_old_19","databaseId":319,"author":{"login":"alice"},"createdAt":"2026-06-08T00:19:00Z","updatedAt":"2026-06-08T00:19:00Z","body":"old pre-trigger thread comment 19"},{"id":"RTC_old_20","databaseId":320,"author":{"login":"alice"},"createdAt":"2026-06-08T00:20:00Z","updatedAt":"2026-06-08T00:20:00Z","body":"old pre-trigger thread comment 20"},{"id":"RTC_latest_21","databaseId":321,"author":{"login":"bob"},"createdAt":"2026-06-08T01:30:00Z","updatedAt":"2026-06-08T01:31:00Z","body":"latest reply after trigger"}]}}]}}}}}
+JSON
+  else
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_more_than_20_comments","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_old_1","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T00:01:00Z","updatedAt":"2026-06-08T00:01:00Z","body":"old pre-trigger thread comment 1"},{"id":"RTC_old_2","databaseId":302,"author":{"login":"alice"},"createdAt":"2026-06-08T00:02:00Z","updatedAt":"2026-06-08T00:02:00Z","body":"old pre-trigger thread comment 2"},{"id":"RTC_old_3","databaseId":303,"author":{"login":"alice"},"createdAt":"2026-06-08T00:03:00Z","updatedAt":"2026-06-08T00:03:00Z","body":"old pre-trigger thread comment 3"},{"id":"RTC_old_4","databaseId":304,"author":{"login":"alice"},"createdAt":"2026-06-08T00:04:00Z","updatedAt":"2026-06-08T00:04:00Z","body":"old pre-trigger thread comment 4"},{"id":"RTC_old_5","databaseId":305,"author":{"login":"alice"},"createdAt":"2026-06-08T00:05:00Z","updatedAt":"2026-06-08T00:05:00Z","body":"old pre-trigger thread comment 5"},{"id":"RTC_old_6","databaseId":306,"author":{"login":"alice"},"createdAt":"2026-06-08T00:06:00Z","updatedAt":"2026-06-08T00:06:00Z","body":"old pre-trigger thread comment 6"},{"id":"RTC_old_7","databaseId":307,"author":{"login":"alice"},"createdAt":"2026-06-08T00:07:00Z","updatedAt":"2026-06-08T00:07:00Z","body":"old pre-trigger thread comment 7"},{"id":"RTC_old_8","databaseId":308,"author":{"login":"alice"},"createdAt":"2026-06-08T00:08:00Z","updatedAt":"2026-06-08T00:08:00Z","body":"old pre-trigger thread comment 8"},{"id":"RTC_old_9","databaseId":309,"author":{"login":"alice"},"createdAt":"2026-06-08T00:09:00Z","updatedAt":"2026-06-08T00:09:00Z","body":"old pre-trigger thread comment 9"},{"id":"RTC_old_10","databaseId":310,"author":{"login":"alice"},"createdAt":"2026-06-08T00:10:00Z","updatedAt":"2026-06-08T00:10:00Z","body":"old pre-trigger thread comment 10"},{"id":"RTC_old_11","databaseId":311,"author":{"login":"alice"},"createdAt":"2026-06-08T00:11:00Z","updatedAt":"2026-06-08T00:11:00Z","body":"old pre-trigger thread comment 11"},{"id":"RTC_old_12","databaseId":312,"author":{"login":"alice"},"createdAt":"2026-06-08T00:12:00Z","updatedAt":"2026-06-08T00:12:00Z","body":"old pre-trigger thread comment 12"},{"id":"RTC_old_13","databaseId":313,"author":{"login":"alice"},"createdAt":"2026-06-08T00:13:00Z","updatedAt":"2026-06-08T00:13:00Z","body":"old pre-trigger thread comment 13"},{"id":"RTC_old_14","databaseId":314,"author":{"login":"alice"},"createdAt":"2026-06-08T00:14:00Z","updatedAt":"2026-06-08T00:14:00Z","body":"old pre-trigger thread comment 14"},{"id":"RTC_old_15","databaseId":315,"author":{"login":"alice"},"createdAt":"2026-06-08T00:15:00Z","updatedAt":"2026-06-08T00:15:00Z","body":"old pre-trigger thread comment 15"},{"id":"RTC_old_16","databaseId":316,"author":{"login":"alice"},"createdAt":"2026-06-08T00:16:00Z","updatedAt":"2026-06-08T00:16:00Z","body":"old pre-trigger thread comment 16"},{"id":"RTC_old_17","databaseId":317,"author":{"login":"alice"},"createdAt":"2026-06-08T00:17:00Z","updatedAt":"2026-06-08T00:17:00Z","body":"old pre-trigger thread comment 17"},{"id":"RTC_old_18","databaseId":318,"author":{"login":"alice"},"createdAt":"2026-06-08T00:18:00Z","updatedAt":"2026-06-08T00:18:00Z","body":"old pre-trigger thread comment 18"},{"id":"RTC_old_19","databaseId":319,"author":{"login":"alice"},"createdAt":"2026-06-08T00:19:00Z","updatedAt":"2026-06-08T00:19:00Z","body":"old pre-trigger thread comment 19"},{"id":"RTC_old_20","databaseId":320,"author":{"login":"alice"},"createdAt":"2026-06-08T00:20:00Z","updatedAt":"2026-06-08T00:20:00Z","body":"old pre-trigger thread comment 20"}]}}]}}}}}
+JSON
+  fi
+  exit 0
+fi
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["review"]["status"] == "unresolved"
+            thread = payload["review"]["threads"]["items"][0]
+            assert thread["comment_count"] == 21
+            assert thread["latest_comment_created_at"] == "2026-06-08T01:30:00Z"
+            assert thread["latest_comment_updated_at"] == "2026-06-08T01:31:00Z"
+            assert thread["activity_at"] == "2026-06-08T01:31:00Z"
+            gh_calls = gh_log.read_text(encoding="utf-8")
+            assert "comments(last: 100)" in gh_calls
+            assert "comments(first: 20)" not in gh_calls
+
+    def test_issue_75_pr_observation_review_collector_unparseable_trigger_is_unknown(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"alice"},"state":"APPROVED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"looks good"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-13-40T25:61:61Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["review"]["status"] == "unknown"
+            assert "trigger_timestamp_unparseable" in [
+                item["code"] for item in payload["limitations"]
+            ]
+
     def test_issue_75_pr_observation_review_collector_ignores_trigger_only_comments_for_status(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -13997,6 +14333,331 @@ esac
             assert payload["trigger"]["source"] == "inferred"
             assert payload["review"]["status"] == "none"
             assert payload["review"]["signals"][0]["trigger_command"] is True
+
+    def test_issue_75_pr_observation_review_collector_excludes_pre_trigger_comments_from_status(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":10,"user":{"login":"alice"},"created_at":"2026-06-08T00:30:00Z","body":"old ordinary conversation noise"},{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["review"]["status"] == "none"
+            assert all("body" not in item for item in payload["review"]["signals"])
+
+    def test_issue_75_pr_observation_review_collector_excludes_stale_feedback_from_commented_status(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"alice"},"state":"COMMENTED","commit_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","submitted_at":"2026-06-08T01:06:00Z","body":"stale review body"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"alice"},"pull_request_review_id":201,"commit_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","created_at":"2026-06-08T01:07:00Z","path":"app.py","line":12,"body":"stale inline body"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["review"]["status"] == "none"
+            assert [item["stale"] for item in payload["review"]["signals"] if "stale" in item] == [True, True]
+
+    def test_issue_75_pr_observation_review_collector_uses_inline_comment_update_for_current_window(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<JSON
+[{"id":301,"user":{"login":"alice"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","original_commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T00:30:00Z","updated_at":"${INLINE_UPDATED_AT}","path":"app.py","line":12,"body":"inline body edited after trigger"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            def run_with_updated_at(updated_at: str) -> dict[str, object]:
+                result = subprocess.run(
+                    [
+                        str(script_path),
+                        "--repo",
+                        "owner/repo",
+                        "--pr",
+                        "13",
+                        "--head-sha",
+                        "a" * 40,
+                        "--trigger-comment-id",
+                        "99",
+                        "--trigger-created-at",
+                        "2026-06-08T01:00:00Z",
+                    ],
+                    env={**env, "INLINE_UPDATED_AT": updated_at},
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                assert result.returncode == 0, result.stdout + result.stderr
+                return json.loads(result.stdout)
+
+            payload = run_with_updated_at("2026-06-08T01:06:00Z")
+            assert payload["review"]["status"] == "commented"
+            inline_comment = next(
+                item
+                for item in payload["review"]["signals"]
+                if item["kind"] == "pull_review_comment"
+            )
+            assert inline_comment["created_at"] == "2026-06-08T00:30:00Z"
+            assert inline_comment["updated_at"] == "2026-06-08T01:06:00Z"
+            assert inline_comment["original_commit_id"] == "a" * 40
+            assert inline_comment["body"] == "inline body edited after trigger"
+            assert inline_comment.get("omitted_reason") is None
+
+            changed = run_with_updated_at("2026-06-08T01:07:00Z")
+            assert changed["fingerprint"] != payload["fingerprint"]
+
+    def test_issue_75_pr_observation_review_collector_compares_trigger_timestamps_by_instant(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T05:30:00Z","body":"@codex review"},{"id":100,"user":{"login":"alice"},"created_at":"2026-06-08T05:20:00Z","body":"before trigger instant"},{"id":101,"user":{"login":"alice"},"created_at":"2026-06-08T05:31:00Z","body":"after trigger instant"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T00:30:00-05:00",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            included_bodies = [
+                item.get("body")
+                for item in payload["review"]["signals"]
+                if item.get("body") is not None
+            ]
+            assert included_bodies == ["after trigger instant"]
+            assert payload["review"]["status"] == "commented"
 
     def test_issue_75_pr_observation_review_collector_out_only_writes_raw_bodies(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -14085,6 +14746,90 @@ esac
                     "kind": "pull_review",
                 },
             ]
+
+    def test_issue_75_pr_observation_review_collector_body_mode_none_out_writes_empty_raw_bodies(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            out_dir = tmp_path / "out"
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"alice"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"raw review body must not be persisted for none mode"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                    "--body-mode",
+                    "none",
+                    "--out",
+                    str(out_dir),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert all("body" not in item for item in payload["review"]["signals"])
+            raw_bodies_path = out_dir / "raw" / "review_bodies.json"
+            assert json.loads(raw_bodies_path.read_text(encoding="utf-8")) == []
+            assert "raw review body must not be persisted" not in raw_bodies_path.read_text(
+                encoding="utf-8"
+            )
 
     def test_issue_75_pr_observation_snapshot_includes_s04_review_collector_result(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -14179,9 +14924,53 @@ esac
             assert payload["summary"]["review"] == "approved"
             assert payload["review"]["status"] == "approved"
             assert payload["review"]["collector"] == "s04"
+            assert payload["artifacts"] == {
+                "result_json": None,
+                "latest_json": None,
+                "events_ndjson": None,
+                "latest_delta_json": None,
+                "snapshots_dir": None,
+            }
             assert "review_collector_pending_s04" not in [
                 item["code"] for item in payload["limitations"]
             ]
+
+            out_dir = tmp_path / "out"
+            out_result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                    "--out",
+                    str(out_dir),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert out_result.returncode == 0, out_result.stdout + out_result.stderr
+            out_payload = json.loads(out_result.stdout)
+            assert out_payload["artifacts"] == {
+                "result_json": str(out_dir / "result.json"),
+                "latest_json": str(out_dir / "latest.json"),
+                "events_ndjson": str(out_dir / "events.ndjson"),
+                "latest_delta_json": str(out_dir / "latest_delta.json"),
+                "snapshots_dir": str(out_dir / "snapshots"),
+            }
+            assert (out_dir / "result.json").read_text(encoding="utf-8") == out_result.stdout
+            assert (out_dir / "latest.json").is_file()
+            assert (out_dir / "events.ndjson").is_file()
+            assert (out_dir / "latest_delta.json").is_file()
 
     def test_issue_75_pr_observation_snapshot_scripts_are_bash_32_compatible(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]

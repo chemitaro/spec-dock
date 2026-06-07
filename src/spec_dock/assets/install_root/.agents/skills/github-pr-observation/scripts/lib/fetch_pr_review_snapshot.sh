@@ -140,9 +140,9 @@ STATUSES = [
     "changes_requested",
     "unresolved",
 ]
-ITEM_BODY_CAP = 64
-TOTAL_BODY_CAP = 160
-ITEM_COUNT_CAP = 4
+ITEM_BODY_CAP = 12000
+TOTAL_BODY_CAP = 120000
+ITEM_COUNT_CAP = 50
 
 
 def now_iso():
@@ -225,12 +225,13 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
           id
           isResolved
           isOutdated
-          comments(first: 20) {
+          comments(last: 100) {
             nodes {
               id
               databaseId
               author { login }
               createdAt
+              updatedAt
               body
             }
           }
@@ -356,15 +357,52 @@ def signal_time(signal):
     return signal.get("created_at") or signal.get("submitted_at") or ""
 
 
+def parse_iso8601_instant(value):
+    if not value:
+        return None
+    normalized = str(value)
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def latest_iso8601_value(values):
+    latest_value = None
+    latest_dt = None
+    for value in values:
+        parsed = parse_iso8601_instant(value)
+        if parsed is None:
+            continue
+        if latest_dt is None or parsed > latest_dt:
+            latest_dt = parsed
+            latest_value = value
+    return latest_value
+
+
+def signal_activity_time(signal):
+    return latest_iso8601_value(
+        (signal.get("created_at"), signal.get("submitted_at"), signal.get("updated_at"))
+    )
+
+
 def is_after_trigger(signal):
-    if not trigger_created_at:
+    if trigger_created_at_dt is None:
         return False
-    created_at = signal_time(signal)
-    if not created_at:
+    activity_at = signal_activity_time(signal)
+    if not activity_at:
         return False
-    if created_at > trigger_created_at:
+    activity_at_dt = parse_iso8601_instant(activity_at)
+    if activity_at_dt is None:
+        return False
+    if activity_at_dt > trigger_created_at_dt:
         return True
-    if created_at < trigger_created_at:
+    if activity_at_dt < trigger_created_at_dt:
         return False
     if signal.get("kind") == "issue_comment" and trigger_comment_id is not None:
         try:
@@ -498,6 +536,17 @@ else:
         }
     )
 
+trigger_created_at_dt = parse_iso8601_instant(trigger_created_at)
+if trigger_created_at and trigger_created_at_dt is None:
+    limitations.append(
+        {
+            "code": "trigger_timestamp_unparseable",
+            "source": "trigger_created_at",
+            "severity": "blocking",
+            "message": "trigger timestamp could not be parsed as an aware instant",
+        }
+    )
+
 signals = []
 for comment in issue_comments:
     raw_body = comment.get("body") or ""
@@ -542,7 +591,9 @@ for comment in review_comments:
             "author": user_login(comment),
             "codex_authored": is_codex_authored(user_login(comment)),
             "created_at": comment.get("created_at"),
+            "updated_at": comment.get("updated_at"),
             "commit_id": commit_id,
+            "original_commit_id": comment.get("original_commit_id"),
             "path": comment.get("path"),
             "line": comment.get("line"),
             "stale": stale,
@@ -579,6 +630,17 @@ threads = []
 for thread in thread_nodes:
     comments = thread_comment_nodes(thread)
     first_comment = comments[0] if comments else {}
+    latest_comment_created_at = latest_iso8601_value(
+        comment.get("createdAt") for comment in comments
+    )
+    latest_comment_updated_at = latest_iso8601_value(
+        comment.get("updatedAt") for comment in comments
+    )
+    activity_at = latest_iso8601_value(
+        timestamp
+        for comment in comments
+        for timestamp in (comment.get("createdAt"), comment.get("updatedAt"))
+    )
     resolved = bool(thread.get("isResolved"))
     outdated = bool(thread.get("isOutdated"))
     state = "resolved" if resolved else "outdated" if outdated else "unresolved"
@@ -592,12 +654,15 @@ for thread in thread_nodes:
             "first_comment_id": first_comment.get("databaseId") or first_comment.get("id"),
             "first_comment_author": user_login(first_comment),
             "first_comment_created_at": first_comment.get("createdAt"),
+            "latest_comment_created_at": latest_comment_created_at,
+            "latest_comment_updated_at": latest_comment_updated_at,
+            "activity_at": activity_at,
         }
     )
 
 signals.sort(key=lambda item: (signal_time(item), str(item.get("id") or "")))
 body_state = {
-    "trigger_known": trigger_source in {"explicit", "inferred"} and bool(trigger_created_at),
+    "trigger_known": trigger_source in {"explicit", "inferred"} and trigger_created_at_dt is not None,
     "included_count": 0,
     "included_chars": 0,
     "item_count_omitted": 0,
@@ -614,7 +679,7 @@ raw_body_artifacts = [
         "body": item.get("_raw_body_artifact"),
     }
     for item in signals
-    if body_state["trigger_known"] and is_after_trigger(item)
+    if body_mode == "out-only" and body_state["trigger_known"] and is_after_trigger(item)
 ]
 for signal in signals:
     signal.pop("_raw_body_artifact", None)
@@ -634,6 +699,7 @@ blocking_collection_failure = any(
         "github_api_collection_failed",
         "github_api_schema_unavailable",
         "thread_state_unavailable",
+        "trigger_timestamp_unparseable",
     }
     and item.get("severity") == "blocking"
     for item in limitations
@@ -661,15 +727,36 @@ thread_counts = {
     "items": threads,
 }
 
-status_signals = [
-    item
-    for item in signals
-    if not (item.get("kind") == "issue_comment" and item.get("trigger_command"))
-]
+def is_current_status_signal(item):
+    if item.get("kind") == "issue_comment" and item.get("trigger_command"):
+        return False
+    if item.get("stale"):
+        return False
+    if trigger_source in {"explicit", "inferred"}:
+        return body_state["trigger_known"] and is_after_trigger(item)
+    return item.get("kind") in {"pull_review", "pull_review_comment"} and bool(expected_head_sha)
+
+
+def is_current_thread(item):
+    if trigger_source not in {"explicit", "inferred"}:
+        return True
+    if not body_state["trigger_known"]:
+        return False
+    return is_after_trigger(
+        {
+            "kind": "thread",
+            "id": item.get("first_comment_id"),
+            "created_at": item.get("activity_at"),
+        }
+    )
+
+
+status_signals = [item for item in signals if is_current_status_signal(item)]
+current_threads = [item for item in threads if is_current_thread(item)]
 
 if blocking_collection_failure:
     status = "unknown"
-elif thread_counts["unresolved"] > 0:
+elif any(item.get("state") == "unresolved" for item in current_threads):
     status = "unresolved"
 elif any(item.get("state") == "changes_requested" and not item.get("stale") for item in status_signals):
     status = "changes_requested"
@@ -684,16 +771,64 @@ elif status_signals:
 else:
     status = "none"
 
+def fingerprint_signal(item):
+    return {
+        "kind": item.get("kind"),
+        "id": item.get("id"),
+        "review_id": item.get("review_id"),
+        "author": item.get("author"),
+        "codex_authored": item.get("codex_authored"),
+        "created_at": item.get("created_at"),
+        "submitted_at": item.get("submitted_at"),
+        "updated_at": item.get("updated_at"),
+        "activity_at": signal_activity_time(item),
+        "state": item.get("state"),
+        "commit_id": item.get("commit_id"),
+        "original_commit_id": item.get("original_commit_id"),
+        "stale": item.get("stale"),
+        "trigger_command": item.get("trigger_command"),
+        "path": item.get("path"),
+        "line": item.get("line"),
+        "body_sha256": item.get("body_sha256"),
+        "body_truncated": item.get("body_truncated"),
+        "body_original_length": item.get("body_original_length"),
+        "omitted_reason": item.get("omitted_reason"),
+    }
+
+
+def fingerprint_thread(item):
+    return {
+        "id": item.get("id"),
+        "state": item.get("state"),
+        "is_resolved": item.get("is_resolved"),
+        "is_outdated": item.get("is_outdated"),
+        "comment_count": item.get("comment_count"),
+        "first_comment_id": item.get("first_comment_id"),
+        "first_comment_created_at": item.get("first_comment_created_at"),
+        "latest_comment_created_at": item.get("latest_comment_created_at"),
+        "latest_comment_updated_at": item.get("latest_comment_updated_at"),
+        "activity_at": item.get("activity_at"),
+    }
+
+
 fingerprint_source = {
     "status": status,
-    "signal_hashes": [item.get("body_sha256") for item in signals],
-    "signal_states": [item.get("state") for item in signals],
-    "review_requests": review_request_signals,
-    "threads": [
-        {"id": item.get("id"), "state": item.get("state")}
-        for item in threads
+    "signals": [fingerprint_signal(item) for item in signals],
+    "codex_authored": [
+        fingerprint_signal(item)
+        for item in signals
+        if item.get("codex_authored")
     ],
-    "limitations": [item.get("code") for item in limitations],
+    "review_requests": review_request_signals,
+    "threads": [fingerprint_thread(item) for item in threads],
+    "body_mode": {
+        "mode": body_mode,
+        "included_count": body_state["included_count"],
+        "included_chars": body_state["included_chars"],
+        "item_count_omitted": body_state["item_count_omitted"],
+        "body_chars_omitted": body_state["body_chars_omitted"],
+    },
+    "limitations": limitations,
 }
 fingerprint = hashlib.sha256(
     json.dumps(fingerprint_source, sort_keys=True, separators=(",", ":")).encode()

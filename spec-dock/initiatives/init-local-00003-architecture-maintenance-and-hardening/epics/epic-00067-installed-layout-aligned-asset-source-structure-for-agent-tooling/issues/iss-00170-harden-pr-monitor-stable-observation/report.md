@@ -918,7 +918,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S06 | ready_to_commit | S06 guidance/test/report diff | pending | pending | N/A | N/A | N/A | N/A |
+| S06 | committed | S06 guidance/test/report diff | `1651dca1` | `git status --short` clean before S90/S99 | N/A | N/A | N/A | N/A |
 
 ---
 
@@ -938,31 +938,47 @@ git diff --check
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / README / workflow / skill / migration notes | no additional docs beyond shipped skill/host guidance | doc-writer for shipped skill guidance | `rg -n "pr-monitor|github-codex-pr-review-comments|github-pr-observation" src/spec_dock/assets/install_root spec-dock/docs .agents .codex .github`; remaining old names are only obsolete cleanup metadata and retired-name prohibition notes; S06 shipped guidance updated; stale `Current Implementation Limit` removed from provider/mirror `github-pr-observation/SKILL.md`; `diff -u` provider/mirror pass; `git diff --check` pass; final spec-reviewer pass | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | added | S01-S06 focused lanes; dogfooding meta snapshot baseline updated; QA P1/P2 review collector gaps fixed; update-only thread activity fixture added; latest `comments(last: 100)` regression reviewed; final focused `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_75_pr_observation or issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets' -q` = `39 passed`; final `uv run pytest tests/unit/infra/test_init_update.py -q` = `251 passed`; `bash -n` provider/mirror scripts pass; provider/mirror `diff -ru` pass; `git diff --check` pass; `./spec-dock/scripts/spec-dock sync --no-github` pass / active unchanged | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | P2 stale review/comment status classification; P2 trigger timestamp lexicographic comparison; P1 existing review thread post-trigger activity omitted from current thread filter; P1 review thread activity could miss replies beyond first 20 comments. Fixed with review collector regressions, including `comments(last: 100)` and a 21-comment latest-reply fixture. Final fresh code-reviewer found no remaining P1/P2 bugs in changed `github-pr-observation` scripts/tests. | 4 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | P1 final JSON schema stale; P1 shipped skill guidance stale; P1 final gate ledger stale; P1 review signal item schema / body cap drift; P2 artifacts no-`--out` shape ambiguity; P1 stale `reviews.trigger_window` design block; P1 stale `reviews.*` fingerprint/test references; P1 `--body-mode none --out` raw body persistence; P1 inline review comment `updated_at` window mismatch; P2 fingerprint participation narrower than design. Fixed by aligning design schema to implemented `review` / `wait` / `summary` / status contract, replacing stale skill implementation-limit text, updating this ledger, raising body caps to `50 / 12000 / 120000`, normalizing snapshot artifacts shape, syncing signal item schema to implemented field names, replacing stale `reviews.*` references with `review.*`, gating raw body artifacts to `out-only`, including inline review comment `updated_at` / `original_commit_id`, using signal activity time for trigger-window classification, and expanding review fingerprint inputs to signal identity/body metadata/Codex subset/thread activity/limitations. Final spec-reviewer found no blocking contract issues. | 5 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| reviewer gates pass; final verification pass | review collector fixes, dogfooding meta snapshot baseline, shipped skill guidance, final report ledger | final response / PR | ready_to_commit |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: S99 `uv run pytest tests/unit/infra/test_init_update.py -q` が dogfooding `.meta.json` snapshot divergence で 1 failed。
+  - 解決: 今回 issue `iss-00170-harden-pr-monitor-stable-observation/.meta.json` を `_CHECKED_IN_DOGFOODING_META_JSON_PATHS` と `_CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH` に sort 順で追加し、focused `1 passed` / full `242 passed` を確認した。
+- 問題: Final QA/code review が trigger-window status classification の漏れを検出。explicit trigger より前の通常 comment や stale review/comment が current status として扱われ、offset timestamp compare も lexicographic だった。
+  - 解決: explicit/inferred trigger が parseable な場合は status 判定を trigger instant 以後の signal に限定し、stale pull review / review comment を `commented` fallback から除外し、`Z` / `±HH:MM` を aware datetime として比較する regression tests を追加。focused review collector `9 passed`; `issue_75` `40 passed`; syntax/parity/check pass。
+- 問題: Final code re-review が、既存 unresolved review thread に trigger 後 reply/update がある場合、first comment が trigger 前だと current thread から落ちる P1 を検出。QA re-review は trigger timestamp parse failure 分岐の P2 coverage gap も指摘。
+  - 解決: thread current-window 判定を thread comments の parse 可能な `createdAt` / `updatedAt` の最新 activity に変更し、GraphQL fixed query に `updatedAt` を追加。`trigger_timestamp_unparseable` limitation + `review.status=unknown` regression も追加。focused review collector `11 passed`; `issue_75` `42 passed`; syntax/parity/check pass。
+- 問題: Final QA re-review が update-only thread activity の P2 coverage gap を指摘。
+  - 解決: 全 thread comment `createdAt` が trigger 以前で、`updatedAt` のみ trigger 後の unresolved thread fixture を追加し、`review.status=unresolved` を確認。focused review collector `12 passed`; `issue_75` `43 passed`; `git diff --check` pass。
+- 問題: Final spec review が design の final JSON schema、shipped skill guidance、final report ledger の stale 表現を P1 として検出。
+  - 解決: design schema を実装済み top-level `review` / `wait` / `summary` / `artifacts` contract へ同期し、provider/mirror `github-pr-observation/SKILL.md` の stale `Current Implementation Limit` を `Observation Semantics` に置換し、QA/code gate ledger を pass へ更新した。
+- 問題: Final spec re-review が review signal item schema と trigger-window body cap の実装差分を P1、snapshot no-`--out` artifacts shape ambiguity を P2 として検出。
+  - 解決: review signal item schema を実装済み `author` / `codex_authored` / `body_sha256` 等へ同期し、default body cap を `ITEM_COUNT_CAP=50`、`ITEM_BODY_CAP=12000`、`TOTAL_BODY_CAP=120000` に引き上げ、snapshot `artifacts` を wait と同じ5キー shape に正規化した。focused `15 passed`; `issue_75` `43 passed`; `bash -n` / parity / `git diff --check` pass。
+- 問題: Final spec second re-review が stale `reviews.trigger_window` design block と、`--body-mode none --out` が raw body artifact を永続化し得る P1 を検出。
+  - 解決: design の Review signal schema を top-level `review.signals` / `review.codex_authored` / `review.threads` / `review.body_mode` に一本化し、`reviews.trigger_window` 例示を削除した。raw body artifact は `body_mode == "out-only"` のときだけ生成し、`none --out` は `raw/review_bodies.json` が空配列になる regression を追加した。focused review collector `13 passed`; `issue_75` `44 passed`; `bash -n` / parity / `git diff --check` pass。
+- 問題: Final spec third re-review が inline review comment の `updated_at` が trigger-window/current 判定に参加しない P1 と、review fingerprint が設計で要求する field より狭い P2 を検出。
+  - 解決: `pull_review_comment` signal に `updated_at` / `original_commit_id` を追加し、`created_at` / `submitted_at` / `updated_at` の最新 activity を trigger-window 判定に使うようにした。fingerprint は signal identity、timestamps、state、stale、body metadata、Codex subset、review requests、thread activity、limitations を含む構造へ拡張した。trigger 前作成・trigger 後更新の inline comment が current body/status に反映され、`updated_at` 変更で fingerprint が変わる regression を追加。focused review collector `14 passed`; `issue_75` `45 passed`; `bash -n` / provider-mirror parity / `git diff --check` pass。
+- 問題: Final code re-review が `reviewThreads.comments(first: 20)` では、20件を超える thread の最新 reply/update を trigger-window activity として見落とす P1 を検出。
+  - 解決: fixed GraphQL query を `comments(last: 100)` に変更し、21件目の最新 comment だけが trigger 後の thread fixture を追加。`review.status=unresolved`、`comment_count=21`、`latest_comment_created_at` / `latest_comment_updated_at` / `activity_at` が最新 comment を指すことを確認。focused review collector `16 passed`; `issue_75` `46 passed`; `bash -n` / provider-mirror parity / `git diff --check` pass。
 
 ## 学んだこと (任意)
 - ...
@@ -971,4 +987,4 @@ git diff --check
 - ...
 
 ## 省略/例外メモ (必須)
-- 該当なし
+- Live GitHub PR observation は未実行。fixed GitHub boundary は fake `gh` fixture と wrapper contract tests で検証した。
