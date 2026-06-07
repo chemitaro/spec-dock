@@ -299,7 +299,9 @@ Rules:
 
 ### CI status taxonomy
 
-CI status は GitHub から機械的に取れる checks / commit statuses の観測結果だけで表す。
+CI status は GitHub から機械的に取れる checks / commit statuses の観測結果を主入力とし、
+fixed `gh pr view --json mergeStateStatus,statusCheckRollup` で取得する merge-state / required-check metadata を
+false pass 防止の補助入力として使う。
 
 - `ci=unknown`:
   - API取得失敗、権限不足、schema不明、head不一致などで判定不能。
@@ -315,13 +317,20 @@ CI status は GitHub から機械的に取れる checks / commit statuses の観
   - failed / running / pending がなく、観測対象が merge-blocking ではない終端状態。
   - `success` だけでなく、GitHub上で終端済みとして扱われる `skipped` / `neutral` もここに含める。
   - workflow 自体が path filtering 等で skip され、required check が Pending のまま残る場合は `passed` ではなく `pending` とする。
-  - `mergeStateStatus` が `CLEAN` または `HAS_HOOKS` 以外で、observed checks/statuses に failure/running/pending が見えない場合も required checks missing/pending として `ci=pending` に畳む。
+  - required-check metadata が取得でき、`mergeStateStatus` と required check rollup が未充足を示していない場合だけ `passed` へ畳む。
 
 `mixed` と `inconclusive` は default progress status として採用しない。
 1件でも失敗系があれば `ci=failed`、未完了があれば `ci=running` / `ci=pending` とする。
 
 CI collector は `ci.required_check_state` に `available`、`merge_state_status`、`status_check_rollup_total`、`status_check_rollup_states[]` を保持する。
-`required_checks_missing_or_pending` は blocking limitation として出し、`pr_required_check_state_unavailable` は informational limitation として扱う。
+`required_checks_missing_or_pending` は、`mergeStateStatus=BLOCKED` かつ `status_check_rollup_states[].state` に
+`EXPECTED` / `IN_PROGRESS` / `PENDING` / `QUEUED` / `REQUESTED` / `WAITING` が含まれ、かつ observed checks/statuses に
+failure / running / pending / stale がない場合だけ blocking limitation として出し、`ci=pending` に分類する。
+`DIRTY` / `BEHIND` など `CLEAN` / `HAS_HOOKS` ではなく、かつ required-check pending でもない merge state は
+`pr_merge_state_blocking` blocking limitation として出し、`ci=unknown` / human gate 相当に分類する。
+`gh pr view --json mergeStateStatus,statusCheckRollup` が失敗した場合は `pr_required_check_state_unavailable`
+informational limitation を保持する。checks/statuses が観測されている場合、この limitation がある状態では
+observed green だけで `ci=passed` にせず、`ci=unknown` として false merge-prepared を防ぐ。
 
 ### Review status taxonomy
 
@@ -727,6 +736,8 @@ CI / review が green に見えても merge-prepared success にしない。
 `wait_pr_observation.sh` が stable / terminal / timeout 判定後に final JSON を stdout へ 1 回だけ出力する。
 timeout 判定時、直前に有効な `latest_payload` がある場合は、CI / review summary と artifacts を保持したまま
 `snapshot_poll_timeout` limitation を追加し、`normalized_status=timeout` / `observation_complete=false` に更新する。
+この limitation は snapshot subprocess が remaining deadline を超過した場合は `source=fetch_pr_observation_snapshot.sh`、
+quiet window / same fingerprint count の完了前に wait deadline に達した場合は `source=wait_pr_observation.sh` として付与する。
 直前 payload がない場合だけ synthetic timeout snapshot を作る。
 `--out` 未指定時、`artifacts` の値は `null` で、通常 caller は stdout JSON を唯一の判断 source とする。
 `--out` 指定時だけ `artifacts` に path を入れる。
