@@ -141,106 +141,128 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- S01 では provider-side source of truth と dogfooding mirror から `pr-monitor` agent assets と `github-codex-pr-review-comments` skill を退役し、`github-pr-observation` skill scaffold を追加した。
+- 初回 code-reviewer は command rules の prefix pattern 破損と obsolete skill の空 directory 残りを検出した。修正後の fresh code-reviewer は findings なし / `review_status=pass`。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-06-07 HH:MM - HH:MM）
+### セッションログ（2026-06-08 S01）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01 Asset retirement and observation skill scaffold
+- AC/EC: AC-011
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: `### S01 Asset retirement and observation skill scaffold`
+  - closure ids: CL-AC-011
 
 #### 実施内容
-- ...
+- dev-coder が provider-side `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/` を追加し、dogfooding mirror `.agents/skills/github-pr-observation/` と byte parity を取った。
+- provider/dogfooding から旧 `pr-monitor` agent assets と旧 `github-codex-pr-review-comments` skill files を削除した。
+- managed skill inventory、CLI harness、command rules、obsolete cleanup manifest、focused tests を更新した。
+- 初回 code-reviewer fail 後、command rules を wrapper ごとの `prefix_rule` に分離し、obsolete exact file unlink 後に managed obsolete prefix 内の空 parent directory だけを prune する処理と regression test を追加した。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_bundled_native_shim_assets_satisfy_static_delegation_only_contract -q
+# 1 passed
 
-<result>
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_75_update_prunes_empty_obsolete_pr_review_skill_dirs_only tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_75_pr_monitor_assets_retired_and_observation_scaffold_present tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_75_pr_observation_placeholder_fails_without_gh_api tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_75_pr_review_wrapper_rejects_unsafe_inputs_before_gh_api -q
+# 4 passed
+
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets -q
+# 1 passed
+
+git diff --check
+# pass
+
+codex exec --ephemeral --sandbox read-only -C . "Reply only: ok"
+# rules load errorなしで pass
+
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / parity + stale cleanup | 初回 code-reviewer が broken command rule と empty obsolete skill directory 残りを検出 | reviewer review + focused command | pass | fail finding を red evidence として採用 |
+| S01 | 緑フェーズ（Green） | new skill scaffold / old assets retired / cleanup fixed | focused pytest 1+4+1 tests pass、rules load smoke pass | `uv run pytest ...`; `codex exec --ephemeral ...` | pass | CL-AC-011 の実装証跡 |
+| S01 | リファクタリング（Refactor） | guardrail satisfied | `git diff --check` pass、fresh code-reviewer pass | command + reviewer | pass | S02-S06 の実装は先取りしていない |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | command rules の `pattern` が wrapper 2本を同一 prefix sequence として扱い、allow rule が壊れる | code-reviewer | wrapper ごとの `prefix_rule` に分離し、static contract test を再実行 | CL-AC-011 | no | `test_bundled_native_shim_assets_satisfy_static_delegation_only_contract` -> pass |
+| S01 | obsolete exact file cleanup 後に旧 skill の空 directory が残る | code-reviewer | managed obsolete prefix 内の空 parent dirs pruning を追加し、custom content preservation test を追加 | CL-AC-011 | no | `test_issue_75_update_prunes_empty_obsolete_pr_review_skill_dirs_only` -> pass |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | CL-AC-011 | new skill added、old agent/skill removed、shim なし、stale cleanup あり | provider/dogfooding scaffold parity、old assets deleted、obsolete cleanup test、fresh code-reviewer pass | pass | S06 の guidance 文言置換は計画どおり残 |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| CL-AC-011 | S01 | yes | red-required + parity | code-reviewer fail findings | focused pytest + fresh code-reviewer | pass | compatibility shim は追加していない |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| CL-AC-011 | S01 | `test_issue_75_pr_monitor_assets_retired_and_observation_scaffold_present`; `test_issue_75_update_prunes_empty_obsolete_pr_review_skill_dirs_only`; parity test; code-reviewer pass | pass | provider source and dogfooding mirror aligned |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| none | CL-AC-011 | S01 focused tests | CL-AC-011 | 計画内の retirement / scaffold / cleanup を補強しただけで closure semantics は変更なし | no | completed |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00170 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/3b01/spec-dock` | iss-00170 | current session | dev-coder, code-reviewer | same repo, active issue, S01 bounded implementation/review; no commit/publish by worker | issue complete / scope change / user revocation | none | proceed |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | shipped scaffold / installer cleanup / tests | dev-coder | S01 asset retirement and scaffold only | `plan.md`; provider install_root; dogfooding mirror | listed provider/mirror assets, CLI inventory, command rules, focused tests | S02-S06 behavior, compatibility shim, broad docs guidance | focused pytest, parity, `git diff --check`, code-reviewer | scope expansion / reviewer fail | worker summary / changed files / verification / risks | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | dev-coder | New `github-pr-observation` scaffold added; old `pr-monitor` / `github-codex-pr-review-comments` retired; broken command rules and empty obsolete directory cleanup fixed after review. | `.agents/`; `.codex/rules/spec-dock-commands.rules`; `.github/agents/`; `src/spec_dock/assets/install_root/`; `src/spec_dock/cli.py`; `tests/cli_runtime/harness.py`; `tests/unit/infra/test_init_update.py` | focused pytest 1+4+1 pass; `git diff --check` pass; rules load smoke pass | pass | S02 input validation/read-only API boundary; S06 guidance migration | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01 | `codex exec` が S01 中の broken command rules 読み込みで起動不能になり、一度だけ orchestrator が rules pattern を最小自己回復した | implied by execution continuity; final diff re-owned by dev-coder and reviewed | `.codex/rules/spec-dock-commands.rules`; `src/spec_dock/assets/install_root/.codex/rules/spec-dock-commands.rules` | broken pattern の一時最小修正 | `git diff` で確認し、dev-coder 修正に統合 | focused pytest / code-reviewer pass | code-reviewer fresh pass | resolved; no waiver |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step reviewer | code-reviewer | fresh | passed | N/A | proceed | initial fail fixed; re-review findingsなし |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | committed | S01 source/test/report diff | current HEAD after S01 amend | `feat(pr-observation)!: PR観測スキルの足場を追加` | `git status --short` clean immediately after commit | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/` - new observation skill scaffold.
+- `src/spec_dock/assets/install_root/.agents/skills/github-codex-pr-review-comments/` - retired.
+- `src/spec_dock/assets/install_root/.codex/agents/pr-monitor.toml` - retired.
+- `src/spec_dock/assets/install_root/.github/agents/pr-monitor.agent.md` - retired.
+- `.agents/`, `.codex/`, `.github/` mirror files - dogfooding parity updates.
+- `src/spec_dock/cli.py` - managed skill inventory and empty obsolete parent directory pruning.
+- `tests/cli_runtime/harness.py`; `tests/unit/infra/test_init_update.py` - inventory, rules, stale cleanup, scaffold tests.
 
 #### コミット
-- <hash> <message>
+- pending
 
 #### メモ
-- ...
+- `github-pr-creator` / `github-pr-merge-preparer` / orchestrator guidance に残る `pr-monitor` 文言は S06 の計画対象。
 
 ---
 
