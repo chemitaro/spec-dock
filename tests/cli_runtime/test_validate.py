@@ -7,7 +7,6 @@ import tempfile
 import time
 from pathlib import Path
 from types import SimpleNamespace
-from unittest import skip
 
 from tests.cli_runtime.harness import (
     CliRuntimeHarness,
@@ -17,6 +16,7 @@ from tests.cli_runtime.harness import (
 )
 
 
+import pytest
 class TestCliValidate(CliRuntimeHarness):
     def test_validate_rejects_missing_or_invalid_required_meta_identity_fields(self) -> None:
         cases = (
@@ -31,41 +31,40 @@ class TestCliValidate(CliRuntimeHarness):
         )
 
         for field, value, expected in cases:
-            with self.subTest(field=field, value=value):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
 
-                    self._create_same_repo_linked_hierarchy(target)
+                self._create_same_repo_linked_hierarchy(target)
 
-                    issue_meta = (
-                        target
-                        / "spec-dock"
-                        / "initiatives"
-                        / "init-00001-auth-platform"
-                        / "epics"
-                        / "epic-00002-jwt-auth"
-                        / "issues"
-                        / "iss-00003-add-refresh-token"
-                        / ".meta.json"
-                    )
-                    meta = json.loads(issue_meta.read_text(encoding="utf-8"))
-                    if value is None:
-                        meta.pop(field, None)
-                    else:
-                        meta[field] = value
-                    self._write_json_force(issue_meta, meta)
+                issue_meta = (
+                    target
+                    / "spec-dock"
+                    / "initiatives"
+                    / "init-00001-auth-platform"
+                    / "epics"
+                    / "epic-00002-jwt-auth"
+                    / "issues"
+                    / "iss-00003-add-refresh-token"
+                    / ".meta.json"
+                )
+                meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+                if value is None:
+                    meta.pop(field, None)
+                else:
+                    meta[field] = value
+                self._write_json_force(issue_meta, meta)
 
-                    p = self._run_runtime_capture(target, ["validate"])
-                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-                    self.assertIn("Invalid .meta.json", p.stderr)
-                    self.assertIn(expected, p.stderr)
-                    self.assertIn(str(issue_meta), p.stderr)
+                p = self._run_runtime_capture(target, ["validate"])
+                assert p.returncode != 0, p.stdout + p.stderr
+                assert "Invalid .meta.json" in p.stderr
+                assert expected in p.stderr
+                assert str(issue_meta) in p.stderr
 
     def test_validate_detects_broken_parent_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -89,7 +88,7 @@ class TestCliValidate(CliRuntimeHarness):
     def test_validate_detects_issue_initiative_id_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
             self._run_runtime(target, ["new", "initiative", "--title", "Payments platform", "--github-issue", "4"])
@@ -111,11 +110,11 @@ class TestCliValidate(CliRuntimeHarness):
 
             self._run_runtime_expect_fail(target, ["validate"])
 
-    @skip("S04: covered by TestRuntimeDomainS03.test_validate_graph_rejects_local_only_initiative_under_github_mandatory_contract")
+    @pytest.mark.skip(reason="S04: covered by TestRuntimeDomainS03.test_validate_graph_rejects_local_only_initiative_under_github_mandatory_contract")
     def test_validate_rejects_local_only_initiative_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -125,14 +124,14 @@ class TestCliValidate(CliRuntimeHarness):
             self._write_json_force(init_meta, meta)
 
             p = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("initiative missing github.issue_number", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "initiative missing github.issue_number" in p.stderr
 
-    @skip("S04: covered by TestValidateApplication.test_validate_graph_reports_linkage_and_parent_diagnostics_without_cli")
+    @pytest.mark.skip(reason="S04: covered by TestValidateApplication.test_validate_graph_reports_linkage_and_parent_diagnostics_without_cli")
     def test_validate_rejects_legacy_unscoped_issue_linkage(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -152,14 +151,14 @@ class TestCliValidate(CliRuntimeHarness):
             self._write_json_force(issue_meta, meta)
 
             p = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("legacy unscoped github linkage", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "legacy unscoped github linkage" in p.stderr
 
-    @skip("S04: covered by TestRuntimeSyncS07.test_sync_fails_preflight_for_malformed_partial_repo_scope_linkage")
+    @pytest.mark.skip(reason="S04: covered by TestRuntimeSyncS07.test_sync_fails_preflight_for_malformed_partial_repo_scope_linkage")
     def test_sync_fails_preflight_on_partially_scoped_issue_linkage(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -182,18 +181,17 @@ class TestCliValidate(CliRuntimeHarness):
                 ["sync", "--no-github", "--no-update-active"],
                 ["sync", "--no-github", "--no-update-active", "--force"],
             ):
-                with self.subTest(args=args):
-                    p = self._run_runtime_capture(target, args)
-                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-                    self.assertIn("Invalid github.repo_owner/repo_name", p.stderr)
-                    self.assertIn("both fields are required", p.stderr)
-                    self.assertNotIn("deps_preflight_failed", p.stderr)
+                p = self._run_runtime_capture(target, args)
+                assert p.returncode != 0, p.stdout + p.stderr
+                assert "Invalid github.repo_owner/repo_name" in p.stderr
+                assert "both fields are required" in p.stderr
+                assert "deps_preflight_failed" not in p.stderr
 
-    @skip("S04: covered by TestRuntimeDomainS03.test_validate_graph_rejects_partially_scoped_issue_linkage")
+    @pytest.mark.skip(reason="S04: covered by TestRuntimeDomainS03.test_validate_graph_rejects_partially_scoped_issue_linkage")
     def test_validate_rejects_blank_string_repo_scope_in_meta_loader(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -213,15 +211,15 @@ class TestCliValidate(CliRuntimeHarness):
             self._write_json_force(issue_meta, meta)
 
             p = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Invalid github.repo_owner/repo_name", p.stderr)
-            self.assertIn("empty value is not allowed", p.stderr)
-            self.assertNotIn("legacy unscoped github linkage", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Invalid github.repo_owner/repo_name" in p.stderr
+            assert "empty value is not allowed" in p.stderr
+            assert "legacy unscoped github linkage" not in p.stderr
 
     def test_validate_reports_invalid_meta_json_shape(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -239,14 +237,14 @@ class TestCliValidate(CliRuntimeHarness):
             self._write_text_force(issue_meta, "[]\n")
 
             p = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(p.returncode, 0)
-            self.assertIn("Invalid .meta.json", p.stderr)
-            self.assertIn(str(issue_meta), p.stderr)
+            assert p.returncode != 0
+            assert "Invalid .meta.json" in p.stderr
+            assert str(issue_meta) in p.stderr
 
     def test_validate_detects_duplicate_github_issue_numbers_with_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -279,23 +277,20 @@ class TestCliValidate(CliRuntimeHarness):
             shutil.rmtree(target / ".git", ignore_errors=True)
 
             p = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Duplicate github.linkage detected", p.stderr)
-            self.assertIn("github.issue_number=1", p.stderr)
-            self.assertIn("repo=(current-or-unknown)", p.stderr)
-            self.assertIn("initiative:init-00001", p.stderr)
-            self.assertIn("issue:iss-00003", p.stderr)
-            self.assertIn("spec-dock/initiatives/init-00001-auth-platform/.meta.json", p.stderr)
-            self.assertIn(
-                "spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/issues/iss-00003-add-refresh-token/.meta.json",
-                p.stderr,
-            )
-            self.assertIn("Fix github linkage", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Duplicate github.linkage detected" in p.stderr
+            assert "github.issue_number=1" in p.stderr
+            assert "repo=(current-or-unknown)" in p.stderr
+            assert "initiative:init-00001" in p.stderr
+            assert "issue:iss-00003" in p.stderr
+            assert "spec-dock/initiatives/init-00001-auth-platform/.meta.json" in p.stderr
+            assert "spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/issues/iss-00003-add-refresh-token/.meta.json" in p.stderr
+            assert "Fix github linkage" in p.stderr
 
     def test_validate_rejects_same_issue_number_when_repo_linkage_is_mixed_and_current_unknown(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -328,18 +323,18 @@ class TestCliValidate(CliRuntimeHarness):
             shutil.rmtree(target / ".git", ignore_errors=True)
 
             p = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Ambiguous github.linkage scope detected", p.stderr)
-            self.assertIn("fail-closed", p.stderr)
-            self.assertIn("github.issue_number=1", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Ambiguous github.linkage scope detected" in p.stderr
+            assert "fail-closed" in p.stderr
+            assert "github.issue_number=1" in p.stderr
 
     def test_validate_allows_same_issue_number_when_current_repo_is_resolved(self) -> None:
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             init_meta = (
@@ -370,13 +365,13 @@ class TestCliValidate(CliRuntimeHarness):
             self._write_json_force(issue_meta, issue_data)
 
             p = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok", p.stdout)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "spec-dock: ok" in p.stdout
 
     def test_validate_grandfathers_legacy_discussion_names_and_ignores_unrelated_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -402,8 +397,8 @@ class TestCliValidate(CliRuntimeHarness):
             (discussions_dir / "rules.md").write_text("notes\n", encoding="utf-8")
 
             p = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok", p.stdout)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "spec-dock: ok" in p.stdout
 
     def test_validate_rejects_malformed_discussion_doc_candidates(self) -> None:
         cases = (
@@ -447,38 +442,37 @@ class TestCliValidate(CliRuntimeHarness):
             "adr_kickoff.md",
         )
         for name in cases:
-            with self.subTest(name=name):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
 
-                    self._create_same_repo_linked_hierarchy(target)
+                self._create_same_repo_linked_hierarchy(target)
 
-                    discussions_dir = (
-                        target
-                        / "spec-dock"
-                        / "initiatives"
-                        / "init-00001-auth-platform"
-                        / "epics"
-                        / "epic-00002-jwt-auth"
-                        / "issues"
-                        / "iss-00003-add-refresh-token"
-                        / "discussions"
-                    )
-                    discussions_dir.mkdir(parents=True, exist_ok=True)
-                    (discussions_dir / name).write_text("bad\n", encoding="utf-8")
-                    (discussions_dir / "rules.md").write_text("allowed\n", encoding="utf-8")
+                discussions_dir = (
+                    target
+                    / "spec-dock"
+                    / "initiatives"
+                    / "init-00001-auth-platform"
+                    / "epics"
+                    / "epic-00002-jwt-auth"
+                    / "issues"
+                    / "iss-00003-add-refresh-token"
+                    / "discussions"
+                )
+                discussions_dir.mkdir(parents=True, exist_ok=True)
+                (discussions_dir / name).write_text("bad\n", encoding="utf-8")
+                (discussions_dir / "rules.md").write_text("allowed\n", encoding="utf-8")
 
-                    p = self._run_runtime_capture(target, ["validate"])
-                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-                    self.assertIn("Malformed discussion document filename", p.stderr)
-                    self.assertIn(name, p.stderr)
-                    self.assertNotIn("rules.md", p.stderr)
+                p = self._run_runtime_capture(target, ["validate"])
+                assert p.returncode != 0, p.stdout + p.stderr
+                assert "Malformed discussion document filename" in p.stderr
+                assert name in p.stderr
+                assert "rules.md" not in p.stderr
 
     def test_validate_accepts_mixed_same_timestamp_unsuffixed_and_suffixed_slots(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -504,13 +498,13 @@ class TestCliValidate(CliRuntimeHarness):
             (discussions_dir / "20260329t123501z-99-draft-plan-plan.md").write_text("plan\n", encoding="utf-8")
 
             p = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok", p.stdout)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "spec-dock: ok" in p.stdout
 
     def test_validate_accepts_high_end_discussion_timestamp_suffix(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -530,13 +524,13 @@ class TestCliValidate(CliRuntimeHarness):
             (discussions_dir / "20260329t123457z-note-next.md").write_text("next\n", encoding="utf-8")
 
             p = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok", p.stdout)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "spec-dock: ok" in p.stdout
 
     def test_validate_accepts_research_discussion_docs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -557,8 +551,8 @@ class TestCliValidate(CliRuntimeHarness):
             (discussions_dir / "rules.md").write_text("notes\n", encoding="utf-8")
 
             p = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok", p.stdout)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "spec-dock: ok" in p.stdout
 
     def test_validate_blocks_proposed_or_missing_metadata_delegated_draft_artifacts(self) -> None:
         cases = (
@@ -614,29 +608,28 @@ class TestCliValidate(CliRuntimeHarness):
             ),
         )
         for _label, artifact_text, expected_reason in cases:
-            with self.subTest(expected_reason=expected_reason):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
-                    self._create_same_repo_linked_hierarchy(target)
-                    issue_dir = (
-                        target
-                        / "spec-dock"
-                        / "initiatives"
-                        / "init-00001-auth-platform"
-                        / "epics"
-                        / "epic-00002-jwt-auth"
-                        / "issues"
-                        / "iss-00003-add-refresh-token"
-                    )
-                    (issue_dir / "design.md").write_text(artifact_text, encoding="utf-8")
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                self._create_same_repo_linked_hierarchy(target)
+                issue_dir = (
+                    target
+                    / "spec-dock"
+                    / "initiatives"
+                    / "init-00001-auth-platform"
+                    / "epics"
+                    / "epic-00002-jwt-auth"
+                    / "issues"
+                    / "iss-00003-add-refresh-token"
+                )
+                (issue_dir / "design.md").write_text(artifact_text, encoding="utf-8")
 
-                    p = self._run_runtime_capture(target, ["validate"])
+                p = self._run_runtime_capture(target, ["validate"])
 
-                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-                    self.assertIn("Delegated draft authority incomplete/blocked", p.stderr)
-                    self.assertIn(expected_reason, p.stderr)
-                    self.assertIn("design.md", p.stderr)
+                assert p.returncode != 0, p.stdout + p.stderr
+                assert "Delegated draft authority incomplete/blocked" in p.stderr
+                assert expected_reason in p.stderr
+                assert "design.md" in p.stderr
 
     def test_validate_blocks_scope_local_evidence_adoption_ledger_entries(self) -> None:
         cases = (
@@ -645,48 +638,47 @@ class TestCliValidate(CliRuntimeHarness):
             ("`blocked`", "`EAL-023`", "blocked", "EAL-023"),
         )
         for status, entry_id, expected_status, expected_entry_id in cases:
-            with self.subTest(status=status):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
-                    self._create_same_repo_linked_hierarchy(target)
-                    issue_dir = (
-                        target
-                        / "spec-dock"
-                        / "initiatives"
-                        / "init-00001-auth-platform"
-                        / "epics"
-                        / "epic-00002-jwt-auth"
-                        / "issues"
-                        / "iss-00003-add-refresh-token"
-                    )
-                    (issue_dir / "report.md").write_text(
-                        "\n".join(
-                            [
-                                "# Report",
-                                "",
-                                "## Evidence Adoption Ledger",
-                                "",
-                                "| ID | adoption_status | target_artifact | next_action |",
-                                "|---|---|---|---|",
-                                f"| {entry_id} | {status} | design.md | resolve reviewer evidence |",
-                                "",
-                            ]
-                        ),
-                        encoding="utf-8",
-                    )
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                self._create_same_repo_linked_hierarchy(target)
+                issue_dir = (
+                    target
+                    / "spec-dock"
+                    / "initiatives"
+                    / "init-00001-auth-platform"
+                    / "epics"
+                    / "epic-00002-jwt-auth"
+                    / "issues"
+                    / "iss-00003-add-refresh-token"
+                )
+                (issue_dir / "report.md").write_text(
+                    "\n".join(
+                        [
+                            "# Report",
+                            "",
+                            "## Evidence Adoption Ledger",
+                            "",
+                            "| ID | adoption_status | target_artifact | next_action |",
+                            "|---|---|---|---|",
+                            f"| {entry_id} | {status} | design.md | resolve reviewer evidence |",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
 
-                    p = self._run_runtime_capture(target, ["validate"])
+                p = self._run_runtime_capture(target, ["validate"])
 
-                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-                    self.assertIn("Evidence Adoption Ledger incomplete/blocked", p.stderr)
-                    self.assertIn(f"evidence_ledger_{expected_status}", p.stderr)
-                    self.assertIn(expected_entry_id, p.stderr)
+                assert p.returncode != 0, p.stdout + p.stderr
+                assert "Evidence Adoption Ledger incomplete/blocked" in p.stderr
+                assert f"evidence_ledger_{expected_status}" in p.stderr
+                assert expected_entry_id in p.stderr
 
     def test_validate_rejects_legacy_sequence_for_new_discussion_types(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -705,14 +697,14 @@ class TestCliValidate(CliRuntimeHarness):
             (discussions_dir / "001-scratch-legacy-capture.md").write_text("legacy\n", encoding="utf-8")
 
             p = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Malformed discussion document filename", p.stderr)
-            self.assertIn("001-scratch-legacy-capture.md", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Malformed discussion document filename" in p.stderr
+            assert "001-scratch-legacy-capture.md" in p.stderr
 
     def test_validate_detects_duplicate_discussion_timestamp_slot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -732,16 +724,16 @@ class TestCliValidate(CliRuntimeHarness):
             (discussions_dir / "20260329t123456z-disc-second.md").write_text("second\n", encoding="utf-8")
 
             p = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Duplicate discussion timestamp slot detected", p.stderr)
-            self.assertIn("slot=20260329t123456z", p.stderr)
-            self.assertIn("20260329t123456z-adr-first.md", p.stderr)
-            self.assertIn("20260329t123456z-disc-second.md", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Duplicate discussion timestamp slot detected" in p.stderr
+            assert "slot=20260329t123456z" in p.stderr
+            assert "20260329t123456z-adr-first.md" in p.stderr
+            assert "20260329t123456z-disc-second.md" in p.stderr
 
     def test_validate_detects_duplicate_discussion_timestamp_suffix_slot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -761,13 +753,13 @@ class TestCliValidate(CliRuntimeHarness):
             (discussions_dir / "20260329t123456z-01-note-second.md").write_text("second\n", encoding="utf-8")
 
             p = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Duplicate discussion timestamp suffix detected", p.stderr)
-            self.assertIn("slot=20260329t123456z-01", p.stderr)
-            self.assertIn("20260329t123456z-01-adr-first.md", p.stderr)
-            self.assertIn("20260329t123456z-01-note-second.md", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Duplicate discussion timestamp suffix detected" in p.stderr
+            assert "slot=20260329t123456z-01" in p.stderr
+            assert "20260329t123456z-01-adr-first.md" in p.stderr
+            assert "20260329t123456z-01-note-second.md" in p.stderr
 
-    @skip("S04: covered by TestValidateApplication.test_validate_tree_reports_missing_required_artifact_docs_without_cli")
+    @pytest.mark.skip(reason="S04: covered by TestValidateApplication.test_validate_tree_reports_missing_required_artifact_docs_without_cli")
     def test_validate_detects_missing_required_artifact_docs_for_each_node_kind(self) -> None:
         artifact_names = ("requirement.md", "design.md", "plan.md", "report.md")
         node_roots = {
@@ -792,23 +784,22 @@ class TestCliValidate(CliRuntimeHarness):
             for artifact_name in artifact_names
         ]
         for _name, artifact_name, artifact_rel_path, expected in cases:
-            with self.subTest(kind=_name, artifact=artifact_name):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
 
-                    self._create_same_repo_linked_hierarchy(target)
+                self._create_same_repo_linked_hierarchy(target)
 
-                    artifact_path = target / artifact_rel_path
-                    artifact_path.unlink(missing_ok=False)
+                artifact_path = target / artifact_rel_path
+                artifact_path.unlink(missing_ok=False)
 
-                    p = self._run_runtime_capture(target, ["validate"])
-                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-                    self.assertIn("Missing required artifact", p.stderr)
-                    self.assertIn(expected, p.stderr)
-                    self.assertIn(artifact_rel_path.as_posix(), p.stderr)
+                p = self._run_runtime_capture(target, ["validate"])
+                assert p.returncode != 0, p.stdout + p.stderr
+                assert "Missing required artifact" in p.stderr
+                assert expected in p.stderr
+                assert artifact_rel_path.as_posix() in p.stderr
 
-    @skip("S04: covered by TestValidateApplication.test_validate_tree_reports_missing_required_meta_without_cli")
+    @pytest.mark.skip(reason="S04: covered by TestValidateApplication.test_validate_tree_reports_missing_required_meta_without_cli")
     def test_validate_detects_missing_required_meta_for_each_node_kind(self) -> None:
         cases = [
             (
@@ -832,26 +823,25 @@ class TestCliValidate(CliRuntimeHarness):
             ),
         ]
         for kind, meta_rel_path, expected in cases:
-            with self.subTest(kind=kind):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    self.assertEqual(main(["init", str(target)]), 0)
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
 
-                    self._create_same_repo_linked_hierarchy(target)
+                self._create_same_repo_linked_hierarchy(target)
 
-                    meta_path = target / meta_rel_path
-                    meta_path.unlink(missing_ok=False)
+                meta_path = target / meta_rel_path
+                meta_path.unlink(missing_ok=False)
 
-                    p = self._run_runtime_capture(target, ["validate"])
-                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-                    self.assertIn("Missing required artifact", p.stderr)
-                    self.assertIn(expected, p.stderr)
-                    self.assertIn(meta_rel_path.as_posix(), p.stderr)
+                p = self._run_runtime_capture(target, ["validate"])
+                assert p.returncode != 0, p.stdout + p.stderr
+                assert "Missing required artifact" in p.stderr
+                assert expected in p.stderr
+                assert meta_rel_path.as_posix() in p.stderr
 
     def test_doctor_detects_missing_required_meta_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -861,15 +851,15 @@ class TestCliValidate(CliRuntimeHarness):
             (target / meta_rel_path).unlink(missing_ok=False)
 
             p = self._run_runtime_capture(target, ["doctor"])
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: doctor: findings=1", p.stderr)
-            self.assertIn("[missing_artifact]", p.stderr)
-            self.assertIn(meta_rel_path.as_posix(), p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "spec-dock: doctor: findings=1" in p.stderr
+            assert "[missing_artifact]" in p.stderr
+            assert meta_rel_path.as_posix() in p.stderr
 
     def test_validate_sync_and_doctor_classify_missing_meta_with_create_lock_in_progress(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -902,26 +892,26 @@ class TestCliValidate(CliRuntimeHarness):
             )
 
             p_validate = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
-            self.assertIn("Create in-progress state detected", p_validate.stderr)
-            self.assertIn(".meta.json", p_validate.stderr)
-            self.assertNotIn("Missing required artifact", p_validate.stderr)
+            assert p_validate.returncode != 0, p_validate.stdout + p_validate.stderr
+            assert "Create in-progress state detected" in p_validate.stderr
+            assert ".meta.json" in p_validate.stderr
+            assert "Missing required artifact" not in p_validate.stderr
 
             p_sync = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
-            self.assertIn("Create in-progress state detected", p_sync.stderr)
-            self.assertNotIn("Missing required artifact", p_sync.stderr)
+            assert p_sync.returncode != 0, p_sync.stdout + p_sync.stderr
+            assert "Create in-progress state detected" in p_sync.stderr
+            assert "Missing required artifact" not in p_sync.stderr
 
             p_doctor = self._run_runtime_capture(target, ["doctor"])
-            self.assertNotEqual(p_doctor.returncode, 0, p_doctor.stdout + p_doctor.stderr)
-            self.assertIn("[stale_create_lock]", p_doctor.stderr)
-            self.assertIn("Create in-progress state detected", p_doctor.stderr)
-            self.assertNotIn("[missing_artifact]", p_doctor.stderr)
+            assert p_doctor.returncode != 0, p_doctor.stdout + p_doctor.stderr
+            assert "[stale_create_lock]" in p_doctor.stderr
+            assert "Create in-progress state detected" in p_doctor.stderr
+            assert "[missing_artifact]" not in p_doctor.stderr
 
     def test_validate_sync_and_doctor_classify_missing_meta_with_stale_create_lock(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -954,26 +944,26 @@ class TestCliValidate(CliRuntimeHarness):
             )
 
             p_validate = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
-            self.assertIn("Stale create-lock state detected", p_validate.stderr)
-            self.assertIn(".meta.json", p_validate.stderr)
-            self.assertNotIn("Missing required artifact", p_validate.stderr)
+            assert p_validate.returncode != 0, p_validate.stdout + p_validate.stderr
+            assert "Stale create-lock state detected" in p_validate.stderr
+            assert ".meta.json" in p_validate.stderr
+            assert "Missing required artifact" not in p_validate.stderr
 
             p_sync = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
-            self.assertIn("Stale create-lock state detected", p_sync.stderr)
-            self.assertNotIn("Missing required artifact", p_sync.stderr)
+            assert p_sync.returncode != 0, p_sync.stdout + p_sync.stderr
+            assert "Stale create-lock state detected" in p_sync.stderr
+            assert "Missing required artifact" not in p_sync.stderr
 
             p_doctor = self._run_runtime_capture(target, ["doctor"])
-            self.assertNotEqual(p_doctor.returncode, 0, p_doctor.stdout + p_doctor.stderr)
-            self.assertIn("[stale_create_lock]", p_doctor.stderr)
-            self.assertIn("Stale create-lock state detected", p_doctor.stderr)
-            self.assertNotIn("[missing_artifact]", p_doctor.stderr)
+            assert p_doctor.returncode != 0, p_doctor.stdout + p_doctor.stderr
+            assert "[stale_create_lock]" in p_doctor.stderr
+            assert "Stale create-lock state detected" in p_doctor.stderr
+            assert "[missing_artifact]" not in p_doctor.stderr
 
     def test_validate_sync_and_doctor_detect_missing_required_plan_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -983,25 +973,25 @@ class TestCliValidate(CliRuntimeHarness):
             (target / missing_rel_path).unlink(missing_ok=False)
 
             p_validate = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
-            self.assertIn("Missing required artifact", p_validate.stderr)
-            self.assertIn(missing_rel_path.as_posix(), p_validate.stderr)
+            assert p_validate.returncode != 0, p_validate.stdout + p_validate.stderr
+            assert "Missing required artifact" in p_validate.stderr
+            assert missing_rel_path.as_posix() in p_validate.stderr
 
             p_sync = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
-            self.assertIn("preflight validate failed", p_sync.stderr)
-            self.assertIn("Missing required artifact", p_sync.stderr)
-            self.assertIn(missing_rel_path.as_posix(), p_sync.stderr)
+            assert p_sync.returncode != 0, p_sync.stdout + p_sync.stderr
+            assert "preflight validate failed" in p_sync.stderr
+            assert "Missing required artifact" in p_sync.stderr
+            assert missing_rel_path.as_posix() in p_sync.stderr
 
             p_doctor = self._run_runtime_capture(target, ["doctor"])
-            self.assertNotEqual(p_doctor.returncode, 0, p_doctor.stdout + p_doctor.stderr)
-            self.assertIn("[missing_artifact]", p_doctor.stderr)
-            self.assertIn(missing_rel_path.as_posix(), p_doctor.stderr)
+            assert p_doctor.returncode != 0, p_doctor.stdout + p_doctor.stderr
+            assert "[missing_artifact]" in p_doctor.stderr
+            assert missing_rel_path.as_posix() in p_doctor.stderr
 
     def test_issue_71_runtime_bundle_missing_required_artifact_fail_fast(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -1011,20 +1001,20 @@ class TestCliValidate(CliRuntimeHarness):
             (target / missing_rel_path).unlink(missing_ok=False)
 
             p_validate = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
-            self.assertIn("Missing required artifact", p_validate.stderr)
-            self.assertIn(missing_rel_path.as_posix(), p_validate.stderr)
+            assert p_validate.returncode != 0, p_validate.stdout + p_validate.stderr
+            assert "Missing required artifact" in p_validate.stderr
+            assert missing_rel_path.as_posix() in p_validate.stderr
 
             p_sync = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
-            self.assertIn("preflight validate failed", p_sync.stderr)
-            self.assertIn("Missing required artifact", p_sync.stderr)
-            self.assertIn(missing_rel_path.as_posix(), p_sync.stderr)
+            assert p_sync.returncode != 0, p_sync.stdout + p_sync.stderr
+            assert "preflight validate failed" in p_sync.stderr
+            assert "Missing required artifact" in p_sync.stderr
+            assert missing_rel_path.as_posix() in p_sync.stderr
 
     def test_sync_force_continues_when_required_plan_artifact_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
             self._run_runtime(target, ["sync", "--no-github", "--no-update-active"])
@@ -1036,24 +1026,24 @@ class TestCliValidate(CliRuntimeHarness):
             (target / missing_rel_path).unlink(missing_ok=False)
 
             p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active", "--force"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("preflight validate failed", p.stderr)
-            self.assertIn("deps_preflight_failed", p.stderr)
-            self.assertIn(missing_rel_path.as_posix(), p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "preflight validate failed" in p.stderr
+            assert "deps_preflight_failed" in p.stderr
+            assert missing_rel_path.as_posix() in p.stderr
 
             index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
-            self.assertFalse(index["deps"]["valid"])
-            self.assertIn("preflight validate failed", str(index["deps"]["error"]))
-            self.assertIn("deps_preflight_failed", index["warnings"])
+            assert not index["deps"]["valid"]
+            assert "preflight validate failed" in str(index["deps"]["error"])
+            assert "deps_preflight_failed" in index["warnings"]
 
             tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
-            self.assertFalse(tree["deps"]["valid"])
-            self.assertIn("preflight validate failed", str(tree["deps"]["error"]))
+            assert not tree["deps"]["valid"]
+            assert "preflight validate failed" in str(tree["deps"]["error"])
 
     def test_sync_fails_when_tree_is_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -1077,16 +1067,16 @@ class TestCliValidate(CliRuntimeHarness):
     def test_sync_force_continues_when_tree_is_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
             self._run_runtime(target, ["sync", "--no-github", "--no-update-active"])
             agent_dir = target / "spec-dock" / ".agent"
             baseline_index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
-            self.assertTrue(baseline_index["deps"]["valid"])
-            self.assertEqual(baseline_index["deps"]["issue_edges"], [])
-            self.assertIsNone(baseline_index["deps"]["error"])
+            assert baseline_index["deps"]["valid"]
+            assert baseline_index["deps"]["issue_edges"] == []
+            assert baseline_index["deps"]["error"] is None
 
             issue_meta = (
                 target
@@ -1104,47 +1094,47 @@ class TestCliValidate(CliRuntimeHarness):
             self._write_json_force(issue_meta, meta)
 
             p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active", "--force"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("preflight validate failed", p.stderr)
-            self.assertIn("deps_preflight_failed", p.stderr)
-            self.assertTrue((agent_dir / "index.json").is_file())
-            self.assertTrue((agent_dir / "tree.json").is_file())
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "preflight validate failed" in p.stderr
+            assert "deps_preflight_failed" in p.stderr
+            assert (agent_dir / "index.json").is_file()
+            assert (agent_dir / "tree.json").is_file()
 
             index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
-            self.assertFalse(index["deps"]["valid"])
-            self.assertEqual(index["deps"]["issue_edges"], [])
-            self.assertIn("preflight validate failed", str(index["deps"]["error"]))
-            self.assertIn("deps_preflight_failed", index["warnings"])
-            self.assertIsNone(index["nodes"]["iss-00003"]["deps"])
+            assert not index["deps"]["valid"]
+            assert index["deps"]["issue_edges"] == []
+            assert "preflight validate failed" in str(index["deps"]["error"])
+            assert "deps_preflight_failed" in index["warnings"]
+            assert index["nodes"]["iss-00003"]["deps"] is None
 
             tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
-            self.assertFalse(tree["deps"]["valid"])
-            self.assertIn("preflight validate failed", str(tree["deps"]["error"]))
+            assert not tree["deps"]["valid"]
+            assert "preflight validate failed" in str(tree["deps"]["error"])
 
             deps_issues = json.loads((agent_dir / "deps-issues.json").read_text(encoding="utf-8"))
-            self.assertFalse(deps_issues["deps"]["valid"])
-            self.assertIn("preflight validate failed", str(deps_issues["deps"]["error"]))
-            self.assertEqual(deps_issues["nodes"], {})
-            self.assertEqual(deps_issues["edges"], [])
+            assert not deps_issues["deps"]["valid"]
+            assert "preflight validate failed" in str(deps_issues["deps"]["error"])
+            assert deps_issues["nodes"] == {}
+            assert deps_issues["edges"] == []
 
             tree_puml = (target / "spec-dock" / "tree.puml").read_text(encoding="utf-8")
-            self.assertIn("deps_preflight_failed", tree_puml)
-            self.assertIn("deps.valid=false", tree_puml)
-            self.assertIn("--force", tree_puml)
+            assert "deps_preflight_failed" in tree_puml
+            assert "deps.valid=false" in tree_puml
+            assert "--force" in tree_puml
             dashboard = (target / "spec-dock" / "dashboard.md").read_text(encoding="utf-8")
-            self.assertIn("DEPS_DISABLED", dashboard)
-            self.assertIn("deps_preflight_failed", dashboard)
-            self.assertIn("deps.valid=false", dashboard)
+            assert "DEPS_DISABLED" in dashboard
+            assert "deps_preflight_failed" in dashboard
+            assert "deps.valid=false" in dashboard
 
             # Legacy v1 deps artifacts must always be removed.
-            self.assertFalse((agent_dir / "deps.json").exists())
-            self.assertFalse((agent_dir / "deps.puml").exists())
-            self.assertFalse((agent_dir / "deps.todo.puml").exists())
+            assert not (agent_dir / "deps.json").exists()
+            assert not (agent_dir / "deps.puml").exists()
+            assert not (agent_dir / "deps.todo.puml").exists()
 
     def test_sync_force_continues_when_meta_id_is_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -1170,23 +1160,23 @@ class TestCliValidate(CliRuntimeHarness):
             (agent_dir / "tree-all.json").unlink(missing_ok=True)
 
             p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active", "--force"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("preflight validate failed", p.stderr)
-            self.assertIn("deps_preflight_failed", p.stderr)
-            self.assertTrue((agent_dir / "index.json").is_file())
-            self.assertTrue((agent_dir / "tree.json").is_file())
-            self.assertTrue((agent_dir / "index-all.json").is_file())
-            self.assertTrue((agent_dir / "tree-all.json").is_file())
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "preflight validate failed" in p.stderr
+            assert "deps_preflight_failed" in p.stderr
+            assert (agent_dir / "index.json").is_file()
+            assert (agent_dir / "tree.json").is_file()
+            assert (agent_dir / "index-all.json").is_file()
+            assert (agent_dir / "tree-all.json").is_file()
 
             index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
-            self.assertFalse(index["deps"]["valid"])
-            self.assertIn("deps_preflight_failed", index["warnings"])
-            self.assertEqual(index["deps"]["issue_edges"], [])
+            assert not index["deps"]["valid"]
+            assert "deps_preflight_failed" in index["warnings"]
+            assert index["deps"]["issue_edges"] == []
 
     def test_sync_and_validate_do_not_backfill_or_relock_existing_meta_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -1234,7 +1224,7 @@ class TestCliValidate(CliRuntimeHarness):
 
                 before_text = meta_path.read_text(encoding="utf-8")
                 before_texts[meta_path] = before_text
-                self.assertNotIn("_spec_dock", json.loads(before_text))
+                assert "_spec_dock" not in json.loads(before_text)
                 if os.name == "posix":
                     before_modes[meta_path] = meta_path.stat().st_mode
 
@@ -1243,20 +1233,20 @@ class TestCliValidate(CliRuntimeHarness):
 
             for meta_path in meta_paths:
                 after_text = meta_path.read_text(encoding="utf-8")
-                self.assertEqual(after_text, before_texts[meta_path])
-                self.assertNotIn("_spec_dock", json.loads(after_text))
+                assert after_text == before_texts[meta_path]
+                assert "_spec_dock" not in json.loads(after_text)
                 if os.name == "posix":
                     after_mode = meta_path.stat().st_mode
-                    self.assertEqual(after_mode, before_modes[meta_path])
-                    self.assertEqual(after_mode & 0o222, before_modes[meta_path] & 0o222)
+                    assert after_mode == before_modes[meta_path]
+                    assert after_mode & 0o222 == before_modes[meta_path] & 0o222
 
     def test_sync_github_keeps_already_normalized_current_repo_linkage_no_origin_continuity(self) -> None:
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
 
@@ -1290,68 +1280,68 @@ class TestCliValidate(CliRuntimeHarness):
 
             # already-normalized current linkage + explicit foreign same-number overlap.
             current_meta_before = json.loads(current_issue_meta_path.read_text(encoding="utf-8"))
-            self.assertEqual(current_meta_before["github"]["issue_number"], 123)
-            self.assertEqual(current_meta_before["github"]["repo_owner"], "current")
-            self.assertEqual(current_meta_before["github"]["repo_name"], "repo")
+            assert current_meta_before["github"]["issue_number"] == 123
+            assert current_meta_before["github"]["repo_owner"] == "current"
+            assert current_meta_before["github"]["repo_name"] == "repo"
             foreign_meta = json.loads(foreign_issue_meta_path.read_text(encoding="utf-8"))
             foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
             self._write_json_force(foreign_issue_meta_path, foreign_meta)
 
             sync_result = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"])
-            self.assertEqual(sync_result.returncode, 0, sync_result.stdout + sync_result.stderr)
+            assert sync_result.returncode == 0, sync_result.stdout + sync_result.stderr
 
             current_meta_after = json.loads(current_issue_meta_path.read_text(encoding="utf-8"))
-            self.assertEqual(current_meta_after["github"]["issue_number"], 123)
-            self.assertEqual(current_meta_after["github"]["repo_owner"], "current")
-            self.assertEqual(current_meta_after["github"]["repo_name"], "repo")
+            assert current_meta_after["github"]["issue_number"] == 123
+            assert current_meta_after["github"]["repo_owner"] == "current"
+            assert current_meta_after["github"]["repo_name"] == "repo"
 
             # no-origin continuity for already-normalized metadata.
             shutil.rmtree(target / ".git", ignore_errors=True)
 
             sync_after_no_origin = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"])
-            self.assertEqual(sync_after_no_origin.returncode, 0, sync_after_no_origin.stdout + sync_after_no_origin.stderr)
+            assert sync_after_no_origin.returncode == 0, sync_after_no_origin.stdout + sync_after_no_origin.stderr
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(validate_result.returncode, 0, validate_result.stdout + validate_result.stderr)
+            assert validate_result.returncode == 0, validate_result.stdout + validate_result.stderr
 
             doctor_result = self._run_runtime_capture(target, ["doctor"])
-            self.assertEqual(doctor_result.returncode, 0, doctor_result.stdout + doctor_result.stderr)
+            assert doctor_result.returncode == 0, doctor_result.stdout + doctor_result.stderr
 
             deps_by_url = self._run_runtime_capture(
                 target,
                 ["deps", "check", "https://github.com/current/repo/issues/123", "--json"],
             )
-            self.assertIn(deps_by_url.returncode, (0, 3), deps_by_url.stdout + deps_by_url.stderr)
-            self.assertIn('"target": "iss-00123"', deps_by_url.stdout)
+            assert deps_by_url.returncode in (0, 3), deps_by_url.stdout + deps_by_url.stderr
+            assert '"target": "iss-00123"' in deps_by_url.stdout
 
             deps_by_id = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00123", "--json"])
-            self.assertIn(deps_by_id.returncode, (0, 3), deps_by_id.stdout + deps_by_id.stderr)
-            self.assertIn('"target": "iss-00123"', deps_by_id.stdout)
+            assert deps_by_id.returncode in (0, 3), deps_by_id.stdout + deps_by_id.stderr
+            assert '"target": "iss-00123"' in deps_by_id.stdout
 
             active_by_url = self._run_runtime_capture(
                 target,
                 ["active", "set", "https://github.com/current/repo/issues/123", "--force"],
             )
-            self.assertEqual(active_by_url.returncode, 0, active_by_url.stdout + active_by_url.stderr)
+            assert active_by_url.returncode == 0, active_by_url.stdout + active_by_url.stderr
 
             active_by_id = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00123", "--force"])
-            self.assertEqual(active_by_id.returncode, 0, active_by_id.stdout + active_by_id.stderr)
+            assert active_by_id.returncode == 0, active_by_id.stdout + active_by_id.stderr
 
             ambiguous_number = self._run_runtime_capture(target, ["deps", "check", "123"])
-            self.assertNotEqual(ambiguous_number.returncode, 0, ambiguous_number.stdout + ambiguous_number.stderr)
-            self.assertIn("Ambiguous github.issue_number=123", ambiguous_number.stderr)
+            assert ambiguous_number.returncode != 0, ambiguous_number.stdout + ambiguous_number.stderr
+            assert "Ambiguous github.issue_number=123" in ambiguous_number.stderr
 
             ambiguous_flag = self._run_runtime_capture(target, ["deps", "check", "--github-issue", "123"])
-            self.assertNotEqual(ambiguous_flag.returncode, 0, ambiguous_flag.stdout + ambiguous_flag.stderr)
-            self.assertIn("Ambiguous github.issue_number=123", ambiguous_flag.stderr)
+            assert ambiguous_flag.returncode != 0, ambiguous_flag.stdout + ambiguous_flag.stderr
+            assert "Ambiguous github.issue_number=123" in ambiguous_flag.stderr
 
     def test_sync_github_keeps_readonly_lone_unscoped_meta_without_backfill(self) -> None:
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
 
@@ -1377,21 +1367,21 @@ class TestCliValidate(CliRuntimeHarness):
             current_issue_meta_path.chmod(current_issue_meta_path.stat().st_mode & ~0o222)
 
             sync_result = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"])
-            self.assertEqual(sync_result.returncode, 0, sync_result.stdout + sync_result.stderr)
+            assert sync_result.returncode == 0, sync_result.stdout + sync_result.stderr
 
             current_meta_after = json.loads(current_issue_meta_path.read_text(encoding="utf-8"))
-            self.assertEqual(current_meta_after["github"]["issue_number"], 123)
-            self.assertNotIn("repo_owner", current_meta_after["github"])
-            self.assertNotIn("repo_name", current_meta_after["github"])
-            self.assertEqual(current_issue_meta_path.stat().st_mode & 0o222, 0)
+            assert current_meta_after["github"]["issue_number"] == 123
+            assert "repo_owner" not in current_meta_after["github"]
+            assert "repo_name" not in current_meta_after["github"]
+            assert current_issue_meta_path.stat().st_mode & 0o222 == 0
 
     def test_sync_github_no_backfill_path_does_not_emit_readonly_lock_warning(self) -> None:
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
 
@@ -1428,19 +1418,19 @@ class TestCliValidate(CliRuntimeHarness):
             )
 
             sync_result = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"])
-            self.assertEqual(sync_result.returncode, 0, sync_result.stdout + sync_result.stderr)
-            self.assertNotIn("readonly_lock_failed", sync_result.stderr)
-            self.assertNotIn("simulated-relock-failure", sync_result.stderr)
+            assert sync_result.returncode == 0, sync_result.stdout + sync_result.stderr
+            assert "readonly_lock_failed" not in sync_result.stderr
+            assert "simulated-relock-failure" not in sync_result.stderr
 
             current_meta_after = json.loads(current_issue_meta_path.read_text(encoding="utf-8"))
-            self.assertEqual(current_meta_after["github"]["issue_number"], 123)
-            self.assertNotIn("repo_owner", current_meta_after["github"])
-            self.assertNotIn("repo_name", current_meta_after["github"])
+            assert current_meta_after["github"]["issue_number"] == 123
+            assert "repo_owner" not in current_meta_after["github"]
+            assert "repo_name" not in current_meta_after["github"]
 
     def test_validate_and_sync_fail_fast_on_legacy_meta_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -1456,7 +1446,7 @@ class TestCliValidate(CliRuntimeHarness):
             )
             dot_meta_path = issue_dir / ".meta.json"
             legacy_meta_path = issue_dir / "meta.json"
-            self.assertTrue(dot_meta_path.is_file())
+            assert dot_meta_path.is_file()
 
             meta = json.loads(dot_meta_path.read_text(encoding="utf-8"))
             meta.pop("_spec_dock", None)
@@ -1466,29 +1456,29 @@ class TestCliValidate(CliRuntimeHarness):
 
             before_text = dot_meta_path.read_text(encoding="utf-8")
             dot_meta_path.rename(legacy_meta_path)
-            self.assertFalse(dot_meta_path.exists())
-            self.assertTrue(legacy_meta_path.is_file())
+            assert not dot_meta_path.exists()
+            assert legacy_meta_path.is_file()
 
             p_validate = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(p_validate.returncode, 0)
-            self.assertIn("Unsupported legacy meta.json detected", p_validate.stderr)
-            self.assertIn(str(legacy_meta_path), p_validate.stderr)
-            self.assertFalse(dot_meta_path.exists())
-            self.assertTrue(legacy_meta_path.is_file())
-            self.assertEqual(legacy_meta_path.read_text(encoding="utf-8"), before_text)
+            assert p_validate.returncode != 0
+            assert "Unsupported legacy meta.json detected" in p_validate.stderr
+            assert str(legacy_meta_path) in p_validate.stderr
+            assert not dot_meta_path.exists()
+            assert legacy_meta_path.is_file()
+            assert legacy_meta_path.read_text(encoding="utf-8") == before_text
 
             p_sync = self._run_runtime_capture(target, ["sync"])
-            self.assertNotEqual(p_sync.returncode, 0)
-            self.assertIn("Unsupported legacy meta.json detected", p_sync.stderr)
-            self.assertIn(str(legacy_meta_path), p_sync.stderr)
-            self.assertFalse(dot_meta_path.exists())
-            self.assertTrue(legacy_meta_path.is_file())
-            self.assertEqual(legacy_meta_path.read_text(encoding="utf-8"), before_text)
+            assert p_sync.returncode != 0
+            assert "Unsupported legacy meta.json detected" in p_sync.stderr
+            assert str(legacy_meta_path) in p_sync.stderr
+            assert not dot_meta_path.exists()
+            assert legacy_meta_path.is_file()
+            assert legacy_meta_path.read_text(encoding="utf-8") == before_text
 
     def test_validate_and_sync_fail_fast_when_dot_meta_and_legacy_coexist(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -1509,27 +1499,27 @@ class TestCliValidate(CliRuntimeHarness):
             legacy_meta_path.write_text("{ invalid legacy json\n", encoding="utf-8")
 
             p_validate = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
-            self.assertIn("Unsupported legacy meta.json detected", p_validate.stderr)
-            self.assertIn(str(legacy_meta_path), p_validate.stderr)
+            assert p_validate.returncode != 0, p_validate.stdout + p_validate.stderr
+            assert "Unsupported legacy meta.json detected" in p_validate.stderr
+            assert str(legacy_meta_path) in p_validate.stderr
 
-            self.assertEqual(dot_meta_path.read_text(encoding="utf-8"), before_text)
-            self.assertTrue(legacy_meta_path.is_file())
+            assert dot_meta_path.read_text(encoding="utf-8") == before_text
+            assert legacy_meta_path.is_file()
 
             p_sync = self._run_runtime_capture(target, ["sync"])
-            self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
-            self.assertIn("Unsupported legacy meta.json detected", p_sync.stderr)
-            self.assertIn(str(legacy_meta_path), p_sync.stderr)
+            assert p_sync.returncode != 0, p_sync.stdout + p_sync.stderr
+            assert "Unsupported legacy meta.json detected" in p_sync.stderr
+            assert str(legacy_meta_path) in p_sync.stderr
 
-            self.assertEqual(dot_meta_path.read_text(encoding="utf-8"), before_text)
-            self.assertTrue(legacy_meta_path.is_file())
+            assert dot_meta_path.read_text(encoding="utf-8") == before_text
+            assert legacy_meta_path.is_file()
 
     def test_sync_clause3_legacy_meta_json_fail_fast_no_auto_repair_or_agent_write_even_with_force(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
             self._remove_generated_sync_artifacts(target)
@@ -1551,18 +1541,18 @@ class TestCliValidate(CliRuntimeHarness):
 
             active_dir = target / "spec-dock" / "active"
             context_pack_path = active_dir / "context-pack.md"
-            self.assertTrue(context_pack_path.is_file(), context_pack_path.as_posix())
-            self.assertFalse(context_pack_path.is_symlink(), context_pack_path.as_posix())
+            assert context_pack_path.is_file(), context_pack_path.as_posix()
+            assert not context_pack_path.is_symlink(), context_pack_path.as_posix()
             before_context_pack_text = context_pack_path.read_text(encoding="utf-8")
 
             def _snapshot_active_pointer(name: str) -> tuple[str, str]:
                 active_link_path = active_dir / name
                 active_path_file = active_dir / f"{name}.path"
                 if active_link_path.is_symlink():
-                    self.assertFalse(active_path_file.exists(), active_path_file.as_posix())
+                    assert not active_path_file.exists(), active_path_file.as_posix()
                     return ("symlink", os.readlink(active_link_path))
-                self.assertFalse(active_link_path.exists(), active_link_path.as_posix())
-                self.assertTrue(active_path_file.is_file(), active_path_file.as_posix())
+                assert not active_link_path.exists(), active_link_path.as_posix()
+                assert active_path_file.is_file(), active_path_file.as_posix()
                 return ("path", active_path_file.read_text(encoding="utf-8").strip())
 
             before_active_pointers = {
@@ -1570,7 +1560,7 @@ class TestCliValidate(CliRuntimeHarness):
             }
 
             agent_active_path = target / "spec-dock" / ".agent" / "active.json"
-            self.assertFalse(agent_active_path.exists(), agent_active_path.as_posix())
+            assert not agent_active_path.exists(), agent_active_path.as_posix()
 
             generated_agent_paths = [
                 target / "spec-dock" / ".agent" / "index.json",
@@ -1586,38 +1576,35 @@ class TestCliValidate(CliRuntimeHarness):
                 target / "spec-dock" / "dashboard.md",
             ]
             for generated_path in generated_agent_paths:
-                self.assertFalse(generated_path.exists(), generated_path.as_posix())
+                assert not generated_path.exists(), generated_path.as_posix()
             for generated_path in generated_top_level_paths:
-                self.assertFalse(generated_path.exists(), generated_path.as_posix())
+                assert not generated_path.exists(), generated_path.as_posix()
 
             for args in (["sync"], ["sync", "--no-github", "--force"]):
                 result = self._run_runtime_capture(target, args)
-                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIn("Unsupported legacy meta.json detected", result.stderr)
-                self.assertIn(str(legacy_meta_path), result.stderr)
-                self.assertFalse(dot_meta_path.exists())
-                self.assertTrue(legacy_meta_path.is_file())
-                self.assertEqual(legacy_meta_path.read_text(encoding="utf-8"), before_text)
-                self.assertTrue(context_pack_path.is_file(), context_pack_path.as_posix())
-                self.assertFalse(context_pack_path.is_symlink(), context_pack_path.as_posix())
-                self.assertEqual(
-                    context_pack_path.read_text(encoding="utf-8"),
-                    before_context_pack_text,
-                )
+                assert result.returncode != 0, result.stdout + result.stderr
+                assert "Unsupported legacy meta.json detected" in result.stderr
+                assert str(legacy_meta_path) in result.stderr
+                assert not dot_meta_path.exists()
+                assert legacy_meta_path.is_file()
+                assert legacy_meta_path.read_text(encoding="utf-8") == before_text
+                assert context_pack_path.is_file(), context_pack_path.as_posix()
+                assert not context_pack_path.is_symlink(), context_pack_path.as_posix()
+                assert context_pack_path.read_text(encoding="utf-8") == before_context_pack_text
                 for name, before_active_pointer in before_active_pointers.items():
-                    self.assertEqual(_snapshot_active_pointer(name), before_active_pointer)
-                self.assertFalse(agent_active_path.exists(), agent_active_path.as_posix())
+                    assert _snapshot_active_pointer(name) == before_active_pointer
+                assert not agent_active_path.exists(), agent_active_path.as_posix()
                 for generated_path in generated_agent_paths:
-                    self.assertFalse(generated_path.exists(), generated_path.as_posix())
+                    assert not generated_path.exists(), generated_path.as_posix()
             for generated_path in generated_top_level_paths:
-                self.assertFalse(generated_path.exists(), generated_path.as_posix())
+                assert not generated_path.exists(), generated_path.as_posix()
 
-            self.assertTrue(legacy_meta_path.is_file())
+            assert legacy_meta_path.is_file()
 
     def test_issue_78_validate_ignores_legacy_hidden_workspace_contents(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             legacy_dir = target / ".spec-dock" / "initiatives"
@@ -1625,13 +1612,13 @@ class TestCliValidate(CliRuntimeHarness):
             (legacy_dir / "legacy-only.txt").write_text("legacy fixture\n", encoding="utf-8")
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(validate_result.returncode, 0, validate_result.stdout + validate_result.stderr)
-            self.assertIn("spec-dock: ok", validate_result.stdout)
+            assert validate_result.returncode == 0, validate_result.stdout + validate_result.stderr
+            assert "spec-dock: ok" in validate_result.stdout
 
     def test_issue_78_validate_does_not_fallback_to_legacy_when_current_is_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             issue_meta = (
@@ -1654,5 +1641,5 @@ class TestCliValidate(CliRuntimeHarness):
             (legacy_dir / "valid-looking.txt").write_text("legacy should be ignored\n", encoding="utf-8")
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            self.assertNotEqual(validate_result.returncode, 0, validate_result.stdout + validate_result.stderr)
-            self.assertIn("issue parent_id mismatch", validate_result.stderr)
+            assert validate_result.returncode != 0, validate_result.stdout + validate_result.stderr
+            assert "issue parent_id mismatch" in validate_result.stderr

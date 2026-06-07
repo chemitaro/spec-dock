@@ -1,5 +1,4 @@
 import sys
-import unittest
 from pathlib import Path
 
 
@@ -54,7 +53,7 @@ def _sync_result(app_contracts, domain_models, *, warnings=None, artifact_failur
     )
 
 
-class PostMutationSyncS01Tests(unittest.TestCase):
+class TestPostMutationSyncS01:
     def test_tc_s01_001_success_outcome_preserves_sync_result(self) -> None:
         app_contracts, app_sync_state, domain_models = _runtime_modules()
         expected = _sync_result(app_contracts, domain_models)
@@ -66,11 +65,11 @@ class PostMutationSyncS01Tests(unittest.TestCase):
         finally:
             app_sync_state.sync_after_mutation = original
 
-        self.assertIs(outcome.sync_result, expected)
-        self.assertFalse(outcome.failed)
-        self.assertIsNone(outcome.exception_reason)
-        self.assertIsNone(outcome.skipped_reason)
-        self.assertEqual(outcome.guidance, [])
+        assert outcome.sync_result is expected
+        assert not outcome.failed
+        assert outcome.exception_reason is None
+        assert outcome.skipped_reason is None
+        assert outcome.guidance == []
 
     def test_tc_s01_002_exception_outcome_does_not_erase_mutation_success(self) -> None:
         _app_contracts, app_sync_state, _domain_models = _runtime_modules()
@@ -85,11 +84,11 @@ class PostMutationSyncS01Tests(unittest.TestCase):
         finally:
             app_sync_state.sync_after_mutation = original
 
-        self.assertTrue(outcome.failed)
-        self.assertIsNone(outcome.sync_result)
-        self.assertEqual(outcome.exception_reason, "boom")
-        self.assertTrue(any("mutation succeeded" in line for line in outcome.guidance))
-        self.assertTrue(any("./spec-dock/scripts/spec-dock sync" in line for line in outcome.guidance))
+        assert outcome.failed
+        assert outcome.sync_result is None
+        assert outcome.exception_reason == "boom"
+        assert any("mutation succeeded" in line for line in outcome.guidance)
+        assert any("./spec-dock/scripts/spec-dock sync" in line for line in outcome.guidance)
 
     def test_tc_s01_003_artifact_failure_is_failed_and_guided(self) -> None:
         app_contracts, app_sync_state, domain_models = _runtime_modules()
@@ -98,9 +97,9 @@ class PostMutationSyncS01Tests(unittest.TestCase):
 
         outcome = app_contracts.PostMutationSyncOutcome.from_sync_result(result)
 
-        self.assertTrue(outcome.failed)
-        self.assertIs(outcome.sync_result, result)
-        self.assertTrue(any("stale or partially written" in line for line in outcome.guidance))
+        assert outcome.failed
+        assert outcome.sync_result is result
+        assert any("stale or partially written" in line for line in outcome.guidance)
 
     def test_tc_s01_004_gh_fetch_failed_warning_is_failed(self) -> None:
         app_contracts, _app_sync_state, domain_models = _runtime_modules()
@@ -108,9 +107,9 @@ class PostMutationSyncS01Tests(unittest.TestCase):
 
         outcome = app_contracts.PostMutationSyncOutcome.from_sync_result(result)
 
-        self.assertTrue(outcome.failed)
-        self.assertEqual(outcome.fatal_warnings, ["gh_fetch_failed"])
-        self.assertTrue(any("gh_fetch_failed" in line for line in outcome.guidance))
+        assert outcome.failed
+        assert outcome.fatal_warnings == ["gh_fetch_failed"]
+        assert any("gh_fetch_failed" in line for line in outcome.guidance)
 
     def test_tc_s01_005_gh_index_incomplete_warning_is_non_fatal(self) -> None:
         app_contracts, _app_sync_state, domain_models = _runtime_modules()
@@ -118,10 +117,10 @@ class PostMutationSyncS01Tests(unittest.TestCase):
 
         outcome = app_contracts.PostMutationSyncOutcome.from_sync_result(result)
 
-        self.assertFalse(outcome.failed)
-        self.assertEqual(outcome.warnings, ["gh_index_incomplete"])
-        self.assertEqual(outcome.fatal_warnings, [])
-        self.assertEqual(outcome.guidance, [])
+        assert not outcome.failed
+        assert outcome.warnings == ["gh_index_incomplete"]
+        assert outcome.fatal_warnings == []
+        assert outcome.guidance == []
 
     def test_tc_s01_006_request_policy_uses_github_no_branch_update_and_no_migrate(self) -> None:
         app_contracts, app_sync_state, domain_models = _runtime_modules()
@@ -138,14 +137,14 @@ class PostMutationSyncS01Tests(unittest.TestCase):
         finally:
             app_sync_state._sync_impl = original
 
-        self.assertIsNotNone(result)
-        self.assertEqual(len(calls), 1)
+        assert result is not None
+        assert len(calls) == 1
         req, active_manifest_mode = calls[0]
-        self.assertTrue(req.github_enabled)
-        self.assertEqual(req.issue_limit, 10000)
-        self.assertFalse(req.force)
-        self.assertFalse(req.update_active_from_branch)
-        self.assertEqual(active_manifest_mode, "no_migrate")
+        assert req.github_enabled
+        assert req.issue_limit == 10000
+        assert not req.force
+        assert not req.update_active_from_branch
+        assert active_manifest_mode == "no_migrate"
 
     def test_tc_s01_007_helper_has_no_side_effect_until_explicit_success_call(self) -> None:
         _app_contracts, app_sync_state, _domain_models = _runtime_modules()
@@ -162,21 +161,17 @@ class PostMutationSyncS01Tests(unittest.TestCase):
         finally:
             app_sync_state.sync_after_mutation = original
 
-        self.assertEqual(calls, [])
-        self.assertFalse(skipped.failed)
-        self.assertEqual(skipped.skipped_reason, "unchanged")
+        assert calls == []
+        assert not skipped.failed
+        assert skipped.skipped_reason == "unchanged"
 
     def test_tc_s01_008_skip_outcome_is_successful_without_guidance(self) -> None:
         app_contracts, _app_sync_state, _domain_models = _runtime_modules()
 
         outcome = app_contracts.PostMutationSyncOutcome.skipped("unchanged")
 
-        self.assertFalse(outcome.failed)
-        self.assertIsNone(outcome.sync_result)
-        self.assertEqual(outcome.skipped_reason, "unchanged")
-        self.assertIsNone(outcome.exception_reason)
-        self.assertEqual(outcome.guidance, [])
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert not outcome.failed
+        assert outcome.sync_result is None
+        assert outcome.skipped_reason == "unchanged"
+        assert outcome.exception_reason is None
+        assert outcome.guidance == []

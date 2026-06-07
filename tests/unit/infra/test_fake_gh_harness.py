@@ -1,10 +1,10 @@
 import json
 import os
+import pytest
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 from tests.cli_runtime.harness import CliRuntimeHarness
 
@@ -17,9 +17,9 @@ from spec_dock_runtime.infra.github_cli import issue_index, issue_index_raw
 
 
 class TestFakeGhHarness(CliRuntimeHarness):
-    def setUp(self) -> None:
+    def setup_method(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
     def _issue_node(self, issue_id: str, number: int) -> SpecNode:
         return SpecNode(
@@ -61,8 +61,8 @@ class TestFakeGhHarness(CliRuntimeHarness):
             )
 
         issues = json.loads(p.stdout)
-        self.assertLessEqual(len(issues), 3)
-        self.assertNotEqual(len(issues), 10000)
+        assert len(issues) <= 3
+        assert len(issues) != 10000
 
     def test_issue_index_raw_captures_large_limit_argv(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -76,13 +76,14 @@ class TestFakeGhHarness(CliRuntimeHarness):
                 log_path=log_path,
             )
 
-            with patch.dict(os.environ, {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}):
+            with pytest.MonkeyPatch.context() as monkeypatch:
+                monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}")
                 issue_index_raw(root, limit=10000)
 
             argv = log_path.read_text(encoding="utf-8").split()
 
-        self.assertIn("--limit", argv)
-        self.assertEqual(argv[argv.index("--limit") + 1], "10000")
+        assert "--limit" in argv
+        assert argv[argv.index("--limit") + 1] == "10000"
 
     def test_large_issue_number_uses_minimal_fixture(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -102,11 +103,12 @@ class TestFakeGhHarness(CliRuntimeHarness):
                 ],
             )
 
-            with patch.dict(os.environ, {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}):
+            with pytest.MonkeyPatch.context() as monkeypatch:
+                monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}")
                 snapshots = issue_index(root, limit=10000)
 
-        self.assertEqual(len(snapshots), 1)
-        self.assertEqual(snapshots[0].issue_number, 10000)
+        assert len(snapshots) == 1
+        assert snapshots[0].issue_number == 10000
 
     def test_state_variations_use_minimal_fixture(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -122,11 +124,12 @@ class TestFakeGhHarness(CliRuntimeHarness):
                 ],
             )
 
-            with patch.dict(os.environ, {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}):
+            with pytest.MonkeyPatch.context() as monkeypatch:
+                monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}")
                 snapshots = issue_index(root, limit=10000)
 
-        self.assertEqual(len(snapshots), 3)
-        self.assertEqual([snapshot.issue_number for snapshot in snapshots], [101, 102, 103])
+        assert len(snapshots) == 3
+        assert [snapshot.issue_number for snapshot in snapshots] == [101, 102, 103]
 
         graph = SpecGraph(
             nodes_by_id={
@@ -144,9 +147,9 @@ class TestFakeGhHarness(CliRuntimeHarness):
             current_repo_slug="example/repo",
         )
 
-        self.assertEqual(statuses["iss-00101"].effective_status, "open")
-        self.assertEqual(statuses["iss-00102"].effective_status, "done")
-        self.assertEqual(statuses["iss-00103"].source, "github")
-        self.assertEqual(statuses["iss-00103"].effective_status, "open")
-        self.assertEqual(statuses["iss-00104"].source, "unknown")
-        self.assertEqual(statuses["iss-00104"].effective_status, "unknown")
+        assert statuses["iss-00101"].effective_status == "open"
+        assert statuses["iss-00102"].effective_status == "done"
+        assert statuses["iss-00103"].source == "github"
+        assert statuses["iss-00103"].effective_status == "open"
+        assert statuses["iss-00104"].source == "unknown"
+        assert statuses["iss-00104"].effective_status == "unknown"

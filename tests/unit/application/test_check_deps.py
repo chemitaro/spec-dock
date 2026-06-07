@@ -1,5 +1,4 @@
 import sys
-import unittest
 from pathlib import Path
 
 
@@ -78,7 +77,7 @@ class _StubIssueGateway:
         raise RuntimeError("gh view failed")
 
 
-class TestCheckDepsApplication(unittest.TestCase):
+class TestCheckDepsApplication:
     def _records(self, infra_contracts):
         root = Path("/repo/spec-dock/initiatives/init-00101-auth-platform")
         epic_dir = root / "epics" / "epic-00201-jwt-auth"
@@ -248,13 +247,13 @@ class TestCheckDepsApplication(unittest.TestCase):
 
         result = app_check_deps.check_deps(self._request(app_contracts, use_github=False), ports)
 
-        self.assertTrue(result.inspection.evaluation.ready)
-        self.assertEqual(result.inspection.evaluation.blockers, [])
-        self.assertEqual(result.inspection.node_states["iss-00301"].status, "done")
-        self.assertEqual(result.inspection.issue_statuses["iss-00302"].source, "cache")
-        self.assertTrue(result.inspection.issue_statuses["iss-00302"].stale)
-        self.assertEqual(result.inspection.issue_statuses["iss-00302"].last_sync_at, "2026-06-05T02:00:00Z")
-        self.assertEqual(issue_gateway.issue_index_calls, [])
+        assert result.inspection.evaluation.ready
+        assert result.inspection.evaluation.blockers == []
+        assert result.inspection.node_states["iss-00301"].status == "done"
+        assert result.inspection.issue_statuses["iss-00302"].source == "cache"
+        assert result.inspection.issue_statuses["iss-00302"].stale
+        assert result.inspection.issue_statuses["iss-00302"].last_sync_at == "2026-06-05T02:00:00Z"
+        assert issue_gateway.issue_index_calls == []
 
     def test_effective_depends_on_merges_parents_and_dedups_without_cli(self) -> None:
         app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
@@ -278,9 +277,9 @@ class TestCheckDepsApplication(unittest.TestCase):
 
         result = app_check_deps.check_deps(self._request(app_contracts, use_github=False), ports)
 
-        self.assertEqual(result.inspection.effective_depends_on, ["iss-00301", "iss-00401"])
-        self.assertEqual(result.inspection.node_states["iss-00302"].effective_depends_on, ["iss-00301", "iss-00401"])
-        self.assertEqual(result.inspection.evaluation.blockers, ["iss-00301", "iss-00401"])
+        assert result.inspection.effective_depends_on == ["iss-00301", "iss-00401"]
+        assert result.inspection.node_states["iss-00302"].effective_depends_on == ["iss-00301", "iss-00401"]
+        assert result.inspection.evaluation.blockers == ["iss-00301", "iss-00401"]
 
     def test_effective_depends_on_merges_epic_and_initiative_without_cli(self) -> None:
         app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
@@ -307,8 +306,8 @@ class TestCheckDepsApplication(unittest.TestCase):
             ports,
         )
 
-        self.assertEqual(result.inspection.effective_depends_on, ["iss-00401", "iss-00402"])
-        self.assertEqual(result.inspection.evaluation.blockers, ["iss-00401", "iss-00402"])
+        assert result.inspection.effective_depends_on == ["iss-00401", "iss-00402"]
+        assert result.inspection.evaluation.blockers == ["iss-00401", "iss-00402"]
 
     def test_no_github_missing_cache_defaults_to_unknown_and_blocks(self) -> None:
         app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
@@ -320,12 +319,12 @@ class TestCheckDepsApplication(unittest.TestCase):
 
         result = app_check_deps.check_deps(self._request(app_contracts, use_github=False), ports)
 
-        self.assertFalse(result.inspection.evaluation.ready)
-        self.assertEqual(result.inspection.evaluation.guard_reason, "unknown")
-        self.assertEqual(result.inspection.evaluation.blockers, ["iss-00301"])
-        self.assertEqual(result.inspection.node_states["iss-00301"].status, "unknown")
-        self.assertEqual(result.inspection.issue_statuses["iss-00301"].source, "cache")
-        self.assertIsNone(result.inspection.issue_statuses["iss-00301"].last_sync_at)
+        assert not result.inspection.evaluation.ready
+        assert result.inspection.evaluation.guard_reason == "unknown"
+        assert result.inspection.evaluation.blockers == ["iss-00301"]
+        assert result.inspection.node_states["iss-00301"].status == "unknown"
+        assert result.inspection.issue_statuses["iss-00301"].source == "cache"
+        assert result.inspection.issue_statuses["iss-00301"].last_sync_at is None
 
     def test_github_index_incomplete_warns_and_leaves_missing_dependency_unknown(self) -> None:
         app_check_deps, app_contracts, app_ports, domain_models, infra_contracts = _runtime_modules()
@@ -340,13 +339,13 @@ class TestCheckDepsApplication(unittest.TestCase):
 
         result = app_check_deps.check_deps(self._request(app_contracts, use_github=True), ports)
 
-        self.assertIn("gh_index_incomplete", result.warnings)
-        self.assertNotIn("gh_fetch_failed", result.warnings)
-        self.assertFalse(result.inspection.evaluation.ready)
-        self.assertEqual(result.inspection.evaluation.guard_reason, "unknown")
-        self.assertEqual(result.inspection.evaluation.blockers, ["iss-00301"])
-        self.assertEqual(result.inspection.node_states["iss-00301"].status, "unknown")
-        self.assertEqual(issue_gateway.issue_index_calls, [(Path("/repo"), 10000)])
+        assert "gh_index_incomplete" in result.warnings
+        assert "gh_fetch_failed" not in result.warnings
+        assert not result.inspection.evaluation.ready
+        assert result.inspection.evaluation.guard_reason == "unknown"
+        assert result.inspection.evaluation.blockers == ["iss-00301"]
+        assert result.inspection.node_states["iss-00301"].status == "unknown"
+        assert issue_gateway.issue_index_calls == [(Path("/repo"), 10000)]
 
     def test_github_fetch_failure_warns_and_blocks_on_unknown_dependency(self) -> None:
         app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
@@ -355,12 +354,12 @@ class TestCheckDepsApplication(unittest.TestCase):
 
         result = app_check_deps.check_deps(self._request(app_contracts, use_github=True), ports)
 
-        self.assertIn("gh_fetch_failed", result.warnings)
-        self.assertFalse(result.inspection.evaluation.ready)
-        self.assertEqual(result.inspection.evaluation.guard_reason, "unknown")
-        self.assertEqual(result.inspection.evaluation.blockers, ["iss-00301"])
-        self.assertEqual(result.inspection.issue_statuses["iss-00301"].source, "unknown")
-        self.assertEqual(issue_gateway.issue_index_calls, [(Path("/repo"), 10000)])
+        assert "gh_fetch_failed" in result.warnings
+        assert not result.inspection.evaluation.ready
+        assert result.inspection.evaluation.guard_reason == "unknown"
+        assert result.inspection.evaluation.blockers == ["iss-00301"]
+        assert result.inspection.issue_statuses["iss-00301"].source == "unknown"
+        assert issue_gateway.issue_index_calls == [(Path("/repo"), 10000)]
 
     def test_github_snapshots_drive_ready_and_blocked_states_without_cli(self) -> None:
         app_check_deps, app_contracts, app_ports, domain_models, infra_contracts = _runtime_modules()
@@ -379,11 +378,11 @@ class TestCheckDepsApplication(unittest.TestCase):
 
         ready = app_check_deps.check_deps(self._request(app_contracts, use_github=True), ready_ports)
 
-        self.assertTrue(ready.inspection.evaluation.ready)
-        self.assertEqual(ready.inspection.evaluation.blockers, [])
-        self.assertEqual(ready.inspection.node_states["iss-00301"].status, "done")
-        self.assertEqual(ready.inspection.issue_statuses["iss-00301"].source, "github")
-        self.assertEqual(ready.inspection.issue_statuses["iss-00301"].last_sync_at, "2026-06-05T03:00:00Z")
+        assert ready.inspection.evaluation.ready
+        assert ready.inspection.evaluation.blockers == []
+        assert ready.inspection.node_states["iss-00301"].status == "done"
+        assert ready.inspection.issue_statuses["iss-00301"].source == "github"
+        assert ready.inspection.issue_statuses["iss-00301"].last_sync_at == "2026-06-05T03:00:00Z"
 
         blocked_ports = self._ports(
             app_ports,
@@ -400,7 +399,7 @@ class TestCheckDepsApplication(unittest.TestCase):
 
         blocked = app_check_deps.check_deps(self._request(app_contracts, use_github=True), blocked_ports)
 
-        self.assertFalse(blocked.inspection.evaluation.ready)
-        self.assertEqual(blocked.inspection.evaluation.guard_reason, "blocked")
-        self.assertEqual(blocked.inspection.evaluation.blockers, ["iss-00301"])
-        self.assertEqual(blocked.inspection.node_states["iss-00301"].status, "ready")
+        assert not blocked.inspection.evaluation.ready
+        assert blocked.inspection.evaluation.guard_reason == "blocked"
+        assert blocked.inspection.evaluation.blockers == ["iss-00301"]
+        assert blocked.inspection.node_states["iss-00301"].status == "ready"

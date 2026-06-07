@@ -1,5 +1,4 @@
 import sys
-import unittest
 from pathlib import Path
 
 
@@ -34,7 +33,7 @@ def _issue_status(domain_models, issue_id: str, status: str):
     )
 
 
-class TestDepsDomain(unittest.TestCase):
+class TestDepsDomain:
     def _graph(self):
         _domain_deps, domain_models, domain_tree = _runtime_modules()
         root = Path("/repo/spec-dock/initiatives/init-00001-platform")
@@ -140,12 +139,12 @@ class TestDepsDomain(unittest.TestCase):
             active_issue_id=None,
         )
 
-        self.assertFalse(inspection.evaluation.ready)
-        self.assertEqual(inspection.evaluation.guard_reason, "blocked")
-        self.assertEqual(inspection.evaluation.blockers, ["iss-00004"])
-        self.assertEqual(inspection.node_states["iss-00003"].status, "blocked")
-        self.assertEqual(inspection.node_states["iss-00004"].status, "ready")
-        self.assertEqual(inspection.node_states["iss-00005"].status, "done")
+        assert not inspection.evaluation.ready
+        assert inspection.evaluation.guard_reason == "blocked"
+        assert inspection.evaluation.blockers == ["iss-00004"]
+        assert inspection.node_states["iss-00003"].status == "blocked"
+        assert inspection.node_states["iss-00004"].status == "ready"
+        assert inspection.node_states["iss-00005"].status == "done"
 
         unknown_statuses = dict(statuses)
         unknown_statuses["iss-00004"] = _issue_status(domain_models, "iss-00004", "unknown")
@@ -156,8 +155,8 @@ class TestDepsDomain(unittest.TestCase):
             issue_statuses=unknown_statuses,
             active_issue_id=None,
         )
-        self.assertEqual(unknown.evaluation.guard_reason, "unknown")
-        self.assertEqual(unknown.node_states["iss-00004"].status, "unknown")
+        assert unknown.evaluation.guard_reason == "unknown"
+        assert unknown.node_states["iss-00004"].status == "unknown"
 
         missing = domain_deps.inspect_target_deps(
             graph,
@@ -166,8 +165,8 @@ class TestDepsDomain(unittest.TestCase):
             issue_statuses={"iss-00003": statuses["iss-00003"]},
             active_issue_id=None,
         )
-        self.assertEqual(missing.evaluation.guard_reason, "unknown")
-        self.assertEqual(missing.node_states["iss-00004"].status, "unknown")
+        assert missing.evaluation.guard_reason == "unknown"
+        assert missing.node_states["iss-00004"].status == "unknown"
 
     def test_effective_deps_merge_issue_epic_and_initiative_edges_without_cli(self) -> None:
         domain_deps, _domain_models, _domain_tree = _runtime_modules()
@@ -182,4 +181,4 @@ class TestDepsDomain(unittest.TestCase):
             },
         )
 
-        self.assertEqual(effective["iss-00003"], ["iss-00004", "iss-00005"])
+        assert effective["iss-00003"] == ["iss-00004", "iss-00005"]
