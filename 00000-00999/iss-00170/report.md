@@ -816,7 +816,109 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S05 | ready_to_commit | S05 source/test/report diff | pending | pending | N/A | N/A | N/A | N/A |
+| S05 | committed | S05 source/test/report diff | `6ec0d7be` | `git status --short` clean before S06 start | N/A | N/A | N/A | N/A |
+
+---
+
+### セッションログ（2026-06-08 S06）
+
+#### 対象
+- Step: S06 Workflow skill guidance and dogfooding parity
+- AC/EC: CL-AC-011 plus regression coverage for AC-001
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `### S06 Workflow skill guidance and dogfooding parity`
+
+#### 実施内容
+- dev-coder に PR workflow skill guidance / host guidance から active `pr-monitor` routing を除去し、`github-pr-observation` direct invocation へ統一する実装を委任した。
+- 対象は provider install_root と dogfooding mirror の `github-pr-merge-preparer` / `github-pr-creator` / host guidance / tests に限定した。
+- 禁止範囲として `pr-monitor` assets の再作成、deprecated aliases / compatibility shim、PR merge responsibility の変更、S05 scripts の不要変更を明示した。
+- `github-pr-merge-preparer` は `wait_pr_observation.sh` direct invocation と stdout final JSON consumption を明記し、push/re-push 後は latest head SHA を取得して再実行する guidance に更新した。
+- `github-pr-creator` は PR creation を terminal step とせず、post-create observation が必要な場合は `fetch_pr_observation_snapshot.sh` / `wait_pr_observation.sh` direct invocation または `github-pr-merge-preparer` へ進む guidance に更新した。
+- `.codex/config.toml` と `.github/agents/orchestrator.agent.md` の active `pr-monitor` routing を `github-pr-observation` skill direct invocation に置換した。
+- focused regression で provider/mirror guidance に active `pr-monitor` routing が残らないことを検証した。
+- S06 の fresh code-reviewer は findings なし / `review_status=pass`。S06 diff は commit ready。
+
+#### 実行コマンド / 結果
+```bash
+git status --short
+# clean before S06 start
+
+rg -n "pr-monitor|github-codex-pr-review-comments|github-pr-observation|wait_pr_observation|fetch_pr_observation_snapshot" src/spec_dock/assets/install_root/.agents src/spec_dock/assets/install_root/.codex src/spec_dock/assets/install_root/.github .agents .codex .github
+# active pr-monitor references found in github-pr-merge-preparer, github-pr-creator, .codex/config.toml, and .github/agents/orchestrator.agent.md
+
+uv run pytest tests/unit/infra/test_init_update.py -k issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing -q
+# red evidence before S06 implementation: failed on active pr-monitor routing
+
+uv run pytest tests/unit/infra/test_init_update.py -k issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing -q
+# 1 passed
+
+uv run pytest tests/unit/infra/test_init_update.py -k issue_75 -q
+# 37 passed
+
+diff -q src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md .agents/skills/github-pr-merge-preparer/SKILL.md
+diff -q src/spec_dock/assets/install_root/.agents/skills/github-pr-creator/SKILL.md .agents/skills/github-pr-creator/SKILL.md
+diff -q src/spec_dock/assets/install_root/.codex/config.toml .codex/config.toml
+diff -q src/spec_dock/assets/install_root/.github/agents/orchestrator.agent.md .github/agents/orchestrator.agent.md
+# no output; parity OK
+
+rg -n "pr-monitor|github-codex-pr-review-comments|github-pr-observation" src/spec_dock/assets/install_root spec-dock/docs .agents .codex .github
+# remaining old names are obsolete cleanup metadata or github-pr-observation retired-name prohibition notes; no active pr-monitor routing
+
+git diff --check
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S06 | 赤フェーズ（Red） | active routing references to retired `pr-monitor` must be detected before guidance fix | active references found in provider/mirror guidance | `rg -n ...` | pass | dev-coder implementation in progress |
+| S06 | 緑フェーズ（Green） | active `pr-monitor` routing removed; observation direct invocation guidance present | focused S06 1 passed; broader `issue_75` 37 passed; parity/diff-check pass; old-name grep classified | pytest + grep + parity + `git diff --check` | pass | CL-AC-011, AC-001 regression |
+| S06 | リファクタリング（Refactor） | guardrail satisfied | `git diff --check` pass; final fresh code-reviewer pass | command | pass | S05 scripts intentionally untouched |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S06 | guidance に active `pr-monitor` routing が残る risk | dev-coder | provider/mirror workflow guidance で `pr-monitor` を含まないこと、`github-pr-observation` direct invocation を含むことの focused regression を追加 | CL-AC-011 | no | focused S06 1 passed |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S06 | CL-AC-011 plus AC-001 regression | merge-preparer no longer delegates to `pr-monitor`; creator references observation support only; host guidance has no active `pr-monitor` routing; provider/mirror parity | focused S06 1 passed; `issue_75` 37 passed; old-name grep classified; parity/check pass; final fresh code-reviewer pass | pass | S90/S99 remain pending |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| CL-AC-011 | S06 | focused workflow guidance regression | pass | active `pr-monitor` routing removed |
+| AC-001 regression | S06 | guidance includes direct wait/snapshot invocation and stdout JSON consumption | pass | caller-side loop remains unnecessary |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
+
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/3b01/spec-dock` | iss-00170 | current session | dev-coder, code-reviewer | same repo, active issue, S06 bounded implementation/review; no commit/publish by worker | issue complete / scope change / user revocation | none | implement |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
+
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S06 | delegated | workflow guidance / parity / tests | dev-coder | S06 guidance and focused tests only | `plan.md`; provider install_root; dogfooding mirror | listed skill/guidance/mirror/test files | recreating `pr-monitor`, deprecated aliases, compatibility shim, PR merge responsibility changes | focused pytest, `issue_75`, old-name grep interpretation, parity, `git diff --check`, code-reviewer | scope expansion / reviewer fail | worker summary / changed files / verification / risks | implementation complete; reviewer pending |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S06 | dev-coder | workflow guidance から active `pr-monitor` routing を除去し、`github-pr-observation` direct invocation に統一した。 | `github-pr-merge-preparer/SKILL.md`; `github-pr-creator/SKILL.md`; `.codex/config.toml`; `.github/agents/orchestrator.agent.md`; provider/mirror pairs; `tests/unit/infra/test_init_update.py` | red focused regression failed before fix; focused S06 1 passed; `issue_75` 37 passed; old-name grep classified; parity pass; `git diff --check` pass | pass | remaining old names only obsolete cleanup metadata / retired-name prohibition notes | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S06 | step reviewer | code-reviewer | fresh | passed | N/A | commit S06 | final fresh code-reviewer pass |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S06 | ready_to_commit | S06 guidance/test/report diff | pending | pending | N/A | N/A | N/A | N/A |
 
 ---
 
