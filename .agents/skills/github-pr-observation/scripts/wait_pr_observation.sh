@@ -354,6 +354,10 @@ def append_snapshot_poll_timeout_limitation(
     timeout_seconds: float,
     stdout_text: object,
     stderr_text: object,
+    *,
+    source: str = "fetch_pr_observation_snapshot.sh",
+    message: str = "snapshot poll exceeded the remaining wait deadline",
+    deadline_reached: bool | None = None,
 ) -> None:
     if isinstance(stdout_text, bytes):
         stdout_text = stdout_text.decode(errors="replace")
@@ -370,12 +374,13 @@ def append_snapshot_poll_timeout_limitation(
     limitations.append(
         {
             "code": "snapshot_poll_timeout",
-            "source": "fetch_pr_observation_snapshot.sh",
+            "source": source,
             "severity": "blocking",
-            "message": "snapshot poll exceeded the remaining wait deadline",
+            "message": message,
             "timeout_seconds": timeout_seconds,
             "stdout_sha256": hashlib.sha256(stdout_text.encode()).hexdigest(),
             "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
+            **({} if deadline_reached is None else {"deadline_reached": deadline_reached}),
         }
     )
 
@@ -506,6 +511,15 @@ def progress_line(
 
 def mark_latest_timeout(payload: dict, latest_change_monotonic: float, same_count: int) -> None:
     quiet_elapsed = int(max(0, time.monotonic() - latest_change_monotonic))
+    append_snapshot_poll_timeout_limitation(
+        payload,
+        0,
+        "",
+        "",
+        source="wait_pr_observation.sh",
+        message="wait deadline expired before quiet/stability completed",
+        deadline_reached=True,
+    )
     payload["status"] = "timeout"
     payload["overall_status"] = "timeout"
     payload["normalized_status"] = "timeout"
@@ -651,6 +665,7 @@ while True:
         final_phase = "terminal"
     elif time.monotonic() >= deadline:
         final_phase = "timeout"
+        mark_latest_timeout(payload, latest_change_monotonic, same_count)
         normalized_status = "timeout"
         overall_status = "timeout"
         next_action = "wait_or_rerun"
