@@ -158,6 +158,7 @@ ok
 | planning | green | issue docs use ChatGPT research and agent-role addendum directly | requirement/design/plan/report rewritten with research trace and agent-only role scope | docs inspection | pass | Fresh reviewer pending after redesign |
 | S01 | green | provider issue-planning skill contains actor workflow spine | provider skill now includes actor sequence, delegated design/plan draft sections, fallback, compatibility, and agent-role authority boundary | targeted `rg`, diff inspection, spec-reviewer | pass | S01 reviewer passed |
 | S02 | green | dogfooding mirror matches provider issue-planning skill | `.agents/skills/spec-dock-issue-planning/SKILL.md` copied from provider source | `diff -u`, spec-reviewer | pass | S02 reviewer passed |
+| S03 | green | delegated authoring roles are agent-only | provider/mirror agent TOML are self-contained and role skill directories are deleted | targeted `rg`, `test ! -e`, provider/mirror `diff -u`, spec-reviewer | pass | S03 reviewer passed |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 
@@ -179,6 +180,7 @@ ok
 | planning | N/A | issue created, started, research captured, planning artifacts drafted | command output, changed files, local validation, spec-reviewer pass | pass | Ready for execution |
 | S01 | tc-001, tc-002, tc-003, tc-004, tc-005 | Provider-side skill reads as actor-based workflow spine | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` updated; targeted `rg` and spec-reviewer passed | pass | Ready to commit |
 | S02 | tc-006 | Dogfooding mirror matches provider-side issue-planning skill | `diff -u src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md .agents/skills/spec-dock-issue-planning/SKILL.md` returned no diff; spec-reviewer passed | pass | Ready to commit |
+| S03 | tc-007, tc-008 | Agent role contracts are self-contained and role skill directories are removed | agent TOML stale skill path search returned no matches; four role skill directories are absent; provider/mirror TOML diffs are empty; spec-reviewer passed | pass | Ready to commit |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 
@@ -188,6 +190,8 @@ ok
 | planning-agent-encapsulation | planning | yes | inspect-only | user追加要件 and local TOML/skill inspection completed | addendum research file created | pass | `discussions/20260607t084352z-research-agent-role-encapsulation-addendum.md` |
 | tc-001 through tc-005 | S01 | yes | inspect-only | old skill workflow only had phase order | targeted `rg` and diff inspection | pass | Provider-side only; mirror handled in S02 |
 | tc-006 | S02 | yes | inspect-only | mirror drifted after S01 provider change | `diff -u` provider vs mirror | pass | exact match |
+| tc-007 | S03 | yes | inspect-only | agent TOML depended on deleted role skills | targeted `rg` / provider-mirror `diff -u` | pass | self-contained agent contracts |
+| tc-008 | S03 | yes | inspect-only | role skill directories existed | `test ! -e` for provider/mirror role skill dirs | pass | four role skill directories absent |
 
 #### クロージャ網羅（Closure Coverage）
 
@@ -201,6 +205,8 @@ ok
 | tc-004 | S01 | provider skill authority wording | pass | Draft/adoption is not a reviewer pass |
 | tc-005 | S01 | provider skill fallback wording | pass | unavailable / denied / unsupported / manual fallback preserves reviewer gates |
 | tc-006 | S02 | provider/mirror `diff -u` | pass | exact match |
+| tc-007 | S03 | agent TOML self-contained contract and no stale skill path dependency | pass | `created_by_role` values use agent role names |
+| tc-008 | S03 | role skill directories absent | pass | provider-side and dogfooding mirror role skill directories removed |
 
 #### クロージャ差分（Closure Delta）
 
@@ -242,6 +248,7 @@ ok
 | plan | plan authoring gate | spec-reviewer | fresh after P1/P2 fixes | pass | no | promoted for implementation | S03/S04/S99 include agent encapsulation, runtime provenance, and focused tests |
 | S01 | provider issue-planning skill review | spec-reviewer | fresh | pass | no | commit S01 | Reviewer agent `019ea214-57d6-7cc1-8d85-4ce74ce92661` returned `review_status: pass` |
 | S02 | issue-planning mirror sync review | spec-reviewer | fresh | pass | no | commit S02 | Reviewer agent `019ea219-c047-74b2-b786-edecde247d91` returned `review_status: pass` |
+| S03 | agent role encapsulation review | spec-reviewer | fresh | pass | no | commit S03 | Reviewer agent `019ea21f-cd3d-7491-b68e-25cf30eff188` returned `review_status: pass` |
 
 #### ステップ commit ゲート（Step Commit Gate）
 
@@ -251,6 +258,7 @@ ok
 | planning authoring | no commit requested | issue-local research and planning docs | final ledger in this report | validate/sync/diff-check passed after edits | N/A | N/A | N/A | N/A |
 | S01 | committed | provider issue-planning skill and report evidence | this commit | clean after commit | N/A | N/A | N/A | N/A |
 | S02 | committed | dogfooding issue-planning skill mirror and report evidence | this commit | clean after commit | N/A | N/A | N/A | N/A |
+| S03 | committed | agent TOML self-contained contracts, deleted role skills, and report evidence | this commit | clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 
@@ -262,3 +270,11 @@ ok
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00171-improve-issue-planning-actor-workflow/report.md`
 - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md`
 - `.agents/skills/spec-dock-issue-planning/SKILL.md`
+- `src/spec_dock/assets/install_root/.codex/agents/system-architect.toml`
+- `src/spec_dock/assets/install_root/.codex/agents/implementation-planner.toml`
+- `.codex/agents/system-architect.toml`
+- `.codex/agents/implementation-planner.toml`
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md`
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md`
+- `.agents/skills/spec-dock-system-architect/SKILL.md`
+- `.agents/skills/spec-dock-implementation-planner/SKILL.md`
