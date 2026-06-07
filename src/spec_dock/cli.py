@@ -33,8 +33,6 @@ _MANAGED_SKILL_NAMES = (
     "spec-dock-issue-planning",
     "spec-dock-issue-execution",
     "spec-dock-clarification",
-    "spec-dock-system-architect",
-    "spec-dock-implementation-planner",
     "spec-dock-adr-facilitation",
     "spec-dock-codex-adapter",
     "spec-dock-copilot-adapter",
@@ -43,7 +41,11 @@ _MANAGED_SKILL_NAMES = (
     "github-pr-creator",
     "github-pr-merge-preparer",
 )
-_LEGACY_MANAGED_SKILL_NAMES = ("spec-driven-tdd-workflow",)
+_LEGACY_MANAGED_SKILL_NAMES = (
+    "spec-driven-tdd-workflow",
+    "spec-dock-system-architect",
+    "spec-dock-implementation-planner",
+)
 _DEFAULT_SPEC_DOCK_GITIGNORE = (
     "# spec-dock runtime (generated)\n"
     "# v2 generated state for agents (SSOT + derived views)\n"
