@@ -109,6 +109,7 @@ trap cleanup EXIT
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 checks_script="$script_dir/lib/fetch_pr_checks_snapshot.sh"
+review_script="$script_dir/lib/fetch_pr_review_snapshot.sh"
 
 gh_stdout="$tmp_dir/gh-pr-view.json"
 gh_stderr="$tmp_dir/gh-pr-view.stderr"
@@ -138,6 +139,9 @@ fi
 checks_stdout="$tmp_dir/checks.json"
 checks_stderr="$tmp_dir/checks.stderr"
 checks_exit=0
+review_stdout="$tmp_dir/review.json"
+review_stderr="$tmp_dir/review.stderr"
+review_exit=0
 if [ "$gh_exit" -eq 0 ] && [ -n "$current_head_sha" ]; then
   checks_head_sha="${head_sha:-$current_head_sha}"
   current_head_sha_lc="$(printf '%s' "$current_head_sha" | tr '[:upper:]' '[:lower:]')"
@@ -146,12 +150,26 @@ if [ "$gh_exit" -eq 0 ] && [ -n "$current_head_sha" ]; then
     set +e
     "$checks_script" --repo "$repo" --pr "$pr" --head-sha "$checks_head_sha" >"$checks_stdout" 2>"$checks_stderr"
     checks_exit=$?
+    review_args=(--repo "$repo" --pr "$pr" --head-sha "$checks_head_sha" --body-mode "$body_mode")
+    if [ -n "$trigger_comment_id" ]; then
+      review_args+=(--trigger-comment-id "$trigger_comment_id")
+    fi
+    if [ -n "$trigger_created_at" ]; then
+      review_args+=(--trigger-created-at "$trigger_created_at")
+    fi
+    if [ -n "$out_dir" ]; then
+      review_args+=(--out "$out_dir")
+    fi
+    "$review_script" "${review_args[@]}" >"$review_stdout" 2>"$review_stderr"
+    review_exit=$?
     set -e
   else
     printf '{}\n' >"$checks_stdout"
+    printf '{}\n' >"$review_stdout"
   fi
 else
   printf '{}\n' >"$checks_stdout"
+  printf '{}\n' >"$review_stdout"
 fi
 
 OBS_SCRIPT="fetch_pr_observation_snapshot.sh" \
@@ -162,6 +180,9 @@ OBS_CURRENT_HEAD_SHA="$current_head_sha" \
 OBS_CHECKS_EXIT="$checks_exit" \
 OBS_CHECKS_JSON_PATH="$checks_stdout" \
 OBS_CHECKS_STDERR_PATH="$checks_stderr" \
+OBS_REVIEW_EXIT="$review_exit" \
+OBS_REVIEW_JSON_PATH="$review_stdout" \
+OBS_REVIEW_STDERR_PATH="$review_stderr" \
 OBS_TRIGGER_COMMENT_ID="$trigger_comment_id" \
 OBS_TRIGGER_CREATED_AT="$trigger_created_at" \
 OBS_BODY_MODE="$body_mode" \
@@ -199,6 +220,13 @@ ci_payload = {
     "failures": [],
     "collector": "pending_s03",
 }
+review_payload = {
+    "status": "unknown",
+    "signals": [],
+    "codex_authored": [],
+    "collector": "pending_s04",
+}
+review_wrapper_payload = {}
 head_matches_expected = (
     None
     if expected_head_sha is None or current_head_sha is None
@@ -287,14 +315,35 @@ else:
                 "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
             }
         )
-    limitations.append(
-        {
-            "code": "review_collector_pending_s04",
-            "source": "s04_contract",
-            "severity": "blocking",
-            "message": "review collector remains intentionally pending until S04",
-        }
-    )
+    review_exit = int(os.environ["OBS_REVIEW_EXIT"])
+    review_path = os.environ["OBS_REVIEW_JSON_PATH"]
+    review_wrapper_payload = {}
+    try:
+        review_wrapper_payload = json.load(open(review_path, encoding="utf-8"))
+    except Exception:
+        review_wrapper_payload = {}
+    if review_exit == 0 and isinstance(review_wrapper_payload.get("review"), dict):
+        review_payload = review_wrapper_payload["review"]
+        summary["review"] = review_payload.get("status") or "unknown"
+        limitations.extend(review_wrapper_payload.get("limitations", []))
+    else:
+        stderr_text = ""
+        stderr_path = os.environ["OBS_REVIEW_STDERR_PATH"]
+        if stderr_path:
+            try:
+                stderr_text = open(stderr_path, encoding="utf-8", errors="replace").read()
+            except OSError:
+                stderr_text = ""
+        limitations.append(
+            {
+                "code": "review_collection_failed",
+                "source": "fetch_pr_review_snapshot.sh",
+                "severity": "blocking",
+                "message": "fixed review/comment/thread collector failed",
+                "exit_code": review_exit,
+                "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
+            }
+        )
 
 fingerprint_source = {
     "repo": repo,
@@ -305,6 +354,8 @@ fingerprint_source = {
     "limitations": [item["code"] for item in limitations],
     "ci_status": ci_payload.get("status"),
     "ci_fingerprint": checks_payload.get("fingerprint") if "checks_payload" in locals() else None,
+    "review_status": review_payload.get("status"),
+    "review_fingerprint": review_wrapper_payload.get("fingerprint") if "review_wrapper_payload" in locals() else None,
 }
 fingerprint = hashlib.sha256(
     json.dumps(fingerprint_source, sort_keys=True, separators=(",", ":")).encode()
@@ -313,10 +364,17 @@ fingerprint = hashlib.sha256(
 trigger_comment_id = os.environ["OBS_TRIGGER_COMMENT_ID"] or None
 trigger_created_at = os.environ["OBS_TRIGGER_CREATED_AT"] or None
 trigger = {
-    "source": "explicit" if trigger_comment_id or trigger_created_at else "none",
+    "source": (
+        review_wrapper_payload.get("trigger", {}).get("source")
+        if isinstance(review_wrapper_payload.get("trigger"), dict)
+        else ("explicit" if trigger_comment_id or trigger_created_at else "none")
+    ),
     "comment_id": int(trigger_comment_id) if trigger_comment_id else None,
     "created_at": trigger_created_at,
 }
+if isinstance(review_wrapper_payload.get("trigger"), dict):
+    trigger["comment_id"] = review_wrapper_payload["trigger"].get("comment_id")
+    trigger["created_at"] = review_wrapper_payload["trigger"].get("created_at")
 
 payload = {
     "script": script,
@@ -337,12 +395,7 @@ payload = {
     "ci": {
         **ci_payload,
     },
-    "review": {
-        "status": "unknown",
-        "signals": [],
-        "codex_authored": [],
-        "collector": "pending_s04",
-    },
+    "review": review_payload,
     "trigger": trigger,
     "body_mode": body_mode,
     "artifacts": {},
