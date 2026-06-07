@@ -1,4 +1,3 @@
-import contextlib
 from dataclasses import replace
 import io
 import json
@@ -6,9 +5,10 @@ import os
 import stat
 import sys
 import tempfile
-import unittest
 from pathlib import Path
 
+import contextlib
+import pytest
 _REQUIRED_NODE_DOCS = ("requirement.md", "design.md", "plan.md", "report.md")
 
 
@@ -269,7 +269,7 @@ class _StubGitGateway:
         return self.repo_slug
 
 
-class TestRuntimeDepsS04(unittest.TestCase):
+class TestRuntimeDepsS04:
     def test_collect_sync_state_reads_shared_topology_map(self) -> None:
         (
             _runtime_app,
@@ -335,15 +335,13 @@ class TestRuntimeDepsS04(unittest.TestCase):
                 ports,
             )
 
-        self.assertEqual(deps_reader.calls, 1)
-        self.assertEqual(state.issue_depends_on_map.get("iss-local-00002"), ["iss-local-00001"])
-        self.assertTrue(
-            any(
+        assert deps_reader.calls == 1
+        assert state.issue_depends_on_map.get("iss-local-00002") == ["iss-local-00001"]
+        assert any(
                 node.node_id == "iss-local-00002" and node.effective_depends_on == ["iss-local-00001"]
                 for node in state.deps_state.nodes
             )
-        )
-        self.assertIsNone(state.deps_preflight_error)
+        assert state.deps_preflight_error is None
 
     def test_status_context_source_selection(self) -> None:
         (
@@ -377,11 +375,11 @@ class TestRuntimeDepsS04(unittest.TestCase):
             issue_snapshots=snapshots,
             cached_issue_status_by_id={"iss-local-00001": "open"},
         )
-        self.assertEqual(context_gh.issue_statuses["iss-local-00001"].authority, "github")
-        self.assertEqual(context_gh.issue_statuses["iss-local-00001"].effective_status, "done")
-        self.assertEqual(context_gh.issue_statuses["iss-local-00001"].source, "github")
-        self.assertFalse(context_gh.issue_statuses["iss-local-00001"].stale)
-        self.assertEqual(context_gh.issue_statuses["iss-local-00001"].last_sync_at, "t")
+        assert context_gh.issue_statuses["iss-local-00001"].authority == "github"
+        assert context_gh.issue_statuses["iss-local-00001"].effective_status == "done"
+        assert context_gh.issue_statuses["iss-local-00001"].source == "github"
+        assert not context_gh.issue_statuses["iss-local-00001"].stale
+        assert context_gh.issue_statuses["iss-local-00001"].last_sync_at == "t"
 
         context_cache = app_status_context.resolve_issue_status_context(
             graph,
@@ -389,9 +387,9 @@ class TestRuntimeDepsS04(unittest.TestCase):
             issue_snapshots=snapshots,
             cached_issue_status_by_id={"iss-local-00001": "open"},
         )
-        self.assertEqual(context_cache.issue_statuses["iss-local-00001"].effective_status, "open")
-        self.assertEqual(context_cache.issue_statuses["iss-local-00001"].source, "cache")
-        self.assertTrue(context_cache.issue_statuses["iss-local-00001"].stale)
+        assert context_cache.issue_statuses["iss-local-00001"].effective_status == "open"
+        assert context_cache.issue_statuses["iss-local-00001"].source == "cache"
+        assert context_cache.issue_statuses["iss-local-00001"].stale
 
     def test_check_deps_use_case_and_cycle_fail_fast(self) -> None:
         (
@@ -429,9 +427,9 @@ class TestRuntimeDepsS04(unittest.TestCase):
             ),
             ports,
         )
-        self.assertFalse(result.inspection.evaluation.ready)
-        self.assertEqual(result.inspection.evaluation.blockers, ["iss-local-00001"])
-        self.assertEqual(result.warnings, [])
+        assert not result.inspection.evaluation.ready
+        assert result.inspection.evaluation.blockers == ["iss-local-00001"]
+        assert result.warnings == []
 
         cycle_ports = app_ports.Ports(
             node_reader=_StubNodeReader(records),
@@ -447,7 +445,7 @@ class TestRuntimeDepsS04(unittest.TestCase):
                 }
             ),
         )
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             app_check_deps.check_deps(
                 app_contracts.CheckDepsRequest(
                     target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00002", github_issue_number=None),
@@ -562,11 +560,11 @@ class TestRuntimeDepsS04(unittest.TestCase):
         )
 
         status = result.inspection.issue_statuses["iss-local-00001"]
-        self.assertEqual(status.source, "github")
-        self.assertEqual(status.effective_status, "done")
-        self.assertFalse(status.stale)
-        self.assertEqual(issue_gateway.view_calls, [("/repo", 123, "other/repo")])
-        self.assertNotIn("gh_index_incomplete", result.warnings)
+        assert status.source == "github"
+        assert status.effective_status == "done"
+        assert not status.stale
+        assert issue_gateway.view_calls == [("/repo", 123, "other/repo")]
+        assert "gh_index_incomplete" not in result.warnings
 
     def test_check_deps_skips_same_repo_repo_scoped_view_fetch_when_index_contains_key(self) -> None:
         (
@@ -663,10 +661,10 @@ class TestRuntimeDepsS04(unittest.TestCase):
         )
 
         status = result.inspection.issue_statuses["iss-local-00001"]
-        self.assertEqual(status.source, "github")
-        self.assertEqual(status.effective_status, "open")
-        self.assertEqual(issue_gateway.view_calls, [])
-        self.assertNotIn("gh_fetch_failed", result.warnings)
+        assert status.source == "github"
+        assert status.effective_status == "open"
+        assert issue_gateway.view_calls == []
+        assert "gh_fetch_failed" not in result.warnings
 
     def test_check_deps_falls_back_to_same_repo_repo_scoped_view_when_index_missing_key(self) -> None:
         (
@@ -763,11 +761,11 @@ class TestRuntimeDepsS04(unittest.TestCase):
         )
 
         status = result.inspection.issue_statuses["iss-local-00001"]
-        self.assertEqual(status.source, "github")
-        self.assertEqual(status.effective_status, "done")
-        self.assertEqual(issue_gateway.view_calls, [("/repo", 123, "current/repo")])
-        self.assertNotIn("gh_fetch_failed", result.warnings)
-        self.assertNotIn("gh_index_incomplete", result.warnings)
+        assert status.source == "github"
+        assert status.effective_status == "done"
+        assert issue_gateway.view_calls == [("/repo", 123, "current/repo")]
+        assert "gh_fetch_failed" not in result.warnings
+        assert "gh_index_incomplete" not in result.warnings
 
     def test_check_deps_falls_back_to_current_repo_view_for_unscoped_linked_epic_when_index_missing_key(self) -> None:
         (
@@ -862,12 +860,12 @@ class TestRuntimeDepsS04(unittest.TestCase):
         )
 
         target_status = result.inspection.issue_statuses["epic-local-00001"]
-        self.assertEqual(target_status.source, "github")
-        self.assertEqual(target_status.effective_status, "done")
-        self.assertFalse(target_status.stale)
-        self.assertEqual(issue_gateway.view_calls, [("/repo", 201, "current/repo")])
-        self.assertNotIn("gh_fetch_failed", result.warnings)
-        self.assertNotIn("gh_index_incomplete", result.warnings)
+        assert target_status.source == "github"
+        assert target_status.effective_status == "done"
+        assert not target_status.stale
+        assert issue_gateway.view_calls == [("/repo", 201, "current/repo")]
+        assert "gh_fetch_failed" not in result.warnings
+        assert "gh_index_incomplete" not in result.warnings
 
     def test_check_deps_github_uses_current_repo_slug_for_unscoped_current_issue_and_keeps_foreign_same_number(self) -> None:
         (
@@ -1014,21 +1012,21 @@ class TestRuntimeDepsS04(unittest.TestCase):
             ),
             ports,
         )
-        self.assertFalse(result.inspection.evaluation.ready)
-        self.assertEqual(result.inspection.evaluation.guard_reason, "blocked")
-        self.assertEqual(result.inspection.evaluation.blockers, ["iss-local-00001"])
-        self.assertEqual(issue_gateway.view_calls, [("/repo", 123, "other/repo")])
-        self.assertEqual(result.warnings, [])
+        assert not result.inspection.evaluation.ready
+        assert result.inspection.evaluation.guard_reason == "blocked"
+        assert result.inspection.evaluation.blockers == ["iss-local-00001"]
+        assert issue_gateway.view_calls == [("/repo", 123, "other/repo")]
+        assert result.warnings == []
 
         payload = json.loads(presentation_json_state.render_deps_check_json(result))
-        self.assertFalse(payload["ready"])
-        self.assertEqual(payload["blockers"], ["iss-local-00001"])
-        self.assertEqual(payload["nodes"]["iss-local-00001"]["state"], "ready")
-        self.assertEqual(payload["nodes"]["iss-local-00001"]["source"], "github")
-        self.assertEqual(payload["nodes"]["iss-local-00001"]["effective_status"], "open")
-        self.assertEqual(payload["nodes"]["iss-local-00002"]["state"], "done")
-        self.assertEqual(payload["nodes"]["iss-local-00002"]["source"], "github")
-        self.assertEqual(payload["nodes"]["iss-local-00002"]["effective_status"], "done")
+        assert not payload["ready"]
+        assert payload["blockers"] == ["iss-local-00001"]
+        assert payload["nodes"]["iss-local-00001"]["state"] == "ready"
+        assert payload["nodes"]["iss-local-00001"]["source"] == "github"
+        assert payload["nodes"]["iss-local-00001"]["effective_status"] == "open"
+        assert payload["nodes"]["iss-local-00002"]["state"] == "done"
+        assert payload["nodes"]["iss-local-00002"]["source"] == "github"
+        assert payload["nodes"]["iss-local-00002"]["effective_status"] == "done"
 
     def test_validate_tree_reconnects_topology_provider(self) -> None:
         (
@@ -1064,9 +1062,9 @@ class TestRuntimeDepsS04(unittest.TestCase):
                 deps_topology_reader=deps_reader,
             )
             result = app_validate_tree.validate_tree(app_contracts.ValidateTreeRequest(), ports)
-            self.assertEqual(deps_reader.calls, 1)
-            self.assertTrue(result.report.errors)
-            self.assertIn("Dependency cycle detected", result.report.errors[0])
+            assert deps_reader.calls == 1
+            assert result.report.errors
+            assert "Dependency cycle detected" in result.report.errors[0]
 
     def test_deps_renderers(self) -> None:
         (
@@ -1127,22 +1125,22 @@ class TestRuntimeDepsS04(unittest.TestCase):
         )
 
         text = presentation_cli_text.render_deps_check_text(result)
-        self.assertIn("spec-dock: blocked (deps check)", text.stderr_lines[0])
-        self.assertIn("authority=github", text.stderr_lines[0])
-        self.assertIn("effective_status=open", text.stderr_lines[0])
-        self.assertIn("source=cache", text.stderr_lines[0])
-        self.assertIn("stale=true", text.stderr_lines[0])
-        self.assertIn("last_sync_at=2026-03-17T12:34:56Z", text.stderr_lines[0])
-        self.assertEqual(text.warnings, ["gh_fetch_failed"])
+        assert "spec-dock: blocked (deps check)" in text.stderr_lines[0]
+        assert "authority=github" in text.stderr_lines[0]
+        assert "effective_status=open" in text.stderr_lines[0]
+        assert "source=cache" in text.stderr_lines[0]
+        assert "stale=true" in text.stderr_lines[0]
+        assert "last_sync_at=2026-03-17T12:34:56Z" in text.stderr_lines[0]
+        assert text.warnings == ["gh_fetch_failed"]
 
         payload = json.loads(presentation_json_state.render_deps_check_json(result))
-        self.assertEqual(payload["target"], "iss-local-00002")
-        self.assertEqual(payload["blockers"], ["iss-local-00001"])
-        self.assertEqual(payload["target_status"]["source"], "cache")
-        self.assertTrue(payload["target_status"]["stale"])
-        self.assertEqual(payload["target_status"]["last_sync_at"], "2026-03-17T12:34:56Z")
-        self.assertEqual(payload["nodes"]["iss-local-00001"]["source"], "cache")
-        self.assertEqual(payload["warnings"], ["gh_fetch_failed"])
+        assert payload["target"] == "iss-local-00002"
+        assert payload["blockers"] == ["iss-local-00001"]
+        assert payload["target_status"]["source"] == "cache"
+        assert payload["target_status"]["stale"]
+        assert payload["target_status"]["last_sync_at"] == "2026-03-17T12:34:56Z"
+        assert payload["nodes"]["iss-local-00001"]["source"] == "cache"
+        assert payload["warnings"] == ["gh_fetch_failed"]
 
     def test_legacy_deps_path_delegates_and_exit_codes(self) -> None:
         (
@@ -1210,18 +1208,18 @@ class TestRuntimeDepsS04(unittest.TestCase):
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
                 exit_code = runtime_app.main(["deps", "check", "iss-local-1"])
 
-            self.assertEqual(exit_code, 3)
-            self.assertEqual(stdout.getvalue(), "")
+            assert exit_code == 3
+            assert stdout.getvalue() == ""
             stderr_lines = [line for line in stderr.getvalue().splitlines() if line.strip()]
-            self.assertTrue(stderr_lines[0].startswith("spec-dock: (warn) gh_fetch_failed"))
-            self.assertIn("spec-dock: blocked (deps check)", stderr_lines[1])
-            self.assertIn("authority=github", stderr_lines[1])
-            self.assertIn("effective_status=open", stderr_lines[1])
-            self.assertIn("source=cache", stderr_lines[1])
-            self.assertIn("stale=true", stderr_lines[1])
-            self.assertIn("last_sync_at=2026-03-17T12:34:56Z", stderr_lines[1])
-            self.assertEqual(calls["req"].target.kind, "node_id")
-            self.assertEqual(calls["req"].target.node_id, "iss-local-1")
+            assert stderr_lines[0].startswith("spec-dock: (warn) gh_fetch_failed")
+            assert "spec-dock: blocked (deps check)" in stderr_lines[1]
+            assert "authority=github" in stderr_lines[1]
+            assert "effective_status=open" in stderr_lines[1]
+            assert "source=cache" in stderr_lines[1]
+            assert "stale=true" in stderr_lines[1]
+            assert "last_sync_at=2026-03-17T12:34:56Z" in stderr_lines[1]
+            assert calls["req"].target.kind == "node_id"
+            assert calls["req"].target.node_id == "iss-local-1"
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             cli_bootstrap.application_check_deps = original_application_check_deps
@@ -1272,25 +1270,25 @@ class TestRuntimeDepsS04(unittest.TestCase):
             stderr = io.StringIO()
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
                 exit_code = runtime_app.main(["deps", "check", "#123"])
-            self.assertEqual(exit_code, 0)
-            self.assertEqual(stderr.getvalue().strip(), "")
+            assert exit_code == 0
+            assert stderr.getvalue().strip() == ""
             ready_line = stdout.getvalue().strip()
-            self.assertIn("spec-dock: ok (deps check)", ready_line)
-            self.assertIn("authority=github", ready_line)
-            self.assertIn("effective_status=open", ready_line)
-            self.assertIn("source=github", ready_line)
-            self.assertIn("stale=false", ready_line)
-            self.assertIn("last_sync_at=2026-03-17T12:34:56Z", ready_line)
+            assert "spec-dock: ok (deps check)" in ready_line
+            assert "authority=github" in ready_line
+            assert "effective_status=open" in ready_line
+            assert "source=github" in ready_line
+            assert "stale=false" in ready_line
+            assert "last_sync_at=2026-03-17T12:34:56Z" in ready_line
 
             stdout = io.StringIO()
             stderr = io.StringIO()
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
                 exit_code = runtime_app.main(["deps", "check", "#123", "--json"])
-            self.assertEqual(exit_code, 0)
-            self.assertEqual(stderr.getvalue().strip(), "")
+            assert exit_code == 0
+            assert stderr.getvalue().strip() == ""
             payload = json.loads(stdout.getvalue())
-            self.assertEqual(payload["target"], "iss-00123")
-            self.assertTrue(payload["ready"])
+            assert payload["target"] == "iss-00123"
+            assert payload["ready"]
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             cli_bootstrap.application_check_deps = original_application_check_deps
@@ -1307,8 +1305,8 @@ class TestRuntimeDepsS04(unittest.TestCase):
             stderr = io.StringIO()
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
                 exit_code = runtime_app.main(["deps", "check", "iss-local-00001"])
-            self.assertEqual(exit_code, 1)
-            self.assertIn("error: boom", stderr.getvalue())
+            assert exit_code == 1
+            assert "error: boom" in stderr.getvalue()
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             cli_bootstrap.application_check_deps = original_application_check_deps
@@ -1335,10 +1333,10 @@ class TestRuntimeDepsS04(unittest.TestCase):
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
                 exit_code = runtime_app.main(["deps", "check", "git@github.com:owner/repo/issues/123"])
 
-            self.assertEqual(exit_code, 1)
-            self.assertEqual(stdout.getvalue().strip(), "")
-            self.assertIn("Invalid target", stderr.getvalue())
-            self.assertEqual(calls["count"], 0)
+            assert exit_code == 1
+            assert stdout.getvalue().strip() == ""
+            assert "Invalid target" in stderr.getvalue()
+            assert calls["count"] == 0
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             cli_bootstrap.application_check_deps = original_application_check_deps
@@ -1384,16 +1382,13 @@ class TestRuntimeDepsS04(unittest.TestCase):
                     ["deps", "add", "--from", "iss-local-00001", "--to", "iss-local-00002"]
                 )
 
-            self.assertEqual(exit_code, 0)
-            self.assertEqual(stderr.getvalue().strip(), "")
-            self.assertEqual(
-                stdout.getvalue().strip(),
-                "spec-dock: ok (deps add) from=iss-local-00001 to=iss-local-00002 result=updated",
-            )
+            assert exit_code == 0
+            assert stderr.getvalue().strip() == ""
+            assert stdout.getvalue().strip() == "spec-dock: ok (deps add) from=iss-local-00001 to=iss-local-00002 result=updated"
             req = calls["req"]
-            self.assertEqual(req.action, "add")
-            self.assertEqual(req.from_id, "iss-local-00001")
-            self.assertEqual(req.to_id, "iss-local-00002")
+            assert req.action == "add"
+            assert req.from_id == "iss-local-00001"
+            assert req.to_id == "iss-local-00002"
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             cli_bootstrap.application_mutate_deps = original_application_mutate_deps
@@ -1437,12 +1432,9 @@ class TestRuntimeDepsS04(unittest.TestCase):
                     ["deps", "add", "--from", "iss-local-00001", "--to", "iss-local-00002"]
                 )
 
-            self.assertEqual(exit_code, 0)
-            self.assertEqual(stderr.getvalue().strip(), "")
-            self.assertEqual(
-                stdout.getvalue().strip(),
-                "spec-dock: ok (deps add) from=iss-local-00001 to=iss-local-00002 result=unchanged",
-            )
+            assert exit_code == 0
+            assert stderr.getvalue().strip() == ""
+            assert stdout.getvalue().strip() == "spec-dock: ok (deps add) from=iss-local-00001 to=iss-local-00002 result=unchanged"
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             cli_bootstrap.application_mutate_deps = original_application_mutate_deps
@@ -1488,16 +1480,13 @@ class TestRuntimeDepsS04(unittest.TestCase):
                     ["deps", "remove", "--from", "iss-local-00001", "--to", "iss-local-00002"]
                 )
 
-            self.assertEqual(exit_code, 0)
-            self.assertEqual(stderr.getvalue().strip(), "")
-            self.assertEqual(
-                stdout.getvalue().strip(),
-                "spec-dock: ok (deps remove) from=iss-local-00001 to=iss-local-00002 result=updated",
-            )
+            assert exit_code == 0
+            assert stderr.getvalue().strip() == ""
+            assert stdout.getvalue().strip() == "spec-dock: ok (deps remove) from=iss-local-00001 to=iss-local-00002 result=updated"
             req = calls["req"]
-            self.assertEqual(req.action, "remove")
-            self.assertEqual(req.from_id, "iss-local-00001")
-            self.assertEqual(req.to_id, "iss-local-00002")
+            assert req.action == "remove"
+            assert req.from_id == "iss-local-00001"
+            assert req.to_id == "iss-local-00002"
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             cli_bootstrap.application_mutate_deps = original_application_mutate_deps
@@ -1541,13 +1530,10 @@ class TestRuntimeDepsS04(unittest.TestCase):
                     ["deps", "add", "--from", "iss-local-00001", "--to", "iss-local-00002"]
                 )
 
-            self.assertEqual(exit_code, 1)
-            self.assertEqual(stdout.getvalue().strip(), "")
-            self.assertIn(
-                "spec-dock: error (deps add) from=iss-local-00001 to=iss-local-00002 code=write_failed",
-                stderr.getvalue(),
-            )
-            self.assertIn("- write_failed[replace]: simulated replace failure", stderr.getvalue())
+            assert exit_code == 1
+            assert stdout.getvalue().strip() == ""
+            assert "spec-dock: error (deps add) from=iss-local-00001 to=iss-local-00002 code=write_failed" in stderr.getvalue()
+            assert "- write_failed[replace]: simulated replace failure" in stderr.getvalue()
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             cli_bootstrap.application_mutate_deps = original_application_mutate_deps
@@ -1585,15 +1571,15 @@ class TestRuntimeDepsS04(unittest.TestCase):
                     raise OSError("simulated replace failure")
 
                 fs_repo.os.replace = _failing_replace
-                with self.assertRaises(RuntimeError) as ctx:
+                with pytest.raises(RuntimeError) as ctx:
                     fs_repo.add_issue_dependency(meta_path, "iss-local-00002")
             finally:
                 fs_repo.os.replace = original_replace
 
-            self.assertIn("write_failed", str(ctx.exception))
-            self.assertEqual(meta_path.read_text(encoding="utf-8"), original)
+            assert "write_failed" in str(ctx.value)
+            assert meta_path.read_text(encoding="utf-8") == original
             tmp_files = [p for p in node_dir.iterdir() if ".meta.json.tmp-" in p.name]
-            self.assertEqual(tmp_files, [])
+            assert tmp_files == []
 
     def test_fs_repo_atomic_replace_failure_preserves_original_meta_json_on_remove(self) -> None:
         runtime_scripts_dir = (
@@ -1636,15 +1622,15 @@ class TestRuntimeDepsS04(unittest.TestCase):
                     raise OSError("simulated replace failure")
 
                 fs_repo.os.replace = _failing_replace
-                with self.assertRaises(RuntimeError) as ctx:
+                with pytest.raises(RuntimeError) as ctx:
                     fs_repo.remove_issue_dependency(meta_path, "iss-local-00002")
             finally:
                 fs_repo.os.replace = original_replace
 
-            self.assertIn("write_failed", str(ctx.exception))
-            self.assertEqual(meta_path.read_text(encoding="utf-8"), original)
+            assert "write_failed" in str(ctx.value)
+            assert meta_path.read_text(encoding="utf-8") == original
             tmp_files = [p for p in node_dir.iterdir() if ".meta.json.tmp-" in p.name]
-            self.assertEqual(tmp_files, [])
+            assert tmp_files == []
 
     def test_fs_repo_remove_issue_dependency_supports_shorthand_matching_refs(self) -> None:
         runtime_scripts_dir = (
@@ -1698,11 +1684,11 @@ class TestRuntimeDepsS04(unittest.TestCase):
             )
 
             payload = json.loads(meta_path.read_text(encoding="utf-8"))
-            self.assertEqual(payload.get("depends_on"), ["iss-local-00003"])
+            assert payload.get("depends_on") == ["iss-local-00003"]
 
     def test_fs_repo_atomic_write_preserves_existing_read_bits(self) -> None:
         if os.name != "posix":
-            self.skipTest("POSIX permission bits are required for this test")
+            pytest.skip("POSIX permission bits are required for this test")
 
         runtime_scripts_dir = (
             Path(__file__).resolve().parents[2]
@@ -1733,12 +1719,12 @@ class TestRuntimeDepsS04(unittest.TestCase):
             fs_repo.add_issue_dependency(meta_path, "iss-local-00002")
 
             written = json.loads(meta_path.read_text(encoding="utf-8"))
-            self.assertEqual(written.get("depends_on"), ["iss-local-00002"])
-            self.assertEqual(stat.S_IMODE(meta_path.stat().st_mode), expected_mode)
+            assert written.get("depends_on") == ["iss-local-00002"]
+            assert stat.S_IMODE(meta_path.stat().st_mode) == expected_mode
 
     def test_fs_repo_atomic_unlock_failure_maps_to_write_failed(self) -> None:
         if os.name != "posix":
-            self.skipTest("POSIX permission bits are required for this test")
+            pytest.skip("POSIX permission bits are required for this test")
 
         runtime_scripts_dir = (
             Path(__file__).resolve().parents[2]
@@ -1774,17 +1760,17 @@ class TestRuntimeDepsS04(unittest.TestCase):
                     return original_chmod(self, mode, *args, **kwargs)
 
                 fs_repo.Path.chmod = _failing_chmod
-                with self.assertRaises(RuntimeError) as ctx:
+                with pytest.raises(RuntimeError) as ctx:
                     fs_repo.add_issue_dependency(meta_path, "iss-local-00002")
             finally:
                 fs_repo.Path.chmod = original_chmod
 
-            self.assertIn("write_failed[unlock]", str(ctx.exception))
-            self.assertEqual(meta_path.read_text(encoding="utf-8"), before)
+            assert "write_failed[unlock]" in str(ctx.value)
+            assert meta_path.read_text(encoding="utf-8") == before
 
     def test_fs_repo_atomic_non_oserror_write_failure_maps_to_write_failed_and_restores_readonly(self) -> None:
         if os.name != "posix":
-            self.skipTest("POSIX permission bits are required for this test")
+            pytest.skip("POSIX permission bits are required for this test")
 
         runtime_scripts_dir = (
             Path(__file__).resolve().parents[2]
@@ -1825,21 +1811,21 @@ class TestRuntimeDepsS04(unittest.TestCase):
                     return original_write_json(path, payload)
 
                 fs_repo.write_json = _failing_write_json
-                with self.assertRaises(RuntimeError) as ctx:
+                with pytest.raises(RuntimeError) as ctx:
                     fs_repo.add_issue_dependency(meta_path, "iss-local-00002")
             finally:
                 fs_repo.write_json = original_write_json
 
-            self.assertIn("write_failed[write_temp]", str(ctx.exception))
-            self.assertIn("simulated non-oserror write failure", str(ctx.exception))
-            self.assertEqual(meta_path.read_text(encoding="utf-8"), before)
-            self.assertEqual(stat.S_IMODE(meta_path.stat().st_mode), expected_mode)
+            assert "write_failed[write_temp]" in str(ctx.value)
+            assert "simulated non-oserror write failure" in str(ctx.value)
+            assert meta_path.read_text(encoding="utf-8") == before
+            assert stat.S_IMODE(meta_path.stat().st_mode) == expected_mode
             tmp_files = [p for p in node_dir.iterdir() if ".meta.json.tmp-" in p.name]
-            self.assertEqual(tmp_files, [])
+            assert tmp_files == []
 
     def test_fs_repo_atomic_lock_failure_maps_to_write_failed_lock_and_preserves_original(self) -> None:
         if os.name != "posix":
-            self.skipTest("POSIX permission bits are required for this test")
+            pytest.skip("POSIX permission bits are required for this test")
 
         runtime_scripts_dir = (
             Path(__file__).resolve().parents[2]
@@ -1879,15 +1865,15 @@ class TestRuntimeDepsS04(unittest.TestCase):
                     return original_chmod(self, mode, *args, **kwargs)
 
                 fs_repo.Path.chmod = _failing_chmod
-                with self.assertRaises(RuntimeError) as ctx:
+                with pytest.raises(RuntimeError) as ctx:
                     fs_repo.add_issue_dependency(meta_path, "iss-local-00002")
             finally:
                 fs_repo.Path.chmod = original_chmod
 
-            self.assertIn("write_failed[lock]", str(ctx.exception))
-            self.assertEqual(meta_path.read_text(encoding="utf-8"), before)
+            assert "write_failed[lock]" in str(ctx.value)
+            assert meta_path.read_text(encoding="utf-8") == before
             tmp_files = [p for p in node_dir.iterdir() if ".meta.json.tmp-" in p.name]
-            self.assertEqual(tmp_files, [])
+            assert tmp_files == []
 
     def test_fs_repo_atomic_mkstemp_failure_maps_to_write_failed_write_temp(self) -> None:
         runtime_scripts_dir = (
@@ -1922,15 +1908,15 @@ class TestRuntimeDepsS04(unittest.TestCase):
                     raise OSError("simulated mkstemp failure")
 
                 fs_repo.tempfile.mkstemp = _failing_mkstemp
-                with self.assertRaises(RuntimeError) as ctx:
+                with pytest.raises(RuntimeError) as ctx:
                     fs_repo.add_issue_dependency(meta_path, "iss-local-00002")
             finally:
                 fs_repo.tempfile.mkstemp = original_mkstemp
 
-            self.assertIn("write_failed[write_temp]", str(ctx.exception))
-            self.assertEqual(meta_path.read_text(encoding="utf-8"), before)
+            assert "write_failed[write_temp]" in str(ctx.value)
+            assert meta_path.read_text(encoding="utf-8") == before
             tmp_files = [p for p in node_dir.iterdir() if ".meta.json.tmp-" in p.name]
-            self.assertEqual(tmp_files, [])
+            assert tmp_files == []
 
     def test_fs_repo_atomic_stat_failure_maps_to_write_failed(self) -> None:
         runtime_scripts_dir = (
@@ -1973,11 +1959,11 @@ class TestRuntimeDepsS04(unittest.TestCase):
 
                 fs_repo.Path.exists = _forced_exists
                 fs_repo.Path.stat = _failing_stat
-                with self.assertRaises(RuntimeError) as ctx:
+                with pytest.raises(RuntimeError) as ctx:
                     fs_repo.add_issue_dependency(meta_path, "iss-local-00002")
             finally:
                 fs_repo.Path.exists = original_exists
                 fs_repo.Path.stat = original_stat
 
-            self.assertIn("write_failed[stat]", str(ctx.exception))
-            self.assertEqual(meta_path.read_text(encoding="utf-8"), before)
+            assert "write_failed[stat]" in str(ctx.value)
+            assert meta_path.read_text(encoding="utf-8") == before

@@ -4,7 +4,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,6 +15,7 @@ from tests.cli_runtime.harness import (
 )
 
 
+import pytest
 class TestCliActive(CliRuntimeHarness):
     def _set_meta_depends_on(self, node_dir: Path, depends_on: object) -> None:
         meta_path = node_dir / ".meta.json"
@@ -26,56 +26,50 @@ class TestCliActive(CliRuntimeHarness):
     def test_active_set_initiative_and_epic_keep_missing_layers_as_placeholder(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
             # Initiative-only active: epic/issue are placeholders.
             self._run_runtime(target, ["active", "set", "init-00001", "--force"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertIsInstance(active.get("initiative"), dict)
-            self.assertIsNone(active.get("epic"))
-            self.assertIsNone(active.get("issue"))
-            self.assertEqual(
-                active["initiative"]["path"],
-                "spec-dock/initiatives/init-00001-auth-platform",
-            )
-            self.assertFalse(active["initiative"]["path"].startswith(str(target)))
-            self.assertIn("init-00001", self._read_active_pointer_text(target, "initiative", "requirement.md"))
-            self.assertIn("Active Epic: なし", self._read_active_pointer_text(target, "epic", "README.md"))
-            self.assertIn("Active Issue: なし", self._read_active_pointer_text(target, "issue", "README.md"))
+            assert isinstance(active.get("initiative"), dict)
+            assert active.get("epic") is None
+            assert active.get("issue") is None
+            assert active["initiative"]["path"] == "spec-dock/initiatives/init-00001-auth-platform"
+            assert not active["initiative"]["path"].startswith(str(target))
+            assert "init-00001" in self._read_active_pointer_text(target, "initiative", "requirement.md")
+            assert "Active Epic: なし" in self._read_active_pointer_text(target, "epic", "README.md")
+            assert "Active Issue: なし" in self._read_active_pointer_text(target, "issue", "README.md")
 
             # Epic-only active: issue is a placeholder.
             self._run_runtime(target, ["active", "set", "epic-00002", "--force"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertIsInstance(active.get("initiative"), dict)
-            self.assertIsInstance(active.get("epic"), dict)
-            self.assertIsNone(active.get("issue"))
-            self.assertEqual(
-                active["epic"]["path"],
-                (
+            assert isinstance(active.get("initiative"), dict)
+            assert isinstance(active.get("epic"), dict)
+            assert active.get("issue") is None
+            assert active["epic"]["path"] == (
                     "spec-dock/initiatives/init-00001-auth-platform/epics/"
                     "epic-00002-jwt-auth"
-                ),
-            )
-            self.assertFalse(active["epic"]["path"].startswith(str(target)))
-            self.assertIn("epic-00002", self._read_active_pointer_text(target, "epic", "requirement.md"))
-            self.assertIn("Active Issue: なし", self._read_active_pointer_text(target, "issue", "README.md"))
+                )
+            assert not active["epic"]["path"].startswith(str(target))
+            assert "epic-00002" in self._read_active_pointer_text(target, "epic", "requirement.md")
+            assert "Active Issue: なし" in self._read_active_pointer_text(target, "issue", "README.md")
 
             # Clear: all placeholders.
             self._run_runtime(target, ["active", "clear"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertIsNone(active.get("initiative"))
-            self.assertIsNone(active.get("epic"))
-            self.assertIsNone(active.get("issue"))
-            self.assertIn("Active Initiative: なし", self._read_active_pointer_text(target, "initiative", "README.md"))
-            self.assertIn("Active Epic: なし", self._read_active_pointer_text(target, "epic", "README.md"))
-            self.assertIn("Active Issue: なし", self._read_active_pointer_text(target, "issue", "README.md"))
+            assert active.get("initiative") is None
+            assert active.get("epic") is None
+            assert active.get("issue") is None
+            assert "Active Initiative: なし" in self._read_active_pointer_text(target, "initiative", "README.md")
+            assert "Active Epic: なし" in self._read_active_pointer_text(target, "epic", "README.md")
+            assert "Active Issue: なし" in self._read_active_pointer_text(target, "issue", "README.md")
 
     def test_active_set_rejects_legacy_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             # Legacy flags were removed in favor of a single `target` argument.
             self._run_runtime_expect_fail(target, ["active", "set", "--issue", "1"])
@@ -83,43 +77,43 @@ class TestCliActive(CliRuntimeHarness):
     def test_active_set_rejects_github_and_no_github_together(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             p = self._run_runtime_capture(target, ["active", "set", "iss-00003", "--github", "--no-github"])
-            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
-            self.assertIn("not allowed with argument", p.stderr)
+            assert p.returncode == 2, p.stdout + p.stderr
+            assert "not allowed with argument" in p.stderr
 
     def test_active_set_accepts_explicit_id_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             p = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00003", "--force"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok (active set)", p.stdout)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "spec-dock: ok (active set)" in p.stdout
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-00003")
+            assert active["issue"]["id"] == "iss-00003"
 
     def test_active_set_accepts_explicit_github_issue_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=123)
 
             p = self._run_runtime_capture(target, ["active", "set", "--github-issue", "123", "--force"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok (active set)", p.stdout)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "spec-dock: ok (active set)" in p.stdout
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-00123")
+            assert active["issue"]["id"] == "iss-00123"
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
     def test_active_set_github_issue_flag_is_ambiguous_with_current_foreign_overlap_but_id_succeeds(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
             self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "124"])
 
@@ -139,21 +133,21 @@ class TestCliActive(CliRuntimeHarness):
             self._write_json_force(foreign_issue_meta, foreign_meta)
 
             ambiguous = self._run_runtime_capture(target, ["active", "set", "--github-issue", "123", "--force"])
-            self.assertNotEqual(ambiguous.returncode, 0, ambiguous.stdout + ambiguous.stderr)
-            self.assertIn("Ambiguous github.issue_number=123", ambiguous.stderr)
+            assert ambiguous.returncode != 0, ambiguous.stdout + ambiguous.stderr
+            assert "Ambiguous github.issue_number=123" in ambiguous.stderr
 
             by_id = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00123", "--force"])
-            self.assertEqual(by_id.returncode, 0, by_id.stdout + by_id.stderr)
-            self.assertIn("spec-dock: ok (active set)", by_id.stdout)
+            assert by_id.returncode == 0, by_id.stdout + by_id.stderr
+            assert "spec-dock: ok (active set)" in by_id.stdout
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-00123")
+            assert active["issue"]["id"] == "iss-00123"
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
     def test_active_set_repo_scoped_url_resolves_exact_match_when_number_is_ambiguous(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
             self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "124"])
 
@@ -173,37 +167,37 @@ class TestCliActive(CliRuntimeHarness):
             self._write_json_force(foreign_issue_meta, foreign_meta)
 
             ambiguous = self._run_runtime_capture(target, ["active", "set", "123", "--force"])
-            self.assertNotEqual(ambiguous.returncode, 0, ambiguous.stdout + ambiguous.stderr)
-            self.assertIn("Ambiguous github.issue_number=123", ambiguous.stderr)
+            assert ambiguous.returncode != 0, ambiguous.stdout + ambiguous.stderr
+            assert "Ambiguous github.issue_number=123" in ambiguous.stderr
 
             by_url = self._run_runtime_capture(target, ["active", "set", "https://github.com/other/repo/issues/123", "--force"])
-            self.assertEqual(by_url.returncode, 0, by_url.stdout + by_url.stderr)
-            self.assertIn("spec-dock: ok (active set)", by_url.stdout)
+            assert by_url.returncode == 0, by_url.stdout + by_url.stderr
+            assert "spec-dock: ok (active set)" in by_url.stdout
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-00124")
+            assert active["issue"]["id"] == "iss-00124"
 
     def test_active_set_repo_scoped_url_fails_closed_when_repo_scope_does_not_match(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
 
             mismatch = self._run_runtime_capture(
                 target,
                 ["active", "set", "https://github.com/other/repo/issues/123", "--force"],
             )
-            self.assertNotEqual(mismatch.returncode, 0, mismatch.stdout + mismatch.stderr)
-            self.assertIn("No node found for github.issue_number=123 in repo scope (other/repo)", mismatch.stderr)
-            self.assertNotIn("spec-dock: ok (active set)", mismatch.stdout)
+            assert mismatch.returncode != 0, mismatch.stdout + mismatch.stderr
+            assert "No node found for github.issue_number=123 in repo scope (other/repo)" in mismatch.stderr
+            assert "spec-dock: ok (active set)" not in mismatch.stdout
 
     def test_active_set_repo_scoped_current_url_resolves_unscoped_current_node(self) -> None:
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(
                 target,
                 owner="current",
@@ -232,76 +226,76 @@ class TestCliActive(CliRuntimeHarness):
                 target,
                 ["active", "set", "https://github.com/current/repo/issues/123", "--force"],
             )
-            self.assertEqual(by_url.returncode, 0, by_url.stdout + by_url.stderr)
-            self.assertIn("spec-dock: ok (active set)", by_url.stdout)
+            assert by_url.returncode == 0, by_url.stdout + by_url.stderr
+            assert "spec-dock: ok (active set)" in by_url.stdout
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-00123")
+            assert active["issue"]["id"] == "iss-00123"
 
     def test_active_set_rejects_non_canonical_url_like_target_and_keeps_active_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
             self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Baseline issue", "--github-issue", "124"])
 
             baseline = self._run_runtime_capture(target, ["active", "set", "iss-00124", "--force"])
-            self.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)
+            assert baseline.returncode == 0, baseline.stdout + baseline.stderr
             active_path = target / "spec-dock" / ".agent" / "active.json"
             before = active_path.read_text(encoding="utf-8")
             baseline_active = json.loads(before)
-            self.assertEqual(baseline_active["issue"]["id"], "iss-00124")
+            assert baseline_active["issue"]["id"] == "iss-00124"
 
             invalid = self._run_runtime_capture(
                 target,
                 ["active", "set", "git@github.com:owner/repo/issues/123", "--force"],
             )
-            self.assertNotEqual(invalid.returncode, 0, invalid.stdout + invalid.stderr)
-            self.assertIn("Invalid target", invalid.stderr)
+            assert invalid.returncode != 0, invalid.stdout + invalid.stderr
+            assert "Invalid target" in invalid.stderr
 
             after = active_path.read_text(encoding="utf-8")
-            self.assertEqual(after, before)
+            assert after == before
 
     def test_active_set_rejects_conflict_between_positional_target_and_id_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             p = self._run_runtime_capture(
                 target,
                 ["active", "set", "123", "--id", "iss-local-00001"],
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("choose exactly one", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "choose exactly one" in p.stderr
 
     def test_active_set_rejects_conflict_between_id_and_github_issue_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             p = self._run_runtime_capture(
                 target,
                 ["active", "set", "--id", "iss-local-00001", "--github-issue", "123"],
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("choose exactly one", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "choose exactly one" in p.stderr
 
     def test_active_set_rejects_non_positive_github_issue_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             p = self._run_runtime_capture(target, ["active", "set", "--github-issue", "0"])
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("positive integer", p.stderr)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "positive integer" in p.stderr
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
     def test_active_set_github_issue_checkout_sets_active(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_git(
@@ -340,26 +334,23 @@ class TestCliActive(CliRuntimeHarness):
 
                 self._run_runtime(target, ["active", "set", "123", "--checkout", "--force"], env=test_env)
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            self.assertEqual(current, "iss-00123-add-refresh-token")
+            assert current == "iss-00123-add-refresh-token"
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-00123")
-            self.assertEqual(
-                active["issue"]["path"],
-                (
+            assert active["issue"]["id"] == "iss-00123"
+            assert active["issue"]["path"] == (
                     "spec-dock/initiatives/init-00001-auth-platform/epics/"
                     "epic-00002-jwt-auth/issues/iss-00123-add-refresh-token"
-                ),
-            )
-            self.assertFalse(active["issue"]["path"].startswith(str(target)))
+                )
+            assert not active["issue"]["path"].startswith(str(target))
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
     def test_active_set_local_only_node_does_not_rename_branch(self) -> None:
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_git(
@@ -373,18 +364,18 @@ class TestCliActive(CliRuntimeHarness):
             self._run_runtime(target, ["active", "set", "iss-local-00001", "--force"])
 
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            self.assertEqual(current, "feature/local-keep-branch")
+            assert current == "feature/local-keep-branch"
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
     def test_active_set_detached_head_creates_desired_branch(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_git(
@@ -401,7 +392,7 @@ class TestCliActive(CliRuntimeHarness):
 
             self._run_git(target, ["checkout", "--detach"])
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            self.assertEqual(current, "HEAD")
+            assert current == "HEAD"
 
             with tempfile.TemporaryDirectory() as bin_tmp:
                 bin_dir = Path(bin_tmp)
@@ -423,22 +414,22 @@ class TestCliActive(CliRuntimeHarness):
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
                 p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout", "--force"], env=test_env)
-                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                assert p.returncode == 0, p.stdout + p.stderr
 
             desired = "iss-00123-add-refresh-token"
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            self.assertEqual(current, desired)
+            assert current == desired
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
     def test_active_set_reuses_existing_desired_branch_without_gh_checkout(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_git(
@@ -490,27 +481,27 @@ class TestCliActive(CliRuntimeHarness):
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
                 p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout", "--force"], env=test_env)
-                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-                self.assertIn("spec-dock: (warn)", p.stderr)
-                self.assertIn("reusing existing branch", p.stderr)
-                self.assertIn("content is not verified", p.stderr)
+                assert p.returncode == 0, p.stdout + p.stderr
+                assert "spec-dock: (warn)" in p.stderr
+                assert "reusing existing branch" in p.stderr
+                assert "content is not verified" in p.stderr
 
                 if counter.exists():
-                    self.assertEqual(counter.read_text(encoding="utf-8").strip(), "0")
+                    assert counter.read_text(encoding="utf-8").strip() == "0"
 
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            self.assertEqual(current, desired)
+            assert current == desired
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
     def test_active_set_reuses_existing_branch_recomputes_desired_after_checkout_for_github_issue_target(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_git(
@@ -583,23 +574,23 @@ class TestCliActive(CliRuntimeHarness):
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
                 p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout", "--force"], env=test_env)
-                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                assert p.returncode == 0, p.stdout + p.stderr
                 if counter.exists():
-                    self.assertEqual(counter.read_text(encoding="utf-8").strip(), "0")
+                    assert counter.read_text(encoding="utf-8").strip() == "0"
 
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            self.assertEqual(current, "iss-00123-add-refresh-token")
+            assert current == "iss-00123-add-refresh-token"
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
     def test_active_set_reuses_existing_branch_recomputes_desired_after_checkout_for_node_id_target(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_git(
@@ -674,23 +665,23 @@ class TestCliActive(CliRuntimeHarness):
                 p = self._run_runtime_capture(
                     target, ["active", "set", "iss-00123", "--checkout", "--force"], env=test_env
                 )
-                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                assert p.returncode == 0, p.stdout + p.stderr
                 if counter.exists():
-                    self.assertEqual(counter.read_text(encoding="utf-8").strip(), "0")
+                    assert counter.read_text(encoding="utf-8").strip() == "0"
 
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            self.assertEqual(current, "iss-00123-add-refresh-token")
+            assert current == "iss-00123-add-refresh-token"
 
-    @unittest.skip("S05: covered by TestActiveDomain.test_branch_decision_falls_back_to_id_for_non_ascii_or_invalid_slug_without_git")
+    @pytest.mark.skip(reason="S05: covered by TestActiveDomain.test_branch_decision_falls_back_to_id_for_non_ascii_or_invalid_slug_without_git")
     def test_active_set_fallbacks_to_id_when_id_slug_is_non_ascii(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_git(
                 target,
@@ -745,24 +736,24 @@ class TestCliActive(CliRuntimeHarness):
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
                 p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout", "--force"], env=test_env)
-                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-                self.assertIn("spec-dock: (warn)", p.stderr)
-                self.assertIn("non-ascii", p.stderr)
-                self.assertIn("fallback to id", p.stderr)
+                assert p.returncode == 0, p.stdout + p.stderr
+                assert "spec-dock: (warn)" in p.stderr
+                assert "non-ascii" in p.stderr
+                assert "fallback to id" in p.stderr
 
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            self.assertEqual(current, "iss-00123")
+            assert current == "iss-00123"
 
-    @unittest.skip("S05: covered by TestActiveDomain.test_branch_decision_falls_back_to_id_for_non_ascii_or_invalid_slug_without_git")
+    @pytest.mark.skip(reason="S05: covered by TestActiveDomain.test_branch_decision_falls_back_to_id_for_non_ascii_or_invalid_slug_without_git")
     def test_active_set_fallbacks_to_id_when_id_slug_is_invalid_ref(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_git(
                 target,
@@ -817,24 +808,24 @@ class TestCliActive(CliRuntimeHarness):
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
                 p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout", "--force"], env=test_env)
-                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-                self.assertIn("spec-dock: (warn)", p.stderr)
-                self.assertIn("invalid ref", p.stderr)
-                self.assertIn("fallback to id", p.stderr)
+                assert p.returncode == 0, p.stdout + p.stderr
+                assert "spec-dock: (warn)" in p.stderr
+                assert "invalid ref" in p.stderr
+                assert "fallback to id" in p.stderr
 
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            self.assertEqual(current, "iss-00123")
+            assert current == "iss-00123"
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
     def test_active_set_parses_hash_and_url_targets(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_git(
@@ -898,21 +889,21 @@ class TestCliActive(CliRuntimeHarness):
                 self._run_runtime(
                     target, ["active", "set", "https://github.com/example/repo/issues/123", "--force"], env=test_env
                 )
-                self.assertFalse(counter.exists())
+                assert not counter.exists()
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-00123")
+            assert active["issue"]["id"] == "iss-00123"
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
     def test_active_set_github_issue_number_requires_linked_node(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_git(
@@ -957,16 +948,16 @@ class TestCliActive(CliRuntimeHarness):
 
                 # GitHub issue number requires a linked node; command fails without checkout side effects.
                 self._run_runtime_expect_fail(target, ["active", "set", "999"], env=test_env)
-                self.assertFalse(counter.exists())
+                assert not counter.exists()
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
     def test_active_set_blocked_by_deps_refuses_without_force(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -1014,20 +1005,20 @@ class TestCliActive(CliRuntimeHarness):
 
             # Blocked: active must not be updated.
             p = self._run_runtime_capture(target, ["active", "set", "iss-00302", "--github"], env=test_env)
-            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
-            self.assertIn("iss-00301", p.stderr)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert "iss-00301" in p.stderr
 
             after = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
-            self.assertEqual(after, before)
+            assert after == before
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
     def test_active_set_force_allows_blocked_target_and_warns(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -1070,21 +1061,21 @@ class TestCliActive(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["active", "set", "iss-00302", "--github", "--force"], env=test_env)
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: (warn)", p.stderr)
-            self.assertIn("iss-00301", p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "spec-dock: (warn)" in p.stderr
+            assert "iss-00301" in p.stderr
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-00302")
+            assert active["issue"]["id"] == "iss-00302"
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
     def test_active_set_is_blocked_when_deps_not_ready(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -1118,7 +1109,7 @@ class TestCliActive(CliRuntimeHarness):
             self._set_meta_depends_on(target_issue_dir, ["epic-00202"])
 
             baseline = self._run_runtime_capture(target, ["active", "set", "iss-00401", "--force"])
-            self.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)
+            assert baseline.returncode == 0, baseline.stdout + baseline.stderr
             before = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
 
             bin_dir = target / ".bin"
@@ -1136,20 +1127,20 @@ class TestCliActive(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["active", "set", "iss-00301", "--github"], env=test_env)
-            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
-            self.assertIn("iss-00401", p.stderr)
-            self.assertNotIn("epic-00202", p.stderr)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert "iss-00401" in p.stderr
+            assert "epic-00202" not in p.stderr
             after = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
-            self.assertEqual(after, before)
+            assert after == before
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
     def test_active_set_force_overrides_deps_guard(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -1197,18 +1188,18 @@ class TestCliActive(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["active", "set", "iss-00301", "--github", "--force"], env=test_env)
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("deps_blocked", p.stderr)
-            self.assertIn("iss-00401", p.stderr)
-            self.assertNotIn("epic-00202", p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "deps_blocked" in p.stderr
+            assert "iss-00401" in p.stderr
+            assert "epic-00202" not in p.stderr
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-00301")
+            assert active["issue"]["id"] == "iss-00301"
 
     def test_active_set_fails_fast_on_unreachable_cycle_and_does_not_run_sync(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
             self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"])
@@ -1220,10 +1211,10 @@ class TestCliActive(CliRuntimeHarness):
             self._run_runtime(target, ["sync", "--no-github", "--no-update-active"])
 
             agent_dir = target / "spec-dock" / ".agent"
-            self.assertTrue((agent_dir / "index-all.json").is_file())
-            self.assertTrue((agent_dir / "tree-all.json").is_file())
-            self.assertTrue((agent_dir / "index.json").is_file())
-            self.assertTrue((agent_dir / "tree.json").is_file())
+            assert (agent_dir / "index-all.json").is_file()
+            assert (agent_dir / "tree-all.json").is_file()
+            assert (agent_dir / "index.json").is_file()
+            assert (agent_dir / "tree.json").is_file()
 
             issue_dir = (
                 target
@@ -1239,28 +1230,28 @@ class TestCliActive(CliRuntimeHarness):
 
             # S06: topology invalid/cycle is fail-fast even when unreachable from target.
             p = self._run_runtime_capture(target, ["active", "set", "iss-00303", "--force"])
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Dependency cycle detected", p.stderr)
-            self.assertFalse((agent_dir / "active.json").exists())
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Dependency cycle detected" in p.stderr
+            assert not (agent_dir / "active.json").exists()
 
             # `active set` must not run `sync`: cached active field must remain unchanged.
             state_index_all = json.loads((agent_dir / "index-all.json").read_text(encoding="utf-8"))
             state_tree_all = json.loads((agent_dir / "tree-all.json").read_text(encoding="utf-8"))
             state_index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
             state_tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
-            self.assertIsNone(state_index_all["active"])
-            self.assertIsNone(state_tree_all["active"])
-            self.assertIsNone(state_index["active"])
-            self.assertIsNone(state_tree["active"])
+            assert state_index_all["active"] is None
+            assert state_tree_all["active"] is None
+            assert state_index["active"] is None
+            assert state_tree["active"] is None
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli")
     def test_active_set_without_github_uses_synced_index_for_deps_guard(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -1308,7 +1299,7 @@ class TestCliActive(CliRuntimeHarness):
                 ],
             )
             p_sync_open = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
-            self.assertEqual(p_sync_open.returncode, 0, p_sync_open.stdout + p_sync_open.stderr)
+            assert p_sync_open.returncode == 0, p_sync_open.stdout + p_sync_open.stderr
 
             # Guard: `active set --no-github` must not fetch GitHub.
             guard_log_open = bin_dir / "gh-guard-open.log"
@@ -1316,11 +1307,11 @@ class TestCliActive(CliRuntimeHarness):
             self._make_gh_issue_list_stub(bin_dir, issues=[], fail=True, log_path=guard_log_open)
 
             p_blocked = self._run_runtime_capture(target, ["active", "set", "iss-00302", "--no-github"], env=test_env)
-            self.assertEqual(p_blocked.returncode, 1, p_blocked.stdout + p_blocked.stderr)
-            self.assertIn("iss-00301", p_blocked.stderr)
+            assert p_blocked.returncode == 1, p_blocked.stdout + p_blocked.stderr
+            assert "iss-00301" in p_blocked.stderr
             after_blocked = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
-            self.assertEqual(after_blocked, before)
-            self.assertFalse(guard_log_open.exists(), "gh must not be invoked with --no-github")
+            assert after_blocked == before
+            assert not guard_log_open.exists(), "gh must not be invoked with --no-github"
 
             # 2) Dependency is CLOSED on GitHub -> index says done -> allowed.
             self._make_gh_issue_list_stub(
@@ -1335,7 +1326,7 @@ class TestCliActive(CliRuntimeHarness):
             p_sync_closed = self._run_runtime_capture(
                 target, ["sync", "--github", "--no-update-active"], env=test_env
             )
-            self.assertEqual(p_sync_closed.returncode, 0, p_sync_closed.stdout + p_sync_closed.stderr)
+            assert p_sync_closed.returncode == 0, p_sync_closed.stdout + p_sync_closed.stderr
 
             # Inject a conflicting snapshot in todo view.
             # `--no-github` deps guard must still prefer `index-all.json`.
@@ -1354,10 +1345,10 @@ class TestCliActive(CliRuntimeHarness):
             self._make_gh_issue_list_stub(bin_dir, issues=[], fail=True, log_path=guard_log_closed)
 
             p_allowed = self._run_runtime_capture(target, ["active", "set", "iss-00302", "--no-github"], env=test_env)
-            self.assertEqual(p_allowed.returncode, 0, p_allowed.stdout + p_allowed.stderr)
-            self.assertFalse(guard_log_closed.exists(), "gh must not be invoked with --no-github")
+            assert p_allowed.returncode == 0, p_allowed.stdout + p_allowed.stderr
+            assert not guard_log_closed.exists(), "gh must not be invoked with --no-github"
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-00302")
+            assert active["issue"]["id"] == "iss-00302"
 
             # The cached index statuses must survive a successful active set,
             # so `--no-github` deps checks can continue to use `.agent/index.json`.
@@ -1367,21 +1358,21 @@ class TestCliActive(CliRuntimeHarness):
             p_after = self._run_runtime_capture(
                 target, ["deps", "check", "iss-00302", "--no-github", "--json"], env=test_env
             )
-            self.assertEqual(p_after.returncode, 0, p_after.stdout + p_after.stderr)
-            self.assertFalse(guard_log_after.exists(), "gh must not be invoked with --no-github")
+            assert p_after.returncode == 0, p_after.stdout + p_after.stderr
+            assert not guard_log_after.exists(), "gh must not be invoked with --no-github"
             data = json.loads(p_after.stdout)
-            self.assertTrue(data["ready"])
-            self.assertEqual(data["blockers"], [])
-            self.assertEqual(data["nodes"]["iss-00301"]["state"], "done")
+            assert data["ready"]
+            assert data["blockers"] == []
+            assert data["nodes"]["iss-00301"]["state"] == "done"
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli")
     def test_active_set_default_github_uses_live_state_for_deps_guard(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -1430,11 +1421,11 @@ class TestCliActive(CliRuntimeHarness):
                 log_path=log_open,
             )
             p_blocked = self._run_runtime_capture(target, ["active", "set", "iss-00302"], env=test_env)
-            self.assertEqual(p_blocked.returncode, 1, p_blocked.stdout + p_blocked.stderr)
-            self.assertTrue(log_open.exists(), "active set default must invoke gh for live deps state")
-            self.assertIn("iss-00301", p_blocked.stderr)
+            assert p_blocked.returncode == 1, p_blocked.stdout + p_blocked.stderr
+            assert log_open.exists(), "active set default must invoke gh for live deps state"
+            assert "iss-00301" in p_blocked.stderr
             after_blocked = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
-            self.assertEqual(after_blocked, before)
+            assert after_blocked == before
 
             log_closed = bin_dir / "gh-live-closed.log"
             self._make_gh_issue_list_stub(
@@ -1448,19 +1439,19 @@ class TestCliActive(CliRuntimeHarness):
                 log_path=log_closed,
             )
             p_allowed = self._run_runtime_capture(target, ["active", "set", "iss-00302"], env=test_env)
-            self.assertEqual(p_allowed.returncode, 0, p_allowed.stdout + p_allowed.stderr)
-            self.assertTrue(log_closed.exists(), "active set default must invoke gh for live deps state")
+            assert p_allowed.returncode == 0, p_allowed.stdout + p_allowed.stderr
+            assert log_closed.exists(), "active set default must invoke gh for live deps state"
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-00302")
+            assert active["issue"]["id"] == "iss-00302"
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli")
     def test_active_set_without_github_uses_index_snapshot_when_present(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -1494,7 +1485,7 @@ class TestCliActive(CliRuntimeHarness):
             self._set_meta_depends_on(target_issue_dir, ["epic-00202"])
 
             baseline = self._run_runtime_capture(target, ["active", "set", "iss-00301", "--force"])
-            self.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)
+            assert baseline.returncode == 0, baseline.stdout + baseline.stderr
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1511,7 +1502,7 @@ class TestCliActive(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p_sync = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
-            self.assertEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
+            assert p_sync.returncode == 0, p_sync.stdout + p_sync.stderr
 
             index_all_path = target / "spec-dock" / ".agent" / "index-all.json"
             index_todo_path = target / "spec-dock" / ".agent" / "index.json"
@@ -1527,16 +1518,16 @@ class TestCliActive(CliRuntimeHarness):
             self._make_gh_issue_list_stub(bin_dir, issues=[], fail=True, log_path=guard_log)
 
             p = self._run_runtime_capture(target, ["active", "set", "iss-00301", "--no-github"], env=test_env)
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertFalse(guard_log.exists(), "gh must not be invoked with --no-github")
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert not guard_log.exists(), "gh must not be invoked with --no-github"
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-00301")
+            assert active["issue"]["id"] == "iss-00301"
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
     def test_active_set_without_github_blocks_when_snapshot_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -1570,24 +1561,24 @@ class TestCliActive(CliRuntimeHarness):
             self._set_meta_depends_on(target_issue_dir, ["epic-00202"])
 
             baseline = self._run_runtime_capture(target, ["active", "set", "iss-00401", "--force"])
-            self.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)
+            assert baseline.returncode == 0, baseline.stdout + baseline.stderr
             before = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
 
             (target / "spec-dock" / ".agent" / "index-all.json").unlink(missing_ok=True)
             (target / "spec-dock" / ".agent" / "index.json").unlink(missing_ok=True)
 
             p = self._run_runtime_capture(target, ["active", "set", "iss-00301"])
-            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
-            self.assertIn("iss-00401", p.stderr)
-            self.assertNotIn("epic-00202", p.stderr)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert "iss-00401" in p.stderr
+            assert "epic-00202" not in p.stderr
             after = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
-            self.assertEqual(after, before)
+            assert after == before
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
     def test_active_set_without_github_local_issue_without_deps_is_ready(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(
                 target,
                 initiative_issue_number=101,
@@ -1604,17 +1595,17 @@ class TestCliActive(CliRuntimeHarness):
 
             before = (agent_dir / "active.json").read_text(encoding="utf-8")
             p = self._run_runtime_capture(target, ["active", "set", "iss-local-00001"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok (active set)", p.stdout)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "spec-dock: ok (active set)" in p.stdout
             after = (agent_dir / "active.json").read_text(encoding="utf-8")
-            self.assertNotEqual(after, before)
+            assert after != before
             active = json.loads(after)
-            self.assertEqual(active["issue"]["id"], "iss-local-00001")
+            assert active["issue"]["id"] == "iss-local-00001"
 
     def test_active_set_epic_and_initiative_use_v2_deps_guard(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
             self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"])
@@ -1640,51 +1631,51 @@ class TestCliActive(CliRuntimeHarness):
 
             before_epic = (agent_dir / "active.json").read_text(encoding="utf-8")
             blocked_epic = self._run_runtime_capture(target, ["active", "set", "epic-00201"])
-            self.assertEqual(blocked_epic.returncode, 1, blocked_epic.stdout + blocked_epic.stderr)
-            self.assertIn("active set blocked", blocked_epic.stderr)
-            self.assertIn("iss-00401", blocked_epic.stderr)
+            assert blocked_epic.returncode == 1, blocked_epic.stdout + blocked_epic.stderr
+            assert "active set blocked" in blocked_epic.stderr
+            assert "iss-00401" in blocked_epic.stderr
             after_epic = (agent_dir / "active.json").read_text(encoding="utf-8")
-            self.assertEqual(after_epic, before_epic)
+            assert after_epic == before_epic
 
             forced_epic = self._run_runtime_capture(target, ["active", "set", "epic-00201", "--force"])
-            self.assertEqual(forced_epic.returncode, 0, forced_epic.stdout + forced_epic.stderr)
-            self.assertIn("deps_blocked", forced_epic.stderr)
-            self.assertIn("blocker: iss-00401", forced_epic.stderr)
+            assert forced_epic.returncode == 0, forced_epic.stdout + forced_epic.stderr
+            assert "deps_blocked" in forced_epic.stderr
+            assert "blocker: iss-00401" in forced_epic.stderr
 
             active_after_epic_force = json.loads((agent_dir / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active_after_epic_force["initiative"]["id"], "init-00101")
-            self.assertEqual(active_after_epic_force["epic"]["id"], "epic-00201")
-            self.assertIsNone(active_after_epic_force["issue"])
+            assert active_after_epic_force["initiative"]["id"] == "init-00101"
+            assert active_after_epic_force["epic"]["id"] == "epic-00201"
+            assert active_after_epic_force["issue"] is None
 
             self._run_runtime(target, ["active", "clear"])
             before_init = (agent_dir / "active.json").read_text(encoding="utf-8")
             blocked_init = self._run_runtime_capture(target, ["active", "set", "init-00101"])
-            self.assertEqual(blocked_init.returncode, 1, blocked_init.stdout + blocked_init.stderr)
-            self.assertIn("active set blocked", blocked_init.stderr)
-            self.assertIn("iss-00401", blocked_init.stderr)
+            assert blocked_init.returncode == 1, blocked_init.stdout + blocked_init.stderr
+            assert "active set blocked" in blocked_init.stderr
+            assert "iss-00401" in blocked_init.stderr
             after_init = (agent_dir / "active.json").read_text(encoding="utf-8")
-            self.assertEqual(after_init, before_init)
+            assert after_init == before_init
 
             forced_init = self._run_runtime_capture(target, ["active", "set", "init-00101", "--force"])
-            self.assertEqual(forced_init.returncode, 0, forced_init.stdout + forced_init.stderr)
-            self.assertIn("deps_blocked", forced_init.stderr)
-            self.assertIn("blocker: iss-00401", forced_init.stderr)
+            assert forced_init.returncode == 0, forced_init.stdout + forced_init.stderr
+            assert "deps_blocked" in forced_init.stderr
+            assert "blocker: iss-00401" in forced_init.stderr
 
             active_after_init_force = json.loads((agent_dir / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active_after_init_force["initiative"]["id"], "init-00101")
-            self.assertIsNone(active_after_init_force["epic"])
-            self.assertIsNone(active_after_init_force["issue"])
+            assert active_after_init_force["initiative"]["id"] == "init-00101"
+            assert active_after_init_force["epic"] is None
+            assert active_after_init_force["issue"] is None
 
-    @unittest.skip("S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
+    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
     def test_active_set_issue_auto_checkouts_when_github_linked(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_git(
@@ -1730,22 +1721,22 @@ class TestCliActive(CliRuntimeHarness):
 
                 # Explicit checkout should switch branches, but gh should not be invoked.
                 self._run_runtime(target, ["active", "set", "iss-0123", "--checkout", "--force"], env=test_env)
-                self.assertFalse(counter.exists())
+                assert not counter.exists()
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-00123")
+            assert active["issue"]["id"] == "iss-00123"
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            self.assertEqual(current, "iss-00123-add-refresh-token")
+            assert current == "iss-00123-add-refresh-token"
 
     def test_active_set_re_resolves_node_after_checkout_when_id_format_changes(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_git(
@@ -1810,17 +1801,17 @@ class TestCliActive(CliRuntimeHarness):
                 self._run_runtime(target, ["active", "set", "iss-00123", "--checkout", "--force"], env=test_env)
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-00123")
+            assert active["issue"]["id"] == "iss-00123"
 
     def test_active_set_github_issue_checkout_refuses_dirty_working_tree(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_git(
@@ -1845,4 +1836,4 @@ class TestCliActive(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             self._run_runtime_expect_fail(target, ["active", "set", "123", "--checkout"], env=test_env)
-            self.assertFalse((target / "spec-dock" / ".agent" / "active.json").exists())
+            assert not (target / "spec-dock" / ".agent" / "active.json").exists()

@@ -1,14 +1,14 @@
-import contextlib
 import io
 import json
 import os
 import sys
 import tempfile
 import time
-import unittest
 from pathlib import Path
 
 
+import contextlib
+import pytest
 def _runtime_modules():
     runtime_scripts_dir = (
         Path(__file__).resolve().parents[2]
@@ -193,7 +193,7 @@ class _StubGitGateway:
         return self._origin_slug
 
 
-class TestRuntimeDoctorS04(unittest.TestCase):
+class TestRuntimeDoctorS04:
     def test_doctor_detects_missing_artifact(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
@@ -209,10 +209,10 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             )
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
 
-            self.assertFalse(result.ok)
-            self.assertEqual(result.findings[0].code, "missing_artifact")
-            self.assertIn("plan.md", result.findings[0].message)
-            self.assertTrue(result.findings[0].guidance)
+            assert not result.ok
+            assert result.findings[0].code == "missing_artifact"
+            assert "plan.md" in result.findings[0].message
+            assert result.findings[0].guidance
 
     def test_doctor_detects_duplicate_discussion_sequence(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, _infra_contracts = _runtime_modules()
@@ -225,12 +225,12 @@ class TestRuntimeDoctorS04(unittest.TestCase):
         )
         result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
 
-        self.assertFalse(result.ok)
-        self.assertEqual(result.findings[0].code, "duplicate_seq")
-        self.assertIn("Duplicate discussion sequence detected", result.findings[0].message)
-        self.assertTrue(result.findings[0].guidance)
-        self.assertTrue(any("重複している discussion markdown" in line for line in result.findings[0].guidance))
-        self.assertTrue(any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance))
+        assert not result.ok
+        assert result.findings[0].code == "duplicate_seq"
+        assert "Duplicate discussion sequence detected" in result.findings[0].message
+        assert result.findings[0].guidance
+        assert any("重複している discussion markdown" in line for line in result.findings[0].guidance)
+        assert any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance)
 
     def test_doctor_detects_duplicate_discussion_timestamps(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -254,30 +254,29 @@ class TestRuntimeDoctorS04(unittest.TestCase):
         )
 
         for label, filenames, expected_message in cases:
-            with self.subTest(label=label):
-                with tempfile.TemporaryDirectory() as tmp:
-                    repo_root = Path(tmp)
-                    specdock_dir = repo_root / "spec-dock"
-                    records, issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
-                    discussions_dir = issue_dir / "discussions"
-                    discussions_dir.mkdir(parents=True, exist_ok=True)
-                    for filename in filenames:
-                        (discussions_dir / filename).write_text(f"{filename}\n", encoding="utf-8")
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                specdock_dir = repo_root / "spec-dock"
+                records, issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
+                discussions_dir = issue_dir / "discussions"
+                discussions_dir.mkdir(parents=True, exist_ok=True)
+                for filename in filenames:
+                    (discussions_dir / filename).write_text(f"{filename}\n", encoding="utf-8")
 
-                    ports = app_ports.Ports(
-                        node_reader=_StubNodeReader(records),
-                        repo_root=repo_root,
-                        specdock_dir=specdock_dir,
-                    )
-                    result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
+                ports = app_ports.Ports(
+                    node_reader=_StubNodeReader(records),
+                    repo_root=repo_root,
+                    specdock_dir=specdock_dir,
+                )
+                result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
 
-                    self.assertFalse(result.ok)
-                    self.assertEqual(result.findings[0].code, "duplicate_seq")
-                    self.assertIn(expected_message, result.findings[0].message)
-                    self.assertTrue(result.findings[0].guidance)
-                    self.assertTrue(any("重複している discussion markdown" in line for line in result.findings[0].guidance))
-                    self.assertFalse(any("重複 sequence" in line for line in result.findings[0].guidance))
-                    self.assertTrue(any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance))
+                assert not result.ok
+                assert result.findings[0].code == "duplicate_seq"
+                assert expected_message in result.findings[0].message
+                assert result.findings[0].guidance
+                assert any("重複している discussion markdown" in line for line in result.findings[0].guidance)
+                assert not any("重複 sequence" in line for line in result.findings[0].guidance)
+                assert any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance)
 
     def test_doctor_detects_malformed_discussion_doc_filename(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, _infra_contracts = _runtime_modules()
@@ -292,12 +291,12 @@ class TestRuntimeDoctorS04(unittest.TestCase):
         )
         result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
 
-        self.assertFalse(result.ok)
-        self.assertEqual(result.findings[0].code, "malformed_discussion_doc")
-        self.assertIn("Malformed discussion document filename", result.findings[0].message)
-        self.assertTrue(result.findings[0].guidance)
-        self.assertTrue(any("discussions 配下" in line for line in result.findings[0].guidance))
-        self.assertTrue(any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance))
+        assert not result.ok
+        assert result.findings[0].code == "malformed_discussion_doc"
+        assert "Malformed discussion document filename" in result.findings[0].message
+        assert result.findings[0].guidance
+        assert any("discussions 配下" in line for line in result.findings[0].guidance)
+        assert any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance)
 
     def test_doctor_detects_malformed_discussion_doc_filename_from_repo_backed_validation(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -316,30 +315,29 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             "bogus-01-adr-kickoff.md",
         )
         for malformed_name in cases:
-            with self.subTest(malformed_name=malformed_name):
-                with tempfile.TemporaryDirectory() as tmp:
-                    repo_root = Path(tmp)
-                    specdock_dir = repo_root / "spec-dock"
-                    _records, issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
-                    discussions_dir = issue_dir / "discussions"
-                    discussions_dir.mkdir(parents=True, exist_ok=True)
-                    (discussions_dir / malformed_name).write_text("# malformed\n", encoding="utf-8")
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                specdock_dir = repo_root / "spec-dock"
+                _records, issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
+                discussions_dir = issue_dir / "discussions"
+                discussions_dir.mkdir(parents=True, exist_ok=True)
+                (discussions_dir / malformed_name).write_text("# malformed\n", encoding="utf-8")
 
-                    ports = app_ports.Ports(
-                        node_reader=_RepoBackedNodeReader(specdock_dir),
-                        repo_root=repo_root,
-                        specdock_dir=specdock_dir,
-                    )
-                    result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
+                ports = app_ports.Ports(
+                    node_reader=_RepoBackedNodeReader(specdock_dir),
+                    repo_root=repo_root,
+                    specdock_dir=specdock_dir,
+                )
+                result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
 
-                    self.assertFalse(result.ok)
-                    self.assertEqual(result.findings[0].code, "malformed_discussion_doc")
-                    self.assertIn("Malformed discussion document filename under", result.findings[0].message)
-                    self.assertIn(malformed_name, result.findings[0].message)
-                    self.assertIn("Expected `<ts>-<kind>-<slug>.md`", result.findings[0].message)
-                    self.assertTrue(result.findings[0].guidance)
-                    self.assertTrue(any("discussions 配下" in line for line in result.findings[0].guidance))
-                    self.assertTrue(any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance))
+                assert not result.ok
+                assert result.findings[0].code == "malformed_discussion_doc"
+                assert "Malformed discussion document filename under" in result.findings[0].message
+                assert malformed_name in result.findings[0].message
+                assert "Expected `<ts>-<kind>-<slug>.md`" in result.findings[0].message
+                assert result.findings[0].guidance
+                assert any("discussions 配下" in line for line in result.findings[0].guidance)
+                assert any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance)
 
     def test_doctor_detects_duplicate_id(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -371,12 +369,12 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             )
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
 
-            self.assertFalse(result.ok)
-            self.assertEqual(result.findings[0].code, "duplicate_id")
-            self.assertIn("Duplicate numeric id detected", result.findings[0].message)
-            self.assertTrue(result.findings[0].guidance)
-            self.assertTrue(any(".meta.json" in line for line in result.findings[0].guidance))
-            self.assertTrue(any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance))
+            assert not result.ok
+            assert result.findings[0].code == "duplicate_id"
+            assert "Duplicate numeric id detected" in result.findings[0].message
+            assert result.findings[0].guidance
+            assert any(".meta.json" in line for line in result.findings[0].guidance)
+            assert any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance)
 
     def test_doctor_detects_exact_duplicate_id_message(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -408,11 +406,11 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             )
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
 
-            self.assertFalse(result.ok)
-            self.assertEqual(result.findings[0].code, "duplicate_id")
-            self.assertIn("Duplicate id detected", result.findings[0].message)
-            self.assertNotIn("Duplicate numeric id detected", result.findings[0].message)
-            self.assertTrue(result.findings[0].guidance)
+            assert not result.ok
+            assert result.findings[0].code == "duplicate_id"
+            assert "Duplicate id detected" in result.findings[0].message
+            assert "Duplicate numeric id detected" not in result.findings[0].message
+            assert result.findings[0].guidance
 
     def test_doctor_detects_legacy_unscoped_github_linkage_when_current_repo_is_resolved(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -455,9 +453,9 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             )
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
 
-            self.assertFalse(result.ok)
-            self.assertEqual(result.findings[0].code, "broken_meta")
-            self.assertIn("legacy unscoped github linkage", result.findings[0].message)
+            assert not result.ok
+            assert result.findings[0].code == "broken_meta"
+            assert "legacy unscoped github linkage" in result.findings[0].message
 
     def test_doctor_detects_broken_meta_when_reader_fails(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, _infra_contracts = _runtime_modules()
@@ -468,12 +466,12 @@ class TestRuntimeDoctorS04(unittest.TestCase):
         )
 
         result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
-        self.assertFalse(result.ok)
-        self.assertEqual(result.findings[0].code, "broken_meta")
-        self.assertIn("Invalid .meta.json", result.findings[0].message)
-        self.assertTrue(result.findings[0].guidance)
-        self.assertTrue(any(".meta.json" in line for line in result.findings[0].guidance))
-        self.assertTrue(any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance))
+        assert not result.ok
+        assert result.findings[0].code == "broken_meta"
+        assert "Invalid .meta.json" in result.findings[0].message
+        assert result.findings[0].guidance
+        assert any(".meta.json" in line for line in result.findings[0].guidance)
+        assert any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance)
 
     def test_doctor_detects_broken_meta_when_reader_reports_invalid_json_for_meta(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, _infra_contracts = _runtime_modules()
@@ -486,9 +484,9 @@ class TestRuntimeDoctorS04(unittest.TestCase):
         )
 
         result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
-        self.assertFalse(result.ok)
-        self.assertEqual(result.findings[0].code, "broken_meta")
-        self.assertIn("Invalid JSON:", result.findings[0].message)
+        assert not result.ok
+        assert result.findings[0].code == "broken_meta"
+        assert "Invalid JSON:" in result.findings[0].message
 
     def test_doctor_detects_broken_meta_when_required_field_is_missing(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -518,9 +516,9 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             )
 
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
-            self.assertFalse(result.ok)
-            self.assertEqual(result.findings[0].code, "broken_meta")
-            self.assertIn("Missing title in .meta.json", result.findings[0].message)
+            assert not result.ok
+            assert result.findings[0].code == "broken_meta"
+            assert "Missing title in .meta.json" in result.findings[0].message
 
     def test_doctor_skips_stale_active_pointer_id_check_when_graph_is_unavailable(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -549,10 +547,10 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             )
 
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
-            self.assertFalse(result.ok)
+            assert not result.ok
             codes = [finding.code for finding in result.findings]
-            self.assertIn("broken_meta", codes)
-            self.assertNotIn("stale_active_pointer", codes)
+            assert "broken_meta" in codes
+            assert "stale_active_pointer" not in codes
 
     def test_doctor_detects_stale_active_pointer(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -584,14 +582,14 @@ class TestRuntimeDoctorS04(unittest.TestCase):
 
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
             codes = [finding.code for finding in result.findings]
-            self.assertIn("stale_active_pointer", codes)
+            assert "stale_active_pointer" in codes
             stale_finding = next((finding for finding in result.findings if finding.code == "stale_active_pointer"), None)
-            self.assertIsNotNone(stale_finding)
+            assert stale_finding is not None
             if stale_finding is None:
-                self.fail("stale_active_pointer finding was not returned")
-            self.assertTrue(stale_finding.guidance)
-            self.assertTrue(any("active clear" in line for line in stale_finding.guidance))
-            self.assertTrue(any("active set <target>" in line for line in stale_finding.guidance))
+                pytest.fail("stale_active_pointer finding was not returned")
+            assert stale_finding.guidance
+            assert any("active clear" in line for line in stale_finding.guidance)
+            assert any("active set <target>" in line for line in stale_finding.guidance)
 
     def test_doctor_detects_stale_active_pointer_for_absolute_path_outside_repo(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -622,12 +620,12 @@ class TestRuntimeDoctorS04(unittest.TestCase):
 
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
             codes = [finding.code for finding in result.findings]
-            self.assertIn("stale_active_pointer", codes)
+            assert "stale_active_pointer" in codes
             stale_finding = next((finding for finding in result.findings if finding.code == "stale_active_pointer"), None)
-            self.assertIsNotNone(stale_finding)
+            assert stale_finding is not None
             if stale_finding is None:
-                self.fail("stale_active_pointer finding was not returned")
-            self.assertIn("issue.path", stale_finding.message)
+                pytest.fail("stale_active_pointer finding was not returned")
+            assert "issue.path" in stale_finding.message
 
     def test_doctor_detects_stale_active_pointer_when_manifest_path_points_to_file(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -659,12 +657,12 @@ class TestRuntimeDoctorS04(unittest.TestCase):
 
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
             codes = [finding.code for finding in result.findings]
-            self.assertIn("stale_active_pointer", codes)
+            assert "stale_active_pointer" in codes
             stale_finding = next((finding for finding in result.findings if finding.code == "stale_active_pointer"), None)
-            self.assertIsNotNone(stale_finding)
+            assert stale_finding is not None
             if stale_finding is None:
-                self.fail("stale_active_pointer finding was not returned")
-            self.assertIn("issue.path is not a directory", stale_finding.message)
+                pytest.fail("stale_active_pointer finding was not returned")
+            assert "issue.path is not a directory" in stale_finding.message
 
     def test_doctor_detects_stale_active_pointer_id_mismatch_when_graph_ids_are_empty(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -694,12 +692,12 @@ class TestRuntimeDoctorS04(unittest.TestCase):
 
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
             codes = [finding.code for finding in result.findings]
-            self.assertIn("stale_active_pointer", codes)
+            assert "stale_active_pointer" in codes
             stale_finding = next((finding for finding in result.findings if finding.code == "stale_active_pointer"), None)
-            self.assertIsNotNone(stale_finding)
+            assert stale_finding is not None
             if stale_finding is None:
-                self.fail("stale_active_pointer finding was not returned")
-            self.assertIn("issue.id=iss-local-99999 is not found in current graph", stale_finding.message)
+                pytest.fail("stale_active_pointer finding was not returned")
+            assert "issue.id=iss-local-99999 is not found in current graph" in stale_finding.message
 
     def test_doctor_reports_stale_active_pointer_when_manifest_is_invalid_and_missing(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -720,17 +718,17 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             )
 
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
-            self.assertFalse(result.ok)
+            assert not result.ok
             codes = [finding.code for finding in result.findings]
-            self.assertIn("stale_active_pointer", codes)
+            assert "stale_active_pointer" in codes
             stale_finding = next((finding for finding in result.findings if finding.code == "stale_active_pointer"), None)
-            self.assertIsNotNone(stale_finding)
+            assert stale_finding is not None
             if stale_finding is None:
-                self.fail("stale_active_pointer finding was not returned")
-            self.assertIn("active_manifest_invalid_shape:agent.active", stale_finding.message)
-            self.assertTrue(any("active clear" in line for line in stale_finding.guidance))
-            self.assertTrue(any("active set <target>" in line for line in stale_finding.guidance))
-            self.assertIn("active_manifest_invalid_shape:agent.active", result.warnings)
+                pytest.fail("stale_active_pointer finding was not returned")
+            assert "active_manifest_invalid_shape:agent.active" in stale_finding.message
+            assert any("active clear" in line for line in stale_finding.guidance)
+            assert any("active set <target>" in line for line in stale_finding.guidance)
+            assert "active_manifest_invalid_shape:agent.active" in result.warnings
 
     def test_doctor_detects_stale_create_lock(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -760,15 +758,15 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             )
 
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
-            self.assertFalse(result.ok)
+            assert not result.ok
             finding = next((item for item in result.findings if item.code == "stale_create_lock"), None)
-            self.assertIsNotNone(finding)
+            assert finding is not None
             if finding is None:
-                self.fail("stale_create_lock finding was not returned")
-            self.assertIn("stale=true", finding.message)
-            self.assertIn(str(lock_path), finding.message)
-            self.assertTrue(any("create 実行中プロセス" in line for line in finding.guidance))
-            self.assertTrue(any(str(lock_path) in line for line in finding.guidance))
+                pytest.fail("stale_create_lock finding was not returned")
+            assert "stale=true" in finding.message
+            assert str(lock_path) in finding.message
+            assert any("create 実行中プロセス" in line for line in finding.guidance)
+            assert any(str(lock_path) in line for line in finding.guidance)
 
     def test_doctor_detects_invalid_create_lock_metadata(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -786,13 +784,13 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             )
 
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
-            self.assertFalse(result.ok)
+            assert not result.ok
             finding = next((item for item in result.findings if item.code == "stale_create_lock"), None)
-            self.assertIsNotNone(finding)
+            assert finding is not None
             if finding is None:
-                self.fail("stale_create_lock finding was not returned")
-            self.assertIn("metadata=missing_fields", finding.message)
-            self.assertIn(str(lock_path), finding.message)
+                pytest.fail("stale_create_lock finding was not returned")
+            assert "metadata=missing_fields" in finding.message
+            assert str(lock_path) in finding.message
 
     def test_doctor_detects_non_stale_create_lock_contention(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -822,15 +820,15 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             )
 
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
-            self.assertFalse(result.ok)
+            assert not result.ok
             finding = next((item for item in result.findings if item.code == "stale_create_lock"), None)
-            self.assertIsNotNone(finding)
+            assert finding is not None
             if finding is None:
-                self.fail("stale_create_lock finding was not returned")
-            self.assertIn("stale=false", finding.message)
-            self.assertIn("contention=true", finding.message)
-            self.assertTrue(any("create 実行中" in line for line in finding.guidance))
-            self.assertTrue(any("削除" in line for line in finding.guidance))
+                pytest.fail("stale_create_lock finding was not returned")
+            assert "stale=false" in finding.message
+            assert "contention=true" in finding.message
+            assert any("create 実行中" in line for line in finding.guidance)
+            assert any("削除" in line for line in finding.guidance)
 
     def test_issue_78_doctor_reports_legacy_only_workspace_as_finding(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, _infra_contracts = _runtime_modules()
@@ -847,14 +845,14 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             )
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
 
-            self.assertFalse(result.ok)
-            self.assertEqual(len(result.findings), 1)
+            assert not result.ok
+            assert len(result.findings) == 1
             finding = result.findings[0]
-            self.assertEqual(finding.code, "legacy_only_workspace")
-            self.assertIn(str(legacy_dir), finding.message)
-            self.assertTrue(any("Do not rename '.spec-dock'" in line for line in finding.guidance))
-            self.assertTrue(any("spec-dock init" in line for line in finding.guidance))
-            self.assertTrue(any("migrate" in line.lower() for line in finding.guidance))
+            assert finding.code == "legacy_only_workspace"
+            assert str(legacy_dir) in finding.message
+            assert any("Do not rename '.spec-dock'" in line for line in finding.guidance)
+            assert any("spec-dock init" in line for line in finding.guidance)
+            assert any("migrate" in line.lower() for line in finding.guidance)
 
     def test_issue_78_doctor_reports_cleanup_pending_warning_for_valid_coexistence(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -872,9 +870,9 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             )
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
 
-            self.assertTrue(result.ok)
-            self.assertEqual(result.findings, [])
-            self.assertIn("legacy_cleanup_pending", result.warnings)
+            assert result.ok
+            assert result.findings == []
+            assert "legacy_cleanup_pending" in result.warnings
 
     def test_issue_78_main_doctor_renders_cleanup_pending_warning_message(self) -> None:
         runtime_app, app_contracts, _app_doctor, _app_ports, _infra_contracts = _runtime_modules()
@@ -897,11 +895,11 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             runtime_app._find_specdock_dir = original_find_specdock_dir
             cli_bootstrap.application_doctor = original_application_doctor
 
-        self.assertEqual(exit_code, 0)
-        self.assertEqual(stdout.getvalue(), "spec-dock: ok (doctor) findings=0\n")
+        assert exit_code == 0
+        assert stdout.getvalue() == "spec-dock: ok (doctor) findings=0\n"
         stderr_text = stderr.getvalue()
-        self.assertIn("spec-dock: (warn) legacy '.spec-dock/' is still present.", stderr_text)
-        self.assertNotIn("legacy_cleanup_pending", stderr_text)
+        assert "spec-dock: (warn) legacy '.spec-dock/' is still present." in stderr_text
+        assert "legacy_cleanup_pending" not in stderr_text
 
     def test_issue_78_main_doctor_reaches_legacy_only_workspace_guidance(self) -> None:
         runtime_app, _app_contracts, _app_doctor, _app_ports, _infra_contracts = _runtime_modules()
@@ -918,13 +916,13 @@ class TestRuntimeDoctorS04(unittest.TestCase):
         finally:
             os.chdir(original_cwd)
 
-        self.assertEqual(exit_code, 1)
-        self.assertEqual(stdout.getvalue(), "")
+        assert exit_code == 1
+        assert stdout.getvalue() == ""
         stderr_text = stderr.getvalue()
-        self.assertIn("spec-dock: doctor: findings=1", stderr_text)
-        self.assertIn("[legacy_only_workspace]", stderr_text)
-        self.assertIn("Do not rename '.spec-dock'", stderr_text)
-        self.assertIn("spec-dock init", stderr_text)
+        assert "spec-dock: doctor: findings=1" in stderr_text
+        assert "[legacy_only_workspace]" in stderr_text
+        assert "Do not rename '.spec-dock'" in stderr_text
+        assert "spec-dock init" in stderr_text
 
     def test_main_doctor_delegates_to_use_case(self) -> None:
         runtime_app, app_contracts, _app_doctor, _app_ports, _infra_contracts = _runtime_modules()
@@ -954,11 +952,11 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             cli_bootstrap.application_doctor = original_application_doctor
 
         stderr_text = stderr.getvalue()
-        self.assertEqual(exit_code, 1)
-        self.assertEqual(stdout.getvalue(), "")
-        self.assertIn("spec-dock: doctor: findings=1", stderr_text)
-        self.assertIn("[missing_artifact]", stderr_text)
-        self.assertIn("  -> 復元してください。", stderr_text)
+        assert exit_code == 1
+        assert stdout.getvalue() == ""
+        assert "spec-dock: doctor: findings=1" in stderr_text
+        assert "[missing_artifact]" in stderr_text
+        assert "  -> 復元してください。" in stderr_text
 
     def test_issue_78_main_doctor_keeps_not_found_when_no_workspace_exists(self) -> None:
         runtime_app, _app_contracts, _app_doctor, _app_ports, _infra_contracts = _runtime_modules()
@@ -974,10 +972,6 @@ class TestRuntimeDoctorS04(unittest.TestCase):
         finally:
             os.chdir(original_cwd)
 
-        self.assertEqual(exit_code, 1)
-        self.assertEqual(stdout.getvalue(), "")
-        self.assertIn("'spec-dock' not found. Run 'uvx ... spec-dock init' first.", stderr.getvalue())
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert exit_code == 1
+        assert stdout.getvalue() == ""
+        assert "'spec-dock' not found. Run 'uvx ... spec-dock init' first." in stderr.getvalue()

@@ -1,7 +1,6 @@
 import json
 import sys
 import tempfile
-import unittest
 from pathlib import Path
 
 
@@ -23,7 +22,7 @@ def _runtime_modules():
     return active_store, infra_contracts
 
 
-class TestActiveStoreInfra(unittest.TestCase):
+class TestActiveStoreInfra:
     def _manifest(self, infra_contracts):
         return infra_contracts.ActiveManifest(
             initiative=infra_contracts.ActiveManifestEntry(
@@ -58,10 +57,10 @@ class TestActiveStoreInfra(unittest.TestCase):
             active_store.write_active_manifest(specdock_dir, self._manifest(infra_contracts))
 
             loaded = active_store.load_active_manifest(specdock_dir)
-            self.assertEqual(loaded.source, "agent.active")
-            self.assertEqual(loaded.manifest.issue.id, "iss-00003")
-            self.assertFalse((legacy_dir / "active.json").exists())
-            self.assertFalse((legacy_dir / "current.json").exists())
+            assert loaded.source == "agent.active"
+            assert loaded.manifest.issue.id == "iss-00003"
+            assert not (legacy_dir / "active.json").exists()
+            assert not (legacy_dir / "current.json").exists()
 
     def test_apply_active_pointers_uses_repo_relative_paths_and_placeholders_without_cli(self) -> None:
         active_store, infra_contracts = _runtime_modules()
@@ -96,10 +95,10 @@ class TestActiveStoreInfra(unittest.TestCase):
             )
 
             active_dir = specdock_dir / "active"
-            self.assertTrue((active_dir / "issue").exists())
-            self.assertIn("active-none/initiative", (active_dir / "initiative").resolve().as_posix())
-            self.assertIn("active-none/epic", (active_dir / "epic").resolve().as_posix())
-            self.assertEqual((active_dir / "context-pack.md").read_text(encoding="utf-8"), "# context\n")
+            assert (active_dir / "issue").exists()
+            assert "active-none/initiative" in (active_dir / "initiative").resolve().as_posix()
+            assert "active-none/epic" in (active_dir / "epic").resolve().as_posix()
+            assert (active_dir / "context-pack.md").read_text(encoding="utf-8") == "# context\n"
 
     def test_patch_agent_state_updates_cached_active_fields_without_rebuilding_indexes(self) -> None:
         active_store, infra_contracts = _runtime_modules()
@@ -117,9 +116,5 @@ class TestActiveStoreInfra(unittest.TestCase):
 
             for name in ("index-all.json", "tree-all.json", "index.json", "tree.json"):
                 payload = json.loads((agent_dir / name).read_text(encoding="utf-8"))
-                self.assertEqual(payload["active"]["issue"]["id"], "iss-00003")
-                self.assertEqual(payload["nodes"]["iss-00003"]["status"], "done")
-
-
-if __name__ == "__main__":
-    unittest.main()
+                assert payload["active"]["issue"]["id"] == "iss-00003"
+                assert payload["nodes"]["iss-00003"]["status"] == "done"

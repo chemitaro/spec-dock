@@ -1,6 +1,5 @@
 import sys
 import tempfile
-import unittest
 from pathlib import Path
 
 
@@ -43,7 +42,7 @@ class _StubNodeReader:
         return list(self.records)
 
 
-class TestValidateApplication(unittest.TestCase):
+class TestValidateApplication:
     def _records(self, infra_contracts, repo_root: Path):
         init_dir = repo_root / "spec-dock" / "initiatives" / "init-00001-platform"
         epic_dir = init_dir / "epics" / "epic-00002-delivery"
@@ -116,27 +115,24 @@ class TestValidateApplication(unittest.TestCase):
         required_docs = ("requirement.md", "design.md", "plan.md", "report.md")
         for node_kind in ("initiative", "epic", "issue"):
             for artifact_name in required_docs:
-                with self.subTest(kind=node_kind, artifact=artifact_name):
-                    with tempfile.TemporaryDirectory() as tmp:
-                        repo_root = Path(tmp) / "repo"
-                        records = self._records(infra_contracts, repo_root)
-                        target = next(record for record in records if record.kind == node_kind)
-                        self._materialize_artifacts(records, omit=(target.id, artifact_name))
+                case = f"node_kind={node_kind} artifact_name={artifact_name}"
+                with tempfile.TemporaryDirectory() as tmp:
+                    repo_root = Path(tmp) / "repo"
+                    records = self._records(infra_contracts, repo_root)
+                    target = next(record for record in records if record.kind == node_kind)
+                    self._materialize_artifacts(records, omit=(target.id, artifact_name))
 
-                        result = app_validate_tree.validate_tree(
-                            app_contracts.ValidateTreeRequest(),
-                            app_ports.Ports(node_reader=_StubNodeReader(records), repo_root=repo_root),
-                        )
-
-                    self.assertEqual(result.checked_node_count, 3)
-                    self.assertTrue(result.report.errors)
-                    self.assertIn("Missing required artifact", result.report.errors[0])
-                    self.assertIn(f"kind={node_kind} id={target.id}", result.report.errors[0])
-                    self.assertIn(artifact_name, result.report.errors[0])
-                    self.assertIn(
-                        (Path(target.path) / artifact_name).relative_to(repo_root).as_posix(),
-                        result.report.errors[0],
+                    result = app_validate_tree.validate_tree(
+                        app_contracts.ValidateTreeRequest(),
+                        app_ports.Ports(node_reader=_StubNodeReader(records), repo_root=repo_root),
                     )
+
+                assert result.checked_node_count == 3, case
+                assert result.report.errors, case
+                assert "Missing required artifact" in result.report.errors[0], case
+                assert f"kind={node_kind} id={target.id}" in result.report.errors[0], case
+                assert artifact_name in result.report.errors[0], case
+                assert (Path(target.path) / artifact_name).relative_to(repo_root).as_posix() in result.report.errors[0], case
 
     def test_validate_tree_reports_missing_required_meta_without_cli(self) -> None:
         (
@@ -150,24 +146,24 @@ class TestValidateApplication(unittest.TestCase):
         ) = _runtime_modules()
 
         for node_kind in ("initiative", "epic", "issue"):
-            with self.subTest(kind=node_kind):
-                with tempfile.TemporaryDirectory() as tmp:
-                    repo_root = Path(tmp) / "repo"
-                    records = self._records(infra_contracts, repo_root)
-                    target = next(record for record in records if record.kind == node_kind)
-                    self._materialize_artifacts(records, omit=(target.id, ".meta.json"))
+            case = f"node_kind={node_kind} artifact_name=.meta.json"
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp) / "repo"
+                records = self._records(infra_contracts, repo_root)
+                target = next(record for record in records if record.kind == node_kind)
+                self._materialize_artifacts(records, omit=(target.id, ".meta.json"))
 
-                    result = app_validate_tree.validate_tree(
-                        app_contracts.ValidateTreeRequest(),
-                        app_ports.Ports(node_reader=_StubNodeReader(records), repo_root=repo_root),
-                    )
+                result = app_validate_tree.validate_tree(
+                    app_contracts.ValidateTreeRequest(),
+                    app_ports.Ports(node_reader=_StubNodeReader(records), repo_root=repo_root),
+                )
 
-                self.assertEqual(result.checked_node_count, 3)
-                self.assertTrue(result.report.errors)
-                self.assertIn("Missing required artifact", result.report.errors[0])
-                self.assertIn(f"kind={node_kind} id={target.id}", result.report.errors[0])
-                self.assertIn(".meta.json", result.report.errors[0])
-                self.assertIn(Path(target.meta_path).relative_to(repo_root).as_posix(), result.report.errors[0])
+            assert result.checked_node_count == 3, case
+            assert result.report.errors, case
+            assert "Missing required artifact" in result.report.errors[0], case
+            assert f"kind={node_kind} id={target.id}" in result.report.errors[0], case
+            assert ".meta.json" in result.report.errors[0], case
+            assert Path(target.meta_path).relative_to(repo_root).as_posix() in result.report.errors[0], case
 
     def test_validate_graph_reports_linkage_and_parent_diagnostics_without_cli(self) -> None:
         (
@@ -228,8 +224,8 @@ class TestValidateApplication(unittest.TestCase):
             ]
         )
         broken_parent = domain_validation.validate_graph(graph, repo_root=Path("/repo"))
-        self.assertTrue(broken_parent.errors)
-        self.assertIn("issue parent_id mismatch", broken_parent.errors[0])
+        assert broken_parent.errors
+        assert "issue parent_id mismatch" in broken_parent.errors[0]
 
         unscoped = domain_tree.build_graph(
             [
@@ -276,5 +272,5 @@ class TestValidateApplication(unittest.TestCase):
             ]
         )
         legacy = domain_validation.validate_graph(unscoped, repo_root=Path("/repo"))
-        self.assertTrue(legacy.errors)
-        self.assertIn("legacy unscoped github linkage", legacy.errors[0])
+        assert legacy.errors
+        assert "legacy unscoped github linkage" in legacy.errors[0]

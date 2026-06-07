@@ -1,10 +1,45 @@
 import sys
 import tempfile
-import unittest
-from unittest.mock import patch
 from pathlib import Path
 
 
+
+
+import contextlib
+import pytest
+_MISSING = object()
+
+
+class _CallProbe:
+    def __init__(self, *, side_effect=_MISSING, return_value=_MISSING):
+        self.calls = []
+        self._side_effect = side_effect
+        self._return_value = return_value
+
+    def __call__(self, *args, **kwargs):
+        self.calls.append((args, kwargs))
+        if self._side_effect is not _MISSING:
+            if isinstance(self._side_effect, BaseException):
+                raise self._side_effect
+            return self._side_effect(*args, **kwargs)
+        if self._return_value is not _MISSING:
+            return self._return_value
+        return None
+
+    def assert_called_once_with(self, *args, **kwargs):
+        assert self.calls == [(args, kwargs)]
+
+
+@contextlib.contextmanager
+def _patch_object(target, name, replacement=_MISSING, *, side_effect=_MISSING, return_value=_MISSING):
+    original = getattr(target, name)
+    if replacement is _MISSING:
+        replacement = _CallProbe(side_effect=side_effect, return_value=return_value)
+    setattr(target, name, replacement)
+    try:
+        yield replacement
+    finally:
+        setattr(target, name, original)
 def _runtime_modules():
     runtime_scripts_dir = (
         Path(__file__).resolve().parents[2]
@@ -178,7 +213,7 @@ class _StubActiveStateStore:
         )
 
 
-class TestRuntimeCloseS12(unittest.TestCase):
+class TestRuntimeCloseS12:
     def _ports(
         self,
         *,
@@ -246,7 +281,7 @@ class TestRuntimeCloseS12(unittest.TestCase):
         issue_gateway = _StubIssueGateway()
         ports = self._ports(repo_root=repo_root, records=records, issue_gateway=issue_gateway)
 
-        with self.assertRaisesRegex(RuntimeError, "not linked to a GitHub issue"):
+        with pytest.raises(RuntimeError, match="not linked to a GitHub issue"):
             app_close_node.close_node(
                 app_contracts.CloseNodeRequest(
                     target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None)
@@ -254,8 +289,8 @@ class TestRuntimeCloseS12(unittest.TestCase):
                 ports,
             )
 
-        self.assertEqual(issue_gateway.view_calls, [])
-        self.assertEqual(issue_gateway.close_calls, [])
+        assert issue_gateway.view_calls == []
+        assert issue_gateway.close_calls == []
 
     def test_close_node_allows_explicit_issue_target_when_authority_is_proposed(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
@@ -293,10 +328,10 @@ class TestRuntimeCloseS12(unittest.TestCase):
             ports,
         )
 
-        self.assertEqual(result.node_id, "iss-local-00001")
-        self.assertFalse(result.already_closed)
-        self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "example/repo")])
-        self.assertEqual(issue_gateway.close_calls, [(str(repo_root), 301, "example/repo")])
+        assert result.node_id == "iss-local-00001"
+        assert not result.already_closed
+        assert issue_gateway.view_calls == [(str(repo_root), 301, "example/repo")]
+        assert issue_gateway.close_calls == [(str(repo_root), 301, "example/repo")]
 
     def test_close_node_allows_explicit_issue_target_when_promotion_record_is_stale(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
@@ -343,10 +378,10 @@ class TestRuntimeCloseS12(unittest.TestCase):
             ports,
         )
 
-        self.assertEqual(result.node_id, "iss-local-00001")
-        self.assertFalse(result.already_closed)
-        self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "example/repo")])
-        self.assertEqual(issue_gateway.close_calls, [(str(repo_root), 301, "example/repo")])
+        assert result.node_id == "iss-local-00001"
+        assert not result.already_closed
+        assert issue_gateway.view_calls == [(str(repo_root), 301, "example/repo")]
+        assert issue_gateway.close_calls == [(str(repo_root), 301, "example/repo")]
 
     def test_close_node_allows_explicit_issue_target_when_target_is_not_active(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
@@ -384,10 +419,10 @@ class TestRuntimeCloseS12(unittest.TestCase):
             ports,
         )
 
-        self.assertEqual(result.node_id, "iss-local-00001")
-        self.assertFalse(result.already_closed)
-        self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "example/repo")])
-        self.assertEqual(issue_gateway.close_calls, [(str(repo_root), 301, "example/repo")])
+        assert result.node_id == "iss-local-00001"
+        assert not result.already_closed
+        assert issue_gateway.view_calls == [(str(repo_root), 301, "example/repo")]
+        assert issue_gateway.close_calls == [(str(repo_root), 301, "example/repo")]
 
     def test_close_node_gh_failure_leaves_local_tree_unchanged(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
@@ -443,7 +478,7 @@ class TestRuntimeCloseS12(unittest.TestCase):
             )
             ports = self._ports(repo_root=repo_root, records=records, issue_gateway=issue_gateway)
 
-            with self.assertRaisesRegex(RuntimeError, "gh issue close failed"):
+            with pytest.raises(RuntimeError, match="gh issue close failed"):
                 app_close_node.close_node(
                     app_contracts.CloseNodeRequest(
                         target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None)
@@ -451,12 +486,9 @@ class TestRuntimeCloseS12(unittest.TestCase):
                     ports,
                 )
 
-            self.assertTrue(issue_dir.is_dir())
-            self.assertTrue((issue_dir / "requirement.md").is_file())
-            self.assertEqual(
-                issue_gateway.close_calls,
-                [(str(repo_root), 301, "example/repo")],
-            )
+            assert issue_dir.is_dir()
+            assert (issue_dir / "requirement.md").is_file()
+            assert issue_gateway.close_calls == [(str(repo_root), 301, "example/repo")]
 
     def test_close_node_already_closed_returns_success_noop(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
@@ -510,12 +542,12 @@ class TestRuntimeCloseS12(unittest.TestCase):
             ports,
         )
 
-        self.assertTrue(result.already_closed)
-        self.assertEqual(result.node_id, "iss-local-00001")
-        self.assertEqual(result.node_kind, "issue")
-        self.assertEqual(result.github_issue_number, 301)
-        self.assertEqual(result.issue_snapshot.state, "CLOSED")
-        self.assertEqual(issue_gateway.close_calls, [])
+        assert result.already_closed
+        assert result.node_id == "iss-local-00001"
+        assert result.node_kind == "issue"
+        assert result.github_issue_number == 301
+        assert result.issue_snapshot.state == "CLOSED"
+        assert issue_gateway.close_calls == []
 
     def test_close_node_read_after_close_race_returns_success_noop(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
@@ -573,10 +605,10 @@ class TestRuntimeCloseS12(unittest.TestCase):
             ports,
         )
 
-        self.assertTrue(result.already_closed)
-        self.assertEqual(result.issue_snapshot.state, "CLOSED")
-        self.assertEqual(len(issue_gateway.view_calls), 2)
-        self.assertEqual(issue_gateway.close_calls, [(str(repo_root), 301, "example/repo")])
+        assert result.already_closed
+        assert result.issue_snapshot.state == "CLOSED"
+        assert len(issue_gateway.view_calls) == 2
+        assert issue_gateway.close_calls == [(str(repo_root), 301, "example/repo")]
 
     def test_close_node_non_cascade_for_epic_target(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
@@ -635,10 +667,10 @@ class TestRuntimeCloseS12(unittest.TestCase):
             ports,
         )
 
-        self.assertFalse(result.already_closed)
-        self.assertEqual(result.node_kind, "epic")
-        self.assertEqual(result.github_issue_number, 201)
-        self.assertEqual(issue_gateway.close_calls, [(str(repo_root), 201, "example/repo")])
+        assert not result.already_closed
+        assert result.node_kind == "epic"
+        assert result.github_issue_number == 201
+        assert issue_gateway.close_calls == [(str(repo_root), 201, "example/repo")]
 
     def test_close_node_non_cascade_for_initiative_target(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
@@ -697,10 +729,10 @@ class TestRuntimeCloseS12(unittest.TestCase):
             ports,
         )
 
-        self.assertFalse(result.already_closed)
-        self.assertEqual(result.node_kind, "initiative")
-        self.assertEqual(result.github_issue_number, 101)
-        self.assertEqual(issue_gateway.close_calls, [(str(repo_root), 101, "example/repo")])
+        assert not result.already_closed
+        assert result.node_kind == "initiative"
+        assert result.github_issue_number == 101
+        assert issue_gateway.close_calls == [(str(repo_root), 101, "example/repo")]
 
     def test_close_node_unlinked_parent_fails_without_touching_linked_child(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, _domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
@@ -752,7 +784,7 @@ class TestRuntimeCloseS12(unittest.TestCase):
             issue_gateway = _StubIssueGateway()
             ports = self._ports(repo_root=repo_root, records=records, issue_gateway=issue_gateway)
 
-            with self.assertRaisesRegex(RuntimeError, "not linked to a GitHub issue"):
+            with pytest.raises(RuntimeError, match="not linked to a GitHub issue"):
                 app_close_node.close_node(
                     app_contracts.CloseNodeRequest(
                         target=app_contracts.TargetRef(kind="node_id", node_id="init-local-00001", github_issue_number=None)
@@ -760,9 +792,9 @@ class TestRuntimeCloseS12(unittest.TestCase):
                     ports,
                 )
 
-            self.assertTrue(init_dir.is_dir())
-            self.assertEqual(issue_gateway.view_calls, [])
-            self.assertEqual(issue_gateway.close_calls, [])
+            assert init_dir.is_dir()
+            assert issue_gateway.view_calls == []
+            assert issue_gateway.close_calls == []
 
     def test_close_node_github_issue_target_resolves_current_unscoped_node_with_repo_scope(self) -> None:
         app_close_node, app_contracts, app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
@@ -840,8 +872,8 @@ class TestRuntimeCloseS12(unittest.TestCase):
             ports,
         )
 
-        self.assertEqual(result.node_id, "iss-local-00001")
-        self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "example/repo")])
+        assert result.node_id == "iss-local-00001"
+        assert issue_gateway.view_calls == [(str(repo_root), 301, "example/repo")]
 
     def test_close_node_github_issue_target_raises_for_ambiguous_unscoped_match(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, _domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
@@ -894,7 +926,7 @@ class TestRuntimeCloseS12(unittest.TestCase):
         ]
         ports = self._ports(repo_root=repo_root, records=records, issue_gateway=_StubIssueGateway())
 
-        with self.assertRaisesRegex(RuntimeError, "Ambiguous github.issue_number=301"):
+        with pytest.raises(RuntimeError, match="Ambiguous github.issue_number=301"):
             app_close_node.close_node(
                 app_contracts.CloseNodeRequest(
                     target=app_contracts.TargetRef(kind="github_issue", node_id=None, github_issue_number=301)
@@ -944,7 +976,7 @@ class TestRuntimeCloseS12(unittest.TestCase):
         ]
         ports = self._ports(repo_root=repo_root, records=records, issue_gateway=_StubIssueGateway())
 
-        with self.assertRaisesRegex(RuntimeError, "No node found for github.issue_number=301 in repo scope"):
+        with pytest.raises(RuntimeError, match="No node found for github.issue_number=301 in repo scope"):
             app_close_node.close_node(
                 app_contracts.CloseNodeRequest(
                     target=app_contracts.TargetRef(
@@ -961,8 +993,8 @@ class TestRuntimeCloseS12(unittest.TestCase):
     def test_bootstrap_registers_close_node_use_case(self) -> None:
         _app_close_node, app_contracts, _app_ports, cli_bootstrap, _domain_models, _infra_github_cli, _infra_contracts = _runtime_modules()
         runtime = cli_bootstrap.build_runtime(Path("/repo/spec-dock"))
-        self.assertTrue(callable(runtime.use_cases.close_node))
-        with self.assertRaisesRegex(RuntimeError, "No nodes found"):
+        assert callable(runtime.use_cases.close_node)
+        with pytest.raises(RuntimeError, match="No nodes found"):
             runtime.use_cases.close_node(
                 app_contracts.CloseNodeRequest(
                     target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None)
@@ -972,10 +1004,10 @@ class TestRuntimeCloseS12(unittest.TestCase):
     def test_bootstrap_issue_gateway_forwards_issue_close(self) -> None:
         _app_close_node, _app_contracts, _app_ports, cli_bootstrap, _domain_models, _infra_github_cli, _infra_contracts = _runtime_modules()
         gateway = cli_bootstrap._IssueGateway()
-        with patch.object(cli_bootstrap.infra_github_cli, "issue_close", return_value="closed") as issue_close:
+        with _patch_object(cli_bootstrap.infra_github_cli, "issue_close", return_value="closed") as issue_close:
             result = gateway.issue_close(Path("/repo"), 301, repo_slug="example/repo")
 
-        self.assertEqual(result, "closed")
+        assert result == "closed"
         issue_close.assert_called_once_with(Path("/repo"), issue_number=301, repo_slug="example/repo")
 
     def test_issue_close_raw_adds_repo_scope_and_reloads_snapshot(self) -> None:
@@ -994,20 +1026,20 @@ class TestRuntimeCloseS12(unittest.TestCase):
             calls.append((list(cmd), cwd))
             return _Completed()
 
-        with patch.object(infra_github_cli, "ensure_gh_available"), patch.object(
+        with _patch_object(infra_github_cli, "ensure_gh_available"), _patch_object(
             infra_github_cli, "issue_view_snapshot_raw", return_value={"number": 301, "state": "CLOSED", "title": "Issue 301", "labels": [], "updatedAt": "t", "url": "https://github.com/example/repo/issues/301"}
-        ) as issue_view_snapshot_raw, patch.object(infra_github_cli.subprocess, "run", side_effect=_fake_run):
+        ) as issue_view_snapshot_raw, _patch_object(infra_github_cli.subprocess, "run", side_effect=_fake_run):
             raw = infra_github_cli.issue_close_raw(repo_root, issue_number=301, repo_slug="example/repo")
 
-        self.assertEqual(raw["state"], "CLOSED")
-        self.assertEqual(calls, [(["gh", "issue", "close", "301", "--repo", "example/repo"], str(repo_root))])
+        assert raw["state"] == "CLOSED"
+        assert calls == [(["gh", "issue", "close", "301", "--repo", "example/repo"], str(repo_root))]
         issue_view_snapshot_raw.assert_called_once_with(repo_root, issue_number=301, repo_slug="example/repo")
 
     def test_issue_close_raw_raises_with_close_command_context(self) -> None:
         _app_close_node, _app_contracts, _app_ports, _cli_bootstrap, _domain_models, infra_github_cli, _infra_contracts = _runtime_modules()
         repo_root = Path("/repo")
 
-        with patch.object(infra_github_cli, "ensure_gh_available"), patch.object(
+        with _patch_object(infra_github_cli, "ensure_gh_available"), _patch_object(
             infra_github_cli.subprocess,
             "run",
             side_effect=infra_github_cli.subprocess.CalledProcessError(
@@ -1016,7 +1048,7 @@ class TestRuntimeCloseS12(unittest.TestCase):
                 stderr="boom",
             ),
         ):
-            with self.assertRaisesRegex(RuntimeError, "gh failed: gh issue close 301"):
+            with pytest.raises(RuntimeError, match="gh failed: gh issue close 301"):
                 infra_github_cli.issue_close_raw(repo_root, issue_number=301)
 
     def test_close_node_raises_when_close_and_fallback_view_both_fail(self) -> None:
@@ -1065,14 +1097,10 @@ class TestRuntimeCloseS12(unittest.TestCase):
         )
         ports = self._ports(repo_root=repo_root, records=records, issue_gateway=issue_gateway)
 
-        with self.assertRaisesRegex(RuntimeError, "close failed"):
+        with pytest.raises(RuntimeError, match="close failed"):
             app_close_node.close_node(
                 app_contracts.CloseNodeRequest(
                     target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None)
                 ),
                 ports,
             )
-
-
-if __name__ == "__main__":
-    unittest.main()

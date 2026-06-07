@@ -180,13 +180,16 @@ See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + 
 
 ```bash
 # Daily local unit suite
-python -m unittest discover -s tests/unit
+uv run pytest tests/unit
 
 # Optional integration suite for real external boundaries
-python -m unittest discover -s tests/integration
+uv run pytest tests/integration
+
+# Runtime / CLI regression lane
+uv run pytest tests/cli_runtime
 
 # Full regression fallback
-python -m unittest discover
+uv run pytest
 ```
 
 ---

@@ -15,6 +15,7 @@ from tests.cli_runtime.harness import (
 )
 
 
+import pytest
 class TestCliSync(CliRuntimeHarness):
     def _set_meta_depends_on(self, node_dir: Path, depends_on: object) -> None:
         meta_path = node_dir / ".meta.json"
@@ -25,16 +26,16 @@ class TestCliSync(CliRuntimeHarness):
     def test_sync_rejects_github_and_no_github_together(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-github"])
-            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
-            self.assertIn("not allowed with argument", p.stderr)
+            assert p.returncode == 2, p.stdout + p.stderr
+            assert "not allowed with argument" in p.stderr
 
     def test_new_and_active_and_sync(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -48,85 +49,79 @@ class TestCliSync(CliRuntimeHarness):
                 / "issues"
                 / "iss-00003-add-refresh-token"
             )
-            self.assertTrue((issue_dir / "requirement.md").is_file())
-            self.assertTrue((issue_dir / "design.md").is_file())
-            self.assertTrue((issue_dir / "plan.md").is_file())
-            self.assertTrue((issue_dir / "report.md").is_file())
+            assert (issue_dir / "requirement.md").is_file()
+            assert (issue_dir / "design.md").is_file()
+            assert (issue_dir / "plan.md").is_file()
+            assert (issue_dir / "report.md").is_file()
 
             # Placeholders should be rendered in generated files.
             requirement = (issue_dir / "requirement.md").read_text(encoding="utf-8")
-            self.assertNotIn("<ISS_ID>", requirement)
-            self.assertNotIn("<ISS_TITLE>", requirement)
-            self.assertIn("iss-00003", requirement)
+            assert "<ISS_ID>" not in requirement
+            assert "<ISS_TITLE>" not in requirement
+            assert "iss-00003" in requirement
 
             # Active pointers are set by a single target argument (node id or GitHub issue number).
             self._run_runtime(target, ["active", "set", "iss-00003", "--force"])
-            self.assertTrue((target / "spec-dock" / ".agent" / "active.json").is_file())
-            self.assertTrue(
+            assert (target / "spec-dock" / ".agent" / "active.json").is_file()
+            assert (
                 (target / "spec-dock" / "active" / "issue").exists()
                 or (target / "spec-dock" / "active" / "issue.path").is_file()
             )
-            self.assertTrue((target / "spec-dock" / "active" / "context-pack.md").is_file())
+            assert (target / "spec-dock" / "active" / "context-pack.md").is_file()
 
             self._run_runtime(target, ["sync"])
-            self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
-            self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
+            assert (target / "spec-dock" / ".agent" / "index.json").is_file()
+            assert (target / "spec-dock" / ".agent" / "tree.json").is_file()
             context_pack = (target / "spec-dock" / "active" / "context-pack.md").read_text(encoding="utf-8")
-            self.assertIn("- entry: `spec-dock/.agent/active.json`", context_pack)
-            self.assertIn("- default working set: `spec-dock/.agent/index.json`", context_pack)
-            self.assertIn("- default dependency view: `spec-dock/.agent/deps-issues.json`", context_pack)
-            self.assertIn("- escalation only: `spec-dock/.agent/index-all.json`", context_pack)
-            self.assertIn("- Start with `spec-dock/.agent/active.json`.", context_pack)
-            self.assertIn(
-                "- For normal work, read `spec-dock/.agent/index.json` and `spec-dock/.agent/deps-issues.json`.",
-                context_pack,
-            )
-            self.assertIn(
-                "- Read `spec-dock/.agent/index-all.json` only when full-history context is needed.",
-                context_pack,
-            )
-            self.assertIn("human guidance", context_pack)
+            assert "- entry: `spec-dock/.agent/active.json`" in context_pack
+            assert "- default working set: `spec-dock/.agent/index.json`" in context_pack
+            assert "- default dependency view: `spec-dock/.agent/deps-issues.json`" in context_pack
+            assert "- escalation only: `spec-dock/.agent/index-all.json`" in context_pack
+            assert "- Start with `spec-dock/.agent/active.json`." in context_pack
+            assert "- For normal work, read `spec-dock/.agent/index.json` and `spec-dock/.agent/deps-issues.json`." in context_pack
+            assert "- Read `spec-dock/.agent/index-all.json` only when full-history context is needed." in context_pack
+            assert "human guidance" in context_pack
 
             # Index: flat nodes (agent-friendly).
             state = (target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8")
-            self.assertIn("\"nodes\"", state)
-            self.assertNotIn("\"tree\"", state)
+            assert "\"nodes\"" in state
+            assert "\"tree\"" not in state
 
             # Tree: nested layer view (human-friendly).
             tree_text = (target / "spec-dock" / ".agent" / "tree.json").read_text(encoding="utf-8")
             tree = json.loads(tree_text)
-            self.assertIn("tree", tree)
+            assert "tree" in tree
 
             index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
             index_nodes = index["nodes"]
 
             init_item = tree["tree"][0]
-            self.assertEqual(init_item["id"], "init-00001")
-            self.assertEqual(init_item["type"], "initiative")
-            self.assertIn("epics", init_item)
+            assert init_item["id"] == "init-00001"
+            assert init_item["type"] == "initiative"
+            assert "epics" in init_item
 
             epic_item = init_item["epics"][0]
-            self.assertEqual(epic_item["id"], "epic-00002")
-            self.assertEqual(epic_item["type"], "epic")
-            self.assertIn("issues", epic_item)
+            assert epic_item["id"] == "epic-00002"
+            assert epic_item["type"] == "epic"
+            assert "issues" in epic_item
 
             issue_item = epic_item["issues"][0]
-            self.assertEqual(issue_item["id"], "iss-00003")
-            self.assertEqual(issue_item["type"], "issue")
+            assert issue_item["id"] == "iss-00003"
+            assert issue_item["type"] == "issue"
 
             # `tree.json` nodes match the same node schema as `index.json` nodes.
-            self.assertEqual(issue_item, index_nodes["iss-00003"])
+            assert issue_item == index_nodes["iss-00003"]
             self._run_runtime(target, ["validate"])
 
     def test_sync_builds_flat_adr_mirror_and_clears_stale_entries_after_rename_and_delete(self) -> None:
-        self.skipTest(
+        pytest.skip(
             "S06 replacement: tests.unit.presentation.test_runtime_sync_s07 covers ADR mirror rebuild and symlink semantics."
         )
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             if not self._can_create_symlink(target):
-                self.skipTest("symlinks not supported in test environment")
+                pytest.skip("symlinks not supported in test environment")
 
             self._create_same_repo_linked_hierarchy(target)
             self._run_runtime(target, ["new", "doc", "adr", "--initiative", "init-00001", "--title", "Initiative decision"])
@@ -147,41 +142,38 @@ class TestCliSync(CliRuntimeHarness):
             self._run_runtime(target, ["sync"])
 
             adrs_dir = specdock_dir / "adrs"
-            self.assertTrue(adrs_dir.is_dir())
-            self.assertEqual(
-                sorted(path.name for path in adrs_dir.iterdir()),
-                sorted([initiative_doc.name, issue_doc.name]),
-            )
+            assert adrs_dir.is_dir()
+            assert sorted(path.name for path in adrs_dir.iterdir()) == sorted([initiative_doc.name, issue_doc.name])
             for source in (initiative_doc, issue_doc):
                 link_path = adrs_dir / source.name
-                self.assertTrue(link_path.is_symlink(), f"missing ADR mirror symlink: {link_path}")
-                self.assertFalse(os.readlink(link_path).startswith("/"), os.readlink(link_path))
-                self.assertEqual(link_path.resolve(), source.resolve())
+                assert link_path.is_symlink(), f"missing ADR mirror symlink: {link_path}"
+                assert not os.readlink(link_path).startswith("/"), os.readlink(link_path)
+                assert link_path.resolve() == source.resolve()
 
             renamed_issue_doc = issue_doc.with_name(issue_doc.name.replace("-issue-decision.md", "-issue-decision-renamed.md"))
             issue_doc.rename(renamed_issue_doc)
 
             self._run_runtime(target, ["sync"])
 
-            self.assertFalse((adrs_dir / issue_doc.name).exists())
+            assert not (adrs_dir / issue_doc.name).exists()
             renamed_link = adrs_dir / renamed_issue_doc.name
-            self.assertTrue(renamed_link.is_symlink(), f"missing renamed ADR mirror symlink: {renamed_link}")
-            self.assertEqual(renamed_link.resolve(), renamed_issue_doc.resolve())
+            assert renamed_link.is_symlink(), f"missing renamed ADR mirror symlink: {renamed_link}"
+            assert renamed_link.resolve() == renamed_issue_doc.resolve()
 
             renamed_issue_doc.unlink()
 
             self._run_runtime(target, ["sync"])
 
-            self.assertEqual(sorted(path.name for path in adrs_dir.iterdir()), [initiative_doc.name])
-            self.assertFalse(renamed_link.exists())
+            assert sorted(path.name for path in adrs_dir.iterdir()) == [initiative_doc.name]
+            assert not renamed_link.exists()
 
     def test_sync_emits_all_and_todo_json_views(self) -> None:
-        self.skipTest(
+        pytest.skip(
             "S06 replacement: tests.unit.presentation.test_runtime_sync_s07 covers sync artifact paths and projections."
         )
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
 
@@ -193,24 +185,24 @@ class TestCliSync(CliRuntimeHarness):
             index_todo_path = agent_dir / "index.json"
             tree_todo_path = agent_dir / "tree.json"
 
-            self.assertTrue(index_all_path.is_file())
-            self.assertTrue(tree_all_path.is_file())
-            self.assertTrue(index_todo_path.is_file())
-            self.assertTrue(tree_todo_path.is_file())
+            assert index_all_path.is_file()
+            assert tree_all_path.is_file()
+            assert index_todo_path.is_file()
+            assert tree_todo_path.is_file()
 
             index_all = json.loads(index_all_path.read_text(encoding="utf-8"))
             tree_all = json.loads(tree_all_path.read_text(encoding="utf-8"))
             index_todo = json.loads(index_todo_path.read_text(encoding="utf-8"))
             tree_todo = json.loads(tree_todo_path.read_text(encoding="utf-8"))
 
-            self.assertEqual(index_all["schema_version"], 2)
-            self.assertEqual(tree_all["schema_version"], 2)
-            self.assertEqual(index_todo["schema_version"], 2)
-            self.assertEqual(tree_todo["schema_version"], 2)
-            self.assertEqual(index_all["projection"], "full-history")
-            self.assertNotIn("source", index_all)
-            self.assertEqual(index_todo["projection"], "current-future")
-            self.assertNotIn("source", index_todo)
+            assert index_all["schema_version"] == 2
+            assert tree_all["schema_version"] == 2
+            assert index_todo["schema_version"] == 2
+            assert tree_todo["schema_version"] == 2
+            assert index_all["projection"] == "full-history"
+            assert "source" not in index_all
+            assert index_todo["projection"] == "current-future"
+            assert "source" not in index_todo
 
             def _collect_tree_node_ids(items: list[dict[str, object]]) -> set[str]:
                 ids: set[str] = set()
@@ -239,21 +231,21 @@ class TestCliSync(CliRuntimeHarness):
             index_todo_nodes = set(index_todo["nodes"].keys())
             tree_todo_nodes = _collect_tree_node_ids(tree_todo["tree"])
 
-            self.assertNotEqual(index_all_nodes, set())
-            self.assertEqual(index_all_nodes, tree_all_nodes)
-            self.assertEqual(index_todo_nodes, tree_todo_nodes)
-            self.assertTrue(index_todo_nodes.issubset(index_all_nodes))
-            self.assertEqual(index_all_nodes, index_todo_nodes)
+            assert index_all_nodes != set()
+            assert index_all_nodes == tree_all_nodes
+            assert index_todo_nodes == tree_todo_nodes
+            assert index_todo_nodes.issubset(index_all_nodes)
+            assert index_all_nodes == index_todo_nodes
 
             def _assert_repo_relative_node_paths(nodes: dict[str, object]) -> None:
                 for item in nodes.values():
-                    self.assertIsInstance(item, dict)
+                    assert isinstance(item, dict)
                     node_path = item.get("path")
-                    self.assertIsInstance(node_path, str)
                     assert isinstance(node_path, str)
-                    self.assertTrue(node_path.startswith("spec-dock/"), node_path)
-                    self.assertFalse(Path(node_path).is_absolute(), node_path)
-                    self.assertFalse(node_path.startswith(str(target)), node_path)
+                    assert isinstance(node_path, str)
+                    assert node_path.startswith("spec-dock/"), node_path
+                    assert not Path(node_path).is_absolute(), node_path
+                    assert not node_path.startswith(str(target)), node_path
 
             def _iter_tree_nodes(items: list[dict[str, object]]):
                 for initiative in items:
@@ -271,16 +263,16 @@ class TestCliSync(CliRuntimeHarness):
             for tree_payload in (tree_all, tree_todo):
                 for node_item in _iter_tree_nodes(tree_payload["tree"]):
                     node_path = node_item.get("path")
-                    self.assertIsInstance(node_path, str)
                     assert isinstance(node_path, str)
-                    self.assertTrue(node_path.startswith("spec-dock/"), node_path)
-                    self.assertFalse(Path(node_path).is_absolute(), node_path)
-                    self.assertFalse(node_path.startswith(str(target)), node_path)
+                    assert isinstance(node_path, str)
+                    assert node_path.startswith("spec-dock/"), node_path
+                    assert not Path(node_path).is_absolute(), node_path
+                    assert not node_path.startswith(str(target)), node_path
 
     def test_sync_compiles_shorthand_to_issue_edges(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Main init"])
@@ -305,7 +297,7 @@ class TestCliSync(CliRuntimeHarness):
             self._set_meta_depends_on(target_issue_dir, ["epic-00202", "102", 401])
 
             p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
 
             index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             index_todo = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
@@ -314,16 +306,16 @@ class TestCliSync(CliRuntimeHarness):
                 {"from": "iss-00301", "to": "iss-00401", "kind": "depends_on"},
                 {"from": "iss-00301", "to": "iss-00402", "kind": "depends_on"},
             ]
-            self.assertEqual(index_all["deps"]["issue_edges"], expected_edges)
-            self.assertEqual(index_todo["deps"]["issue_edges"], expected_edges)
+            assert index_all["deps"]["issue_edges"] == expected_edges
+            assert index_todo["deps"]["issue_edges"] == expected_edges
             for edge in expected_edges:
-                self.assertTrue(edge["from"].startswith("iss-"))
-                self.assertTrue(edge["to"].startswith("iss-"))
+                assert edge["from"].startswith("iss-")
+                assert edge["to"].startswith("iss-")
 
     def test_sync_warns_when_shorthand_expands_to_empty(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Main init"])
@@ -346,16 +338,16 @@ class TestCliSync(CliRuntimeHarness):
             self._set_meta_depends_on(target_issue_dir, ["epic-00202", "init-00102"])
 
             p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("deps_ref_expanded_to_empty", p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "deps_ref_expanded_to_empty" in p.stderr
 
             index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
-            self.assertEqual(index["deps"]["issue_edges"], [])
+            assert index["deps"]["issue_edges"] == []
 
     def test_sync_fails_on_unresolved_ref(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(
                 target,
@@ -380,14 +372,14 @@ class TestCliSync(CliRuntimeHarness):
             self._set_meta_depends_on(target_issue_dir, ["iss-99999"])
 
             p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
-            self.assertIn("iss-99999", p.stderr)
-            self.assertIn(".meta.json", p.stderr)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert "iss-99999" in p.stderr
+            assert ".meta.json" in p.stderr
 
     def test_sync_fails_on_descendant_dependency(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(
                 target,
@@ -404,14 +396,14 @@ class TestCliSync(CliRuntimeHarness):
             self._set_meta_depends_on(init_dir, ["iss-00301"])
 
             p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
-            self.assertIn(str(deps_path), p.stderr)
-            self.assertIn("iss-00301", p.stderr)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert str(deps_path) in p.stderr
+            assert "iss-00301" in p.stderr
 
     def test_sync_fails_on_self_or_cycle(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Main init"])
@@ -434,34 +426,34 @@ class TestCliSync(CliRuntimeHarness):
             # Self dependency must fail.
             self._set_meta_depends_on(issue_one_dir, ["iss-00301"])
             p_self = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(p_self.returncode, 1, p_self.stdout + p_self.stderr)
-            self.assertIn("iss-00301", p_self.stderr)
-            self.assertIn(str(issue_one_deps_path), p_self.stderr)
+            assert p_self.returncode == 1, p_self.stdout + p_self.stderr
+            assert "iss-00301" in p_self.stderr
+            assert str(issue_one_deps_path) in p_self.stderr
 
             # Shorthand self (issue depends on own epic) must also fail.
             self._set_meta_depends_on(issue_one_dir, ["epic-00201"])
             p_shorthand_self = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(p_shorthand_self.returncode, 1, p_shorthand_self.stdout + p_shorthand_self.stderr)
-            self.assertIn("iss-00301", p_shorthand_self.stderr)
-            self.assertIn("epic-00201", p_shorthand_self.stderr)
-            self.assertIn(str(issue_one_deps_path), p_shorthand_self.stderr)
+            assert p_shorthand_self.returncode == 1, p_shorthand_self.stdout + p_shorthand_self.stderr
+            assert "iss-00301" in p_shorthand_self.stderr
+            assert "epic-00201" in p_shorthand_self.stderr
+            assert str(issue_one_deps_path) in p_shorthand_self.stderr
 
             # Cycle dependency must fail.
             self._set_meta_depends_on(issue_one_dir, ["iss-00302"])
             self._set_meta_depends_on(issue_two_dir, ["iss-00301"])
             p_cycle = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(p_cycle.returncode, 1, p_cycle.stdout + p_cycle.stderr)
-            self.assertIn("iss-00301", p_cycle.stderr)
-            self.assertIn("iss-00302", p_cycle.stderr)
-            self.assertIn("->", p_cycle.stderr)
+            assert p_cycle.returncode == 1, p_cycle.stdout + p_cycle.stderr
+            assert "iss-00301" in p_cycle.stderr
+            assert "iss-00302" in p_cycle.stderr
+            assert "->" in p_cycle.stderr
 
     def test_sync_derives_deps_fields_ready_and_blockers(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -520,26 +512,23 @@ class TestCliSync(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
 
             index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             nodes = index_all["nodes"]
-            self.assertEqual(nodes["iss-00301"]["status"], "done")
-            self.assertEqual(nodes["iss-00301"]["deps"], {"ready": True, "depends_on": [], "blockers_top": []})
-            self.assertEqual(nodes["iss-00302"]["deps"], {"ready": True, "depends_on": [], "blockers_top": []})
-            self.assertEqual(
-                nodes["iss-00303"]["deps"],
-                {"ready": False, "depends_on": ["iss-00302"], "blockers_top": ["iss-00302"]},
-            )
+            assert nodes["iss-00301"]["status"] == "done"
+            assert nodes["iss-00301"]["deps"] == {"ready": True, "depends_on": [], "blockers_top": []}
+            assert nodes["iss-00302"]["deps"] == {"ready": True, "depends_on": [], "blockers_top": []}
+            assert nodes["iss-00303"]["deps"] == {"ready": False, "depends_on": ["iss-00302"], "blockers_top": ["iss-00302"]}
 
             tree = json.loads((target / "spec-dock" / ".agent" / "tree.json").read_text(encoding="utf-8"))
             tree_issue = [i for i in tree["tree"][0]["epics"][0]["issues"] if i["id"] == "iss-00303"][0]
-            self.assertEqual(tree_issue["deps"], nodes["iss-00303"]["deps"])
+            assert tree_issue["deps"] == nodes["iss-00303"]["deps"]
 
     def test_local_only_issue_is_open_and_ready_without_deps(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(
                 target,
@@ -551,22 +540,22 @@ class TestCliSync(CliRuntimeHarness):
             self._materialize_local_compat_ids(target)
 
             p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
 
             index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
             issue = index["nodes"]["iss-local-00001"]
-            self.assertEqual(issue["status"], "open")
-            self.assertEqual(issue["authority"], "local")
-            self.assertEqual(issue["effective_status"], "open")
-            self.assertEqual(issue["source"], "local")
-            self.assertFalse(issue["stale"])
-            self.assertIsNone(issue["last_sync_at"])
-            self.assertEqual(issue["deps"], {"ready": True, "depends_on": [], "blockers_top": []})
+            assert issue["status"] == "open"
+            assert issue["authority"] == "local"
+            assert issue["effective_status"] == "open"
+            assert issue["source"] == "local"
+            assert not issue["stale"]
+            assert issue["last_sync_at"] is None
+            assert issue["deps"] == {"ready": True, "depends_on": [], "blockers_top": []}
 
     def test_sync_outputs_are_deterministically_sorted(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -590,37 +579,34 @@ class TestCliSync(CliRuntimeHarness):
             self._set_meta_depends_on(issues_root / "iss-00304-issue-target", ["iss-00303", "iss-00301"])
 
             p1 = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(p1.returncode, 0, p1.stdout + p1.stderr)
+            assert p1.returncode == 0, p1.stdout + p1.stderr
             index1 = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
 
             p2 = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(p2.returncode, 0, p2.stdout + p2.stderr)
+            assert p2.returncode == 0, p2.stdout + p2.stderr
             index2 = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
 
-            self.assertEqual(
-                index1["deps"]["issue_edges"],
-                [
+            assert index1["deps"]["issue_edges"] == [
                     {"from": "iss-00302", "to": "iss-00301", "kind": "depends_on"},
                     {"from": "iss-00303", "to": "iss-00302", "kind": "depends_on"},
                     {"from": "iss-00304", "to": "iss-00301", "kind": "depends_on"},
                     {"from": "iss-00304", "to": "iss-00303", "kind": "depends_on"},
-                ],
-            )
-            self.assertEqual(index2["deps"]["issue_edges"], index1["deps"]["issue_edges"])
+                ]
+            assert index2["deps"]["issue_edges"] == index1["deps"]["issue_edges"]
 
             deps1 = index1["nodes"]["iss-00304"]["deps"]
             deps2 = index2["nodes"]["iss-00304"]["deps"]
-            self.assertEqual(deps1, deps2)
-            self.assertEqual(deps1["depends_on"], ["iss-00301", "iss-00302", "iss-00303"])
-            self.assertEqual(deps1["blockers_top"], deps1["depends_on"][: len(deps1["blockers_top"])])
+            assert deps1 == deps2
+            assert deps1["depends_on"] == ["iss-00301", "iss-00302", "iss-00303"]
+            assert deps1["blockers_top"] == deps1["depends_on"][: len(deps1["blockers_top"])]
 
     def test_sync_emits_deps_issues_json_and_puml_todo_only(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -678,55 +664,49 @@ class TestCliSync(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
 
             deps_issues_path = target / "spec-dock" / ".agent" / "deps-issues.json"
             deps_issues_puml_path = target / "spec-dock" / "deps-issues.puml"
-            self.assertTrue(deps_issues_path.is_file())
-            self.assertTrue(deps_issues_puml_path.is_file())
+            assert deps_issues_path.is_file()
+            assert deps_issues_puml_path.is_file()
 
             deps_issues = json.loads(deps_issues_path.read_text(encoding="utf-8"))
-            self.assertEqual(deps_issues["schema_version"], 1)
-            self.assertEqual(deps_issues["projection"], "open-issues-dependency-view")
-            self.assertEqual(
-                deps_issues["source"],
-                {"index": "spec-dock/.agent/index.json", "schema_version": 2},
-            )
-            self.assertEqual(
-                set(deps_issues["nodes"].keys()),
-                {"iss-00302", "iss-00303", "iss-00304", "iss-00305"},
-            )
+            assert deps_issues["schema_version"] == 1
+            assert deps_issues["projection"] == "open-issues-dependency-view"
+            assert deps_issues["source"] == {"index": "spec-dock/.agent/index.json", "schema_version": 2}
+            assert set(deps_issues["nodes"].keys()) == {"iss-00302", "iss-00303", "iss-00304", "iss-00305"}
 
             node_302 = deps_issues["nodes"]["iss-00302"]
             node_304 = deps_issues["nodes"]["iss-00304"]
             node_305 = deps_issues["nodes"]["iss-00305"]
-            self.assertEqual(node_302["ready"], False)
-            self.assertEqual(node_302["depends_on"], ["iss-00303"])
-            self.assertEqual(node_302["state"], "blocked")
-            self.assertEqual(node_304["ready"], True)
-            self.assertEqual(node_304["depends_on"], [])
-            self.assertEqual(node_304["state"], "ready")
-            self.assertEqual(node_305["ready"], True)
-            self.assertEqual(node_305["depends_on"], [])
-            self.assertEqual(node_305["state"], "ready")
+            assert node_302["ready"] == False
+            assert node_302["depends_on"] == ["iss-00303"]
+            assert node_302["state"] == "blocked"
+            assert node_304["ready"] == True
+            assert node_304["depends_on"] == []
+            assert node_304["state"] == "ready"
+            assert node_305["ready"] == True
+            assert node_305["depends_on"] == []
+            assert node_305["state"] == "ready"
 
             edge_pairs = [(edge["from"], edge["to"]) for edge in deps_issues["edges"]]
-            self.assertEqual(edge_pairs, [("iss-00302", "iss-00303")])
+            assert edge_pairs == [("iss-00302", "iss-00303")]
 
             puml = deps_issues_puml_path.read_text(encoding="utf-8")
-            self.assertIn("iss-00302", puml)
-            self.assertIn("iss-00303", puml)
-            self.assertIn("iss-00305", puml)
-            self.assertNotIn("iss-00301", puml)
-            self.assertIn("Niss_00303 --> Niss_00302 : blocks", puml)
+            assert "iss-00302" in puml
+            assert "iss-00303" in puml
+            assert "iss-00305" in puml
+            assert "iss-00301" not in puml
+            assert "Niss_00303 --> Niss_00302 : blocks" in puml
 
     def test_sync_todo_projection_excludes_done_and_empty_branches(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             # Branch A: mixed done/open issues.
@@ -789,32 +769,29 @@ class TestCliSync(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
 
             index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             index_todo = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
             tree_todo = json.loads((target / "spec-dock" / ".agent" / "tree.json").read_text(encoding="utf-8"))
             deps_issues = json.loads((target / "spec-dock" / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
 
-            self.assertIn("iss-00301", index_all["nodes"])  # done issue remains in all
-            self.assertIn("iss-00401", index_all["nodes"])  # done-only branch remains in all
+            assert "iss-00301" in index_all["nodes"]  # done issue remains in all
+            assert "iss-00401" in index_all["nodes"]  # done-only branch remains in all
 
             # todo projection: done issues + empty ancestors are removed.
             todo_nodes = set(index_todo["nodes"].keys())
-            self.assertNotIn("iss-00301", todo_nodes)
-            self.assertNotIn("iss-00401", todo_nodes)
-            self.assertNotIn("epic-00202", todo_nodes)
-            self.assertNotIn("init-00102", todo_nodes)
-            self.assertIn("iss-00302", todo_nodes)
-            self.assertIn("iss-00303", todo_nodes)
-            self.assertIn("epic-00201", todo_nodes)
-            self.assertIn("init-00101", todo_nodes)
+            assert "iss-00301" not in todo_nodes
+            assert "iss-00401" not in todo_nodes
+            assert "epic-00202" not in todo_nodes
+            assert "init-00102" not in todo_nodes
+            assert "iss-00302" in todo_nodes
+            assert "iss-00303" in todo_nodes
+            assert "epic-00201" in todo_nodes
+            assert "init-00101" in todo_nodes
 
             # deps.issue_edges for todo keeps only edges with both endpoints in todo issues.
-            self.assertEqual(
-                index_todo["deps"]["issue_edges"],
-                [{"from": "iss-00302", "to": "iss-00303", "kind": "depends_on"}],
-            )
+            assert index_todo["deps"]["issue_edges"] == [{"from": "iss-00302", "to": "iss-00303", "kind": "depends_on"}]
 
             # tree.json node set must match index.json todo node set.
             def collect_tree_ids(items: list[dict]) -> set[str]:
@@ -827,7 +804,7 @@ class TestCliSync(CliRuntimeHarness):
                             ids.add(issue_item["id"])
                 return ids
 
-            self.assertEqual(collect_tree_ids(tree_todo["tree"]), todo_nodes)
+            assert collect_tree_ids(tree_todo["tree"]) == todo_nodes
 
             # deps-issues nodes should match todo issue set from index.json.
             todo_issue_ids = {
@@ -835,15 +812,15 @@ class TestCliSync(CliRuntimeHarness):
                 for node_id, item in index_todo["nodes"].items()
                 if isinstance(item, dict) and item.get("type") == "issue"
             }
-            self.assertEqual(set(deps_issues["nodes"].keys()), todo_issue_ids)
+            assert set(deps_issues["nodes"].keys()) == todo_issue_ids
 
     def test_sync_emits_tree_puml_ready_board_at_spec_dock_root(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -889,7 +866,7 @@ class TestCliSync(CliRuntimeHarness):
             self._set_meta_depends_on(issues_root / "iss-00304-ready-second", [301])
 
             p_active = self._run_runtime_capture(target, ["active", "set", "305", "--force", "--no-checkout"])
-            self.assertEqual(p_active.returncode, 0, p_active.stdout + p_active.stderr)
+            assert p_active.returncode == 0, p_active.stdout + p_active.stderr
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -908,35 +885,35 @@ class TestCliSync(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
 
             tree_all_puml_path = target / "spec-dock" / "tree-all.puml"
             tree_todo_puml_path = target / "spec-dock" / "tree.puml"
-            self.assertTrue(tree_all_puml_path.is_file())
-            self.assertTrue(tree_todo_puml_path.is_file())
+            assert tree_all_puml_path.is_file()
+            assert tree_todo_puml_path.is_file()
 
             tree_all_puml = tree_all_puml_path.read_text(encoding="utf-8")
-            self.assertIn("iss-00301\\n[DONE]", tree_all_puml)
-            self.assertIn("iss-00302\\n[BLOCKED]", tree_all_puml)
-            self.assertIn("iss-00303\\n[READY]", tree_all_puml)
-            self.assertIn("iss-00305\\n[DOING]", tree_all_puml)
-            self.assertIn("iss-00306\\n[UNKNOWN]", tree_all_puml)
-            self.assertIn("blockers:", tree_all_puml)
+            assert "iss-00301\\n[DONE]" in tree_all_puml
+            assert "iss-00302\\n[BLOCKED]" in tree_all_puml
+            assert "iss-00303\\n[READY]" in tree_all_puml
+            assert "iss-00305\\n[DOING]" in tree_all_puml
+            assert "iss-00306\\n[UNKNOWN]" in tree_all_puml
+            assert "blockers:" in tree_all_puml
 
             tree_todo_puml = tree_todo_puml_path.read_text(encoding="utf-8")
-            self.assertNotIn("iss-00301", tree_todo_puml)
-            self.assertIn("iss-00302", tree_todo_puml)
-            self.assertIn("iss-00303", tree_todo_puml)
-            self.assertIn("iss-00305", tree_todo_puml)
-            self.assertIn("iss-00306", tree_todo_puml)
+            assert "iss-00301" not in tree_todo_puml
+            assert "iss-00302" in tree_todo_puml
+            assert "iss-00303" in tree_todo_puml
+            assert "iss-00305" in tree_todo_puml
+            assert "iss-00306" in tree_todo_puml
 
     def test_sync_emits_dashboard_md_at_spec_dock_root(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -987,42 +964,42 @@ class TestCliSync(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
 
             dashboard_path = target / "spec-dock" / "dashboard.md"
-            self.assertTrue(dashboard_path.is_file())
+            assert dashboard_path.is_file()
             dashboard = dashboard_path.read_text(encoding="utf-8")
-            self.assertIn("spec-dock/.agent/index.json", dashboard)
-            self.assertIn("spec-dock/tree.puml", dashboard)
-            self.assertIn("spec-dock/deps-issues.puml", dashboard)
-            self.assertIn("## Ready", dashboard)
-            self.assertIn("## Blocked", dashboard)
-            self.assertIn("## Unknown", dashboard)
-            self.assertIn("`iss-00303`", dashboard)
-            self.assertIn("`iss-00302`", dashboard)
-            self.assertIn("blockers: iss-00303", dashboard)
-            self.assertIn("`iss-00304`", dashboard)
-            self.assertNotIn("`iss-00301`", dashboard)
+            assert "spec-dock/.agent/index.json" in dashboard
+            assert "spec-dock/tree.puml" in dashboard
+            assert "spec-dock/deps-issues.puml" in dashboard
+            assert "## Ready" in dashboard
+            assert "## Blocked" in dashboard
+            assert "## Unknown" in dashboard
+            assert "`iss-00303`" in dashboard
+            assert "`iss-00302`" in dashboard
+            assert "blockers: iss-00303" in dashboard
+            assert "`iss-00304`" in dashboard
+            assert "`iss-00301`" not in dashboard
 
     def test_spec_dock_gitignore_ignores_human_facing_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             gitignore = (target / "spec-dock" / ".gitignore").read_text(encoding="utf-8")
-            self.assertIn("tree-all.puml", gitignore)
-            self.assertIn("tree.puml", gitignore)
-            self.assertIn("deps-issues.puml", gitignore)
-            self.assertIn("dashboard.md", gitignore)
-            self.assertIn("/adrs/", gitignore)
+            assert "tree-all.puml" in gitignore
+            assert "tree.puml" in gitignore
+            assert "deps-issues.puml" in gitignore
+            assert "dashboard.md" in gitignore
+            assert "/adrs/" in gitignore
 
     def test_spec_dock_gitignore_behavior_matches_git_check_ignore(self) -> None:
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._run_git(target, ["init"])
 
             (target / "spec-dock" / "dashboard.md").write_text("dashboard\n", encoding="utf-8")
@@ -1032,7 +1009,7 @@ class TestCliSync(CliRuntimeHarness):
             nested_adrs_doc = target / "spec-dock" / "docs" / "adrs" / "example.md"
             nested_adrs_doc.parent.mkdir(parents=True, exist_ok=True)
             nested_adrs_doc.write_text("nested adr\n", encoding="utf-8")
-            self.assertTrue((target / "spec-dock" / "docs" / "README.md").is_file())
+            assert (target / "spec-dock" / "docs" / "README.md").is_file()
 
             isolated_home = target / ".git-home"
             isolated_xdg = target / ".git-xdg"
@@ -1066,37 +1043,25 @@ class TestCliSync(CliRuntimeHarness):
                 )
 
             ignored_dashboard = _run_check_ignore("spec-dock/dashboard.md")
-            self.assertEqual(
-                ignored_dashboard.returncode,
-                0,
-                ignored_dashboard.stdout + ignored_dashboard.stderr,
-            )
-            self.assertIn("spec-dock/dashboard.md", ignored_dashboard.stdout)
+            assert ignored_dashboard.returncode == 0, ignored_dashboard.stdout + ignored_dashboard.stderr
+            assert "spec-dock/dashboard.md" in ignored_dashboard.stdout
 
             ignored_adr = _run_check_ignore("spec-dock/adrs/example.md")
-            self.assertEqual(ignored_adr.returncode, 0, ignored_adr.stdout + ignored_adr.stderr)
-            self.assertIn("spec-dock/adrs/example.md", ignored_adr.stdout)
+            assert ignored_adr.returncode == 0, ignored_adr.stdout + ignored_adr.stderr
+            assert "spec-dock/adrs/example.md" in ignored_adr.stdout
 
             not_ignored_doc = _run_check_ignore("spec-dock/docs/README.md")
-            self.assertEqual(
-                not_ignored_doc.returncode,
-                1,
-                not_ignored_doc.stdout + not_ignored_doc.stderr,
-            )
+            assert not_ignored_doc.returncode == 1, not_ignored_doc.stdout + not_ignored_doc.stderr
             not_ignored_nested_adrs = _run_check_ignore("spec-dock/docs/adrs/example.md")
-            self.assertEqual(
-                not_ignored_nested_adrs.returncode,
-                1,
-                not_ignored_nested_adrs.stdout + not_ignored_nested_adrs.stderr,
-            )
+            assert not_ignored_nested_adrs.returncode == 1, not_ignored_nested_adrs.stdout + not_ignored_nested_adrs.stderr
 
     def test_sync_force_does_not_update_active_from_branch(self) -> None:
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
             self._run_git(target, ["add", "-A"])
@@ -1110,19 +1075,19 @@ class TestCliSync(CliRuntimeHarness):
 
             self._run_runtime(target, ["active", "clear"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertIsNone(active.get("issue"))
+            assert active.get("issue") is None
 
             self._run_runtime(target, ["sync", "--no-github", "--force"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertIsNone(active.get("issue"))
+            assert active.get("issue") is None
 
     def test_sync_updates_active_from_branch_id(self) -> None:
         if shutil.which("git") is None:
-            self.skipTest("git not available")
+            pytest.skip("git not available")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
 
             self._create_same_repo_linked_hierarchy(target)
             self._run_git(target, ["add", "-A"])
@@ -1136,17 +1101,17 @@ class TestCliSync(CliRuntimeHarness):
 
             self._run_runtime(target, ["sync"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["initiative"]["id"], "init-00001")
-            self.assertEqual(active["epic"]["id"], "epic-00002")
-            self.assertEqual(active["issue"]["id"], "iss-00003")
+            assert active["initiative"]["id"] == "init-00001"
+            assert active["epic"]["id"] == "epic-00002"
+            assert active["issue"]["id"] == "iss-00003"
 
     def test_issue_71_runtime_bundle_validate_sync_and_sync_github_surface(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._create_same_repo_linked_hierarchy(
@@ -1157,10 +1122,10 @@ class TestCliSync(CliRuntimeHarness):
             )
 
             p_validate = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
+            assert p_validate.returncode == 0, p_validate.stdout + p_validate.stderr
 
             p_sync = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            self.assertEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
+            assert p_sync.returncode == 0, p_sync.stdout + p_sync.stderr
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1178,18 +1143,18 @@ class TestCliSync(CliRuntimeHarness):
                 ["sync", "--github", "--no-update-active"],
                 env=test_env,
             )
-            self.assertEqual(p_sync_github.returncode, 0, p_sync_github.stdout + p_sync_github.stderr)
+            assert p_sync_github.returncode == 0, p_sync_github.stdout + p_sync_github.stderr
 
             index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
-            self.assertIn("iss-00301", index["nodes"])
+            assert "iss-00301" in index["nodes"]
 
     def test_sync_default_github_populates_issue_statuses(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -1220,46 +1185,46 @@ class TestCliSync(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["sync", "--no-update-active"], env=test_env)
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
 
             index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             nodes = index_all["nodes"]
-            self.assertEqual(nodes["iss-00301"]["status"], "done")
-            self.assertEqual(nodes["iss-00301"]["github"]["state"], "CLOSED")
-            self.assertEqual(nodes["iss-00301"]["source"], "github")
-            self.assertFalse(nodes["iss-00301"]["stale"])
-            self.assertEqual(nodes["iss-00301"]["last_sync_at"], "t")
-            self.assertEqual(nodes["iss-00302"]["status"], "open")
-            self.assertEqual(nodes["iss-00302"]["github"]["state"], "OPEN")
-            self.assertEqual(nodes["iss-00302"]["source"], "github")
-            self.assertFalse(nodes["iss-00302"]["stale"])
-            self.assertEqual(nodes["iss-00302"]["last_sync_at"], "t")
+            assert nodes["iss-00301"]["status"] == "done"
+            assert nodes["iss-00301"]["github"]["state"] == "CLOSED"
+            assert nodes["iss-00301"]["source"] == "github"
+            assert not nodes["iss-00301"]["stale"]
+            assert nodes["iss-00301"]["last_sync_at"] == "t"
+            assert nodes["iss-00302"]["status"] == "open"
+            assert nodes["iss-00302"]["github"]["state"] == "OPEN"
+            assert nodes["iss-00302"]["source"] == "github"
+            assert not nodes["iss-00302"]["stale"]
+            assert nodes["iss-00302"]["last_sync_at"] == "t"
             index_todo = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
-            self.assertNotIn("iss-00301", index_todo["nodes"])
+            assert "iss-00301" not in index_todo["nodes"]
 
             guard_log = bin_dir / "gh-guard-sync-no-github.log"
             guard_log.unlink(missing_ok=True)
             self._make_gh_issue_list_stub(bin_dir, issues=[], fail=True, log_path=guard_log)
 
             p_cache = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"], env=test_env)
-            self.assertEqual(p_cache.returncode, 0, p_cache.stdout + p_cache.stderr)
-            self.assertFalse(guard_log.exists(), "gh must not be invoked with sync --no-github")
+            assert p_cache.returncode == 0, p_cache.stdout + p_cache.stderr
+            assert not guard_log.exists(), "gh must not be invoked with sync --no-github"
             index_all_cache = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             cache_nodes = index_all_cache["nodes"]
-            self.assertEqual(cache_nodes["iss-00301"]["source"], "cache")
-            self.assertTrue(cache_nodes["iss-00301"]["stale"])
-            self.assertEqual(cache_nodes["iss-00301"]["last_sync_at"], "t")
-            self.assertEqual(cache_nodes["iss-00302"]["source"], "cache")
-            self.assertTrue(cache_nodes["iss-00302"]["stale"])
-            self.assertEqual(cache_nodes["iss-00302"]["last_sync_at"], "t")
+            assert cache_nodes["iss-00301"]["source"] == "cache"
+            assert cache_nodes["iss-00301"]["stale"]
+            assert cache_nodes["iss-00301"]["last_sync_at"] == "t"
+            assert cache_nodes["iss-00302"]["source"] == "cache"
+            assert cache_nodes["iss-00302"]["stale"]
+            assert cache_nodes["iss-00302"]["last_sync_at"] == "t"
 
     def test_sync_generates_index_deps_and_deps_issues_artifacts(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -1318,65 +1283,59 @@ class TestCliSync(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
 
             index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
-            self.assertEqual(index_all["projection"], "full-history")
-            self.assertTrue(index_all["deps"]["valid"])
-            self.assertIsNone(index_all["deps"]["error"])
-            self.assertEqual(
-                index_all["deps"]["issue_edges"],
-                [
+            assert index_all["projection"] == "full-history"
+            assert index_all["deps"]["valid"]
+            assert index_all["deps"]["error"] is None
+            assert index_all["deps"]["issue_edges"] == [
                     {"from": "iss-00301", "to": "iss-00303", "kind": "depends_on"},
                     {"from": "iss-00302", "to": "iss-00301", "kind": "depends_on"},
-                ],
-            )
-            self.assertEqual(index_all["nodes"]["iss-00301"]["deps"]["depends_on"], [])
-            self.assertTrue(index_all["nodes"]["iss-00301"]["deps"]["ready"])
+                ]
+            assert index_all["nodes"]["iss-00301"]["deps"]["depends_on"] == []
+            assert index_all["nodes"]["iss-00301"]["deps"]["ready"]
 
             index_todo = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
-            self.assertEqual(index_todo["projection"], "current-future")
-            self.assertTrue(index_todo["deps"]["valid"])
-            self.assertIsNone(index_todo["deps"]["error"])
-            self.assertEqual(index_todo["deps"]["issue_edges"], [])
+            assert index_todo["projection"] == "current-future"
+            assert index_todo["deps"]["valid"]
+            assert index_todo["deps"]["error"] is None
+            assert index_todo["deps"]["issue_edges"] == []
             nodes = index_todo["nodes"]
-            self.assertNotIn("iss-00301", nodes)
-            self.assertEqual(nodes["iss-00302"]["deps"]["depends_on"], [])
-            self.assertTrue(nodes["iss-00302"]["deps"]["ready"])
+            assert "iss-00301" not in nodes
+            assert nodes["iss-00302"]["deps"]["depends_on"] == []
+            assert nodes["iss-00302"]["deps"]["ready"]
 
             deps_issues_path = target / "spec-dock" / ".agent" / "deps-issues.json"
             deps_issues_puml_path = target / "spec-dock" / "deps-issues.puml"
-            self.assertTrue(deps_issues_path.is_file())
-            self.assertTrue(deps_issues_puml_path.is_file())
+            assert deps_issues_path.is_file()
+            assert deps_issues_puml_path.is_file()
             deps_issues = json.loads(deps_issues_path.read_text(encoding="utf-8"))
-            self.assertEqual(deps_issues["projection"], "open-issues-dependency-view")
-            self.assertEqual(
-                deps_issues["source"],
-                {"index": "spec-dock/.agent/index.json", "schema_version": 2},
-            )
-            self.assertTrue(deps_issues["deps"]["valid"])
-            self.assertIsNone(deps_issues["deps"]["error"])
-            self.assertNotIn("iss-00301", deps_issues["nodes"])  # done issue is filtered from todo projection
-            self.assertIn("iss-00302", deps_issues["nodes"])
-            self.assertIn("iss-00303", deps_issues["nodes"])
+            assert deps_issues["projection"] == "open-issues-dependency-view"
+            assert deps_issues["source"] == {"index": "spec-dock/.agent/index.json", "schema_version": 2}
+            assert deps_issues["deps"]["valid"]
+            assert deps_issues["deps"]["error"] is None
+            assert "iss-00301" not in deps_issues["nodes"]  # done issue is filtered from todo projection
+            assert "iss-00302" in deps_issues["nodes"]
+            assert "iss-00303" in deps_issues["nodes"]
 
             deps_issues_puml = deps_issues_puml_path.read_text(encoding="utf-8")
-            self.assertIn("iss-00302", deps_issues_puml)
-            self.assertIn("iss-00303", deps_issues_puml)
-            self.assertNotIn("iss-00301", deps_issues_puml)
+            assert "iss-00302" in deps_issues_puml
+            assert "iss-00303" in deps_issues_puml
+            assert "iss-00301" not in deps_issues_puml
 
             # Legacy v1 deps artifacts are no longer generated.
-            self.assertFalse((target / "spec-dock" / ".agent" / "deps.json").exists())
-            self.assertFalse((target / "spec-dock" / ".agent" / "deps.puml").exists())
-            self.assertFalse((target / "spec-dock" / ".agent" / "deps.todo.puml").exists())
+            assert not (target / "spec-dock" / ".agent" / "deps.json").exists()
+            assert not (target / "spec-dock" / ".agent" / "deps.puml").exists()
+            assert not (target / "spec-dock" / ".agent" / "deps.todo.puml").exists()
 
     def test_sync_github_passes_gh_limit_to_gh(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -1392,24 +1351,24 @@ class TestCliSync(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["sync", "--gh-limit", "10000", "--no-update-active"], env=test_env)
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
 
-            self.assertTrue(log_path.is_file())
+            assert log_path.is_file()
             lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
-            self.assertNotEqual(lines, [])
+            assert lines != []
             argv = lines[-1].split()
-            self.assertIn("--limit", argv)
+            assert "--limit" in argv
             i = argv.index("--limit")
-            self.assertLess(i + 1, len(argv))
-            self.assertEqual(argv[i + 1], "10000")
+            assert i + 1 < len(argv)
+            assert argv[i + 1] == "10000"
 
     def test_sync_github_index_incomplete_warns_and_marks_unknown(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -1435,24 +1394,21 @@ class TestCliSync(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["sync", "--no-update-active"], env=test_env)
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("gh_fetch_failed", p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "gh_fetch_failed" in p.stderr
 
             index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
             nodes = index["nodes"]
-            self.assertEqual(nodes["iss-00301"]["status"], "unknown")
-            self.assertEqual(
-                nodes["iss-00301"]["github"],
-                {"issue_number": 301, "repo_owner": "example", "repo_name": "repo"},
-            )
+            assert nodes["iss-00301"]["status"] == "unknown"
+            assert nodes["iss-00301"]["github"] == {"issue_number": 301, "repo_owner": "example", "repo_name": "repo"}
 
     def test_sync_github_fetch_failure_warns_and_continues(self) -> None:
         if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
+            assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -1471,9 +1427,9 @@ class TestCliSync(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["sync", "--no-update-active"], env=test_env)
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("gh_fetch_failed", p.stderr)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "gh_fetch_failed" in p.stderr
 
             index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
             nodes = index["nodes"]
-            self.assertEqual(nodes["iss-00301"]["status"], "unknown")
+            assert nodes["iss-00301"]["status"] == "unknown"
