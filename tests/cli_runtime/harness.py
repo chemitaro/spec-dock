@@ -37,8 +37,6 @@ _EXPECTED_MANAGED_SKILL_NAMES = (
     "spec-dock-issue-planning",
     "spec-dock-issue-execution",
     "spec-dock-clarification",
-    "spec-dock-system-architect",
-    "spec-dock-implementation-planner",
     "spec-dock-adr-facilitation",
     "spec-dock-codex-adapter",
     "spec-dock-copilot-adapter",
@@ -46,6 +44,10 @@ _EXPECTED_MANAGED_SKILL_NAMES = (
     "github-codex-pr-review-comments",
     "github-pr-creator",
     "github-pr-merge-preparer",
+)
+_DELETED_ROLE_SKILL_NAMES = (
+    "spec-dock-system-architect",
+    "spec-dock-implementation-planner",
 )
 
 
@@ -545,6 +547,15 @@ class CliRuntimeHarness:
             installed_managed,
             sorted(f"{name}/SKILL.md" for name in _EXPECTED_MANAGED_SKILL_NAMES),
         )
+        installed_skill_names = {
+            skill_file.split("/", 1)[0] for skill_file in self._installed_skill_files(target)
+        }
+        for deleted_skill_name in _DELETED_ROLE_SKILL_NAMES:
+            _assert_equal(
+                deleted_skill_name not in installed_skill_names,
+                True,
+                f"deleted role skill must not be installed: {deleted_skill_name}",
+            )
 
     def _read_text_map(self, base: Path, rel_paths: list[str]) -> dict[str, str]:
         out: dict[str, str] = {}
