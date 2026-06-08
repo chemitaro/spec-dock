@@ -40,7 +40,9 @@ ID: "iss-00170"
 - CI/check/status と review/comment/thread/request は収集対象としては性質が異なるため内部 collector は分けるべきだが、merge-prepared evidence としては同じ head SHA / observation window に基づく combined wait result が必要である。
 - `wait_pr_observation.sh` は10〜30分程度の foreground wait になりうるため、silent wait ではなく stderr progress による liveness が必要である。
 - review 本文は PR 全件を常に出すと古い指摘がノイズになるため、`@codex review` trigger comment を基準にした trigger window 内の本文を final JSON に含める必要がある。
+- `@codex review` という文字列を含む通常 feedback を trigger command と誤分類すると、最新の人間/レビュー指摘が current review signal から消えるため、trigger 判定は actual command comment に限定する必要がある。
 - CI は件数だけでは修正判断に不足するため、失敗時は workflow / run / job / failed step を machine-readable に返す必要がある。
+- `.codex/config.toml` は bootstrap-only file であり通常 update では上書きされないため、既存 repo に残る stale `pr-monitor` / `github-codex-pr-review-comments` guidance は、旧 agent を復活させずに fixed migration で解消する必要がある。
 
 ## 対象ユーザー / 利用シナリオ
 
@@ -70,11 +72,13 @@ ID: "iss-00170"
   - `--out` は optional debug/audit mode とし、通常 path の必須 artifact を増やさない。
   - all review signals と Codex-authored subset を分けて出力する。
   - `@codex review` trigger comment を explicit input または fixed inference で特定し、trigger window 後の review/comment body を final JSON に含める。
+  - trigger command 判定は、explicit trigger comment id または本文の first nonblank line が `@codex review` command である comment に限定する。
   - review body inclusion は `--body-mode` で制御し、default は bounded な `trigger-window-truncated` とする。
   - CI failure detail として workflow / run / job / failed step を取得できる範囲で final JSON に含める。
   - review thread state が取得できる場合は unresolved / resolved / outdated を区別し、取得できない場合は limitation として machine-readable に出力する。
   - `overall_status` 互換を維持しつつ、`normalized_status`、`observation_complete`、`limitations`、`summary`、`recommended_next_action` を final JSON に出力する。
   - provider-side source と dogfooding mirror の parity、old asset retirement、wrapper schema、progress contract に対する regression coverage を追加または更新する。
+  - bootstrap-only `.codex/config.toml` に stale `pr-monitor` / old review wrapper guidance が残る既存 repo は、update 時に `github-pr-observation` direct invocation guidance へ移行する。
 - 禁止:
   - `pr-monitor` provider / mirror asset を残さない。
   - deprecated shim を残さない。
@@ -123,7 +127,9 @@ ID: "iss-00170"
 - stderr progress は final decision authority ではない。
 - `--out` artifacts は optional debug/audit output であり、通常 path の正規受け渡しではない。
 - review/comment body を final JSON に含める場合も、trigger window、body mode、size cap、truncation metadata に従う。
+- `@codex review` trigger command は explicit trigger id または first nonblank line command としてだけ扱い、本文中の単なる言及は通常 feedback signal として保持する。
 - body hash / fingerprint には raw body ではなく body hash を使う。
+- wait wrapper の semantic stability 判定は、wrapper 実行ごとに変わり得る raw snapshot fingerprint ではなく、head / CI / review / limitations / normalized status 等の意味的 field に基づく。
 - CI failure detail は取得可能な workflow / run / job / failed step metadata に限定し、log body 全文取得は本 issue の通常 path に含めない。
 - Thread state 不明、wrapper failure、stale head、zero-check grace 未満は success ではない。
 - Provider-side source of truth は `src/spec_dock/assets/install_root/` であり、dogfooding mirror は検証対象として parity を保つ。
@@ -254,6 +260,7 @@ ID: "iss-00170"
   - 期待結果:
     - terminal / complete / stable の条件を満たすまで success としない。
     - checks green 直後に遅れて付く review signal を見逃しにくい。
+    - wrapper 側の semantic fingerprint は、raw snapshot fingerprint のみの churn で same-fingerprint count を無限に reset しない。
 - AC-006:
   - アクター:
     - snapshot helper / review collector。
@@ -321,6 +328,7 @@ ID: "iss-00170"
     - provider-side source と dogfooding mirror に `github-pr-observation` が存在する。
     - provider-side source と dogfooding mirror に `pr-monitor` assets と `github-codex-pr-review-comments` skill が残らない。
     - init/update regression が managed asset inventory の drift を検出できる。
+    - 既存 bootstrap-only `.codex/config.toml` に stale `pr-monitor` / old review wrapper guidance がある場合、update は旧 agent / shim を復活させず `github-pr-observation` direct invocation guidance へ移行する。
 - AC-012:
   - アクター:
     - wait wrapper / review collector。
@@ -329,6 +337,8 @@ ID: "iss-00170"
   - 操作:
     - trigger 後に付いた PR conversation comment、inline review comment、review body を取得する。
   - 期待結果:
+    - trigger comment 自身、または first nonblank line が `@codex review` command である inferred trigger comment は `trigger_command=true` として識別される。
+    - `@codex review` という文字列を本文途中に含む通常 feedback は trigger command ではなく current review/comment signal として残る。
     - trigger 前の old review/comment body は final JSON の current trigger-window payload に含まれない。
     - trigger 後の body は `--body-mode` と cap に従って final JSON に含まれる。
     - cap 超過時は truncation / overflow metadata を出す。
@@ -341,7 +351,8 @@ ID: "iss-00170"
   - 操作:
     - fixed logic で最新の `@codex review` comment を探す。
   - 期待結果:
-    - 見つかった場合は `trigger.source=inferred` と `limitations=["trigger_inferred"]` 相当を出す。
+    - first nonblank line が `@codex review` command である comment が見つかった場合は `trigger.source=inferred` と `limitations=["trigger_inferred"]` 相当を出す。
+    - 本文途中の単なる `@codex review` 言及だけでは inferred trigger としない。
     - 見つからない場合は body payload を全件化せず、trigger unknown limitation と recommended next action を出す。
 - AC-014:
   - アクター:

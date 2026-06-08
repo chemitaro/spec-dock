@@ -338,7 +338,21 @@ def is_codex_authored(login):
 
 
 def is_trigger_command_body(body):
-    return "@codex review" in str(body or "").lower()
+    for line in str(body or "").splitlines():
+        stripped = line.strip().lower()
+        if not stripped:
+            continue
+        return stripped == "@codex review" or stripped.startswith("@codex review ")
+    return False
+
+
+def is_explicit_trigger_comment(comment):
+    if trigger_comment_id is None:
+        return False
+    try:
+        return int(comment.get("id") or 0) == trigger_comment_id
+    except (TypeError, ValueError):
+        return False
 
 
 def sha_prefix_matches(left, right):
@@ -530,7 +544,7 @@ elif issue_comments:
     inferred_candidates = []
     for comment in issue_comments:
         body = str(comment.get("body") or "")
-        if "@codex review" in body.lower():
+        if is_trigger_command_body(body):
             inferred_candidates.append(comment)
     if inferred_candidates:
         inferred_candidates.sort(key=lambda item: (str(item.get("created_at") or ""), int(item.get("id") or 0)))
@@ -589,7 +603,7 @@ for comment in issue_comments:
             "codex_authored": is_codex_authored(user_login(comment)),
             "created_at": comment.get("created_at"),
             "state": "commented",
-            "trigger_command": is_trigger_command_body(raw_body),
+            "trigger_command": is_explicit_trigger_comment(comment) or is_trigger_command_body(raw_body),
             "_raw_body": raw_body,
         }
     )
