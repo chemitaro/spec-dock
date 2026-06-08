@@ -2021,6 +2021,7 @@ def _apply_managed_skill_install_plan(
     for target_rel, source_path, target_path in current_sync_plan:
         if target_rel in bootstrap_only_target_rel_paths and target_path.exists():
             if target_path.is_file():
+                _migrate_bootstrap_only_config_if_stale(target_rel, target_path)
                 continue
             raise RuntimeError(
                 "target directory/container conflict for current managed path "
@@ -2064,6 +2065,28 @@ def _apply_managed_skill_install_plan(
             "target directory/container conflict for obsolete managed path "
             f"'{obsolete_rel.as_posix()}' (non-file entry at exact file path)"
         )
+
+
+def _migrate_bootstrap_only_config_if_stale(target_rel: Path, target_path: Path) -> None:
+    if target_rel.as_posix() != ".codex/config.toml":
+        return
+    try:
+        target_text = target_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return
+    migrated_text = target_text
+    replacements = (
+        (
+            "PR 作成後の checks / statuses / Codex review 監視は pr-monitor",
+            "PR 作成後の checks / statuses / Codex review 監視は "
+            "`github-pr-observation` skill の "
+            "`./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` direct invocation",
+        ),
+    )
+    for old, new in replacements:
+        migrated_text = migrated_text.replace(old, new)
+    if migrated_text != target_text:
+        target_path.write_text(migrated_text, encoding="utf-8")
 
 
 def _install_skill(target_root: Path, *, plan: _ManagedSkillInstallPlan | None = None) -> None:

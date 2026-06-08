@@ -74,6 +74,10 @@ ID: "iss-00170"
   - `.codex/agents/pr-monitor.toml`
   - `.github/agents/pr-monitor.agent.md`
   - `.agents/skills/github-codex-pr-review-comments/`
+- bootstrap-only config:
+  - `.codex/config.toml` は既存 repo の local guidance を通常 update で全面上書きしない。
+  - そのため stale `pr-monitor` / `github-codex-pr-review-comments` guidance が残ると、旧 agent asset 削除後も orchestrator routing が retired role を参照し続ける。
+  - update は旧 agent / compatibility shim を復活させず、known stale references だけを `github-pr-observation` skill / `wait_pr_observation.sh` direct invocation guidance へ fixed migration する。
 - tests:
   - `tests/unit/infra/test_init_update.py`
   - installed asset inventory / parity / stale cleanup tests。
@@ -112,6 +116,9 @@ ID: "iss-00170"
 - D8: PR workflow skills は維持する。
   - `github-pr-merge-preparer` / `github-pr-creator` は今回 agent 化しない。
   - ただし `pr-monitor` handoff は `github-pr-observation` invocation に置き換える。
+- D9: 既存 bootstrap-only `.codex/config.toml` の stale guidance は targeted migration する。
+  - update は user edits を保ち、既知の `pr-monitor` / `github-codex-pr-review-comments` / old wrapper 参照だけを `github-pr-observation` direct invocation guidance に置換する。
+  - 旧 agent や compatibility shim を復活させない。
 
 ## 依存関係分析
 
@@ -459,10 +466,13 @@ Trigger window は `@codex review` command comment を基準にする。
 - explicit trigger:
   - caller が `--trigger-comment-id` と `--trigger-created-at` を渡す。
   - この mode が最も正確であり、推奨 path とする。
+  - `--trigger-comment-id` と一致する issue comment は、本文 shape にかかわらず explicit trigger command として扱う。
   - caller が `--trigger-comment-id` だけを渡した場合、review collector は固定 issue comments 取得結果から同 id の `created_at` を解決する。
   - id から timestamp を解決できない場合は `trigger.source=unknown` とし、`trigger_timestamp_unresolved` informational limitation を出す。
 - inferred trigger:
-  - explicit trigger がない場合、script は fixed logic で PR conversation comments から最新の `@codex review` comment を探してよい。
+  - explicit trigger がない場合、script は fixed logic で PR conversation comments から最新の actual `@codex review` command comment を探してよい。
+  - actual command comment は first nonblank line が `@codex review` または `@codex review ` で始まる comment に限定する。
+  - body 中の単なる `@codex review` 言及は trigger ではなく、trigger window 内なら通常 review/comment signal として扱う。
   - 推定した場合は `trigger.source=inferred` と `limitations` に `trigger_inferred` を出す。
 - unknown trigger:
   - trigger が見つからない場合、body payload を全件化しない。
@@ -519,6 +529,8 @@ Fingerprint participation rule:
 - trigger window payload も fingerprint では raw body ではなく `body_sha256` と truncation metadata を使う。
 - outstanding `review_requests` は default では success blocker ではないが、fingerprint と counts には含める。
 - `thread_state_available=false` の場合、visible signals が0件でも `review_state_unknown` / limitation が fingerprint と final classification に参加する。
+- wait wrapper の stability fingerprint は、snapshot payload の raw `fingerprint` 文字列をそのまま使わず、head / normalized status / recommended next action / CI summary / review summary / limitations / trigger / body metadata 等の wait decision inputs から作る semantic fingerprint とする。
+- これにより、snapshot 実行ごとの内部 fingerprint churn だけで same-fingerprint count が reset され続けることを防ぐ。
 
 ### CI failure detail schema
 
@@ -730,6 +742,8 @@ CI logs の全文取得は通常 path には含めない。
 `normalized_status`、`recommended_next_action`、`observation_complete` を導出する。head mismatch、
 blocking limitation、CI failure / pending / running / none、review human gate を wait wrapper と同じ top-level
 意味へ正規化するが、quiet window / same fingerprint の安定判定は wait wrapper だけが担う。
+wait wrapper はこの snapshot の top-level `normalized_status=human_gate` と PR lifecycle 用 `recommended_next_action`
+を preserve し、draft / closed PR を CI/review summary だけから `merge_prepared` へ再分類しない。
 PR metadata の `isDraft=true` は `normalized_status=human_gate` / `recommended_next_action=mark_pr_ready_for_review`、
 `state != OPEN` は `normalized_status=human_gate` / `recommended_next_action=reopen_or_use_open_pr` として扱い、
 CI / review が green に見えても merge-prepared success にしない。
@@ -768,7 +782,8 @@ script failure ではなく人間または実装 agent への handoff 状態と�
    - arbitrary GitHub request option を受け付けない。
 2. Trigger resolution:
    - explicit `--trigger-comment-id` / `--trigger-created-at` があれば `trigger.source=explicit` とする。
-   - explicit trigger がない場合は fixed REST GET で PR conversation comments から最新の `@codex review` comment を推定する。
+   - explicit trigger がない場合は fixed REST GET で PR conversation comments から最新の actual `@codex review` command comment を推定する。
+   - actual command は first nonblank line の command だけとし、本文途中の単なる言及は trigger 推定に使わない。
    - 推定した場合は `trigger.source=inferred` と `limitations=["trigger_inferred"]` 相当を出す。
    - trigger が不明な場合は body payload を全件化せず、limitation と recommended next action を出す。
 3. Snapshot collection:
@@ -783,6 +798,7 @@ script failure ではなく人間または実装 agent への handoff 状態と�
 5. Fingerprint:
    - head SHA、checks/statuses normalized state、review ids/states/thread states/`body_sha256`/review requests、limitations を含める。
    - raw body は含めない。
+   - wait wrapper の same-fingerprint 判定は raw snapshot `fingerprint` ではなく、wait decision inputs の semantic fingerprint を使う。
 6. Progress:
    - poll ごとに stderr へ current-state summary を最大1行出す。
    - 完了済み領域は compact status に畳む。
@@ -834,7 +850,7 @@ script failure ではなく人間または実装 agent への handoff 状態と�
   - `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`
   - `src/spec_dock/assets/install_root/.agents/skills/github-pr-creator/SKILL.md`
   - host / role guidance that mentions `pr-monitor`
-  - installer / update cleanup behavior if stale managed assets are otherwise left behind
+  - installer / update cleanup behavior if stale managed assets or bootstrap-only `.codex/config.toml` guidance are otherwise left behind
   - tests for asset inventory, parity, stale cleanup, stdout/stderr contract, progress taxonomy。
 
 ## テスト設計
@@ -880,7 +896,8 @@ script failure ではなく人間または実装 agent への handoff 状態と�
   - trigger 後の PR conversation comment body、inline review comment body、review body が body mode に応じて出る。
   - PR conversation comment が trigger と同一 timestamp の場合、`id > trigger_comment_id` のものだけ含まれる。
   - expected head SHA と一致しない review/comment は stale / prior-head signal として分離される。
-  - explicit trigger がない場合、最新 `@codex review` comment が inferred trigger になり、`trigger_inferred` limitation が出る。
+  - explicit trigger がない場合、first nonblank line が `@codex review` command である最新 comment が inferred trigger になり、`trigger_inferred` limitation が出る。
+  - body 中の単なる `@codex review` 言及は inferred trigger にならず、trigger window 内なら通常 feedback signal として残る。
   - trigger が見つからない場合、body payload が全件化されず、trigger unknown limitation と recommended next action が出る。
   - `trigger-window-truncated` で per-item / total cap 超過時も valid JSON が出て、truncation / overflow metadata が付く。
   - `none` では body が出ず、metadata と `body_sha256` のみになる。
@@ -892,6 +909,7 @@ script failure ではなく人間または実装 agent への handoff 状態と�
   - init/update で `github-codex-pr-review-comments` skill が残らない。
   - provider-side source と dogfooding mirror の parity を確認する。
   - stale managed assets cleanup が必要な場合、test-visible にする。
+  - bootstrap-only `.codex/config.toml` に stale `pr-monitor` / old wrapper guidance がある update fixture で、user edits を保ったまま `github-pr-observation` direct invocation guidance へ移行されることを確認する。
 
 ## リスクと緩和
 
@@ -928,6 +946,7 @@ script failure ではなく人間または実装 agent への handoff 状態と�
   - trigger 推定が誤ると古い review body を混ぜる、または必要な review body を落とす。
 - Mitigation:
   - 推奨 path は explicit `--trigger-comment-id` + `--trigger-created-at` とする。
+  - inferred trigger は first nonblank line command に限定し、本文途中の単なる言及は trigger とみなさない。
   - inferred trigger は `limitations` に明示する。
   - trigger unknown の場合は全件 body 出力に fallback しない。
 

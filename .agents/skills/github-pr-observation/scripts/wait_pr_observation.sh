@@ -230,6 +230,44 @@ def has_zero_check_limitation(payload: dict) -> bool:
     )
 
 
+def sanitized_review_signals(payload: dict) -> list:
+    review = payload.get("review")
+    if not isinstance(review, dict):
+        return []
+    safe_keys = (
+        "kind",
+        "id",
+        "review_id",
+        "author",
+        "codex_authored",
+        "created_at",
+        "submitted_at",
+        "updated_at",
+        "activity_at",
+        "state",
+        "commit_id",
+        "original_commit_id",
+        "stale",
+        "trigger_command",
+        "path",
+        "line",
+        "thread_id",
+        "thread_state",
+        "body_sha256",
+        "body_truncated",
+        "body_original_length",
+        "omitted_reason",
+    )
+    signals = review.get("signals")
+    if not isinstance(signals, list):
+        return []
+    return [
+        {key: item.get(key) for key in safe_keys}
+        for item in signals
+        if isinstance(item, dict)
+    ]
+
+
 def semantic_fingerprint(payload: dict) -> str:
     source = {
         "repo": payload.get("repo"),
@@ -237,7 +275,6 @@ def semantic_fingerprint(payload: dict) -> str:
         "expected_head_sha": payload.get("expected_head_sha"),
         "current_head_sha": payload.get("current_head_sha"),
         "head_matches_expected": payload.get("head_matches_expected"),
-        "snapshot_fingerprint": payload.get("fingerprint"),
         "normalized_status": payload.get("normalized_status"),
         "limitations": limitation_codes(payload),
         "ci": {
@@ -255,7 +292,17 @@ def semantic_fingerprint(payload: dict) -> str:
             "fingerprint": payload.get("review", {}).get("fingerprint")
             if isinstance(payload.get("review"), dict)
             else None,
+            "signals": sanitized_review_signals(payload),
+            "review_requests": payload.get("review", {}).get("review_requests")
+            if isinstance(payload.get("review"), dict)
+            else None,
+            "summary": payload.get("review", {}).get("summary")
+            if isinstance(payload.get("review"), dict)
+            else None,
             "threads": payload.get("review", {}).get("threads")
+            if isinstance(payload.get("review"), dict)
+            else None,
+            "body_mode": payload.get("review", {}).get("body_mode")
             if isinstance(payload.get("review"), dict)
             else None,
         },
@@ -464,9 +511,16 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
     review = payload.get("review") if isinstance(payload.get("review"), dict) else {}
     ci_status = ci.get("status") or payload.get("summary", {}).get("ci") or "unknown"
     review_status = review.get("status") or payload.get("summary", {}).get("review") or "unknown"
+    top_level_status = payload.get("normalized_status")
+    top_level_next_action = payload.get("recommended_next_action")
 
-    if payload.get("head_matches_expected") is False or payload.get("normalized_status") == "stale_head":
+    if payload.get("head_matches_expected") is False or top_level_status == "stale_head":
         return "stale_head", "stale_head", "rerun_for_current_head", False, True
+    if (
+        top_level_status == "human_gate"
+        and top_level_next_action in {"mark_pr_ready_for_review", "reopen_or_use_open_pr"}
+    ):
+        return "human_gate", "human_gate", top_level_next_action, False, True
     if ci_status == "none" and has_zero_check_limitation(payload):
         if has_blocking_limitation(payload, ignored_codes={"zero_checks_s03_non_success"}):
             return "unknown", "unknown", "human_gate", False, True
@@ -509,8 +563,14 @@ def progress_line(
     return line[:240]
 
 
-def mark_latest_timeout(payload: dict, latest_change_monotonic: float, same_count: int) -> None:
-    quiet_elapsed = int(max(0, time.monotonic() - latest_change_monotonic))
+def mark_latest_timeout(
+    payload: dict,
+    latest_change_monotonic: float,
+    same_count: int,
+    quiet_elapsed: int | None = None,
+) -> None:
+    if quiet_elapsed is None:
+        quiet_elapsed = int(max(0, time.monotonic() - latest_change_monotonic))
     append_snapshot_poll_timeout_limitation(
         payload,
         0,
@@ -665,7 +725,7 @@ while True:
         final_phase = "terminal"
     elif time.monotonic() >= deadline:
         final_phase = "timeout"
-        mark_latest_timeout(payload, latest_change_monotonic, same_count)
+        mark_latest_timeout(payload, latest_change_monotonic, same_count, quiet_elapsed)
         normalized_status = "timeout"
         overall_status = "timeout"
         next_action = "wait_or_rerun"

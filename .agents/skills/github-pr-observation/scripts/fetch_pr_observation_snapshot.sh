@@ -384,6 +384,13 @@ else:
         )
 
 normalized_status, recommended_next_action, observation_complete = classify_snapshot()
+review_collector_fingerprint = (
+    review_wrapper_payload.get("fingerprint")
+    if "review_wrapper_payload" in locals() and isinstance(review_wrapper_payload, dict)
+    else None
+)
+if isinstance(review_payload, dict) and review_collector_fingerprint:
+    review_payload = {**review_payload, "fingerprint": review_collector_fingerprint}
 
 fingerprint_source = {
     "repo": repo,
@@ -395,7 +402,7 @@ fingerprint_source = {
     "ci_status": ci_payload.get("status"),
     "ci_fingerprint": checks_payload.get("fingerprint") if "checks_payload" in locals() else None,
     "review_status": review_payload.get("status"),
-    "review_fingerprint": review_wrapper_payload.get("fingerprint") if "review_wrapper_payload" in locals() else None,
+    "review_fingerprint": review_collector_fingerprint,
 }
 fingerprint = hashlib.sha256(
     json.dumps(fingerprint_source, sort_keys=True, separators=(",", ":")).encode()
