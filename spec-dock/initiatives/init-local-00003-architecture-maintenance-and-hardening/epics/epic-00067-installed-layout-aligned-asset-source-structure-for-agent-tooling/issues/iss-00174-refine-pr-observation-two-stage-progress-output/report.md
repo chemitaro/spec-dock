@@ -49,7 +49,8 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | user / orchestrator | `iss-00170` の main PR は merge 済みだが、polling progress 表示はユーザー意図と異なるため後続 issue へ切り出された。 | A: `iss-00170` へ追加実装を戻す; B: 新 issue `iss-00174` で progress 表示改善として扱う | B を採用する。`iss-00174` は `github-pr-observation` wait wrapper の stderr progress 二段階表示、quiet reset semantics、focused tests を扱う follow-up issue とする。 | PR #173 / GitHub #170 は close 済みであり、追加改善は scope / review / delivery を分離した方が安全で追跡しやすい。 | applied | `requirement.md`; `discussions/20260608t024500z-research-progress-line-two-stage-status-analysis.md`; `discussions/20260608t030500z-disc-progress-line-two-stage-design-proposal.md` | none |
+| D-002 | resolved | interpretation | user interview / orchestrator | progress line の `comments=N` が、PR 全体コメント、Codex authored 全件、trigger-window signal、unresolved thread のどれを指すかで要件が変わる。 | A: PR 全体コメント件数; B: Codex authored 全件; C: `@codex review` trigger 以後の今回の観測窓で捕捉した Codex review comments / review signals 件数 | C を採用する。古い PR 全体コメントや過去 unresolved thread は `comments=N` へ毎回積み上げない。 | ユーザー回答が Yes で確定済み。目的は「今回のレビューが 0 -> 1 -> 2 と進んでいる」ことを読むこと。 | applied | `discussions/20260608t025500z-interview-progress-review-comment-count.md`; `requirement.md` | design / plan で projection と tests を具体化する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +64,9 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | research / discussion | `requirement.md` | progress line の現状、目標二段階表示、quiet reset、テスト観点を要件へ昇格するための主要 evidence として十分。 | `discussions/20260608t024500z-research-progress-line-two-stage-status-analysis.md`; `requirement.md` | fresh `spec-reviewer` review |
+| EAL-002 | adopted | interview | `requirement.md` | `comments=N` の定義はユーザー意図 blocker だったため、回答済み interview を要件の非交渉制約・受け入れ条件へ反映した。 | `discussions/20260608t025500z-interview-progress-review-comment-count.md`; `requirement.md` | fresh `spec-reviewer` review |
+| EAL-003 | partially_adopted | discussion | `requirement.md` | design proposal / implementation plan draft は要件粒度に必要な範囲のみ採用し、projection structure や optional field drop order などの詳細は次の design / plan へ残した。 | `discussions/20260608t030500z-disc-progress-line-two-stage-design-proposal.md`; `discussions/20260608t031000z-disc-progress-line-two-stage-implementation-plan.md`; `requirement.md` | design authoring で再採用判断 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +74,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | Primary objective is better long-running PR observation progress readability without changing stdout final JSON authority. | Secondary requirements include provider/mirror parity, no new GitHub API calls for progress only, and focused regression tests. | low | passed by fresh `spec-reviewer` (`/private/tmp/iss-00174-requirement-spec-review-2.json`) |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +82,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | active issue docs; parent epic requirement; progress research; answered interview; design proposal; implementation plan draft; provider wait script; tests grep | `comments=N` definition answered in `discussions/20260608t025500z-interview-progress-review-comment-count.md`; no new blocking user question | adopted into `requirement.md`; first review P2 findings fixed; requirement marked approved | passed (`/private/tmp/iss-00174-requirement-spec-review-2.json`, findings=[]) | no | promote to design authoring |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -208,7 +211,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| requirement | requirement authoring gate | spec-reviewer | fresh after latest substantive change | passed | no | proceed to design authoring | `/private/tmp/iss-00174-requirement-spec-review-2.json`; findings=[]; previous P2 findings from `/private/tmp/iss-00174-requirement-spec-review-1.json` were fixed |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
