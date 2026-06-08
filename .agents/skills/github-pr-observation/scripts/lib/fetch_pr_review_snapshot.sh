@@ -416,9 +416,38 @@ def signal_activity_time(signal):
     )
 
 
+def numeric_id_sort_key(value):
+    try:
+        return (0, int(value))
+    except (TypeError, ValueError):
+        return (1, str(value or ""))
+
+
+def signal_sort_key(signal):
+    return (
+        signal_time(signal),
+        numeric_id_sort_key(signal.get("id")),
+        int(signal.get("_api_index") or 0),
+    )
+
+
+def review_collapse_key(signal):
+    return (
+        signal_activity_time(signal) or "",
+        numeric_id_sort_key(signal.get("id")),
+        int(signal.get("_api_index") or 0),
+    )
+
+
 def is_after_trigger(signal):
     if trigger_created_at_dt is None:
         return False
+    if signal.get("kind") == "issue_comment" and trigger_comment_id is not None:
+        try:
+            if int(signal.get("id") or 0) == trigger_comment_id:
+                return False
+        except (TypeError, ValueError):
+            pass
     activity_at = signal_activity_time(signal)
     if not activity_at:
         return False
@@ -430,11 +459,20 @@ def is_after_trigger(signal):
     if activity_at_dt < trigger_created_at_dt:
         return False
     if signal.get("kind") == "issue_comment" and trigger_comment_id is not None:
+        updated_at_dt = parse_iso8601_instant(signal.get("updated_at"))
+        created_at_dt = parse_iso8601_instant(signal.get("created_at"))
+        if (
+            updated_at_dt is not None
+            and updated_at_dt >= trigger_created_at_dt
+            and created_at_dt is not None
+            and created_at_dt < trigger_created_at_dt
+        ):
+            return True
         try:
             return int(signal.get("id") or 0) > trigger_comment_id
         except (TypeError, ValueError):
             return False
-    return True
+    return False
 
 
 def body_hash(body):
@@ -602,19 +640,21 @@ for comment in issue_comments:
             "author": user_login(comment),
             "codex_authored": is_codex_authored(user_login(comment)),
             "created_at": comment.get("created_at"),
+            "updated_at": comment.get("updated_at"),
             "state": "commented",
             "trigger_command": is_explicit_trigger_comment(comment) or is_trigger_command_body(raw_body),
             "_raw_body": raw_body,
         }
     )
 
-for review in reviews:
+for review_index, review in enumerate(reviews):
     commit_id = review.get("commit_id")
     stale = bool(expected_head_sha and commit_id and not sha_prefix_matches(commit_id, expected_head_sha))
     signals.append(
         {
             "kind": "pull_review",
             "id": review.get("id"),
+            "_api_index": review_index,
             "author": user_login(review),
             "codex_authored": is_codex_authored(user_login(review)),
             "submitted_at": review.get("submitted_at"),
@@ -633,6 +673,7 @@ for comment in review_comments:
             "kind": "pull_review_comment",
             "id": comment.get("id"),
             "review_id": comment.get("pull_request_review_id"),
+            "thread_id": comment.get("thread_id"),
             "author": user_login(comment),
             "codex_authored": is_codex_authored(user_login(comment)),
             "created_at": comment.get("created_at"),
@@ -675,9 +716,11 @@ review_decision_requires_review = (
     str(review_decision or "").upper() == "REVIEW_REQUIRED"
     and not review_request_signals
 )
+review_decision_changes_requested = str(review_decision or "").upper() == "CHANGES_REQUESTED"
 
 threads = []
 thread_comment_states = {}
+thread_states_by_thread_id = {}
 for thread in thread_nodes:
     comments = thread_comment_nodes(thread)
     first_comment = comments[0] if comments else {}
@@ -695,6 +738,12 @@ for thread in thread_nodes:
     resolved = bool(thread.get("isResolved"))
     outdated = bool(thread.get("isOutdated"))
     state = "resolved" if resolved else "outdated" if outdated else "unresolved"
+    thread_id = thread.get("id")
+    if thread_id is not None:
+        thread_states_by_thread_id[str(thread_id)] = {
+            "thread_id": thread_id,
+            "state": state,
+        }
     comment_ids = []
     for comment in comments:
         comment_id = comment.get("databaseId")
@@ -703,7 +752,7 @@ for thread in thread_nodes:
         if comment_id is not None:
             comment_ids.append(comment_id)
             thread_comment_states[str(comment_id)] = {
-                "thread_id": thread.get("id"),
+                "thread_id": thread_id,
                 "state": state,
             }
     threads.append(
@@ -723,7 +772,7 @@ for thread in thread_nodes:
         }
     )
 
-signals.sort(key=lambda item: (signal_time(item), str(item.get("id") or "")))
+signals.sort(key=signal_sort_key)
 body_state = {
     "trigger_known": trigger_source in {"explicit", "inferred"} and trigger_created_at_dt is not None,
     "included_count": 0,
@@ -735,6 +784,8 @@ for signal in signals:
     add_body_metadata(signal, body_state)
     if signal.get("kind") == "pull_review_comment":
         thread_state = thread_comment_states.get(str(signal.get("id")))
+        if not thread_state and signal.get("thread_id") is not None:
+            thread_state = thread_states_by_thread_id.get(str(signal.get("thread_id")))
         if thread_state:
             signal["thread_id"] = thread_state.get("thread_id")
             signal["thread_state"] = thread_state.get("state")
@@ -814,7 +865,7 @@ for item in status_signals:
         continue
     author_key = item.get("author") or f"id:{item.get('id')}"
     previous = current_review_by_author.get(author_key)
-    if previous is None or (signal_activity_time(item) or "") >= (signal_activity_time(previous) or ""):
+    if previous is None or review_collapse_key(item) >= review_collapse_key(previous):
         current_review_by_author[author_key] = item
 active_review_signals = list(current_review_by_author.values())
 active_comment_signals = [
@@ -823,12 +874,16 @@ active_comment_signals = [
     if item.get("kind") == "pull_review_comment"
     and item.get("thread_state") not in {"resolved", "outdated"}
 ]
+for signal in signals:
+    signal.pop("_api_index", None)
 
 if blocking_collection_failure:
     status = "unknown"
 elif any(item.get("state") == "unresolved" for item in threads):
     status = "unresolved"
 elif any(item.get("state") == "changes_requested" for item in active_review_signals):
+    status = "changes_requested"
+elif review_decision_changes_requested:
     status = "changes_requested"
 elif review_request_signals:
     status = "requested"
