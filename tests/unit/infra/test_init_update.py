@@ -1143,6 +1143,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00142-matt-pocock-skill-adoption-analysis/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00151-codex-agent-gpt55-low-reasoning/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00170-harden-pr-monitor-stable-observation/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00174-refine-pr-observation-two-stage-progress-output/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json",
@@ -1259,6 +1260,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00142-matt-pocock-skill-adoption-analysis/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00151-codex-agent-gpt55-low-reasoning/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00170-harden-pr-monitor-stable-observation/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00174-refine-pr-observation-two-stage-progress-output/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json": [],
@@ -12983,6 +12985,550 @@ exit 44
                 capture_output=True,
                 text=True,
                 check=False,
+            )
+            assert quiet_result.returncode == 0, quiet_result.stdout + quiet_result.stderr
+            json.loads(quiet_result.stdout)
+            assert quiet_result.stderr == ""
+
+    def _issue_174_write_wait_fake_snapshot_script(self, script_path: Path) -> None:
+        script_path.write_text(
+            """#!/usr/bin/env python3
+import json
+import os
+from pathlib import Path
+
+scenario = json.loads(Path(os.environ["FAKE_SNAPSHOT_SCENARIO"]).read_text(encoding="utf-8"))
+state_path = Path(os.environ["FAKE_SNAPSHOT_STATE"])
+poll = int(state_path.read_text(encoding="utf-8")) + 1 if state_path.exists() else 1
+state_path.write_text(str(poll), encoding="utf-8")
+current = scenario[min(poll - 1, len(scenario) - 1)]
+head = current.get("head", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+ci_status = current.get("ci", "running")
+review_status = current.get("review", "none")
+check_runs = current.get("check_runs", {
+    "total": 0,
+    "success": 0,
+    "skipped": 0,
+    "neutral": 0,
+    "failed": 0,
+    "running": 0,
+    "pending": 0,
+    "other": 0,
+    "stale": 0,
+})
+signals = current.get("signals", [])
+threads = current.get("threads", {"total": 0, "unresolved": 0, "items": []})
+payload = {
+    "script": "fetch_pr_observation_snapshot.sh",
+    "status": current.get("status", ci_status),
+    "overall_status": current.get("overall_status", ci_status),
+    "normalized_status": current.get("normalized_status", ci_status),
+    "observation_complete": current.get("observation_complete", False),
+    "repo": "owner/repo",
+    "pr": 13,
+    "expected_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "current_head_sha": head,
+    "head_matches_expected": head == "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "summary": {"ci": ci_status, "review": review_status, "head": "current"},
+    "limitations": current.get("limitations", []),
+    "recommended_next_action": current.get("recommended_next_action", "wait"),
+    "ci": {
+        "status": ci_status,
+        "check_runs": check_runs,
+        "checks": current.get("checks", []),
+        "failures": current.get("failures", []),
+    },
+    "review": {
+        "status": review_status,
+        "fingerprint": current.get("review_fingerprint", "review-fp"),
+        "signals": signals,
+        "review_requests": current.get("review_requests", []),
+        "summary": current.get("review_summary", {"all": {"total": len(signals)}}),
+        "threads": threads,
+        "body_mode": {"mode": "trigger-window-truncated"},
+    },
+    "trigger": current.get("trigger", {
+        "source": "explicit",
+        "comment_id": 99,
+        "created_at": "2026-06-08T01:00:00Z",
+    }),
+    "artifacts": {},
+}
+print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+""",
+            encoding="utf-8",
+        )
+        script_path.chmod(0o755)
+
+    def _issue_174_run_wait_fake_snapshots(
+        self,
+        tmp_path: Path,
+        scenario: list[dict],
+        *,
+        progress: str = "stderr-summary",
+        timeout_seconds: int = 8,
+        quiet_seconds: int = 1,
+        same_fingerprint_count: int = 2,
+        zero_check_grace_polls: int = 2,
+    ) -> tuple[subprocess.CompletedProcess[str], Path]:
+        repo_root = Path(__file__).resolve().parents[3]
+        source_script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        )
+        script_dir = tmp_path / "scripts"
+        script_dir.mkdir(parents=True)
+        wait_script_path = script_dir / "wait_pr_observation.sh"
+        snapshot_script_path = script_dir / "fetch_pr_observation_snapshot.sh"
+        scenario_path = tmp_path / "scenario.json"
+        state_path = tmp_path / "state.txt"
+        out_dir = tmp_path / "out"
+        shutil.copy2(source_script_path, wait_script_path)
+        self._issue_174_write_wait_fake_snapshot_script(snapshot_script_path)
+        wait_script_path.chmod(0o755)
+        scenario_path.write_text(json.dumps(scenario), encoding="utf-8")
+        env = {
+            **os.environ,
+            "FAKE_SNAPSHOT_SCENARIO": str(scenario_path),
+            "FAKE_SNAPSHOT_STATE": str(state_path),
+        }
+        result = subprocess.run(
+            [
+                str(wait_script_path),
+                "--repo",
+                "owner/repo",
+                "--pr",
+                "13",
+                "--head-sha",
+                "a" * 40,
+                "--timeout-seconds",
+                str(timeout_seconds),
+                "--poll-interval-seconds",
+                "1",
+                "--quiet-seconds",
+                str(quiet_seconds),
+                "--same-fingerprint-count",
+                str(same_fingerprint_count),
+                "--zero-check-grace-polls",
+                str(zero_check_grace_polls),
+                "--progress",
+                progress,
+                "--out",
+                str(out_dir),
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout_seconds + 3,
+        )
+        return result, out_dir
+
+    def test_issue_174_pr_observation_wait_renders_ci_progress_and_resets_quiet(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "running",
+                        "review": "none",
+                        "check_runs": {"total": 4, "success": 2, "running": 2, "pending": 0, "failed": 0},
+                    },
+                    {
+                        "ci": "running",
+                        "review": "none",
+                        "check_runs": {"total": 4, "success": 3, "running": 1, "pending": 0, "failed": 0},
+                    },
+                    {
+                        "ci": "running",
+                        "review": "none",
+                        "check_runs": {"total": 4, "success": 4, "running": 0, "pending": 0, "failed": 0},
+                    },
+                    {
+                        "ci": "running",
+                        "review": "none",
+                        "check_runs": {"total": 4, "success": 4, "running": 0, "pending": 0, "failed": 0},
+                    },
+                ],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            stderr_lines = result.stderr.strip().splitlines()
+            assert "pr_obs" in stderr_lines[0]
+            assert "ci=running" in stderr_lines[0]
+            assert "checks=2/4" in stderr_lines[0]
+            assert "ok=2" in stderr_lines[0]
+            assert "run=2" in stderr_lines[0]
+            assert "pend=0" in stderr_lines[0]
+            assert "fail=0" in stderr_lines[0]
+            assert "limit=none" in stderr_lines[0]
+            assert any("checks=4/4" in line and "quiet=0/1" in line for line in stderr_lines)
+            payload = json.loads(result.stdout)
+            assert payload["wait"]["latest_change_poll"] == 3
+
+    def test_issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            passed_result, _passed_out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir) / "passed",
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "check_runs": {"total": 3, "success": 1, "skipped": 1, "neutral": 1, "failed": 0},
+                    },
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "check_runs": {"total": 3, "success": 1, "skipped": 1, "neutral": 1, "failed": 0},
+                    },
+                ],
+            )
+            assert passed_result.returncode == 0, passed_result.stdout + passed_result.stderr
+            passed_lines = passed_result.stderr.strip().splitlines()
+            assert "phase=terminal" in passed_lines[-1]
+            assert "ci=passed" in passed_lines[-1]
+            assert "checks=" not in passed_lines[-1]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            human_gate_result, _human_gate_out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "unresolved",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 301,
+                                "state": "commented",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review",
+                                "id": 201,
+                                "state": "changes_requested",
+                                "codex_authored": True,
+                            },
+                        ],
+                        "threads": {"total": 2, "unresolved": 2, "items": []},
+                    },
+                    {
+                        "ci": "passed",
+                        "review": "unresolved",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 301,
+                                "state": "commented",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review",
+                                "id": 201,
+                                "state": "changes_requested",
+                                "codex_authored": True,
+                            },
+                        ],
+                        "threads": {"total": 2, "unresolved": 2, "items": []},
+                    },
+                ],
+            )
+            assert human_gate_result.returncode == 0, human_gate_result.stdout + human_gate_result.stderr
+            human_gate_lines = human_gate_result.stderr.strip().splitlines()
+            assert "phase=terminal" in human_gate_lines[-1]
+            assert "review=unresolved" in human_gate_lines[-1]
+            assert "comments=2" in human_gate_lines[-1]
+            assert "threads=2" in human_gate_lines[-1]
+            assert "unresolved=2" in human_gate_lines[-1]
+
+    def test_issue_174_pr_observation_wait_renders_review_progress_without_historical_noise(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [
+                            {
+                                "kind": "issue_comment",
+                                "id": 90,
+                                "trigger_command": True,
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 250,
+                                "omitted_reason": "outside_trigger_window",
+                                "codex_authored": True,
+                            },
+                        ],
+                        "threads": {"total": 1, "unresolved": 1, "items": []},
+                    },
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [
+                            {
+                                "kind": "issue_comment",
+                                "id": 90,
+                                "trigger_command": True,
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 250,
+                                "omitted_reason": "outside_trigger_window",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "issue_comment",
+                                "id": 260,
+                                "omitted_reason": "trigger_unknown",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review",
+                                "id": 270,
+                                "omitted_reason": "timestamp-unavailable",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 280,
+                                "state": "commented",
+                                "codex_authored": False,
+                            },
+                        ],
+                        "threads": {"total": 1, "unresolved": 1, "items": []},
+                    },
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [
+                            {
+                                "kind": "issue_comment",
+                                "id": 90,
+                                "trigger_command": True,
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 250,
+                                "omitted_reason": "outside_trigger_window",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "issue_comment",
+                                "id": 260,
+                                "omitted_reason": "trigger_unknown",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review",
+                                "id": 270,
+                                "omitted_reason": "timestamp-unavailable",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 280,
+                                "state": "commented",
+                                "codex_authored": False,
+                            },
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 301,
+                                "state": "commented",
+                                "codex_authored": True,
+                            },
+                        ],
+                        "threads": {"total": 1, "unresolved": 1, "items": []},
+                    },
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [
+                            {
+                                "kind": "issue_comment",
+                                "id": 90,
+                                "trigger_command": True,
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 250,
+                                "omitted_reason": "outside_trigger_window",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "issue_comment",
+                                "id": 260,
+                                "omitted_reason": "trigger_unknown",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review",
+                                "id": 270,
+                                "omitted_reason": "timestamp-unavailable",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 280,
+                                "state": "commented",
+                                "codex_authored": False,
+                            },
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 301,
+                                "state": "commented",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review",
+                                "id": 201,
+                                "state": "commented",
+                                "codex_authored": True,
+                            },
+                        ],
+                        "threads": {"total": 2, "unresolved": 2, "items": []},
+                    },
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [
+                            {
+                                "kind": "issue_comment",
+                                "id": 90,
+                                "trigger_command": True,
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 250,
+                                "omitted_reason": "outside_trigger_window",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "issue_comment",
+                                "id": 260,
+                                "omitted_reason": "trigger_unknown",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review",
+                                "id": 270,
+                                "omitted_reason": "timestamp-unavailable",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 280,
+                                "state": "commented",
+                                "codex_authored": False,
+                            },
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 301,
+                                "state": "commented",
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review",
+                                "id": 201,
+                                "state": "commented",
+                                "codex_authored": True,
+                            },
+                        ],
+                        "threads": {"total": 2, "unresolved": 2, "items": []},
+                    },
+                ],
+                timeout_seconds=10,
+                quiet_seconds=2,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            stderr_lines = result.stderr.strip().splitlines()
+            stderr_text = result.stderr
+            assert "comments=0" in stderr_lines[0]
+            assert "comments=0" in stderr_lines[1]
+            assert "quiet=1/2" in stderr_lines[1]
+            assert "comments=0" in stderr_text
+            assert "comments=1" in stderr_text
+            assert "comments=2" in stderr_text
+            assert "quiet=0/2" in stderr_text
+            payload = json.loads(result.stdout)
+            assert payload["wait"]["latest_change_poll"] == 4
+
+    def test_issue_174_pr_observation_wait_preserves_output_boundary_and_line_budget(self) -> None:
+        forbidden_tokens = (
+            "https://example.test",
+            "alice",
+            "CI Workflow",
+            "unit-test-job",
+            "Run tests",
+            "P1",
+            "body must stay hidden",
+        )
+        scenario = [
+            {
+                "ci": "failed",
+                "review": "changes_requested",
+                "check_runs": {"total": 2, "success": 1, "failed": 1},
+                "failures": [
+                    {
+                        "workflow_name": "CI Workflow",
+                        "job_name": "unit-test-job",
+                        "html_url": "https://example.test/job/1",
+                        "failed_steps": [{"name": "Run tests", "conclusion": "failure"}],
+                    }
+                ],
+                "signals": [
+                    {
+                        "kind": "pull_review",
+                        "id": 201,
+                        "author": "alice",
+                        "state": "changes_requested",
+                        "body": "P1 body must stay hidden",
+                    }
+                ],
+                "threads": {"total": int("9" * 180), "unresolved": int("8" * 180), "items": []},
+                "review_requests": [{"login": "reviewer"} for _ in range(40)],
+                "limitations": [{"code": f"limit_{index}", "severity": "informational"} for index in range(30)],
+            }
+        ]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                scenario,
+                timeout_seconds=2,
+                same_fingerprint_count=1,
+            )
+            assert result.returncode == 0, result.stdout + result.stderr
+            json.loads(result.stdout)
+            stderr_line = result.stderr.strip()
+            assert len(stderr_line) <= 240
+            assert "limit=truncated" in stderr_line
+            assert "ci=failed" in stderr_line
+            assert "fail=1" in stderr_line
+            for token in forbidden_tokens:
+                assert token not in result.stderr
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            quiet_result, _quiet_out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                scenario,
+                progress="none",
+                timeout_seconds=2,
+                same_fingerprint_count=1,
             )
             assert quiet_result.returncode == 0, quiet_result.stdout + quiet_result.stderr
             json.loads(quiet_result.stdout)
