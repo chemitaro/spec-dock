@@ -253,6 +253,7 @@ def sanitized_review_signals(payload: dict) -> list:
         "line",
         "thread_id",
         "thread_state",
+        "current_status_signal",
         "body_sha256",
         "body_truncated",
         "body_original_length",
@@ -268,13 +269,38 @@ def sanitized_review_signals(payload: dict) -> list:
     ]
 
 
-def review_progress_signal_items(payload: dict) -> list:
-    progress_kinds = {"pull_review", "pull_review_comment", "issue_comment"}
+def review_progress_signal_is_current(item: dict) -> bool:
+    if item.get("current_status_signal") is not None:
+        return item.get("current_status_signal") is True
+    if item.get("stale") is True:
+        return False
+    return item.get("omitted_reason") not in {
+        "outside_trigger_window",
+        "trigger_unknown",
+        "timestamp-unavailable",
+    }
+
+
+def review_semantic_signal_items(payload: dict) -> list:
+    signal_kinds = {"pull_review", "pull_review_comment", "issue_comment"}
     return [
         item
         for item in sanitized_review_signals(payload)
         if item.get("trigger_command") is not True
-        and not item.get("omitted_reason")
+        and review_progress_signal_is_current(item)
+        and item.get("kind") in signal_kinds
+    ]
+
+
+def review_progress_signal_items(payload: dict) -> list:
+    progress_kinds = {"pull_review", "pull_review_comment", "issue_comment"}
+    omitted_progress_reasons = {None, "body_mode_none", "body_mode_out_only", "item_count_cap", "total_body_char_cap"}
+    return [
+        item
+        for item in sanitized_review_signals(payload)
+        if item.get("trigger_command") is not True
+        and review_progress_signal_is_current(item)
+        and item.get("omitted_reason") in omitted_progress_reasons
         and item.get("codex_authored") is True
         and item.get("kind") in progress_kinds
     ]
@@ -362,10 +388,7 @@ def semantic_fingerprint(payload: dict) -> str:
             "status": payload.get("review", {}).get("status")
             if isinstance(payload.get("review"), dict)
             else None,
-            "fingerprint": payload.get("review", {}).get("fingerprint")
-            if isinstance(payload.get("review"), dict)
-            else None,
-            "signals": review_progress_signal_items(payload),
+            "signals": review_semantic_signal_items(payload),
             "review_requests": payload.get("review", {}).get("review_requests")
             if isinstance(payload.get("review"), dict)
             else None,

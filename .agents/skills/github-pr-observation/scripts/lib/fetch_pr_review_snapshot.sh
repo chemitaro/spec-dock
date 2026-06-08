@@ -856,7 +856,9 @@ def is_current_status_signal(item):
     return item.get("kind") in {"pull_review", "pull_review_comment"} and bool(expected_head_sha)
 
 
-status_signals = [item for item in signals if is_current_status_signal(item)]
+for signal in signals:
+    signal["current_status_signal"] = is_current_status_signal(signal)
+status_signals = [item for item in signals if item.get("current_status_signal")]
 current_review_by_author = {}
 for item in status_signals:
     if item.get("kind") != "pull_review":
@@ -922,6 +924,7 @@ def fingerprint_signal(item):
         "line": item.get("line"),
         "thread_id": item.get("thread_id"),
         "thread_state": item.get("thread_state"),
+        "current_status_signal": item.get("current_status_signal"),
         "body_sha256": item.get("body_sha256"),
         "body_truncated": item.get("body_truncated"),
         "body_original_length": item.get("body_original_length"),
