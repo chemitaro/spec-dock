@@ -13301,6 +13301,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                                 "kind": "pull_review_comment",
                                 "id": 280,
                                 "state": "commented",
+                                "current_status_signal": False,
                                 "codex_authored": False,
                             },
                         ],
@@ -13339,6 +13340,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                                 "kind": "pull_review_comment",
                                 "id": 280,
                                 "state": "commented",
+                                "current_status_signal": False,
                                 "codex_authored": False,
                             },
                             {
@@ -13383,6 +13385,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                                 "kind": "pull_review_comment",
                                 "id": 280,
                                 "state": "commented",
+                                "current_status_signal": False,
                                 "codex_authored": False,
                             },
                             {
@@ -13433,6 +13436,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                                 "kind": "pull_review_comment",
                                 "id": 280,
                                 "state": "commented",
+                                "current_status_signal": False,
                                 "codex_authored": False,
                             },
                             {
@@ -13467,6 +13471,309 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert "quiet=0/2" in stderr_text
             payload = json.loads(result.stdout)
             assert payload["wait"]["latest_change_poll"] == 4
+
+    def test_issue_174_pr_observation_wait_counts_body_mode_omitted_review_progress(self) -> None:
+        allowed_omitted_signals = [
+            {
+                "kind": "pull_review",
+                "id": 201,
+                "omitted_reason": "body_mode_none",
+                "current_status_signal": True,
+                "codex_authored": True,
+            },
+            {
+                "kind": "pull_review_comment",
+                "id": 202,
+                "omitted_reason": "body_mode_out_only",
+                "current_status_signal": True,
+                "codex_authored": True,
+            },
+            {
+                "kind": "issue_comment",
+                "id": 203,
+                "omitted_reason": "item_count_cap",
+                "current_status_signal": True,
+                "codex_authored": True,
+            },
+            {
+                "kind": "pull_review_comment",
+                "id": 204,
+                "omitted_reason": "total_body_char_cap",
+                "current_status_signal": True,
+                "codex_authored": True,
+            },
+            {"kind": "pull_request", "id": 205, "current_status_signal": True, "codex_authored": True},
+            {
+                "kind": "pull_review_comment",
+                "id": 206,
+                "omitted_reason": "outside_trigger_window",
+                "current_status_signal": False,
+                "codex_authored": True,
+            },
+            {
+                "kind": "issue_comment",
+                "id": 207,
+                "omitted_reason": "trigger_unknown",
+                "current_status_signal": False,
+                "codex_authored": True,
+            },
+            {
+                "kind": "pull_review",
+                "id": 208,
+                "omitted_reason": "timestamp-unavailable",
+                "current_status_signal": False,
+                "codex_authored": True,
+            },
+        ]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": allowed_omitted_signals,
+                        "threads": {"total": 4, "unresolved": 4, "items": []},
+                    },
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": allowed_omitted_signals,
+                        "threads": {"total": 4, "unresolved": 4, "items": []},
+                    },
+                ],
+                quiet_seconds=1,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "comments=4" in result.stderr
+            assert "comments=5" not in result.stderr
+            assert "comments=8" not in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["wait"]["latest_change_poll"] == 1
+
+    def test_issue_174_pr_observation_wait_excludes_body_mode_omitted_noncurrent_review_progress(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 301,
+                                "omitted_reason": "body_mode_none",
+                                "current_status_signal": False,
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 302,
+                                "omitted_reason": "body_mode_none",
+                                "current_status_signal": True,
+                                "codex_authored": True,
+                            },
+                        ],
+                        "threads": {"total": 1, "unresolved": 1, "items": []},
+                    },
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 301,
+                                "omitted_reason": "body_mode_none",
+                                "current_status_signal": False,
+                                "codex_authored": True,
+                            },
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 302,
+                                "omitted_reason": "body_mode_none",
+                                "current_status_signal": True,
+                                "codex_authored": True,
+                            },
+                        ],
+                        "threads": {"total": 1, "unresolved": 1, "items": []},
+                    },
+                ],
+                quiet_seconds=1,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "comments=1" in result.stderr
+            assert "comments=2" not in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["wait"]["latest_change_poll"] == 1
+            events = [
+                json.loads(line)
+                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
+            ]
+            assert [event["changed"] for event in events] == [True, False]
+
+    def test_issue_174_pr_observation_wait_resets_quiet_for_non_codex_current_review_change(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [
+                            {
+                                "kind": "pull_review",
+                                "id": 401,
+                                "state": "commented",
+                                "current_status_signal": True,
+                                "codex_authored": False,
+                                "body_sha256": "human-review-v1",
+                            }
+                        ],
+                        "threads": {"total": 1, "unresolved": 1, "items": []},
+                    },
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [
+                            {
+                                "kind": "pull_review",
+                                "id": 401,
+                                "state": "commented",
+                                "current_status_signal": True,
+                                "codex_authored": False,
+                                "body_sha256": "human-review-v2",
+                            }
+                        ],
+                        "threads": {"total": 1, "unresolved": 1, "items": []},
+                    },
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [
+                            {
+                                "kind": "pull_review",
+                                "id": 401,
+                                "state": "commented",
+                                "current_status_signal": True,
+                                "codex_authored": False,
+                                "body_sha256": "human-review-v2",
+                            }
+                        ],
+                        "threads": {"total": 1, "unresolved": 1, "items": []},
+                    },
+                ],
+                quiet_seconds=1,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "comments=0" in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["wait"]["latest_change_poll"] == 2
+            events = [
+                json.loads(line)
+                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
+            ]
+            assert [event["changed"] for event in events] == [True, True, False]
+
+    def test_issue_174_pr_observation_wait_ignores_stale_review_progress_for_quiet(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "review_fingerprint": "review-fp-1",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [],
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    },
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "review_fingerprint": "review-fp-2",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [
+                            {
+                                "kind": "pull_review_comment",
+                                "id": 301,
+                                "state": "commented",
+                                "stale": True,
+                                "codex_authored": True,
+                            }
+                        ],
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    },
+                ],
+                quiet_seconds=1,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "comments=0" in result.stderr
+            assert "comments=1" not in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["wait"]["latest_change_poll"] == 1
+            events = [
+                json.loads(line)
+                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
+            ]
+            assert [event["changed"] for event in events] == [True, False]
+
+    def test_issue_174_pr_observation_wait_ignores_raw_review_fingerprint_drift_for_quiet(self) -> None:
+        current_signal = {
+            "kind": "pull_review_comment",
+            "id": 301,
+            "state": "commented",
+            "codex_authored": True,
+            "body_sha256": "same-filtered-signal-hash",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "review_fingerprint": "review-fp-1",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [current_signal],
+                        "threads": {"total": 1, "unresolved": 1, "items": []},
+                    },
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "review_fingerprint": "review-fp-2",
+                        "check_runs": {"total": 1, "success": 1},
+                        "signals": [current_signal],
+                        "threads": {"total": 1, "unresolved": 1, "items": []},
+                    },
+                ],
+                quiet_seconds=1,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "comments=1" in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["wait"]["latest_change_poll"] == 1
+            events = [
+                json.loads(line)
+                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
+            ]
+            assert [event["changed"] for event in events] == [True, False]
+            snapshots_dir = out_dir / "snapshots"
+            first_snapshot = json.loads((snapshots_dir / "poll-0001.json").read_text(encoding="utf-8"))
+            second_snapshot = json.loads((snapshots_dir / "poll-0002.json").read_text(encoding="utf-8"))
+            assert first_snapshot["review"]["fingerprint"] != second_snapshot["review"]["fingerprint"]
 
     def test_issue_174_pr_observation_wait_preserves_output_boundary_and_line_budget(self) -> None:
         forbidden_tokens = (
