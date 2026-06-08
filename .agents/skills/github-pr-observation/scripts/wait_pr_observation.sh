@@ -268,7 +268,79 @@ def sanitized_review_signals(payload: dict) -> list:
     ]
 
 
+def review_progress_signal_items(payload: dict) -> list:
+    progress_kinds = {"pull_review", "pull_review_comment", "issue_comment"}
+    return [
+        item
+        for item in sanitized_review_signals(payload)
+        if item.get("trigger_command") is not True
+        and not item.get("omitted_reason")
+        and item.get("codex_authored") is True
+        and item.get("kind") in progress_kinds
+    ]
+
+
+def int_count(source: dict, key: str) -> int:
+    value = source.get(key)
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return max(0, value)
+    if isinstance(value, float):
+        return max(0, int(value))
+    return 0
+
+
+def ci_progress_counts(payload: dict) -> dict:
+    ci = payload.get("ci") if isinstance(payload.get("ci"), dict) else {}
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    check_runs = ci.get("check_runs") if isinstance(ci.get("check_runs"), dict) else {}
+    ok = (
+        int_count(check_runs, "success")
+        + int_count(check_runs, "skipped")
+        + int_count(check_runs, "neutral")
+    )
+    fail = int_count(check_runs, "failed")
+    other = int_count(check_runs, "other")
+    run = int_count(check_runs, "running")
+    pend = int_count(check_runs, "pending")
+    stale = int_count(check_runs, "stale")
+    total = int_count(check_runs, "total")
+    done = ok + fail + other
+    return {
+        "status": ci.get("status") or summary.get("ci") or "unknown",
+        "done": done,
+        "total": total,
+        "ok": ok,
+        "run": run,
+        "pend": pend,
+        "fail": fail,
+        "other": other,
+        "stale": stale,
+    }
+
+
+def review_progress_counts(payload: dict) -> dict:
+    review = payload.get("review") if isinstance(payload.get("review"), dict) else {}
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    threads = review.get("threads") if isinstance(review.get("threads"), dict) else {}
+    signals = review.get("signals") if isinstance(review.get("signals"), list) else []
+    comments = len(review_progress_signal_items(payload)) if signals else 0
+    review_requests = review.get("review_requests")
+    requested = len(review_requests) if isinstance(review_requests, list) else 0
+    return {
+        "status": review.get("status") or summary.get("review") or "unknown",
+        "comments": comments,
+        "threads": int_count(threads, "total"),
+        "unresolved": int_count(threads, "unresolved"),
+        "requested": requested,
+        "limits": len(payload.get("limitations")) if isinstance(payload.get("limitations"), list) else 0,
+    }
+
+
 def semantic_fingerprint(payload: dict) -> str:
+    ci_progress = ci_progress_counts(payload)
+    review_progress = review_progress_counts(payload)
     source = {
         "repo": payload.get("repo"),
         "pr": payload.get("pr"),
@@ -284,6 +356,7 @@ def semantic_fingerprint(payload: dict) -> str:
             "failures": payload.get("ci", {}).get("failures")
             if isinstance(payload.get("ci"), dict)
             else None,
+            "progress": ci_progress,
         },
         "review": {
             "status": payload.get("review", {}).get("status")
@@ -292,11 +365,8 @@ def semantic_fingerprint(payload: dict) -> str:
             "fingerprint": payload.get("review", {}).get("fingerprint")
             if isinstance(payload.get("review"), dict)
             else None,
-            "signals": sanitized_review_signals(payload),
+            "signals": review_progress_signal_items(payload),
             "review_requests": payload.get("review", {}).get("review_requests")
-            if isinstance(payload.get("review"), dict)
-            else None,
-            "summary": payload.get("review", {}).get("summary")
             if isinstance(payload.get("review"), dict)
             else None,
             "threads": payload.get("review", {}).get("threads")
@@ -305,6 +375,7 @@ def semantic_fingerprint(payload: dict) -> str:
             "body_mode": payload.get("review", {}).get("body_mode")
             if isinstance(payload.get("review"), dict)
             else None,
+            "progress": review_progress,
         },
         "trigger": payload.get("trigger"),
     }
@@ -553,14 +624,82 @@ def progress_line(
     payload: dict,
     quiet_elapsed: int,
     quiet_required: int,
+    same_count: int,
+    same_required: int,
+    observation_complete: bool,
 ) -> str:
-    ci = payload.get("summary", {}).get("ci") or payload.get("ci", {}).get("status") or "unknown"
-    review = payload.get("summary", {}).get("review") or payload.get("review", {}).get("status") or "unknown"
-    line = (
-        f"poll={poll} elapsed={elapsed} remain={remain} phase={phase} "
-        f"ci={ci} review={review} quiet={quiet_elapsed}/{quiet_required} limit=ok final=stdout_json"
+    ci_counts = ci_progress_counts(payload)
+    review_counts = review_progress_counts(payload)
+    ci_status = ci_counts["status"]
+    review_status = review_counts["status"]
+    render_review = review_status
+    if phase == "wait" and not observation_complete:
+        render_review = "observing"
+
+    fields: list[tuple[str, str, bool]] = [
+        ("poll", str(poll), False),
+        ("elapsed", str(elapsed), False),
+        ("remain", str(remain), False),
+        ("phase", phase, False),
+        ("ci", str(ci_status), False),
+    ]
+    ci_detailed = phase == "wait" and ci_status in {"running", "pending", "none", "unknown"}
+    if ci_detailed:
+        fields.extend(
+            [
+                ("checks", f"{ci_counts['done']}/{ci_counts['total']}", False),
+                ("ok", str(ci_counts["ok"]), False),
+                ("run", str(ci_counts["run"]), True),
+                ("pend", str(ci_counts["pend"]), True),
+                ("fail", str(ci_counts["fail"]), False),
+                ("other", str(ci_counts["other"]), True),
+            ]
+        )
+    elif ci_status == "failed":
+        fields.append(("fail", str(ci_counts["fail"]), False))
+
+    fields.append(("review", str(render_review), False))
+    review_human_gate = review_status in {"unresolved", "changes_requested", "commented"}
+    review_detailed = phase == "wait" and not observation_complete
+    if review_detailed or review_human_gate:
+        fields.append(("comments", str(review_counts["comments"]), False))
+    if review_detailed or review_status in {"unresolved", "changes_requested"}:
+        fields.extend(
+            [
+                ("threads", str(review_counts["threads"]), True),
+                ("unresolved", str(review_counts["unresolved"]), True),
+                ("requested", str(review_counts["requested"]), True),
+            ]
+        )
+    fields.extend(
+        [
+            ("quiet", f"{quiet_elapsed}/{quiet_required}", False),
+            ("stable", f"{same_count}/{same_required}", True),
+        ]
     )
-    return line[:240]
+
+    drop_order = ["other", "requested", "threads", "unresolved", "stable", "pend", "run"]
+    active = list(fields)
+
+    def build(parts: list[tuple[str, str, bool]], limit_value: str) -> str:
+        rendered = ["pr_obs"] + [f"{key}={value}" for key, value, _optional in parts]
+        rendered.extend([f"limit={limit_value}", "final=stdout_json"])
+        return " ".join(rendered)
+
+    line = build(active, "none")
+    if len(line) <= 240:
+        return line
+    for key in drop_order:
+        candidate = [
+            item for item in active if not (item[0] == key and item[2])
+        ]
+        if len(candidate) == len(active):
+            continue
+        active = candidate
+        line = build(active, "truncated")
+        if len(line) <= 240:
+            return line
+    return build(active, "truncated")[:240]
 
 
 def mark_latest_timeout(
@@ -797,6 +936,9 @@ while True:
                 payload=payload,
                 quiet_elapsed=quiet_elapsed,
                 quiet_required=quiet_seconds,
+                same_count=same_count,
+                same_required=same_fingerprint_count,
+                observation_complete=observation_complete,
             ),
             file=sys.stderr,
         )
