@@ -13330,6 +13330,138 @@ exit 44
             second_signals = {item["id"]: item for item in second_snapshot["review"]["signals"]}
             assert first_signals[202]["body_sha256"] != second_signals[202]["body_sha256"]
 
+    def test_issue_170_pr_observation_wait_ignores_raw_review_body_for_semantic_stability(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        source_script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            script_dir = tmp_path / "scripts"
+            script_dir.mkdir()
+            wait_script_path = script_dir / "wait_pr_observation.sh"
+            snapshot_script_path = script_dir / "fetch_pr_observation_snapshot.sh"
+            state_path = tmp_path / "state.txt"
+            out_dir = tmp_path / "out"
+            shutil.copy2(source_script_path, wait_script_path)
+            snapshot_script_path.write_text(
+                """#!/usr/bin/env python3
+import json
+import os
+from pathlib import Path
+
+state_path = Path(os.environ["FAKE_SNAPSHOT_STATE"])
+poll = int(state_path.read_text(encoding="utf-8")) + 1 if state_path.exists() else 1
+state_path.write_text(str(poll), encoding="utf-8")
+body = "raw body variant one" if poll == 1 else "raw body variant two"
+payload = {
+    "script": "fetch_pr_observation_snapshot.sh",
+    "status": "human_gate",
+    "overall_status": "human_gate",
+    "normalized_status": "human_gate",
+    "observation_complete": False,
+    "repo": "owner/repo",
+    "pr": 13,
+    "expected_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "current_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "head_matches_expected": True,
+    "summary": {"ci": "passed", "review": "commented", "head": "current"},
+    "limitations": [],
+    "recommended_next_action": "address_review_feedback",
+    "ci": {"status": "passed", "checks": [], "failures": []},
+    "review": {
+        "status": "commented",
+        "fingerprint": "safe-review-fingerprint",
+        "signals": [{
+            "kind": "pull_review",
+            "id": 202,
+            "author": "alice",
+            "submitted_at": "2026-06-08T01:06:00Z",
+            "state": "commented",
+            "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "body": body,
+            "body_sha256": "same-safe-body-hash",
+            "body_truncated": False,
+            "body_original_length": 22,
+        }],
+        "review_requests": [],
+        "summary": {"all": {"total": 1}, "codex_authored": {"total": 0}},
+        "threads": {"total": 0, "items": []},
+        "body_mode": {
+            "mode": "trigger-window-full",
+            "included_count": 1,
+            "included_chars": 22,
+            "item_count_omitted": 0,
+            "body_chars_omitted": 0,
+        },
+    },
+    "trigger": {"source": "explicit", "comment_id": 99, "created_at": "2026-06-08T01:00:00Z"},
+    "artifacts": {},
+}
+print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+""",
+                encoding="utf-8",
+            )
+            wait_script_path.chmod(0o755)
+            snapshot_script_path.chmod(0o755)
+            env = {
+                **os.environ,
+                "FAKE_SNAPSHOT_STATE": str(state_path),
+            }
+
+            result = subprocess.run(
+                [
+                    str(wait_script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--body-mode",
+                    "trigger-window-full",
+                    "--timeout-seconds",
+                    "4",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "2",
+                    "--out",
+                    str(out_dir),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=6,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "human_gate"
+            assert payload["wait"]["same_fingerprint_observed"] == 2
+            assert payload["wait"]["latest_change_poll"] == 1
+            events = [
+                json.loads(line)
+                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
+            ]
+            assert [event["changed"] for event in events] == [True, False]
+            first_snapshot = json.loads(
+                (out_dir / "snapshots" / "poll-0001.json").read_text(encoding="utf-8")
+            )
+            second_snapshot = json.loads(
+                (out_dir / "snapshots" / "poll-0002.json").read_text(encoding="utf-8")
+            )
+            assert first_snapshot["review"]["signals"][0]["body"] != second_snapshot["review"]["signals"][0]["body"]
+            assert (
+                first_snapshot["review"]["signals"][0]["body_sha256"]
+                == second_snapshot["review"]["signals"][0]["body_sha256"]
+            )
+
     def test_issue_170_pr_observation_wait_preserves_snapshot_human_gate_for_draft_and_closed_pr(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
