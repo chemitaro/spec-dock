@@ -55,15 +55,15 @@ ID: "iss-00170"
 | AC-002 | S03 | S05 | expected head SHA mismatch が non-success JSON になる fixture test |
 | AC-003 | S05 | S03 | monitoring 中の head change が stale/reset として扱われる fixture test |
 | AC-004 | S03 | S05 | failure 系 conclusion が1件でも CI failed になり、details が出る fixture test |
-| AC-005 | S05 | S02, S03, S04 | quiet / fingerprint / same count まで complete しない wait fixture test |
-| AC-006 | S04 | S05 | trigger-window review/comment body が body mode/cap 付きで出る fixture test |
+| AC-005 | S05 | S02, S03, S04 | quiet / semantic fingerprint / same count まで complete しない wait fixture test |
+| AC-006 | S04 | S05 | trigger-window review/comment body が body mode/cap 付きで出る fixture test; `@codex review` mention-only feedback remains a signal |
 | AC-007 | S03 | S05 | zero-check grace 中は success にしない fixture test |
 | AC-008 | S04 | S05 | unresolved / changes requested / comments が review non-success または human action になる fixture test |
 | AC-009 | S04 | S05 | thread state unavailable は limitation として machine-readable に出る fixture test |
 | AC-010 | S02 | S05 | stderr progress が1 poll 最大1行、stdout に混ざらない test |
-| AC-011 | S01 | S06 | provider/mirror inventory と stale cleanup test |
-| AC-012 | S04 | S05 | explicit trigger id/time 後の本文だけを含む fixture test |
-| AC-013 | S04 | S05 | inferred/unknown trigger の limitation と body suppression test |
+| AC-011 | S01 | S06 | provider/mirror inventory、stale asset cleanup、bootstrap-only config migration test |
+| AC-012 | S04 | S05 | explicit trigger id/time 後の本文だけを含み、trigger text mention を command 誤分類しない fixture test |
+| AC-013 | S04 | S05 | first-line command inferred trigger / unknown trigger の limitation と body suppression test |
 | AC-014 | S03 | S05 | Actions job/step failure detail fallback test |
 | EC-001 | S05 | S03, S04 | checks green 後も review stability を待つ fixture test |
 | EC-002 | S03 | S05 | success + pending / required pending が pending になる fixture test |
@@ -83,15 +83,15 @@ ID: "iss-00170"
 | CL-AC-002 | S03/S05 | AC-002 | head SHA mismatch は `stale_head` / non-success / `observation_complete=false` | stale green reuse | yes | red-required |
 | CL-AC-003 | S05 | AC-003 | monitoring 中の head change は old snapshot を final success にしない | mixed-SHA final result | yes | red-required |
 | CL-AC-004 | S03 | AC-004 | 1件でも failure 系なら CI status は `failed`、detail を保持 | mixed success/failure false pass | yes | red-required |
-| CL-AC-005 | S05 | AC-005 | quiet / fingerprint / same count を満たすまで complete しない | early success | yes | red-required |
+| CL-AC-005 | S05 | AC-005 | quiet / semantic fingerprint / same count を満たすまで complete しない | early success / fingerprint churn false timeout | yes | red-required |
 | CL-AC-006 | S04 | AC-006 | trigger-window body を default truncated mode で final JSON に含める | missing actionable review body | yes | red-required |
 | CL-AC-007 | S03/S05 | AC-007 | zero-check grace 未満は success にしない | no-check false green | yes | red-required |
 | CL-AC-008 | S04 | AC-008 | unresolved / changes requested / comments は review status に反映 | ignored blocker | yes | red-required |
 | CL-AC-009 | S04 | AC-009 | thread state unavailable は limitation として出す | hidden unresolved thread | yes | red-required |
 | CL-AC-010 | S02/S05 | AC-010 | progress は stderr、1 poll 最大1行、stdout JSON に混ざらない | unparsable stdout | yes | red-required |
-| CL-AC-011 | S01/S06 | AC-011 | new skill added、old agent/skill removed、shim なし、stale cleanup あり | duplicate/conflicting assets | yes | red-required + parity |
-| CL-AC-012 | S04 | AC-012 | explicit trigger 後の body だけを current payload に含める | old review noise | yes | red-required |
-| CL-AC-013 | S04 | AC-013 | inferred は limitation、unknown は body full output しない | unsafe body overcollection | yes | red-required |
+| CL-AC-011 | S01/S06 | AC-011 | new skill added、old agent/skill removed、shim なし、stale cleanup と bootstrap-only config migration あり | duplicate/conflicting assets / stale routing | yes | red-required + parity |
+| CL-AC-012 | S04 | AC-012 | explicit trigger 後の body だけを current payload に含め、mention-only feedback は signal に残す | old review noise / lost feedback | yes | red-required |
+| CL-AC-013 | S04 | AC-013 | inferred trigger は first nonblank line command に限定し、unknown は body full output しない | unsafe body overcollection / false trigger | yes | red-required |
 | CL-AC-014 | S03 | AC-014 | CI failure detail は workflow/run/job/step または check-run fallback で出す | insufficient fix context | yes | red-required |
 | CL-EC-001 | S05 | EC-001 | CI green 後も review stability を待つ | late review miss | yes | red-required |
 | CL-EC-002 | S03 | EC-002 | success + pending/status pending は pending | partial green | yes | red-required |
@@ -126,6 +126,7 @@ ID: "iss-00170"
 - 必須検証:
   - asset inventory test fails before adding new skill / removing old assets and passes after.
   - update cleanup fixture proves stale `pr-monitor` / `github-codex-pr-review-comments` assets are removed.
+  - update fixture proves bootstrap-only `.codex/config.toml` stale `pr-monitor` / old wrapper guidance is migrated to `github-pr-observation` direct invocation without restoring old assets or overwriting unrelated user edits.
   - `rg 'pr-monitor|github-codex-pr-review-comments' src/spec_dock/assets/install_root tests -n` only finds deliberate retirement assertions or historical text.
 - reviewer gate:
   - code-reviewer for asset/test diff.
@@ -145,12 +146,12 @@ ID: "iss-00170"
   - role: dev-coder
   - allowed changes: new skill scripts and tests.
   - forbidden: caller-provided endpoint/method/query/header/body/jq/raw gh args, write operations, `summary.md`.
-- 必須検証:
-  - invalid repo/pr/head/options fail before any fake `gh` call.
-  - stdout contains valid JSON only; progress and diagnostics do not contaminate stdout.
-  - stderr default emits bounded key/value progress; `--progress none` suppresses progress.
-  - `--out` writes `result.json` only as stdout copy plus debug artifacts; no `summary.md`.
-  - auth/rate/schema collection failure can be represented as limitation + non-success when JSON generation is possible.
+  - 必須検証:
+    - invalid repo/pr/head/options fail before any fake `gh` call.
+    - stdout contains valid JSON only; progress and diagnostics do not contaminate stdout.
+    - stderr default emits bounded key/value progress; `--progress none` suppresses progress.
+    - `--out` writes `result.json` only as stdout copy plus debug artifacts; no `summary.md`.
+    - auth/rate/schema collection failure can be represented as limitation + non-success when JSON generation is possible.
 - reviewer gate:
   - code-reviewer.
 - closure:
@@ -204,9 +205,10 @@ ID: "iss-00170"
     - all review signals and Codex-authored subset are both represented.
     - explicit `--trigger-comment-id` / `--trigger-created-at` includes only trigger-window bodies.
     - explicit `--trigger-comment-id` without `--trigger-created-at` resolves timestamp from issue comments or records `trigger_timestamp_unresolved`.
-  - inferred trigger emits `trigger_inferred` limitation.
-  - unknown trigger does not dump all bodies.
-  - `body-mode` cap/truncation metadata preserves valid JSON.
+    - inferred trigger only uses an actual command comment whose first nonblank line is `@codex review` / `@codex review ...`, and emits `trigger_inferred` limitation.
+    - a normal feedback body that merely mentions `@codex review` is not treated as trigger command and remains a current review/comment signal when it belongs to the trigger window.
+    - unknown trigger does not dump all bodies.
+    - `body-mode` cap/truncation metadata preserves valid JSON.
 - reviewer gate:
   - code-reviewer.
 - closure:
@@ -227,6 +229,7 @@ ID: "iss-00170"
   - 必須検証:
     - default `timeout=1800`, `poll_interval=30`, `quiet=90`, `same_fingerprint_count=2` are exposed and overrideable.
     - quiet window and same fingerprint count are required before `observation_complete=true`.
+    - wait same-fingerprint count uses a semantic fingerprint derived from wait decision inputs, not the raw snapshot `fingerprint`, so snapshot-internal fingerprint churn alone does not prevent stability.
     - head SHA changes reset or terminate as stale/non-success.
     - CI green followed by late review feedback waits for review stability.
     - draft and non-open PRs return `human_gate` with PR-state-specific recommended next action instead of merge-prepared success.
@@ -258,6 +261,7 @@ ID: "iss-00170"
   - `github-pr-merge-preparer` no longer delegates to `pr-monitor`; it invokes `wait_pr_observation.sh` and consumes stdout JSON.
   - `github-pr-creator` references snapshot/wait only as post-create observation support.
   - role guidance contains no active `pr-monitor` routing.
+  - bootstrap-only `.codex/config.toml` migration removes active stale routing to removed `pr-monitor` / old review wrapper guidance and keeps the no-shim decision intact.
 - reviewer gate:
   - code-reviewer for tests/assets, spec-reviewer focus if skill prose changes material workflow semantics.
 - closure:
