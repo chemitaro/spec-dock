@@ -77,6 +77,7 @@ ID: "iss-00170"
 - bootstrap-only config:
   - `.codex/config.toml` は既存 repo の local guidance を通常 update で全面上書きしない。
   - そのため stale `pr-monitor` / `github-codex-pr-review-comments` guidance が残ると、旧 agent asset 削除後も orchestrator routing が retired role を参照し続ける。
+  - `.codex/config.toml` が symlink の場合は migration 対象外とし、link target を辿って repo 外または user-managed shared config を書き換えない。
   - update は旧 agent / compatibility shim を復活させず、known stale references だけを `github-pr-observation` skill / `wait_pr_observation.sh` direct invocation guidance へ fixed migration する。
 - tests:
   - `tests/unit/infra/test_init_update.py`
@@ -320,6 +321,8 @@ false pass 防止の補助入力として使う。
   - failed がなく、in_progress が1件以上ある。
 - `ci=pending`:
   - failed / running がなく、queued / requested / waiting / pending など開始前または待機中の状態がある。
+  - `mergeStateStatus=UNKNOWN` は GitHub 側の一時的な mergeability 未計算状態としてここに分類し、`pr_merge_state_blocking` にはしない。
+  - commit status aggregate `state=pending` は individual `statuses[]` が1件以上ある場合に限り、individual `statuses[]` より広い backstop としてここに分類する。
 - `ci=passed`:
   - failed / running / pending がなく、観測対象が merge-blocking ではない終端状態。
   - `success` だけでなく、GitHub上で終端済みとして扱われる `skipped` / `neutral` もここに含める。
@@ -327,9 +330,12 @@ false pass 防止の補助入力として使う。
   - required-check metadata が取得でき、`mergeStateStatus` と required check rollup が未充足を示していない場合だけ `passed` へ畳む。
 
 `mixed` と `inconclusive` は default progress status として採用しない。
-1件でも失敗系があれば `ci=failed`、未完了があれば `ci=running` / `ci=pending` とする。
+observed check run/status failure または backstop 条件を満たす aggregate failure/error があれば `ci=failed`、未完了 signal があれば `ci=running` / `ci=pending` とする。
 
 CI collector は `ci.required_check_state` に `available`、`merge_state_status`、`status_check_rollup_total`、`status_check_rollup_states[]` を保持する。
+CI collector は `ci.commit_statuses.aggregate_state` に commit statuses API top-level `state` を保持し、`statuses[]` が1件以上ある場合に限り、`pending` / `failure` / `error` を individual statuses の backstop として status classification に参加させる。
+ただし commit statuses API の `statuses[]` が空の場合、top-level `state=pending|failure|error` は backstop として採用しない。
+この場合は check runs と required-check rollup を優先し、すべて completed success かつ merge-state / required-check metadata が未充足を示していなければ `ci=passed` にできる。
 `required_checks_missing_or_pending` は、`mergeStateStatus=BLOCKED` かつ `status_check_rollup_states[].state` に
 `EXPECTED` / `IN_PROGRESS` / `PENDING` / `QUEUED` / `REQUESTED` / `WAITING` が含まれ、かつ observed checks/statuses に
 failure / running / pending / stale がない場合だけ blocking limitation として出し、`ci=pending` に分類する。
@@ -374,6 +380,7 @@ Status precedence:
 - active review request または `reviewDecision=REVIEW_REQUIRED` は `requested` とする。
 - current trigger window 内の issue comment は approval より優先して `commented` として扱い、approval だけで merge-prepared と誤判定しない。
 - dismissed review は signal として保持するが、最新 non-dismissed reviewer state と unresolved / current comment がない場合に限り block しない。
+- reviewer ごとの最新 non-dismissed review state を畳むとき、同じ `submitted_at` 秒の review は文字列 id 比較にしない。数値 review id または REST API order 相当の deterministic tie-breaker で新旧を決め、同秒の古い review が新しい review を上書きしないようにする。
 
 ### Review signal schema
 
@@ -437,7 +444,7 @@ trigger window 後の body payload は `review.signals[]` の各 item に body m
   "codex_authored": false,
   "created_at": "2026-06-07T00:00:00Z",
   "submitted_at": "optional-review-submitted-at",
-  "updated_at": "optional-inline-comment-updated-at",
+  "updated_at": "optional-issue-or-inline-comment-updated-at",
   "state": "commented|approved|changes_requested|pending|dismissed|unknown",
   "commit_id": "optional-review-or-comment-head-sha",
   "original_commit_id": "optional-inline-original-sha",
@@ -482,17 +489,22 @@ Window 判定:
 
 - PR conversation comment:
   - `created_at > trigger_created_at` を含める。
+  - `updated_at >= trigger_created_at` の edit も current trigger window signal として含める。
   - `created_at == trigger_created_at` の場合は `id > trigger_comment_id` のものだけ含める。
   - trigger comment 自身は含めない。
 - Pull request review:
-  - `submitted_at >= trigger_created_at` を候補にする。
+  - `submitted_at > trigger_created_at` を候補にする。
+  - `submitted_at == trigger_created_at` は GitHub timestamp の秒精度では trigger 後と断定できないため current-window body / status signal には含めない。
   - `commit_id == expected_head_sha` を current-window として優先する。
   - expected head SHA と異なるものは stale / prior-head signal として分離する。
 - Inline review comment:
-  - `created_at >= trigger_created_at` または `updated_at >= trigger_created_at` を候補にする。
+  - `created_at > trigger_created_at` または `updated_at > trigger_created_at` を候補にする。
+  - `created_at == trigger_created_at` / `updated_at == trigger_created_at` は GitHub timestamp の秒精度では trigger 後と断定できないため current-window body / status signal には含めない。
   - `commit_id` / `original_commit_id` が expected head SHA と一致しないものは stale / prior-head signal として分離する。
 - Review thread:
   - fixed GraphQL query で thread comments の created/updated time、resolved/outdated state、path/line を取得できる場合は window 判定に参加させる。
+  - GraphQL `comments(last: 100)` に対象 REST review comment id が含まれない場合でも、REST review comment の `thread_id` と GraphQL thread node id が一致すれば thread state を反映する。
+  - REST review comment に `thread_id` がない場合は GraphQL comment id 突合だけを使い、推測で thread state を割り当てない。
   - GraphQL unavailable の場合は REST body collection は継続し、`thread_state_available=false` と limitation を出す。
 
 Body mode:
@@ -792,6 +804,7 @@ script failure ではなく人間または実装 agent への handoff 状態と�
    - checks/statuses collector と review collector を実行する。
    - failure 系 check がある場合は fixed Actions run/jobs collection で workflow / job / failed step detail を取得する。
    - review collector は trigger window に属する review/comment body を body mode に従って抽出する。
+   - collector 実行後に fixed `gh pr view --json headRefOid,url,state,isDraft,number` を再実行し、PR head が expected head SHA から変わっていれば collected result を採用せず `stale_head` / `observation_complete=false` / `rerun_for_current_head` を返す。
 4. Status normalization:
    - CI を `unknown|none|failed|running|pending|passed` に集約する。
    - Review を `unknown|unresolved|changes_requested|requested|commented|approved|pending|none` に集約する。
