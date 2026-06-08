@@ -2070,6 +2070,8 @@ def _apply_managed_skill_install_plan(
 def _migrate_bootstrap_only_config_if_stale(target_rel: Path, target_path: Path) -> None:
     if target_rel.as_posix() != ".codex/config.toml":
         return
+    if target_path.is_symlink():
+        return
     try:
         target_text = target_path.read_text(encoding="utf-8")
     except UnicodeDecodeError:

@@ -17,7 +17,7 @@ ID: "iss-00170"
 - AC:
   - AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-012, AC-013, AC-014
 - EC:
-  - EC-001, EC-002, EC-003, EC-004, EC-005, EC-006, EC-007, EC-008, EC-009
+  - EC-001, EC-002, EC-003, EC-004, EC-005, EC-006, EC-007, EC-008, EC-009, EC-010, EC-011, EC-012
 - 非交渉制約:
   - `pr-monitor` sub-agent は完全廃止する。
   - `github-codex-pr-review-comments` skill は削除し、compatibility shim は残さない。
@@ -74,6 +74,9 @@ ID: "iss-00170"
 | EC-007 | S05 | S03, S04 | draft / non-open PR が human_gate になり merge-prepared にならない fixture test |
 | EC-008 | S05 | S02 | late snapshot poll / wait deadline timeout が latest payload を保持しつつ timeout limitation を付ける fixture test |
 | EC-009 | S03 | S05 | required-check pending、non-CI merge state、required-check metadata failure を分ける fixture test |
+| EC-010 | S03/S04/S05 | S02 | mergeStateStatus UNKNOWN、commit status aggregate、issue comment updated_at、reviewDecision CHANGES_REQUESTED、collection 後 head race を分ける fixture test |
+| EC-011 | S04/S05 | S02 | REST `thread_id` fallback と same-second review/comment trigger-window exclusion を分ける fixture test |
+| EC-012 | S03/S04/S06 | S02/S05 | empty commit-status aggregate、same-second review collapse、bootstrap config symlink migration skip を分ける fixture test |
 
 ## 仕様固定クロージャ索引（Spec-Locked Closure Index）
 
@@ -102,6 +105,9 @@ ID: "iss-00170"
 | CL-EC-007 | S05 | EC-007 | draft / non-open PR は human_gate | draft/closed false merge-prepared | yes | red-required |
 | CL-EC-008 | S05 | EC-008 | late poll timeout / wait deadline timeout は latest payload を保持 | timeout synthetic unknown loss | yes | red-required |
 | CL-EC-009 | S03/S05 | EC-009 | required-check pending は wait、non-CI merge state / metadata failure は false pass させない | merge-state false wait / false green | yes | red-required |
+| CL-EC-010 | S03/S04/S05 | EC-010 | GitHub aggregate field と collection timing の境界を false pass / false gate にしない | aggregate blind spot / head race / stale review decision | yes | red-required |
+| CL-EC-011 | S04/S05 | EC-011 | thread state は REST `thread_id` fallback で補い、same-second review/comment は trigger 後と断定しない | long thread false blocker / same-second false current feedback | yes | red-required |
+| CL-EC-012 | S03/S04/S06 | EC-012 | 空 commit-status aggregate は false wait にせず、同秒 review は数値/API-order tie-break し、config symlink は migration で辿らない | empty aggregate false wait / same-second review miscollapse / symlink target rewrite | yes | red-required |
 
 ## 実装ステップ
 
@@ -175,6 +181,8 @@ ID: "iss-00170"
     - success + skipped + neutral can yield `passed` when no blocking pending/failure remains.
     - required pending / path-filter pending remains `pending`.
     - `mergeStateStatus=BLOCKED` plus pending / expected required check rollup becomes `required_checks_missing_or_pending` and `ci=pending`.
+    - `mergeStateStatus=UNKNOWN` becomes transient `ci=pending` and is not emitted as `pr_merge_state_blocking`.
+    - commit status aggregate `state=pending|failure|error` participates as a backstop only when individual `statuses[]` are present, so empty `statuses[]` + all check runs / required rollup success does not stay pending or failed solely because aggregate is pending / failure / error.
     - `DIRTY` / `BEHIND` and other non-CI merge states become `pr_merge_state_blocking` and `ci=unknown` / human gate instead of `ci=pending`.
     - `gh pr view --json mergeStateStatus,statusCheckRollup` failure is surfaced as `pr_required_check_state_unavailable` and does not allow observed green false pass when checks/statuses exist.
   - zero checks remain non-success until grace/deadline semantics allow a limitation result.
@@ -182,7 +190,7 @@ ID: "iss-00170"
 - reviewer gate:
   - code-reviewer.
 - closure:
-  - CL-AC-002, CL-AC-004, CL-AC-007, CL-AC-014, CL-EC-002, CL-EC-003, CL-EC-009.
+  - CL-AC-002, CL-AC-004, CL-AC-007, CL-AC-014, CL-EC-002, CL-EC-003, CL-EC-009, CL-EC-010.
 
 ### S04 Review/comment/thread collector
 
@@ -201,7 +209,9 @@ ID: "iss-00170"
     - fixed GraphQL query reads review thread state and `reviewDecision` when available; unavailable thread state becomes limitation.
     - review statuses are limited to `unknown`, `none`, `requested`, `commented`, `approved`, `changes_requested`, `unresolved`.
     - `reviewDecision=REVIEW_REQUIRED` maps to `requested` even without explicit review-request nodes.
+    - `reviewDecision=CHANGES_REQUESTED` maps to `changes_requested` even when REST review rows are stale or outside the trigger window.
     - current trigger-window issue comments override approval for aggregate status.
+    - issue comments include `updated_at`, and an edit with `updated_at >= trigger_created_at` participates in current-window signal selection and fingerprint metadata.
     - all review signals and Codex-authored subset are both represented.
     - explicit `--trigger-comment-id` / `--trigger-created-at` includes only trigger-window bodies.
     - explicit `--trigger-comment-id` without `--trigger-created-at` resolves timestamp from issue comments or records `trigger_timestamp_unresolved`.
@@ -212,7 +222,7 @@ ID: "iss-00170"
 - reviewer gate:
   - code-reviewer.
 - closure:
-  - CL-AC-006, CL-AC-008, CL-AC-009, CL-AC-012, CL-AC-013, CL-EC-004, CL-EC-005.
+  - CL-AC-006, CL-AC-008, CL-AC-009, CL-AC-012, CL-AC-013, CL-EC-004, CL-EC-005, CL-EC-010, CL-EC-011, CL-EC-012.
 
 ### S05 Wait loop integration and stable result
 
@@ -231,6 +241,7 @@ ID: "iss-00170"
     - quiet window and same fingerprint count are required before `observation_complete=true`.
     - wait same-fingerprint count uses a semantic fingerprint derived from wait decision inputs, not the raw snapshot `fingerprint`, so snapshot-internal fingerprint churn alone does not prevent stability.
     - head SHA changes reset or terminate as stale/non-success.
+    - snapshot integration revalidates PR head after checks/review collection and returns `stale_head` / `observation_complete=false` / `rerun_for_current_head` when the head changed during collection.
     - CI green followed by late review feedback waits for review stability.
     - draft and non-open PRs return `human_gate` with PR-state-specific recommended next action instead of merge-prepared success.
     - late snapshot poll timeout or wait deadline expiry with a prior valid payload preserves latest CI/review summary and appends `snapshot_poll_timeout`.
@@ -238,7 +249,7 @@ ID: "iss-00170"
 - reviewer gate:
   - code-reviewer.
 - closure:
-  - CL-AC-001, CL-AC-003, CL-AC-005, CL-AC-010, CL-EC-001, CL-EC-005, CL-EC-006, CL-EC-007, CL-EC-008, CL-EC-009.
+  - CL-AC-001, CL-AC-003, CL-AC-005, CL-AC-010, CL-EC-001, CL-EC-005, CL-EC-006, CL-EC-007, CL-EC-008, CL-EC-009, CL-EC-010, CL-EC-011, CL-EC-012.
 
 ### S06 Workflow skill guidance and dogfooding parity
 
@@ -262,6 +273,7 @@ ID: "iss-00170"
   - `github-pr-creator` references snapshot/wait only as post-create observation support.
   - role guidance contains no active `pr-monitor` routing.
   - bootstrap-only `.codex/config.toml` migration removes active stale routing to removed `pr-monitor` / old review wrapper guidance and keeps the no-shim decision intact.
+  - `.codex/config.toml` symlink is not followed or rewritten by migration.
 - reviewer gate:
   - code-reviewer for tests/assets, spec-reviewer focus if skill prose changes material workflow semantics.
 - closure:

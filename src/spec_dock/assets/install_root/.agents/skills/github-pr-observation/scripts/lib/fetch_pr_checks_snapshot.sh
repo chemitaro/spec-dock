@@ -252,6 +252,14 @@ if limitation:
 
 check_runs = as_list(check_runs_payload, "check_runs")
 statuses = as_list(statuses_payload, "statuses")
+aggregate_status_state = (
+    str(statuses_payload.get("state") or "").lower()
+    if isinstance(statuses_payload, dict)
+    else ""
+)
+aggregate_status_classification = normalize_status_state({"state": aggregate_status_state})
+aggregate_status_pending_backstop = aggregate_status_classification == "pending" and bool(statuses)
+aggregate_status_failed_backstop = aggregate_status_classification == "failed" and bool(statuses)
 status_check_rollup = as_list(pr_view_payload, "statusCheckRollup")
 merge_state_status = str(pr_view_payload.get("mergeStateStatus") or "").upper()
 
@@ -268,6 +276,7 @@ check_counts = {
 }
 status_counts = {
     "total": len(statuses),
+    "aggregate_state": aggregate_status_state or None,
     "success": 0,
     "failure": 0,
     "pending": 0,
@@ -356,6 +365,16 @@ for status in statuses:
                 "target_url": status.get("target_url"),
             }
         )
+if aggregate_status_failed_backstop and not (
+    status_counts["failure"] or status_counts["error"]
+):
+    failures.append(
+        {
+            "kind": "commit_status_aggregate",
+            "state": aggregate_status_state,
+            "description": "combined commit status aggregate state was non-success",
+        }
+    )
 
 for check in failed_checks:
     workflow_run = check.get("workflow_run") if isinstance(check.get("workflow_run"), dict) else {}
@@ -413,16 +432,39 @@ for check in failed_checks:
 required_checks_missing_or_pending = (
     merge_state_status == "BLOCKED"
     and required_check_rollup_pending
-    and not (check_counts["failed"] or status_counts["failure"] or status_counts["error"] or check_counts["stale"])
-    and not (check_counts["running"] or check_counts["pending"] or status_counts["pending"])
+    and not (
+        check_counts["failed"]
+        or status_counts["failure"]
+        or status_counts["error"]
+        or aggregate_status_failed_backstop
+        or check_counts["stale"]
+    )
+    and not (
+        check_counts["running"]
+        or check_counts["pending"]
+        or status_counts["pending"]
+        or aggregate_status_pending_backstop
+    )
 )
 merge_state_blocking = (
     bool(merge_state_status)
-    and merge_state_status not in {"CLEAN", "HAS_HOOKS"}
+    and merge_state_status not in {"CLEAN", "HAS_HOOKS", "UNKNOWN"}
     and not required_checks_missing_or_pending
-    and not (check_counts["failed"] or status_counts["failure"] or status_counts["error"] or check_counts["stale"])
-    and not (check_counts["running"] or check_counts["pending"] or status_counts["pending"])
+    and not (
+        check_counts["failed"]
+        or status_counts["failure"]
+        or status_counts["error"]
+        or aggregate_status_failed_backstop
+        or check_counts["stale"]
+    )
+    and not (
+        check_counts["running"]
+        or check_counts["pending"]
+        or status_counts["pending"]
+        or aggregate_status_pending_backstop
+    )
 )
+merge_state_unknown = merge_state_status == "UNKNOWN"
 
 if required_checks_missing_or_pending:
     limitations.append(
@@ -445,13 +487,25 @@ elif merge_state_blocking:
         }
     )
 
-if check_counts["failed"] or status_counts["failure"] or status_counts["error"] or check_counts["stale"]:
+if (
+    check_counts["failed"]
+    or status_counts["failure"]
+    or status_counts["error"]
+    or aggregate_status_failed_backstop
+    or check_counts["stale"]
+):
     ci_status = "failed"
 elif limitations and any(item.get("severity") == "blocking" and item.get("code", "").startswith("github_api") for item in limitations):
     ci_status = "unknown"
 elif check_counts["running"]:
     ci_status = "running"
-elif check_counts["pending"] or status_counts["pending"] or required_checks_missing_or_pending:
+elif (
+    check_counts["pending"]
+    or status_counts["pending"]
+    or aggregate_status_pending_backstop
+    or required_checks_missing_or_pending
+    or merge_state_unknown
+):
     ci_status = "pending"
 elif merge_state_blocking or (
     not required_check_state["available"] and (check_counts["total"] or status_counts["total"])
