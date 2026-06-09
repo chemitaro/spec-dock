@@ -12726,6 +12726,446 @@ PY
                     assert result.returncode == 64, result.stdout + result.stderr
                     assert not log_path.exists()
 
+    def _issue_176_write_wait_s04_scripts(self, script_dir: Path, log_path: Path) -> Path:
+        repo_root = Path(__file__).resolve().parents[3]
+        source_wait = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        )
+        wait_script = script_dir / "wait_pr_observation.sh"
+        shutil.copy2(source_wait, wait_script)
+        wait_script.chmod(0o755)
+
+        trigger_script = script_dir / "trigger_codex_review.sh"
+        trigger_script.write_text(
+            """#!/usr/bin/env bash
+set -euo pipefail
+printf 'trigger %s\\n' "$*" >> "$S04_WAIT_LOG"
+cat <<'JSON'
+{"success":true,"overall_status":"trigger_posted","trigger":{"action":"posted","mode":"post-once","body":"@codex review","body_matches_expected":true,"comment_id":456,"created_at":"2026-06-09T01:02:03Z","endpoint":"repos/owner/repo/issues/13/comments"}}
+JSON
+""",
+            encoding="utf-8",
+        )
+        trigger_script.chmod(0o755)
+
+        snapshot_script = script_dir / "fetch_pr_observation_snapshot.sh"
+        snapshot_script.write_text(
+            """#!/usr/bin/env bash
+set -euo pipefail
+printf 'snapshot %s\\n' "$*" >> "$S04_WAIT_LOG"
+python3 - "$@" <<'PY'
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+trigger_id = None
+trigger_created_at = None
+while args:
+    arg = args.pop(0)
+    if arg == "--trigger-comment-id":
+        trigger_id = int(args.pop(0))
+    elif arg == "--trigger-created-at":
+        trigger_created_at = args.pop(0)
+    elif arg == "--out":
+        args.pop(0)
+    elif args:
+        args.pop(0)
+
+payload = json.loads(os.environ["S04_WAIT_PAYLOAD"])
+payload.setdefault(
+    "trigger",
+    {"source": "explicit", "comment_id": trigger_id, "created_at": trigger_created_at},
+)
+payload["trigger"]["comment_id"] = trigger_id
+payload["trigger"]["created_at"] = trigger_created_at
+print(json.dumps(payload, separators=(",", ":")))
+PY
+""",
+            encoding="utf-8",
+        )
+        snapshot_script.chmod(0o755)
+        del log_path
+        return wait_script
+
+    def _issue_176_s04_wait_payload(
+        self,
+        *,
+        ci_status: str,
+        review_status: str,
+        lifecycle_status: str,
+        completion_signal: str,
+        head_matches_expected: bool = True,
+    ) -> dict:
+        current_head = "a" * 40 if head_matches_expected else "b" * 40
+        ci_failed = ci_status == "failed"
+        return {
+            "script": "fetch_pr_observation_snapshot.sh",
+            "status": ci_status,
+            "overall_status": ci_status,
+            "normalized_status": ci_status,
+            "observation_complete": False,
+            "repo": "owner/repo",
+            "pr": 13,
+            "expected_head_sha": "a" * 40,
+            "current_head_sha": current_head,
+            "head_matches_expected": head_matches_expected,
+            "summary": {"ci": ci_status, "review": review_status, "head": "match" if head_matches_expected else "mismatch"},
+            "limitations": [],
+            "recommended_next_action": "fix_ci" if ci_failed else "wait",
+            "ci": {
+                "status": ci_status,
+                "failures": [{"name": "test"}] if ci_failed else [],
+                "check_runs": {
+                    "total": 1,
+                    "success": 0 if ci_failed else 1,
+                    "skipped": 0,
+                    "neutral": 0,
+                    "failed": 1 if ci_failed else 0,
+                    "running": 0,
+                    "pending": 0,
+                    "other": 0,
+                    "stale": 0,
+                },
+            },
+            "review": {
+                "status": review_status,
+                "signals": [],
+                "review_requests": [],
+                "threads": {"total": 0, "unresolved": 0},
+            },
+            "codex_review": {
+                "lifecycle": {
+                    "status": lifecycle_status,
+                    "completion_signal": completion_signal,
+                    "confidence": "high" if completion_signal == "submitted_pull_request_review" else "medium",
+                    "selected_review_ids": [201] if completion_signal == "submitted_pull_request_review" else [],
+                    "selected_review_comment_ids": [],
+                    "selected_review_thread_ids": [],
+                    "trigger_source": "explicit",
+                },
+                "selected_reviews": [],
+                "selected_review_comments": [],
+                "collection_summary": {
+                    "reviews": {"fetched_ids": [], "selected_ids": [], "boundary_before_excluded_ids": []},
+                    "review_comments": {"fetched_ids": [], "selected_ids": [], "boundary_before_excluded_ids": []},
+                    "review_threads": {
+                        "fetched_ids": [],
+                        "selected_ids": [],
+                        "boundary_before_excluded_ids": [],
+                        "unresolved_ids": [],
+                        "unresolved_count": 0,
+                    },
+                },
+            },
+            "artifacts": {},
+        }
+
+    def test_issue_176_s04_wait_ci_failed_with_completed_codex_review_is_not_merge_ready(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            log_path = tmp_path / "wait.log"
+            wait_script = self._issue_176_write_wait_s04_scripts(tmp_path, log_path)
+            env = {
+                **os.environ,
+                "S04_WAIT_LOG": str(log_path),
+                "S04_WAIT_PAYLOAD": json.dumps(
+                    self._issue_176_s04_wait_payload(
+                        ci_status="failed",
+                        review_status="none",
+                        lifecycle_status="completed",
+                        completion_signal="submitted_pull_request_review",
+                    )
+                ),
+            }
+
+            result = subprocess.run(
+                [
+                    str(wait_script),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "777",
+                    "--trigger-created-at",
+                    "2026-06-09T02:03:04Z",
+                    "--timeout-seconds",
+                    "2",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "1",
+                    "--progress",
+                    "none",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "failed"
+            assert payload["recommended_next_action"] == "fix_ci"
+            assert payload["observation_complete"] is False
+            assert payload["codex_review"]["lifecycle"]["completion_signal"] == "submitted_pull_request_review"
+
+    def test_issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            log_path = tmp_path / "wait.log"
+            wait_script = self._issue_176_write_wait_s04_scripts(tmp_path, log_path)
+            for review_status in ("none", "pending"):
+                with _case(review_status=review_status):
+                    out_dir = tmp_path / f"out-{review_status}"
+                    env = {
+                        **os.environ,
+                        "S04_WAIT_LOG": str(log_path),
+                        "S04_WAIT_PAYLOAD": json.dumps(
+                            self._issue_176_s04_wait_payload(
+                                ci_status="passed",
+                                review_status=review_status,
+                                lifecycle_status="pending",
+                                completion_signal="none",
+                            )
+                        ),
+                    }
+
+                    result = subprocess.run(
+                        [
+                            str(wait_script),
+                            "--repo",
+                            "owner/repo",
+                            "--pr",
+                            "13",
+                            "--head-sha",
+                            "a" * 40,
+                            "--trigger-mode",
+                            "resume",
+                            "--trigger-comment-id",
+                            "777",
+                            "--trigger-created-at",
+                            "2026-06-09T02:03:04Z",
+                            "--timeout-seconds",
+                            "2",
+                            "--poll-interval-seconds",
+                            "1",
+                            "--quiet-seconds",
+                            "30",
+                            "--same-fingerprint-count",
+                            "30",
+                            "--out",
+                            str(out_dir),
+                        ],
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                        timeout=6,
+                    )
+
+                    assert result.returncode == 0, result.stdout + result.stderr
+                    payload = json.loads(result.stdout)
+                    assert payload["normalized_status"] == "timeout"
+                    assert payload["recommended_next_action"] == "wait_or_rerun"
+                    assert payload["resume"]["available"] is True
+                    assert payload["resume"]["trigger_comment_id"] == 777
+                    assert payload["resume"]["trigger_created_at"] == "2026-06-09T02:03:04Z"
+                    assert "--trigger-mode resume" in payload["resume"]["command_hint"]
+                    assert "--trigger-comment-id 777" in payload["resume"]["command_hint"]
+                    assert payload["codex_review"]["lifecycle"]["status"] == "pending"
+                    assert "phase=wait ci=passed review=observing" in result.stderr
+                    assert (out_dir / "result.json").read_text(encoding="utf-8") == result.stdout
+                    assert not (out_dir / "summary.md").exists()
+
+    def test_issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            log_path = tmp_path / "wait.log"
+            wait_script = self._issue_176_write_wait_s04_scripts(tmp_path, log_path)
+            env = {
+                **os.environ,
+                "S04_WAIT_LOG": str(log_path),
+                "S04_WAIT_PAYLOAD": json.dumps(
+                    self._issue_176_s04_wait_payload(
+                        ci_status="passed",
+                        review_status="commented",
+                        lifecycle_status="fallback",
+                        completion_signal="fallback_issue_comment",
+                    )
+                ),
+            }
+
+            result = subprocess.run(
+                [
+                    str(wait_script),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "777",
+                    "--trigger-created-at",
+                    "2026-06-09T02:03:04Z",
+                    "--timeout-seconds",
+                    "2",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "1",
+                    "--progress",
+                    "none",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "human_gate"
+            assert payload["recommended_next_action"] == "wait_or_rerun"
+            assert payload["observation_complete"] is False
+            assert payload["codex_review"]["lifecycle"]["completion_signal"] == "fallback_issue_comment"
+
+    def test_issue_176_s04_wait_post_once_first_poll_timeout_keeps_resume_hint(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            log_path = tmp_path / "wait.log"
+            wait_script = self._issue_176_write_wait_s04_scripts(tmp_path, log_path)
+            snapshot_script = tmp_path / "fetch_pr_observation_snapshot.sh"
+            snapshot_script.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+printf 'snapshot %s\\n' "$*" >> "$S04_WAIT_LOG"
+sleep 5
+""",
+                encoding="utf-8",
+            )
+            snapshot_script.chmod(0o755)
+            env = {
+                **os.environ,
+                "S04_WAIT_LOG": str(log_path),
+                "S04_WAIT_PAYLOAD": json.dumps(
+                    self._issue_176_s04_wait_payload(
+                        ci_status="passed",
+                        review_status="none",
+                        lifecycle_status="pending",
+                        completion_signal="none",
+                    )
+                ),
+            }
+
+            result = subprocess.run(
+                [
+                    str(wait_script),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--timeout-seconds",
+                    "1",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "1",
+                    "--progress",
+                    "none",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "timeout"
+            assert payload["recommended_next_action"] == "wait_or_rerun"
+            assert payload["resume"]["available"] is True
+            assert payload["resume"]["trigger_comment_id"] == 456
+            assert payload["resume"]["trigger_created_at"] == "2026-06-09T01:02:03Z"
+            assert "--trigger-mode resume" in payload["resume"]["command_hint"]
+            assert "--trigger-comment-id 456" in payload["resume"]["command_hint"]
+            log_lines = log_path.read_text(encoding="utf-8").splitlines()
+            assert log_lines[0].startswith("trigger ")
+            assert log_lines[1].startswith("snapshot ")
+
+    def test_issue_176_s04_wait_post_trigger_head_drift_preserves_trigger_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            log_path = tmp_path / "wait.log"
+            wait_script = self._issue_176_write_wait_s04_scripts(tmp_path, log_path)
+            env = {
+                **os.environ,
+                "S04_WAIT_LOG": str(log_path),
+                "S04_WAIT_PAYLOAD": json.dumps(
+                    self._issue_176_s04_wait_payload(
+                        ci_status="passed",
+                        review_status="none",
+                        lifecycle_status="completed",
+                        completion_signal="submitted_pull_request_review",
+                        head_matches_expected=False,
+                    )
+                ),
+            }
+
+            result = subprocess.run(
+                [
+                    str(wait_script),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--timeout-seconds",
+                    "2",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "1",
+                    "--progress",
+                    "none",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "stale_head"
+            assert payload["observation_complete"] is False
+            assert payload["recommended_next_action"] == "rerun_for_current_head"
+            assert payload["trigger"]["comment_id"] == 456
+            assert payload["trigger"]["created_at"] == "2026-06-09T01:02:03Z"
+            assert log_path.read_text(encoding="utf-8").splitlines()[0].startswith("trigger ")
+
     def test_issue_75_pr_observation_snapshot_reports_collection_failure_as_json(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -14729,6 +15169,10 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert payload["wait"]["deadline_reached"] is True
             assert payload["wait"]["polls"] == 1
             assert payload["recommended_next_action"] == "wait_or_rerun"
+            assert payload["resume"]["available"] is True
+            assert payload["resume"]["trigger_comment_id"] == 99
+            assert "--trigger-mode resume" in payload["resume"]["command_hint"]
+            assert "--trigger-comment-id 99" in payload["resume"]["command_hint"]
             assert payload["limitations"][0]["code"] == "snapshot_poll_timeout"
             assert payload["limitations"][0]["severity"] == "blocking"
             assert len(result.stderr.strip().splitlines()) == 1
