@@ -365,16 +365,17 @@ final_head_sha = final_metadata.get("headRefOid") or ""
 payload["final_head_sha"] = final_head_sha or None
 
 if final_exit != 0 or not final_head_sha:
-    payload["success"] = False
-    payload["overall_status"] = "metadata_failed_after_trigger"
     payload["limitations"].append(
         limitation(
             "post_trigger_metadata_failed",
             "could not read PR head after trigger comment POST",
             gh_exit=final_exit,
             gh_stderr=final_stderr.strip(),
+            severity="warning" if payload["success"] else "blocking",
         )
     )
+    if not payload["success"]:
+        payload["overall_status"] = "metadata_failed_after_trigger"
 elif not head_matches(final_head_sha, expected_head_sha):
     payload["success"] = False
     payload["overall_status"] = "stale_head"
