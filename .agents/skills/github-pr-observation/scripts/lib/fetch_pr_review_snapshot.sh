@@ -482,6 +482,7 @@ def body_hash(body):
 def add_body_metadata(signal, body_state):
     raw_body = str(signal.pop("_raw_body", "") or "")
     signal["_raw_body_artifact"] = raw_body
+    signal["_selected_full_body"] = raw_body
     signal["body_sha256"] = body_hash(raw_body)
     signal["body_original_length"] = len(raw_body)
     signal["body_truncated"] = False
@@ -526,6 +527,86 @@ def thread_comment_nodes(thread):
     comments = thread.get("comments") if isinstance(thread, dict) else None
     nodes = comments.get("nodes") if isinstance(comments, dict) else None
     return nodes if isinstance(nodes, list) else []
+
+
+def item_id(item):
+    return item.get("id") if isinstance(item, dict) else None
+
+
+def compact_ids(items):
+    ids = [item_id(item) for item in items]
+    return [value for value in ids if value is not None]
+
+
+def boundary_exclusion_reason(item):
+    if not body_state["trigger_known"]:
+        return "trigger_unknown"
+    activity_at = signal_activity_time(item)
+    if not activity_at:
+        return "activity_time_missing"
+    if not is_after_trigger(item):
+        return "boundary_before_or_equal_trigger"
+    return None
+
+
+def summarize_signal_collection(items, selected_ids):
+    boundary_exclusions = []
+    for item in items:
+        reason = boundary_exclusion_reason(item)
+        if reason is not None:
+            boundary_exclusions.append({"id": item.get("id"), "reason": reason})
+    return {
+        "fetched_count": len(items),
+        "fetched_ids": compact_ids(items),
+        "selected_ids": selected_ids,
+        "boundary_before_excluded_count": len(boundary_exclusions),
+        "boundary_before_excluded_ids": [
+            item["id"] for item in boundary_exclusions if item.get("id") is not None
+        ],
+        "boundary_before_exclusion_reasons": boundary_exclusions,
+    }
+
+
+def thread_after_trigger(thread):
+    if not body_state["trigger_known"]:
+        return False
+    activity_at = thread.get("activity_at") if isinstance(thread, dict) else None
+    if not activity_at:
+        return False
+    activity_at_dt = parse_iso8601_instant(activity_at)
+    return activity_at_dt is not None and activity_at_dt > trigger_created_at_dt
+
+
+def summarize_thread_collection(items, selected_ids):
+    boundary_exclusions = []
+    for item in items:
+        if not body_state["trigger_known"]:
+            reason = "trigger_unknown"
+        elif not item.get("activity_at"):
+            reason = "activity_time_missing"
+        elif not thread_after_trigger(item):
+            reason = "boundary_before_or_equal_trigger"
+        else:
+            reason = None
+        if reason is not None:
+            boundary_exclusions.append({"id": item.get("id"), "reason": reason})
+    unresolved_ids = [
+        item.get("id")
+        for item in items
+        if item.get("state") == "unresolved" and item.get("id") is not None
+    ]
+    return {
+        "fetched_count": len(items),
+        "fetched_ids": compact_ids(items),
+        "selected_ids": selected_ids,
+        "unresolved_count": len(unresolved_ids),
+        "unresolved_ids": unresolved_ids,
+        "boundary_before_excluded_count": len(boundary_exclusions),
+        "boundary_before_excluded_ids": [
+            item["id"] for item in boundary_exclusions if item.get("id") is not None
+        ],
+        "boundary_before_exclusion_reasons": boundary_exclusions,
+    }
 
 
 limitations = []
@@ -876,8 +957,135 @@ active_comment_signals = [
     if item.get("kind") == "pull_review_comment"
     and item.get("thread_state") not in {"resolved", "outdated"}
 ]
+selected_review_signals = [
+    item
+    for item in active_review_signals
+    if item.get("codex_authored")
+    and item.get("state") in {"commented", "approved", "changes_requested"}
+]
+selected_review_ids = [
+    item.get("id") for item in selected_review_signals if item.get("id") is not None
+]
+selected_review_id_set = {str(value) for value in selected_review_ids}
+selected_comment_signals = [
+    item
+    for item in active_comment_signals
+    if item.get("review_id") is not None
+    and str(item.get("review_id")) in selected_review_id_set
+]
+selected_review_comment_ids = [
+    item.get("id") for item in selected_comment_signals if item.get("id") is not None
+]
+selected_thread_ids = []
+for item in selected_comment_signals:
+    thread_id = item.get("thread_id")
+    if thread_id is not None and thread_id not in selected_thread_ids:
+        selected_thread_ids.append(thread_id)
+
+def selected_review_item(item):
+    raw_body = str(item.get("_selected_full_body", "") or "")
+    return {
+        "id": item.get("id"),
+        "author": item.get("author"),
+        "state": item.get("state"),
+        "submitted_at": item.get("submitted_at"),
+        "commit_id": item.get("commit_id"),
+        "stale": item.get("stale"),
+        "body": raw_body,
+        "body_sha256": item.get("body_sha256"),
+        "body_original_length": len(raw_body),
+        "body_collection_status": "present" if raw_body else "empty",
+    }
+
+
+def selected_review_comment_item(item):
+    raw_body = str(item.get("_selected_full_body", "") or "")
+    return {
+        "id": item.get("id"),
+        "review_id": item.get("review_id"),
+        "thread_id": item.get("thread_id"),
+        "thread_state": item.get("thread_state"),
+        "author": item.get("author"),
+        "created_at": item.get("created_at"),
+        "updated_at": item.get("updated_at"),
+        "commit_id": item.get("commit_id"),
+        "original_commit_id": item.get("original_commit_id"),
+        "path": item.get("path"),
+        "line": item.get("line"),
+        "stale": item.get("stale"),
+        "body": raw_body,
+        "body_sha256": item.get("body_sha256"),
+        "body_original_length": len(raw_body),
+        "body_collection_status": "present" if raw_body else "empty",
+    }
+
+
+reviews_for_summary = [item for item in signals if item.get("kind") == "pull_review"]
+review_comments_for_summary = [
+    item for item in signals if item.get("kind") == "pull_review_comment"
+]
+review_collection_summary = {
+    "reviews": summarize_signal_collection(reviews_for_summary, selected_review_ids),
+    "review_comments": summarize_signal_collection(
+        review_comments_for_summary,
+        selected_review_comment_ids,
+    ),
+    "review_threads": summarize_thread_collection(threads, selected_thread_ids),
+}
+if selected_review_signals:
+    lifecycle_status = "unresolved" if selected_thread_ids else "completed"
+    completion_signal = "submitted_pull_request_review"
+    lifecycle_confidence = "high"
+elif any(
+    item.get("kind") == "issue_comment"
+    and item.get("codex_authored")
+    and item.get("current_status_signal")
+    for item in signals
+):
+    lifecycle_status = "fallback"
+    completion_signal = "fallback_issue_comment"
+    lifecycle_confidence = "low"
+elif any(
+    item.get("kind") == "pull_review"
+    and item.get("codex_authored")
+    and item.get("state") == "pending"
+    and item.get("current_status_signal")
+    for item in signals
+):
+    lifecycle_status = "pending"
+    completion_signal = "none"
+    lifecycle_confidence = "medium"
+elif review_request_signals or review_decision_requires_review:
+    lifecycle_status = "pending"
+    completion_signal = "none"
+    lifecycle_confidence = "medium"
+elif blocking_collection_failure:
+    lifecycle_status = "unknown"
+    completion_signal = "none"
+    lifecycle_confidence = "low"
+else:
+    lifecycle_status = "none"
+    completion_signal = "none"
+    lifecycle_confidence = "medium"
+codex_review_payload = {
+    "lifecycle": {
+        "status": lifecycle_status,
+        "completion_signal": completion_signal,
+        "confidence": lifecycle_confidence,
+        "selected_review_ids": selected_review_ids,
+        "selected_review_comment_ids": selected_review_comment_ids,
+        "selected_review_thread_ids": selected_thread_ids,
+        "trigger_source": trigger_source,
+    },
+    "selected_reviews": [selected_review_item(item) for item in selected_review_signals],
+    "selected_review_comments": [
+        selected_review_comment_item(item) for item in selected_comment_signals
+    ],
+    "collection_summary": review_collection_summary,
+}
 for signal in signals:
     signal.pop("_api_index", None)
+    signal.pop("_selected_full_body", None)
 
 if blocking_collection_failure:
     status = "unknown"
@@ -966,6 +1174,7 @@ fingerprint_source = {
         "item_count_omitted": body_state["item_count_omitted"],
         "body_chars_omitted": body_state["body_chars_omitted"],
     },
+    "codex_review": codex_review_payload,
     "limitations": limitations,
 }
 fingerprint = hashlib.sha256(
@@ -1003,7 +1212,9 @@ payload = {
             "item_count_omitted": body_state["item_count_omitted"],
             "body_chars_omitted": body_state["body_chars_omitted"],
         },
+        "codex_review": codex_review_payload,
     },
+    "codex_review": codex_review_payload,
     "trigger": {
         "source": trigger_source,
         "comment_id": trigger_comment_id,
