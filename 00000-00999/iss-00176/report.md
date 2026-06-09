@@ -263,6 +263,113 @@ git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-o
 #### コミット
 - current S01 commit in git history: `feat(github-pr-observation): Codexレビュー起動ヘルパーを追加`
 
+### セッションログ（2026-06-09 S02 wait trigger mode orchestration）
+
+#### 対象
+- Step: S02
+- AC/EC: AC-001, AC-003, AC-008, EC-005, EC-007
+- 計画上の出典（Planned source）:
+  - `plan.md` `実装ステップ S02 — wait trigger mode orchestration`
+  - closure ids: cl-004, cl-005
+
+#### 実施内容
+- `wait_pr_observation.sh` に `--trigger-mode post-once|resume` を追加し、未指定時は `post-once` とした。
+- `post-once` では S01 の `trigger_codex_review.sh` を待機開始時に1回だけ実行し、helper stdout JSON を内部捕捉した上で snapshot args に `trigger_comment_id` / `trigger_created_at` を渡すようにした。
+- `resume` では `--trigger-comment-id` と `--trigger-created-at` を必須にし、trigger helper を呼ばず、明示 metadata だけを snapshot へ渡すようにした。
+- 無効 mode、`post-once` と explicit metadata の混在、`resume` metadata 不足は、GitHub / snapshot command 実行前に usage error とした。
+- helper 失敗、helper JSON 不正、helper metadata 不足は、stdout に helper stdout を漏らさず、wait 側の最終 JSON 1個で失敗を返す contract にした。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s02
+# 3 passed, 305 deselected
+
+uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation_wait or issue_176_s02"
+# 27 passed, 281 deselected
+
+uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s01 or issue_176_s02"
+# 11 passed, 297 deselected
+
+git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh tests/unit/infra/test_init_update.py
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | 既存 wait には trigger mode がなく、default post-once で helper を先に呼び snapshot へ metadata を渡す contract、resume で helper を呼ばない contract、invalid combinations の fail-fast contract を新規テストで固定した。 | test design / fake script call log | pass | red 実行ログは未分離だが、既存実装では満たせない観測可能 contract として追加した。 |
+| S02 | 緑フェーズ（Green） | focused fake scripts pytest | `issue_176_s02` 3 tests passed; wait regression selection 27 tests passed | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s02`; `uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation_wait or issue_176_s02"` | pass | default post-once, explicit resume, invalid mode combinations, stdout single JSON, existing wait regressions. |
+| S02 | リファクタリング（Refactor） | no stdout leakage / no implicit trigger reuse | helper stdout は internal JSON parse に限定し、snapshot execution 前に mode validation を完了する構造へ整理した。 | `git diff --check` / code-reviewer | pass | richer final trigger JSON integration は S03/S04 scope として維持。 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | default `post-once` が helper stdout JSON と snapshot stdout JSON の2文書を stdout に混在させるリスク | implementation | helper stdout を subprocess capture し、user-facing stdout は wait final JSON だけにした | cl-005 | no | `test_issue_176_s02_wait_default_post_once_calls_helper_before_snapshot` |
+| S02 | timeout 後の継続観測で default trigger が再投稿されるリスク | user / requirement | `resume` mode を追加し、explicit trigger metadata 必須かつ helper no-call とした | cl-004 | no | `test_issue_176_s02_wait_resume_uses_explicit_trigger_without_helper` |
+| S02 | mode / metadata の曖昧な組み合わせが snapshot まで進むリスク | implementation | invalid mode combinations を usage error とし、fake command log が空であることを確認した | cl-004 | no | `test_issue_176_s02_wait_rejects_invalid_trigger_mode_combinations_before_commands` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | cl-004, cl-005 | default `post-once` / explicit `resume` が trigger metadata を決定的に扱う。helper stdout は内部捕捉され、user-facing stdout は final JSON 1個だけ。 | focused pytest 3 passed; wait regression 27 passed; S01/S02 11 passed; code-reviewer passed | pass | richer final trigger JSON integration は S03/S04 範囲。 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-004 / tc-s02-001 | S02 | yes | red-required | wait に trigger mode がない既存状態 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s02` | pass | default post-once calls helper before snapshot and forwards helper metadata. |
+| cl-004 / tc-s02-002 | S02 | yes | red-required | wait に resume mode がない既存状態 | same | pass | resume uses explicit trigger metadata and does not call helper. |
+| cl-004 / tc-s02-003 | S02 | yes | red-required | invalid mode combinations の validation 不在 | same | pass | invalid mode, post-once+metadata, resume missing metadata fail before commands. |
+| cl-005 / tc-s02-004 | S02 | yes | red-required | helper stdout が混在し得る設計 gap | same | pass | final stdout parses as one JSON document; helper stdout is not emitted separately. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-004 | S02 | default post-once call log: trigger then snapshot; resume call log: snapshot only; invalid combinations: no command log | pass | `trigger_comment_id` / `trigger_created_at` are forwarded to snapshot args. |
+| cl-005 | S02 | stdout JSON parse and helper stdout capture inspection | pass | final stdout remains a single JSON authority for S02 scenarios. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | cl-004, cl-005 | N/A | cl-004, cl-005 | 計画済み S02 closure の範囲内で実装・検証した | no | yes, step reviewer passed |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/3b01/spec-dock` | iss-00176 | current session | code-reviewer | same repo, active issue, named role; S02 allowed files only | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | parent local implementation + delegated review | wait orchestration integration with existing shell/Python script and regression tests | code-reviewer | S02 diff review | `requirement.md`, `design.md`, `plan.md` | `wait_pr_observation.sh`, S02/wait regression tests, report S02 ledger | S03/S04 collector/final JSON behavior, skill docs, package/install behavior, GitHub state | focused pytest, wait regression, diff check | arbitrary trigger write surface required / stdout authority split | reviewer JSON / verification | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | code-reviewer | S02 source-of-truth、wait script diff、S02 tests を確認し、focused regression と diff check を実行 | `wait_pr_observation.sh`, `tests/unit/infra/test_init_update.py` | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_176_s02 or pr_observation_wait'` -> 27 passed; `git diff --check` -> pass | passed | richer final trigger JSON integration is S03/S04 scope; full suite not run | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | implementation was kept local because S02 changes were bounded to existing orchestration and regression fixtures after S01 contract was fixed | workflow-scoped local implementation within same S02 boundary | `wait_pr_observation.sh`, `tests/unit/infra/test_init_update.py`, `report.md` | S02 planned contract only | inspect diff and restore S02 files if reviewer failed | focused pytest 3 passed; wait regression 27 passed; S01/S02 11 passed; diff check pass | code-reviewer passed | no waiver; fresh reviewer gate passed |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | passed | no | proceed | `/private/tmp/iss-00176-s02-code-review.json`; findings 0, confidence high. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | committed | S02 target files + report S02 ledger | current S02 commit in git history | `git status --short` -> clean for S02 scope after commit | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` - default `post-once` / explicit `resume` trigger mode orchestration.
+- `tests/unit/infra/test_init_update.py` - S02 fake scripts and wait regression updates.
+- `spec-dock/.../iss-00176.../report.md` - S02 execution evidence.
+
+#### コミット
+- current S02 commit in git history: `feat(github-pr-observation): PR観測のtrigger modeを追加`
+
 ### セッションログ（2026-06-08 HH:MM - HH:MM）
 
 #### 対象
