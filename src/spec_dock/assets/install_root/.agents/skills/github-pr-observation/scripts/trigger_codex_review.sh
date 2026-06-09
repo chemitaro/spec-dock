@@ -226,6 +226,32 @@ if not payload["head_matches_expected"]:
     emit(payload)
     raise SystemExit(0)
 
+if metadata.get("isDraft") is True:
+    payload["overall_status"] = "draft_pr"
+    payload["trigger"]["action"] = "skipped"
+    payload["limitations"].append(
+        limitation(
+            "draft_pr_trigger_skipped",
+            "draft PR cannot receive the deterministic Codex review trigger",
+        )
+    )
+    emit(payload)
+    raise SystemExit(0)
+
+pr_state = str(metadata.get("state") or "").upper()
+if pr_state and pr_state != "OPEN":
+    payload["overall_status"] = "non_open_pr"
+    payload["trigger"]["action"] = "skipped"
+    payload["limitations"].append(
+        limitation(
+            "non_open_pr_trigger_skipped",
+            "non-open PR cannot receive the deterministic Codex review trigger",
+            state=metadata.get("state"),
+        )
+    )
+    emit(payload)
+    raise SystemExit(0)
+
 before_exit, before_stdout, before_stderr = run_gh(["api", endpoint, "--paginate"])
 before_comments_raw = load_json(before_stdout, None) if before_exit == 0 else None
 before_comments_trusted = isinstance(before_comments_raw, list)

@@ -12173,8 +12173,8 @@ if args == ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,ur
     emit({
         "headRefOid": head_sequence[index],
         "url": "https://github.com/owner/repo/pull/13",
-        "state": "OPEN",
-        "isDraft": False,
+        "state": scenario.get("state", "OPEN"),
+        "isDraft": scenario.get("is_draft", False),
         "number": 13,
     })
 elif args == ["api", "repos/owner/repo/issues/13/comments", "--paginate"]:
@@ -12366,6 +12366,40 @@ exit 44
         assert payload["trigger"]["action"] == "stale"
         assert payload["current_head_sha"] == "b" * 40
         assert payload["expected_head_sha"] == "a" * 40
+        assert [call for call in calls if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]] == []
+
+    def test_issue_176_s01_trigger_helper_does_not_post_to_draft_pr(self) -> None:
+        result, calls = self._issue_176_run_trigger(
+            scenario={
+                "head": "a" * 40,
+                "is_draft": True,
+                "before_comments": [],
+            },
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["success"] is False
+        assert payload["overall_status"] == "draft_pr"
+        assert payload["trigger"]["action"] == "skipped"
+        assert "draft_pr_trigger_skipped" in [item["code"] for item in payload["limitations"]]
+        assert [call for call in calls if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]] == []
+
+    def test_issue_176_s01_trigger_helper_does_not_post_to_non_open_pr(self) -> None:
+        result, calls = self._issue_176_run_trigger(
+            scenario={
+                "head": "a" * 40,
+                "state": "CLOSED",
+                "before_comments": [],
+            },
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["success"] is False
+        assert payload["overall_status"] == "non_open_pr"
+        assert payload["trigger"]["action"] == "skipped"
+        assert "non_open_pr_trigger_skipped" in [item["code"] for item in payload["limitations"]]
         assert [call for call in calls if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]] == []
 
     def test_issue_176_s01_trigger_helper_fails_closed_without_blind_retry(self) -> None:
@@ -13276,7 +13310,7 @@ sleep 5
             assert payload["resume"]["available"] is True
             assert payload["codex_review"]["lifecycle"]["completion_signal"] == "none"
 
-    def test_issue_176_s04_wait_non_codex_feedback_does_not_human_gate_before_codex_review(self) -> None:
+    def test_issue_176_s04_wait_trigger_window_feedback_human_gates_before_codex_review(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
             log_path = tmp_path / "wait.log"
@@ -13328,15 +13362,16 @@ sleep 5
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["normalized_status"] == "timeout"
-            assert payload["observation_complete"] is False
-            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["normalized_status"] == "human_gate"
+            assert payload["observation_complete"] is True
+            assert payload["recommended_next_action"] == "address_review_feedback"
             assert payload["codex_review"]["lifecycle"]["completion_signal"] == "none"
 
     def test_issue_176_s04_wait_post_once_trigger_timeout_writes_out_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
             log_path = tmp_path / "wait.log"
+            child_marker = tmp_path / "trigger-child-marker"
             out_dir = tmp_path / "out"
             wait_script = self._issue_176_write_wait_s04_scripts(tmp_path, log_path)
             trigger_script = tmp_path / "trigger_codex_review.sh"
@@ -13344,12 +13379,17 @@ sleep 5
                 """#!/usr/bin/env bash
 set -euo pipefail
 printf 'trigger %s\\n' "$*" >> "$S04_WAIT_LOG"
+(sleep 2; printf 'late-child\\n' >> "$S04_CHILD_MARKER") &
 sleep 5
 """,
                 encoding="utf-8",
             )
             trigger_script.chmod(0o755)
-            env = {**os.environ, "S04_WAIT_LOG": str(log_path)}
+            env = {
+                **os.environ,
+                "S04_WAIT_LOG": str(log_path),
+                "S04_CHILD_MARKER": str(child_marker),
+            }
 
             result = subprocess.run(
                 [
@@ -13392,6 +13432,8 @@ sleep 5
             assert (out_dir / "events.ndjson").is_file()
             assert (out_dir / "latest_delta.json").is_file()
             assert not (out_dir / "summary.md").exists()
+            time.sleep(2.5)
+            assert not child_marker.exists(), "trigger timeout left a descendant process running"
 
     def test_issue_176_s04_wait_post_trigger_head_drift_preserves_trigger_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

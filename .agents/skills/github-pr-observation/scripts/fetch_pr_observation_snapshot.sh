@@ -331,10 +331,10 @@ def classify_snapshot():
         return "unknown", "human_gate", False
     if completion_signal == "fallback_issue_comment":
         return "human_gate", "wait_or_resume", False
-    if completion_signal != "submitted_pull_request_review":
-        return "pending", "wait", False
     if review_status in {"requested", "commented", "changes_requested", "unresolved"}:
         return "human_gate", "address_review_feedback", True
+    if completion_signal != "submitted_pull_request_review":
+        return "pending", "wait", False
     if review_status in {"none", "approved"}:
         return "passed", "merge_prepared", True
     return "unknown", "human_gate", False
