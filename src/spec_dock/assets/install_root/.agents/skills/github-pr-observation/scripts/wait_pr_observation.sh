@@ -1237,6 +1237,8 @@ while True:
             **trigger_helper_metadata,
             **snapshot_trigger,
         }
+    if next_action == "wait_or_resume":
+        attach_resume_metadata(payload)
 
     latest_payload = payload
     latest_snapshot_text = snapshot_text

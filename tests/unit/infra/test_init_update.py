@@ -12167,6 +12167,11 @@ def emit_paginated(payloads):
 head_sequence = scenario.get("head_sequence") or [scenario.get("head", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
 
 if args == ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,url,state,isDraft,number"]:
+    if scenario.get("metadata_error_after_post", False) and state["pr_view_count"] > 0:
+        state["pr_view_count"] += 1
+        save_state()
+        print("simulated final metadata failure", file=sys.stderr)
+        sys.exit(44)
     index = min(state["pr_view_count"], len(head_sequence) - 1)
     state["pr_view_count"] += 1
     save_state()
@@ -12367,6 +12372,35 @@ exit 44
         assert payload["current_head_sha"] == "b" * 40
         assert payload["expected_head_sha"] == "a" * 40
         assert [call for call in calls if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]] == []
+
+    def test_issue_176_s01_trigger_helper_preserves_posted_trigger_after_final_metadata_failure(self) -> None:
+        result, calls = self._issue_176_run_trigger(
+            scenario={
+                "head": "a" * 40,
+                "before_comments": [],
+                "metadata_error_after_post": True,
+                "post_comment": {
+                    "id": 456,
+                    "created_at": "2026-06-09T01:02:03Z",
+                    "body": "@codex review",
+                    "html_url": "https://github.com/owner/repo/issues/13#issuecomment-456",
+                },
+            },
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        post_calls = [
+            call for call in calls
+            if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]
+            and "--method" in call
+        ]
+        assert len(post_calls) == 1
+        assert payload["success"] is True
+        assert payload["overall_status"] == "trigger_posted"
+        assert payload["trigger"]["comment_id"] == 456
+        assert payload["trigger"]["created_at"] == "2026-06-09T01:02:03Z"
+        assert "post_trigger_metadata_failed" in [item["code"] for item in payload["limitations"]]
 
     def test_issue_176_s01_trigger_helper_does_not_post_to_draft_pr(self) -> None:
         result, calls = self._issue_176_run_trigger(
@@ -13179,6 +13213,10 @@ PY
             assert payload["normalized_status"] == "human_gate"
             assert payload["recommended_next_action"] == "wait_or_resume"
             assert payload["observation_complete"] is False
+            assert payload["resume"]["available"] is True
+            assert payload["resume"]["trigger_comment_id"] == 777
+            assert payload["resume"]["trigger_created_at"] == "2026-06-09T02:03:04Z"
+            assert "--trigger-mode resume" in payload["resume"]["command_hint"]
             assert payload["codex_review"]["lifecycle"]["completion_signal"] == "fallback_issue_comment"
 
     def test_issue_176_s04_wait_post_once_first_poll_timeout_keeps_resume_hint(self) -> None:
