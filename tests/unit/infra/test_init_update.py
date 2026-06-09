@@ -16795,6 +16795,274 @@ esac
             assert "api repos/owner/repo/pulls/13/comments --paginate" in gh_calls
             assert "api graphql " in gh_calls
 
+    def test_issue_176_s03_review_collector_returns_codex_review_contract(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":90,"user":{"login":"codex"},"created_at":"2026-06-08T00:10:00Z","body":"@codex review old"},{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":200,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T00:20:00Z","body":"old codex review body"},{"id":201,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"full selected codex review body"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":300,"user":{"login":"codex"},"pull_request_review_id":200,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T00:25:00Z","path":"old.py","line":1,"body":"old inline body"},{"id":301,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"full selected inline body"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_old","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_300","databaseId":300,"author":{"login":"codex"},"createdAt":"2026-06-08T00:25:00Z","body":"old thread body"}]}},{"id":"RT_selected","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:06:00Z","body":"selected thread body"}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            for body_mode in ("none", "out-only", "trigger-window-truncated"):
+                with _case(body_mode=body_mode):
+                    result = subprocess.run(
+                        [
+                            str(script_path),
+                            "--repo",
+                            "owner/repo",
+                            "--pr",
+                            "13",
+                            "--head-sha",
+                            "a" * 40,
+                            "--trigger-comment-id",
+                            "99",
+                            "--trigger-created-at",
+                            "2026-06-08T01:00:00Z",
+                            "--body-mode",
+                            body_mode,
+                            "--out",
+                            str(tmp_path / f"out-{body_mode}"),
+                        ],
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+
+                    assert result.returncode == 0, result.stdout + result.stderr
+                    payload = json.loads(result.stdout)
+                    codex_review = payload["codex_review"]
+                    assert payload["review"]["codex_review"] == codex_review
+                    assert codex_review["lifecycle"]["completion_signal"] == "submitted_pull_request_review"
+                    assert codex_review["lifecycle"]["confidence"] == "high"
+                    assert codex_review["lifecycle"]["selected_review_ids"] == [201]
+                    assert codex_review["lifecycle"]["selected_review_comment_ids"] == [301]
+                    assert codex_review["lifecycle"]["selected_review_thread_ids"] == ["RT_selected"]
+                    assert codex_review["selected_reviews"][0]["body"] == "full selected codex review body"
+                    assert codex_review["selected_review_comments"][0]["body"] == "full selected inline body"
+                    assert codex_review["collection_summary"]["reviews"]["fetched_ids"] == [200, 201]
+                    assert codex_review["collection_summary"]["reviews"]["selected_ids"] == [201]
+                    assert codex_review["collection_summary"]["reviews"]["boundary_before_excluded_ids"] == [200]
+                    assert codex_review["collection_summary"]["review_comments"]["fetched_ids"] == [300, 301]
+                    assert codex_review["collection_summary"]["review_comments"]["selected_ids"] == [301]
+                    assert codex_review["collection_summary"]["review_comments"]["boundary_before_excluded_ids"] == [300]
+                    assert codex_review["collection_summary"]["review_threads"]["fetched_ids"] == ["RT_old", "RT_selected"]
+                    assert codex_review["collection_summary"]["review_threads"]["selected_ids"] == ["RT_selected"]
+                    assert codex_review["collection_summary"]["review_threads"]["unresolved_ids"] == ["RT_old", "RT_selected"]
+                    assert codex_review["collection_summary"]["review_threads"]["boundary_before_excluded_ids"] == ["RT_old"]
+
+    def test_issue_176_s03_review_collector_does_not_mark_fallback_as_primary(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"I am looking at this PR."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            lifecycle = payload["codex_review"]["lifecycle"]
+            assert lifecycle["status"] == "fallback"
+            assert lifecycle["completion_signal"] == "fallback_issue_comment"
+            assert lifecycle["confidence"] == "low"
+            assert lifecycle["selected_review_ids"] == []
+            assert lifecycle["selected_review_comment_ids"] == []
+
+    def test_issue_176_s03_review_collector_excludes_pending_and_unrelated_threads_from_primary(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"codex"},"state":"PENDING","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"draft body"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":302,"user":{"login":"codex"},"pull_request_review_id":999,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"other.py","line":7,"body":"unrelated codex inline"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_human","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_human","databaseId":777,"author":{"login":"alice"},"createdAt":"2026-06-08T01:06:00Z","body":"human unresolved thread"}]}},{"id":"RT_codex_unrelated","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_302","databaseId":302,"author":{"login":"codex"},"createdAt":"2026-06-08T01:07:00Z","body":"unrelated codex thread"}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            lifecycle = payload["codex_review"]["lifecycle"]
+            assert lifecycle["status"] == "pending"
+            assert lifecycle["completion_signal"] == "none"
+            assert lifecycle["selected_review_ids"] == []
+            assert lifecycle["selected_review_comment_ids"] == []
+            assert lifecycle["selected_review_thread_ids"] == []
+            thread_summary = payload["codex_review"]["collection_summary"]["review_threads"]
+            assert thread_summary["fetched_ids"] == ["RT_human", "RT_codex_unrelated"]
+            assert thread_summary["selected_ids"] == []
+            assert thread_summary["unresolved_ids"] == ["RT_human", "RT_codex_unrelated"]
+
     def test_issue_170_pr_observation_review_collector_keeps_feedback_with_trigger_text(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -19415,6 +19683,8 @@ esac
             assert payload["summary"]["review"] == "approved"
             assert payload["review"]["status"] == "approved"
             assert payload["review"]["collector"] == "s04"
+            assert payload["codex_review"] == payload["review"]["codex_review"]
+            assert "collection_summary" in payload["codex_review"]
             assert payload["artifacts"] == {
                 "result_json": None,
                 "latest_json": None,

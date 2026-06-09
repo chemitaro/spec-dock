@@ -370,6 +370,127 @@ git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-o
 #### コミット
 - current S02 commit in git history: `feat(github-pr-observation): PR観測のtrigger modeを追加`
 
+### セッションログ（2026-06-09 S03 snapshot and review JSON contract）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-003, AC-004, AC-008, EC-002, EC-006, EC-007
+- 計画上の出典（Planned source）:
+  - `plan.md` `実装ステップ S03 — snapshot and review JSON contract`
+  - closure ids: cl-006, cl-007, cl-008
+
+#### 実施内容
+- `fetch_pr_review_snapshot.sh` に `codex_review` payload を追加し、`review.codex_review` と top-level `codex_review` の両方に同一 contract を露出した。
+- Codex-authored submitted PR review の primary completion を、`commented` / `approved` / `changes_requested` の terminal review state に限定した。
+- `pending` / `unknown` review、issue comment fallback、unrelated inline comment / thread は `submitted_pull_request_review` として扱わないようにした。
+- selected review / selected review comment の body は `body-mode none|out-only|trigger-window-truncated` に関係なく full text を stdout JSON の `codex_review.selected_*[].body` に含めるようにした。
+- reviews / review_comments / review_threads の collection summary と、thread unresolved ids / counts を `codex_review.collection_summary` に追加した。
+- `fetch_pr_observation_snapshot.sh` が review collector の `codex_review` を final snapshot top-level に伝播するようにした。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s03
+# 3 passed, 308 deselected
+
+uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s03 or issue_75_pr_observation_snapshot_includes_s04_review_collector_result"
+# 4 passed, 307 deselected
+
+uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation_review_collector or pr_review_collector or issue_176_s03 or snapshot_includes_s04_review_collector_result"
+# 35 passed, 276 deselected
+
+uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s01 or issue_176_s02 or issue_176_s03"
+# 13 passed, 297 deselected
+
+git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh tests/unit/infra/test_init_update.py
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | 既存 collector は `codex_review` payload、selected body の `body-mode` 非依存、collection summary を持たないため、S03 tests で新 contract を固定した。 | test design / reviewer findings | pass | code-reviewer r1/r2 が pending review と unrelated thread/comment の false positive を追加 characterization として検出した。 |
+| S03 | 緑フェーズ（Green） | focused fake `gh` pytest | S03 tests 3 passed; snapshot propagation 1 passed; review collector regression 35 passed | `uv run pytest ... -k issue_176_s03`; `uv run pytest ... -k "pr_observation_review_collector or pr_review_collector or issue_176_s03 or snapshot_includes_s04_review_collector_result"` | pass | submitted review primary、fallback non-primary、selected body full text、collection summary、snapshot propagation を確認。 |
+| S03 | リファクタリング（Refactor） | read-only collector boundary / no unsafe follow-up API | 新規 GitHub endpoint や write surface は追加せず、既存 fixed REST / GraphQL collector の JSON assembly に閉じた。 | `git diff --check` / code-reviewer r4 | pass | selected comment は selected submitted review id に紐づくものだけに制限。 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | `PENDING` / `unknown` Codex review を submitted completion と誤判定するリスク | code-reviewer r1 | selected review を terminal review states に限定し、pending は lifecycle pending / completion none とした | cl-006 | no | `test_issue_176_s03_review_collector_excludes_pending_and_unrelated_threads_from_primary` |
+| S03 | unrelated unresolved thread を selected Codex review thread に混ぜるリスク | code-reviewer r1 | selected thread を selected review comment の thread id 由来に限定した | cl-008 | no | same |
+| S03 | Codex-authored inline comment だけで selected review comment / thread になってしまうリスク | code-reviewer r2 | selected comment を selected submitted review id に紐づく comment だけに制限した | cl-008 | no | same; code-reviewer r4 passed |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | cl-006, cl-007, cl-008 | explicit boundary selection、primary completion、selected body full text、collection summary、fallback limitations are covered | focused pytest 3 passed; snapshot propagation 1 passed; review regression 35 passed; code-reviewer r4 pass | pass | 同一 Codex author の submitted review 後にさらに pending draft review が存在する場合の author collapse は residual risk として S04/final review で再確認する。 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-006 / tc-s03-001 | S03 | yes | red-required | `codex_review.lifecycle` 不在 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s03` | pass | submitted Codex PR review is primary completion. |
+| cl-006 / tc-s03-002 | S03 | yes | red-required | fallback と primary の区別なし | same | pass | issue comment fallback is low confidence, not submitted review completion. |
+| cl-006 / tc-s03-003 | S03 | yes | red-required | pending review false positive risk | same | pass | pending Codex review completion_signal is none. |
+| cl-007 / tc-s03-004 | S03 | yes | red-required | selected body was governed by generic body-mode | same | pass | selected review/comment bodies remain full text for `none`, `out-only`, and `trigger-window-truncated`. |
+| cl-008 / tc-s03-005 | S03 | yes | red-required | collection summary absent | same | pass | fetched IDs, selected IDs, boundary-before exclusions, unresolved thread IDs are present. |
+| cl-008 / tc-s03-006 | S03 | yes | red-required | unrelated human/Codex thread false positive risk | same | pass | unrelated threads remain in unresolved summary but not selected ids. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-006 | S03 | submitted review, fallback issue comment, pending review negative tests | pass | primary completion is limited to selected terminal Codex PR review. |
+| cl-007 | S03 | body-mode variants `none`, `out-only`, `trigger-window-truncated` | pass | selected full bodies are in stdout JSON, not only `--out`. |
+| cl-008 | S03 | before/after trigger reviews/comments/threads and unrelated thread/comment negative tests | pass | selected comments/threads must tie to selected submitted review id; unresolved summary remains complete. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | cl-006 | pending review negative | cl-006 | code-reviewer r1 が pending false positive を検出 | no | yes, r4 passed |
+| added | cl-008 | unrelated human/Codex thread/comment negative | cl-008 | code-reviewer r1/r2 が unrelated selection false positive を検出 | no | yes, r4 passed |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/3b01/spec-dock` | iss-00176 | current session | code-reviewer | same repo, active issue, named role; S03 allowed files only | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | parent local implementation + delegated review | collector JSON contract and fake GitHub regression | code-reviewer | S03 diff review | `requirement.md`, `design.md`, `plan.md` | snapshot/review collector scripts, S03 tests, report S03 ledger | write helper, wait parser, skill docs, package/install behavior, GitHub state | focused pytest, review regression, diff check | unsafe follow-up API required / selected body cannot be stdout | reviewer JSON / verification | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | code-reviewer r1 | pending review false positive と unrelated unresolved thread false positive を検出 | S03 files | `uv run pytest ... -k 'issue_176_s03 ...'` -> pass but gaps found | failed | tests lacked pending/unrelated negative coverage | fixed |
+| S03 | code-reviewer r2 | unrelated Codex-authored inline comment が selected thread になり得ることを ad-hoc fake gh で検出 | S03 files | ad-hoc fake gh reproduced failed behavior | failed | selected comment relation too broad | fixed |
+| S03 | code-reviewer r4 | S03 closure と修正後 fixture を確認 | S03 files | `uv run pytest ... -k 'issue_176_s03 or issue_75_pr_observation_snapshot_includes_s04_review_collector_result'` -> 4 passed | pass | full suite not run | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | implementation was kept local because changes were bounded to review collector JSON assembly and tests | workflow-scoped local implementation within same S03 boundary | `fetch_pr_observation_snapshot.sh`, `fetch_pr_review_snapshot.sh`, `tests/unit/infra/test_init_update.py`, `report.md` | S03 planned contract only | inspect diff and restore S03 files if reviewer failed | focused 4 passed; review regression 35 passed; S01-S03 13 passed; diff check pass | code-reviewer r4 pass | no waiver; fresh reviewer gate passed |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer r1 | code-reviewer | fresh | failed | no | blocked until fixes | `/private/tmp/iss-00176-s03-code-review.json`; pending review and unrelated thread findings. |
+| S03 | step reviewer r2 | code-reviewer | fresh | failed | no | blocked until fixes | `/private/tmp/iss-00176-s03-code-review-r2.json`; unrelated Codex inline comment finding. |
+| S03 | step reviewer r3 | code-reviewer | fresh | passed with residual risk | no | superseded by r4 after fixture cleanup | `/private/tmp/iss-00176-s03-code-review-r3.json`. |
+| S03 | step reviewer r4 | code-reviewer | fresh | passed | no | proceed | `/private/tmp/iss-00176-s03-code-review-r4.json`; findings 0, confidence high. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | committed | S03 target files + report S03 ledger | current S03 commit in git history | `git status --short` -> clean for S03 scope after commit | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh` - `codex_review` top-level propagation.
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh` - `codex_review` lifecycle, selected full bodies, collection summary.
+- `tests/unit/infra/test_init_update.py` - S03 fake `gh` tests and snapshot propagation assertion.
+- `spec-dock/.../iss-00176.../report.md` - S03 execution evidence.
+
+#### コミット
+- current S03 commit in git history: `feat(github-pr-observation): Codexレビュー観測JSONを追加`
+
 ### セッションログ（2026-06-08 HH:MM - HH:MM）
 
 #### 対象
