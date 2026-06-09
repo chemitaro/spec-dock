@@ -3,97 +3,389 @@
 ID: "iss-00176"
 タイトル: "GitHub PR observation should trigger and wait for Codex review completion"
 関連GitHub: ["#176"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-06-08"
+最終更新: "2026-06-09"
 親: ["epic-00067", "init-local-00003"]
 ---
 
 # iss-00176 GitHub PR observation should trigger and wait for Codex review completion — 要件定義（何を、なぜ行うか）
 
 ## 目的
-- （1〜3行）...
+- `github-pr-observation` skill を、PR checks と Codex review を決定的に観測できる workflow にする。
+- `wait_pr_observation.sh` の通常実行で `@codex review` を機械的に1回だけ投稿し、その trigger comment を境界として Codex review completion と review output を収集できるようにする。
+- PR monitor sub-agent を廃止した後の運用で、メインエージェントが長時間の PR 待機を script contract に委ねられる状態を作る。
 
 ## 背景・現状
 - 現状の挙動:
-  - ...
+  - `github-pr-observation` skill は read-only PR observation skill として定義されている。
+  - public entrypoint は `scripts/wait_pr_observation.sh` と `scripts/fetch_pr_observation_snapshot.sh` である。
+  - `wait_pr_observation.sh` は `--trigger-comment-id` / `--trigger-created-at` を受け取り、trigger window を使った review collection を行えるが、自身では `@codex review` comment を投稿しない。
+  - `fetch_pr_review_snapshot.sh` は issue comments / PR reviews / inline review comments / review requests / review threads を収集し、trigger metadata が無い場合は最新の `@codex review` comment を推定する fallback を持つ。
 - 現状の課題:
-  - ...
-- 再現手順:
-  1. ...
-  2. ...
-- 観測点:
-  - UI:
-  - HTTP:
-  - DB:
-  - ログ:
+  - `@codex review` を手動またはエージェント裁量で投稿する運用では、実際に投稿されたか、どの comment が今回 run の trigger かが非決定的になる。
+  - CI 完了後の quiet window だけで review completion を推定すると、Codex review がまだ進行中でも observation が完了扱いになり得る。
+  - 既存 trigger の自動推定や同一 head SHA の trigger reuse は、古い run、手動投稿、別 automation、遅延 review output を今回 run と混ぜるリスクがある。
+  - `stdout` final JSON、`stderr` progress、`--out` debug artifact の authority 境界が崩れると、実行エージェントが最終結果を誤認する。
+  - エージェントが後から GitHub CLI / GitHub API で review 本文を取得しようとすると、全件コメント取得によるノイズ、または変更可能な `gh api` 利用リスクに直面する。
+- 再現シナリオ:
+  1. PR 作成後に `wait_pr_observation.sh` を実行する。
+  2. script は checks と review status を polling するが、`@codex review` 投稿を自動で行わない。
+  3. Codex review が開始されない、または別 run / 手動投稿の trigger を推定してしまう。
+  4. 実行エージェントは、今回 run に紐づいた Codex review completion と review body を安定して取得できない。
 - 情報源:
-  - ...
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh`
+  - `discussions/20260608t092803z-research-chatgpt55-pro-codex-review-trigger-completion-analysis.md`
+  - `discussions/20260608t111111z-research-deterministic-codex-review-trigger-design.md`
+  - `discussions/20260609t030339z-interview-issue-scope-for-deterministic-codex-review-trigger.md`
 
-## 対象ユーザー / 利用シナリオ（必要時）
+## 対象ユーザー / 利用シナリオ
 - 主な利用者:
-  - ...
+  - PR 作成後に checks / review / comments / threads を待つメインエージェント。
+  - PR merge readiness を判断する人間レビュアー。
+  - `github-pr-observation` skill を使う Codex / agent runtime。
 - 代表シナリオ:
-  - ...
+  - PR 作成または push 後、メインエージェントが `wait_pr_observation.sh --repo OWNER/REPO --pr NUMBER --head-sha SHA` を実行する。
+  - script が default `post-once` mode として `@codex review` を決定的に1回投稿する。
+  - script が返却された trigger comment metadata を使い、PR checks と Codex review lifecycle を polling する。
+  - script は最終 `stdout` JSON に、CI status、review lifecycle、trigger metadata、selected review output、selected review body full text、limitations、次アクションを含める。
+  - メインエージェントは `stdout` final JSON を authority として、修正要否、human gate、timeout、stale head を判断する。
+  - timeout / limit 到達時に CI または Codex review がまだ進行中であれば、メインエージェントは final JSON の resume metadata を使い、`resume` mode で同じ trigger boundary の観測を継続する。
 
 ## スコープ
 - 必須:
-  - ...
+  - `github-pr-observation` skill の契約を、read-only only から「固定 trigger write + read-only observation」へ更新する。
+  - `wait_pr_observation.sh` は、trigger mode 未指定時に default `post-once` mode として実行開始時に `@codex review` を1回だけ投稿する。
+  - `wait_pr_observation.sh` は、timeout / limit 後の継続観測用に明示的な `resume` mode を提供し、`resume` mode では新しい `@codex review` を投稿しない。
+  - trigger 投稿は、固定 endpoint / 固定 body / 固定 JSON contract に閉じ込める。
+  - trigger 投稿で得た `comment_id` / `created_at` を、今回 run の唯一の observation boundary として使う。
+  - `resume` mode では、既知の `comment_id` / `created_at` を observation boundary として再利用し、初回 run からの review / comment / thread collection に抜け漏れが出ないようにする。
+  - `wait_pr_observation.sh` は、内部 trigger の stdout を user-facing stdout に流さず、final JSON に統合する。
+  - Codex review completion の primary signal は、Codex-authored submitted PR review とする。
+  - CI terminal と Codex review completion を別系統の状態として扱い、最終判定で合流させる。
+  - `stdout` は authoritative final JSON 1個、`stderr` は bounded progress / diagnostics、`--out` は optional debug / audit artifact という境界を維持する。
+  - final `stdout` JSON には、trigger boundary 以降に選択された Codex review の本文全文を含める。
+  - selected review body full text は final `stdout` JSON から取得でき、エージェントが追加の GitHub API / CLI 探索を行わなくても修正要否を判断できる。
+  - head SHA が投稿前、投稿直後、観測中に変化した場合は、stale / non-success / human gate として扱い、成功扱いしない。
+  - GitHub auth、permission、rate limit、schema failure、POST failure、ambiguous recovery は JSON で表現可能な non-success / limitation として返す。
+  - shipped asset の source of truth は `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/` とする。
 - 禁止:
-  - ...
+  - 利用エージェントに `@codex review` を投稿するかどうかを判断させる通常運用。
+  - 通常 path で既存 `@codex review` comment を自動 reuse すること。
+  - `POST` 失敗時の blind retry による二重投稿リスク。
+  - caller-provided body、body file、raw `gh` args、arbitrary endpoint、caller-provided GraphQL / jq / headers / methods を受け入れること。
+  - `eyes` reaction の消滅、Codex issue comment、quiet window だけを completion primary とすること。
+  - trigger script の JSON を `wait_pr_observation.sh` の user-facing stdout に混ぜること。
+  - `--out` artifact を final stdout JSON の authority として扱うこと。
+  - selected review body full text の唯一の所在を `--out` artifact にすること。
+  - エージェントに review 本文取得のための追加 `gh api` や全件コメント取得を要求すること。
+  - retired `pr-monitor` sub-agent または retired `github-codex-pr-review-comments` skill を復活・互換 shim 化すること。
 - 対象外:
-  - ...
+  - GitHub / Codex 側サービスの動作変更。
+  - PR の merge 自体の自動実行。
+  - Codex review comment の内容をカスタマイズする prompt / body 設計。
+  - 汎用 GitHub write automation の追加。
+  - PR monitor sub-agent の再導入。
 
 ## 境界
 - 常に行う:
-  - ...
+  - `post-once` mode の `wait_pr_observation.sh` 実行では、expected head SHA を確認した上で `@codex review` を新規投稿する。
+  - 投稿成功時の `comment_id` / `created_at` を今回 run の trigger boundary として downstream collector に渡す。
+  - PR checks と Codex review lifecycle を別々に観測し、final JSON で統合する。
+  - final JSON に trigger mode、trigger action、head SHA state、review completion signal、selected review body full text、confidence、limitations、recommended next action、resume metadata を含める。
 - 判断が必要:
-  - ...
+  - 既存 trigger を観測し直す resume / manual diagnosis / test path は、default `post-once` と区別できる明示 option に限定する。
+  - Codex author login、reaction、response issue comment など公開仕様が不確かな signal は補助 signal または limitation として扱う。
+  - quiet window fallback は、primary completion ではなく low confidence / fallback として扱う。
 - 行わない:
-  - ...
+  - 通常 path で「既存 trigger があれば reuse、無ければ post」の auto mode を使わない。
+  - trigger comment を投稿後に head SHA が変わっても削除しない。
+  - 実行エージェントの判断で追加 GitHub API や raw `gh` command を組み立てない。
 
 ## 非交渉制約
-- ...
+- 決定性:
+  - trigger mode 未指定の invocation は、default `post-once` として実行開始時に新規 trigger を作成する contract を持つ。
+  - `post-once` mode の observation boundary は、今回 run が作成した trigger comment metadata である。
+  - `resume` mode の observation boundary は、明示指定された既存 trigger comment metadata であり、新規 trigger は作成しない。
+- 安全境界:
+  - 許可する write は `@codex review` の固定投稿に限る。
+  - write boundary は read-only snapshot collector と分離され、監査・テスト可能であること。
+- 出力境界:
+  - `stdout` は最終 JSON 1個のみ。
+  - `stderr` は progress / diagnostics のみ。
+  - `--out` は optional debug / audit copy であり、authority ではない。
+  - selected review body full text は final `stdout` JSON に含まれ、`--out` のみに退避しない。
+- head SHA:
+  - expected head SHA と実際の PR head の整合が崩れた場合、成功扱いしない。
+- 互換性:
+  - 既存の fixed contract / strict validation / arbitrary GitHub API を受け付けない方針を弱めない。
+  - `summary.md` は生成しない。
 
 ## 前提
-- ...
+- 実行環境には GitHub CLI `gh` があり、対象 repo / PR への read 権限と issue comment 投稿権限がある。
+- `@codex review` comment により Codex review が起動する GitHub integration が利用可能である。
+- Codex review completion の最も安定した primary signal は GitHub PR review object として取得できる、または取得できない場合は limitation / fallback として表現できる。
+- CI checks / statuses と Codex review lifecycle は独立した GitHub object family として観測される。
+- この issue は `iss-00176` 内で要件・設計・実装計画・実装まで進める。別 issue に実装を切り出さない。
 
 ## 受け入れ条件
-- AC-001:
+- AC-001: 通常 wait invocation が決定的に trigger を投稿する
   - アクター:
+    - メインエージェント
   - 前提:
+    - 対象 PR の current head SHA が `--head-sha` と一致している。
   - 操作:
+    - `wait_pr_observation.sh --repo OWNER/REPO --pr NUMBER --head-sha SHA` を通常 path で実行する。
   - 期待結果:
+    - trigger mode 未指定時は default `post-once` mode として扱われる。
+    - script は `@codex review` を1回だけ投稿する。
+    - 投稿で得た `comment_id` / `created_at` を今回 run の trigger boundary として保持する。
+    - 初回の通常観測では、利用者が trigger mode を指定しなくても決定的に投稿される。
   - 観測点:
-- AC-002:
-  - ...
+    - GitHub API stub / call log
+    - final stdout JSON の `trigger`
+    - stderr progress
+- AC-002: trigger write は固定安全境界に閉じる
+  - アクター:
+    - メインエージェント / script 実行者
+  - 前提:
+    - trigger 投稿が必要な通常 wait invocation である。
+  - 操作:
+    - trigger 投稿処理を実行する。
+  - 期待結果:
+    - 許可される write は固定本文 `@codex review` の PR issue comment 投稿だけである。
+    - caller-provided body、raw `gh` args、arbitrary endpoint、GraphQL、jq、header、method は受け付けない。
+    - 投稿結果は machine-readable JSON として扱える。
+  - 観測点:
+    - script usage validation
+    - GitHub API stub / call log
+    - trigger JSON
+- AC-003: final stdout JSON が authoritative result になる
+  - アクター:
+    - メインエージェント
+  - 前提:
+    - wait invocation が trigger posting と polling を実行している。
+  - 操作:
+    - script completion 後に stdout / stderr / `--out` を確認する。
+  - 期待結果:
+    - stdout は最終 JSON 1個のみである。
+    - trigger script の中間 JSON は user-facing stdout に漏れない。
+    - stderr は progress / diagnostics のみであり、authority を持たない。
+    - `--out` artifact は debug / audit copy であり、stdout final JSON を置き換えない。
+    - selected review body full text は stdout final JSON に含まれ、`--out` だけを読まないと判断できない状態にしない。
+  - 観測点:
+    - stdout parse
+    - selected review body full text
+    - stderr content
+    - optional `--out` artifact
+- AC-004: Codex review completion は submitted PR review を primary とする
+  - アクター:
+    - メインエージェント / 人間レビュアー
+  - 前提:
+    - trigger comment が既知であり、Codex-authored PR review が trigger 後に submitted される。
+  - 操作:
+    - wait invocation が review lifecycle を polling する。
+  - 期待結果:
+    - Codex-authored submitted PR review が primary completion signal として扱われる。
+    - selected review output は trigger boundary、expected head SHA、Codex author、submitted review id、review comment id の組み合わせで今回 run に紐づく。
+    - selected Codex review 本文と selected review comment 本文は、原則として全文が stdout final JSON に含まれる。
+    - reaction / issue comment / quiet window は completion primary にならない。
+  - 観測点:
+    - final JSON の `codex_review.lifecycle`
+    - selected review ids / selected review comment ids
+    - selected review bodies / selected review comment bodies
+    - limitations / confidence
+- AC-005: CI と review lifecycle が独立して観測される
+  - アクター:
+    - メインエージェント
+  - 前提:
+    - CI と Codex review が異なる順序で完了し得る。
+  - 操作:
+    - wait invocation が PR checks と Codex review を polling する。
+  - 期待結果:
+    - CI terminal と review completion は別々の status として保持される。
+    - 一方の完了だけで、もう一方が未完了のまま最終成功扱いにならない。
+    - 最終 status / recommended next action が、CI failure、review pending、human gate、timeout を区別する。
+  - 観測点:
+    - final JSON の `summary.ci`, `summary.review`, `overall_status`
+    - progress line
+- AC-006: head SHA 変化は成功扱いしない
+  - アクター:
+    - メインエージェント
+  - 前提:
+    - 投稿前、投稿直後、または polling 中に PR head SHA が expected head SHA から変化する。
+  - 操作:
+    - wait invocation を実行する。
+  - 期待結果:
+    - 投稿前 mismatch では trigger comment を投稿しない。
+    - 投稿後 / 観測中 mismatch では trigger metadata と stale state を final JSON に残し、成功扱いしない。
+    - 投稿済み trigger comment を削除しない。
+  - 観測点:
+    - GitHub API stub / call log
+    - final JSON の head / stale status
+- AC-007: POST failure と ambiguous recovery が fail closed になる
+  - アクター:
+    - メインエージェント
+  - 前提:
+    - trigger comment POST が失敗、timeout、または応答損失する。
+  - 操作:
+    - wait invocation が trigger posting を試行する。
+  - 期待結果:
+    - script は無条件に2回目の POST を行わない。
+    - 投稿前後 snapshot 差分で exact body `@codex review` comment が1件だけ確認できる場合のみ recovery として採用する。
+    - 0件または複数件の場合は non-success / limitation として fail closed する。
+  - 観測点:
+    - GitHub API stub / call log
+    - final JSON の trigger action / limitation
+- AC-008: timeout / limit 後の resume mode が同じ trigger boundary で観測を継続する
+  - アクター:
+    - メインエージェント
+  - 前提:
+    - 先行する `post-once` run が timeout / limit に到達した。
+    - CI または Codex review がまだ完了していない、または完了判定が取得できていない。
+    - 先行 run の final JSON に `trigger.comment_id` / `trigger.created_at` / expected head SHA が含まれている。
+  - 操作:
+    - 明示的な `resume` mode と既存 trigger metadata を渡して observation を再実行する。
+  - 期待結果:
+    - `resume` mode では新しい `@codex review` を投稿しない。
+    - `resume` mode は default `post-once` と区別できる明示 option が必要である。
+    - `trigger-comment-id` と `trigger-created-at` の不足は usage error になる。
+    - default `post-once` に trigger metadata を渡しただけで暗黙 no-post にならない。
+    - reviews / review comments / review threads collection は、既存 trigger boundary から現在までを対象にし、先行 run の timeout 前後で発生した Codex review output を取りこぼさない。
+    - trigger boundary 以降の PR reviews / review comments / review threads について、fetched counts、fetched IDs、selected IDs、unresolved thread IDs、boundary 以前の除外 counts / IDs / reasons を final JSON または `--out` debug artifact で検証できる。
+    - resume 中に head SHA が expected head SHA から変わっていた場合は stale / non-success として扱う。
+  - 観測点:
+    - usage validation
+    - final JSON の trigger mode / source
+    - reviews / review comments / review threads の fetched counts / fetched IDs
+    - selected review ids / selected review comment ids / selected review thread ids
+    - unresolved review thread ids / counts
+    - trigger boundary 以前の reviews / review comments / review threads exclusion evidence
+    - GitHub API stub / call log
 
 ## 例外・エッジケース
-- EC-001:
+- EC-001: 権限不足
   - 条件:
+    - GitHub token が issue comment 投稿権限を持たない。
   - 期待:
+    - trigger posting は non-success JSON / limitation として表現され、blind retry しない。
   - 観測点:
-- EC-002:
-  - ...
+    - final JSON `limitations`
+    - stderr diagnostics
+- EC-002: Codex review が PR review object として取得できない
+  - 条件:
+    - Codex activity はあるが Codex-authored submitted PR review が取得できない。
+  - 期待:
+    - primary completion にはせず、timeout、human gate、または fallback low-confidence completion として表現する。
+  - 観測点:
+    - final JSON `codex_review.lifecycle.completion_signal`
+    - `confidence`
+    - `limitations`
+- EC-003: CI が失敗し、review は完了する
+  - 条件:
+    - CI は failed、Codex review は submitted される。
+  - 期待:
+    - review completion は記録するが、overall は merge-ready success ではなく failed / human gate / required action になる。
+  - 観測点:
+    - final JSON `summary.ci`, `summary.review`, `overall_status`
+- EC-004: CI は完了し、review はまだ未完了
+  - 条件:
+    - CI が terminal に到達しても、Codex-authored submitted PR review がまだ存在しない。
+  - 期待:
+    - review completion を待つ。timeout する場合は review timeout として表現する。
+  - 観測点:
+    - progress line
+    - final JSON `codex_review.lifecycle`
+- EC-005: 複数の古い `@codex review` comment が存在する
+  - 条件:
+    - 同じ PR / head SHA に過去 run や手動投稿の trigger comment が存在する。
+  - 期待:
+    - 通常 path は既存 trigger を自動 reuse せず、新規 trigger を投稿して今回 run の boundary とする。
+  - 観測点:
+    - GitHub API stub / call log
+    - final JSON `trigger.comment_id`
+- EC-006: `--out` 指定時
+  - 条件:
+    - 実行者が debug / audit artifact 出力先を指定する。
+  - 期待:
+    - `result.json` などは stdout final JSON の copy / debug artifact であり、別 authority にならない。
+    - selected review body full text は stdout final JSON に含まれ、`--out` artifact のみに置かれない。
+  - 観測点:
+    - stdout JSON
+    - selected review body full text
+    - `--out` files
+- EC-007: timeout / limit 到達後に resume する
+  - 条件:
+    - 初回 `post-once` run が timeout / limit に到達し、CI または Codex review が進行中である。
+  - 期待:
+    - final JSON に再実行可能な trigger metadata と resume command hint が含まれる。
+    - `resume` mode の再実行では新規 trigger を投稿せず、同じ trigger boundary で観測を継続する。
+    - 初回 run の終了後から resume run の開始前までに発生した reviews / review comments / review threads も収集対象に含まれる。
+    - reviews / review comments / review threads ごとの fetched counts、fetched IDs、selected IDs、boundary-before exclusion counts / IDs / reasons が final JSON または `--out` debug artifact で確認できる。
+    - review threads については unresolved IDs / counts も final JSON または `--out` debug artifact で確認できる。
+  - 観測点:
+    - final JSON `trigger`, `resume`
+    - final JSON または `--out` artifact の reviews / review comments / review threads fetched counts / fetched IDs
+    - final JSON または `--out` artifact の selected review IDs / selected review comment IDs / selected review thread IDs
+    - final JSON または `--out` artifact の boundary-before exclusion counts / IDs / reasons
+    - final JSON または `--out` artifact の unresolved review thread IDs / counts
+    - GitHub API stub / call log
+    - selected review output
 
-## 入力→出力例（必要時）
-- EX-001:
+## 入力→出力例
+- EX-001: 通常 success
   - 入力:
+    - `wait_pr_observation.sh --repo owner/repo --pr 123 --head-sha abc123`
   - 出力:
+    - stdout final JSON に `trigger.mode=post-once`, `trigger.action=posted`, `trigger.comment_id`, `trigger.created_at`, `codex_review.lifecycle.completion_signal=submitted_pull_request_review`, selected review body full text, `summary.ci=passed`, `summary.review=commented|changes_requested|approved` が含まれる。
+- EX-002: 投稿前 stale
+  - 入力:
+    - `wait_pr_observation.sh --repo owner/repo --pr 123 --head-sha oldsha`
+  - 出力:
+    - trigger comment は投稿されず、stdout final JSON に `status=stale_head` または同等の non-success status と current head evidence が含まれる。
+- EX-003: POST ambiguous failure
+  - 入力:
+    - trigger comment POST が timeout し、投稿後 snapshot で新規 exact-body comment が複数見つかる。
+  - 出力:
+    - stdout final JSON に `trigger.action=failed`, `limitations[].code=trigger_failed_ambiguous_duplicate` または同等 code が含まれ、追加 POST は行われない。
+- EX-004: timeout 後の resume
+  - 入力:
+    - 初回: `wait_pr_observation.sh --repo owner/repo --pr 123 --head-sha abc123 --timeout-seconds 600`
+    - 再開: `wait_pr_observation.sh --repo owner/repo --pr 123 --head-sha abc123 --trigger-mode resume --trigger-comment-id 456 --trigger-created-at 2026-06-09T10:00:00Z`
+  - 出力:
+    - 初回 stdout final JSON に `trigger.mode=post-once`, `trigger.comment_id=456`, `trigger.created_at`, `resume.available=true`, `resume.command_hint` が含まれる。
+    - 再開 stdout final JSON に `trigger.mode=resume`, `trigger.action=reused`, `trigger.comment_id=456`, `trigger.created_at` が含まれ、新しい `@codex review` comment は投稿されない。
 
-## 用語（ドメイン語彙）
-- TERM-001:
-  - ...
+## 用語
+- TERM-001: 通常 path
+  - `wait_pr_observation.sh` を `--repo` / `--pr` / `--head-sha` を中心に実行する標準運用。trigger mode 未指定時は default `post-once` として `@codex review` を自動で1回投稿する。
+- TERM-002: trigger boundary
+  - 今回 run で作成または明示指定された trigger comment の `comment_id` / `created_at` に基づく observation scope。
+- TERM-003: fixed trigger write
+  - `@codex review` の固定本文を固定 endpoint に投稿するためだけの write。汎用 GitHub mutation ではない。
+- TERM-004: submitted PR review
+  - GitHub Pull Request Review object として submitted された review。Codex review completion の primary signal。
+- TERM-005: fallback completion
+  - submitted PR review が確認できない場合に、bounded quiet window などから推定する低信頼の完了表現。primary completion ではない。
+- TERM-006: human gate
+  - 自動的に成功 / 失敗を確定せず、人間または上位エージェントの判断を要求する状態。
+- TERM-007: resume mode
+  - timeout / limit 後に、既存 trigger comment metadata を明示指定して同じ observation boundary の観測を継続する mode。新しい `@codex review` は投稿しない。
+- TERM-008: post-once mode
+  - 初回観測用の default mode。trigger mode 未指定時に適用され、`@codex review` を1回だけ投稿する。
+- TERM-009: selected review body full text
+  - trigger boundary、expected head SHA、Codex author、submitted review id、review comment id によって今回 run に紐づけられた Codex review / review comment の本文全文。final `stdout` JSON に含め、`--out` のみに退避しない。
 
 ## 未確定事項
-- Q-001:
-  - 質問:
-  - 選択肢:
-    - A:
-      - ...
-    - B:
-      - ...
-  - 推奨案:
-    - ...
-  - 影響範囲:
-    - ...
+- なし:
+  - `iss-00176` はこの issue 内で要件・設計・実装計画・実装まで進める。
+  - default `post-once` による決定的 `@codex review` 投稿、timeout / limit 後の明示 `resume` mode、固定 write boundary、既存 trigger 自動 reuse 禁止、submitted PR review primary、selected review body full text の stdout 収録、stdout / stderr authority 境界は本要件で固定する。
+- 設計 / 実装で確認する技術詳細:
+  - Codex GitHub author login の具体値。
+  - `@codex review` 投稿後の Codex response issue comment の有無。
+  - `eyes` reaction の付与先と消滅タイミング。
+  - private repo / permission / rate limit 時の GitHub API response detail。
+  - これらは lifecycle collector の精度に影響するが、本 issue の scope / acceptance を変更する未確定事項ではない。
