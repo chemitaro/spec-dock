@@ -577,7 +577,7 @@ def thread_after_trigger(thread):
     return activity_at_dt is not None and activity_at_dt > trigger_created_at_dt
 
 
-def summarize_thread_collection(items, selected_ids):
+def summarize_thread_collection(items, selected_ids, current_unresolved_ids):
     boundary_exclusions = []
     for item in items:
         if not body_state["trigger_known"]:
@@ -590,17 +590,12 @@ def summarize_thread_collection(items, selected_ids):
             reason = None
         if reason is not None:
             boundary_exclusions.append({"id": item.get("id"), "reason": reason})
-    unresolved_ids = [
-        item.get("id")
-        for item in items
-        if item.get("state") == "unresolved" and item.get("id") is not None
-    ]
     return {
         "fetched_count": len(items),
         "fetched_ids": compact_ids(items),
         "selected_ids": selected_ids,
-        "unresolved_count": len(unresolved_ids),
-        "unresolved_ids": unresolved_ids,
+        "unresolved_count": len(current_unresolved_ids),
+        "unresolved_ids": current_unresolved_ids,
         "boundary_before_excluded_count": len(boundary_exclusions),
         "boundary_before_excluded_ids": [
             item["id"] for item in boundary_exclusions if item.get("id") is not None
@@ -981,6 +976,13 @@ for item in selected_comment_signals:
     thread_id = item.get("thread_id")
     if thread_id is not None and thread_id not in selected_thread_ids:
         selected_thread_ids.append(thread_id)
+current_unresolved_thread_ids = [
+    item.get("id")
+    for item in threads
+    if item.get("state") == "unresolved"
+    and item.get("id") is not None
+    and (not body_state["trigger_known"] or thread_after_trigger(item))
+]
 
 def selected_review_item(item):
     raw_body = str(item.get("_selected_full_body", "") or "")
@@ -1030,7 +1032,11 @@ review_collection_summary = {
         review_comments_for_summary,
         selected_review_comment_ids,
     ),
-    "review_threads": summarize_thread_collection(threads, selected_thread_ids),
+    "review_threads": summarize_thread_collection(
+        threads,
+        selected_thread_ids,
+        current_unresolved_thread_ids,
+    ),
 }
 if selected_review_signals:
     lifecycle_status = "unresolved" if selected_thread_ids else "completed"
@@ -1089,7 +1095,7 @@ for signal in signals:
 
 if blocking_collection_failure:
     status = "unknown"
-elif any(item.get("state") == "unresolved" for item in threads):
+elif current_unresolved_thread_ids:
     status = "unresolved"
 elif any(item.get("state") == "changes_requested" for item in active_review_signals):
     status = "changes_requested"
