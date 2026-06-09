@@ -597,6 +597,83 @@ pass
 #### コミット
 - current S04 commit in git history: `feat(github-pr-observation): Codexレビュー完了待機を統合`
 
+### セッションログ（2026-06-09 S05a）
+
+#### 対象
+- Step: S05a
+- AC/EC: docs / retired workflow constraints
+- 計画上の出典（Planned source）:
+  - `plan.md` S05a
+  - closure ids: cl-014
+
+#### 実施内容
+- `github-pr-observation` skill docs を、read-only only contract から「fixed `@codex review` write + read-only observation」contract に更新した。
+- default `post-once`、explicit `resume`、stdout/stderr/`--out` authority、selected review body in stdout、retired `pr-monitor` / `github-codex-pr-review-comments` prohibition、manual trigger discretion prohibition を明文化した。
+- `fetch_pr_observation_snapshot.sh` と collector libraries は read-only のまま、`wait_pr_observation.sh` の default `post-once` だけが internal `trigger_codex_review.sh` helper 経由で固定 write を行う境界として記述した。
+
+#### 実行コマンド / 結果
+```bash
+git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md
+
+pass
+```
+
+```bash
+codex exec -p spec-reviewer -C /Users/iwasawayuuta/.codex/worktrees/3b01/spec-dock -o /private/tmp/iss-00176-s05a-spec-review.json "<S05a spec-review prompt>"
+
+findings: []
+review_status: pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S05a | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only | 既存 `SKILL.md` は scripts read-only と記述し、S01-S04 で実装した fixed trigger write / default post-once contract を説明していなかった。 | diff inspection | pass | docs-only public contract artifact のため automated red test は不要。 |
+| S05a | 緑フェーズ（Green） | docs diff inspection / spec-reviewer gate | `SKILL.md` に fixed write boundary、default/resume、stdout body、retired workflow prohibition を追記した。 | diff inspection / spec-reviewer | pass | `/private/tmp/iss-00176-s05a-spec-review.json`。 |
+| S05a | リファクタリング（Refactor） | docs scope guardrail satisfied | provider-side `SKILL.md` のみを更新し、script/test behavior は変更しなかった。 | `git diff --check` | pass | dogfooding mirror refresh は S90 / install parity scope で確認する。 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S05a | none | docs inspection / spec-reviewer | N/A | cl-014 | no | spec-reviewer pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S05a | cl-014 | `SKILL.md` aligns with implemented contract and retired workflows remain prohibited. | docs diff inspection; spec-reviewer pass; diff check pass | pass | arbitrary GitHub write / manual trigger discretion は禁止のまま。 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-014 / `tc-s05a-001` | S05a | yes | inspect-only | `SKILL.md` still described read-only-only scripts and lacked default `post-once` / explicit `resume` / fixed write docs. | docs inspection; `/private/tmp/iss-00176-s05a-spec-review.json` | pass | skill docs now state cl-014 contract. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-014 | S05a | docs diff inspection + spec-reviewer | pass | fixed trigger write + read-only observation、default/resume、stdout body、retired workflow prohibition を確認。 |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S05a | step reviewer | spec-reviewer | fresh | passed | N/A | proceed | findingsなし / `review_status: pass` (`/private/tmp/iss-00176-s05a-spec-review.json`) |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S05a | ready-to-commit | S05a target file + report S05a ledger | pending commit | pending | N/A | N/A | N/A | N/A |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | worker / reviewer | 実施内容 | 入力 | 出力 / 変更 | 検証 | 判定 | メモ |
+|---|---|---|---|---|---|---|---|
+| S05a | spec-reviewer | S05a docs contract alignment review | `requirement.md`, `design.md`, `plan.md`, current `SKILL.md` diff | findingsなし / `review_status: pass` | `/private/tmp/iss-00176-s05a-spec-review.json` | accepted | Review scope was `SKILL.md` only. |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md` - fixed trigger write + read-only observation public contract。
+- `spec-dock/.../iss-00176.../report.md` - S05a execution evidence。
+
+#### コミット
+- pending S05a commit
+
 ### セッションログ（2026-06-08 HH:MM - HH:MM）
 
 #### 対象
