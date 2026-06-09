@@ -302,6 +302,17 @@ def has_blocking_limitation(ignored_codes=None):
 def classify_snapshot():
     ci_status = ci_payload.get("status") or summary.get("ci") or "unknown"
     review_status = review_payload.get("status") or summary.get("review") or "unknown"
+    codex_review = (
+        review_wrapper_payload.get("codex_review")
+        if isinstance(review_wrapper_payload, dict) and isinstance(review_wrapper_payload.get("codex_review"), dict)
+        else (
+            review_payload.get("codex_review")
+            if isinstance(review_payload, dict) and isinstance(review_payload.get("codex_review"), dict)
+            else {}
+        )
+    )
+    codex_lifecycle = codex_review.get("lifecycle") if isinstance(codex_review.get("lifecycle"), dict) else {}
+    completion_signal = codex_lifecycle.get("completion_signal")
     if head_matches_expected is False or normalized_status == "stale_head":
         return "stale_head", "rerun_for_current_head", False
     if metadata.get("isDraft") is True:
@@ -318,10 +329,12 @@ def classify_snapshot():
         return "unknown", "human_gate", False
     if ci_status != "passed":
         return "unknown", "human_gate", False
-    if review_status in {"none", "approved"}:
-        return "passed", "merge_prepared", True
     if review_status in {"requested", "commented", "changes_requested", "unresolved"}:
         return "human_gate", "address_review_feedback", True
+    if completion_signal != "submitted_pull_request_review":
+        return "pending", "wait", False
+    if review_status in {"none", "approved"}:
+        return "passed", "merge_prepared", True
     return "unknown", "human_gate", False
 
 if gh_exit != 0:

@@ -537,7 +537,7 @@ def timeout_snapshot(timeout_seconds: float, stdout_text: object, stderr_text: o
                 "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
             }
         ],
-        "recommended_next_action": "wait_or_rerun",
+        "recommended_next_action": "wait_or_resume",
         "ci": {"status": "unknown", "checks": [], "failures": []},
         "review": {"status": "unknown", "signals": [], "codex_authored": []},
         "trigger": {},
@@ -770,13 +770,15 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
     if ci_status != "passed":
         return "unknown", "unknown", "human_gate", False, True
     if completion_signal == "fallback_issue_comment":
-        return "human_gate", "human_gate", "wait_or_rerun", False, True
+        return "human_gate", "human_gate", "wait_or_resume", False, True
     if review_status in {"none", "pending"} and lifecycle_status in {"pending", "unknown"}:
         return "pending", "pending", "wait", False, False
     if review_status in {"none", "pending"} and lifecycle_status == "none" and completion_signal == "none":
         return "pending", "pending", "wait", False, False
     if review_status in {"requested", "commented", "changes_requested", "unresolved"}:
         return "human_gate", "human_gate", "address_review_feedback", True, False
+    if completion_signal != "submitted_pull_request_review":
+        return "pending", "pending", "wait", False, False
     if review_status == "approved":
         return "passed", "passed", "merge_prepared", True, False
     if review_status == "none":
@@ -945,7 +947,7 @@ def mark_latest_timeout(
     payload["overall_status"] = "timeout"
     payload["normalized_status"] = "timeout"
     payload["observation_complete"] = False
-    payload["recommended_next_action"] = "wait_or_rerun"
+    payload["recommended_next_action"] = "wait_or_resume"
     payload["observed_at"] = utc_now()
     payload.setdefault("wait", {})["deadline_reached"] = True
     payload["wait"]["quiet_seconds_observed"] = quiet_elapsed
@@ -1111,7 +1113,7 @@ while True:
         final_phase = "timeout"
         normalized_status = "timeout"
         overall_status = "timeout"
-        next_action = "wait_or_rerun"
+        next_action = "wait_or_resume"
     elif terminal_now:
         final_phase = "terminal"
     elif time.monotonic() >= deadline:
@@ -1119,7 +1121,7 @@ while True:
         mark_latest_timeout(payload, latest_change_monotonic, same_count, quiet_elapsed)
         normalized_status = "timeout"
         overall_status = "timeout"
-        next_action = "wait_or_rerun"
+        next_action = "wait_or_resume"
     else:
         final_phase = "wait"
 
