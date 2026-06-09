@@ -1,29 +1,38 @@
 ---
 name: github-pr-observation
-description: Observe pull request checks, statuses, reviews, comments, and review threads through fixed read-only scripts. Use when a PR needs deterministic snapshot or wait evidence after creation or push.
+description: Trigger a fixed Codex PR review request and observe pull request checks, statuses, reviews, comments, and review threads through bounded scripts. Use when a PR needs deterministic wait or snapshot evidence after creation or push.
 ---
 
 # GitHub PR Observation
 
 ## Overview
 
-Use this skill to collect read-only PR observation evidence through fixed
-scripts. The public entrypoints are:
+Use this skill to request one fixed Codex PR review and collect PR observation
+evidence through bounded scripts. The public entrypoints are:
 
 - `scripts/wait_pr_observation.sh`
 - `scripts/fetch_pr_observation_snapshot.sh`
 
-The scripts expose a stable public contract for PR observation. `stdout` is
-machine-readable JSON only. Progress and diagnostics belong on `stderr` and are
-non-authoritative.
+`wait_pr_observation.sh` is the normal orchestration entrypoint. By default it
+posts exactly one fixed `@codex review` issue comment, then observes CI and
+Codex review completion for that trigger boundary. `fetch_pr_observation_snapshot.sh`
+is read-only and collects one snapshot. `stdout` is machine-readable JSON only.
+Progress and diagnostics belong on `stderr` and are non-authoritative.
 
 ## Public Script Contract
 
-- The scripts are read-only and call only fixed GitHub read APIs internally.
+- `wait_pr_observation.sh` may perform one fixed GitHub write through the
+  internal `trigger_codex_review.sh` helper in default `post-once` mode.
+- The only allowed write is `POST repos/{owner}/{repo}/issues/{pr}/comments`
+  with the fixed body `@codex review`.
+- `fetch_pr_observation_snapshot.sh` and the collector libraries remain
+  read-only and call only fixed GitHub read APIs internally.
 - The scripts reject invalid `--repo`, `--pr`, `--head-sha`, timing, progress,
   trigger, body mode, and output options before any `gh` command can run.
 - The scripts do not accept arbitrary GitHub endpoints, methods, GraphQL
   queries, request bodies, headers, `jq` expressions, or raw `gh` arguments.
+- Callers must not ask an agent to post `@codex review` manually for the normal
+  wait flow. The script owns that deterministic trigger action.
 - GitHub auth, rate-limit, schema, or collection failures that can still be
   represented as JSON are returned as non-success observation payloads with
   machine-readable `limitations`.
@@ -36,6 +45,7 @@ non-authoritative.
   --repo owner/repo \
   --pr 13 \
   --head-sha <sha> \
+  [--trigger-mode post-once|resume] \
   [--timeout-seconds 1800] \
   [--poll-interval-seconds 30] \
   [--quiet-seconds 90] \
@@ -57,6 +67,21 @@ non-authoritative.
   [--out <dir>]
 ```
 
+## Trigger Modes
+
+- Default mode is `post-once`.
+- In `post-once`, `wait_pr_observation.sh` validates the current PR head, posts
+  one fixed `@codex review` comment, captures the helper JSON internally, and
+  uses the returned `comment_id` / `created_at` as the observation boundary.
+- `post-once` rejects caller-supplied `--trigger-comment-id` and
+  `--trigger-created-at`; those values must come from the helper result.
+- `resume` never posts a new comment. It requires explicit
+  `--trigger-comment-id` and `--trigger-created-at` from a previous final JSON
+  result, and continues observation for the same trigger boundary.
+- Do not implement an automatic "reuse existing trigger if present" mode. It can
+  mix old manual comments, delayed review output, and unrelated automation into
+  the current run.
+
 ## Output Boundary
 
 - `stdout`: exactly one JSON text result.
@@ -68,6 +93,8 @@ non-authoritative.
 - `--out <dir>` writes debug/audit artifacts, including a `result.json` copy of
   stdout and snapshot/debug files. These artifacts are optional and are not a
   separate authority.
+- Selected Codex PR review bodies and selected review comment bodies are present
+  in the final `stdout` JSON. They are not available only through `--out`.
 
 ## Observation Semantics
 
@@ -79,10 +106,44 @@ status collection are implemented by the public scripts.
 - `--out` artifacts are optional debug/audit copies.
 - Observation statuses include `passed`, `failed`, `pending`, `running`,
   `none`, `timeout`, `stale_head`, `unknown`, and `human_gate`.
-- Review bodies are trigger-window scoped when body mode allows body
-  collection.
+- CI terminal state and Codex review lifecycle are observed independently and
+  merged only in the final wait result.
+- Codex review completion is primarily detected from Codex-authored submitted PR
+  review objects. Issue comments, reactions, or quiet windows are fallback or
+  supporting evidence only.
+- Review bodies selected for the current trigger boundary are included in the
+  final `stdout` JSON regardless of `--body-mode`.
+- When a timeout or limit occurs before CI and review complete, the final JSON
+  includes resume metadata and a resume command hint for continuing the same
+  boundary without posting another trigger.
+
+## Safe Usage
+
+Normal wait after creating or updating a PR:
+
+```bash
+./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh \
+  --repo owner/repo \
+  --pr 13 \
+  --head-sha <sha>
+```
+
+Resume after a timeout or external limit:
+
+```bash
+./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh \
+  --repo owner/repo \
+  --pr 13 \
+  --head-sha <sha> \
+  --trigger-mode resume \
+  --trigger-comment-id <issue-comment-id> \
+  --trigger-created-at <iso8601>
+```
 
 ## Safety Boundary
 
 Do not use the retired `pr-monitor` sub-agent or the retired
 `github-codex-pr-review-comments` skill. Do not add a compatibility shim.
+Do not bypass this skill by assembling raw `gh api` or GraphQL calls to fetch
+review bodies; the final `stdout` JSON is the intended information boundary for
+agents.

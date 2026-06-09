@@ -1,6 +1,6 @@
 ---
 name: github-pr-merge-preparer
-description: Coordinate pull request creation or discovery, read-only monitoring, bounded fix delegation, re-push confirmation, and re-monitoring until a PR is merge-prepared for human judgment. Use when a workflow must continue after PR creation and report whether the PR is ready for a human merge decision without merging it.
+description: Coordinate pull request creation or discovery, fixed Codex review triggering, PR observation, bounded fix delegation, re-push confirmation, and re-monitoring until a PR is merge-prepared for human judgment. Use when a workflow must continue after PR creation and report whether the PR is ready for a human merge decision without merging it.
 ---
 
 # GitHub PR Merge Preparer
@@ -9,7 +9,7 @@ description: Coordinate pull request creation or discovery, read-only monitoring
 
 Use this skill to coordinate the post-implementation PR delivery loop: create or find the PR, monitor the latest head SHA, classify monitor results, delegate bounded fixes when appropriate, confirm commit and push evidence, re-monitor, and finally report either `merge-prepared` evidence or a human gate.
 
-This skill is a workflow coordinator. It reuses `github-pr-creator` for PR creation, invokes `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` directly for read-only checks/statuses/review observation, and delegates appropriate repair workers for implementation fixes. It does not implement CI log parsing, review repair logic, or GitHub write operations beyond the delegated branch push needed after an approved fix.
+This skill is a workflow coordinator. It reuses `github-pr-creator` for PR creation, invokes `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` directly for fixed Codex review triggering plus checks/statuses/review observation, and delegates appropriate repair workers for implementation fixes. It does not implement CI log parsing, review repair logic, or GitHub write operations beyond the delegated branch push needed after an approved fix and the bounded `@codex review` trigger owned by `github-pr-observation`.
 
 ## Inputs
 
@@ -33,7 +33,7 @@ This skill is a workflow coordinator. It reuses `github-pr-creator` for PR creat
    - If local final gates are known to have passed, create or keep a ready PR unless the user explicitly requested draft.
    - If local final gates are incomplete or unknown, create a draft PR or stop at a human gate; do not present it as merge-prepared.
 4. Create or find the PR through `github-pr-creator`, requiring PR URL, number, open/closed state, base branch, head branch, issue linkage, and latest head SHA in the return.
-5. Invoke `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` directly with the repository, PR number, latest head SHA, and any known `@codex review` trigger comment id / created_at. Treat the stdout final JSON as the primary result.
+5. Invoke `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` directly with the repository, PR number, and latest head SHA. For a normal first observation, rely on the default `post-once` mode to post the fixed `@codex review` trigger. When continuing after a timeout or external limit, invoke explicit `--trigger-mode resume` with the trigger comment id / created_at from the previous final JSON. Treat the stdout final JSON as the primary result.
 6. Treat observation output as stale when it is not for the latest head SHA. After every push or re-push, obtain the new latest head SHA and re-run `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`.
 7. Classify failures with coarse labels only:
    - `check_failure:<job_or_check_name>`
