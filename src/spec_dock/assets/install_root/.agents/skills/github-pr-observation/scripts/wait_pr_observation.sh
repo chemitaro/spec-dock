@@ -11,6 +11,7 @@ Options:
   --quiet-seconds NUMBER
   --same-fingerprint-count NUMBER
   --zero-check-grace-polls NUMBER
+  --trigger-mode post-once|resume
   --trigger-comment-id NUMBER
   --trigger-created-at ISO8601
   --body-mode none|trigger-window-truncated|trigger-window-full|out-only
@@ -38,6 +39,7 @@ same_fingerprint_count="2"
 zero_check_grace_polls="2"
 trigger_comment_id=""
 trigger_created_at=""
+trigger_mode="post-once"
 body_mode="trigger-window-truncated"
 progress="stderr-summary"
 out_dir=""
@@ -82,6 +84,11 @@ while [ "$#" -gt 0 ]; do
     --zero-check-grace-polls)
       [ "$#" -ge 2 ] || fail_usage
       zero_check_grace_polls="$2"
+      shift 2
+      ;;
+    --trigger-mode)
+      [ "$#" -ge 2 ] || fail_usage
+      trigger_mode="$2"
       shift 2
       ;;
     --trigger-comment-id)
@@ -153,6 +160,16 @@ fi
 if [ -n "$trigger_created_at" ] && ! [[ "$trigger_created_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})?$ ]]; then
   fail_usage
 fi
+case "$trigger_mode" in
+  post-once|resume) ;;
+  *) fail_usage ;;
+esac
+if [ "$trigger_mode" = "post-once" ] && { [ -n "$trigger_comment_id" ] || [ -n "$trigger_created_at" ]; }; then
+  fail_usage
+fi
+if [ "$trigger_mode" = "resume" ] && { [ -z "$trigger_comment_id" ] || [ -z "$trigger_created_at" ]; }; then
+  fail_usage
+fi
 case "$body_mode" in
   none|trigger-window-truncated|trigger-window-full|out-only) ;;
   *) fail_usage ;;
@@ -167,8 +184,10 @@ fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 snapshot_script="$script_dir/fetch_pr_observation_snapshot.sh"
+trigger_script="$script_dir/trigger_codex_review.sh"
 
 OBS_SNAPSHOT_SCRIPT="$snapshot_script" \
+OBS_TRIGGER_SCRIPT="$trigger_script" \
 OBS_REPO="$repo" \
 OBS_PR="$pr" \
 OBS_HEAD_SHA="$head_sha" \
@@ -177,6 +196,7 @@ OBS_POLL_INTERVAL_SECONDS="$poll_interval_seconds" \
 OBS_QUIET_SECONDS="$quiet_seconds" \
 OBS_SAME_FINGERPRINT_COUNT="$same_fingerprint_count" \
 OBS_ZERO_CHECK_GRACE_POLLS="$zero_check_grace_polls" \
+OBS_TRIGGER_MODE="$trigger_mode" \
 OBS_TRIGGER_COMMENT_ID="$trigger_comment_id" \
 OBS_TRIGGER_CREATED_AT="$trigger_created_at" \
 OBS_BODY_MODE="$body_mode" \
@@ -566,6 +586,86 @@ def run_snapshot(args: list[str], timeout_seconds: float) -> tuple[int, str, str
         return proc.returncode if proc.returncode is not None else -signal.SIGKILL, stdout_text or "", stderr_text or "", True
 
 
+def trigger_failure_result(trigger_payload: dict, trigger_stdout: str, trigger_stderr: str) -> dict:
+    trigger = trigger_payload.get("trigger") if isinstance(trigger_payload.get("trigger"), dict) else {}
+    normalized_status = trigger_payload.get("overall_status") or trigger_payload.get("status") or "unknown"
+    if normalized_status == "trigger_posted":
+        normalized_status = "unknown"
+    next_action = "rerun_for_current_head" if normalized_status == "stale_head" else "human_gate"
+    return {
+        **trigger_payload,
+        "script": "wait_pr_observation.sh",
+        "status": normalized_status,
+        "overall_status": normalized_status,
+        "normalized_status": normalized_status,
+        "observation_complete": False,
+        "observed_at": utc_now(),
+        "recommended_next_action": next_action,
+        "trigger": {
+            **trigger,
+            "mode": "post-once",
+            "helper_success": False,
+            "helper_stdout_sha256": hashlib.sha256(trigger_stdout.encode()).hexdigest(),
+            "helper_stderr_sha256": hashlib.sha256(trigger_stderr.encode()).hexdigest(),
+        },
+        "wait": {
+            "polls": 0,
+            "contract_phase": "s02_trigger_post_once",
+        },
+    }
+
+
+def run_trigger(
+    *,
+    trigger_script: str,
+    repo: str,
+    pr: str,
+    head_sha: str,
+) -> dict:
+    completed = subprocess.run(
+        [trigger_script, "--repo", repo, "--pr", pr, "--head-sha", head_sha],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    try:
+        payload = json.loads(completed.stdout)
+    except Exception:
+        payload = {
+            "script": "trigger_codex_review.sh",
+            "success": False,
+            "overall_status": "trigger_json_unavailable",
+            "limitations": [
+                {
+                    "code": "trigger_json_unavailable",
+                    "source": "trigger_codex_review.sh",
+                    "severity": "blocking",
+                    "message": "trigger helper did not return parseable JSON",
+                    "exit_code": completed.returncode,
+                    "stdout_sha256": hashlib.sha256(completed.stdout.encode()).hexdigest(),
+                    "stderr_sha256": hashlib.sha256(completed.stderr.encode()).hexdigest(),
+                }
+            ],
+            "trigger": {"mode": "post-once", "action": "failed"},
+        }
+    if completed.returncode != 0:
+        payload.setdefault("limitations", []).append(
+            {
+                "code": "trigger_helper_failed",
+                "source": "trigger_codex_review.sh",
+                "severity": "blocking",
+                "message": "trigger helper exited non-zero",
+                "exit_code": completed.returncode,
+                "stderr_sha256": hashlib.sha256(completed.stderr.encode()).hexdigest(),
+            }
+        )
+        payload["success"] = False
+        payload.setdefault("overall_status", "trigger_helper_failed")
+    payload["_helper_stdout"] = completed.stdout
+    payload["_helper_stderr"] = completed.stderr
+    return payload
+
+
 def copy_tree_contents(source: Path, destination: Path) -> None:
     if not source.is_dir():
         return
@@ -754,6 +854,7 @@ def mark_latest_timeout(
 
 
 snapshot_script = os.environ["OBS_SNAPSHOT_SCRIPT"]
+trigger_script = os.environ["OBS_TRIGGER_SCRIPT"]
 repo = os.environ["OBS_REPO"]
 pr = os.environ["OBS_PR"]
 head_sha = os.environ["OBS_HEAD_SHA"]
@@ -762,12 +863,39 @@ poll_interval_seconds = int(os.environ["OBS_POLL_INTERVAL_SECONDS"])
 quiet_seconds = int(os.environ["OBS_QUIET_SECONDS"])
 same_fingerprint_count = int(os.environ["OBS_SAME_FINGERPRINT_COUNT"])
 zero_check_grace_polls = int(os.environ["OBS_ZERO_CHECK_GRACE_POLLS"])
+trigger_mode = os.environ["OBS_TRIGGER_MODE"]
 trigger_comment_id = os.environ["OBS_TRIGGER_COMMENT_ID"]
 trigger_created_at = os.environ["OBS_TRIGGER_CREATED_AT"]
 body_mode = os.environ["OBS_BODY_MODE"]
 progress = os.environ["OBS_PROGRESS"]
 out_dir_text = os.environ["OBS_OUT_DIR"]
 out_dir = Path(out_dir_text) if out_dir_text else None
+
+if trigger_mode == "post-once":
+    trigger_payload = run_trigger(
+        trigger_script=trigger_script,
+        repo=repo,
+        pr=pr,
+        head_sha=head_sha,
+    )
+    trigger_stdout = str(trigger_payload.pop("_helper_stdout", ""))
+    trigger_stderr = str(trigger_payload.pop("_helper_stderr", ""))
+    trigger = trigger_payload.get("trigger") if isinstance(trigger_payload.get("trigger"), dict) else {}
+    trigger_comment_id = str(trigger.get("comment_id") or "")
+    trigger_created_at = str(trigger.get("created_at") or "")
+    if (
+        trigger_payload.get("success") is not True
+        or not trigger_comment_id
+        or not trigger_created_at
+    ):
+        print(
+            json.dumps(
+                trigger_failure_result(trigger_payload, trigger_stdout, trigger_stderr),
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        raise SystemExit(0)
 
 snapshot_args = [
     snapshot_script,

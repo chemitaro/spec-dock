@@ -11909,6 +11909,13 @@ elif args[:2] == ["api", f"repos/owner/repo/commits/{head}/check-runs"]:
         }]})
 elif args[:2] == ["api", f"repos/owner/repo/commits/{head}/status"]:
     emit({"state": "pending" if ci == "pending" else "success", "statuses": []})
+elif args == ["api", "repos/owner/repo/issues/13/comments", "--method", "POST", "--raw-field", "body=@codex review"]:
+    emit({
+        "id": 99,
+        "created_at": "2026-06-08T01:00:00Z",
+        "body": "@codex review",
+        "html_url": "https://github.com/owner/repo/issues/13#issuecomment-99",
+    })
 elif args[:2] == ["api", "repos/owner/repo/issues/13/comments"]:
     emit([{
         "id": 99,
@@ -12504,6 +12511,221 @@ exit 44
             "new_exact_comment_count": 1,
         }
 
+    def _issue_176_write_wait_mode_scripts(self, script_dir: Path, log_path: Path) -> Path:
+        repo_root = Path(__file__).resolve().parents[3]
+        source_wait = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        )
+        wait_script = script_dir / "wait_pr_observation.sh"
+        shutil.copy2(source_wait, wait_script)
+        wait_script.chmod(0o755)
+
+        trigger_script = script_dir / "trigger_codex_review.sh"
+        trigger_script.write_text(
+            """#!/usr/bin/env bash
+set -euo pipefail
+printf 'trigger %s\\n' "$*" >> "$S02_WAIT_LOG"
+cat <<'JSON'
+{"success":true,"overall_status":"trigger_posted","trigger":{"action":"posted","mode":"post-once","body":"@codex review","body_matches_expected":true,"comment_id":456,"created_at":"2026-06-09T01:02:03Z","endpoint":"repos/owner/repo/issues/13/comments"}}
+JSON
+""",
+            encoding="utf-8",
+        )
+        trigger_script.chmod(0o755)
+
+        snapshot_script = script_dir / "fetch_pr_observation_snapshot.sh"
+        snapshot_script.write_text(
+            """#!/usr/bin/env bash
+set -euo pipefail
+printf 'snapshot %s\\n' "$*" >> "$S02_WAIT_LOG"
+trigger_id=""
+trigger_created_at=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --trigger-comment-id)
+      trigger_id="$2"
+      shift 2
+      ;;
+    --trigger-created-at)
+      trigger_created_at="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+python3 - "$trigger_id" "$trigger_created_at" <<'PY'
+import json
+import sys
+
+trigger_id = int(sys.argv[1]) if sys.argv[1] else None
+trigger_created_at = sys.argv[2] or None
+payload = {
+    "script": "fetch_pr_observation_snapshot.sh",
+    "status": "failed",
+    "overall_status": "failed",
+    "normalized_status": "failed",
+    "observation_complete": False,
+    "repo": "owner/repo",
+    "pr": 13,
+    "expected_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "current_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "head_matches_expected": True,
+    "summary": {"ci": "failed", "review": "none", "head": "match"},
+    "limitations": [],
+    "recommended_next_action": "fix_ci",
+    "ci": {
+        "status": "failed",
+        "failures": [{"name": "test"}],
+        "check_runs": {"total": 1, "success": 0, "skipped": 0, "neutral": 0, "failed": 1, "running": 0, "pending": 0, "other": 0, "stale": 0},
+    },
+    "review": {"status": "none", "signals": [], "review_requests": [], "threads": {"total": 0, "unresolved": 0}},
+    "trigger": {"source": "explicit", "comment_id": trigger_id, "created_at": trigger_created_at},
+    "artifacts": {},
+}
+print(json.dumps(payload, separators=(",", ":")))
+PY
+""",
+            encoding="utf-8",
+        )
+        snapshot_script.chmod(0o755)
+        del log_path
+        return wait_script
+
+    def test_issue_176_s02_wait_default_post_once_calls_helper_before_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            log_path = tmp_path / "wait.log"
+            wait_script = self._issue_176_write_wait_mode_scripts(tmp_path, log_path)
+            env = {**os.environ, "S02_WAIT_LOG": str(log_path)}
+
+            result = subprocess.run(
+                [
+                    str(wait_script),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--timeout-seconds",
+                    "2",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "1",
+                    "--progress",
+                    "none",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            log_lines = log_path.read_text(encoding="utf-8").splitlines()
+            assert log_lines[0].startswith("trigger --repo owner/repo --pr 13 --head-sha ")
+            assert log_lines[1].startswith("snapshot --repo owner/repo --pr 13 --head-sha ")
+            assert "--trigger-comment-id 456" in log_lines[1]
+            assert "--trigger-created-at 2026-06-09T01:02:03Z" in log_lines[1]
+            assert payload["script"] == "wait_pr_observation.sh"
+            assert payload["trigger"]["comment_id"] == 456
+            assert payload["trigger"]["created_at"] == "2026-06-09T01:02:03Z"
+            assert result.stdout.count("\n") == 1
+
+    def test_issue_176_s02_wait_resume_uses_explicit_trigger_without_helper(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            log_path = tmp_path / "wait.log"
+            wait_script = self._issue_176_write_wait_mode_scripts(tmp_path, log_path)
+            env = {**os.environ, "S02_WAIT_LOG": str(log_path)}
+
+            result = subprocess.run(
+                [
+                    str(wait_script),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "777",
+                    "--trigger-created-at",
+                    "2026-06-09T02:03:04Z",
+                    "--timeout-seconds",
+                    "2",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "1",
+                    "--progress",
+                    "none",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            log_lines = log_path.read_text(encoding="utf-8").splitlines()
+            assert len(log_lines) == 1
+            assert log_lines[0].startswith("snapshot --repo owner/repo --pr 13 --head-sha ")
+            assert "--trigger-comment-id 777" in log_lines[0]
+            assert "--trigger-created-at 2026-06-09T02:03:04Z" in log_lines[0]
+            assert payload["trigger"]["comment_id"] == 777
+            assert payload["trigger"]["created_at"] == "2026-06-09T02:03:04Z"
+
+    def test_issue_176_s02_wait_rejects_invalid_trigger_mode_combinations_before_commands(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        wait_script = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            log_path = Path(tmp_dir) / "wait.log"
+            env = {**os.environ, "S02_WAIT_LOG": str(log_path)}
+            invalid_arg_sets = (
+                ("--trigger-mode", "invalid"),
+                ("--trigger-mode", "post-once", "--trigger-comment-id", "456", "--trigger-created-at", "2026-06-09T01:02:03Z"),
+                ("--trigger-mode", "resume", "--trigger-comment-id", "456"),
+                ("--trigger-mode", "resume", "--trigger-created-at", "2026-06-09T01:02:03Z"),
+            )
+            for extra_args in invalid_arg_sets:
+                with _case(args=extra_args):
+                    if log_path.exists():
+                        log_path.unlink()
+                    result = subprocess.run(
+                        [
+                            str(wait_script),
+                            "--repo",
+                            "owner/repo",
+                            "--pr",
+                            "13",
+                            "--head-sha",
+                            "a" * 40,
+                            *extra_args,
+                        ],
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    assert result.returncode == 64, result.stdout + result.stderr
+                    assert not log_path.exists()
+
     def test_issue_75_pr_observation_snapshot_reports_collection_failure_as_json(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -12877,6 +13099,12 @@ esac
                     "13",
                     "--head-sha",
                     "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
                     "--timeout-seconds",
                     "2",
                     "--poll-interval-seconds",
@@ -13339,6 +13567,12 @@ exit 44
                     "13",
                     "--head-sha",
                     "b" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
                     "--timeout-seconds",
                     "1",
                     "--poll-interval-seconds",
@@ -13515,6 +13749,12 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                 "13",
                 "--head-sha",
                 "a" * 40,
+                "--trigger-mode",
+                "resume",
+                "--trigger-comment-id",
+                "99",
+                "--trigger-created-at",
+                "2026-06-08T01:00:00Z",
                 "--timeout-seconds",
                 str(timeout_seconds),
                 "--poll-interval-seconds",
@@ -14455,6 +14695,12 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     "13",
                     "--head-sha",
                     "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
                     "--timeout-seconds",
                     "1",
                     "--poll-interval-seconds",
@@ -14545,6 +14791,12 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     "13",
                     "--head-sha",
                     "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
                     "--timeout-seconds",
                     "6",
                     "--poll-interval-seconds",
@@ -14640,6 +14892,12 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     "13",
                     "--head-sha",
                     "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
                     "--timeout-seconds",
                     "10",
                     "--poll-interval-seconds",
@@ -14769,6 +15027,12 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     "13",
                     "--head-sha",
                     "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
                     "--body-mode",
                     "trigger-window-full",
                     "--timeout-seconds",
@@ -15000,6 +15264,8 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     "13",
                     "--head-sha",
                     "a" * 40,
+                    "--trigger-mode",
+                    "resume",
                     "--trigger-comment-id",
                     "99",
                     "--trigger-created-at",
@@ -15102,6 +15368,12 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     "13",
                     "--head-sha",
                     "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
                     "--body-mode",
                     "none",
                     "--timeout-seconds",
@@ -15242,6 +15514,12 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     "13",
                     "--head-sha",
                     "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
                     "--timeout-seconds",
                     "4",
                     "--poll-interval-seconds",
