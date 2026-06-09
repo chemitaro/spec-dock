@@ -1025,6 +1025,7 @@ out_dir_text = os.environ["OBS_OUT_DIR"]
 out_dir = Path(out_dir_text) if out_dir_text else None
 start_monotonic = time.monotonic()
 deadline = start_monotonic + timeout_seconds
+trigger_helper_metadata: dict = {}
 
 if out_dir:
     clear_managed_out_artifacts(out_dir)
@@ -1042,6 +1043,10 @@ if trigger_mode == "post-once":
     trigger = trigger_payload.get("trigger") if isinstance(trigger_payload.get("trigger"), dict) else {}
     trigger_comment_id = str(trigger.get("comment_id") or "")
     trigger_created_at = str(trigger.get("created_at") or "")
+    trigger_helper_metadata = {
+        **trigger,
+        "helper_success": trigger_payload.get("success") is True,
+    }
     if (
         trigger_payload.get("success") is not True
         or not trigger_comment_id
@@ -1223,6 +1228,12 @@ while True:
             "snapshots_dir": str(out_dir / "snapshots") if out_dir else None,
         }
     )
+    if trigger_helper_metadata:
+        snapshot_trigger = payload.get("trigger") if isinstance(payload.get("trigger"), dict) else {}
+        payload["trigger"] = {
+            **trigger_helper_metadata,
+            **snapshot_trigger,
+        }
 
     latest_payload = payload
     latest_snapshot_text = snapshot_text

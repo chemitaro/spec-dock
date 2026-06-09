@@ -13211,6 +13211,9 @@ sleep 5
             assert payload["resume"]["trigger_created_at"] == "2026-06-09T01:02:03Z"
             assert "--trigger-mode resume" in payload["resume"]["command_hint"]
             assert "--trigger-comment-id 456" in payload["resume"]["command_hint"]
+            assert payload["trigger"]["mode"] == "post-once"
+            assert payload["trigger"]["action"] == "posted"
+            assert payload["trigger"]["helper_success"] is True
             log_lines = log_path.read_text(encoding="utf-8").splitlines()
             assert log_lines[0].startswith("trigger ")
             assert log_lines[1].startswith("snapshot ")
@@ -13675,6 +13678,104 @@ esac
             assert payload["normalized_status"] == "human_gate"
             assert payload["recommended_next_action"] == "address_review_feedback"
             assert payload["observation_complete"] is True
+
+    def test_issue_176_s04_snapshot_fallback_issue_comment_is_human_gate(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
+    cat <<'JSON'
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{"total_count":1,"check_runs":[{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{"state":"success","statuses":[]}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"CLEAN","statusCheckRollup":[{"name":"test","status":"COMPLETED","conclusion":"SUCCESS"}]}
+JSON
+    ;;
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"I could not submit a PR review but found fallback feedback."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["summary"]["ci"] == "passed"
+            assert payload["codex_review"]["lifecycle"]["completion_signal"] == "fallback_issue_comment"
+            assert payload["normalized_status"] == "human_gate"
+            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["observation_complete"] is False
 
     def test_issue_170_pr_observation_snapshot_blocks_draft_and_non_open_prs(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -15313,8 +15414,12 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             timeout_limitation = next(
                 item for item in payload["limitations"] if item["code"] == "snapshot_poll_timeout"
             )
-            assert timeout_limitation["source"] == "wait_pr_observation.sh"
-            assert timeout_limitation["deadline_reached"] is True
+            assert timeout_limitation["source"] in {
+                "wait_pr_observation.sh",
+                "fetch_pr_observation_snapshot.sh",
+            }
+            if timeout_limitation["source"] == "wait_pr_observation.sh":
+                assert timeout_limitation["deadline_reached"] is True
 
     def test_issue_75_pr_observation_wait_applies_zero_check_grace_before_human_gate(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -17662,7 +17767,7 @@ esac
                     assert codex_review["collection_summary"]["review_comments"]["boundary_before_excluded_ids"] == [300]
                     assert codex_review["collection_summary"]["review_threads"]["fetched_ids"] == ["RT_old", "RT_selected"]
                     assert codex_review["collection_summary"]["review_threads"]["selected_ids"] == ["RT_selected"]
-                    assert codex_review["collection_summary"]["review_threads"]["unresolved_ids"] == ["RT_old", "RT_selected"]
+                    assert codex_review["collection_summary"]["review_threads"]["unresolved_ids"] == ["RT_selected"]
                     assert codex_review["collection_summary"]["review_threads"]["boundary_before_excluded_ids"] == ["RT_old"]
 
     def test_issue_176_s03_review_collector_does_not_mark_fallback_as_primary(self) -> None:
@@ -19416,7 +19521,7 @@ esac
             ] == ["approved", "changes_requested"]
             assert all("_api_index" not in item for item in payload["review"]["signals"])
 
-    def test_issue_170_pr_review_collector_keeps_pre_trigger_unresolved_threads_blocking(self) -> None:
+    def test_issue_170_pr_review_collector_excludes_pre_trigger_unresolved_threads_from_status(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -19488,7 +19593,7 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["review"]["status"] == "unresolved"
+            assert payload["review"]["status"] == "none"
             assert payload["review"]["threads"]["items"][0]["activity_at"] == "2026-06-08T00:30:00Z"
 
     def test_issue_170_pr_review_collector_current_issue_comment_overrides_approval(self) -> None:
