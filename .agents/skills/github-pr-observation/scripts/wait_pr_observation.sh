@@ -650,19 +650,70 @@ def trigger_failure_result(trigger_payload: dict, trigger_stdout: str, trigger_s
     }
 
 
+def write_final_artifacts(
+    *,
+    out_dir: Path,
+    result_text: str,
+    latest_snapshot_text: str = "{}\n",
+    latest_delta: dict | None = None,
+    events: list[dict] | None = None,
+    latest_snapshot_out_dir: Path | None = None,
+) -> None:
+    if latest_snapshot_out_dir:
+        copy_tree_contents(latest_snapshot_out_dir / "raw", out_dir / "raw")
+    (out_dir / "result.json").write_text(result_text, encoding="utf-8")
+    (out_dir / "latest.json").write_text(
+        latest_snapshot_text if latest_snapshot_text.endswith("\n") else latest_snapshot_text + "\n",
+        encoding="utf-8",
+    )
+    (out_dir / "latest_delta.json").write_text(
+        json.dumps(latest_delta or {}, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    (out_dir / "events.ndjson").write_text(
+        "".join(json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n" for event in (events or [])),
+        encoding="utf-8",
+    )
+
+
 def run_trigger(
     *,
     trigger_script: str,
     repo: str,
     pr: str,
     head_sha: str,
+    timeout_seconds: float,
 ) -> dict:
-    completed = subprocess.run(
-        [trigger_script, "--repo", repo, "--pr", pr, "--head-sha", head_sha],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            [trigger_script, "--repo", repo, "--pr", pr, "--head-sha", head_sha],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=max(0.1, timeout_seconds),
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout_text = exc.stdout if isinstance(exc.stdout, str) else (exc.stdout or b"").decode(errors="replace")
+        stderr_text = exc.stderr if isinstance(exc.stderr, str) else (exc.stderr or b"").decode(errors="replace")
+        return {
+            "script": "trigger_codex_review.sh",
+            "success": False,
+            "overall_status": "trigger_timeout",
+            "limitations": [
+                {
+                    "code": "trigger_timeout",
+                    "source": "trigger_codex_review.sh",
+                    "severity": "blocking",
+                    "message": "trigger helper exceeded the remaining wait deadline",
+                    "timeout_seconds": timeout_seconds,
+                    "stdout_sha256": hashlib.sha256(stdout_text.encode()).hexdigest(),
+                    "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
+                }
+            ],
+            "trigger": {"mode": "post-once", "action": "failed"},
+            "_helper_stdout": stdout_text,
+            "_helper_stderr": stderr_text,
+        }
     try:
         payload = json.loads(completed.stdout)
     except Exception:
@@ -775,10 +826,10 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
         return "pending", "pending", "wait", False, False
     if review_status in {"none", "pending"} and lifecycle_status == "none" and completion_signal == "none":
         return "pending", "pending", "wait", False, False
-    if review_status in {"requested", "commented", "changes_requested", "unresolved"}:
-        return "human_gate", "human_gate", "address_review_feedback", True, False
     if completion_signal != "submitted_pull_request_review":
         return "pending", "pending", "wait", False, False
+    if review_status in {"requested", "commented", "changes_requested", "unresolved"}:
+        return "human_gate", "human_gate", "address_review_feedback", True, False
     if review_status == "approved":
         return "passed", "passed", "merge_prepared", True, False
     if review_status == "none":
@@ -972,6 +1023,11 @@ body_mode = os.environ["OBS_BODY_MODE"]
 progress = os.environ["OBS_PROGRESS"]
 out_dir_text = os.environ["OBS_OUT_DIR"]
 out_dir = Path(out_dir_text) if out_dir_text else None
+start_monotonic = time.monotonic()
+deadline = start_monotonic + timeout_seconds
+
+if out_dir:
+    clear_managed_out_artifacts(out_dir)
 
 if trigger_mode == "post-once":
     trigger_payload = run_trigger(
@@ -979,6 +1035,7 @@ if trigger_mode == "post-once":
         repo=repo,
         pr=pr,
         head_sha=head_sha,
+        timeout_seconds=max(0.1, deadline - time.monotonic()),
     )
     trigger_stdout = str(trigger_payload.pop("_helper_stdout", ""))
     trigger_stderr = str(trigger_payload.pop("_helper_stderr", ""))
@@ -990,12 +1047,27 @@ if trigger_mode == "post-once":
         or not trigger_comment_id
         or not trigger_created_at
     ):
+        failure_payload = trigger_failure_result(trigger_payload, trigger_stdout, trigger_stderr)
+        failure_payload.setdefault("artifacts", {})
+        failure_payload["artifacts"].update(
+            {
+                "result_json": str(out_dir / "result.json") if out_dir else None,
+                "latest_json": str(out_dir / "latest.json") if out_dir else None,
+                "events_ndjson": str(out_dir / "events.ndjson") if out_dir else None,
+                "latest_delta_json": str(out_dir / "latest_delta.json") if out_dir else None,
+                "snapshots_dir": str(out_dir / "snapshots") if out_dir else None,
+            }
+        )
+        result_text = json.dumps(
+            failure_payload,
+            sort_keys=True,
+            separators=(",", ":"),
+        ) + "\n"
+        if out_dir:
+            write_final_artifacts(out_dir=out_dir, result_text=result_text)
         print(
-            json.dumps(
-                trigger_failure_result(trigger_payload, trigger_stdout, trigger_stderr),
-                sort_keys=True,
-                separators=(",", ":"),
-            )
+            result_text,
+            end="",
         )
         raise SystemExit(0)
 
@@ -1015,11 +1087,6 @@ if trigger_comment_id:
 if trigger_created_at:
     snapshot_args.extend(["--trigger-created-at", trigger_created_at])
 
-if out_dir:
-    clear_managed_out_artifacts(out_dir)
-
-start_monotonic = time.monotonic()
-deadline = start_monotonic + timeout_seconds
 previous_fingerprint = None
 latest_change_monotonic = start_monotonic
 same_count = 0
