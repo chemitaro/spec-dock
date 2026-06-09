@@ -12090,6 +12090,420 @@ exit 44
                     assert result.returncode == 64, result.stdout + result.stderr
                     assert not gh_log.exists(), "unsafe wait input reached fake gh api"
 
+    def _issue_176_write_trigger_fake_gh(
+        self,
+        fake_gh: Path,
+        *,
+        scenario_path: Path,
+        state_path: Path,
+        log_path: Path,
+    ) -> None:
+        fake_gh.write_text(
+            """#!/usr/bin/env python3
+import json
+import os
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+scenario = json.loads(Path(os.environ["GH_FAKE_TRIGGER_SCENARIO"]).read_text(encoding="utf-8"))
+state_path = Path(os.environ["GH_FAKE_TRIGGER_STATE"])
+state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {
+    "pr_view_count": 0,
+    "comments_get_count": 0,
+    "post_count": 0,
+}
+with open(os.environ["GH_FAKE_LOG"], "a", encoding="utf-8") as log:
+    log.write(json.dumps(args, separators=(",", ":")) + "\\n")
+
+def save_state():
+    state_path.write_text(json.dumps(state, separators=(",", ":")), encoding="utf-8")
+
+def emit(payload):
+    print(json.dumps(payload, separators=(",", ":")))
+
+head_sequence = scenario.get("head_sequence") or [scenario.get("head", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+
+if args == ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,url,state,isDraft,number"]:
+    index = min(state["pr_view_count"], len(head_sequence) - 1)
+    state["pr_view_count"] += 1
+    save_state()
+    emit({
+        "headRefOid": head_sequence[index],
+        "url": "https://github.com/owner/repo/pull/13",
+        "state": "OPEN",
+        "isDraft": False,
+        "number": 13,
+    })
+elif args == ["api", "repos/owner/repo/issues/13/comments", "--paginate"]:
+    state["comments_get_count"] += 1
+    save_state()
+    if state["comments_get_count"] == 1:
+        if scenario.get("before_comments_error", False):
+            print("simulated before comments failure", file=sys.stderr)
+            sys.exit(44)
+        emit(scenario.get("before_comments", []))
+    else:
+        if scenario.get("after_comments_error", False):
+            print("simulated after comments failure", file=sys.stderr)
+            sys.exit(44)
+        emit(scenario.get("after_comments", scenario.get("before_comments", [])))
+elif args == ["api", "repos/owner/repo/issues/13/comments", "--method", "POST", "--raw-field", "body=@codex review"]:
+    state["post_count"] += 1
+    save_state()
+    if scenario.get("post_success", True):
+        emit(scenario.get("post_comment", {
+            "id": 456,
+            "created_at": "2026-06-09T01:02:03Z",
+            "body": "@codex review",
+            "html_url": "https://github.com/owner/repo/issues/13#issuecomment-456",
+        }))
+    else:
+        print("simulated post failure", file=sys.stderr)
+        sys.exit(44)
+else:
+    print(f"unexpected gh call: {' '.join(args)}", file=sys.stderr)
+    sys.exit(44)
+""",
+            encoding="utf-8",
+        )
+        del scenario_path, state_path, log_path
+        fake_gh.chmod(0o755)
+
+    def _issue_176_run_trigger(
+        self,
+        *,
+        scenario: dict[str, object],
+    ) -> tuple[subprocess.CompletedProcess[str], list[list[str]]]:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/trigger_codex_review.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            scenario_path = tmp_path / "scenario.json"
+            state_path = tmp_path / "state.json"
+            gh_log = tmp_path / "gh.log"
+            scenario_path.write_text(json.dumps(scenario), encoding="utf-8")
+            self._issue_176_write_trigger_fake_gh(
+                fake_gh,
+                scenario_path=scenario_path,
+                state_path=state_path,
+                log_path=gh_log,
+            )
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_TRIGGER_SCENARIO": str(scenario_path),
+                "GH_FAKE_TRIGGER_STATE": str(state_path),
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            calls = [
+                json.loads(line)
+                for line in gh_log.read_text(encoding="utf-8").splitlines()
+            ] if gh_log.exists() else []
+            return result, calls
+
+    def test_issue_176_s01_trigger_helper_posts_fixed_review_comment_once(self) -> None:
+        result, calls = self._issue_176_run_trigger(
+            scenario={
+                "head": "a" * 40,
+                "before_comments": [],
+                "post_comment": {
+                    "id": 456,
+                    "created_at": "2026-06-09T01:02:03Z",
+                    "body": "@codex review",
+                    "html_url": "https://github.com/owner/repo/issues/13#issuecomment-456",
+                },
+            },
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        post_calls = [
+            call for call in calls
+            if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]
+            and "--method" in call
+        ]
+        assert post_calls == [[
+            "api",
+            "repos/owner/repo/issues/13/comments",
+            "--method",
+            "POST",
+            "--raw-field",
+            "body=@codex review",
+        ]]
+        assert payload["success"] is True
+        assert payload["overall_status"] == "trigger_posted"
+        assert payload["trigger"]["action"] == "posted"
+        assert payload["trigger"]["endpoint"] == "repos/owner/repo/issues/13/comments"
+        assert payload["trigger"]["body"] == "@codex review"
+        assert payload["trigger"]["body_matches_expected"] is True
+        assert payload["trigger"]["comment_id"] == 456
+        assert payload["trigger"]["created_at"] == "2026-06-09T01:02:03Z"
+        assert [call[0:2] for call in calls].count(["pr", "view"]) == 2
+
+    def test_issue_176_s01_trigger_helper_rejects_invalid_inputs_before_gh(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/trigger_codex_review.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            gh_log = tmp_path / "gh.log"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$GH_FAKE_LOG"
+exit 44
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            invalid_args = (
+                ("--repo", "owner", "--pr", "13", "--head-sha", "a" * 40),
+                ("--repo", "owner/repo", "--pr", "0", "--head-sha", "a" * 40),
+                ("--repo", "owner/repo", "--pr", "13", "--head-sha", "abc123"),
+                ("--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40, "--body", "@codex review"),
+            )
+            for args in invalid_args:
+                with _case(args=args):
+                    if gh_log.exists():
+                        gh_log.unlink()
+                    result = subprocess.run(
+                        [str(script_path), *args],
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    assert result.returncode == 64, result.stdout + result.stderr
+                    assert not gh_log.exists(), "unsafe trigger input reached fake gh api"
+
+    def test_issue_176_s01_trigger_helper_does_not_post_when_head_is_stale(self) -> None:
+        result, calls = self._issue_176_run_trigger(
+            scenario={
+                "head": "b" * 40,
+                "before_comments": [],
+            },
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["success"] is False
+        assert payload["overall_status"] == "stale_head"
+        assert payload["trigger"]["action"] == "stale"
+        assert payload["current_head_sha"] == "b" * 40
+        assert payload["expected_head_sha"] == "a" * 40
+        assert [call for call in calls if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]] == []
+
+    def test_issue_176_s01_trigger_helper_fails_closed_without_blind_retry(self) -> None:
+        result, calls = self._issue_176_run_trigger(
+            scenario={
+                "head": "a" * 40,
+                "before_comments": [],
+                "post_success": False,
+                "after_comments": [],
+            },
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        post_calls = [
+            call for call in calls
+            if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]
+            and "--method" in call
+        ]
+        get_calls = [
+            call for call in calls
+            if call == ["api", "repos/owner/repo/issues/13/comments", "--paginate"]
+        ]
+        assert len(post_calls) == 1
+        assert len(get_calls) == 2
+        assert payload["success"] is False
+        assert payload["overall_status"] == "trigger_post_failed"
+        assert payload["trigger"]["action"] == "failed"
+        assert payload["recovery"] == {
+            "attempted": True,
+            "accepted": False,
+            "new_exact_comment_count": 0,
+        }
+        assert "trigger_post_failed" in [item["code"] for item in payload["limitations"]]
+        assert "trigger_recovery_ambiguous" in [item["code"] for item in payload["limitations"]]
+
+    def test_issue_176_s01_trigger_helper_does_not_recover_without_trusted_before_snapshot(self) -> None:
+        result, calls = self._issue_176_run_trigger(
+            scenario={
+                "head": "a" * 40,
+                "before_comments_error": True,
+                "post_success": False,
+                "after_comments": [
+                    {
+                        "id": 457,
+                        "created_at": "2026-06-09T01:02:04Z",
+                        "body": "@codex review",
+                    },
+                ],
+            },
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        post_calls = [
+            call for call in calls
+            if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]
+            and "--method" in call
+        ]
+        assert len(post_calls) == 1
+        assert payload["success"] is False
+        assert payload["overall_status"] == "trigger_post_failed"
+        assert payload["recovery"] == {
+            "attempted": True,
+            "accepted": False,
+            "new_exact_comment_count": 1,
+        }
+        limitation_codes = [item["code"] for item in payload["limitations"]]
+        assert "before_comments_snapshot_untrusted" in limitation_codes
+        assert "trigger_recovery_unavailable" in limitation_codes
+
+    def test_issue_176_s01_trigger_helper_rejects_multiple_new_exact_comments(self) -> None:
+        result, calls = self._issue_176_run_trigger(
+            scenario={
+                "head": "a" * 40,
+                "before_comments": [],
+                "post_success": False,
+                "after_comments": [
+                    {
+                        "id": 457,
+                        "created_at": "2026-06-09T01:02:04Z",
+                        "body": "@codex review",
+                    },
+                    {
+                        "id": 458,
+                        "created_at": "2026-06-09T01:02:05Z",
+                        "body": "@codex review",
+                    },
+                ],
+            },
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        post_calls = [
+            call for call in calls
+            if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]
+            and "--method" in call
+        ]
+        assert len(post_calls) == 1
+        assert payload["success"] is False
+        assert payload["overall_status"] == "trigger_post_failed"
+        assert payload["trigger"]["action"] == "failed"
+        assert payload["recovery"] == {
+            "attempted": True,
+            "accepted": False,
+            "new_exact_comment_count": 2,
+        }
+        assert "trigger_recovery_ambiguous" in [item["code"] for item in payload["limitations"]]
+
+    def test_issue_176_s01_trigger_helper_fails_when_head_changes_after_post(self) -> None:
+        result, calls = self._issue_176_run_trigger(
+            scenario={
+                "head_sequence": ["a" * 40, "b" * 40],
+                "before_comments": [],
+                "post_comment": {
+                    "id": 456,
+                    "created_at": "2026-06-09T01:02:03Z",
+                    "body": "@codex review",
+                    "html_url": "https://github.com/owner/repo/issues/13#issuecomment-456",
+                },
+            },
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        post_calls = [
+            call for call in calls
+            if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]
+            and "--method" in call
+        ]
+        assert len(post_calls) == 1
+        assert payload["success"] is False
+        assert payload["overall_status"] == "stale_head"
+        assert payload["trigger"]["action"] == "posted"
+        assert payload["current_head_sha"] == "a" * 40
+        assert payload["final_head_sha"] == "b" * 40
+        assert "post_trigger_head_mismatch" in [item["code"] for item in payload["limitations"]]
+
+    def test_issue_176_s01_trigger_helper_recovers_exactly_one_new_comment(self) -> None:
+        result, calls = self._issue_176_run_trigger(
+            scenario={
+                "head": "a" * 40,
+                "before_comments": [
+                    {
+                        "id": 100,
+                        "created_at": "2026-06-09T00:00:00Z",
+                        "body": "@codex review",
+                    }
+                ],
+                "post_success": False,
+                "after_comments": [
+                    {
+                        "id": 100,
+                        "created_at": "2026-06-09T00:00:00Z",
+                        "body": "@codex review",
+                    },
+                    {
+                        "id": 457,
+                        "created_at": "2026-06-09T01:02:04Z",
+                        "body": "@codex review",
+                        "html_url": "https://github.com/owner/repo/issues/13#issuecomment-457",
+                    },
+                ],
+            },
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        post_calls = [
+            call for call in calls
+            if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]
+            and "--method" in call
+        ]
+        assert len(post_calls) == 1
+        assert payload["success"] is True
+        assert payload["overall_status"] == "trigger_recovered"
+        assert payload["trigger"]["action"] == "recovered"
+        assert payload["trigger"]["comment_id"] == 457
+        assert payload["trigger"]["created_at"] == "2026-06-09T01:02:04Z"
+        assert payload["recovery"] == {
+            "attempted": True,
+            "accepted": True,
+            "new_exact_comment_count": 1,
+        }
+
     def test_issue_75_pr_observation_snapshot_reports_collection_failure_as_json(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
