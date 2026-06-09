@@ -814,6 +814,9 @@ review_status: pass
 ## 遭遇した問題と解決 (任意)
 - 問題: final QA/code/spec reviewer r1 で S99 report 未記入、timeout next action enum drift、human approval only の premature success、cl-015/cl-016 closure 未記録が見つかった。
   - 解決: `wait_or_resume` に統一し、Codex submitted review completion がない approval は success にしない一方で review feedback は human gate のまま維持した。focused regression を追加し、S99 report の placeholder を実証台帳へ置き換えた。
+- 問題: PR #177 の Codex review で、trigger helper の paginated issue comments parsing、trigger helper timeout、Codex completion 前の generic feedback human gate、trigger failure 時の `--out` artifact 書き出し不足が指摘された。
+  - 解決: trigger helper に multi-document pagination parser を追加し、wait script の trigger subprocess を残り deadline で bounded にした。trigger failure / timeout も finalization path を通して `result.json` などを生成し、Codex submitted review completion がない generic feedback は timeout/resume 待機に留めるようにした。
+  - 証跡: PR #177 observation result -> CI passed / review unresolved 4 threads / `recommended_next_action=address_review_feedback`。`uv run pytest tests/unit/infra/test_init_update.py -k issue_176` -> 24 passed。provider/mirror `trigger_codex_review.sh` / `wait_pr_observation.sh` / `fetch_pr_observation_snapshot.sh` parity -> match。
 
 ## 学んだこと (任意)
 - success 判定だけを Codex submitted review completion に依存させ、review feedback の human gate 判定とは分ける必要がある。

@@ -12160,6 +12160,10 @@ def save_state():
 def emit(payload):
     print(json.dumps(payload, separators=(",", ":")))
 
+def emit_paginated(payloads):
+    for payload in payloads:
+        print(json.dumps(payload, separators=(",", ":")))
+
 head_sequence = scenario.get("head_sequence") or [scenario.get("head", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
 
 if args == ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,url,state,isDraft,number"]:
@@ -12180,12 +12184,18 @@ elif args == ["api", "repos/owner/repo/issues/13/comments", "--paginate"]:
         if scenario.get("before_comments_error", False):
             print("simulated before comments failure", file=sys.stderr)
             sys.exit(44)
-        emit(scenario.get("before_comments", []))
+        if "before_comments_pages" in scenario:
+            emit_paginated(scenario["before_comments_pages"])
+        else:
+            emit(scenario.get("before_comments", []))
     else:
         if scenario.get("after_comments_error", False):
             print("simulated after comments failure", file=sys.stderr)
             sys.exit(44)
-        emit(scenario.get("after_comments", scenario.get("before_comments", [])))
+        if "after_comments_pages" in scenario:
+            emit_paginated(scenario["after_comments_pages"])
+        else:
+            emit(scenario.get("after_comments", scenario.get("before_comments", [])))
 elif args == ["api", "repos/owner/repo/issues/13/comments", "--method", "POST", "--raw-field", "body=@codex review"]:
     state["post_count"] += 1
     save_state()
@@ -12536,6 +12546,68 @@ exit 44
         assert payload["trigger"]["action"] == "recovered"
         assert payload["trigger"]["comment_id"] == 457
         assert payload["trigger"]["created_at"] == "2026-06-09T01:02:04Z"
+        assert payload["recovery"] == {
+            "attempted": True,
+            "accepted": True,
+            "new_exact_comment_count": 1,
+        }
+
+    def test_issue_176_s01_trigger_helper_recovers_from_paginated_comment_snapshots(self) -> None:
+        result, calls = self._issue_176_run_trigger(
+            scenario={
+                "head": "a" * 40,
+                "before_comments_pages": [
+                    [
+                        {
+                            "id": 100,
+                            "created_at": "2026-06-09T00:00:00Z",
+                            "body": "@codex review",
+                        }
+                    ],
+                    [
+                        {
+                            "id": 101,
+                            "created_at": "2026-06-09T00:10:00Z",
+                            "body": "not the trigger",
+                        }
+                    ],
+                ],
+                "post_success": False,
+                "after_comments_pages": [
+                    [
+                        {
+                            "id": 100,
+                            "created_at": "2026-06-09T00:00:00Z",
+                            "body": "@codex review",
+                        }
+                    ],
+                    [
+                        {
+                            "id": 101,
+                            "created_at": "2026-06-09T00:10:00Z",
+                            "body": "not the trigger",
+                        },
+                        {
+                            "id": 457,
+                            "created_at": "2026-06-09T01:02:04Z",
+                            "body": "@codex review",
+                            "html_url": "https://github.com/owner/repo/issues/13#issuecomment-457",
+                        },
+                    ],
+                ],
+            },
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        get_calls = [
+            call for call in calls
+            if call == ["api", "repos/owner/repo/issues/13/comments", "--paginate"]
+        ]
+        assert len(get_calls) == 2
+        assert payload["success"] is True
+        assert payload["overall_status"] == "trigger_recovered"
+        assert payload["trigger"]["comment_id"] == 457
         assert payload["recovery"] == {
             "attempted": True,
             "accepted": True,
@@ -13201,6 +13273,123 @@ sleep 5
             assert payload["resume"]["available"] is True
             assert payload["codex_review"]["lifecycle"]["completion_signal"] == "none"
 
+    def test_issue_176_s04_wait_non_codex_feedback_does_not_human_gate_before_codex_review(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            log_path = tmp_path / "wait.log"
+            wait_script = self._issue_176_write_wait_s04_scripts(tmp_path, log_path)
+            env = {
+                **os.environ,
+                "S04_WAIT_LOG": str(log_path),
+                "S04_WAIT_PAYLOAD": json.dumps(
+                    self._issue_176_s04_wait_payload(
+                        ci_status="passed",
+                        review_status="commented",
+                        lifecycle_status="none",
+                        completion_signal="none",
+                    )
+                ),
+            }
+
+            result = subprocess.run(
+                [
+                    str(wait_script),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "777",
+                    "--trigger-created-at",
+                    "2026-06-09T02:03:04Z",
+                    "--timeout-seconds",
+                    "2",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "1",
+                    "--progress",
+                    "none",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "timeout"
+            assert payload["observation_complete"] is False
+            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["codex_review"]["lifecycle"]["completion_signal"] == "none"
+
+    def test_issue_176_s04_wait_post_once_trigger_timeout_writes_out_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            log_path = tmp_path / "wait.log"
+            out_dir = tmp_path / "out"
+            wait_script = self._issue_176_write_wait_s04_scripts(tmp_path, log_path)
+            trigger_script = tmp_path / "trigger_codex_review.sh"
+            trigger_script.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+printf 'trigger %s\\n' "$*" >> "$S04_WAIT_LOG"
+sleep 5
+""",
+                encoding="utf-8",
+            )
+            trigger_script.chmod(0o755)
+            env = {**os.environ, "S04_WAIT_LOG": str(log_path)}
+
+            result = subprocess.run(
+                [
+                    str(wait_script),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--timeout-seconds",
+                    "1",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "1",
+                    "--progress",
+                    "none",
+                    "--out",
+                    str(out_dir),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "trigger_timeout"
+            assert payload["observation_complete"] is False
+            assert payload["recommended_next_action"] == "human_gate"
+            assert "trigger_timeout" in [item["code"] for item in payload["limitations"]]
+            assert payload["artifacts"]["result_json"] == str(out_dir / "result.json")
+            assert (out_dir / "result.json").read_text(encoding="utf-8") == result.stdout
+            assert (out_dir / "latest.json").is_file()
+            assert (out_dir / "events.ndjson").is_file()
+            assert (out_dir / "latest_delta.json").is_file()
+            assert not (out_dir / "summary.md").exists()
+
     def test_issue_176_s04_wait_post_trigger_head_drift_preserves_trigger_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
@@ -13429,7 +13618,7 @@ JSON
     ;;
   "api repos/owner/repo/pulls/13/reviews --paginate")
     cat <<'JSON'
-[{"id":201,"user":{"login":"alice"},"state":"CHANGES_REQUESTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"must fix"}]
+[{"id":201,"user":{"login":"codex"},"state":"CHANGES_REQUESTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"must fix"}]
 JSON
     ;;
   "api repos/owner/repo/pulls/13/comments --paginate")
@@ -15571,6 +15760,19 @@ payload = {
         },
     },
     "trigger": {"source": "explicit", "comment_id": 99, "created_at": "2026-06-08T01:00:00Z"},
+    "codex_review": {
+        "lifecycle": {
+            "status": "commented",
+            "completion_signal": "submitted_pull_request_review",
+            "confidence": "high",
+            "selected_review_ids": [202],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "trigger_source": "explicit",
+        },
+        "selected_reviews": [],
+        "selected_review_comments": [],
+    },
     "artifacts": {},
 }
 print(json.dumps(payload, sort_keys=True, separators=(",", ":")))

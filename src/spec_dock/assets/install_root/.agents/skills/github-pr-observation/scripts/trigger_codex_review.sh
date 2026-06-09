@@ -95,9 +95,48 @@ def run_gh(args):
     return completed.returncode, completed.stdout, completed.stderr
 
 
+def parse_gh_paginated_stdout(text):
+    decoder = json.JSONDecoder()
+    index = 0
+    payloads = []
+    text = text or ""
+    while index < len(text):
+        while index < len(text) and text[index].isspace():
+            index += 1
+        if index >= len(text):
+            break
+        payload, index = decoder.raw_decode(text, index)
+        payloads.append(payload)
+    if not payloads:
+        return []
+    if len(payloads) == 1:
+        return payloads[0]
+    if all(isinstance(payload, list) for payload in payloads):
+        merged_list = []
+        for payload in payloads:
+            merged_list.extend(payload)
+        return merged_list
+    if all(isinstance(payload, dict) for payload in payloads):
+        merged = {}
+        for payload in payloads:
+            for key, value in payload.items():
+                if isinstance(value, list):
+                    merged.setdefault(key, [])
+                    if isinstance(merged[key], list):
+                        merged[key].extend(value)
+                    else:
+                        merged[key] = value
+                elif isinstance(value, int) and key == "total_count":
+                    merged[key] = int(merged.get(key, 0) or 0) + value
+                else:
+                    merged[key] = value
+        return merged
+    return payloads[-1]
+
+
 def load_json(text, fallback):
     try:
-        return json.loads(text or "")
+        return parse_gh_paginated_stdout(text)
     except Exception:
         return fallback
 
