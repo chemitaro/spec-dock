@@ -660,7 +660,7 @@ review_status: pass
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S05a | ready-to-commit | S05a target file + report S05a ledger | pending commit | pending | N/A | N/A | N/A | N/A |
+| S05a | committed | S05a target file + report S05a ledger | current S05a commit in git history | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | worker / reviewer | 実施内容 | 入力 | 出力 / 変更 | 検証 | 判定 | メモ |
@@ -672,7 +672,104 @@ review_status: pass
 - `spec-dock/.../iss-00176.../report.md` - S05a execution evidence。
 
 #### コミット
-- pending S05a commit
+- current S05a commit in git history: `docs(github-pr-observation): fixed trigger契約をスキル文書に反映`
+
+### セッションログ（2026-06-09 S05b）
+
+#### 対象
+- Step: S05b
+- AC/EC: provider-side asset / package constraints
+- 計画上の出典（Planned source）:
+  - `plan.md` S05b
+  - closure ids: cl-013
+
+#### 実施内容
+- `trigger_codex_review.sh` を install-root authoritative inventory と classification inventory に追加した。
+- package representative install-root artifact に `trigger_codex_review.sh` を追加し、source / wheel / sdist / installed package surface の package inventory regression に含めた。
+- `init` 後に helper が配置され実行権限を持つこと、削除後の `update` で復元され実行権限を持つことを確認する S05b 専用テストを追加した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s05b or issue_68_install_root_tree_exists or issue_68_authoritative_inventory_paths_are_classified"
+
+3 passed, 314 deselected
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "representative_install_root_assets_are_packaged"
+
+1 passed, 316 deselected
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_68_install_root_tree_exists tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_68_authoritative_inventory_paths_are_classified_under_install_root tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_176_s05b_codex_review_trigger_helper_is_installed_by_init_and_update tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_69_representative_install_root_assets_are_packaged_in_all_artifact_surfaces
+
+4 passed
+```
+
+```bash
+git diff --check -- tests/unit/infra/test_init_update.py
+
+pass
+```
+
+```bash
+codex exec -p code-reviewer -C /Users/iwasawayuuta/.codex/worktrees/3b01/spec-dock -o /private/tmp/iss-00176-s05b-code-review.txt "<S05b code-review prompt>"
+
+Findings: なし
+review_status: pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S05b | 赤フェーズ / 代替証跡（Red / alternative） | red-required | `trigger_codex_review.sh` は source に存在したが、authoritative / classification / representative package inventory に未登録だった。 | diff inspection / inventory inspection | pass | 追加した assertions は既存状態では inventory coverage を満たせない。 |
+| S05b | 緑フェーズ（Green） | focused package/install pytest selection | source inventory 3 passed、package representative 1 passed、reviewer exact selection 4 passed。 | pytest commands listed above | pass | source install-root、init/update installed layout、package surfaces を確認。 |
+| S05b | リファクタリング（Refactor） | guardrail satisfied | test diff は inventory registration と init/update helper placement assertion に限定した。 | `git diff --check` / code-reviewer | pass | script behavior / GitHub API contract は変更していない。 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S05b | direct init/update layout assertion が必要 | cl-013 execution | `test_issue_176_s05b_codex_review_trigger_helper_is_installed_by_init_and_update` を追加 | cl-013 | no | focused pytest / code-reviewer pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S05b | cl-013 | install/package tests cover new helper. | focused pytest 3 passed; package representative 1 passed; reviewer exact 4 passed; diff check pass; code-reviewer pass | pass | source / init-update / package surface を分担して固定。 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-013 / issue68 inventory tests | S05b | yes | red-required | helper script が authoritative / classification inventory に未登録 | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s05b or issue_68_install_root_tree_exists or issue_68_authoritative_inventory_paths_are_classified"` | pass | source install-root inventory を固定。 |
+| cl-013 / `test_issue_176_s05b_codex_review_trigger_helper_is_installed_by_init_and_update` | S05b | yes | red-required | init/update layout に helper file / executable permission を直接確認する test がなかった | same command as above | pass | init 後配置と update 復元を確認。 |
+| cl-013 / `test_issue_69_representative_install_root_assets_are_packaged_in_all_artifact_surfaces` | S05b | yes | red-required | package representative inventory に helper が未登録 | `uv run pytest tests/unit/infra/test_init_update.py -k "representative_install_root_assets_are_packaged"` | pass | source / wheel / sdist / installed surfaces を確認。 |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-013 | S05b | source inventory + init/update installed layout + package representative tests + code-reviewer | pass | `trigger_codex_review.sh` の shipped asset / install / package drift を固定。 |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S05b | step reviewer | code-reviewer | fresh | passed | N/A | proceed | findingsなし / `review_status: pass` (`/private/tmp/iss-00176-s05b-code-review.txt`) |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S05b | ready-to-commit | S05b target tests + report S05b ledger | pending commit | pending | N/A | N/A | N/A | N/A |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | worker / reviewer | 実施内容 | 入力 | 出力 / 変更 | 検証 | 判定 | メモ |
+|---|---|---|---|---|---|---|---|
+| S05b | code-reviewer | package/install regression coverage review | `requirement.md`, `design.md`, `plan.md`, current tests diff | findingsなし / `review_status: pass` | `/private/tmp/iss-00176-s05b-code-review.txt`; reviewer exact 4 tests passed | accepted | Review scope was `tests/unit/infra/test_init_update.py` only. |
+
+#### 変更したファイル
+- `tests/unit/infra/test_init_update.py` - `trigger_codex_review.sh` の authoritative inventory、package representative inventory、init/update installed layout regression。
+- `spec-dock/.../iss-00176.../report.md` - S05b execution evidence and S05a commit gate update。
+
+#### コミット
+- pending S05b commit
 
 ### セッションログ（2026-06-08 HH:MM - HH:MM）
 
