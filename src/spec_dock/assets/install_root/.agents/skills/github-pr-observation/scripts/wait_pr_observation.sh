@@ -371,7 +371,17 @@ def review_progress_counts(payload: dict) -> dict:
     summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
     threads = review.get("threads") if isinstance(review.get("threads"), dict) else {}
     signals = review.get("signals") if isinstance(review.get("signals"), list) else []
+    codex_review = payload.get("codex_review")
+    if not isinstance(codex_review, dict):
+        nested_codex_review = review.get("codex_review")
+        codex_review = nested_codex_review if isinstance(nested_codex_review, dict) else {}
+    selected_review_comments = codex_review.get("selected_review_comments")
+    selected_reviews = codex_review.get("selected_reviews")
     comments = len(review_progress_signal_items(payload)) if signals else 0
+    if isinstance(selected_review_comments, list):
+        comments = max(comments, len(selected_review_comments))
+    if isinstance(selected_reviews, list):
+        comments = max(comments, len(selected_reviews))
     review_requests = review.get("review_requests")
     requested = len(review_requests) if isinstance(review_requests, list) else 0
     return {
@@ -384,9 +394,24 @@ def review_progress_counts(payload: dict) -> dict:
     }
 
 
+def codex_review_payload(payload: dict) -> dict:
+    codex_review = payload.get("codex_review")
+    if isinstance(codex_review, dict):
+        return codex_review
+    review = payload.get("review") if isinstance(payload.get("review"), dict) else {}
+    nested_codex_review = review.get("codex_review")
+    return nested_codex_review if isinstance(nested_codex_review, dict) else {}
+
+
+def codex_review_lifecycle(payload: dict) -> dict:
+    lifecycle = codex_review_payload(payload).get("lifecycle")
+    return lifecycle if isinstance(lifecycle, dict) else {}
+
+
 def semantic_fingerprint(payload: dict) -> str:
     ci_progress = ci_progress_counts(payload)
     review_progress = review_progress_counts(payload)
+    lifecycle = codex_review_lifecycle(payload)
     source = {
         "repo": payload.get("repo"),
         "pr": payload.get("pr"),
@@ -419,6 +444,16 @@ def semantic_fingerprint(payload: dict) -> str:
             if isinstance(payload.get("review"), dict)
             else None,
             "progress": review_progress,
+        },
+        "codex_review": {
+            "lifecycle": {
+                "status": lifecycle.get("status"),
+                "completion_signal": lifecycle.get("completion_signal"),
+                "selected_review_ids": lifecycle.get("selected_review_ids"),
+                "selected_review_comment_ids": lifecycle.get("selected_review_comment_ids"),
+                "selected_review_thread_ids": lifecycle.get("selected_review_thread_ids"),
+            },
+            "collection_summary": codex_review_payload(payload).get("collection_summary"),
         },
         "trigger": payload.get("trigger"),
     }
@@ -705,6 +740,9 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
     review = payload.get("review") if isinstance(payload.get("review"), dict) else {}
     ci_status = ci.get("status") or payload.get("summary", {}).get("ci") or "unknown"
     review_status = review.get("status") or payload.get("summary", {}).get("review") or "unknown"
+    lifecycle = codex_review_lifecycle(payload)
+    lifecycle_status = lifecycle.get("status")
+    completion_signal = lifecycle.get("completion_signal")
     top_level_status = payload.get("normalized_status")
     top_level_next_action = payload.get("recommended_next_action")
 
@@ -731,11 +769,72 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
         return "unknown", "unknown", "human_gate", False, True
     if ci_status != "passed":
         return "unknown", "unknown", "human_gate", False, True
-    if review_status in {"none", "approved"}:
-        return "passed", "passed", "merge_prepared", True, False
+    if completion_signal == "fallback_issue_comment":
+        return "human_gate", "human_gate", "wait_or_rerun", False, True
+    if review_status in {"none", "pending"} and lifecycle_status in {"pending", "unknown"}:
+        return "pending", "pending", "wait", False, False
+    if review_status in {"none", "pending"} and lifecycle_status == "none" and completion_signal == "none":
+        return "pending", "pending", "wait", False, False
     if review_status in {"requested", "commented", "changes_requested", "unresolved"}:
         return "human_gate", "human_gate", "address_review_feedback", True, False
+    if review_status == "approved":
+        return "passed", "passed", "merge_prepared", True, False
+    if review_status == "none":
+        return "passed", "passed", "merge_prepared", True, False
     return "unknown", "unknown", "human_gate", False, True
+
+
+def resume_command_hint(payload: dict) -> str | None:
+    trigger = payload.get("trigger") if isinstance(payload.get("trigger"), dict) else {}
+    comment_id = (
+        trigger.get("comment_id")
+        or globals().get("trigger_comment_id")
+        or os.environ.get("OBS_TRIGGER_COMMENT_ID")
+    )
+    created_at = (
+        trigger.get("created_at")
+        or globals().get("trigger_created_at")
+        or os.environ.get("OBS_TRIGGER_CREATED_AT")
+    )
+    if not comment_id or not created_at:
+        return None
+    return (
+        "./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        f" --repo {os.environ['OBS_REPO']}"
+        f" --pr {os.environ['OBS_PR']}"
+        f" --head-sha {os.environ['OBS_HEAD_SHA']}"
+        " --trigger-mode resume"
+        f" --trigger-comment-id {comment_id}"
+        f" --trigger-created-at {created_at}"
+    )
+
+
+def attach_resume_metadata(payload: dict) -> None:
+    trigger = payload.get("trigger") if isinstance(payload.get("trigger"), dict) else {}
+    comment_id = (
+        trigger.get("comment_id")
+        or globals().get("trigger_comment_id")
+        or os.environ.get("OBS_TRIGGER_COMMENT_ID")
+        or None
+    )
+    created_at = (
+        trigger.get("created_at")
+        or globals().get("trigger_created_at")
+        or os.environ.get("OBS_TRIGGER_CREATED_AT")
+        or None
+    )
+    command_hint = resume_command_hint(payload)
+    comment_id_value = int(comment_id) if isinstance(comment_id, str) and comment_id.isdigit() else comment_id
+    payload["resume"] = {
+        "available": bool(command_hint) and bool(comment_id) and bool(created_at),
+        "trigger_mode": "resume",
+        "trigger_comment_id": comment_id_value,
+        "trigger_created_at": created_at,
+        "repo": os.environ["OBS_REPO"],
+        "pr": int(os.environ["OBS_PR"]),
+        "head_sha": os.environ["OBS_HEAD_SHA"],
+        "command_hint": command_hint,
+    }
 
 
 def progress_line(
@@ -851,6 +950,7 @@ def mark_latest_timeout(
     payload.setdefault("wait", {})["deadline_reached"] = True
     payload["wait"]["quiet_seconds_observed"] = quiet_elapsed
     payload["wait"]["same_fingerprint_observed"] = same_count
+    attach_resume_metadata(payload)
 
 
 snapshot_script = os.environ["OBS_SNAPSHOT_SCRIPT"]
@@ -965,6 +1065,7 @@ while True:
         snapshot_text = latest_snapshot_text
     elif snapshot_poll_timed_out:
         payload = timeout_snapshot(snapshot_timeout, snapshot_stdout, snapshot_stderr)
+        attach_resume_metadata(payload)
         snapshot_text = json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n"
     else:
         snapshot_text = snapshot_stdout if snapshot_stdout else "{}\n"
