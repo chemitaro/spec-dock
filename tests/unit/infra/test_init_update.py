@@ -1147,6 +1147,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00151-codex-agent-gpt55-low-reasoning/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00170-harden-pr-monitor-stable-observation/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00174-refine-pr-observation-two-stage-progress-output/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00176-github-pr-observation-codex-review-trigger-and-completion/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json",
@@ -1264,6 +1265,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00151-codex-agent-gpt55-low-reasoning/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00170-harden-pr-monitor-stable-observation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00174-refine-pr-observation-two-stage-progress-output/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00176-github-pr-observation-codex-review-trigger-and-completion/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json": [],
@@ -11956,7 +11958,7 @@ elif args[:2] == ["api", "repos/owner/repo/pulls/13/reviews"]:
     if review == "approved":
         emit([{
             "id": 201,
-            "user": {"login": "alice"},
+            "user": {"login": current.get("review_author", "codex")},
             "state": "APPROVED",
             "commit_id": head,
             "submitted_at": "2026-06-08T01:05:00Z",
@@ -11965,7 +11967,7 @@ elif args[:2] == ["api", "repos/owner/repo/pulls/13/reviews"]:
     elif review == "commented":
         emit([{
             "id": 202,
-            "user": {"login": "alice"},
+            "user": {"login": current.get("review_author", "codex")},
             "state": "COMMENTED",
             "commit_id": head,
             "submitted_at": "2026-06-08T01:06:00Z",
@@ -11974,7 +11976,7 @@ elif args[:2] == ["api", "repos/owner/repo/pulls/13/reviews"]:
     elif review == "changes_requested":
         emit([{
             "id": 203,
-            "user": {"login": "alice"},
+            "user": {"login": current.get("review_author", "codex")},
             "state": "CHANGES_REQUESTED",
             "commit_id": head,
             "submitted_at": "2026-06-08T01:06:00Z",
@@ -13005,7 +13007,7 @@ PY
                     assert result.returncode == 0, result.stdout + result.stderr
                     payload = json.loads(result.stdout)
                     assert payload["normalized_status"] == "timeout"
-                    assert payload["recommended_next_action"] == "wait_or_rerun"
+                    assert payload["recommended_next_action"] == "wait_or_resume"
                     assert payload["resume"]["available"] is True
                     assert payload["resume"]["trigger_comment_id"] == 777
                     assert payload["resume"]["trigger_created_at"] == "2026-06-09T02:03:04Z"
@@ -13069,7 +13071,7 @@ PY
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
             assert payload["normalized_status"] == "human_gate"
-            assert payload["recommended_next_action"] == "wait_or_rerun"
+            assert payload["recommended_next_action"] == "wait_or_resume"
             assert payload["observation_complete"] is False
             assert payload["codex_review"]["lifecycle"]["completion_signal"] == "fallback_issue_comment"
 
@@ -13131,7 +13133,7 @@ sleep 5
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
             assert payload["normalized_status"] == "timeout"
-            assert payload["recommended_next_action"] == "wait_or_rerun"
+            assert payload["recommended_next_action"] == "wait_or_resume"
             assert payload["resume"]["available"] is True
             assert payload["resume"]["trigger_comment_id"] == 456
             assert payload["resume"]["trigger_created_at"] == "2026-06-09T01:02:03Z"
@@ -13140,6 +13142,64 @@ sleep 5
             log_lines = log_path.read_text(encoding="utf-8").splitlines()
             assert log_lines[0].startswith("trigger ")
             assert log_lines[1].startswith("snapshot ")
+
+    def test_issue_176_s04_wait_human_approval_does_not_complete_without_codex_review(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            log_path = tmp_path / "wait.log"
+            wait_script = self._issue_176_write_wait_s04_scripts(tmp_path, log_path)
+            env = {
+                **os.environ,
+                "S04_WAIT_LOG": str(log_path),
+                "S04_WAIT_PAYLOAD": json.dumps(
+                    self._issue_176_s04_wait_payload(
+                        ci_status="passed",
+                        review_status="approved",
+                        lifecycle_status="none",
+                        completion_signal="none",
+                    )
+                ),
+            }
+
+            result = subprocess.run(
+                [
+                    str(wait_script),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "777",
+                    "--trigger-created-at",
+                    "2026-06-09T02:03:04Z",
+                    "--timeout-seconds",
+                    "2",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "1",
+                    "--progress",
+                    "none",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "timeout"
+            assert payload["observation_complete"] is False
+            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["resume"]["available"] is True
+            assert payload["codex_review"]["lifecycle"]["completion_signal"] == "none"
 
     def test_issue_176_s04_wait_post_trigger_head_drift_preserves_trigger_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -13279,7 +13339,7 @@ JSON
     ;;
   "api repos/owner/repo/pulls/13/reviews --paginate")
     cat <<'JSON'
-[{"id":201,"user":{"login":"alice"},"state":"APPROVED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"looks good"}]
+[{"id":201,"user":{"login":"codex"},"state":"APPROVED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"looks good"}]
 JSON
     ;;
   "api repos/owner/repo/pulls/13/comments --paginate")
@@ -13525,6 +13585,22 @@ esac
             assert closed_payload["recommended_next_action"] == "reopen_or_use_open_pr"
             assert closed_payload["observation_complete"] is False
 
+            open_result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert open_result.returncode == 0, open_result.stdout + open_result.stderr
+            open_payload = json.loads(open_result.stdout)
+            assert open_payload["summary"]["ci"] == "passed"
+            assert open_payload["summary"]["review"] == "approved"
+            assert open_payload["normalized_status"] == "pending"
+            assert open_payload["recommended_next_action"] == "wait"
+            assert open_payload["observation_complete"] is False
+            assert open_payload["codex_review"]["lifecycle"]["completion_signal"] == "none"
+
     def test_issue_170_pr_observation_wait_preserves_latest_payload_on_late_poll_timeout(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -13600,7 +13676,7 @@ esac
             assert payload["ci"]["status"] == "passed"
             assert payload["review"]["status"] == "approved"
             assert "snapshot_poll_timeout" in [item["code"] for item in payload["limitations"]]
-            assert payload["recommended_next_action"] == "wait_or_rerun"
+            assert payload["recommended_next_action"] == "wait_or_resume"
             latest_payload = json.loads((out_dir / "latest.json").read_text(encoding="utf-8"))
             assert latest_payload["summary"]["ci"] == "passed"
             assert latest_payload["summary"]["review"] == "approved"
@@ -13993,7 +14069,7 @@ esac
             assert "phase=wait ci=pending" in result.stderr
             payload = json.loads(result.stdout)
             assert payload["normalized_status"] == "timeout"
-            assert payload["recommended_next_action"] == "wait_or_rerun"
+            assert payload["recommended_next_action"] == "wait_or_resume"
             assert "required_checks_missing_or_pending" in [
                 item["code"] for item in payload["limitations"]
             ]
@@ -14135,6 +14211,21 @@ check_runs = current.get("check_runs", {
 })
 signals = current.get("signals", [])
 threads = current.get("threads", {"total": 0, "unresolved": 0, "items": []})
+codex_review = current.get("codex_review")
+if codex_review is None and review_status in {"approved", "commented", "changes_requested", "unresolved"}:
+    codex_review = {
+        "lifecycle": {
+            "status": "completed",
+            "completion_signal": "submitted_pull_request_review",
+            "confidence": "high",
+            "selected_review_ids": [201],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+        },
+        "selected_reviews": [],
+        "selected_review_comments": [],
+        "collection_summary": {},
+    }
 payload = {
     "script": "fetch_pr_observation_snapshot.sh",
     "status": current.get("status", ci_status),
@@ -14163,7 +14254,9 @@ payload = {
         "summary": current.get("review_summary", {"all": {"total": len(signals)}}),
         "threads": threads,
         "body_mode": {"mode": "trigger-window-truncated"},
+        "codex_review": codex_review,
     },
+    "codex_review": codex_review or {},
     "trigger": current.get("trigger", {
         "source": "explicit",
         "comment_id": 99,
@@ -15197,7 +15290,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert payload["observation_complete"] is False
             assert payload["wait"]["deadline_reached"] is True
             assert payload["wait"]["polls"] == 1
-            assert payload["recommended_next_action"] == "wait_or_rerun"
+            assert payload["recommended_next_action"] == "wait_or_resume"
             assert payload["resume"]["available"] is True
             assert payload["resume"]["trigger_comment_id"] == 99
             assert "--trigger-mode resume" in payload["resume"]["command_hint"]
@@ -15295,7 +15388,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert payload["normalized_status"] == "timeout"
             assert payload["overall_status"] == "timeout"
             assert payload["observation_complete"] is False
-            assert payload["recommended_next_action"] == "wait_or_rerun"
+            assert payload["recommended_next_action"] == "wait_or_resume"
             assert payload["wait"]["same_fingerprint_observed"] >= 2
             assert payload["wait"]["quiet_seconds_observed"] < 10
             assert (out_dir / "result.json").read_text(encoding="utf-8") == result.stdout

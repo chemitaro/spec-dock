@@ -99,7 +99,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | `wait_pr_observation.sh` default `post-once`、fixed `trigger_codex_review.sh`、submitted PR review primary completion、selected review body stdout JSON を S01-S04 で実装・検証した | provider/mirror skill docs、package/install regression、S90 docs impact、dogfooding `.meta.json` snapshot 更新を S05a/S05b/S90/S99 で追随した | 低: docs/package 追随は副次要件だが、S90/S99 で主目的の script contract を補強する範囲に限定した | pass: final QA/code/spec reviewer r2 completed after S99/report and completion-gating fixes |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -155,7 +155,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- `github-pr-observation` の通常待機を default `post-once` trigger に変更し、固定 `@codex review` comment と trigger metadata を今回 run の observation boundary として扱うようにした。
+- `resume` mode、selected review body の stdout JSON 出力、Codex submitted PR review completion に基づく完了判定を追加し、timeout / fallback / stale head / human gate の next action を明示した。
+- provider install-root と dogfooding mirror の script / skill docs / regression tests / package snapshot を同期し、PR monitor 廃止後の deterministic PR observation workflow として閉じた。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -504,7 +506,7 @@ git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-o
 - `wait_pr_observation.sh` が S03 の `codex_review.lifecycle` を final classification と stability fingerprint に含めるようにした。
 - CI は `failed` を独立して `fix_ci` に分類し、Codex review が完了済みでも merge-ready にはしないよう固定した。
 - CI が `passed` でも `review.status=none|pending` かつ Codex review lifecycle が `pending` / `unknown` / `none` の場合は `passed` にせず、待機継続または timeout にするよう固定した。
-- fallback issue comment は actionable review feedback とみなさず、submitted PR review を待つための `wait_or_rerun` に分類するよう固定した。
+- fallback issue comment は actionable review feedback とみなさず、submitted PR review を待つための `wait_or_resume` に分類するよう固定した。
 - 既存互換として、明示的な `review.status=approved` は merge-prepared、`commented` / `changes_requested` / `unresolved` は review feedback の human gate として終端扱いを維持した。
 - timeout / limit 時に `resume` metadata と `--trigger-mode resume` の `command_hint` を final stdout JSON に含めるようにした。
 - progress / stability の review comment count と semantic fingerprint が `codex_review.selected_reviews` / `selected_review_comments` も見るようにし、Codex review 本文・コメント選択の変化で quiet / stable がリセットされるようにした。
@@ -566,7 +568,7 @@ pass
 |---|---|---|---|---|---|---|---|
 | cl-009 / `test_issue_176_s04_wait_ci_failed_with_completed_codex_review_is_not_merge_ready` | S04 | yes | red-required | `codex_review.lifecycle` を分類に使わず mixed state を区別できない既存状態 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s04` | pass | CI failed + review completed は `failed` / `fix_ci`。 |
 | cl-009, cl-012 / `test_issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint` | S04 | yes | red-required | CI passed + review none を Codex review pending でも passed にできる既存状態 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s04` | pass | pending lifecycle は timeout まで wait し、resume metadata / command hint を返す。 |
-| cl-009 / `test_issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback` | S04 | yes | red-required | fallback issue comment が generic `commented` branch で actionable feedback と誤分類され得る状態 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s04` | pass | fallback completion signal は `wait_or_rerun`。 |
+| cl-009 / `test_issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback` | S04 | yes | red-required | fallback issue comment が generic `commented` branch で actionable feedback と誤分類され得る状態 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s04` | pass | fallback completion signal は `wait_or_resume`。 |
 | cl-012 / `test_issue_176_s04_wait_post_once_first_poll_timeout_keeps_resume_hint` | S04 | yes | red-required | post-once trigger metadata が first-poll timeout resume に伝播しない状態 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s04` | pass | helper が得た comment id / created_at を timeout resume hint に保持する。 |
 | cl-010 / `test_issue_176_s04_wait_post_trigger_head_drift_preserves_trigger_metadata` | S04 | yes | red-required | post-trigger head drift 時の trigger metadata 保持を S04 固有で未固定 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s04` | pass | default post-once 後の stale_head が trigger comment id / created_at を保持する。 |
 | cl-011 / existing `--out` assertions in S04 timeout test | S04 | yes | red-required | `summary.md` 復活や stdout/result split の regression を S04 timeout path で未固定 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s04` | pass | `result.json` equals stdout、`summary.md` absent。 |
@@ -771,116 +773,6 @@ review_status: pass
 #### コミット
 - current S05b commit in git history: `test(github-pr-observation): trigger helperの配送保証を追加`
 
-### セッションログ（2026-06-08 HH:MM - HH:MM）
-
-#### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
-
-#### 実施内容
-- ...
-
-#### 実行コマンド / 結果
-```bash
-<command>
-
-<result>
-```
-
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
-
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
-
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
-
-#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
-`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
-
-| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
-|---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00176 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
-
-#### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
-
-| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
-
-#### 委任 worker 証跡（Delegated Worker Evidence）
-| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
-|---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
-
-#### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
-
-#### レビューゲート状態（Reviewer Gate Status）
-| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
-
-#### ステップ commit ゲート（Step Commit Gate）
-| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
-
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
-
-#### コミット
-- <hash> <message>
-
-#### メモ
-- ...
-
----
-
-### セッションログ（2026-06-08 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
-
----
-
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
@@ -890,35 +782,44 @@ review_status: pass
 | `github-pr-merge-preparer` provider and mirror skill docs | yes | orchestrator | first observation は default `post-once`、timeout/limit continuation は explicit `--trigger-mode resume` と記述。frontmatter description から stale `read-only monitoring` を除去。provider/mirror `cmp` -> match。 | pass: initial S90 spec-reviewer failed P2; r2 findingsなし / `review_status: pass` (`/private/tmp/iss-00176-s90-spec-review-r2.txt`) |
 | docs / templates / README / workflow / migration notes outside impacted skill surfaces | no | N/A | stale wording search for read-only-only / manual-trigger-era phrases returned no matches after S90 fixes. No broader workflow/template/README contract change was identified beyond the updated skill docs and dogfooding mirror. | pass: r2 findingsなし / `review_status: pass` (`/private/tmp/iss-00176-s90-spec-review-r2.txt`) |
 
+### 最終クロージャ網羅（Final Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-015 | S90 | S90 docs impact table, provider/mirror `cmp`, stale wording search, S90 spec-reviewer r2 pass | pass | impacted skill docs and dogfooding mirror were updated; broader docs/templates/README/workflow had no additional contract change. |
+| cl-016 | S99 | final validation commands, QA/code/spec r1 findings, follow-up fixes, focused `issue_176` tests, failing-selection rerun, final QA/code/spec r2 pass | pass | final reviewers passed after S99 follow-up; final commit ledger is ready for commit. |
+
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer r1 | whole issue obligation coverage | add one regression and align action enum | `/private/tmp/iss-00176-s99-qa-review.txt`; P1 S99 report/tree not closed; P2 timeout next action drift (`wait_or_resume` vs `wait_or_rerun`) | failed; follow-up applied |
+| qa-reviewer r2 | whole issue obligation coverage after follow-up | pass; no blocking AC/EC findings | `/private/tmp/iss-00176-s99-qa-review-r2.txt`; fixed `wait_or_resume` action, added human-approval-without-Codex-review regression, removed report placeholders, updated dogfooding `.meta.json` snapshot; `uv run pytest tests/unit/infra/test_init_update.py -k issue_176` -> 21 passed; failing 12-test selection -> 12 passed; full `uv run pytest tests/unit/infra/test_init_update.py` -> 318 passed; `./spec-dock/scripts/spec-dock validate` -> ok nodes=90; `git diff --check` -> pass; final low optional placeholder finding resolved in this report update | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer r1 | issue-wide integrated diff | High: human approval alone could become `merge_prepared`; fixed by requiring `completion_signal=submitted_pull_request_review` only for success while preserving review-feedback human gate. Low: diff-check concern was rechecked and `git diff --check` passed. | 0 | failed; follow-up applied |
+| code-reviewer r2 | issue-wide integrated diff after follow-up | `/private/tmp/iss-00176-s99-code-review-r2.txt`; findingsなし; verified human approval alone no longer becomes success, Codex review feedback remains human gate, provider/mirror parity and fixed trigger boundary remain intact | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer r1 | requirement / design / plan / report / implementation / tests / docs alignment | P1/P2: S99 final gate, cl-015/cl-016 closure, clean-tree evidence, and unfilled scaffold rows were missing. Fixed by labeling cl-015/S90, replacing final-gate placeholders, filling OAL, and removing unused session-log scaffold block. | 0 | failed; follow-up applied |
+| spec-reviewer r2 | requirement / design / plan / report / implementation / tests / docs alignment after follow-up | `/private/tmp/iss-00176-s99-spec-review-r2.txt`; findingsなし; requirement/design/plan/report, implementation, tests, docs, closure `cl-001`..`cl-016`, retired workflow boundaries, and provider/mirror parity aligned | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S99 report ledger records r1 findings, follow-up fixes, and final QA/code/spec r2 pass evidence | S99 follow-up fixes in scripts, tests, mirror scripts, dogfooding snapshot, and report | final response / PR / issue comment as applicable | ready for final commit |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: final QA/code/spec reviewer r1 で S99 report 未記入、timeout next action enum drift、human approval only の premature success、cl-015/cl-016 closure 未記録が見つかった。
+  - 解決: `wait_or_resume` に統一し、Codex submitted review completion がない approval は success にしない一方で review feedback は human gate のまま維持した。focused regression を追加し、S99 report の placeholder を実証台帳へ置き換えた。
 
 ## 学んだこと (任意)
-- ...
+- success 判定だけを Codex submitted review completion に依存させ、review feedback の human gate 判定とは分ける必要がある。
 
 ## 今後の推奨事項 (任意)
-- ...
+- live PR で `post-once` から timeout した場合は、final stdout JSON の `resume.command_hint` に従い explicit `resume` で同じ trigger boundary を継続観測する。
 
 ## 省略/例外メモ (必須)
 - 該当なし
