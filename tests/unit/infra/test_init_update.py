@@ -749,6 +749,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/git-commit-conventional-ja/agents/openai.yaml",
         ".agents/skills/git-commit-conventional-ja/references/conventional-commits-v1.0.0.md",
         ".agents/skills/github-pr-observation/SKILL.md",
+        ".agents/skills/github-pr-observation/scripts/trigger_codex_review.sh",
         ".agents/skills/github-pr-observation/scripts/wait_pr_observation.sh",
         ".agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh",
         ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh",
@@ -808,6 +809,7 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/git-commit-conventional-ja/agents/openai.yaml",
             ".agents/skills/git-commit-conventional-ja/references/conventional-commits-v1.0.0.md",
             ".agents/skills/github-pr-observation/SKILL.md",
+            ".agents/skills/github-pr-observation/scripts/trigger_codex_review.sh",
             ".agents/skills/github-pr-observation/scripts/wait_pr_observation.sh",
             ".agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh",
             ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh",
@@ -988,6 +990,7 @@ class TestInitUpdate(CliRuntimeHarness):
     }
     _ISSUE_69_REPRESENTATIVE_ARTIFACT_RELATIVE_PATHS = (
         "spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md",
+        "spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/trigger_codex_review.sh",
         "spec_dock/assets/install_root/.agents/skills/spec-dock-codex-adapter/SKILL.md",
         "spec_dock/assets/install_root/.agents/skills/spec-dock-copilot-adapter/SKILL.md",
         "spec_dock/assets/install_root/.agents/host-adapters/meta.json",
@@ -9316,6 +9319,32 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert classified_paths == \
             set(self._ISSUE_68_AUTHORITATIVE_RELATIVE_PATHS), \
             "issue-68 authoritative inventory should be fully classified under install_root"
+
+    def test_issue_176_s05b_codex_review_trigger_helper_is_installed_by_init_and_update(self) -> None:
+        relative_path = Path(
+            ".agents/skills/github-pr-observation/scripts/trigger_codex_review.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+
+            assert main(["init", str(target)]) == 0
+
+            installed_helper = target / relative_path
+            assert installed_helper.is_file(), \
+                f"missing Codex review trigger helper after init: {relative_path}"
+            assert os.access(installed_helper, os.X_OK), \
+                f"Codex review trigger helper is not executable after init: {relative_path}"
+
+            installed_helper.unlink()
+            assert not installed_helper.exists()
+
+            assert main(["update", str(target)]) == 0
+
+            assert installed_helper.is_file(), \
+                f"missing Codex review trigger helper after update: {relative_path}"
+            assert os.access(installed_helper, os.X_OK), \
+                f"Codex review trigger helper is not executable after update: {relative_path}"
 
     def test_issue_68_workflow_seed_matches_repo_root_ci_workflow(self) -> None:
         install_root_workflow = self._ISSUE_68_INSTALL_ROOT / ".github/workflows/ci.yml"
