@@ -159,6 +159,110 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装記録（セッションログ） (必須)
 
+### セッションログ（2026-06-09 S01 fixed trigger write helper）
+
+#### 対象
+- Step: S01
+- AC/EC: AC-001, AC-002, AC-006, AC-007, EC-001, EC-005
+- 計画上の出典（Planned source）:
+  - `plan.md` `実装ステップ S01 — fixed trigger write helper`
+  - closure ids: cl-001, cl-002, cl-003
+
+#### 実施内容
+- `trigger_codex_review.sh` を追加し、`--repo` / `--pr` / `--head-sha` だけを受け付ける固定 write helper とした。
+- PR head が一致する場合だけ `POST repos/{owner}/{repo}/issues/{pr}/comments` に固定本文 `@codex review` を投稿し、comment metadata JSON を返す。
+- pre-trigger stale、post-trigger stale、POST failure、before snapshot untrusted、multiple exact candidates、exact-one recovery を fake `gh` で固定した。
+- code-reviewer r1 で `gh api --field` の `@` file magic と recovery trust gap を検出し、`--raw-field` と trusted before/after snapshot 条件へ修正した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s01
+# 8 passed, 297 deselected
+
+git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/trigger_codex_review.sh tests/unit/infra/test_init_update.py
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | helper script 不在から S01 fake `gh` tests を追加する計画。dev-coder 実装では red 実行ログは未分離だが、code-reviewer r1 が実 gh `--field` 問題と recovery trust gap を検出し、追加 failing scenario を確定した。 | reviewer finding / review-driven characterization | pass | r1 findings を red 相当の追加 characterization として扱った。 |
+| S01 | 緑フェーズ（Green） | focused fake `gh` pytest | `issue_176_s01` 8 tests passed | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s01` | pass | fixed POST, invalid input no-gh, pre/post stale, fail-closed, untrusted before snapshot, multiple candidates, exact-one recovery. |
+| S01 | リファクタリング（Refactor） | no non-fixed write surface | helper は `--raw-field body=@codex review` の固定 POST と read-only `gh pr view` / issue comments snapshot に限定。 | `git diff --check` / code-reviewer r2 | pass | 汎用 GitHub write helper 化はしていない。 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S01 | `gh api --field body=@codex review` は `@` を file magic として扱うリスク | code-reviewer r1 | `--raw-field` に変更し fake `gh` expectation も更新 | cl-001 | no | `test_issue_176_s01_trigger_helper_posts_fixed_review_comment_once` |
+| S01 | before snapshot が信頼不能でも exact-one recovery してしまうリスク | code-reviewer r1 | before/after snapshot trust check を追加し、before untrusted では recovery unavailable にした | cl-003 | no | `test_issue_176_s01_trigger_helper_does_not_recover_without_trusted_before_snapshot` |
+| S01 | multiple exact candidates と post-trigger head drift の検出不足 | code-reviewer r1 | negative tests を追加 | cl-003 / cl-002 | no | `test_issue_176_s01_trigger_helper_rejects_multiple_new_exact_comments`, `test_issue_176_s01_trigger_helper_fails_when_head_changes_after_post` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S01 | cl-001, cl-002, cl-003 | S01 tests pass; helper has executable permission; no non-fixed write surface is exposed | focused pytest 8 passed; `ls -l` で executable permission 確認; code-reviewer r2 passed | pass | install/package inclusion は S05b 範囲。 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-001 / tc-s01-001 | S01 | yes | red-required | helper 不在 / r1 finding | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s01` | pass | one fixed POST with `--raw-field body=@codex review`. |
+| cl-002 / tc-s01-002 | S01 | yes | red-required | helper 不在 | same | pass | pre-trigger stale no POST; post-trigger stale non-success. |
+| cl-003 / tc-s01-003 | S01 | yes | red-required | helper 不在 / r1 finding | same | pass | POST failure no blind retry; zero/multiple/untrusted fail closed. |
+| cl-003 / tc-s01-004 | S01 | yes | red-required | helper 不在 | same | pass | before/after trusted exact-one recovery only. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-001 | S01 | fake `gh` call log asserts one POST to `repos/owner/repo/issues/13/comments` with fixed body via `--raw-field` | pass | caller-provided body/endpoint/raw args are rejected before `gh`. |
+| cl-002 | S01 | pre-trigger stale no POST; post-trigger stale non-success | pass | trigger metadata is retained on post-trigger stale. |
+| cl-003 | S01 | POST failure no blind retry; exact-one recovery only; untrusted/multiple fail closed | pass | recovery depends on trusted before/after snapshots. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | cl-003 | before snapshot untrusted / multiple exact comments | cl-003 | code-reviewer r1 により fail-closed の技術的穴を検出 | no | yes, r2 passed |
+| added | cl-002 | post-trigger head drift | cl-002 | S01 helper の post-head check を固定するため | no | yes, r2 passed |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/3b01/spec-dock` | iss-00176 | current session | dev-coder, code-reviewer | same repo, active issue, named role; S01 allowed files only | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated, then approved-local-execution for review fixes | fixed write boundary and tests | dev-coder / parent local fix after capacity failure | S01 helper and tests | `requirement.md`, `design.md`, `plan.md` | `trigger_codex_review.sh`, S01 tests | wait orchestration, collectors, skill docs, GitHub state | focused pytest and diff check | non-fixed write surface required | worker JSON / reviewer JSON / verification | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S01 | dev-coder | fixed trigger write helper と 5 tests を追加 | `trigger_codex_review.sh`, `tests/unit/infra/test_init_update.py` | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s01` -> 5 passed; `git diff --check` -> pass | r1 failed | live GitHub behavior not exercised; S05b package inclusion outside S01 | accepted with required fixes |
+| S01 | parent local fix | reviewer findings に基づき `--raw-field`、trusted snapshot recovery、追加 negative tests を実装 | same | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s01` -> 8 passed; `git diff --check` -> pass | r2 passed | live GitHub pagination/API shape outside fake fixture | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S01 | dev-coder fix delegation failed because selected model was at capacity | workflow-scoped local fix within same S01 boundary | `trigger_codex_review.sh`, `tests/unit/infra/test_init_update.py` | code-reviewer findings only | inspect diff and restore S01 files if reviewer failed | focused pytest 8 passed; diff check pass | code-reviewer r2 passed | unavailable handled by local bounded fix and fresh reviewer gate |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S01 | step reviewer r1 | code-reviewer | fresh | failed | no | blocked until fixes | `/private/tmp/iss-00176-s01-code-review.json`; high findings on `--field` and recovery trust. |
+| S01 | step reviewer r2 | code-reviewer | fresh | passed | no | proceed | `/private/tmp/iss-00176-s01-code-review-r2.json`; findings 0, confidence high. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S01 | committed | S01 target files + report S01 ledger | current S01 commit in git history | `git status --short` -> clean for S01 scope after amend | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/trigger_codex_review.sh` - fixed `@codex review` trigger write helper.
+- `tests/unit/infra/test_init_update.py` - S01 fake `gh` tests.
+- `spec-dock/.../iss-00176.../report.md` - S01 execution evidence.
+
+#### コミット
+- current S01 commit in git history: `feat(github-pr-observation): Codexレビュー起動ヘルパーを追加`
+
 ### セッションログ（2026-06-08 HH:MM - HH:MM）
 
 #### 対象
