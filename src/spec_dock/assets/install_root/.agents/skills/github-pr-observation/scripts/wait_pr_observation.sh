@@ -626,7 +626,16 @@ def trigger_failure_result(trigger_payload: dict, trigger_stdout: str, trigger_s
     normalized_status = trigger_payload.get("overall_status") or trigger_payload.get("status") or "unknown"
     if normalized_status == "trigger_posted":
         normalized_status = "unknown"
-    next_action = "rerun_for_current_head" if normalized_status == "stale_head" else "human_gate"
+    if normalized_status == "stale_head":
+        next_action = "rerun_for_current_head"
+    elif normalized_status == "draft_pr":
+        normalized_status = "human_gate"
+        next_action = "mark_pr_ready_for_review"
+    elif normalized_status == "non_open_pr":
+        normalized_status = "human_gate"
+        next_action = "reopen_or_use_open_pr"
+    else:
+        next_action = "human_gate"
     return {
         **trigger_payload,
         "script": "wait_pr_observation.sh",
@@ -684,17 +693,11 @@ def run_trigger(
     head_sha: str,
     timeout_seconds: float,
 ) -> dict:
-    try:
-        completed = subprocess.run(
-            [trigger_script, "--repo", repo, "--pr", pr, "--head-sha", head_sha],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=max(0.1, timeout_seconds),
-        )
-    except subprocess.TimeoutExpired as exc:
-        stdout_text = exc.stdout if isinstance(exc.stdout, str) else (exc.stdout or b"").decode(errors="replace")
-        stderr_text = exc.stderr if isinstance(exc.stderr, str) else (exc.stderr or b"").decode(errors="replace")
+    exit_code, stdout_text, stderr_text, timed_out = run_snapshot(
+        [trigger_script, "--repo", repo, "--pr", pr, "--head-sha", head_sha],
+        max(0.1, timeout_seconds),
+    )
+    if timed_out:
         return {
             "script": "trigger_codex_review.sh",
             "success": False,
@@ -715,7 +718,7 @@ def run_trigger(
             "_helper_stderr": stderr_text,
         }
     try:
-        payload = json.loads(completed.stdout)
+        payload = json.loads(stdout_text)
     except Exception:
         payload = {
             "script": "trigger_codex_review.sh",
@@ -727,28 +730,28 @@ def run_trigger(
                     "source": "trigger_codex_review.sh",
                     "severity": "blocking",
                     "message": "trigger helper did not return parseable JSON",
-                    "exit_code": completed.returncode,
-                    "stdout_sha256": hashlib.sha256(completed.stdout.encode()).hexdigest(),
-                    "stderr_sha256": hashlib.sha256(completed.stderr.encode()).hexdigest(),
+                    "exit_code": exit_code,
+                    "stdout_sha256": hashlib.sha256(stdout_text.encode()).hexdigest(),
+                    "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
                 }
             ],
             "trigger": {"mode": "post-once", "action": "failed"},
         }
-    if completed.returncode != 0:
+    if exit_code != 0:
         payload.setdefault("limitations", []).append(
             {
                 "code": "trigger_helper_failed",
                 "source": "trigger_codex_review.sh",
                 "severity": "blocking",
                 "message": "trigger helper exited non-zero",
-                "exit_code": completed.returncode,
-                "stderr_sha256": hashlib.sha256(completed.stderr.encode()).hexdigest(),
+                "exit_code": exit_code,
+                "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
             }
         )
         payload["success"] = False
         payload.setdefault("overall_status", "trigger_helper_failed")
-    payload["_helper_stdout"] = completed.stdout
-    payload["_helper_stderr"] = completed.stderr
+    payload["_helper_stdout"] = stdout_text
+    payload["_helper_stderr"] = stderr_text
     return payload
 
 
@@ -822,14 +825,14 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
         return "unknown", "unknown", "human_gate", False, True
     if completion_signal == "fallback_issue_comment":
         return "human_gate", "human_gate", "wait_or_resume", False, True
+    if review_status in {"requested", "commented", "changes_requested", "unresolved"}:
+        return "human_gate", "human_gate", "address_review_feedback", True, False
     if review_status in {"none", "pending"} and lifecycle_status in {"pending", "unknown"}:
         return "pending", "pending", "wait", False, False
     if review_status in {"none", "pending"} and lifecycle_status == "none" and completion_signal == "none":
         return "pending", "pending", "wait", False, False
     if completion_signal != "submitted_pull_request_review":
         return "pending", "pending", "wait", False, False
-    if review_status in {"requested", "commented", "changes_requested", "unresolved"}:
-        return "human_gate", "human_gate", "address_review_feedback", True, False
     if review_status == "approved":
         return "passed", "passed", "merge_prepared", True, False
     if review_status == "none":
