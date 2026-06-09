@@ -491,6 +491,112 @@ git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-o
 #### コミット
 - current S03 commit in git history: `feat(github-pr-observation): Codexレビュー観測JSONを追加`
 
+### セッションログ（2026-06-09 S04）
+
+#### 対象
+- Step: S04
+- AC/EC: AC-003, AC-005, AC-006, AC-008, EC-003, EC-004, EC-006, EC-007
+- 計画上の出典（Planned source）:
+  - `plan.md` S04
+  - closure ids: cl-009, cl-010, cl-011, cl-012
+
+#### 実施内容
+- `wait_pr_observation.sh` が S03 の `codex_review.lifecycle` を final classification と stability fingerprint に含めるようにした。
+- CI は `failed` を独立して `fix_ci` に分類し、Codex review が完了済みでも merge-ready にはしないよう固定した。
+- CI が `passed` でも `review.status=none|pending` かつ Codex review lifecycle が `pending` / `unknown` / `none` の場合は `passed` にせず、待機継続または timeout にするよう固定した。
+- fallback issue comment は actionable review feedback とみなさず、submitted PR review を待つための `wait_or_rerun` に分類するよう固定した。
+- 既存互換として、明示的な `review.status=approved` は merge-prepared、`commented` / `changes_requested` / `unresolved` は review feedback の human gate として終端扱いを維持した。
+- timeout / limit 時に `resume` metadata と `--trigger-mode resume` の `command_hint` を final stdout JSON に含めるようにした。
+- progress / stability の review comment count と semantic fingerprint が `codex_review.selected_reviews` / `selected_review_comments` も見るようにし、Codex review 本文・コメント選択の変化で quiet / stable がリセットされるようにした。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s04
+
+6 passed, 310 deselected
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation_wait or issue_176_s04"
+
+29 passed, 287 deselected
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s01 or issue_176_s02 or issue_176_s03 or issue_176_s04"
+
+19 passed, 297 deselected
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation_review_collector or pr_review_collector or issue_176_s03 or issue_176_s04 or snapshot_includes_s04_review_collector_result"
+
+40 passed, 276 deselected
+```
+
+```bash
+git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh tests/unit/infra/test_init_update.py spec-dock/active/issue/report.md
+
+pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | 既存 wait は `codex_review.lifecycle` を classification / fingerprint に使わず、CI passed + review none を Codex review 未完了でも passed にできた。S04 tests で新 contract を固定した。 | test design / focused pytest | pass | red 実行ログは未分離だが、既存実装では満たせない `codex_review.lifecycle pending` timeout contract と resume hint contract を追加した。 |
+| S04 | 緑フェーズ（Green） | focused fake scripts pytest / wait regression / collector regression | S04 focused 6 passed、wait regression 29 passed、S01-S04 19 passed、collector related 40 passed。 | pytest commands listed above | pass | CI/review mixed status、fallback issue comment、post-once first-poll timeout resume、post-trigger stale、stdout/result authority、timeout resume metadata を確認した。 |
+| S04 | リファクタリング（Refactor） | guardrail satisfied | lifecycle helper / resume metadata helper を `wait_pr_observation.sh` 内の既存 Python block に閉じ、GitHub write boundary や collector endpoint は広げなかった。 | diff inspection / `git diff --check` | pass | `review.status=approved/commented` の既存終端 contract は regression failure 後に保持するよう調整した。 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | `codex_review.lifecycle=none` を無条件に pending 扱いすると、既存の `review.status=approved/commented` 終端 contract が timeout に退行する | wait regression | CI passed 後の分類順を、明示的な review feedback / approval を先に評価し、`review.status=none` の場合だけ Codex lifecycle 未完了を wait にするよう修正 | cl-009 | no | 初回 wait regression 4 failed -> 修正後 27 passed |
+| S04 | fallback issue comment は `review.status=commented` も返すため、generic commented branch が先にあると `address_review_feedback` に誤分類される | code-reviewer r1 | `completion_signal=fallback_issue_comment` を generic feedback より先に評価し、S04 test を追加 | cl-009 | no | `/private/tmp/iss-00176-s04-code-review.txt`; `test_issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback` |
+| S04 | collector が pending PR review を `review.status=pending` と返す場合、`review.status=none` 限定の待機条件では human_gate に落ちる | code-reviewer r1 | pending wait 条件を `review.status in {"none", "pending"}` に広げ、S04 pending test を `none` / `pending` 両方で確認 | cl-009 | no | `/private/tmp/iss-00176-s04-code-review.txt`; `test_issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint` |
+| S04 | first snapshot poll timeout では `latest_payload` がなく `mark_latest_timeout` を通らないため、resume metadata が付かない | code-reviewer r2 | first-poll `timeout_snapshot` branch でも resume metadata を付与し、既存 hung timeout test に assertion を追加 | cl-012 | no | `/private/tmp/iss-00176-s04-code-review-r2.txt`; `test_issue_75_pr_observation_wait_bounds_hung_snapshot_poll_by_deadline` |
+| S04 | default `post-once` で helper が取得した trigger metadata は環境変数にないため、first-poll timeout の resume metadata が空になる | code-reviewer r3 | resume metadata fallback を実行中の `trigger_comment_id` / `trigger_created_at` 変数にも広げ、post-once first-poll timeout test を追加 | cl-012 | no | `/private/tmp/iss-00176-s04-code-review-r3.txt`; `test_issue_176_s04_wait_post_once_first_poll_timeout_keeps_resume_hint` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | cl-009, cl-010, cl-011, cl-012 | wait final JSON が CI/review/head/timeout/output authority を統合する | focused pytest 6 passed; wait regression 29 passed; S01-S04 19 passed; collector related 40 passed; diff check pass; code-reviewer r4 pass | pass | reviewer findings r1-r3 fixed in S04 scope. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-009 / `test_issue_176_s04_wait_ci_failed_with_completed_codex_review_is_not_merge_ready` | S04 | yes | red-required | `codex_review.lifecycle` を分類に使わず mixed state を区別できない既存状態 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s04` | pass | CI failed + review completed は `failed` / `fix_ci`。 |
+| cl-009, cl-012 / `test_issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint` | S04 | yes | red-required | CI passed + review none を Codex review pending でも passed にできる既存状態 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s04` | pass | pending lifecycle は timeout まで wait し、resume metadata / command hint を返す。 |
+| cl-009 / `test_issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback` | S04 | yes | red-required | fallback issue comment が generic `commented` branch で actionable feedback と誤分類され得る状態 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s04` | pass | fallback completion signal は `wait_or_rerun`。 |
+| cl-012 / `test_issue_176_s04_wait_post_once_first_poll_timeout_keeps_resume_hint` | S04 | yes | red-required | post-once trigger metadata が first-poll timeout resume に伝播しない状態 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s04` | pass | helper が得た comment id / created_at を timeout resume hint に保持する。 |
+| cl-010 / `test_issue_176_s04_wait_post_trigger_head_drift_preserves_trigger_metadata` | S04 | yes | red-required | post-trigger head drift 時の trigger metadata 保持を S04 固有で未固定 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s04` | pass | default post-once 後の stale_head が trigger comment id / created_at を保持する。 |
+| cl-011 / existing `--out` assertions in S04 timeout test | S04 | yes | red-required | `summary.md` 復活や stdout/result split の regression を S04 timeout path で未固定 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_176_s04` | pass | `result.json` equals stdout、`summary.md` absent。 |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-009 | S04 | S04 focused + wait regression | pass | CI failed + review completed、CI passed + review pending、fallback issue comment、既存 approval/feedback regression を確認。 |
+| cl-010 | S04 | S04 stale test | pass | post-trigger/polling head mismatch は stale_head / rerun_for_current_head で trigger metadata を保持。 |
+| cl-011 | S04 | S04 timeout out assertions + existing wait out contract regression | pass | stdout final JSON、stderr progress、`--out/result.json` stdout copy、`summary.md` absent。 |
+| cl-012 | S04 | S04 pending timeout test + first-poll timeout tests | pass | timeout JSON に resume metadata と `--trigger-mode resume` command hint を含み、resume と post-once の first-poll timeout でも保持する。 |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | code-reviewer | fresh | passed | N/A | proceed | r1/r2/r3 findings fixed; r4 no priority findings (`/private/tmp/iss-00176-s04-code-review-r4.txt`) |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | committed | S04 target files + report S04 ledger | current S04 commit in git history | `git status --short` -> clean after commit/amend | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` - Codex review lifecycle classification、semantic fingerprint、timeout resume metadata。
+- `tests/unit/infra/test_init_update.py` - S04 fake script tests for mixed CI/review state、pending timeout resume、post-trigger stale、out authority。
+- `spec-dock/.../iss-00176.../report.md` - S04 execution evidence。
+
+#### コミット
+- current S04 commit in git history: `feat(github-pr-observation): Codexレビュー完了待機を統合`
+
 ### セッションログ（2026-06-08 HH:MM - HH:MM）
 
 #### 対象
