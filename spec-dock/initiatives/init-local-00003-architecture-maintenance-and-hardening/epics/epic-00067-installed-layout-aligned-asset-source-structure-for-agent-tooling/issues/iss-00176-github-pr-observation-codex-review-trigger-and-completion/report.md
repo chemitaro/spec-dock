@@ -757,7 +757,7 @@ review_status: pass
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S05b | ready-to-commit | S05b target tests + report S05b ledger | pending commit | pending | N/A | N/A | N/A | N/A |
+| S05b | committed | S05b target tests + report S05b ledger | current S05b commit in git history | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | worker / reviewer | 実施内容 | 入力 | 出力 / 変更 | 検証 | 判定 | メモ |
@@ -769,7 +769,7 @@ review_status: pass
 - `spec-dock/.../iss-00176.../report.md` - S05b execution evidence and S05a commit gate update。
 
 #### コミット
-- pending S05b commit
+- current S05b commit in git history: `test(github-pr-observation): trigger helperの配送保証を追加`
 
 ### セッションログ（2026-06-08 HH:MM - HH:MM）
 
@@ -886,7 +886,9 @@ review_status: pass
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| `github-pr-observation` skill mirror / scripts mirror | yes | orchestrator | `uvx --from . spec-dock update .` で provider install-root の S01-S05 実装を repo-root `.agents/` mirror に反映。`cmp` で `SKILL.md` / `trigger_codex_review.sh` parity を確認。`uv run pytest tests/unit/infra/test_init_update.py -k "issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets or issue_75_pr_monitor_assets_retired_and_observation_scaffold_present or issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing"` -> 3 passed。 | pass: initial S90 spec-reviewer failed P1/P2; r2 findingsなし / `review_status: pass` (`/private/tmp/iss-00176-s90-spec-review-r2.txt`) |
+| `github-pr-merge-preparer` provider and mirror skill docs | yes | orchestrator | first observation は default `post-once`、timeout/limit continuation は explicit `--trigger-mode resume` と記述。frontmatter description から stale `read-only monitoring` を除去。provider/mirror `cmp` -> match。 | pass: initial S90 spec-reviewer failed P2; r2 findingsなし / `review_status: pass` (`/private/tmp/iss-00176-s90-spec-review-r2.txt`) |
+| docs / templates / README / workflow / migration notes outside impacted skill surfaces | no | N/A | stale wording search for read-only-only / manual-trigger-era phrases returned no matches after S90 fixes. No broader workflow/template/README contract change was identified beyond the updated skill docs and dogfooding mirror. | pass: r2 findingsなし / `review_status: pass` (`/private/tmp/iss-00176-s90-spec-review-r2.txt`) |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |

@@ -489,6 +489,15 @@ review_collector_fingerprint = (
 )
 if isinstance(review_payload, dict) and review_collector_fingerprint:
     review_payload = {**review_payload, "fingerprint": review_collector_fingerprint}
+codex_review_payload = (
+    review_wrapper_payload.get("codex_review")
+    if isinstance(review_wrapper_payload.get("codex_review"), dict)
+    else (
+        review_payload.get("codex_review")
+        if isinstance(review_payload, dict) and isinstance(review_payload.get("codex_review"), dict)
+        else {}
+    )
+)
 
 fingerprint_source = {
     "repo": repo,
@@ -542,6 +551,7 @@ payload = {
         **ci_payload,
     },
     "review": review_payload,
+    "codex_review": codex_review_payload,
     "trigger": trigger,
     "body_mode": body_mode,
     "artifacts": {

@@ -11,6 +11,7 @@ Options:
   --quiet-seconds NUMBER
   --same-fingerprint-count NUMBER
   --zero-check-grace-polls NUMBER
+  --trigger-mode post-once|resume
   --trigger-comment-id NUMBER
   --trigger-created-at ISO8601
   --body-mode none|trigger-window-truncated|trigger-window-full|out-only
@@ -38,6 +39,7 @@ same_fingerprint_count="2"
 zero_check_grace_polls="2"
 trigger_comment_id=""
 trigger_created_at=""
+trigger_mode="post-once"
 body_mode="trigger-window-truncated"
 progress="stderr-summary"
 out_dir=""
@@ -82,6 +84,11 @@ while [ "$#" -gt 0 ]; do
     --zero-check-grace-polls)
       [ "$#" -ge 2 ] || fail_usage
       zero_check_grace_polls="$2"
+      shift 2
+      ;;
+    --trigger-mode)
+      [ "$#" -ge 2 ] || fail_usage
+      trigger_mode="$2"
       shift 2
       ;;
     --trigger-comment-id)
@@ -153,6 +160,16 @@ fi
 if [ -n "$trigger_created_at" ] && ! [[ "$trigger_created_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})?$ ]]; then
   fail_usage
 fi
+case "$trigger_mode" in
+  post-once|resume) ;;
+  *) fail_usage ;;
+esac
+if [ "$trigger_mode" = "post-once" ] && { [ -n "$trigger_comment_id" ] || [ -n "$trigger_created_at" ]; }; then
+  fail_usage
+fi
+if [ "$trigger_mode" = "resume" ] && { [ -z "$trigger_comment_id" ] || [ -z "$trigger_created_at" ]; }; then
+  fail_usage
+fi
 case "$body_mode" in
   none|trigger-window-truncated|trigger-window-full|out-only) ;;
   *) fail_usage ;;
@@ -167,8 +184,10 @@ fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 snapshot_script="$script_dir/fetch_pr_observation_snapshot.sh"
+trigger_script="$script_dir/trigger_codex_review.sh"
 
 OBS_SNAPSHOT_SCRIPT="$snapshot_script" \
+OBS_TRIGGER_SCRIPT="$trigger_script" \
 OBS_REPO="$repo" \
 OBS_PR="$pr" \
 OBS_HEAD_SHA="$head_sha" \
@@ -177,6 +196,7 @@ OBS_POLL_INTERVAL_SECONDS="$poll_interval_seconds" \
 OBS_QUIET_SECONDS="$quiet_seconds" \
 OBS_SAME_FINGERPRINT_COUNT="$same_fingerprint_count" \
 OBS_ZERO_CHECK_GRACE_POLLS="$zero_check_grace_polls" \
+OBS_TRIGGER_MODE="$trigger_mode" \
 OBS_TRIGGER_COMMENT_ID="$trigger_comment_id" \
 OBS_TRIGGER_CREATED_AT="$trigger_created_at" \
 OBS_BODY_MODE="$body_mode" \
@@ -351,7 +371,17 @@ def review_progress_counts(payload: dict) -> dict:
     summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
     threads = review.get("threads") if isinstance(review.get("threads"), dict) else {}
     signals = review.get("signals") if isinstance(review.get("signals"), list) else []
+    codex_review = payload.get("codex_review")
+    if not isinstance(codex_review, dict):
+        nested_codex_review = review.get("codex_review")
+        codex_review = nested_codex_review if isinstance(nested_codex_review, dict) else {}
+    selected_review_comments = codex_review.get("selected_review_comments")
+    selected_reviews = codex_review.get("selected_reviews")
     comments = len(review_progress_signal_items(payload)) if signals else 0
+    if isinstance(selected_review_comments, list):
+        comments = max(comments, len(selected_review_comments))
+    if isinstance(selected_reviews, list):
+        comments = max(comments, len(selected_reviews))
     review_requests = review.get("review_requests")
     requested = len(review_requests) if isinstance(review_requests, list) else 0
     return {
@@ -364,9 +394,24 @@ def review_progress_counts(payload: dict) -> dict:
     }
 
 
+def codex_review_payload(payload: dict) -> dict:
+    codex_review = payload.get("codex_review")
+    if isinstance(codex_review, dict):
+        return codex_review
+    review = payload.get("review") if isinstance(payload.get("review"), dict) else {}
+    nested_codex_review = review.get("codex_review")
+    return nested_codex_review if isinstance(nested_codex_review, dict) else {}
+
+
+def codex_review_lifecycle(payload: dict) -> dict:
+    lifecycle = codex_review_payload(payload).get("lifecycle")
+    return lifecycle if isinstance(lifecycle, dict) else {}
+
+
 def semantic_fingerprint(payload: dict) -> str:
     ci_progress = ci_progress_counts(payload)
     review_progress = review_progress_counts(payload)
+    lifecycle = codex_review_lifecycle(payload)
     source = {
         "repo": payload.get("repo"),
         "pr": payload.get("pr"),
@@ -399,6 +444,16 @@ def semantic_fingerprint(payload: dict) -> str:
             if isinstance(payload.get("review"), dict)
             else None,
             "progress": review_progress,
+        },
+        "codex_review": {
+            "lifecycle": {
+                "status": lifecycle.get("status"),
+                "completion_signal": lifecycle.get("completion_signal"),
+                "selected_review_ids": lifecycle.get("selected_review_ids"),
+                "selected_review_comment_ids": lifecycle.get("selected_review_comment_ids"),
+                "selected_review_thread_ids": lifecycle.get("selected_review_thread_ids"),
+            },
+            "collection_summary": codex_review_payload(payload).get("collection_summary"),
         },
         "trigger": payload.get("trigger"),
     }
@@ -566,6 +621,86 @@ def run_snapshot(args: list[str], timeout_seconds: float) -> tuple[int, str, str
         return proc.returncode if proc.returncode is not None else -signal.SIGKILL, stdout_text or "", stderr_text or "", True
 
 
+def trigger_failure_result(trigger_payload: dict, trigger_stdout: str, trigger_stderr: str) -> dict:
+    trigger = trigger_payload.get("trigger") if isinstance(trigger_payload.get("trigger"), dict) else {}
+    normalized_status = trigger_payload.get("overall_status") or trigger_payload.get("status") or "unknown"
+    if normalized_status == "trigger_posted":
+        normalized_status = "unknown"
+    next_action = "rerun_for_current_head" if normalized_status == "stale_head" else "human_gate"
+    return {
+        **trigger_payload,
+        "script": "wait_pr_observation.sh",
+        "status": normalized_status,
+        "overall_status": normalized_status,
+        "normalized_status": normalized_status,
+        "observation_complete": False,
+        "observed_at": utc_now(),
+        "recommended_next_action": next_action,
+        "trigger": {
+            **trigger,
+            "mode": "post-once",
+            "helper_success": False,
+            "helper_stdout_sha256": hashlib.sha256(trigger_stdout.encode()).hexdigest(),
+            "helper_stderr_sha256": hashlib.sha256(trigger_stderr.encode()).hexdigest(),
+        },
+        "wait": {
+            "polls": 0,
+            "contract_phase": "s02_trigger_post_once",
+        },
+    }
+
+
+def run_trigger(
+    *,
+    trigger_script: str,
+    repo: str,
+    pr: str,
+    head_sha: str,
+) -> dict:
+    completed = subprocess.run(
+        [trigger_script, "--repo", repo, "--pr", pr, "--head-sha", head_sha],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    try:
+        payload = json.loads(completed.stdout)
+    except Exception:
+        payload = {
+            "script": "trigger_codex_review.sh",
+            "success": False,
+            "overall_status": "trigger_json_unavailable",
+            "limitations": [
+                {
+                    "code": "trigger_json_unavailable",
+                    "source": "trigger_codex_review.sh",
+                    "severity": "blocking",
+                    "message": "trigger helper did not return parseable JSON",
+                    "exit_code": completed.returncode,
+                    "stdout_sha256": hashlib.sha256(completed.stdout.encode()).hexdigest(),
+                    "stderr_sha256": hashlib.sha256(completed.stderr.encode()).hexdigest(),
+                }
+            ],
+            "trigger": {"mode": "post-once", "action": "failed"},
+        }
+    if completed.returncode != 0:
+        payload.setdefault("limitations", []).append(
+            {
+                "code": "trigger_helper_failed",
+                "source": "trigger_codex_review.sh",
+                "severity": "blocking",
+                "message": "trigger helper exited non-zero",
+                "exit_code": completed.returncode,
+                "stderr_sha256": hashlib.sha256(completed.stderr.encode()).hexdigest(),
+            }
+        )
+        payload["success"] = False
+        payload.setdefault("overall_status", "trigger_helper_failed")
+    payload["_helper_stdout"] = completed.stdout
+    payload["_helper_stderr"] = completed.stderr
+    return payload
+
+
 def copy_tree_contents(source: Path, destination: Path) -> None:
     if not source.is_dir():
         return
@@ -605,6 +740,9 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
     review = payload.get("review") if isinstance(payload.get("review"), dict) else {}
     ci_status = ci.get("status") or payload.get("summary", {}).get("ci") or "unknown"
     review_status = review.get("status") or payload.get("summary", {}).get("review") or "unknown"
+    lifecycle = codex_review_lifecycle(payload)
+    lifecycle_status = lifecycle.get("status")
+    completion_signal = lifecycle.get("completion_signal")
     top_level_status = payload.get("normalized_status")
     top_level_next_action = payload.get("recommended_next_action")
 
@@ -631,11 +769,72 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
         return "unknown", "unknown", "human_gate", False, True
     if ci_status != "passed":
         return "unknown", "unknown", "human_gate", False, True
-    if review_status in {"none", "approved"}:
-        return "passed", "passed", "merge_prepared", True, False
+    if completion_signal == "fallback_issue_comment":
+        return "human_gate", "human_gate", "wait_or_rerun", False, True
+    if review_status in {"none", "pending"} and lifecycle_status in {"pending", "unknown"}:
+        return "pending", "pending", "wait", False, False
+    if review_status in {"none", "pending"} and lifecycle_status == "none" and completion_signal == "none":
+        return "pending", "pending", "wait", False, False
     if review_status in {"requested", "commented", "changes_requested", "unresolved"}:
         return "human_gate", "human_gate", "address_review_feedback", True, False
+    if review_status == "approved":
+        return "passed", "passed", "merge_prepared", True, False
+    if review_status == "none":
+        return "passed", "passed", "merge_prepared", True, False
     return "unknown", "unknown", "human_gate", False, True
+
+
+def resume_command_hint(payload: dict) -> str | None:
+    trigger = payload.get("trigger") if isinstance(payload.get("trigger"), dict) else {}
+    comment_id = (
+        trigger.get("comment_id")
+        or globals().get("trigger_comment_id")
+        or os.environ.get("OBS_TRIGGER_COMMENT_ID")
+    )
+    created_at = (
+        trigger.get("created_at")
+        or globals().get("trigger_created_at")
+        or os.environ.get("OBS_TRIGGER_CREATED_AT")
+    )
+    if not comment_id or not created_at:
+        return None
+    return (
+        "./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        f" --repo {os.environ['OBS_REPO']}"
+        f" --pr {os.environ['OBS_PR']}"
+        f" --head-sha {os.environ['OBS_HEAD_SHA']}"
+        " --trigger-mode resume"
+        f" --trigger-comment-id {comment_id}"
+        f" --trigger-created-at {created_at}"
+    )
+
+
+def attach_resume_metadata(payload: dict) -> None:
+    trigger = payload.get("trigger") if isinstance(payload.get("trigger"), dict) else {}
+    comment_id = (
+        trigger.get("comment_id")
+        or globals().get("trigger_comment_id")
+        or os.environ.get("OBS_TRIGGER_COMMENT_ID")
+        or None
+    )
+    created_at = (
+        trigger.get("created_at")
+        or globals().get("trigger_created_at")
+        or os.environ.get("OBS_TRIGGER_CREATED_AT")
+        or None
+    )
+    command_hint = resume_command_hint(payload)
+    comment_id_value = int(comment_id) if isinstance(comment_id, str) and comment_id.isdigit() else comment_id
+    payload["resume"] = {
+        "available": bool(command_hint) and bool(comment_id) and bool(created_at),
+        "trigger_mode": "resume",
+        "trigger_comment_id": comment_id_value,
+        "trigger_created_at": created_at,
+        "repo": os.environ["OBS_REPO"],
+        "pr": int(os.environ["OBS_PR"]),
+        "head_sha": os.environ["OBS_HEAD_SHA"],
+        "command_hint": command_hint,
+    }
 
 
 def progress_line(
@@ -751,9 +950,11 @@ def mark_latest_timeout(
     payload.setdefault("wait", {})["deadline_reached"] = True
     payload["wait"]["quiet_seconds_observed"] = quiet_elapsed
     payload["wait"]["same_fingerprint_observed"] = same_count
+    attach_resume_metadata(payload)
 
 
 snapshot_script = os.environ["OBS_SNAPSHOT_SCRIPT"]
+trigger_script = os.environ["OBS_TRIGGER_SCRIPT"]
 repo = os.environ["OBS_REPO"]
 pr = os.environ["OBS_PR"]
 head_sha = os.environ["OBS_HEAD_SHA"]
@@ -762,12 +963,39 @@ poll_interval_seconds = int(os.environ["OBS_POLL_INTERVAL_SECONDS"])
 quiet_seconds = int(os.environ["OBS_QUIET_SECONDS"])
 same_fingerprint_count = int(os.environ["OBS_SAME_FINGERPRINT_COUNT"])
 zero_check_grace_polls = int(os.environ["OBS_ZERO_CHECK_GRACE_POLLS"])
+trigger_mode = os.environ["OBS_TRIGGER_MODE"]
 trigger_comment_id = os.environ["OBS_TRIGGER_COMMENT_ID"]
 trigger_created_at = os.environ["OBS_TRIGGER_CREATED_AT"]
 body_mode = os.environ["OBS_BODY_MODE"]
 progress = os.environ["OBS_PROGRESS"]
 out_dir_text = os.environ["OBS_OUT_DIR"]
 out_dir = Path(out_dir_text) if out_dir_text else None
+
+if trigger_mode == "post-once":
+    trigger_payload = run_trigger(
+        trigger_script=trigger_script,
+        repo=repo,
+        pr=pr,
+        head_sha=head_sha,
+    )
+    trigger_stdout = str(trigger_payload.pop("_helper_stdout", ""))
+    trigger_stderr = str(trigger_payload.pop("_helper_stderr", ""))
+    trigger = trigger_payload.get("trigger") if isinstance(trigger_payload.get("trigger"), dict) else {}
+    trigger_comment_id = str(trigger.get("comment_id") or "")
+    trigger_created_at = str(trigger.get("created_at") or "")
+    if (
+        trigger_payload.get("success") is not True
+        or not trigger_comment_id
+        or not trigger_created_at
+    ):
+        print(
+            json.dumps(
+                trigger_failure_result(trigger_payload, trigger_stdout, trigger_stderr),
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        raise SystemExit(0)
 
 snapshot_args = [
     snapshot_script,
@@ -837,6 +1065,7 @@ while True:
         snapshot_text = latest_snapshot_text
     elif snapshot_poll_timed_out:
         payload = timeout_snapshot(snapshot_timeout, snapshot_stdout, snapshot_stderr)
+        attach_resume_metadata(payload)
         snapshot_text = json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n"
     else:
         snapshot_text = snapshot_stdout if snapshot_stdout else "{}\n"
