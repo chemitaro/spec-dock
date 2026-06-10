@@ -1,3 +1,17 @@
+---
+種別: disc
+ID: "<DISC_ID>"
+タイトル: "PR repair batch"
+状態: "draft | proposed | archived"
+作成者: "<YOUR_NAME>"
+最終更新: "YYYY-MM-DD"
+親: ["<ISSUE_ID>"]
+関連: []
+authority: "proposed"
+derived_from: []
+reflected_to: []
+---
+
 # PR repair batch
 
 ## PR / Observation Metadata
