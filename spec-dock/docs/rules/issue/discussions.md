@@ -16,6 +16,7 @@
   - `interview`: docs-aware clarification の正式質問シート。重要判断は一問一答で扱い、回答前に unanswered artifact を作成し、回答後に同じ artifact へ回答、採用判断、反映先を追記する。既存の複数質問 artifact は grandfathered で、自動分割や rename はしない。
   - `research`: source-grounded read。事実、推測、未検証、用語衝突、edge case、判断への含意を分ける。
   - `disc`: synthesis / 中間レポート / reflection proposal / ADR candidate triage。採否の最終証跡は canonical docs / ADR / `report.md` Evidence Adoption Ledger に昇格する。
+    - PR repair batch / repair unit は existing `disc` usage です。詳細な canonical template と運用手順は `github-pr-merge-preparer` の skill-local `templates/pr-repair-batch.md` に従い、この catalog には重複させません。
   - `adr`: 意思決定記録。後から戻しにくく、将来の読者に意外性があり、実質的な tradeoff がある長期判断を固定する。
   - `draft-requirement`: scope kind に応じた canonical requirement template を直接 source として render する discussion-local draft。
   - `draft-design`: scope kind に応じた canonical design template を直接 source として render する discussion-local draft。
