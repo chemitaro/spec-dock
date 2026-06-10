@@ -367,6 +367,101 @@ result: pass, empty output
 #### メモ
 - S02 では script、JSON schema、runtime、tests、dogfooding copy は変更していない。
 
+### セッションログ（2026-06-10 S03）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-002, AC-004, AC-008
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S03 — Issue discussion rules に短い PR repair contract を追加する`
+  - closure ids: `tc-012`
+
+#### 実施内容
+- provider-side issue discussion rules の `disc` catalog に、PR repair batch / repair unit が existing `disc` usage であることを短く追記した。
+- 詳細な canonical template と運用手順は `github-pr-merge-preparer` の skill-local `templates/pr-repair-batch.md` に従うと明記し、catalog への full template duplication を避けた。
+
+#### 実行コマンド / 結果
+```bash
+rg -n "PR repair batch|repair unit|github-pr-merge-preparer|existing .disc.|canonical" src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md
+
+9:- Sub-agent-created draft は canonical docs ...
+10:- Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` ...
+11:- `report.md` は canonical observed evidence ledger ...
+18:  - `disc`: synthesis ...
+19:    - PR repair batch / repair unit は existing `disc` usage です。詳細な canonical template と運用手順は `github-pr-merge-preparer` の skill-local `templates/pr-repair-batch.md` に従い、この catalog には重複させません。
+21:  - `draft-requirement`: scope kind に応じた canonical requirement template ...
+22:  - `draft-design`: scope kind に応じた canonical design template ...
+23:  - `draft-plan`: scope kind に応じた canonical plan template ...
+25:- `disc` が大きくなりすぎたら ...
+
+git diff --check
+result: pass, no output
+
+manual diff inspection
+result: pass, one-line catalog addition only; no full template duplication.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only | 実装前の required `rg` では `canonical` と既存 `disc` 説明のみ検出され、`PR repair batch` / `repair unit` / `github-pr-merge-preparer` の contract は未検出。 | worker pre-change `rg` | pass | docs-only catalog addition のため executable red test ではなく文書点検を採用。 |
+| S03 | 緑フェーズ（Green） | inspect-only | `PR repair batch`, `repair unit`, `existing `disc``, `canonical`, `github-pr-merge-preparer` が discussion rules に存在する。 | `rg` command above | pass | `tc-012` を確認。 |
+| S03 | リファクタリング（Refactor） | guardrail satisfied | full template duplication なし。runtime templates / runtime / dogfooding copy なし。 | manual diff inspection; `git diff --check` | pass | 1 行の catalog contract に留めた。 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | none | implementation | no additional requirement or plan amendment needed | N/A | no | worker summary and parent inspection |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | `tc-012` | short catalog contract が存在し、full template duplication がない | `rg` output at `discussions.md:19`; manual diff inspection | pass | step reviewer 前の親統合判断は accepted。 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-012 | S03 | yes | inspect-only | PR repair batch / repair unit / github-pr-merge-preparer contract 未検出 | `rg -n "PR repair batch|repair unit|github-pr-merge-preparer|existing .disc.|canonical" .../discussions.md` | pass | discussion rules は short contract に留まり、template は skill-local に委ねる。 |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-012 | S03 | `rg` PR repair batch / repair unit / github-pr-merge-preparer / existing `disc` / canonical; manual diff inspection | pass | AC-002 / AC-004 / AC-008 を確認。 |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | N/A | N/A | N/A | S03 は plan の closure ids 内で完了。 | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | shipped docs catalog | dev-coder | provider issue discussion rules only | `plan.md` S03 | `src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md` | full template duplication, runtime templates, runtime, dogfooding copy | required `rg`; `git diff --check`; manual diff inspection | runtime template support / full template duplication required | worker summary, changed files, verification, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | `disc` catalog に PR repair batch / repair unit の short contract を追加し、詳細 template は merge-preparer skill-local template に委ねた。 | `src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md` | required `rg` -> pass; `git diff --check` -> pass; manual diff inspection -> pass | pass | low; docs-only one-line catalog addition | accepted for commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | spec-reviewer | fresh | passed | no | proceed to commit | Reviewer passed with no findings; runtime templates / runtime / dogfooding copy spread was not observed. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | committed | provider discussion rules, report evidence | S03 commit containing this ledger entry | `git status --short` -> clean for S03 scope after commit | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md` - PR repair batch / repair unit の short catalog contract を追加。
+
+#### コミット
+- S03 commit: docs(spec-dock): PR修復バッチのdisc用途を明記
+
+#### メモ
+- S03 では full template duplication、runtime templates、runtime、dogfooding copy は変更していない。
+
 ### セッションログ（2026-06-10 HH:MM - HH:MM）
 
 #### 対象
