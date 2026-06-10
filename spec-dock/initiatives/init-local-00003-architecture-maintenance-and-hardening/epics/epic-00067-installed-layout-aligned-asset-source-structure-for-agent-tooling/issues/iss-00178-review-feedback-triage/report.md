@@ -717,6 +717,24 @@ result: pass, no output
 | R002 | `discussion_r3389673614` | valid | blocking | yes | fix-now | implemented | Seeded untriaged blocking inventory row could falsely block clean batches. |
 | R003 | `discussion_r3389673619` | valid | blocking | yes | fix-now | implemented | Template gate must not be weaker than skill-level blocking feedback predicate. |
 
+### セッションログ（2026-06-10 PR #179 review repair 2）
+
+#### 対象
+- Step: PR delivery repair after re-review
+- PR: <https://github.com/chemitaro/spec-dock/pull/179>
+- Reviewed commit: `e0d700b4da`
+- Review source: Codex Review `4469559752`
+
+#### 実施内容
+- `discussion_r3389786924`: PR repair batch を issue scope の `discussions/` に `disc` として作る要件がある一方、skill-local template に `disc` front matter がない指摘を妥当と判断した。template 先頭に standard `disc` front matter を追加し、転記時に `ID` / `親` / metadata を埋められる形にした。
+- `discussion_r3389786931`: skill が initiative / epic など任意 scope への batch 作成を許すよう読め、issue scope の `discussions/` 直下に置く要件とずれる指摘を妥当と判断した。`github-pr-merge-preparer` skill の PR Repair Triage Gate を `SpecDock issue scope` に限定し、issue scope がない場合だけ inline fallback を使うよう明記した。
+
+#### PR repair batch summary
+| ID | source | validity | risk_class | need_to_fix | disposition | status | rationale |
+|---|---|---|---|---|---|---|---|
+| R004 | `discussion_r3389786924` | valid | blocking | yes | fix-now | implemented | The batch template must be copyable into a valid issue-local `disc` artifact. |
+| R005 | `discussion_r3389786931` | valid | blocking | yes | fix-now | implemented | Batch placement must not drift to initiative / epic scope when the issue owns the PR repair loop. |
+
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`
 - `.agents/skills/github-pr-merge-preparer/SKILL.md`
