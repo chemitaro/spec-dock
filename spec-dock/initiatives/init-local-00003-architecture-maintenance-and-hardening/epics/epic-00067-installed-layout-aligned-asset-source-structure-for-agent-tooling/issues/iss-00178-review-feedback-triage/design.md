@@ -132,7 +132,7 @@ ID: "iss-00178"
   - まず `github-pr-merge-preparer` skill の contract を固定する。
   - 次に observation boundary note と discussion rules contract を合わせる。
 - 順序への影響:
-  - `github-pr-merge-preparer` の skeleton が最初に固まらないと、discussion rules の参照先と plan の inspect criteria が不安定になる。
+  - `github-pr-merge-preparer` の skill-local template と workflow contract が最初に固まらないと、discussion rules の参照先と plan の inspect criteria が不安定になる。
 
 ## モジュール依存図（Module Dependency Diagram）
 
@@ -186,6 +186,8 @@ Rules ..> Unit : names existing disc usage
   - source:
     - provider: `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md`
     - dogfooding copy: `.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md`
+  - file existence:
+    - prose-only skeleton in `SKILL.md` is insufficient. The provider template file must exist and contain the operational batch control sheet structure.
   - sections:
     - `PR / Observation Metadata`
     - `Batch Purpose`
@@ -345,7 +347,7 @@ Forbidden:
 - AC-008 -> skill-local template 以外の runtime templates / doc type に変更を加えない design guard を置く。
 - EC-001 -> timeout / observation limit は batch inventory item として扱い、resume metadata を証跡化する。
 - EC-002 -> `Concern Catalog` / `Per-Concern Analysis` / `Repair Queue` で same root cause を unit grouping する。
-- EC-003 -> `validity=false-positive` / `covered-by` / `already-addressed` 相当の rationale を batch に残す。
+- EC-003 -> `validity=false-positive` または `risk_class=false-positive`、`disposition=no-action` または `covered-by`、および false-positive / stale / already-addressed rationale を batch に残す。
 - EC-004 -> `follow-up` / `needs-human` と stop condition で scope expansion を止める。
 - EC-005 -> fix loop limits と batch status で repeated failure class を human gate にする。
 
