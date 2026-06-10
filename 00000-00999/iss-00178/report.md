@@ -462,6 +462,107 @@ result: pass, one-line catalog addition only; no full template duplication.
 #### メモ
 - S03 では full template duplication、runtime templates、runtime、dogfooding copy は変更していない。
 
+### セッションログ（2026-06-10 S04）
+
+#### 対象
+- Step: S04
+- AC/EC: AC-008
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S04 — Dogfooding copy parity を確認または同期する`
+  - closure ids: `tc-013`
+
+#### 実施内容
+- S01-S03 で確定した provider-side skill/docs/template を dogfooding copy に同期した。
+- supported update path は unrelated rewrite の可能性があるため、計画の fallback として対象4ファイルのみを provider から copy した。
+- provider/dogfooding の4ペアが完全一致することを `diff -u` で確認した。
+
+#### 実行コマンド / 結果
+```bash
+cp src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md .agents/skills/github-pr-merge-preparer/SKILL.md
+cp src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md .agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md
+cp src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md .agents/skills/github-pr-observation/SKILL.md
+cp src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md spec-dock/docs/rules/issue/discussions.md
+
+diff -u src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md .agents/skills/github-pr-merge-preparer/SKILL.md
+result: pass, empty output
+
+diff -u src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md .agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md
+result: pass, empty output
+
+diff -u src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md .agents/skills/github-pr-observation/SKILL.md
+result: pass, empty output
+
+diff -u src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md spec-dock/docs/rules/issue/discussions.md
+result: pass, empty output
+
+git diff --check
+result: pass, no output
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only / command | 同期前は dogfooding 側に `github-pr-merge-preparer/templates/pr-repair-batch.md` が存在しなかった。 | `test -f .agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md` -> exit 1 | pass | parity drift を確認。 |
+| S04 | 緑フェーズ（Green） | command | provider/dogfooding 4ペアの `diff -u` がすべて empty output。 | `diff -u` commands above | pass | `tc-013` を確認。 |
+| S04 | リファクタリング（Refactor） | guardrail satisfied | S04 allowed dogfooding files のみを copy。 | `git status --short`; `git diff --check` | pass | supported update path ではなく targeted copy fallback を採用。 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | none | implementation | no additional requirement or plan amendment needed | N/A | no | provider/dogfooding `diff -u` empty |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | `tc-013` | all provider/dogfooding pairs match or approved no-op with evidence | all 4 `diff -u` commands returned empty output | pass | step reviewer 前の親統合判断は accepted。 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-013 | S04 | yes | inspect-only / command | dogfooding template file missing | provider/dogfooding 4ペアの `diff -u` | pass | PR repair batch template を含む parity を確認。 |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-013 | S04 | `diff -u` x4 empty output; `git diff --check` pass | pass | AC-008 を確認。 |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | N/A | N/A | N/A | S04 は plan の closure ids 内で完了。 | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | approved-local-execution | targeted parity copy | N/A | dogfooding copy parity only | provider-side S01-S03 files | `.agents/skills/github-pr-merge-preparer/SKILL.md`; `.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md`; `.agents/skills/github-pr-observation/SKILL.md`; `spec-dock/docs/rules/issue/discussions.md` | issue data rewrites, runtime templates, unrelated generated state | provider/dogfooding `diff -u` x4 | broad unrelated rewrite / unsafe update needed | sync method, changed files, diff outputs, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 | N/A | targeted copy fallback で dogfooding copy を provider と同期。 | `.agents/skills/github-pr-merge-preparer/SKILL.md`; `.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md`; `.agents/skills/github-pr-observation/SKILL.md`; `spec-dock/docs/rules/issue/discussions.md` | `diff -u` x4 -> pass; `git diff --check` -> pass | pass | low; direct copy limited to S04 target files | accepted for commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | spec-reviewer | fresh | passed | no | proceed to commit | Reviewer confirmed provider/dogfooding parity and S04 scope containment with no findings. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | committed | dogfooding copies, report evidence | S04 commit containing this ledger entry | `git status --short` -> clean for S04 scope after commit | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `.agents/skills/github-pr-merge-preparer/SKILL.md` - provider と同期。
+- `.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md` - provider template を追加。
+- `.agents/skills/github-pr-observation/SKILL.md` - provider と同期。
+- `spec-dock/docs/rules/issue/discussions.md` - provider と同期。
+
+#### コミット
+- S04 commit: docs(dogfooding): PR修復バッチ関連のコピーを同期
+
+#### メモ
+- S04 では provider source、runtime templates、issue data rewrites は変更していない。
+
 ### セッションログ（2026-06-10 HH:MM - HH:MM）
 
 #### 対象
