@@ -148,6 +148,134 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装記録（セッションログ） (必須)
 
+### セッションログ（2026-06-10 S01）
+
+#### 対象
+- Step: S01
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-008, EC-001, EC-002, EC-003, EC-004, EC-005
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S01 — Provider merge-preparer skill に PR Repair Triage Gate を追加する`
+  - closure ids: `tc-001`, `tc-002`, `tc-003`, `tc-004`, `tc-005`, `tc-006`, `tc-009`, `tc-010`, `tc-011`
+
+#### 実施内容
+- `github-pr-merge-preparer` skill に、observation 後かつ fix delegation 前に実行する PR Repair Triage Gate を追加した。
+- skill-local template `templates/pr-repair-batch.md` を追加し、batch metadata、concern catalog、inventory、classification values、repair queue、unit discussion plan、stop conditions、merge-prepared gate を操作シートとして定義した。
+- repair worker が raw finding ではなく repair unit `disc` を source of truth とすること、`review-clean` と `merge-prepared` を区別すること、timeout / resume / trigger boundary を batch に残すことを明記した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n "PR Repair Triage Gate|fix delegation|PR repair batch|Concern Catalog|Inventory|Unit Discussion Plan|Merge-Prepared Gate" src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md
+rg -n "templates/pr-repair-batch.md|pr-repair-batch.md" src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md
+test -f src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md
+rg -n "PR / Observation Metadata|Batch Purpose|Concern Catalog|Inventory|Classification Values|Per-Concern Analysis|Repair Queue|Unit Discussion Plan|Stop Conditions|Merge-Prepared Gate" src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md
+rg -n "validity|risk_class|need_to_fix|disposition|status|fix-now|follow-up|no-action|covered-by|needs-human|false-positive|duplicate" src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md
+rg -n "source_batch|covered_ids|Implementation Plan|Re-observation Result|Residual Risk" src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md
+rg -n "review-clean|merge-prepared|untriaged|needs-human|human gate|latest head|resume metadata|trigger boundary|new trigger|observation limitation" src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md
+git diff --check
+git diff -- src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime src/spec_dock/assets/spec_dock/templates
+
+result: pass
+
+Observed output summary:
+- `SKILL.md:38-44` shows PR Repair Triage Gate before repair delegation, with batch `Inventory`, required sections, trigger boundary, resume metadata, and no-untriaged requirement.
+- `SKILL.md:39,89` show explicit references to `templates/pr-repair-batch.md` / `pr-repair-batch.md`.
+- `pr-repair-batch.md:3,22,26,32,38,46,59,65,90,104` show required sections: PR / Observation Metadata, Batch Purpose, Concern Catalog, Inventory, Classification Values, Per-Concern Analysis, Repair Queue, Unit Discussion Plan, Stop Conditions, Merge-Prepared Gate.
+- `SKILL.md:55-59` and `pr-repair-batch.md:40-44` show classification values for `validity`, `risk_class`, `need_to_fix`, `disposition`, and `status`.
+- `SKILL.md:62-63,141` and `pr-repair-batch.md:61,71,73,83,87-88` show repair unit fields, `source_batch`, `covered_ids`, `Implementation Plan`, `Re-observation Result`, and `Residual Risk`.
+- `SKILL.md:77,79,82,90-95,125-127,142-145` show `review-clean` / `merge-prepared` distinction, latest head, untriaged / needs-human blockers, resume metadata, trigger boundary, new trigger, and observation limitation handling.
+- `test -f src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md` returned success.
+- `git diff --check` returned success with no output.
+- `git diff -- src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime src/spec_dock/assets/spec_dock/templates` returned empty output.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S01 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only | 既存 `SKILL.md` は PR Repair Triage Gate、skill-local batch template 参照、batch-aware merge-prepared predicate を持たず、`templates/` ディレクトリも存在しなかった。 | worker inspection; `ls -l .../templates` before change -> no such directory | pass | docs-only / skill-text change のため executable red test ではなく差分前文書点検を採用。 |
+| S01 | 緑フェーズ（Green） | inspect-only | PR Repair Triage Gate、template 参照、required sections、classification values、repair unit fields、resume / trigger boundary / observation limitation terms が provider skill/template に存在する。 | `rg` commands above; `test -f .../pr-repair-batch.md` | pass | closure ids `tc-001`..`tc-006`, `tc-009`..`tc-011` を inspection で確認。 |
+| S01 | リファクタリング（Refactor） | guardrail satisfied | runtime `spec_dock_runtime` と runtime `templates` に差分なし。 | `git diff --check`; `git diff -- src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime src/spec_dock/assets/spec_dock/templates` | pass | plan の scope containment を維持。 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S01 | none | implementation | no additional requirement or plan amendment needed | N/A | no | worker summary and parent inspection |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S01 | `tc-001`, `tc-002`, `tc-003`, `tc-004`, `tc-005`, `tc-006`, `tc-009`, `tc-010`, `tc-011` | provider merge-preparer skill と skill-local batch template が PR repair batch triage / repair unit / batch-aware merge-prepared predicate を持つ | `rg` / `test -f` / forbidden runtime diff / worker summary | pass | step reviewer 前の親統合判断は accepted。 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-001 | S01 | yes | inspect-only | PR Repair Triage Gate 未定義 | `rg -n "PR Repair Triage Gate|fix delegation" .../github-pr-merge-preparer/SKILL.md` | pass | observation 後、fix delegation 前の gate を確認。 |
+| tc-002 | S01 | yes | inspect-only | skill-local template file なし | `test -f .../templates/pr-repair-batch.md`; `rg -n "templates/pr-repair-batch.md|pr-repair-batch.md" .../SKILL.md` | pass | template file と skill 参照を確認。 |
+| tc-003 | S01 | yes | inspect-only | required classification vocabulary 未定義 | `rg -n "validity|risk_class|need_to_fix|disposition|status|fix-now|follow-up|no-action|covered-by|needs-human|false-positive|duplicate" ...` | pass | skill と template の分類値を確認。 |
+| tc-004 | S01 | yes | inspect-only | repair unit checklist / worker handoff 未定義 | `rg -n "source_batch|covered_ids|Implementation Plan|Re-observation Result|Residual Risk" ...` | pass | repair unit `disc` の必須項目と handoff を確認。 |
+| tc-005 | S01 | yes | inspect-only | non-fix rationale / residual risk path 未定義 | `rg -n "follow-up|no-action|covered-by|duplicate|false-positive|rationale|residual risk" ...` | pass | silent dismissal を防ぐ記述を確認。 |
+| tc-006 | S01 | yes | inspect-only | review-clean と merge-prepared の区別なし | `rg -n "review-clean|merge-prepared|latest head|untriaged|needs-human" .../SKILL.md` | pass | batch-aware merge-prepared predicate を確認。 |
+| tc-009 | S01 | yes | inspect-only | resume / trigger boundary / observation limitation の batch 記録未定義 | `rg -n "resume metadata|trigger boundary|new trigger|observation limitation" .../SKILL.md` | pass | duplicate trigger と stale-head 判定の防止条件を確認。 |
+| tc-010 | S01 | yes | inspect-only | same root cause grouping 未定義 | `rg -n "Group related items|same root cause|repair unit" .../SKILL.md` | pass | concern / unit grouping を確認。 |
+| tc-011 | S01 | yes | inspect-only | false positive / stale review rationale path 未定義 | `rg -n "false-positive|stale|rationale" .../SKILL.md .../pr-repair-batch.md` | pass | non-fix disposition と rationale path を確認。 |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-001 | S01 | `rg` PR Repair Triage Gate / fix delegation | pass | gate placement を確認。 |
+| tc-002 | S01 | `test -f` template; `rg` template reference / required sections | pass | skill-local template を確認。 |
+| tc-003 | S01 | `rg` classification vocabulary | pass | required fields and values を確認。 |
+| tc-004 | S01 | `rg` repair unit fields and source_batch / covered_ids | pass | raw finding handoff を禁止。 |
+| tc-005 | S01 | `rg` non-fix dispositions / rationale / residual risk | pass | no-action 等の説明責務を確認。 |
+| tc-006 | S01 | `rg` review-clean / merge-prepared predicate | pass | human merge decision 用の状態を分離。 |
+| tc-009 | S01 | `rg` resume metadata / trigger boundary / observation limitation / latest head | pass | timeout / resume / stale-head class を閉じた。 |
+| tc-010 | S01 | `rg` same root cause / concern / repair unit | pass | duplicate repair unit class を閉じた。 |
+| tc-011 | S01 | `rg` false-positive / rationale | pass | invalid finding の扱いを閉じた。 |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | N/A | N/A | N/A | S01 は plan の closure ids 内で完了。 | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/3b01/spec-dock` | iss-00178 | current session | dev-coder, spec-reviewer | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated | shipped scaffold / skill workflow text | dev-coder | provider merge-preparer skill and skill-local template only | `plan.md` S01 | `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`; `.../templates/pr-repair-batch.md` | runtime `spec_dock_runtime`; runtime template catalog; unrelated docs/code | `rg` closure terms; `test -f`; `git diff --check`; forbidden runtime diff empty | scope expansion / runtime edit / missing template / missing closure term | worker summary, changed files, verification, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S01 | dev-coder | PR Repair Triage Gate、batch template、repair unit handoff、batch-aware merge-prepared predicate を追加。 | `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md` | `rg` closure terms -> pass; `test -f` -> pass; `git diff --check` -> pass; forbidden runtime diff -> empty | pass | none | accepted for commit |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S01 | N/A | N/A | N/A | N/A | N/A | N/A | spec-reviewer pending | N/A |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S01 | step reviewer | spec-reviewer | fresh | passed | no | proceed to commit | Initial review failed on missing `rg` output evidence; report was updated with observed output summary and re-review passed with no findings. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S01 | committed | provider merge-preparer skill, skill-local template, report evidence | S01 commit containing this ledger entry | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md` - PR Repair Triage Gate と batch-aware merge-prepared predicate を追加。
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md` - PR repair batch 専用テンプレートを追加。
+
+#### コミット
+- S01 commit: docs(github-pr-merge-preparer): PR修復バッチのトリアージ手順を追加
+
+#### メモ
+- S01 では runtime `new doc --template`、runtime template catalog、`spec_dock_runtime` は変更していない。
+
 ### セッションログ（2026-06-10 HH:MM - HH:MM）
 
 #### 対象
