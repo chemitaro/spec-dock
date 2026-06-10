@@ -682,6 +682,51 @@ result after snapshot repair: pass, 332 passed
 #### メモ
 - S99 snapshot repair は test expectation を緩めず、現在の checked-in dogfooding tree に追随させた。
 
+### セッションログ（2026-06-10 PR #179 review repair）
+
+#### 対象
+- Step: PR delivery repair after S99
+- PR: <https://github.com/chemitaro/spec-dock/pull/179>
+- Reviewed commit: `bf178cc12f`
+- Review source: Codex Review `4469430853`
+
+#### 実施内容
+- `discussion_r3389673606`: active SpecDock scope がない場合、mandatory batch `disc` を作れず merge-prepared へ到達できない指摘を妥当と判断した。`github-pr-merge-preparer` skill に、writable SpecDock scope がある場合は scope-local `disc`、ない場合は同じ template sections を使う inline PR repair batch with `batch_path: N/A` を保持する fallback を追加した。
+- `discussion_r3389673614`: template の seeded `R001` row が実 inventory として blocking / needs-human / untriaged に見える指摘を妥当と判断した。Inventory / Concern Catalog / Repair Queue の seeded concrete rows を削除し、実 item がある場合だけ行を追加する説明へ置換した。
+- `discussion_r3389673619`: template の Merge-Prepared Gate に `No blocking review feedback remains` がない指摘を妥当と判断した。skill-level predicate と同じ条件を template に追加した。
+
+#### 実行コマンド / 結果
+```bash
+diff -u src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md .agents/skills/github-pr-merge-preparer/SKILL.md
+result: pass, empty output
+
+diff -u src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md .agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md
+result: pass, empty output
+
+rg -n "writable SpecDock scope|batch_path: N/A|No blocking review feedback remains|Do not keep example rows|No required check failure remains|No non-required check failure remains" ...
+result: pass
+
+git diff --check
+result: pass, no output
+```
+
+#### PR repair batch summary
+| ID | source | validity | risk_class | need_to_fix | disposition | status | rationale |
+|---|---|---|---|---|---|---|---|
+| R001 | `discussion_r3389673606` | valid | material-follow-up | yes | fix-now | implemented | Optional active issue context was still supported by skill inputs; fallback was required. |
+| R002 | `discussion_r3389673614` | valid | blocking | yes | fix-now | implemented | Seeded untriaged blocking inventory row could falsely block clean batches. |
+| R003 | `discussion_r3389673619` | valid | blocking | yes | fix-now | implemented | Template gate must not be weaker than skill-level blocking feedback predicate. |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`
+- `.agents/skills/github-pr-merge-preparer/SKILL.md`
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md`
+- `.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md`
+- `spec-dock/active/issue/report.md`
+
+#### コミット
+- pending PR review repair commit
+
 ### セッションログ（2026-06-10 HH:MM - HH:MM）
 
 #### 対象
