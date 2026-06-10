@@ -167,7 +167,7 @@ PR observation が収集した複数の Codex review finding、CI failure、merg
   - アクター: orchestrator
   - 前提: repair loop 後に latest head SHA で re-observation が完了している。
   - 操作: `merge-prepared` と報告する。
-  - 期待結果: untriaged item、未解決 `needs-human`、blocking かつ未完了の repair unit が残っていないことを確認してから `merge-prepared` と報告する。`review-clean` ではない場合も、残存 finding が分類済みなら `merge-prepared` と報告できる。
+  - 期待結果: required check failure が残っておらず、non-required check failure は known optional または user explicit waiver がある場合だけ残せる。untriaged item、未解決 `needs-human`、blocking かつ未完了の repair unit が残っていないことを確認してから `merge-prepared` と報告する。`review-clean` ではない場合も、残存 finding が分類済みかつ non-blocking なら `merge-prepared` と報告できる。
   - 観測点: `github-pr-merge-preparer` merge-prepared predicate / response checklist
 
 - AC-007: observation boundary preservation
