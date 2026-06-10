@@ -158,9 +158,9 @@ PR observation が収集した複数の Codex review finding、CI failure、merg
 
 - AC-005: non-fix disposition
   - アクター: orchestrator
-  - 前提: finding が `follow-up` / `no-action` / `covered-by` / `duplicate` / `false-positive` に分類される。
+  - 前提: finding の `disposition` が `follow-up` / `no-action` / `covered-by` のいずれか、または `validity` / `risk_class` が `duplicate` / `false-positive` のいずれかである。
   - 操作: batch item を閉じる。
-  - 期待結果: rationale、evidence、residual risk、必要なら follow-up target が batch 内に残り、repair unit `disc` は必須にならない。
+  - 期待結果: `disposition` が `follow-up` / `no-action` / `covered-by` の item には rationale、evidence、residual risk、必要なら follow-up target が batch 内に残る。`duplicate` / `false-positive` の item には該当する `validity` / `risk_class` と、対応する `disposition`（通常は `covered-by` または `no-action`）および rationale が残る。これらの item では repair unit `disc` は必須にならない。
   - 観測点: batch template / merge-prepared gate
 
 - AC-006: merge-prepared gate
@@ -198,7 +198,7 @@ PR observation が収集した複数の Codex review finding、CI failure、merg
 
 - EC-003: false positive / stale review
   - 条件: review finding の前提が誤り、または古い head / 古い trigger boundary に基づく。
-  - 期待: `validity=false-positive` または `covered-by` / `already-addressed` 相当の rationale を残し、必要なら human gate にする。
+  - 期待: `validity=false-positive` または `risk_class=false-positive` と、`disposition=no-action` または `disposition=covered-by` を明記し、false-positive / stale / already-addressed と判断した rationale を残す。必要なら human gate にする。
   - 観測点: batch inventory
 
 - EC-004: scope expansion

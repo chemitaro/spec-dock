@@ -53,7 +53,7 @@ ID: "iss-00178"
     - unblock: S04, S90
     - 対象ファイル: `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md`
   - S03:
-    - 依存: S01 の skeleton / checklist
+    - 依存: S01 の skill-local template / checklist
     - unblock: S04, S90
     - 対象ファイル: `src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md`
   - S04:
@@ -138,7 +138,7 @@ ID: "iss-00178"
 | tc-009 | S01 | stop-conditions | edge | EC-001/004/005 | timeout / observation limit は observation limitation と resume metadata として batch に残し、resume は同じ trigger boundary を使い、latest head SHA 再観測前に merge-prepared と言わず、無承認の新規 trigger を投稿しない | merge-preparer skill text | unsafe repeated repair loop / duplicate trigger / stale-head merge-prepared | yes | inspect-only | exact-term `rg` output + reviewer pass |
 | tc-010 | S01 | grouping | edge | EC-002 | same root cause を concern/unit で group できる | merge-preparer skill text | duplicate repair units | yes | inspect-only | `rg` output + reviewer pass |
 | tc-011 | S01 | false-positive | edge | EC-003 | false positive / stale review に rationale path がある | merge-preparer skill text | invalid finding treated as required fix | yes | inspect-only | `rg` output + reviewer pass |
-| tc-012 | S03 | discussion-contract | acceptance | design discussion contract | discussion rules は短く skill skeleton を参照する | provider discussion rules | duplicated drift-prone skeleton | yes | inspect-only | `rg` output + reviewer pass |
+| tc-012 | S03 | discussion-contract | acceptance | design discussion contract | discussion rules は短く skill-local template と skill guidance を参照する | provider discussion rules | duplicated drift-prone template | yes | inspect-only | `rg` output + reviewer pass |
 | tc-013 | S04 | dogfooding-parity | integration | parent epic provider-first | dogfooding copy が provider source と一致する | provider and dogfooding files | provider/dogfooding drift | yes | inspect-only / command | `diff -u` outputs |
 | tc-014 | S90 | docs-impact | docs | workflow_issue docs impact | docs impact が解決済みまたは no-op rationale 付き | relevant docs/skills | undocumented contract drift | yes | inspect-only | docs impact ledger |
 | tc-015 | S99 | final-gate | final | workflow_issue final gate | final validation and reviewers pass | full issue diff | incomplete closure | yes | command + reviewer | final report gates |
@@ -197,6 +197,7 @@ ID: "iss-00178"
       - runtime scripts、runtime templates、dogfooding copy、tests、canonical docs、GitHub state。
   - Green 検証:
     - `rg -n "PR Repair Triage Gate|fix delegation|PR repair batch|Concern Catalog|Inventory|Unit Discussion Plan|Merge-Prepared Gate" src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`
+    - `rg -n "templates/pr-repair-batch.md|pr-repair-batch.md" src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`
     - `test -f src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md`
     - `rg -n "PR / Observation Metadata|Batch Purpose|Concern Catalog|Inventory|Classification Values|Per-Concern Analysis|Repair Queue|Unit Discussion Plan|Stop Conditions|Merge-Prepared Gate" src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md`
     - `rg -n "validity.*valid.*partially-valid.*false-positive.*duplicate.*unknown|risk_class.*blocking.*material-follow-up.*minor.*false-positive.*duplicate|need_to_fix.*yes.*no.*follow-up.*human-decision|disposition.*fix-now.*follow-up.*no-action.*covered-by.*needs-human|status.*untriaged.*triaged.*unit-needed.*unit-created.*implemented.*reobserved-pass.*blocked" src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`
@@ -241,9 +242,9 @@ ID: "iss-00178"
 
 - `tc-s01-001` inspect-only: PR Repair Triage Gate と batch template が確認できる
   - 前提: provider-side merge-preparer skill を編集済み。
-  - 操作: `test -f` と `rg` で skill-local template file、gate 名、batch template sections、classification vocabulary の exact values を検索する。
-  - 期待結果: PR repair batch 専用 template が存在し、required terms と `valid` / `partially-valid` / `human-decision` / `reobserved-pass` などの標準値が provider skill / template に存在する。
-  - 失敗検出: batch artifact を省略できる、template file がない、または severity-only classification に戻る回帰を検出する。
+  - 操作: `test -f` と `rg` で skill-local template file、skill 内の exact template path reference、gate 名、batch template sections、classification vocabulary の exact values を検索する。
+  - 期待結果: PR repair batch 専用 template が存在し、provider skill が `templates/pr-repair-batch.md` を参照し、required terms と `valid` / `partially-valid` / `human-decision` / `reobserved-pass` などの標準値が provider skill / template に存在する。
+  - 失敗検出: batch artifact を省略できる、template file がない、skill が template を参照しない、または severity-only classification に戻る回帰を検出する。
   - 検証方法: S01 の Green 検証 command。
   - 関連 closure id: `tc-001`, `tc-002`, `tc-003`
 
@@ -274,7 +275,7 @@ ID: "iss-00178"
 - report evidence:
   - Step Contract Closure / Test Contract Closure / Closure Coverage
 - 残リスク:
-  - agent interpretation risk; mitigated by explicit skeleton and reviewer pass。
+  - agent interpretation risk; mitigated by explicit skill-local template and reviewer pass。
 
 #### ステップゲート（step gate）
 
@@ -425,7 +426,7 @@ ID: "iss-00178"
 - 計画済み契約:
   - safe approach:
     - Prefer supported local update path if it only updates intended managed files.
-    - Fallback: copy the three provider files to dogfooding locations if update would cause unrelated rewrites, and record rationale.
+    - Fallback: copy the changed provider skill/docs/template assets to dogfooding locations if update would cause unrelated rewrites, and record rationale.
   - allowed paths:
     - dogfooding target files above
   - forbidden changes:
@@ -503,6 +504,7 @@ ID: "iss-00178"
   - provider skills/docs/skill-local template, dogfooding copies, active issue canonical docs/discussions/report.
 - 必須 validation:
   - `git diff --check`
+  - `git diff --name-only`
   - `git diff -- src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime src/spec_dock/assets/spec_dock/templates`
   - `uv run pytest tests/unit/infra`
   - `./spec-dock/scripts/spec-dock validate`
