@@ -276,6 +276,97 @@ Observed output summary:
 #### メモ
 - S01 では runtime `new doc --template`、runtime template catalog、`spec_dock_runtime` は変更していない。
 
+### セッションログ（2026-06-10 S02）
+
+#### 対象
+- Step: S02
+- AC/EC: AC-007, AC-008
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S02 — Provider observation skill の collection-only boundary を補強する`
+  - closure ids: `tc-007`
+
+#### 実施内容
+- `github-pr-observation` skill の Overview に collection-only boundary を追加した。
+- observation skill は evidence collection のみを担い、`risk_class`、`need_to_fix`、`disposition`、repair unit grouping は行わないことを明記した。
+- collected evidence の triage / judgment は `github-pr-merge-preparer` の責務であることを明記した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n "collection-only|evidence collection|risk_class|need_to_fix|disposition|repair unit grouping|github-pr-merge-preparer" src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md
+
+22:This skill has a collection-only boundary. It performs evidence collection and
+23:returns authoritative observation evidence; it does not assign `risk_class`,
+24:decide `need_to_fix`, set `disposition`, or perform repair unit grouping.
+26:`github-pr-merge-preparer`.
+
+git diff --check
+result: pass, no output
+
+git diff -- src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime src/spec_dock/assets/spec_dock/templates
+result: pass, empty output
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only | 実装前の required `rg` は対象語句を検出せず exit 1。 | worker pre-change `rg` | pass | docs-only boundary clarification のため executable red test ではなく文書点検を採用。 |
+| S02 | 緑フェーズ（Green） | inspect-only | `collection-only`, `evidence collection`, `risk_class`, `need_to_fix`, `disposition`, `repair unit grouping`, `github-pr-merge-preparer` が `SKILL.md:22-26` に存在する。 | `rg` command above | pass | `tc-007` を確認。 |
+| S02 | リファクタリング（Refactor） | guardrail satisfied | runtime `spec_dock_runtime` と runtime `templates` に差分なし。 | `git diff --check`; forbidden runtime diff | pass | text-only 1 paragraph に留めた。 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | none | implementation | no additional requirement or plan amendment needed | N/A | no | worker summary and parent inspection |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | `tc-007` | boundary note が存在し、forbidden runtime diff がない | `rg` output at `SKILL.md:22-26`; `git diff --check`; forbidden runtime diff empty | pass | step reviewer 前の親統合判断は accepted。 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-007 | S02 | yes | inspect-only | required `rg` exit 1 | `rg -n "collection-only|evidence collection|risk_class|need_to_fix|disposition|repair unit grouping|github-pr-merge-preparer" .../github-pr-observation/SKILL.md` | pass | observation skill が judgment を持たない境界を確認。 |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-007 | S02 | `rg` collection-only / evidence collection / judgment terms; forbidden runtime diff empty | pass | AC-007 / AC-008 を確認。 |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | N/A | N/A | N/A | S02 は plan の closure ids 内で完了。 | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | shipped skill workflow text | dev-coder | provider observation skill only | `plan.md` S02 | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md` | scripts, JSON schema, runtime, tests, dogfooding copy | required `rg`; `git diff --check`; forbidden runtime diff empty | script / schema / runtime change required | worker summary, changed files, verification, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | collection-only boundary を追加し、triage / judgment は `github-pr-merge-preparer` の責務と明記。 | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md` | required `rg` -> pass; `git diff --check` -> pass; forbidden runtime diff -> empty | pass | low; text-only boundary clarification | accepted for commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | spec-reviewer | fresh | passed | no | proceed to commit | Initial review failed due to concurrent S03 docs diff in the live working tree; S03 diff was removed from the S02 review set and fresh re-review passed with no findings. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | committed | provider observation skill, report evidence | S02 commit containing this ledger entry | `git status --short` -> clean for S02 scope after commit | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md` - collection-only boundary を追加。
+
+#### コミット
+- S02 commit: docs(github-pr-observation): 監視スキルの収集専用境界を明記
+
+#### メモ
+- S02 では script、JSON schema、runtime、tests、dogfooding copy は変更していない。
+
 ### セッションログ（2026-06-10 HH:MM - HH:MM）
 
 #### 対象
