@@ -107,7 +107,8 @@ Report `merge-prepared: yes` only when all conditions are true:
 
 - PR is open.
 - Latest head re-observation is complete and matches the latest head SHA.
-- Required and non-required checks are passing, waived, or recorded as residual risk according to policy.
+- No required check failure remains.
+- No non-required check failure remains unless the check is known optional or the user explicitly waived it; waived or optional non-required failures are recorded as residual risk.
 - No visible merge conflict or equivalent merge blocker remains.
 - No `untriaged` inventory item remains.
 - No unresolved `needs-human` item remains.

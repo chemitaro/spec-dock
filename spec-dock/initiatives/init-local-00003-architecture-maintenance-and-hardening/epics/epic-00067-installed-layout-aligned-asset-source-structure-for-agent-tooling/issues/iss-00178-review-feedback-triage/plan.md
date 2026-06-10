@@ -132,7 +132,7 @@ ID: "iss-00178"
 | tc-003 | S01 | classification | acceptance | AC-003 | required fields and values が明記される | merge-preparer skill text | severity-only classification | yes | inspect-only | `rg` output + reviewer pass |
 | tc-004 | S01 | repair-unit | acceptance | AC-004 | repair unit checklist と worker handoff がある | merge-preparer skill text | raw finding used as worker source | yes | inspect-only | `rg` output + reviewer pass |
 | tc-005 | S01 | non-fix | acceptance | AC-005 | non-fix disposition に rationale / residual risk が必要 | merge-preparer skill text | silent dismissal of findings | yes | inspect-only | `rg` output + reviewer pass |
-| tc-006 | S01 | merge-prepared | acceptance | AC-006 | merge-prepared predicate は batch-aware で review-clean と区別される | merge-preparer skill text | endless review-clean loop / premature merge-prepared | yes | inspect-only | `rg` output + reviewer pass |
+| tc-006 | S01 | merge-prepared | acceptance | AC-006 | merge-prepared predicate は batch-aware で review-clean と区別され、required check failure を許さず、non-required check failure は known optional または user explicit waiver がある場合だけ残せる | merge-preparer skill text and skill-local template | endless review-clean loop / premature merge-prepared / non-mergeable check failure treated as merge-prepared | yes | inspect-only | `rg` output + reviewer pass |
 | tc-007 | S02 | observation-boundary | acceptance | AC-007 | observation skill は collection-only で judgment を持たない | observation skill text | collector starts making judgment | yes | inspect-only | `rg` output + reviewer pass |
 | tc-008 | S99 | scope-containment | negative | AC-008 | skill-local template 以外の runtime templates / doc type は変更されない | forbidden path diff | scope creep into runtime template registry | yes | inspect-only | empty diff |
 | tc-009 | S01 | stop-conditions | edge | EC-001/004/005 | timeout / observation limit は observation limitation と resume metadata として batch に残し、resume は同じ trigger boundary を使い、latest head SHA 再観測前に merge-prepared と言わず、無承認の新規 trigger を投稿しない | merge-preparer skill text | unsafe repeated repair loop / duplicate trigger / stale-head merge-prepared | yes | inspect-only | exact-term `rg` output + reviewer pass |
@@ -204,6 +204,7 @@ ID: "iss-00178"
     - `rg -n "validity.*valid.*partially-valid.*false-positive.*duplicate.*unknown|risk_class.*blocking.*material-follow-up.*minor.*false-positive.*duplicate|need_to_fix.*yes.*no.*follow-up.*human-decision|disposition.*fix-now.*follow-up.*no-action.*covered-by.*needs-human|status.*untriaged.*triaged.*unit-needed.*unit-created.*implemented.*reobserved-pass.*blocked" src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md`
     - `rg -n "source_batch|covered_ids|Implementation Plan|Re-observation Result|Residual Risk" src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`
     - `rg -n "review-clean|merge-prepared|untriaged|needs-human|human gate|latest head|resume metadata|trigger boundary|new trigger|observation limitation" src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`
+    - `rg -n "No required check failure remains|No non-required check failure remains|known optional|explicitly waived" src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md`
   - Refactor / cleanup ガードレール:
     - 目的: skill text と skill-local template の追加・再構成に留める。
     - 禁止する広がり: script / runtime / runtime template / unrelated skill の変更。
@@ -258,9 +259,9 @@ ID: "iss-00178"
 
 - `tc-s01-003` inspect-only: merge-prepared と stop conditions が確認できる
   - 前提: provider-side merge-preparer skill を編集済み。
-  - 操作: `rg` で `review-clean`、`merge-prepared`、`untriaged`、`needs-human`、`latest head`、`resume metadata`、`trigger boundary`、`new trigger`、`observation limitation` を検索する。
-  - 期待結果: review-clean と merge-prepared が区別され、timeout / observation limit は observation limitation と resume metadata で記録され、resume は同じ trigger boundary を使い、latest head SHA の re-observation 前に merge-prepared と言わず、無承認の新規 trigger を投稿しない。
-  - 失敗検出: duplicate trigger、stale-head merge-prepared、resume metadata 欠落、no major issues までの無限ループ、または untriaged item があるのに merge-prepared と言う回帰を検出する。
+  - 操作: `rg` で `review-clean`、`merge-prepared`、`untriaged`、`needs-human`、`latest head`、`resume metadata`、`trigger boundary`、`new trigger`、`observation limitation`、required / non-required check gate を検索する。
+  - 期待結果: review-clean と merge-prepared が区別され、required check failure は merge-prepared を禁止し、non-required check failure は known optional または user explicit waiver がある場合だけ残せる。timeout / observation limit は observation limitation と resume metadata で記録され、resume は同じ trigger boundary を使い、latest head SHA の re-observation 前に merge-prepared と言わず、無承認の新規 trigger を投稿しない。
+  - 失敗検出: duplicate trigger、stale-head merge-prepared、resume metadata 欠落、no major issues までの無限ループ、required check failure または未 waiver の non-required check failure があるのに merge-prepared と言う回帰、または untriaged item があるのに merge-prepared と言う回帰を検出する。
   - 検証方法: S01 の Green 検証 command。
   - 関連 closure id: `tc-006`, `tc-009`
 
