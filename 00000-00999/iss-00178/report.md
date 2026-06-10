@@ -63,7 +63,10 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | discussion / system-architect draft | `design.md` | `20260610t032530z-disc-system-architect-design-draft.md` の provider-side source of truth、PR Repair Triage Gate、batch skeleton、repair unit checklist、observation boundary、runtime non-change 方針を main orchestrator が検査し、canonical design に再記述した。 | `discussions/20260610t032530z-disc-system-architect-design-draft.md`; diff guard: 指定 discussion artifact 以外の forbidden canonical / implementation edit claim なし; design reviewer pass 済み | design reviewer passed; proceed to plan |
+| EAL-002 | adopted | discussion / implementation-planner draft | `plan.md` | `20260610t034048z-disc-implementation-planner-draft.md` の S01-S04/S90/S99、closure IDs、inspect-only evidence、stop conditions、reviewer gate 方針を main orchestrator が検査し、canonical plan に再記述した。 | `discussions/20260610t034048z-disc-implementation-planner-draft.md`; diff guard: 指定 discussion artifact 以外の forbidden canonical / implementation edit claim なし; plan reviewer pass 済み | ready for issue execution |
+
+EAL-001 / EAL-002 の `source_role`、`claim`、`target_artifact`、`target_section`、`evidence_strength`、`adopter`、`reviewer`、`blocking` は、下の `委任ドラフト証跡（Delegated Draft Evidence）` の各 row を正本補足として参照する。この EAL table は採否サマリーであり、詳細 provenance は Delegated Draft Evidence と reviewer gate rows に分離して記録する。
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +74,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | `requirement.md` / `design.md` / `plan.md` は PR observation 後の repair triage workflow hardening を主目的としている。 | runtime `new doc --template`、first-class doc type、CI log parser は対象外として明記し、PR repair batch は skill/docs skeleton に閉じた。 | low | requirement/design/plan spec-reviewer pass |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +82,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | `20260609t151424z-research-review-feedback-triage-policy.md`; `20260609t152616z-research-historical-p2-p3-review-analysis.md`; `20260609t154515z-disc-pr-repair-triage-workflow-proposal.md`; `20260610t022800z-interview-pr-repair-template-scope.md`; `20260610t031332z-disc-pr-repair-batch-dedicated-sheet-analysis.md`; local runtime/docs inspection | `20260610t022800z-interview-pr-repair-template-scope.md`: PR repair batch は通常 `disc` では足りず、専用 template が必要。unit は existing `disc`、runtime `--template` は対象外として回答採用済み | adopted | amended after previous pass to add skill-local PR repair batch template requirement; fresh re-review pending | no | promote to design after re-review |
+| design | `requirement.md`; `20260610t032530z-disc-system-architect-design-draft.md`; provider/dogfooding source inspection; report EAL-001 | none | adopted | amended after previous pass to move full batch skeleton into skill-local template file; fresh re-review pending | no | promote to plan after re-review |
+| plan | `requirement.md`; `design.md`; `20260610t034048z-disc-implementation-planner-draft.md`; phase plan docs; issue-plan authoring docs; report EAL-002 | none | adopted | amended after previous pass to add template file targets, closure checks, and dogfooding parity; fresh re-review pending | no | ready for issue execution after re-review |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -107,7 +112,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| system-architect | iss-00178 | `discussions/20260610t032530z-disc-system-architect-design-draft.md` | `requirement.md`; provider/dogfooding `github-pr-merge-preparer`; provider/dogfooding `github-pr-observation`; discussion rules; PR repair batch analysis | `design.md`; `plan.md`; `report.md`; provider skill/docs targets | adopted | `design.md`; `report.md` | passed | Provider source of truth、triage gate、batch/unit artifact contract、observation boundary、runtime non-change、verification strategy を canonical `design.md` に統合 | none | none | design spec-reviewer passed after provenance and diagram metadata fixes | promoted to design |
+| implementation-planner | iss-00178 | `discussions/20260610t034048z-disc-implementation-planner-draft.md` | `requirement.md`; `design.md`; `report.md`; phase plan docs; issue-plan authoring docs; provider skill/docs targets | `plan.md`; `report.md` | adopted | `plan.md`; `report.md` | passed | S01-S04/S90/S99、Spec-Locked Closure Index、delegation contracts、inspect-only verification、final gate を canonical `plan.md` に統合 | none | none | plan spec-reviewer passed after exact vocabulary / EC-001 / closure owner / EAL provenance fixes | ready for issue execution |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
