@@ -46,14 +46,15 @@ Add one row per real concern. Leave this table empty when no concern exists.
 
 ## Inventory
 
-| ID | source_type | concern | evidence | summary | validity | risk_class | need_to_fix | disposition | repair_unit | status | rationale | residual_risk |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ID | source_type | concern | failure_class | evidence | summary | validity | risk_class | need_to_fix | disposition | repair_unit | status | rationale | residual_risk |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 Add one row per real review finding, CI failure, merge blocker, or observation limitation. Do not keep example rows as active inventory.
 
 ## Classification Values
 
 - `validity`: `valid` / `partially-valid` / `false-positive` / `duplicate` / `unknown`
+- `failure_class`: `check_failure:<job_or_check_name>` / `review_feedback:<topic>` / `merge_conflict` / `base_branch_conflict` / `permission_or_auth` / `external_or_flaky` / `timeout` / `unknown`
 - `risk_class`: `blocking` / `material-follow-up` / `minor` / `false-positive` / `duplicate`
 - `need_to_fix`: `yes` / `no` / `follow-up` / `human-decision`
 - `disposition`: `fix-now` / `follow-up` / `no-action` / `covered-by` / `needs-human`
@@ -133,4 +134,5 @@ Report `merge-prepared: yes` only when all conditions are true:
 - No `blocking` item has an incomplete `fix-now` repair unit.
 - Every `follow-up`, `no-action`, `covered-by`, `duplicate`, or `false-positive` item has rationale and residual risk where relevant.
 - Observation limitation handling, resume metadata, trigger boundary, and new trigger approval status are recorded.
+- Review-thread unresolved state is known, or any unresolved-thread limitation is explicitly waived and recorded as residual risk.
 - `review-clean` is reported separately from `merge-prepared`; `review-clean: no` may still be `merge-prepared: yes` when all remaining items are triaged and non-blocking.
