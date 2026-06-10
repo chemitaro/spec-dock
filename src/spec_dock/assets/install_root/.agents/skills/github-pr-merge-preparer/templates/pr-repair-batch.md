@@ -27,13 +27,15 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 
 | concern_id | concern | related_inventory_ids | suspected_root_cause | repair_unit | notes |
 | --- | --- | --- | --- | --- | --- |
-| C001 |  |  |  |  |  |
+
+Add one row per real concern. Leave this table empty when no concern exists.
 
 ## Inventory
 
 | ID | source_type | concern | evidence | summary | validity | risk_class | need_to_fix | disposition | repair_unit | status | rationale | residual_risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| R001 | review_feedback | C001 |  |  | unknown | blocking | human-decision | needs-human |  | untriaged |  |  |
+
+Add one row per real review finding, CI failure, merge blocker, or observation limitation. Do not keep example rows as active inventory.
 
 ## Classification Values
 
@@ -45,7 +47,7 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 
 ## Per-Concern Analysis
 
-### C001
+### CXXX
 
 - Covered inventory IDs:
 - Validity analysis:
@@ -60,7 +62,8 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 
 | unit_id | source_batch | covered_ids | disposition | risk_class | repair_unit_disc | status | Implementation Plan | Re-observation Result | Residual Risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| U001 |  |  | fix-now | blocking |  | unit-needed |  |  |  |
+
+Add one row per real repair unit. Leave this table empty when no repair unit is needed.
 
 ## Unit Discussion Plan
 
@@ -109,6 +112,7 @@ Report `merge-prepared: yes` only when all conditions are true:
 - Latest head re-observation is complete and matches the latest head SHA.
 - No required check failure remains.
 - No non-required check failure remains unless the check is known optional or the user explicitly waived it; waived or optional non-required failures are recorded as residual risk.
+- No blocking review feedback remains.
 - No visible merge conflict or equivalent merge blocker remains.
 - No `untriaged` inventory item remains.
 - No unresolved `needs-human` item remains.

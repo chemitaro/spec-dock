@@ -36,7 +36,7 @@ This skill is a workflow coordinator. It reuses `github-pr-creator` for PR creat
 5. Invoke `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` directly with the repository, PR number, and latest head SHA. For a normal first observation, rely on the default `post-once` mode to post the fixed `@codex review` trigger. When continuing after a timeout or external limit, invoke explicit `--trigger-mode resume` with the trigger comment id / created_at from the previous final JSON. Treat the stdout final JSON as the primary result.
 6. Treat observation output as stale when it is not for the latest head SHA. After every push or re-push, obtain the new latest head SHA and re-run `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`.
 7. Before fix delegation, pass through the PR Repair Triage Gate:
-   - Create or update a PR repair batch `disc` from the skill-local template `templates/pr-repair-batch.md` (`pr-repair-batch.md`). The template is the operational control sheet; prose-only notes in this skill are insufficient.
+   - Create or update a PR repair batch from the skill-local template `templates/pr-repair-batch.md` (`pr-repair-batch.md`). When an active or explicitly provided writable SpecDock scope exists, create it as a scope-local `disc`; when no writable SpecDock scope exists, maintain an inline PR repair batch section in the response or work log using the same template sections and state `batch_path: N/A`.
    - Add every review finding, CI failure, merge blocker, and observation limitation from the observation result to the batch `Inventory`.
    - Preserve PR metadata, latest head SHA, observation command, stdout final JSON location when available, trigger comment id / created_at, resume metadata, trigger boundary, and any observation limitation.
    - Do not post an unapproved new trigger while resuming a timeout or limit. Continue within the same trigger boundary with explicit resume metadata unless the user approves a new trigger.
@@ -86,7 +86,7 @@ Report `merge-prepared: yes` only when all of these are evidenced:
 - Any waived non-required check failure is reported as residual risk.
 - No blocking review feedback remains.
 - No visible merge conflict or equivalent merge blocker remains.
-- PR repair batch exists from `templates/pr-repair-batch.md` / `pr-repair-batch.md`.
+- PR repair batch exists from `templates/pr-repair-batch.md` / `pr-repair-batch.md` as a scope-local `disc` when a writable SpecDock scope exists, or as an inline batch with `batch_path: N/A` when no writable scope exists.
 - No `untriaged` inventory item remains.
 - No unresolved `needs-human` item remains.
 - No `blocking` item with incomplete `fix-now` repair unit remains.
