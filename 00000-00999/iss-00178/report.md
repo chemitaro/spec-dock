@@ -735,6 +735,28 @@ result: pass, no output
 | R004 | `discussion_r3389786924` | valid | blocking | yes | fix-now | implemented | The batch template must be copyable into a valid issue-local `disc` artifact. |
 | R005 | `discussion_r3389786931` | valid | blocking | yes | fix-now | implemented | Batch placement must not drift to initiative / epic scope when the issue owns the PR repair loop. |
 
+### セッションログ（2026-06-10 PR #179 review repair 3）
+
+#### 対象
+- Step: PR delivery repair after second re-review
+- PR: <https://github.com/chemitaro/spec-dock/pull/179>
+- Reviewed commit: `dfdfbd7ec8`
+- Review source: Codex Review `4469616052`
+
+#### 実施内容
+- `discussion_r3389832007`: no writable SpecDock issue scope の fallback は batch だけで、repair unit は `disc` 必須のままだという指摘を妥当と判断した。no-scope 時は inline / work-log repair unit with `unit_path: N/A` を使えるよう skill guidance を補強した。
+- `discussion_r3389832011`: skill が template source 名 `pr-repair-batch.md` を target filename と誤読させる指摘を妥当と判断した。issue scope では `<ts>-disc-pr-repair-batch.md` を target とし、template source と target filename を分離した。
+- `discussion_r3389832018`: template の Merge-Prepared Gate に review-thread unresolved state known / explicit waiver 条件がなく、coordinator predicate より弱い指摘を妥当と判断した。gate に review-thread state known または waiver + residual risk 記録条件を追加した。
+- `discussion_r3389832021`: loop limit と human-gate reporting に必要な `failure_class` が Inventory にない指摘を妥当と判断した。Inventory に `failure_class` column を追加し、Classification Values に coarse label set を追加した。
+
+#### PR repair batch summary
+| ID | source | validity | risk_class | need_to_fix | disposition | status | rationale |
+|---|---|---|---|---|---|---|---|
+| R006 | `discussion_r3389832007` | valid | blocking | yes | fix-now | implemented | No-scope fallback must not dead-end before repair unit planning. |
+| R007 | `discussion_r3389832011` | valid | blocking | yes | fix-now | implemented | Target discussion filename must follow timestamped `disc` semantics. |
+| R008 | `discussion_r3389832018` | valid | blocking | yes | fix-now | implemented | Template gate must include the coordinator's review-thread waiver condition. |
+| R009 | `discussion_r3389832021` | valid | blocking | yes | fix-now | implemented | Inventory must carry `failure_class` for loop-limit decisions. |
+
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`
 - `.agents/skills/github-pr-merge-preparer/SKILL.md`
