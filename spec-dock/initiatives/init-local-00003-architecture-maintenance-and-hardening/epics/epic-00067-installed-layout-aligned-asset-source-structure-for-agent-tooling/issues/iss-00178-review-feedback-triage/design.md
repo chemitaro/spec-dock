@@ -239,6 +239,8 @@ Rules ..> Unit : names existing disc usage
   - `Residual Risk / Follow-up`
 
 - Merge-prepared additional predicate:
+  - no required check failure remains.
+  - no non-required check failure remains unless the check is known optional or the user explicitly waived it; waived or optional non-required failures are reported as residual risk.
   - no `untriaged` inventory item remains.
   - no unresolved `needs-human` item remains.
   - no `blocking` item with incomplete `fix-now` repair unit remains.

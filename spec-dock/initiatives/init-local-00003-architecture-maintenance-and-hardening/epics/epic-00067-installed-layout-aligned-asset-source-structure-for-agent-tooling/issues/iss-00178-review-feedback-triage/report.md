@@ -18,7 +18,7 @@ ID: "iss-00178"
 
 `report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
 
-Material な判断がない場合もこの section は残し、次を明示する。
+Material な判断がない場合もこの section は残し、次の no-decision statement を明示する。現在のこの report には resolved decision entries があるため、この no-decision statement は適用しない。
 
 - No material interpretation changes.
 - No decision entries.
@@ -49,7 +49,9 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | test-strategy | orchestrator / final QA | S01-S04 は skill/docs/template 中心の変更であり、runtime behavior 変更ではない。 | runtime tests を追加する; inspect-only evidence + reviewer gates で閉じる | skill/docs/template 変更は inspect-only evidence、provider/dogfooding parity、forbidden runtime diff、step reviewer pass で閉じる。 | 実行対象 script / runtime schema / runtime template catalog は変更しておらず、各 step の `rg` / `diff -u` / reviewer pass で contract を検証した。 | applied | S01-S04 session logs; step reviewer pass rows; `git diff -- src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime src/spec_dock/assets/spec_dock/templates` empty | none |
+| D-002 | resolved | scope | orchestrator / final validation | S99 で checked-in dogfooding `.meta.json` snapshot が active issue `iss-00178` を含まず infra test が失敗した。 | test を緩める; snapshot を現在の checked-in tree に正確に更新する; issue tree を削除する | snapshot を現在の checked-in dogfooding tree に合わせて最小更新する。 | test は checked-in dogfooding tree の完全一致を固定する契約であり、`iss-00178` はこの issue の正当な checked-in active issue data。assertion は緩めず、path と empty `depends_on` expectation だけを追加した。 | applied | `tests/unit/infra/test_init_update.py`; focused pytest 1 passed; full `uv run pytest tests/unit/infra` 332 passed | none |
+| D-003 | resolved | compatibility | code-reviewer / spec-reviewer / orchestrator | final reviewers が PR repair batch template の required/non-required check failure 表現が merge-preparer predicate と矛盾すると指摘した。 | required / non-required checks を同一に扱う; required check failure は blocking と明記する; non-required failure も skill predicate と同じ optional / explicit waiver 条件に揃える | required check failure は merge-prepared を禁止し、non-required check failure は known optional または明示 waiver がある場合だけ残せる。waived / optional non-required failure は residual risk として記録する。 | merge-preparer skill の predicate は `No required check failure remains` と `No non-required check failure remains unless the check is known optional or the user explicitly waived it` を要求しており、template も同じ gate を持つ必要がある。 | applied | `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md`; `.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md`; final code-reviewer P1; final spec-reviewer P1 | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -563,6 +565,123 @@ result: pass, no output
 #### メモ
 - S04 では provider source、runtime templates、issue data rewrites は変更していない。
 
+### セッションログ（2026-06-10 S90/S99）
+
+#### 対象
+- Step: S90, S99
+- AC/EC: AC-008, final closure
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `ドキュメント影響の解消ステップ S90`, `最終品質ゲートステップ S99`
+  - closure ids: `tc-008`, `tc-014`, `tc-015`
+
+#### 実施内容
+- S01-S04 の docs / skill / template impact を横断確認し、runtime `new doc --template`、runtime template catalog、`spec_dock_runtime` が out of scope のまま差分なしであることを確認した。
+- final validation 中に `tests/unit/infra` の checked-in dogfooding `.meta.json` snapshot が active issue `iss-00178` を含んでいない失敗を検出したため、現在の checked-in dogfooding tree に合わせて snapshot を最小更新した。
+- focused test と full infra suite を再実行し、S99 validation を通した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n "PR Repair Triage Gate|PR repair batch|repair unit|review-clean|merge-prepared" src/spec_dock/assets/install_root/.agents/skills src/spec_dock/assets/spec_dock/docs/rules/issue .agents/skills spec-dock/docs/rules/issue
+result: pass, provider/dogfooding skill/template/docs hits observed
+
+test -f src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md
+result: pass
+
+git diff --check
+result: pass, no output
+
+git diff --name-only
+result: pass, empty output before S99 snapshot repair; after repair only `tests/unit/infra/test_init_update.py` and this report were changed
+
+git diff -- src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime src/spec_dock/assets/spec_dock/templates
+result: pass, empty output
+
+./spec-dock/scripts/spec-dock validate
+result: pass, `spec-dock: ok (validate) nodes=91`
+
+./spec-dock/scripts/spec-dock sync --no-github
+result: pass, active unchanged and generated outputs unchanged in git status
+
+uv run pytest tests/unit/infra
+initial result: fail, 331 passed / 1 failed
+failure: `TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`; checked-in dogfooding `.meta.json` snapshot omitted active issue `iss-00178`
+
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+result after snapshot repair: pass, 1 passed
+
+uv run pytest tests/unit/infra
+result after snapshot repair: pass, 332 passed
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S90 | 緑フェーズ（Green） | inspect-only / command | docs/skill/template impact terms exist in provider and dogfooding copies; runtime templates and `spec_dock_runtime` diff empty. | `rg`; `test -f`; forbidden runtime diff | pass | No extra README / migration / runtime template update required. |
+| S99 | 赤フェーズ / 代替証跡（Red / alternative） | command | `uv run pytest tests/unit/infra` failed because checked-in dogfooding `.meta.json` snapshot omitted `iss-00178`. | `uv run pytest tests/unit/infra` | pass | Final validation revealed a snapshot maintenance failure. |
+| S99 | 緑フェーズ（Green） | command | focused test passed, then full infra suite passed. | focused pytest; `uv run pytest tests/unit/infra` | pass | 332 passed after snapshot update. |
+| S99 | リファクタリング（Refactor） | guardrail satisfied | snapshot repair touched only `tests/unit/infra/test_init_update.py`; `git diff --check` pass. | diff inspection; `git diff --check` | pass | Test expectation was updated to current checked-in dogfooding tree without relaxing assertions. |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S99 | checked-in dogfooding `.meta.json` snapshot omitted active issue `iss-00178` | final validation | added `iss-00178` path and empty `depends_on` expectation to `tests/unit/infra/test_init_update.py` | tc-015 | no | focused test 1 passed; full infra 332 passed |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | `tc-014` | docs impact が解決済みまたは no-op rationale 付き | `rg` impact terms; runtime template diff empty; no extra docs required | pass | skill-local template is intentionally not runtime template catalog. |
+| S99 | `tc-008`, `tc-015` | final validation and reviewers can pass; forbidden runtime/template diff empty | `git diff --check`; forbidden runtime diff empty; validate pass; sync pass; infra tests 332 passed | pass | reviewer gates still pending. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-008 | S99 | yes | inspect-only | N/A | `git diff -- src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime src/spec_dock/assets/spec_dock/templates` | pass | forbidden runtime/template diff empty. |
+| tc-014 | S90 | yes | inspect-only / command | N/A | S90 `rg`; `test -f`; forbidden runtime diff | pass | docs impact resolved without runtime template catalog changes. |
+| tc-015 | S99 | yes | command + reviewer | initial infra suite failed on dogfooding snapshot omission | focused pytest; full `uv run pytest tests/unit/infra` | pass | final reviewer gates pending. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-008 | S99 | forbidden runtime/template diff empty | pass | AC-008 final scope containment. |
+| tc-014 | S90 | docs impact `rg` and runtime diff | pass | No extra docs required beyond S01-S04. |
+| tc-015 | S99 | validate pass; sync pass; infra tests 332 passed | pass | Final reviewer gates pending. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added evidence | tc-015 | dogfooding-meta-snapshot | tc-015 | final validation exposed checked-in dogfooding snapshot drift for active issue `iss-00178`; expectation updated to exact current tree | no | yes, final reviewers |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S99 | delegated | final validation repair | dev-coder | checked-in dogfooding snapshot test only | current checked-in dogfooding tree | `tests/unit/infra/test_init_update.py` | implementation skill/docs/provider/dogfooding files; test logic weakening | focused pytest; `git diff --check`; full infra rerun by parent | broad test rewrite / assertion weakening | worker summary, changed files, verification, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S99 | dev-coder | checked-in dogfooding snapshot に `iss-00178` path と empty `depends_on` expectation を追加。 | `tests/unit/infra/test_init_update.py` | focused pytest -> pass; `git diff --check` -> pass; parent full infra -> 332 passed | pending final reviewers | none | accepted for final review |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | docs impact reviewer | spec-reviewer | fresh | passed | no | proceed to commit | Final spec-reviewer confirmed docs/template/runtime boundary and upstream trace. |
+| S99 | final QA / code / spec reviewers | qa-reviewer, code-reviewer, spec-reviewer | fresh | passed | no | proceed to commit | QA pass after Decision Ledger fix; code-reviewer pass after required/non-required check gate fix; spec-reviewer pass after upstream trace fix. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90/S99 | committed | final validation test snapshot, required/non-required check gate trace, report evidence | final S90/S99 commit containing this ledger entry | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/unit/infra/test_init_update.py` - checked-in dogfooding `.meta.json` snapshot に `iss-00178` を追加。
+- `spec-dock/active/issue/report.md` - S90/S99 validation evidence を記録。
+
+#### コミット
+- S90/S99 final commit: docs(review-triage): 最終ゲートの証跡とチェック条件を整合
+
+#### メモ
+- S99 snapshot repair は test expectation を緩めず、現在の checked-in dogfooding tree に追随させた。
+
 ### セッションログ（2026-06-10 HH:MM - HH:MM）
 
 #### 対象
@@ -678,27 +797,27 @@ result: pass, no output
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / README / workflow / skill / migration notes | yes | dev-coder / orchestrator | S01-S04 skill/docs/template updates; S90 `rg` impact check; forbidden runtime template diff empty; skill-local template intentionally excluded from runtime template catalog | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | runtime integration test not required; infra snapshot test required and updated | initial review failed on placeholder Decision Ledger; D-001..D-003 resolved entries added; `uv run pytest tests/unit/infra` -> 332 passed | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | initial review failed on required/non-required check wording in `pr-repair-batch.md`; template now requires no required check failure and aligns non-required failure handling with known optional / explicit waiver predicate | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | initial review failed on placeholder Decision Ledger; first re-review found non-required check residual-risk wording too broad; second re-review requested AC-006/design/plan trace; all corrected and passed | 3 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S90/S99 final ledger and reviewer repair evidence | `requirement.md`; `design.md`; `plan.md`; `tests/unit/infra/test_init_update.py`; provider/dogfooding `pr-repair-batch.md`; active issue `report.md` | PR delivery workflow after final commit | ready |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
