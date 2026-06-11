@@ -84,7 +84,7 @@ head_sha: "2fa6da0d2f55a07eb6c60bbd01d1f7a67234c75b"
 ## Repair Queue
 | unit_id | covered_items | owner | status | validation |
 |---|---|---|---|---|
-| U001 | I001-I007 | dev-coder | implemented | focused tests, full `tests/unit/infra/test_init_update.py`, runtime doctor suite, mirror diffs, `validate`, `git diff --check` |
+| U001 | I001-I007 | dev-coder | reobserved-pass | focused tests, full `tests/unit/infra/test_init_update.py`, runtime doctor suite, mirror diffs, `validate`, `git diff --check`, PR re-observation |
 
 ## Unit Discussion Plan
 - A separate repair unit is not necessary because the five items are a single bounded PR repair pass and all changes are within iss-00180's existing surfaces:
@@ -106,7 +106,7 @@ head_sha: "2fa6da0d2f55a07eb6c60bbd01d1f7a67234c75b"
   - Any remaining limitation is explicitly classified and not hidden.
 
 ## Implementation Result
-- U001 status: implemented, commit pending.
+- U001 status: implemented, committed, pushed, reobserved.
 - I001: fixed by adding `iss-00180` checked-in dogfooding `.meta.json` path and `depends_on=[]` expectation.
 - I002: fixed by updating the wait-contract test to expect typed `github_rate_limited` / `rate_limited` / `wait_or_retry_later`.
 - I003: fixed by classifying `Resource not accessible by integration` as permission denied in runtime doctor and PR observation checks helper.
@@ -129,7 +129,16 @@ head_sha: "2fa6da0d2f55a07eb6c60bbd01d1f7a67234c75b"
 - `git diff --check` -> pass
 
 ## Re-observation Plan
-- Commit U001.
-- Push branch.
-- Re-run `wait_pr_observation.sh` against PR #181 latest head SHA.
-- Treat previous Codex P2 threads as resolved only if they become stale on the new head or the new observation has no blocking unresolved findings.
+- Completed.
+- U001 commit: `cdb4a39c0818d10ee3d151c8cac8fd1b5002fd13`.
+- Re-observation command:
+  - `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh --repo chemitaro/spec-dock --pr 181 --head-sha cdb4a39c0818d10ee3d151c8cac8fd1b5002fd13 --timeout-seconds 1200 --poll-interval-seconds 30 --quiet-seconds 90 --same-fingerprint-count 2 --zero-check-grace-polls 2 --body-mode trigger-window-truncated --out /private/tmp/iss-00180-pr181-observation-2`
+- Re-observation result:
+  - CI: passed, 4/4 checks success.
+  - Latest Codex review signal: fallback issue comment with no major issues.
+  - PR state: open, ready, `MERGEABLE`.
+  - Final JSON: `overall_status=human_gate` because one old review thread remained unresolved outside the latest trigger boundary.
+- Residual risk:
+  - The remaining unresolved thread is an old-thread state limitation rather than a latest-head blocker. The repair commit addressed the finding, two prior threads became outdated, latest Codex review did not re-raise major issues, and all checks passed.
+- Merge-prepared decision:
+  - `merge-prepared=yes` for human merge decision; merge remains a human action.
