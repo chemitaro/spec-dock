@@ -57,7 +57,68 @@ class ValidationResult:
 
 @dataclass(frozen=True)
 class DoctorRequest:
-    pass
+    github_repo: str | None = None
+    github_pr: int | None = None
+    github_head_sha: str | None = None
+    github_extended: bool = False
+
+
+GitHubCapability = Literal[
+    "repo_metadata_read",
+    "pull_request_read",
+    "check_runs_read",
+    "commit_statuses_read",
+    "status_check_rollup_read",
+    "actions_read",
+    "issue_comments_read",
+    "trigger_comment_write",
+]
+GitHubCapabilityStatus = Literal[
+    "ok",
+    "permission_denied",
+    "auth_missing",
+    "rate_limited",
+    "target_unavailable",
+    "transient_unknown",
+    "schema_unavailable",
+    "skipped",
+]
+GitHubCapabilityTokenSource = Literal["GH_TOKEN", "gh_saved_auth", "unknown"]
+GitHubCapabilitySeverity = Literal["info", "warning", "blocking"]
+GitHubCapabilityGroup = Literal["core", "extended"]
+GitHubCapabilityDiagnosticCode = Literal[
+    "github_capability_ok",
+    "github_token_permission_denied",
+    "github_auth_missing",
+    "github_rate_limited",
+    "github_target_unavailable",
+    "github_transient_unknown",
+    "github_schema_unavailable",
+    "github_capability_skipped",
+]
+
+
+@dataclass(frozen=True)
+class GitHubCapabilityProbeRequest:
+    github_repo: str
+    github_pr: int
+    github_head_sha: str
+    include_extended: bool = False
+
+
+@dataclass(frozen=True)
+class GitHubCapabilityDiagnostic:
+    code: GitHubCapabilityDiagnosticCode
+    capability: GitHubCapability
+    status: GitHubCapabilityStatus
+    token_source: GitHubCapabilityTokenSource
+    api: str
+    severity: GitHubCapabilitySeverity
+    message: str
+    recommended_next_action: str
+    secret_redacted: bool
+    stderr_sha256: str | None
+    group: GitHubCapabilityGroup
 
 
 @dataclass(frozen=True)
@@ -81,6 +142,7 @@ class DoctorResult:
     ok: bool
     findings: list[DoctorFinding]
     warnings: list[str]
+    github_capability_diagnostics: list[GitHubCapabilityDiagnostic] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -678,7 +740,7 @@ class UseCases:
         RuntimeError("issue_finish is not configured")
     )
     doctor: Callable[[DoctorRequest], DoctorResult] = (
-        lambda _req: DoctorResult(ok=True, findings=[], warnings=[])
+        lambda _req: DoctorResult(ok=True, findings=[], warnings=[], github_capability_diagnostics=[])
     )
     worktree_create: Callable[[WorktreeCreateRequest], WorktreeCreateResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("worktree_create is not configured")

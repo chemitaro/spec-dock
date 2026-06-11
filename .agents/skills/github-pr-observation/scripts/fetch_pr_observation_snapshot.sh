@@ -299,6 +299,14 @@ def has_blocking_limitation(ignored_codes=None):
     )
 
 
+def has_permission_limitation():
+    return any(
+        item.get("code") == "github_token_permission_denied"
+        for item in limitations
+        if isinstance(item, dict)
+    )
+
+
 def classify_snapshot():
     ci_status = ci_payload.get("status") or summary.get("ci") or "unknown"
     review_status = review_payload.get("status") or summary.get("review") or "unknown"
@@ -323,8 +331,12 @@ def classify_snapshot():
         return "failed", "fix_ci", False
     if ci_status in {"pending", "running", "none"}:
         if has_blocking_limitation(ignored_codes={"required_checks_missing_or_pending"}):
+            if has_permission_limitation():
+                return "unknown", "fix_github_token_permissions", False
             return "unknown", "human_gate", False
         return ci_status, "wait", False
+    if has_permission_limitation():
+        return "unknown", "fix_github_token_permissions", False
     if has_blocking_limitation():
         return "unknown", "human_gate", False
     if ci_status != "passed":
