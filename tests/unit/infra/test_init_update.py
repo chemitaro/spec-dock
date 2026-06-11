@@ -13729,6 +13729,130 @@ exit 44
             assert payload["limitations"][0]["code"] == "pr_metadata_collection_failed"
             assert gh_log.read_text(encoding="utf-8").startswith("pr view 13 --repo owner/repo --json ")
 
+    def test_issue_180_s02_snapshot_maps_pr_metadata_permission_denied_to_limitation(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
+        )
+        token_marker = "ghp_secret_marker_pr_metadata"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
+    printf 'GraphQL: Resource not accessible by personal access token {token_marker}\\n' >&2
+    exit 1
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_TOKEN": token_marker,
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "unknown"
+            assert payload["overall_status"] == "unknown"
+            assert payload["observation_complete"] is False
+            assert payload["recommended_next_action"] == "fix_github_token_permissions"
+            limitation = payload["limitations"][0]
+            assert limitation["code"] == "github_token_permission_denied"
+            assert limitation["capability"] == "pull_request_read"
+            assert limitation["api"] == "gh pr view --json headRefOid,url,state,isDraft,number"
+            assert limitation["source"] == "gh_pr_view"
+            assert limitation["status"] == "permission_denied"
+            assert limitation["token_source"] == "GH_TOKEN"
+            assert limitation["secret_redacted"] is True
+            assert limitation["recommended_next_action"] == "fix_github_token_permissions"
+            assert "stderr_sha256" in limitation
+            assert "gh_stderr" not in limitation
+
+    def test_issue_180_s02_snapshot_maps_pr_metadata_integration_denied_to_limitation(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
+        )
+        token_marker = "ghs_secret_marker_pr_metadata"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
+    printf 'GraphQL: Resource not accessible by integration {token_marker}\\n' >&2
+    exit 1
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_TOKEN": token_marker,
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "unknown"
+            assert payload["overall_status"] == "unknown"
+            assert payload["observation_complete"] is False
+            assert payload["recommended_next_action"] == "fix_github_token_permissions"
+            limitation = payload["limitations"][0]
+            assert limitation["code"] == "github_token_permission_denied"
+            assert limitation["capability"] == "pull_request_read"
+            assert limitation["api"] == "gh pr view --json headRefOid,url,state,isDraft,number"
+            assert limitation["source"] == "gh_pr_view"
+            assert limitation["status"] == "permission_denied"
+            assert limitation["token_source"] == "GH_TOKEN"
+            assert limitation["secret_redacted"] is True
+            assert limitation["recommended_next_action"] == "fix_github_token_permissions"
+            assert "stderr_sha256" in limitation
+            assert "gh_stderr" not in limitation
+
     def test_issue_170_pr_observation_snapshot_derives_terminal_status_from_collectors(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -14460,6 +14584,141 @@ esac
                     ).hexdigest(),
                 }
             ]
+
+    def test_issue_180_s02_checks_collector_maps_commit_status_permission_denied(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+        token_marker = "ghp_secret_marker_commit_status"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{{"total_count":1,"check_runs":[{{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}}]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    printf 'GraphQL: Resource not accessible by personal access token {token_marker}\\n' >&2
+    exit 1
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{{"mergeStateStatus":"CLEAN","statusCheckRollup":[{{"name":"test","status":"COMPLETED","conclusion":"SUCCESS"}}]}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_TOKEN": token_marker,
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            payload = json.loads(result.stdout)
+            limitation = next(
+                item
+                for item in payload["limitations"]
+                if item.get("code") == "github_token_permission_denied"
+            )
+            assert limitation["capability"] == "commit_statuses_read"
+            assert limitation["api"] == "repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status"
+            assert limitation["status"] == "permission_denied"
+            assert limitation["secret_redacted"] is True
+            assert "stderr_sha256" in limitation
+
+    def test_issue_180_s02_checks_collector_maps_status_check_rollup_permission_denied(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+        token_marker = "ghp_secret_marker_status_rollup"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{{"total_count":1,"check_runs":[{{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}}]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{{"state":"success","statuses":[]}}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    printf 'GraphQL: Resource not accessible by personal access token {token_marker}\\n' >&2
+    exit 1
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_TOKEN": token_marker,
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            payload = json.loads(result.stdout)
+            limitation = next(
+                item
+                for item in payload["limitations"]
+                if item.get("code") == "github_token_permission_denied"
+            )
+            assert limitation["capability"] == "status_check_rollup_read"
+            assert limitation["api"] == "gh_pr_view.statusCheckRollup"
+            assert limitation["source"] == "gh_pr_view"
+            assert limitation["status"] == "permission_denied"
+            assert limitation["secret_redacted"] is True
+            assert "stderr_sha256" in limitation
 
     def test_issue_170_pr_observation_snapshot_keeps_required_checks_pending_as_wait(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
