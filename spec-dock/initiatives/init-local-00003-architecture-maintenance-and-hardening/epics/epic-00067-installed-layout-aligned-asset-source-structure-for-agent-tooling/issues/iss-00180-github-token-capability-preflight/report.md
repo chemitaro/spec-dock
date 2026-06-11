@@ -91,7 +91,7 @@ ID: "iss-00180"
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | runtime contract / tests / infra adapter | dev-coder | Runtime doctor capability diagnostics | `plan.md` S01 | S01 allowed paths | raw API checker, live GitHub tests, unrelated doctor findings | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py`; forbidden raw API surface inspection; `git diff --check` | broad command redesign, endpoint scope expansion, secret redaction cannot be asserted | changed files / tests / closure evidence / risks | pass: dev-coder implemented S01, follow-up fixed schema classification, code-reviewer pass |
 | S02 | delegated | shipped script behavior / final JSON compatibility | dev-coder | PR observation permission limitation classification | `plan.md` S02 | S02 allowed paths | arbitrary API args, extra write probes, retired wrapper | focused `tests/unit/infra/test_init_update.py` selection; nearby regression selector; `git diff --check` | status enum conflict, JSON compatibility break | changed files / tests / final JSON examples / risks | pass: dev-coder implemented S02, focused/nearby tests pass, code-reviewer pass after follow-ups |
-| S03 | planned delegation | shipped asset guidance / dogfooding parity | dev-coder or doc-writer | Guidance and parity | `plan.md` S03 | S03 allowed paths | broad docs rewrite, credential storage guidance | parity inspection and focused tests | mirror overwrite risk, scope expansion | changed files / parity evidence / risks | pending |
+| S03 | delegated | shipped asset guidance / dogfooding parity | dev-coder | Guidance and parity | `plan.md` S03 | S03 allowed paths | broad docs rewrite, credential storage guidance | provider/mirror diff inspection; focused install/parity tests; `validate`; `git diff --check` | mirror overwrite risk, scope expansion | changed files / parity evidence / risks | pass: provider guidance updated and dogfooding mirrors synced; code-reviewer pending after report evidence update |
 | S99 | planned review gates | issue-wide closure | qa-reviewer / code-reviewer / spec-reviewer | final quality gates | `plan.md` S99 | issue-wide diff | unreviewed completion | required validation commands and reviewer pass | missing closure evidence | gate verdicts / final risk | pending |
 
 ## 実装記録
@@ -107,7 +107,12 @@ ID: "iss-00180"
   - Fixed trigger comment write permission failure は `trigger_comment_write` limitation と `human_gate` として扱う。
   - auth missing / rate limit / transient / schema unavailable / invalid input を permission denied と分離した。
   - `tc-007`-`tc-011` を focused script tests で閉じた。
-- 次回実行時は `plan.md` S03 から開始する。
+- S03 complete:
+  - Provider `github-pr-observation/SKILL.md` に permission limitation semantics を追記した。
+  - Provider-side PR observation skill assets を dogfooding `.agents/skills/github-pr-observation/` に反映した。
+  - Provider-side runtime S01 changes を dogfooding `spec-dock/scripts/spec_dock_runtime/` に反映した。
+  - `tc-012` を parity inspection と focused install/parity tests で閉じた。
+- 次回実行時は `plan.md` S99 から開始する。
 
 ## 実行コマンド / 結果
 ```bash
@@ -135,6 +140,15 @@ uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02 or issue_75
 uv run pytest tests/unit/infra/test_init_update.py
 # 326 passed / 4 failed
 # failures are outside S02 allowed scope: dogfooding mirror/S03 parity and existing dogfooding snapshot mismatch
+
+diff -qr src/spec_dock/assets/install_root/.agents/skills/github-pr-observation .agents/skills/github-pr-observation
+# clean
+
+diff -qr -x __pycache__ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime spec-dock/scripts/spec_dock_runtime
+# clean
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'github_pr_observation or checked_in_dogfooding_runtime'
+# 40 passed
 ```
 
 ## テスト駆動開発証跡
@@ -148,12 +162,16 @@ uv run pytest tests/unit/infra/test_init_update.py
 | S02 | Reviewer follow-up | code-reviewer P2 generic permission denied | Generic `permission denied` fixture failed before follow-up and passed after classifier broadening | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | `tc-007` strengthened for S01/S02 classifier parity |
 | S02 | Reviewer follow-up | code-reviewer P2 trigger generic permission denied | Generic `permission denied while posting issue comment` fixture failed before follow-up and passed after trigger classifier broadening | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | `tc-008` strengthened for read/trigger classifier parity |
 | S02 | Refactor / guardrail | fixed contract retained | Diff stayed within S02 allowed paths; no raw endpoint/method args added | diff inspection; `git diff --check` | pass | Dogfooding mirror intentionally left for S03 |
+| S03 | Red / alternative | tc-012 inspect-only | Provider/mirror diff failed before sync; focused parity test failed 1/40 before dogfooding runtime sync | `diff -qr ...`; focused pytest selector | fail as expected | S01/S02 provider changes had not yet been mirrored |
+| S03 | Green | tc-012 pass | Provider/mirror diffs clean and focused parity tests pass | `diff -qr ...`; `uv run pytest tests/unit/infra/test_init_update.py -k 'github_pr_observation or checked_in_dogfooding_runtime'` | pass | 40 passed |
+| S03 | Refactor / guardrail | guidance/mirror only | Diff limited to SKILL guidance and dogfooding mirrors | diff inspection; `git diff --check` | pass | No broad docs rewrite or credential storage guidance |
 
 ## ステップ契約の完了証跡
 | step | closure ids | close condition from plan | observed evidence | result | notes |
 |---|---|---|---|---|---|
 | S01 | tc-001-tc-006 | Runtime doctor capability diagnostics implemented, verified, and reviewed | Tests `34 passed`; forbidden surface inspection pass; code-reviewer pass | pass | S01 scope complete |
 | S02 | tc-007-tc-011 | PR observation permission limitation classification implemented, verified, and reviewed | Focused tests 6 passed; nearby regression 41 passed; code-reviewer pass after generic permission follow-ups | pass | S02 provider-side scope complete; S03 parity pending |
+| S03 | tc-012 | Guidance and dogfooding parity implemented, verified, and reviewed | Provider/mirror diffs clean; focused parity tests 40 passed; code-reviewer pending after report evidence update | pass | S03 scope complete |
 
 ## テスト契約の完了証跡
 | closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or path | observed result | notes |
@@ -169,6 +187,7 @@ uv run pytest tests/unit/infra/test_init_update.py
 | tc-009 | S02 | yes | red-required | Focused S02 test failed before implementation because non-permission failures collapsed into generic failure | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | auth/rate/transient/schema are distinct and not `github_token_permission_denied` |
 | tc-010 | S02 | yes | red-required | Existing usage contract characterized invalid input as exit 64 | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | invalid `--head-sha` remains usage error and emits no token limitation |
 | tc-011 | S02 | yes | red-required | Focused S02 tests failed before implementation because token marker could leak in trigger helper JSON | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | raw token-like stderr marker absent; limitation includes `stderr_sha256` and `secret_redacted=true` |
+| tc-012 | S03 | yes | inspect-only | Provider/mirror diffs and focused dogfooding parity test failed before sync | provider/mirror `diff -qr`; `uv run pytest tests/unit/infra/test_init_update.py -k 'github_pr_observation or checked_in_dogfooding_runtime'` | pass | PR observation skill mirror and dogfooding runtime mirror match provider-side sources excluding `__pycache__` |
 
 ## クロージャ網羅
 | closure id | step | verification evidence | result | notes |
@@ -184,6 +203,7 @@ uv run pytest tests/unit/infra/test_init_update.py
 | tc-009 | S02 | `test_issue_180_s02_checks_collector_keeps_non_permission_failures_distinct` | pass | Auth/rate/transient/schema classification covered |
 | tc-010 | S02 | `test_issue_180_s02_checks_collector_invalid_input_remains_usage_error` | pass | Usage error remains non-zero |
 | tc-011 | S02 | `test_issue_180_s02_trigger_helper_classifies_comment_permission_denied_without_secret`; snapshot permission test | pass | Secret marker excluded from final JSON |
+| tc-012 | S03 | provider/mirror diff inspections; checked-in dogfooding parity tests | pass | Shipped guidance and dogfooding mirrors align |
 
 ## クロージャ差分
 | change | closure id | test id alias | resolved closure id | reason | plan amendment required | re-review required |
@@ -192,18 +212,21 @@ uv run pytest tests/unit/infra/test_init_update.py
 | changed | tc-007 | generic permission denied fixture | tc-007 | code-reviewer P2 requested parity with S01 runtime classifier | no | yes, S02 code-reviewer re-review |
 | changed | tc-008 | generic trigger permission denied fixture | tc-008 | code-reviewer P2 requested parity with read-side classifier | no | yes, S02 code-reviewer re-review |
 | none | tc-009-tc-011 | S02 PR observation focused tests | tc-009-tc-011 | Planned closure ids closed as written | no | no |
+| none | tc-012 | S03 parity inspection and focused tests | tc-012 | Planned closure id closed as written | no | yes, S03 code-reviewer re-review |
 
 ## 委任 worker 証跡
 | step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
 |---|---|---|---|---|---|---|---|
 | S01 | dev-coder | Added runtime GitHub capability diagnostics, fixed CLI probe port/adapter, added focused tests; follow-up fixed `Unknown JSON field` schema classification | `application/contracts.py`; `application/ports.py`; `application/doctor.py`; `commands/doctor.py`; `cli/bootstrap.py`; `infra/github_capability_cli.py`; `presentation/cli_text.py`; `tests/cli_runtime/test_runtime_doctor_s04.py` | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` -> 34 passed; `git diff --check` -> pass | code-reviewer pass after follow-up | Live GitHub API behavior intentionally not tested per plan; S02 remains pending | accepted |
 | S02 | dev-coder | Added PR observation permission limitation classification for checks/status/rollup and trigger comment write, with focused script tests; follow-ups broadened generic `permission denied` matching for read and trigger paths | `fetch_pr_checks_snapshot.sh`; `fetch_pr_observation_snapshot.sh`; `trigger_codex_review.sh`; `wait_pr_observation.sh`; `tests/unit/infra/test_init_update.py` | `issue_180_s02` -> 6 passed; nearby PR observation selector -> 41 passed; `git diff --check` -> pass | code-reviewer pass after follow-ups | Full `test_init_update.py` has 4 failures in S03 parity / existing dogfooding snapshot scope | accepted |
+| S03 | dev-coder | Updated provider skill guidance and mirrored PR observation assets plus runtime dogfooding files | provider `github-pr-observation/SKILL.md`; `.agents/skills/github-pr-observation/**`; `spec-dock/scripts/spec_dock_runtime/**` | provider/mirror diffs clean; focused parity tests -> 40 passed; `validate` -> ok; `git diff --check` -> pass | code-reviewer pending after report evidence update | Live GitHub API not exercised per plan | accepted |
 
 ## ステップ commit ゲート
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
 | S01 | ready_to_commit | Runtime doctor capability diagnostics and S01 report evidence | pending commit | pending | N/A | N/A | N/A | N/A |
 | S02 | ready_to_commit | Provider-side PR observation permission limitation classification and S02 report evidence | pending commit | pending | N/A | N/A | N/A | N/A |
+| S03 | ready_to_commit | Guidance and dogfooding mirror parity plus S03 report evidence | pending commit | pending | N/A | N/A | N/A | N/A |
 
 ## 最終品質ゲート
 | gate | scope | result | evidence | next action |
@@ -211,4 +234,4 @@ uv run pytest tests/unit/infra/test_init_update.py
 | authoring requirement gate | `requirement.md` | pass | fresh spec-reviewer pass | complete |
 | authoring design gate | `design.md` | pass | fresh spec-reviewer pass | complete |
 | authoring plan gate | `plan.md` | pass | fresh spec-reviewer pass | complete |
-| issue execution gate | S01-S99 | in progress | S01 complete; S02 complete; S03 pending | start S03 |
+| issue execution gate | S01-S99 | in progress | S01 complete; S02 complete; S03 complete; S99 pending | start S99 |

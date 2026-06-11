@@ -55,9 +55,13 @@ def render_validate_text(result: ValidationResult) -> CliText:
 
 def render_doctor_text(result: DoctorResult) -> CliText:
     warnings = [_doctor_warning_message(warning) for warning in result.warnings]
+    capability_lines = _render_github_capability_diagnostics(result)
     if result.ok:
         return CliText(
-            stdout_lines=["spec-dock: ok (doctor) findings=0"],
+            stdout_lines=[
+                "spec-dock: ok (doctor) findings=0",
+                *capability_lines,
+            ],
             stderr_lines=[],
             warnings=warnings,
         )
@@ -67,12 +71,35 @@ def render_doctor_text(result: DoctorResult) -> CliText:
         stderr_lines.append(f"- [{finding.code}] {finding.message}")
         for guidance in finding.guidance:
             stderr_lines.append(f"  -> {guidance}")
+    stderr_lines.extend(capability_lines)
 
     return CliText(
         stdout_lines=[],
         stderr_lines=stderr_lines,
         warnings=warnings,
     )
+
+
+def _render_github_capability_diagnostics(result: DoctorResult) -> list[str]:
+    diagnostics = list(result.github_capability_diagnostics)
+    if not diagnostics:
+        return []
+    lines = [f"spec-dock: github capability diagnostics={len(diagnostics)}"]
+    for diagnostic in diagnostics:
+        stderr_hash = f" stderr_sha256={diagnostic.stderr_sha256}" if diagnostic.stderr_sha256 else ""
+        lines.append(
+            f"- [github:{diagnostic.group}] "
+            f"code={diagnostic.code} "
+            f"capability={diagnostic.capability} "
+            f"status={diagnostic.status} "
+            f"api={diagnostic.api} "
+            f"token_source={diagnostic.token_source} "
+            f"severity={diagnostic.severity} "
+            f"recommended_next_action={diagnostic.recommended_next_action} "
+            f"secret_redacted={str(diagnostic.secret_redacted).lower()}"
+            f"{stderr_hash}"
+        )
+    return lines
 
 
 def _rel_path_for_output(path_text: str) -> str:

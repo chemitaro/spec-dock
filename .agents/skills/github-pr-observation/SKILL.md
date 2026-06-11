@@ -44,6 +44,25 @@ Triage and judgment over collected evidence belong to
   machine-readable `limitations`.
 - `summary.md` is never generated.
 
+## Permission Limitations
+
+- The final JSON written to `stdout` is the authority for permission limitation
+  semantics; `stderr` progress is non-authoritative.
+- GitHub token permission failures are reported with
+  `limitations[].code="github_token_permission_denied"` and
+  `recommended_next_action="fix_github_token_permissions"`.
+- Read permission failures for checks, statuses, or status rollup keep process
+  exit success when final JSON can be built, but return semantic non-success:
+  `normalized_status="unknown"` and `overall_status="unknown"`.
+- The fixed `@codex review` trigger comment write failure is separate from read
+  collection failures. It returns `normalized_status="human_gate"`,
+  `overall_status="human_gate"`, and a
+  `limitations[].capability="trigger_comment_write"` permission limitation.
+- These scripts remain a fixed PR observation surface, not an arbitrary GitHub
+  permission scanner. Do not add caller-provided endpoints, methods, GraphQL,
+  headers, request bodies, `jq`, or raw `gh` arguments.
+- Token values, `hosts.yml` secrets, and private payloads must never be emitted.
+
 ## Entry Points
 
 ```bash
