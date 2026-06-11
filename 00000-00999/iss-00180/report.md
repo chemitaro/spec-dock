@@ -18,10 +18,13 @@ ID: "iss-00180"
   - `design.md`: 作成済み、fresh spec-reviewer pass。
   - `plan.md`: 作成済み、fresh spec-reviewer pass。
 - 実装:
-  - 未着手。次工程は `plan.md` S01 からの dev-coder 委任。
+  - S01 Runtime doctor capability diagnostics: 実装済み、focused tests pass、code-reviewer pass、commit 済み。
+  - S02 PR observation permission limitation classification: 実装済み、focused / nearby tests pass、code-reviewer pass、commit 済み。
+  - S03 Guidance / dogfooding parity: 実装済み、provider/mirror parity pass、code-reviewer pass、commit 済み。
+  - S99 final gate: 初回 final reviewers の P1/P2 指摘を反映済み。`doctor` malformed target rejection、PR metadata / commit status / statusCheckRollup permission coverage、`Resource not accessible by integration` 分類を追補実装済み。fresh final QA / code / spec reviewer pass。
 - handoff readiness:
-  - ready for issue execution。
-  - 実行者は `plan.md` の S01 -> S02 -> S03 -> S99 の順に進める。
+  - ready for final commit and PR creation。
+  - final commit、PR 作成・観測が残作業。
 
 ## 仕様解釈・判断台帳
 | ID | Status | Type | Raised By | Gap | 検討した選択肢 | 判断 / 解釈 | Rationale | Disposition | Evidence | Follow-up |
@@ -91,8 +94,8 @@ ID: "iss-00180"
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | runtime contract / tests / infra adapter | dev-coder | Runtime doctor capability diagnostics | `plan.md` S01 | S01 allowed paths | raw API checker, live GitHub tests, unrelated doctor findings | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py`; forbidden raw API surface inspection; `git diff --check` | broad command redesign, endpoint scope expansion, secret redaction cannot be asserted | changed files / tests / closure evidence / risks | pass: dev-coder implemented S01, follow-up fixed schema classification, code-reviewer pass |
 | S02 | delegated | shipped script behavior / final JSON compatibility | dev-coder | PR observation permission limitation classification | `plan.md` S02 | S02 allowed paths | arbitrary API args, extra write probes, retired wrapper | focused `tests/unit/infra/test_init_update.py` selection; nearby regression selector; `git diff --check` | status enum conflict, JSON compatibility break | changed files / tests / final JSON examples / risks | pass: dev-coder implemented S02, focused/nearby tests pass, code-reviewer pass after follow-ups |
-| S03 | delegated | shipped asset guidance / dogfooding parity | dev-coder | Guidance and parity | `plan.md` S03 | S03 allowed paths | broad docs rewrite, credential storage guidance | provider/mirror diff inspection; focused install/parity tests; `validate`; `git diff --check` | mirror overwrite risk, scope expansion | changed files / parity evidence / risks | pass: provider guidance updated and dogfooding mirrors synced; code-reviewer pending after report evidence update |
-| S99 | planned review gates | issue-wide closure | qa-reviewer / code-reviewer / spec-reviewer | final quality gates | `plan.md` S99 | issue-wide diff | unreviewed completion | required validation commands and reviewer pass | missing closure evidence | gate verdicts / final risk | pending |
+| S03 | delegated | shipped asset guidance / dogfooding parity | dev-coder | Guidance and parity | `plan.md` S03 | S03 allowed paths | broad docs rewrite, credential storage guidance | provider/mirror diff inspection; focused install/parity tests; `validate`; `git diff --check` | mirror overwrite risk, scope expansion | changed files / parity evidence / risks | pass: provider guidance updated and dogfooding mirrors synced; code-reviewer pass |
+| S99 | delegated / passed | issue-wide closure | qa-reviewer / code-reviewer / spec-reviewer / dev-coder | final quality gates and reviewer follow-ups | `plan.md` S99 | issue-wide diff; bounded follow-up paths | unreviewed completion, live GitHub tests, arbitrary API expansion | required validation commands and reviewer pass | missing closure evidence, implementation reviewer finding | gate verdicts / final risk | pass: first final reviewers failed on stale report and P2 coverage gaps; follow-up implementation verified; final QA/code/spec reviewers passed |
 
 ## 実装記録
 - S01 complete:
@@ -112,7 +115,12 @@ ID: "iss-00180"
   - Provider-side PR observation skill assets を dogfooding `.agents/skills/github-pr-observation/` に反映した。
   - Provider-side runtime S01 changes を dogfooding `spec-dock/scripts/spec_dock_runtime/` に反映した。
   - `tc-012` を parity inspection と focused install/parity tests で閉じた。
-- 次回実行時は `plan.md` S99 から開始する。
+- S99 in progress:
+  - 初回 final QA / code / spec reviewer で stale report evidence と追補 coverage gaps を確認した。
+  - `doctor --github-repo/--github-pr/--github-head-sha` の malformed target を CLI misuse として reject する追補を実装した。
+  - PR observation read permission coverage を PR metadata `pull_request_read`、commit status `/status`、`statusCheckRollup` に拡張した。
+  - PR metadata permission denied でも raw stderr / token marker を出さず、`stderr_sha256` と `secret_redacted=true` を返す。
+  - code-reviewer P2 により、GitHub App / `GITHUB_TOKEN` 系の `Resource not accessible by integration` を permission denied として扱う追補が必要と判定されたため、dev-coder に委任し、provider / dogfooding mirror とテストを更新した。
 
 ## 実行コマンド / 結果
 ```bash
@@ -149,6 +157,27 @@ diff -qr -x __pycache__ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime
 
 uv run pytest tests/unit/infra/test_init_update.py -k 'github_pr_observation or checked_in_dogfooding_runtime'
 # 40 passed
+
+uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py
+# 37 passed
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02 or github_pr_observation or codex_review or checks_snapshot or checked_in_dogfooding_runtime'
+# 56 passed, 279 deselected
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02 and pr_metadata'
+# 2 passed, 333 deselected
+
+diff -qr -x __pycache__ src/spec_dock/assets/install_root/.agents/skills/github-pr-observation .agents/skills/github-pr-observation
+# clean
+
+diff -qr -x __pycache__ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime spec-dock/scripts/spec_dock_runtime
+# clean
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=92
+
+git diff --check
+# pass
 ```
 
 ## テスト駆動開発証跡
@@ -165,13 +194,18 @@ uv run pytest tests/unit/infra/test_init_update.py -k 'github_pr_observation or 
 | S03 | Red / alternative | tc-012 inspect-only | Provider/mirror diff failed before sync; focused parity test failed 1/40 before dogfooding runtime sync | `diff -qr ...`; focused pytest selector | fail as expected | S01/S02 provider changes had not yet been mirrored |
 | S03 | Green | tc-012 pass | Provider/mirror diffs clean and focused parity tests pass | `diff -qr ...`; `uv run pytest tests/unit/infra/test_init_update.py -k 'github_pr_observation or checked_in_dogfooding_runtime'` | pass | 40 passed |
 | S03 | Refactor / guardrail | guidance/mirror only | Diff limited to SKILL guidance and dogfooding mirrors | diff inspection; `git diff --check` | pass | No broad docs rewrite or credential storage guidance |
+| S99 | Red / reviewer follow-up | final reviewer P2 coverage gaps | Malformed doctor target test failed before follow-up; PR metadata permission denied mapped to generic path before follow-up | dev-coder focused red runs | fail as expected | `malformed_github_targets`: 3 failed before fix; `pr_metadata` permission path: 1 failed / 2 passed before fix |
+| S99 | Green / follow-up | tc-004 / tc-007 / tc-011 strengthened | Runtime doctor suite and PR observation issue-wide selector passed | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py`; PR observation selector | pass | 37 passed; 56 passed / 279 deselected |
+| S99 | Red / reviewer follow-up | code-reviewer P2 integration permission wording | `Resource not accessible by integration` PR metadata classification gap found | code-reviewer review; dev-coder red test | fail as expected | `recommended_next_action` fell to `human_gate` before fix |
+| S99 | Green / reviewer follow-up | code-reviewer P2 integration permission wording | Integration-denied PR metadata fixture passes and maps to token permission limitation | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02 and pr_metadata'`; broader PR observation selector | pass | 2 passed; 56 passed / 279 deselected |
 
 ## ステップ契約の完了証跡
 | step | closure ids | close condition from plan | observed evidence | result | notes |
 |---|---|---|---|---|---|
 | S01 | tc-001-tc-006 | Runtime doctor capability diagnostics implemented, verified, and reviewed | Tests `34 passed`; forbidden surface inspection pass; code-reviewer pass | pass | S01 scope complete |
 | S02 | tc-007-tc-011 | PR observation permission limitation classification implemented, verified, and reviewed | Focused tests 6 passed; nearby regression 41 passed; code-reviewer pass after generic permission follow-ups | pass | S02 provider-side scope complete; S03 parity pending |
-| S03 | tc-012 | Guidance and dogfooding parity implemented, verified, and reviewed | Provider/mirror diffs clean; focused parity tests 40 passed; code-reviewer pending after report evidence update | pass | S03 scope complete |
+| S03 | tc-012 | Guidance and dogfooding parity implemented, verified, and reviewed | Provider/mirror diffs clean; focused parity tests 40 passed; code-reviewer pass | pass | S03 scope complete |
+| S99 | tc-013 | Issue-wide validation / QA / code / spec review / handoff gates pass | Focused runtime tests 37 passed; PR observation selector 56 passed; `issue_180_s02 and pr_metadata` 2 passed; provider/mirror diffs clean; validate ok; `git diff --check` pass; final QA pass; final code-reviewer pass; final spec-reviewer pass | pass | S99 scope complete before final commit / PR delivery |
 
 ## テスト契約の完了証跡
 | closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or path | observed result | notes |
@@ -179,15 +213,16 @@ uv run pytest tests/unit/infra/test_init_update.py -k 'github_pr_observation or 
 | tc-001 | S01 | yes | red-required | Added test failed before implementation due missing capability contract / port | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` | pass | `check_runs_read` permission denied renders status/api/source/action without token value |
 | tc-002 | S01 | yes | red-required | Added test failed before implementation due missing no-target diagnostic | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` | pass | No target returns `target_unavailable`, gateway not called, structural success retained |
 | tc-003 | S01 | yes | red-required | Added test failed before implementation due missing extended diagnostics | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` | pass | `actions_read` / `issue_comments_read` render as `[github:extended]` |
-| tc-004 | S01 | yes | inspect-only | Parser surface lacked explicit fixed GitHub args before S01 | parser negative test; implementation `rg` inspection | pass | No raw endpoint / method / jq / header / raw surface in implementation |
+| tc-004 | S01 | yes | inspect-only | Parser surface lacked explicit fixed GitHub args before S01; malformed target arguments were accepted before S99 follow-up | parser negative test; implementation `rg` inspection; malformed target parser test | pass | No raw endpoint / method / jq / header / raw surface in implementation; malformed `--github-repo`, non-positive `--github-pr`, and non-hex `--github-head-sha` reject at parse time |
 | tc-005 | S01 | yes | red-required | Added test failed before implementation due missing auth diagnostics | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` | pass | `auth_missing` remains distinct from `permission_denied` and token source is non-secret |
 | tc-006 | S01 | yes | red-required | Initial implementation classified `Unknown JSON field` as `transient_unknown`; follow-up red evidence reproduced it | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` | pass | rate limit / transient / schema unavailable render distinctly; `Unknown JSON field` maps to `schema_unavailable` |
-| tc-007 | S02 | yes | red-required | Focused S02 test failed before implementation because checks permission denied stayed generic | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | check-runs permission denied exits 0 and yields `github_token_permission_denied`, `unknown`, and `fix_github_token_permissions` |
+| tc-007 | S02 | yes | red-required | Focused S02 test failed before implementation because checks permission denied stayed generic; PR metadata permission denied mapped to generic path before S99 follow-up; integration wording mapped to `human_gate` before final follow-up | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02 and pr_metadata'`; S99 PR observation selector | pass | check-runs, commit status `/status`, statusCheckRollup, PR metadata PAT wording, and PR metadata integration wording permission denied paths are covered |
 | tc-008 | S02 | yes | red-required | Focused S02 test failed before implementation because trigger permission denied leaked raw marker and did not map to human gate | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | trigger comment permission denied exits 0 and yields `trigger_comment_write` / `human_gate` |
 | tc-009 | S02 | yes | red-required | Focused S02 test failed before implementation because non-permission failures collapsed into generic failure | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | auth/rate/transient/schema are distinct and not `github_token_permission_denied` |
 | tc-010 | S02 | yes | red-required | Existing usage contract characterized invalid input as exit 64 | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | invalid `--head-sha` remains usage error and emits no token limitation |
 | tc-011 | S02 | yes | red-required | Focused S02 tests failed before implementation because token marker could leak in trigger helper JSON | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | raw token-like stderr marker absent; limitation includes `stderr_sha256` and `secret_redacted=true` |
 | tc-012 | S03 | yes | inspect-only | Provider/mirror diffs and focused dogfooding parity test failed before sync | provider/mirror `diff -qr`; `uv run pytest tests/unit/infra/test_init_update.py -k 'github_pr_observation or checked_in_dogfooding_runtime'` | pass | PR observation skill mirror and dogfooding runtime mirror match provider-side sources excluding `__pycache__` |
+| tc-013 | S99 | yes | manual-required | First final reviewer pass failed on stale report and P2 coverage gaps | final QA / code / spec reviewer gates; final validation commands | pass | Final QA pass with P2 ledger update request; final code-reviewer pass; final spec-reviewer pass |
 
 ## クロージャ網羅
 | closure id | step | verification evidence | result | notes |
@@ -204,6 +239,7 @@ uv run pytest tests/unit/infra/test_init_update.py -k 'github_pr_observation or 
 | tc-010 | S02 | `test_issue_180_s02_checks_collector_invalid_input_remains_usage_error` | pass | Usage error remains non-zero |
 | tc-011 | S02 | `test_issue_180_s02_trigger_helper_classifies_comment_permission_denied_without_secret`; snapshot permission test | pass | Secret marker excluded from final JSON |
 | tc-012 | S03 | provider/mirror diff inspections; checked-in dogfooding parity tests | pass | Shipped guidance and dogfooding mirrors align |
+| tc-013 | S99 | focused tests, parity diff, `validate`, `git diff --check`, final reviewer gates | pass | S99 final gate closed |
 
 ## クロージャ差分
 | change | closure id | test id alias | resolved closure id | reason | plan amendment required | re-review required |
@@ -213,20 +249,28 @@ uv run pytest tests/unit/infra/test_init_update.py -k 'github_pr_observation or 
 | changed | tc-008 | generic trigger permission denied fixture | tc-008 | code-reviewer P2 requested parity with read-side classifier | no | yes, S02 code-reviewer re-review |
 | none | tc-009-tc-011 | S02 PR observation focused tests | tc-009-tc-011 | Planned closure ids closed as written | no | no |
 | none | tc-012 | S03 parity inspection and focused tests | tc-012 | Planned closure id closed as written | no | yes, S03 code-reviewer re-review |
+| changed | tc-004 | malformed GitHub target parser test | tc-004 | final code-reviewer requested malformed local target rejection instead of accepting invalid target values | no | yes, S99 code-reviewer re-review |
+| changed | tc-007 | PR metadata / commit status / statusCheckRollup permission fixtures | tc-007 | final QA/code reviewers requested branch coverage for all PR observation read permission paths | no | yes, S99 code-reviewer re-review |
+| changed | tc-007 | PR metadata integration permission fixture | tc-007 | code-reviewer P2 identified `Resource not accessible by integration` as unclassified permission wording | no | yes, S99 code-reviewer re-review |
+| changed | tc-011 | PR metadata secret redaction fixture | tc-011 | final reviewers requested secret redaction evidence for PR metadata permission failure path | no | yes, S99 code-reviewer re-review |
+| changed | tc-013 | final reviewer gates | tc-013 | Final QA/code/spec reviewers passed after S99 follow-up implementation and report evidence update | no | no |
 
 ## 委任 worker 証跡
 | step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
 |---|---|---|---|---|---|---|---|
 | S01 | dev-coder | Added runtime GitHub capability diagnostics, fixed CLI probe port/adapter, added focused tests; follow-up fixed `Unknown JSON field` schema classification | `application/contracts.py`; `application/ports.py`; `application/doctor.py`; `commands/doctor.py`; `cli/bootstrap.py`; `infra/github_capability_cli.py`; `presentation/cli_text.py`; `tests/cli_runtime/test_runtime_doctor_s04.py` | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` -> 34 passed; `git diff --check` -> pass | code-reviewer pass after follow-up | Live GitHub API behavior intentionally not tested per plan; S02 remains pending | accepted |
 | S02 | dev-coder | Added PR observation permission limitation classification for checks/status/rollup and trigger comment write, with focused script tests; follow-ups broadened generic `permission denied` matching for read and trigger paths | `fetch_pr_checks_snapshot.sh`; `fetch_pr_observation_snapshot.sh`; `trigger_codex_review.sh`; `wait_pr_observation.sh`; `tests/unit/infra/test_init_update.py` | `issue_180_s02` -> 6 passed; nearby PR observation selector -> 41 passed; `git diff --check` -> pass | code-reviewer pass after follow-ups | Full `test_init_update.py` has 4 failures in S03 parity / existing dogfooding snapshot scope | accepted |
-| S03 | dev-coder | Updated provider skill guidance and mirrored PR observation assets plus runtime dogfooding files | provider `github-pr-observation/SKILL.md`; `.agents/skills/github-pr-observation/**`; `spec-dock/scripts/spec_dock_runtime/**` | provider/mirror diffs clean; focused parity tests -> 40 passed; `validate` -> ok; `git diff --check` -> pass | code-reviewer pending after report evidence update | Live GitHub API not exercised per plan | accepted |
+| S03 | dev-coder | Updated provider skill guidance and mirrored PR observation assets plus runtime dogfooding files | provider `github-pr-observation/SKILL.md`; `.agents/skills/github-pr-observation/**`; `spec-dock/scripts/spec_dock_runtime/**` | provider/mirror diffs clean; focused parity tests -> 40 passed; `validate` -> ok; `git diff --check` -> pass | code-reviewer pass | Live GitHub API not exercised per plan | accepted |
+| S99 follow-up 1 | dev-coder | Added malformed doctor target rejection and expanded read permission coverage for PR metadata, commit status, and statusCheckRollup | `commands/doctor.py`; `fetch_pr_observation_snapshot.sh`; dogfooding mirrors; `tests/cli_runtime/test_runtime_doctor_s04.py`; `tests/unit/infra/test_init_update.py` | runtime doctor suite -> 37 passed; PR observation selector -> 55 passed; provider/mirror diffs clean; `validate` -> ok; `git diff --check` -> pass | code-reviewer fail | live GitHub API intentionally not exercised; integration wording gap found | accepted with follow-up |
+| S99 follow-up 2 | dev-coder | GitHub App / `GITHUB_TOKEN` integration permission wording classification | `fetch_pr_observation_snapshot.sh`; dogfooding mirror; `tests/unit/infra/test_init_update.py` | `issue_180_s02 and pr_metadata` -> 2 passed; PR observation selector -> 56 passed; provider/mirror diff clean; `git diff --check` -> pass | final code-reviewer pass | live GitHub API intentionally not exercised | accepted |
 
 ## ステップ commit ゲート
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S01 | ready_to_commit | Runtime doctor capability diagnostics and S01 report evidence | pending commit | pending | N/A | N/A | N/A | N/A |
-| S02 | ready_to_commit | Provider-side PR observation permission limitation classification and S02 report evidence | pending commit | pending | N/A | N/A | N/A | N/A |
-| S03 | ready_to_commit | Guidance and dogfooding mirror parity plus S03 report evidence | pending commit | pending | N/A | N/A | N/A | N/A |
+| S01 | committed | Runtime doctor capability diagnostics and S01 report evidence | `a8d128d5` | clean after commit | N/A | N/A | N/A | N/A |
+| S02 | committed | Provider-side PR observation permission limitation classification and S02 report evidence | `0bfe1049` | clean after commit | N/A | N/A | N/A | N/A |
+| S03 | committed | Guidance and dogfooding mirror parity plus S03 report evidence | `8499971d` | clean after commit | N/A | N/A | N/A | N/A |
+| S99 follow-up | ready_to_commit | Final reviewer implementation follow-ups and final report evidence | pending final commit | pending | N/A | N/A | N/A | N/A |
 
 ## 最終品質ゲート
 | gate | scope | result | evidence | next action |
@@ -234,4 +278,4 @@ uv run pytest tests/unit/infra/test_init_update.py -k 'github_pr_observation or 
 | authoring requirement gate | `requirement.md` | pass | fresh spec-reviewer pass | complete |
 | authoring design gate | `design.md` | pass | fresh spec-reviewer pass | complete |
 | authoring plan gate | `plan.md` | pass | fresh spec-reviewer pass | complete |
-| issue execution gate | S01-S99 | in progress | S01 complete; S02 complete; S03 complete; S99 pending | start S99 |
+| issue execution gate | S01-S99 | pass | S01 complete; S02 complete; S03 complete; S99 final QA/code/spec reviewers passed | commit final follow-up and create PR |
