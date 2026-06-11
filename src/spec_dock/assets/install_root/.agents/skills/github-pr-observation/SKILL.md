@@ -19,6 +19,12 @@ Codex review completion for that trigger boundary. `fetch_pr_observation_snapsho
 is read-only and collects one snapshot. `stdout` is machine-readable JSON only.
 Progress and diagnostics belong on `stderr` and are non-authoritative.
 
+This skill has a collection-only boundary. It performs evidence collection and
+returns authoritative observation evidence; it does not assign `risk_class`,
+decide `need_to_fix`, set `disposition`, or perform repair unit grouping.
+Triage and judgment over collected evidence belong to
+`github-pr-merge-preparer`.
+
 ## Public Script Contract
 
 - `wait_pr_observation.sh` may perform one fixed GitHub write through the
