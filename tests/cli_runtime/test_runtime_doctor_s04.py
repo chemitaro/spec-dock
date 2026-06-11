@@ -291,6 +291,25 @@ class TestRuntimeDoctorS04:
             with pytest.raises(SystemExit):
                 parser.parse_args([forbidden, "value"])
 
+    @pytest.mark.parametrize(
+        "args",
+        (
+            ["--github-repo", "not-a-repo", "--github-pr", "123", "--github-head-sha", "abcde12345"],
+            ["--github-repo", "example/repo", "--github-pr", "0", "--github-head-sha", "abcde12345"],
+            ["--github-repo", "example/repo", "--github-pr", "123", "--github-head-sha", "not-a-sha"],
+        ),
+    )
+    def test_doctor_command_surface_rejects_malformed_github_targets(self, args: list[str]) -> None:
+        import argparse
+
+        command_doctor = _runtime_doctor_command()
+        spec = command_doctor.command_specs()["doctor"]
+        parser = argparse.ArgumentParser(prog="doctor")
+        spec.add_arguments(parser)
+
+        with pytest.raises(SystemExit):
+            parser.parse_args(args)
+
     def test_doctor_renders_targeted_github_permission_diagnostic_without_secret(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:

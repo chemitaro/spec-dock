@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 from dataclasses import dataclass
 
 from ..application.contracts import DoctorRequest, UseCases
@@ -27,9 +28,21 @@ def command_specs() -> dict[str, CommandSpec]:
 
 
 def _add_doctor_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--github-repo", help="GitHub repo slug for fixed capability diagnostics, e.g. owner/repo")
-    parser.add_argument("--github-pr", type=int, help="GitHub pull request number for fixed capability diagnostics")
-    parser.add_argument("--github-head-sha", help="GitHub PR head SHA for fixed capability diagnostics")
+    parser.add_argument(
+        "--github-repo",
+        type=_github_repo_arg,
+        help="GitHub repo slug for fixed capability diagnostics, e.g. owner/repo",
+    )
+    parser.add_argument(
+        "--github-pr",
+        type=_github_pr_arg,
+        help="GitHub pull request number for fixed capability diagnostics",
+    )
+    parser.add_argument(
+        "--github-head-sha",
+        type=_github_head_sha_arg,
+        help="GitHub PR head SHA for fixed capability diagnostics",
+    )
     parser.add_argument(
         "--github-extended",
         action="store_true",
@@ -64,3 +77,25 @@ def _expect_doctor_args(args: CommandArgs) -> DoctorArgs:
     if not isinstance(args, DoctorArgs):
         raise RuntimeError("Invalid command args for doctor")
     return args
+
+
+def _github_repo_arg(value: str) -> str:
+    if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", value or ""):
+        return value
+    raise argparse.ArgumentTypeError("--github-repo must be OWNER/REPO")
+
+
+def _github_pr_arg(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("--github-pr must be a positive integer") from exc
+    if parsed > 0:
+        return parsed
+    raise argparse.ArgumentTypeError("--github-pr must be a positive integer")
+
+
+def _github_head_sha_arg(value: str) -> str:
+    if re.fullmatch(r"[0-9A-Fa-f]{7,64}", value or ""):
+        return value
+    raise argparse.ArgumentTypeError("--github-head-sha must be a 7-64 character hex SHA")

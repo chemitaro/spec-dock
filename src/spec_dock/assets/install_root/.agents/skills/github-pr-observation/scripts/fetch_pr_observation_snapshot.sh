@@ -307,6 +307,107 @@ def has_permission_limitation():
     )
 
 
+def token_source():
+    return "GH_TOKEN" if os.environ.get("GH_TOKEN") else "gh_saved_auth"
+
+
+def classify_github_stderr(stderr):
+    lowered = (stderr or "").lower()
+    if (
+        "resource not accessible by personal access token" in lowered
+        or "resource not accessible by integration" in lowered
+        or "permission denied" in lowered
+    ):
+        return "permission_denied"
+    if (
+        "requires authentication" in lowered
+        or "authentication required" in lowered
+        or "not logged into" in lowered
+        or "http 401" in lowered
+    ):
+        return "auth_missing"
+    if "rate limit" in lowered or "http 429" in lowered:
+        return "rate_limited"
+    if "unknown json field" in lowered:
+        return "schema_unavailable"
+    if (
+        "http 5" in lowered
+        or "timeout" in lowered
+        or "timed out" in lowered
+        or "temporarily unavailable" in lowered
+        or "connection reset" in lowered
+    ):
+        return "transient_unknown"
+    return "unknown"
+
+
+def pr_metadata_failure_limitation(*, exit_code, stderr, default_code, default_message):
+    classification = classify_github_stderr(stderr)
+    stderr_sha256 = hashlib.sha256((stderr or "").encode()).hexdigest()
+    base = {
+        "capability": "pull_request_read",
+        "api": "gh pr view --json headRefOid,url,state,isDraft,number",
+        "source": "gh_pr_view",
+        "token_source": token_source(),
+        "secret_redacted": True,
+        "stderr_sha256": stderr_sha256,
+        "exit_code": exit_code,
+    }
+    if classification == "permission_denied":
+        return {
+            **base,
+            "code": "github_token_permission_denied",
+            "status": "permission_denied",
+            "severity": "blocking",
+            "message": "GitHub token lacks permission for fixed PR metadata API",
+            "recommended_next_action": "fix_github_token_permissions",
+        }
+    if classification == "auth_missing":
+        return {
+            **base,
+            "code": "github_auth_missing",
+            "status": "auth_missing",
+            "severity": "blocking",
+            "message": "GitHub authentication is unavailable for fixed PR metadata API",
+            "recommended_next_action": "authenticate_github_cli",
+        }
+    if classification == "rate_limited":
+        return {
+            **base,
+            "code": "github_rate_limited",
+            "status": "rate_limited",
+            "severity": "blocking",
+            "message": "GitHub rate limit blocked fixed PR metadata API",
+            "recommended_next_action": "wait_or_retry_later",
+        }
+    if classification == "schema_unavailable":
+        return {
+            **base,
+            "code": "github_api_schema_unavailable",
+            "status": "schema_unavailable",
+            "severity": "blocking",
+            "message": "fixed read-only PR metadata schema is unavailable",
+            "recommended_next_action": "inspect_github_api_schema",
+        }
+    if classification == "transient_unknown":
+        return {
+            **base,
+            "code": "github_transient_unknown",
+            "status": "transient_unknown",
+            "severity": "blocking",
+            "message": "transient GitHub failure blocked fixed PR metadata API",
+            "recommended_next_action": "retry_observation",
+        }
+    return {
+        "code": default_code,
+        "source": "gh_pr_view",
+        "severity": "blocking",
+        "message": default_message,
+        "exit_code": exit_code,
+        "stderr_sha256": stderr_sha256,
+    }
+
+
 def classify_snapshot():
     ci_status = ci_payload.get("status") or summary.get("ci") or "unknown"
     review_status = review_payload.get("status") or summary.get("review") or "unknown"
@@ -360,14 +461,12 @@ if gh_exit != 0:
         except OSError:
             stderr_text = ""
     limitations.append(
-        {
-            "code": "pr_metadata_collection_failed",
-            "source": "gh_pr_view",
-            "severity": "blocking",
-            "message": "fixed read-only PR metadata collection failed",
-            "exit_code": gh_exit,
-            "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
-        }
+        pr_metadata_failure_limitation(
+            exit_code=gh_exit,
+            stderr=stderr_text,
+            default_code="pr_metadata_collection_failed",
+            default_message="fixed read-only PR metadata collection failed",
+        )
     )
 elif not metadata or not current_head_sha:
     limitations.append(
@@ -404,14 +503,12 @@ else:
             except OSError:
                 stderr_text = ""
         limitations.append(
-            {
-                "code": "pr_head_revalidation_failed",
-                "source": "gh_pr_view",
-                "severity": "blocking",
-                "message": "fixed read-only PR head revalidation failed after snapshot collection",
-                "exit_code": final_gh_exit,
-                "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
-            }
+            pr_metadata_failure_limitation(
+                exit_code=final_gh_exit,
+                stderr=stderr_text,
+                default_code="pr_head_revalidation_failed",
+                default_message="fixed read-only PR head revalidation failed after snapshot collection",
+            )
         )
     elif not final_current_head_sha:
         limitations.append(
