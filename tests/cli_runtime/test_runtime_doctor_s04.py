@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -9,6 +10,11 @@ from pathlib import Path
 
 import contextlib
 import pytest
+
+
+_SECRET_TOKEN = "ghp_secret_token_value"
+
+
 def _runtime_modules():
     runtime_scripts_dir = (
         Path(__file__).resolve().parents[2]
@@ -45,6 +51,58 @@ def _runtime_fs_repo():
     finally:
         sys.path.pop(0)
     return infra_fs_repo
+
+
+def _runtime_doctor_command():
+    runtime_scripts_dir = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "spec_dock"
+        / "assets"
+        / "spec_dock"
+        / "scripts"
+    )
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.commands import doctor as command_doctor
+    finally:
+        sys.path.pop(0)
+    return command_doctor
+
+
+def _runtime_github_capability_cli():
+    runtime_scripts_dir = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "spec_dock"
+        / "assets"
+        / "spec_dock"
+        / "scripts"
+    )
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.infra import github_capability_cli
+    finally:
+        sys.path.pop(0)
+    return github_capability_cli
+
+
+def _render_doctor_text(app_contracts, result):
+    runtime_scripts_dir = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "spec_dock"
+        / "assets"
+        / "spec_dock"
+        / "scripts"
+    )
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.presentation.cli_text import render_doctor_text
+    finally:
+        sys.path.pop(0)
+    del app_contracts
+    return render_doctor_text(result)
 
 
 def _record(
@@ -193,7 +251,314 @@ class _StubGitGateway:
         return self._origin_slug
 
 
+class _StubGitHubCapabilityGateway:
+    def __init__(self, diagnostics):
+        self.diagnostics = list(diagnostics)
+        self.requests = []
+
+    def probe(self, request):
+        self.requests.append(request)
+        return list(self.diagnostics)
+
+
 class TestRuntimeDoctorS04:
+    def test_doctor_command_surface_rejects_raw_github_api_arguments(self) -> None:
+        import argparse
+
+        command_doctor = _runtime_doctor_command()
+        spec = command_doctor.command_specs()["doctor"]
+        parser = argparse.ArgumentParser(prog="doctor")
+        spec.add_arguments(parser)
+
+        parsed = parser.parse_args(
+            [
+                "--github-repo",
+                "example/repo",
+                "--github-pr",
+                "123",
+                "--github-head-sha",
+                "abcde12345",
+                "--github-extended",
+            ]
+        )
+        args = spec.args_factory(parsed)
+        assert args.github_repo == "example/repo"
+        assert args.github_pr == 123
+        assert args.github_head_sha == "abcde12345"
+        assert args.github_extended is True
+
+        for forbidden in ("--api", "--endpoint", "--method", "--jq", "--header", "--raw"):
+            with pytest.raises(SystemExit):
+                parser.parse_args([forbidden, "value"])
+
+    def test_doctor_renders_targeted_github_permission_diagnostic_without_secret(self) -> None:
+        _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            records, _issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
+            diagnostic = app_contracts.GitHubCapabilityDiagnostic(
+                code="github_token_permission_denied",
+                capability="check_runs_read",
+                status="permission_denied",
+                token_source="GH_TOKEN",
+                api="GET /repos/{repo}/commits/{sha}/check-runs",
+                severity="blocking",
+                message=f"Resource not accessible by personal access token: {_SECRET_TOKEN}",
+                recommended_next_action="fix_github_token_permissions",
+                secret_redacted=True,
+                stderr_sha256="abc123",
+                group="core",
+            )
+            gateway = _StubGitHubCapabilityGateway([diagnostic])
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                github_capability_gateway=gateway,
+            )
+
+            result = app_doctor.doctor(
+                app_contracts.DoctorRequest(
+                    github_repo="example/repo",
+                    github_pr=123,
+                    github_head_sha="abcde12345",
+                ),
+                ports,
+            )
+
+            assert result.ok
+            assert result.github_capability_diagnostics == [diagnostic]
+            assert gateway.requests[0].github_repo == "example/repo"
+            text = _render_doctor_text(app_contracts, result)
+            rendered = "\n".join(text.stdout_lines + text.stderr_lines + text.warnings)
+            assert "github capability diagnostics=1" in rendered
+            assert "capability=check_runs_read" in rendered
+            assert "status=permission_denied" in rendered
+            assert "api=GET /repos/{repo}/commits/{sha}/check-runs" in rendered
+            assert "token_source=GH_TOKEN" in rendered
+            assert "fix_github_token_permissions" in rendered
+            assert _SECRET_TOKEN not in rendered
+
+    def test_doctor_without_github_target_skips_capability_probe_without_structural_failure(self) -> None:
+        _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            records, _issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
+            gateway = _StubGitHubCapabilityGateway([])
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                github_capability_gateway=gateway,
+            )
+
+            result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
+
+            assert result.ok
+            assert gateway.requests == []
+            assert len(result.github_capability_diagnostics) == 1
+            diagnostic = result.github_capability_diagnostics[0]
+            assert diagnostic.capability == "check_runs_read"
+            assert diagnostic.status == "target_unavailable"
+            assert diagnostic.token_source == "unknown"
+            text = _render_doctor_text(app_contracts, result)
+            rendered = "\n".join(text.stdout_lines + text.stderr_lines + text.warnings)
+            assert "status=target_unavailable" in rendered
+            assert "capability=check_runs_read" in rendered
+
+    def test_doctor_renders_optional_extended_diagnostics_separately(self) -> None:
+        _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            records, _issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
+            gateway = _StubGitHubCapabilityGateway(
+                [
+                    app_contracts.GitHubCapabilityDiagnostic(
+                        code="github_capability_ok",
+                        capability="check_runs_read",
+                        status="ok",
+                        token_source="gh_saved_auth",
+                        api="GET /repos/{repo}/commits/{sha}/check-runs",
+                        severity="info",
+                        message="ok",
+                        recommended_next_action="none",
+                        secret_redacted=True,
+                        stderr_sha256=None,
+                        group="core",
+                    ),
+                    app_contracts.GitHubCapabilityDiagnostic(
+                        code="github_rate_limited",
+                        capability="actions_read",
+                        status="rate_limited",
+                        token_source="gh_saved_auth",
+                        api="GET /repos/{repo}/actions/runs",
+                        severity="warning",
+                        message="GitHub API rate limit exceeded.",
+                        recommended_next_action="retry_after_rate_limit_reset",
+                        secret_redacted=True,
+                        stderr_sha256="def456",
+                        group="extended",
+                    ),
+                    app_contracts.GitHubCapabilityDiagnostic(
+                        code="github_auth_missing",
+                        capability="issue_comments_read",
+                        status="auth_missing",
+                        token_source="gh_saved_auth",
+                        api="GET /repos/{repo}/issues/{pr}/comments",
+                        severity="blocking",
+                        message="GitHub authentication is missing.",
+                        recommended_next_action="authenticate_gh_or_set_token",
+                        secret_redacted=True,
+                        stderr_sha256="ghi789",
+                        group="extended",
+                    ),
+                ]
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                github_capability_gateway=gateway,
+            )
+
+            result = app_doctor.doctor(
+                app_contracts.DoctorRequest(
+                    github_repo="example/repo",
+                    github_pr=123,
+                    github_head_sha="abcde12345",
+                    github_extended=True,
+                ),
+                ports,
+            )
+
+            assert result.ok
+            assert gateway.requests[0].include_extended is True
+            text = _render_doctor_text(app_contracts, result)
+            rendered = "\n".join(text.stdout_lines + text.stderr_lines + text.warnings)
+            assert "github capability diagnostics=3" in rendered
+            assert "[github:core]" in rendered
+            assert "[github:extended]" in rendered
+            assert "capability=actions_read status=rate_limited" in rendered
+            assert "capability=issue_comments_read status=auth_missing" in rendered
+
+    def test_doctor_distinguishes_auth_missing_from_permission_denied_without_gh_token(self) -> None:
+        _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            records, _issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
+            gateway = _StubGitHubCapabilityGateway(
+                [
+                    app_contracts.GitHubCapabilityDiagnostic(
+                        code="github_auth_missing",
+                        capability="pull_request_read",
+                        status="auth_missing",
+                        token_source="unknown",
+                        api="gh pr view",
+                        severity="blocking",
+                        message="GitHub authentication is missing.",
+                        recommended_next_action="authenticate_gh_or_set_token",
+                        secret_redacted=True,
+                        stderr_sha256="sha",
+                        group="core",
+                    )
+                ]
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                github_capability_gateway=gateway,
+            )
+
+            result = app_doctor.doctor(
+                app_contracts.DoctorRequest(
+                    github_repo="example/repo",
+                    github_pr=123,
+                    github_head_sha="abcde12345",
+                ),
+                ports,
+            )
+
+            text = _render_doctor_text(app_contracts, result)
+            rendered = "\n".join(text.stdout_lines + text.stderr_lines + text.warnings)
+            assert result.ok
+            assert "token_source=unknown" in rendered
+            assert "status=auth_missing" in rendered
+            assert "status=permission_denied" not in rendered
+            assert _SECRET_TOKEN not in rendered
+
+    def test_doctor_renders_rate_transient_and_schema_statuses_distinctly(self) -> None:
+        _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
+        statuses = [
+            ("github_rate_limited", "commit_statuses_read", "rate_limited"),
+            ("github_transient_unknown", "pull_request_read", "transient_unknown"),
+            ("github_schema_unavailable", "status_check_rollup_read", "schema_unavailable"),
+        ]
+        diagnostics = [
+            app_contracts.GitHubCapabilityDiagnostic(
+                code=code,
+                capability=capability,
+                status=status,
+                token_source="GH_TOKEN",
+                api="fixed api",
+                severity="warning",
+                message=status,
+                recommended_next_action="retry_or_inspect_github",
+                secret_redacted=True,
+                stderr_sha256=status,
+                group="core",
+            )
+            for code, capability, status in statuses
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            records, _issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                github_capability_gateway=_StubGitHubCapabilityGateway(diagnostics),
+            )
+
+            result = app_doctor.doctor(
+                app_contracts.DoctorRequest(
+                    github_repo="example/repo",
+                    github_pr=123,
+                    github_head_sha="abcde12345",
+                ),
+                ports,
+            )
+
+            text = _render_doctor_text(app_contracts, result)
+            rendered = "\n".join(text.stdout_lines + text.stderr_lines + text.warnings)
+            assert result.ok
+            assert "status=rate_limited" in rendered
+            assert "status=transient_unknown" in rendered
+            assert "status=schema_unavailable" in rendered
+            assert "status=permission_denied" not in rendered
+
+    @pytest.mark.parametrize("stderr", ("Unknown JSON field: \"statusCheckRollup\"", "unknown json field: statusCheckRollup"))
+    def test_github_capability_cli_classifies_unknown_json_field_as_schema_unavailable(self, stderr: str) -> None:
+        github_capability_cli = _runtime_github_capability_cli()
+        completed = subprocess.CompletedProcess(["gh"], 1, "", stderr)
+
+        diagnostic = github_capability_cli._diagnostic_from_completed_process(
+            capability="status_check_rollup_read",
+            group="core",
+            api="gh pr view --json statusCheckRollup",
+            completed=completed,
+        )
+
+        assert diagnostic.status == "schema_unavailable"
+        assert diagnostic.code == "github_schema_unavailable"
+        assert diagnostic.recommended_next_action == "inspect_gh_version_or_api_schema"
+        assert diagnostic.secret_redacted is True
+
     def test_doctor_detects_missing_artifact(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:

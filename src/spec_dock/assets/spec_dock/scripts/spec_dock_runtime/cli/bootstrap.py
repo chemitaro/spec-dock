@@ -37,6 +37,7 @@ from ..infra import derived_state_reader as infra_derived_state_reader
 from ..infra import fs_cli as infra_fs_cli
 from ..infra import fs_repo as infra_fs_repo
 from ..infra import git_cli as infra_git_cli
+from ..infra import github_capability_cli as infra_github_capability_cli
 from ..infra import github_cli as infra_github_cli
 from ..infra import json_store as infra_json_store
 from ..infra import make_cli as infra_make_cli
@@ -205,6 +206,12 @@ class _GitGateway:
 
 
 @dataclass(frozen=True)
+class _GitHubCapabilityGateway:
+    def probe(self, request):
+        return infra_github_capability_cli.GitHubCapabilityCliGateway().probe(request)
+
+
+@dataclass(frozen=True)
 class _BootstrapGateway:
     def run_make_init_if_available(self, worktree_path: Path):
         return infra_make_cli.run_make_init_if_available(worktree_path)
@@ -264,6 +271,7 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         active_state_store=_ActiveStateStore(),
         deps_topology_reader=_DepsTopologyReader(),
         git_gateway=_GitGateway(),
+        github_capability_gateway=_GitHubCapabilityGateway(),
         bootstrap_gateway=_BootstrapGateway(),
         environment_gateway=_EnvironmentGateway(),
         filesystem_gateway=_FilesystemGateway(),
