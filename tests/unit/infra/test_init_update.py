@@ -1151,6 +1151,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00174-refine-pr-observation-two-stage-progress-output/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00176-github-pr-observation-codex-review-trigger-and-completion/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00178-review-feedback-triage/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00180-github-token-capability-preflight/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json",
@@ -1270,6 +1271,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00174-refine-pr-observation-two-stage-progress-output/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00176-github-pr-observation-codex-review-trigger-and-completion/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00178-review-feedback-triage/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00180-github-token-capability-preflight/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json": [],
@@ -12262,6 +12264,10 @@ else:
             }
             if "env_gh_token" in scenario:
                 env["GH_TOKEN"] = str(scenario["env_gh_token"])
+            if "env_github_token" in scenario:
+                env["GITHUB_TOKEN"] = str(scenario["env_github_token"])
+                if "env_gh_token" not in scenario:
+                    env.pop("GH_TOKEN", None)
 
             result = subprocess.run(
                 [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
@@ -12557,8 +12563,9 @@ exit 44
                 "head": "a" * 40,
                 "before_comments": [],
                 "post_success": False,
-                "post_stderr": f"GraphQL: Resource not accessible by personal access token {token_marker}",
+                "post_stderr": f"GraphQL: Resource not accessible by integration {token_marker}",
                 "env_gh_token": token_marker,
+                "env_github_token": "lower_priority_github_token_marker",
                 "after_comments": [],
             },
         )
@@ -12592,6 +12599,31 @@ exit 44
                 "body=@codex review",
             ]
         ]) == 1
+
+    def test_issue_180_s02_trigger_helper_reports_github_token_source(self) -> None:
+        token_marker = "ghs_secret_marker_trigger"
+        result, _calls = self._issue_176_run_trigger(
+            scenario={
+                "head": "a" * 40,
+                "before_comments": [],
+                "post_success": False,
+                "post_stderr": f"GraphQL: Resource not accessible by integration {token_marker}",
+                "env_github_token": token_marker,
+                "after_comments": [],
+            },
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert token_marker not in result.stdout
+        payload = json.loads(result.stdout)
+        limitation = next(
+            item
+            for item in payload["limitations"]
+            if item.get("code") == "github_token_permission_denied"
+        )
+        assert limitation["capability"] == "trigger_comment_write"
+        assert limitation["token_source"] == "GITHUB_TOKEN"
+        assert limitation["secret_redacted"] is True
 
     def test_issue_180_s02_trigger_helper_classifies_generic_permission_denied(self) -> None:
         result, _calls = self._issue_176_run_trigger(
@@ -12658,6 +12690,7 @@ esac
                 **os.environ,
                 "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
                 "GH_TOKEN": token_marker,
+                "GITHUB_TOKEN": "lower_priority_github_token_marker",
             }
 
             result = subprocess.run(
@@ -13853,6 +13886,59 @@ esac
             assert "stderr_sha256" in limitation
             assert "gh_stderr" not in limitation
 
+    def test_issue_180_s02_snapshot_maps_pr_metadata_github_token_source(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
+        )
+        token_marker = "ghs_secret_marker_pr_metadata_github_token"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
+    printf 'GraphQL: Resource not accessible by integration {token_marker}\\n' >&2
+    exit 1
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GITHUB_TOKEN": token_marker,
+            }
+            env.pop("GH_TOKEN", None)
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            payload = json.loads(result.stdout)
+            limitation = payload["limitations"][0]
+            assert limitation["code"] == "github_token_permission_denied"
+            assert limitation["capability"] == "pull_request_read"
+            assert limitation["token_source"] == "GITHUB_TOKEN"
+            assert limitation["secret_redacted"] is True
+
     def test_issue_170_pr_observation_snapshot_derives_terminal_status_from_collectors(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -14652,6 +14738,73 @@ esac
             assert limitation["secret_redacted"] is True
             assert "stderr_sha256" in limitation
 
+    def test_issue_180_s02_checks_collector_maps_integration_permission_denied(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+        token_marker = "github_token_secret_marker"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    printf 'GraphQL: Resource not accessible by integration {token_marker}\\n' >&2
+    exit 1
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{{"state":"success","statuses":[]}}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GITHUB_TOKEN": token_marker,
+            }
+            env.pop("GH_TOKEN", None)
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            payload = json.loads(result.stdout)
+            limitation = next(
+                item
+                for item in payload["limitations"]
+                if item.get("code") == "github_token_permission_denied"
+            )
+            assert limitation["capability"] == "check_runs_read"
+            assert limitation["status"] == "permission_denied"
+            assert limitation["token_source"] == "GITHUB_TOKEN"
+            assert limitation["secret_redacted"] is True
+
     def test_issue_180_s02_checks_collector_maps_status_check_rollup_permission_denied(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -14929,7 +15082,9 @@ exit 44
             assert payload["script"] == "wait_pr_observation.sh"
             assert payload["normalized_status"] == "unknown"
             assert payload["observation_complete"] is False
-            assert payload["limitations"][0]["code"] == "pr_metadata_collection_failed"
+            assert payload["limitations"][0]["code"] == "github_rate_limited"
+            assert payload["limitations"][0]["status"] == "rate_limited"
+            assert payload["limitations"][0]["recommended_next_action"] == "wait_or_retry_later"
             assert "poll=1" in result.stderr
             assert "final=stdout_json" in result.stderr
             assert len(result.stderr.strip().splitlines()) == 1

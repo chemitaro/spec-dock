@@ -578,6 +578,62 @@ class TestRuntimeDoctorS04:
         assert diagnostic.recommended_next_action == "inspect_gh_version_or_api_schema"
         assert diagnostic.secret_redacted is True
 
+    def test_github_capability_cli_classifies_integration_permission_denied(self) -> None:
+        github_capability_cli = _runtime_github_capability_cli()
+        completed = subprocess.CompletedProcess(
+            ["gh"],
+            1,
+            "",
+            "GraphQL: Resource not accessible by integration",
+        )
+
+        diagnostic = github_capability_cli._diagnostic_from_completed_process(
+            capability="check_runs_read",
+            group="core",
+            api="GET /repos/{repo}/commits/{sha}/check-runs",
+            completed=completed,
+        )
+
+        assert diagnostic.status == "permission_denied"
+        assert diagnostic.code == "github_token_permission_denied"
+        assert diagnostic.recommended_next_action == "fix_github_token_permissions"
+        assert diagnostic.secret_redacted is True
+
+    def test_github_capability_cli_token_source_uses_github_token_when_gh_token_absent(self, monkeypatch) -> None:
+        github_capability_cli = _runtime_github_capability_cli()
+        monkeypatch.delenv("GH_TOKEN", raising=False)
+        monkeypatch.setenv("GITHUB_TOKEN", "ghp_secret_github_token")
+
+        assert github_capability_cli._token_source() == "GITHUB_TOKEN"
+
+    def test_github_capability_cli_token_source_prefers_gh_token(self, monkeypatch) -> None:
+        github_capability_cli = _runtime_github_capability_cli()
+        monkeypatch.setenv("GH_TOKEN", "ghp_secret_gh_token")
+        monkeypatch.setenv("GITHUB_TOKEN", "ghp_secret_github_token")
+
+        assert github_capability_cli._token_source() == "GH_TOKEN"
+
+    def test_github_capability_cli_reports_missing_gh_as_auth_missing(self, monkeypatch) -> None:
+        github_capability_cli = _runtime_github_capability_cli()
+
+        def raise_missing_binary(*_args, **_kwargs):
+            raise FileNotFoundError("gh")
+
+        monkeypatch.setattr(github_capability_cli.subprocess, "run", raise_missing_binary)
+
+        diagnostic = github_capability_cli._diagnostic_from_completed_process(
+            capability="pull_request_read",
+            group="core",
+            api="gh pr view",
+            completed=github_capability_cli._run_fixed_gh(["gh", "pr", "view", "13"]),
+        )
+
+        assert diagnostic.status == "auth_missing"
+        assert diagnostic.code == "github_auth_missing"
+        assert diagnostic.recommended_next_action == "authenticate_gh_or_set_token"
+        assert diagnostic.secret_redacted is True
+        assert diagnostic.stderr_sha256 is not None
+
     def test_doctor_detects_missing_artifact(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:

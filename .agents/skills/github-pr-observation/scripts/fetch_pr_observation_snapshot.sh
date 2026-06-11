@@ -308,7 +308,11 @@ def has_permission_limitation():
 
 
 def token_source():
-    return "GH_TOKEN" if os.environ.get("GH_TOKEN") else "gh_saved_auth"
+    if os.environ.get("GH_TOKEN"):
+        return "GH_TOKEN"
+    if os.environ.get("GITHUB_TOKEN"):
+        return "GITHUB_TOKEN"
+    return "gh_saved_auth"
 
 
 def classify_github_stderr(stderr):

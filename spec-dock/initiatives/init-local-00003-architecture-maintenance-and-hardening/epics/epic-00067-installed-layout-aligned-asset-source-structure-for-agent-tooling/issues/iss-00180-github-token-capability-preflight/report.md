@@ -23,8 +23,8 @@ ID: "iss-00180"
   - S03 Guidance / dogfooding parity: 実装済み、provider/mirror parity pass、code-reviewer pass、commit 済み。
   - S99 final gate: 初回 final reviewers の P1/P2 指摘を反映済み。`doctor` malformed target rejection、PR metadata / commit status / statusCheckRollup permission coverage、`Resource not accessible by integration` 分類を追補実装済み。fresh final QA / code / spec reviewer pass。
 - handoff readiness:
-  - ready for final commit and PR creation。
-  - final commit、PR 作成・観測が残作業。
+  - PR #181 created and repair loop in progress。
+  - 初回 PR observation で provider-tests failure と Codex P2 comments を検出し、repair batch `discussions/20260611t161800z-disc-pr-repair-batch.md` の U001 を実装・検証済み。local code-review P2 で PR metadata / trigger write の `GITHUB_TOKEN` source coverage と trigger integration wording も追補済み。final repair commit、push、再観測が残作業。
 
 ## 仕様解釈・判断台帳
 | ID | Status | Type | Raised By | Gap | 検討した選択肢 | 判断 / 解釈 | Rationale | Disposition | Evidence | Follow-up |
@@ -198,6 +198,8 @@ git diff --check
 | S99 | Green / follow-up | tc-004 / tc-007 / tc-011 strengthened | Runtime doctor suite and PR observation issue-wide selector passed | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py`; PR observation selector | pass | 37 passed; 56 passed / 279 deselected |
 | S99 | Red / reviewer follow-up | code-reviewer P2 integration permission wording | `Resource not accessible by integration` PR metadata classification gap found | code-reviewer review; dev-coder red test | fail as expected | `recommended_next_action` fell to `human_gate` before fix |
 | S99 | Green / reviewer follow-up | code-reviewer P2 integration permission wording | Integration-denied PR metadata fixture passes and maps to token permission limitation | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02 and pr_metadata'`; broader PR observation selector | pass | 2 passed; 56 passed / 279 deselected |
+| PR repair U001 | Red / observation | PR #181 initial observation | Provider CI failed; Codex review returned 3 unresolved P2 comments | `wait_pr_observation.sh` on PR #181 head `2fa6da0d...`; `gh run view`; local focused reproduction | fail as expected | failure classes: `check_failure:provider-tests`, `review_feedback:github-capability-classifier`, `review_feedback:token-source`, `review_feedback:missing-gh` |
+| PR repair U001 | Green | I001-I007 repair | Full provider unit lane and focused repair tests passed | focused pytest commands; full `tests/unit/infra/test_init_update.py`; mirror diffs; validate; diff check | pass | 41 runtime doctor tests passed; focused trigger selector 4 passed; 338 `test_init_update.py` tests passed |
 
 ## ステップ契約の完了証跡
 | step | closure ids | close condition from plan | observed evidence | result | notes |
@@ -263,6 +265,7 @@ git diff --check
 | S03 | dev-coder | Updated provider skill guidance and mirrored PR observation assets plus runtime dogfooding files | provider `github-pr-observation/SKILL.md`; `.agents/skills/github-pr-observation/**`; `spec-dock/scripts/spec_dock_runtime/**` | provider/mirror diffs clean; focused parity tests -> 40 passed; `validate` -> ok; `git diff --check` -> pass | code-reviewer pass | Live GitHub API not exercised per plan | accepted |
 | S99 follow-up 1 | dev-coder | Added malformed doctor target rejection and expanded read permission coverage for PR metadata, commit status, and statusCheckRollup | `commands/doctor.py`; `fetch_pr_observation_snapshot.sh`; dogfooding mirrors; `tests/cli_runtime/test_runtime_doctor_s04.py`; `tests/unit/infra/test_init_update.py` | runtime doctor suite -> 37 passed; PR observation selector -> 55 passed; provider/mirror diffs clean; `validate` -> ok; `git diff --check` -> pass | code-reviewer fail | live GitHub API intentionally not exercised; integration wording gap found | accepted with follow-up |
 | S99 follow-up 2 | dev-coder | GitHub App / `GITHUB_TOKEN` integration permission wording classification | `fetch_pr_observation_snapshot.sh`; dogfooding mirror; `tests/unit/infra/test_init_update.py` | `issue_180_s02 and pr_metadata` -> 2 passed; PR observation selector -> 56 passed; provider/mirror diff clean; `git diff --check` -> pass | final code-reviewer pass | live GitHub API intentionally not exercised | accepted |
+| PR repair U001 | dev-coder | Closed PR #181 provider-tests failures and Codex P2 review comments by updating dogfooding snapshot, rate-limit expectation, integration wording classifiers, `GITHUB_TOKEN` token source, and missing `gh` diagnostic handling | runtime doctor adapter/contracts; PR observation scripts; dogfooding mirrors; runtime doctor tests; `test_init_update.py`; repair batch discussion | runtime doctor -> 41 passed; focused trigger selector -> 4 passed; full `test_init_update.py` -> 338 passed; mirror diffs clean; `validate` -> ok; `git diff --check` -> pass | code-reviewer pass with P2 follow-up applied; PR re-observation pending | live GitHub API limited to PR observation; previous review threads unresolved until new head is pushed and reobserved | accepted |
 
 ## ステップ commit ゲート
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
@@ -279,3 +282,4 @@ git diff --check
 | authoring design gate | `design.md` | pass | fresh spec-reviewer pass | complete |
 | authoring plan gate | `plan.md` | pass | fresh spec-reviewer pass | complete |
 | issue execution gate | S01-S99 | pass | S01 complete; S02 complete; S03 complete; S99 final QA/code/spec reviewers passed | commit final follow-up and create PR |
+| PR delivery gate | PR #181 | in progress | PR created against `main`; initial observation failed; repair batch U001 implemented and verified locally | run code-reviewer on repair diff, commit, push, reobserve PR |
