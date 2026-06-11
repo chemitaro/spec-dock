@@ -102,13 +102,16 @@ class GitHubCapabilityCliGateway:
 
 
 def _run_fixed_gh(command: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        command,
-        check=False,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    try:
+        return subprocess.run(
+            command,
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except FileNotFoundError:
+        return subprocess.CompletedProcess(command, 127, "", "gh executable not found")
 
 
 def _diagnostic_from_completed_process(
@@ -138,6 +141,8 @@ def _diagnostic_from_completed_process(
 def _token_source() -> GitHubCapabilityTokenSource:
     if os.environ.get("GH_TOKEN"):
         return "GH_TOKEN"
+    if os.environ.get("GITHUB_TOKEN"):
+        return "GITHUB_TOKEN"
     return "gh_saved_auth"
 
 
@@ -151,9 +156,18 @@ def _classify_status(completed: subprocess.CompletedProcess[str]) -> GitHubCapab
     if completed.returncode == 0:
         return "ok"
     stderr = completed.stderr.lower()
-    if "resource not accessible by personal access token" in stderr or "permission denied" in stderr:
+    if (
+        "resource not accessible by personal access token" in stderr
+        or "resource not accessible by integration" in stderr
+        or "permission denied" in stderr
+    ):
         return "permission_denied"
-    if "authentication" in stderr or "not logged into" in stderr or "could not resolve to a repository" in stderr:
+    if (
+        "authentication" in stderr
+        or "not logged into" in stderr
+        or "could not resolve to a repository" in stderr
+        or "gh executable not found" in stderr
+    ):
         return "auth_missing"
     if "rate limit" in stderr or "api rate limit exceeded" in stderr:
         return "rate_limited"

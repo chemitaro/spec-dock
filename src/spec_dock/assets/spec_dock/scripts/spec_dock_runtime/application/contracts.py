@@ -83,7 +83,7 @@ GitHubCapabilityStatus = Literal[
     "schema_unavailable",
     "skipped",
 ]
-GitHubCapabilityTokenSource = Literal["GH_TOKEN", "gh_saved_auth", "unknown"]
+GitHubCapabilityTokenSource = Literal["GH_TOKEN", "GITHUB_TOKEN", "gh_saved_auth", "unknown"]
 GitHubCapabilitySeverity = Literal["info", "warning", "blocking"]
 GitHubCapabilityGroup = Literal["core", "extended"]
 GitHubCapabilityDiagnosticCode = Literal[
