@@ -3,7 +3,7 @@
 ID: "iss-00184"
 タイトル: "Rename Spec Dock Hub Skill"
 関連GitHub: ["#184"]
-状態: "draft | approved"
+状態: "executed; final reviewers passed"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-12"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -79,7 +79,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | Primary objective is a clear, integrated SpecDock hub skill name with no contradictory compatibility surface | Secondary requirements cover reference inventory, provider/mirror verification, tests, and historical evidence handling | low | pending requirement review |
+| OAL-001 | Primary objective is a clear, integrated SpecDock hub skill name with no contradictory compatibility surface | Secondary requirements cover reference inventory, provider/mirror verification, tests, and historical evidence handling | low | requirement/design/plan/final reviewer gates found no objective inversion after fixes |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -135,27 +135,29 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- Hub skill の current name/path を `spec-driven-tdd-workflow` から `spec-dock-hub` へ移行し、provider asset、dogfooding mirror、installer/update cleanup metadata、current docs、tests/harness expectations を統合的に更新した。
+- 旧名は compatibility surface として残さず、obsolete cleanup metadata、prune/legacy cleanup fixtures、historical evidence に限定した。
+- Final validation は focused / fallback pytest、sync、validate、diff-check、provider/mirror parity、scoped current-surface inspections で pass した。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-06-12 HH:MM - HH:MM）
+### セッションログ（2026-06-12 execution）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01-S05, S90, S99
+- AC/EC: AC-001 through AC-006, EC-001 through EC-003
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` steps S01-S05, S90, S99
+  - closure ids: all AC / EC closure ids
 
 #### 実施内容
-- ...
+- Executed the approved full migration plan from old hub skill name to `spec-dock-hub`.
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+see TDD / Test Contract / Final Quality Gate tables below
 
-<result>
+pass unless explicitly recorded as fail-as-expected or fixed reviewer finding
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
@@ -176,6 +178,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S05 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only: historical `rg` shows expected old-name past evidence, while current-surface old-name matches must be classified | historical `spec-dock/initiatives/**` contains many old-name references from completed specs/discussions; current-surface old-name matches are limited to cleanup metadata and prune fixtures | `rg -n "spec-driven-tdd-workflow|Spec-driven TDD Workflow" spec-dock/initiatives`; scoped current-surface old-name `rg` | pass | historical matches are non-current evidence; current matches were 6 cleanup/test entries only |
 | S05 | 緑フェーズ（Green） | sync, validate, diff-check, `cmp`, and scoped inspections pass | `sync` passed and left worktree clean; `validate` passed; `cmp` provider/mirror hub skill passed; positive new-name `rg` found current docs/code/tests/skills; negative old-name current-surface `rg` found only allowed cleanup/test exceptions | `./spec-dock/scripts/spec-dock sync`; `./spec-dock/scripts/spec-dock validate`; `git diff --check`; `git status --short`; `cmp -s ...spec-dock-hub...`; positive/negative scoped `rg` | pass | `sync` wrote projection files but produced no tracked diff; cl-ac-004 can now close fully |
 | S05 | リファクタリング（Refactor） | no manual historical rewrite or generated-data cleanup | no generated/runtime/docs diff remained after sync; no historical specs were rewritten | `git status --short`; `git diff --check` | pass | S05 implementation is report evidence only |
+| S99 | 最終検証（Final validation） | final required validation and inspections pass | wrapper focused test passed; focused unit lane passed; fallback combined lane passed; sync/validate/diff-check/cmp passed; current-surface inspections passed with old-name matches limited to cleanup/test exceptions and historical evidence | `uv run pytest tests/cli_runtime/test_wrappers.py`; focused `tests/unit/infra/test_init_update.py -k ...`; fallback `uv run pytest tests/unit/infra/test_init_update.py tests/cli_runtime/test_wrappers.py`; `sync`; `validate`; `git diff --check`; `cmp`; scoped `rg` | pass | QA/code gates pass; final spec re-review pending after ledger fix |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
@@ -187,6 +190,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S05 | scoped current-surface old-name inspection still reports cleanup/test matches | current-surface `rg` | classified allowed exceptions: `_LEGACY_MANAGED_SKILL_NAMES`, provider/mirror obsolete exact path metadata, and prune/legacy cleanup fixtures | cl-ac-005 / cl-ec-003 | no | no README/docs/skills/harness wrapper current discovery match remains |
 | S90 | no additional current docs impact after S05 | S05 scoped current-surface inspection | record approved no-op for docs impact resolution; no doc-writer edit required | cl-ac-005 / cl-ec-003 | no | S03 already updated known current docs; historical references remain excluded evidence |
 | S99 | broader fallback pytest found two test harness expectation gaps | S99 fallback pytest | updated legacy obsolete hub fixture setup to create parent directory and added `iss-00184/.meta.json` to checked-in dogfooding snapshot with `depends_on=[]` | cl-ac-001 / cl-ac-004 / cl-ac-006 / cl-ec-001 | no | `uv run pytest tests/unit/infra/test_init_update.py tests/cli_runtime/test_wrappers.py` first failed with 2 failures, then passed `361 passed` after bounded test fix |
+| S99 | final current-surface inspection still reports old name in cleanup/test exceptions | final scoped `rg` | classify as allowed exceptions and keep historical evidence unchanged | cl-ac-005 / cl-ec-003 | no | current-surface old-name matches: `_LEGACY_MANAGED_SKILL_NAMES`, provider/mirror obsolete exact path metadata, and obsolete prune fixtures only |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
@@ -200,7 +204,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| cl-ac-001 | S01 | yes | inspect-only + pytest later | old provider/mirror path existed; new path absent | `rg -n "name: spec-dock-hub|SpecDock Hub|route selector|global invariant" src/.../spec-dock-hub/SKILL.md .agents/.../spec-dock-hub/SKILL.md` | pass | S04 will add installed inventory test evidence |
+| cl-ac-001 | S01 | yes | inspect-only + pytest later | old provider/mirror path existed; new path absent | `rg -n "name: spec-dock-hub|SpecDock Hub|route selector|global invariant" src/.../spec-dock-hub/SKILL.md .agents/.../spec-dock-hub/SKILL.md` | pass | S04 and S99 added installed inventory test evidence |
 | cl-ac-003 | S01 | yes | inspect-only + reviewer | existing hub text routed to leaf skills | `spec-reviewer` Franklin reviewed skill wording and hub/leaf boundary | pass | no leaf workflow spine absorbed |
 | cl-ec-002 | S01 | yes | inspect-only + reviewer | old name was vague; new path absent | new skill text includes `SpecDock Hub`, `route selector`, and `global invariant`; `spec-reviewer` pass | pass | short name clarified by heading/description/first bullets |
 | cl-ac-004 | S01 | yes | command partial | provider/mirror old paths existed before S01 | `cmp -s src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md .agents/skills/spec-dock-hub/SKILL.md` | pass | partial parity evidence only; final closure waits for S05/S99 sync/validate |
@@ -222,7 +226,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| cl-ac-001 | S01 | new skill path, frontmatter, heading, description inspection | pass | S04 installed inventory evidence still pending |
+| cl-ac-001 | S01 | new skill path, frontmatter, heading, description inspection | pass | S04/S99 installed inventory evidence completed |
 | cl-ac-003 | S01 | `spec-reviewer` Franklin pass | pass | hub/leaf boundary maintained |
 | cl-ec-002 | S01 | wording inspection and `spec-reviewer` pass | pass | short name clarity satisfied for skill text |
 | cl-ac-004 | S01 | provider/mirror `cmp` | partial-pass | final closure waits for S05/S99 |
@@ -238,6 +242,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | cl-ac-004 | S05 | sync, validate, `cmp`, clean status | pass | full closure reached |
 | cl-ac-005 | S05 | positive/negative current-surface `rg` | pass | current surfaces use `spec-dock-hub` |
 | cl-ec-003 | S05 | historical exclusion `rg` and no manual historical rewrite | pass | historical references intentionally preserved |
+| all AC/EC | S99 | focused tests, fallback tests, sync, validate, diff-check, `cmp`, scoped positive/negative `rg` | pass | QA/code gates pass; final spec re-review pending after ledger fix |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -279,7 +284,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| none | No parent implementation exception was used for implementation/test/shipped docs changes | N/A | N/A | N/A | N/A | N/A | N/A | delegated workers performed implementation/doc/test changes; parent edited issue-local report evidence only |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
@@ -307,8 +312,11 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S05 | committed | S05 report evidence only; sync generated no tracked diff | S05 commit hash is post-commit external evidence; report records closure state without self-referential hash | `git status --short` after S05 commit -> clean | sync/validate/current-surface inspection produced no implementation diff | generated dogfooding outputs; current-surface old-name exception list; historical exclusion | `git status --short`; `git diff --check` | reviewer not required because no generated/runtime/docs diff remained |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- Provider / mirror skill assets: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md`, `.agents/skills/spec-dock-hub/SKILL.md`; old current hub skill paths deleted.
+- Installer / manifest / mirror metadata: `src/spec_dock/cli.py`, `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json`, `.agents/host-adapters/meta.json`.
+- Current docs: `README.md`, `src/spec_dock/assets/spec_dock/docs/README.md`, `spec-dock/docs/README.md`.
+- Tests / harness: `tests/cli_runtime/harness.py`, `tests/cli_runtime/test_wrappers.py`, `tests/unit/infra/test_init_update.py`.
+- Issue evidence: `requirement.md`, `design.md`, `plan.md`, `report.md`, and scope-local `discussions/` drafts/research/interview artifacts.
 
 ### セッションログ（2026-06-12 issue bootstrap）
 
@@ -350,21 +358,23 @@ pass: id=iss-00184 github=#184; new issue auto-sync passed.
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00184-rename-spec-dock-hub-skill/report.md` - issue bootstrap の観測証跡を記録。
 
 #### コミット
-- <hash> <message>
+- issue bootstrap / planning commits were completed before execution handoff; execution step commits are recorded in Step Commit Gate.
 
 #### メモ
-- ...
+- bootstrap evidence retained for issue creation context; no open bootstrap blocker remains.
 
 ---
 
-### セッションログ（2026-06-12 HH:MM - HH:MM）
+### セッションログ（2026-06-12 execution summary）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S01-S05, S90, S99
+- AC/EC: all AC / EC
 
 #### 実施内容
-- ...
+- S01-S04 implemented the hub rename, installer cleanup contract, current docs references, and tests/harness expectations through delegated workers and per-step reviewer gates.
+- S05/S90 recorded dogfooding sync/current-surface inspections and docs impact no-op evidence.
+- S99 fixed fallback test gaps, reran final validation, and collected final reviewer gates.
 
 ---
 
@@ -378,32 +388,38 @@ pass: id=iss-00184 github=#184; new issue auto-sync passed.
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer Hegel `019ebb2f-4deb-7042-a268-2887ad9fbfb9` | whole issue obligation coverage | already sufficient / fallback gap fixed | wrapper focused `6 passed`; focused unit `95 passed, 260 deselected`; fallback combined `361 passed`; sync/validate/diff-check/cmp/scoped rg passed | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer Schrodinger `019ebb2f-7eae-73b0-941e-d3e52d9afffe` | issue-wide integrated diff | no findings; confirmed no alias/forwarding/current old discovery, provider/mirror parity, cleanup-only old-name usage, and sufficient validation evidence | 0 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer Helmholtz `019ebb2f-c283-72b0-88d7-1647b09bb39b` | requirement / design / plan / report / implementation / tests / docs alignment | fail: final gate rows were still pending and placeholder evidence remained; this report update resolves those ledger issues before re-review | 0 | fail, re-review required |
+| spec-reviewer Jason `019ebb34-2d66-7c42-8635-d1f0e0ad1174` | requirement / design / plan / report / implementation / tests / docs alignment | fail: Final Commit row remained pending and residual report placeholders remained; this report update resolved placeholders and clarified the final commit row is closed after final spec pass | 1 | fail, re-review required |
+| spec-reviewer James `019ebb37-ea11-7db2-9c31-bee41393fe99` | requirement / design / plan / report / implementation / tests / docs alignment | no findings; confirmed AC/EC closure evidence, placeholder cleanup, and Final Commit row closure after final spec pass | 2 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| final validation, QA/code reviewer pass, and final spec re-review pass recorded | final report evidence only | final response / PR / issue comment / other external delivery evidence | ready |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: S04 code-reviewer failed because S04 report evidence was not yet recorded.
+  - 解決: S04 TDD / closure / reviewer / commit evidenceを report に追記し、fresh re-review pass を取得した。
+- 問題: S99 fallback test revealed legacy obsolete hub fixture parent directory and checked-in dogfooding `.meta.json` snapshot gaps.
+  - 解決: bounded test fixを委任し、targeted / focused / fallback tests と code-reviewer pass で確認した。
+- 問題: final spec-reviewer failed because final gate rows and scaffold placeholders remained.
+  - 解決: final gate rowsを実 reviewer 結果へ更新し、unused placeholder rowsを factual no-op evidenceへ置換した。
 
 ## 学んだこと (任意)
-- ...
+- Current-surface negative inspection must classify cleanup/test exceptions separately from historical evidence.
 
 ## 今後の推奨事項 (任意)
-- ...
+- Dogfooding snapshot tests are sensitive to newly created checked-in issues; future issue creation work should update or regenerate those baselines as part of final fallback validation.
 
 ## 省略/例外メモ (必須)
 - 該当なし
