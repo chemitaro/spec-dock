@@ -73,6 +73,144 @@ expected_head_sha = os.environ["OBS_HEAD_SHA"]
 expected_head_sha_lower = expected_head_sha.lower()
 
 
+def token_source():
+    if os.environ.get("GH_TOKEN"):
+        return "GH_TOKEN"
+    if os.environ.get("GITHUB_TOKEN"):
+        return "GITHUB_TOKEN"
+    return "gh_saved_auth"
+
+
+def classify_github_stderr(stderr):
+    lowered = (stderr or "").lower()
+    if (
+        "resource not accessible by personal access token" in lowered
+        or "resource not accessible by integration" in lowered
+        or "permission denied" in lowered
+    ):
+        return "permission_denied"
+    if (
+        "requires authentication" in lowered
+        or "authentication required" in lowered
+        or "not logged into" in lowered
+        or "http 401" in lowered
+    ):
+        return "auth_missing"
+    if "rate limit" in lowered or "http 429" in lowered:
+        return "rate_limited"
+    if "unknown json field" in lowered:
+        return "schema_unavailable"
+    if (
+        "http 5" in lowered
+        or "timeout" in lowered
+        or "timed out" in lowered
+        or "temporarily unavailable" in lowered
+        or "connection reset" in lowered
+    ):
+        return "transient_unknown"
+    return "unknown"
+
+
+def capability_for_api(api):
+    if api == "gh_pr_view.statusCheckRollup":
+        return "status_check_rollup_read"
+    if api.endswith("/check-runs"):
+        return "check_runs_read"
+    if api.endswith("/status"):
+        return "commit_statuses_read"
+    if "/actions/runs/" in api and api.endswith("/jobs"):
+        return "actions_read"
+    return "unknown"
+
+
+def github_failure_limitation(*, api, source, exit_code, stderr, default_code, default_message, default_severity):
+    classification = classify_github_stderr(stderr)
+    stderr_sha256 = hashlib.sha256((stderr or "").encode()).hexdigest()
+    if classification == "permission_denied":
+        return {
+            "code": "github_token_permission_denied",
+            "capability": capability_for_api(api),
+            "api": api,
+            "source": source,
+            "status": "permission_denied",
+            "token_source": token_source(),
+            "severity": "blocking",
+            "message": "GitHub token lacks permission for fixed PR observation API",
+            "recommended_next_action": "fix_github_token_permissions",
+            "secret_redacted": True,
+            "stderr_sha256": stderr_sha256,
+            "exit_code": exit_code,
+        }
+    if classification == "auth_missing":
+        return {
+            "code": "github_auth_missing",
+            "capability": capability_for_api(api),
+            "api": api,
+            "source": source,
+            "status": "auth_missing",
+            "token_source": token_source(),
+            "severity": "blocking",
+            "message": "GitHub authentication is unavailable for fixed PR observation API",
+            "recommended_next_action": "authenticate_github_cli",
+            "secret_redacted": True,
+            "stderr_sha256": stderr_sha256,
+            "exit_code": exit_code,
+        }
+    if classification == "rate_limited":
+        return {
+            "code": "github_rate_limited",
+            "capability": capability_for_api(api),
+            "api": api,
+            "source": source,
+            "status": "rate_limited",
+            "token_source": token_source(),
+            "severity": "blocking",
+            "message": "GitHub rate limit blocked fixed PR observation API",
+            "recommended_next_action": "wait_or_retry_later",
+            "secret_redacted": True,
+            "stderr_sha256": stderr_sha256,
+            "exit_code": exit_code,
+        }
+    if classification == "schema_unavailable":
+        return {
+            "code": "github_api_schema_unavailable",
+            "capability": capability_for_api(api),
+            "api": api,
+            "source": source,
+            "status": "schema_unavailable",
+            "token_source": token_source(),
+            "severity": "blocking",
+            "message": "fixed read-only GitHub API schema is unavailable",
+            "recommended_next_action": "inspect_github_api_schema",
+            "secret_redacted": True,
+            "stderr_sha256": stderr_sha256,
+            "exit_code": exit_code,
+        }
+    if classification == "transient_unknown":
+        return {
+            "code": "github_transient_unknown",
+            "capability": capability_for_api(api),
+            "api": api,
+            "source": source,
+            "status": "transient_unknown",
+            "token_source": token_source(),
+            "severity": "blocking",
+            "message": "transient GitHub failure blocked fixed PR observation API",
+            "recommended_next_action": "retry_observation",
+            "secret_redacted": True,
+            "stderr_sha256": stderr_sha256,
+            "exit_code": exit_code,
+        }
+    return {
+        "code": default_code,
+        "source": source,
+        "severity": default_severity,
+        "message": default_message,
+        "exit_code": exit_code,
+        "stderr_sha256": stderr_sha256,
+    }
+
+
 def sha_prefix_matches(left, right):
     left_lower = str(left or "").lower()
     right_lower = str(right or "").lower()
@@ -85,14 +223,15 @@ def gh_api(path):
     command = ["gh", "api", path, "--paginate"]
     completed = subprocess.run(command, capture_output=True, text=True, check=False)
     if completed.returncode != 0:
-        return None, {
-            "code": "github_api_collection_failed",
-            "source": path,
-            "severity": "blocking",
-            "message": "fixed read-only GitHub API collection failed",
-            "exit_code": completed.returncode,
-            "stderr_sha256": hashlib.sha256(completed.stderr.encode()).hexdigest(),
-        }
+        return None, github_failure_limitation(
+            api=path,
+            source=path,
+            exit_code=completed.returncode,
+            stderr=completed.stderr,
+            default_code="github_api_collection_failed",
+            default_message="fixed read-only GitHub API collection failed",
+            default_severity="blocking",
+        )
     try:
         return parse_gh_paginated_stdout(completed.stdout), None
     except json.JSONDecodeError:
@@ -108,14 +247,15 @@ def gh_pr_view():
     command = ["gh", "pr", "view", str(pr), "--repo", repo, "--json", "mergeStateStatus,statusCheckRollup"]
     completed = subprocess.run(command, capture_output=True, text=True, check=False)
     if completed.returncode != 0:
-        return {}, {
-            "code": "pr_required_check_state_unavailable",
-            "source": "gh_pr_view",
-            "severity": "informational",
-            "message": "fixed read-only PR required check state collection failed",
-            "exit_code": completed.returncode,
-            "stderr_sha256": hashlib.sha256(completed.stderr.encode()).hexdigest(),
-        }
+        return {}, github_failure_limitation(
+            api="gh_pr_view.statusCheckRollup",
+            source="gh_pr_view",
+            exit_code=completed.returncode,
+            stderr=completed.stderr,
+            default_code="pr_required_check_state_unavailable",
+            default_message="fixed read-only PR required check state collection failed",
+            default_severity="informational",
+        )
     try:
         payload = json.loads(completed.stdout or "{}")
     except json.JSONDecodeError:
@@ -487,7 +627,9 @@ elif merge_state_blocking:
         }
     )
 
-if (
+if any(item.get("code") == "github_token_permission_denied" for item in limitations):
+    ci_status = "unknown"
+elif (
     check_counts["failed"]
     or status_counts["failure"]
     or status_counts["error"]

@@ -68,6 +68,7 @@ TRIGGER_PR="$pr" \
 TRIGGER_HEAD_SHA="$head_sha" \
 python3 - <<'PY'
 import json
+import hashlib
 import os
 import subprocess
 from datetime import datetime, timezone
@@ -147,8 +148,47 @@ def emit(payload):
 
 def limitation(code, message, **extra):
     payload = {"code": code, "message": message, "source": "trigger_codex_review.sh"}
-    payload.update(extra)
+    sanitized_extra = {}
+    for key, value in extra.items():
+        if key.endswith("gh_stderr") or key == "gh_stderr":
+            sanitized_extra[f"{key}_sha256"] = hashlib.sha256(str(value or "").encode()).hexdigest()
+        else:
+            sanitized_extra[key] = value
+    payload.update(sanitized_extra)
     return payload
+
+
+def token_source():
+    if os.environ.get("GH_TOKEN"):
+        return "GH_TOKEN"
+    if os.environ.get("GITHUB_TOKEN"):
+        return "GITHUB_TOKEN"
+    return "gh_saved_auth"
+
+
+def is_permission_denied(stderr):
+    lowered = (stderr or "").lower()
+    return (
+        "resource not accessible by personal access token" in lowered
+        or "resource not accessible by integration" in lowered
+        or "permission denied" in lowered
+    )
+
+
+def trigger_permission_limitation(stderr, exit_code):
+    return limitation(
+        "github_token_permission_denied",
+        "GitHub token lacks permission to post the fixed Codex review trigger comment",
+        capability="trigger_comment_write",
+        api=endpoint,
+        status="permission_denied",
+        token_source=token_source(),
+        severity="blocking",
+        recommended_next_action="fix_github_token_permissions",
+        secret_redacted=True,
+        stderr_sha256=hashlib.sha256((stderr or "").encode()).hexdigest(),
+        exit_code=exit_code,
+    )
 
 
 def head_matches(actual, expected):
@@ -296,6 +336,8 @@ if post_exit == 0 and isinstance(post_payload, dict):
 else:
     payload["trigger"]["action"] = "failed"
     payload["overall_status"] = "trigger_post_failed"
+    if is_permission_denied(post_stderr):
+        payload["limitations"].append(trigger_permission_limitation(post_stderr, post_exit))
     payload["limitations"].append(
         limitation(
             "trigger_post_failed",

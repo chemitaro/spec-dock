@@ -10,6 +10,7 @@ from ..infra.contracts import ActiveManifestEntry, StoredMetaRecord
 from . import create_node as app_create_node
 from .artifact_preflight import validate_required_artifacts_for_graph
 from .contracts import DoctorFinding, DoctorRequest, DoctorResult
+from .contracts import GitHubCapabilityDiagnostic, GitHubCapabilityProbeRequest
 from .ports import Ports
 from .repo_context import resolve_current_repo_slug
 
@@ -322,8 +323,53 @@ def _stale_create_lock_finding(specdock_dir: Path) -> DoctorFinding | None:
     )
 
 
+def _github_target_unavailable_diagnostic() -> GitHubCapabilityDiagnostic:
+    return GitHubCapabilityDiagnostic(
+        code="github_target_unavailable",
+        capability="check_runs_read",
+        status="target_unavailable",
+        token_source="unknown",
+        api="github_pr_core_probe",
+        severity="info",
+        message="GitHub PR capability probe skipped because repo, PR, or head SHA was not provided.",
+        recommended_next_action="provide_github_repo_pr_and_head_sha_for_capability_probe",
+        secret_redacted=True,
+        stderr_sha256=None,
+        group="core",
+    )
+
+
+def _github_gateway_unavailable_diagnostic() -> GitHubCapabilityDiagnostic:
+    return GitHubCapabilityDiagnostic(
+        code="github_capability_skipped",
+        capability="check_runs_read",
+        status="skipped",
+        token_source="unknown",
+        api="github_pr_core_probe",
+        severity="info",
+        message="GitHub capability gateway is unavailable.",
+        recommended_next_action="run_in_installed_runtime_with_github_capability_gateway",
+        secret_redacted=True,
+        stderr_sha256=None,
+        group="core",
+    )
+
+
+def _github_capability_diagnostics(req: DoctorRequest, ports: Ports) -> list[GitHubCapabilityDiagnostic]:
+    if not (req.github_repo and req.github_pr is not None and req.github_head_sha):
+        return [_github_target_unavailable_diagnostic()]
+    if ports.github_capability_gateway is None:
+        return [_github_gateway_unavailable_diagnostic()]
+    probe_request = GitHubCapabilityProbeRequest(
+        github_repo=req.github_repo,
+        github_pr=req.github_pr,
+        github_head_sha=req.github_head_sha,
+        include_extended=req.github_extended,
+    )
+    return ports.github_capability_gateway.probe(probe_request)
+
+
 def doctor(req: DoctorRequest, ports: Ports) -> DoctorResult:
-    del req
     warnings: list[str] = []
     findings: list[DoctorFinding] = []
     graph: SpecGraph | None = None
@@ -335,7 +381,12 @@ def doctor(req: DoctorRequest, ports: Ports) -> DoctorResult:
 
     if has_legacy_workspace and not has_current_workspace:
         findings.append(_legacy_only_workspace_finding(legacy_dir=legacy_dir))
-        return DoctorResult(ok=False, findings=findings, warnings=warnings)
+        return DoctorResult(
+            ok=False,
+            findings=findings,
+            warnings=warnings,
+            github_capability_diagnostics=_github_capability_diagnostics(req, ports),
+        )
 
     try:
         records = ports.node_reader.load_node_records()
@@ -380,4 +431,9 @@ def doctor(req: DoctorRequest, ports: Ports) -> DoctorResult:
     if has_current_workspace and has_legacy_workspace and not findings:
         _append_unique(warnings, "legacy_cleanup_pending")
 
-    return DoctorResult(ok=(len(findings) == 0), findings=findings, warnings=warnings)
+    return DoctorResult(
+        ok=(len(findings) == 0),
+        findings=findings,
+        warnings=warnings,
+        github_capability_diagnostics=_github_capability_diagnostics(req, ports),
+    )
