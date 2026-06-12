@@ -27,7 +27,7 @@ _SPEC_DOCK_DIRNAME = "spec-dock"
 _LEGACY_SPEC_DOCK_DIRNAME = ".spec-dock"
 _MANAGED_DIRS = ("docs", "templates", "scripts", "system")
 _MANAGED_SKILL_NAMES = (
-    "spec-driven-tdd-workflow",
+    "spec-dock-hub",
     "spec-dock-initiative-planning",
     "spec-dock-epic-planning",
     "spec-dock-issue-planning",

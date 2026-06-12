@@ -24,11 +24,20 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
 from tests.cli_runtime.harness import (
     CliRuntimeHarness,
     _DELETED_ROLE_SKILL_NAMES,
-    _EXPECTED_MANAGED_SKILL_NAMES,
+    _EXPECTED_MANAGED_SKILL_NAMES as _HARNESS_EXPECTED_MANAGED_SKILL_NAMES,
     _expected_spec_dock_version,
     main,
 )
 import pytest
+
+_EXPECTED_MANAGED_SKILL_NAMES = (
+    "spec-dock-hub",
+    *(
+        skill_name
+        for skill_name in _HARNESS_EXPECTED_MANAGED_SKILL_NAMES
+        if skill_name != "spec-driven-tdd-workflow"
+    ),
+)
 
 
 @contextmanager
@@ -286,6 +295,22 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
     }
 
+    def _assert_managed_skills_installed(self, target: Path) -> None:
+        managed_names = set(_EXPECTED_MANAGED_SKILL_NAMES)
+        installed_managed = sorted(
+            skill_file
+            for skill_file in self._installed_skill_files(target)
+            if skill_file.split("/", 1)[0] in managed_names
+        )
+        assert installed_managed == sorted(
+            f"{name}/SKILL.md" for name in _EXPECTED_MANAGED_SKILL_NAMES
+        )
+        installed_skill_names = {
+            skill_file.split("/", 1)[0] for skill_file in self._installed_skill_files(target)
+        }
+        for deleted_skill_name in _DELETED_ROLE_SKILL_NAMES:
+            assert deleted_skill_name not in installed_skill_names
+
     def _capture_installer_main(self, args: list[str]) -> tuple[int, str, str]:
         stdout = io.StringIO()
         stderr = io.StringIO()
@@ -428,8 +453,8 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/rules/issue/discussions.md": (
             "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"
         ),
-        ".agents/skills/spec-driven-tdd-workflow/SKILL.md": (
-            "src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md"
+        ".agents/skills/spec-dock-hub/SKILL.md": (
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md"
         ),
         ".agents/skills/spec-dock-initiative-planning/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md"
@@ -732,6 +757,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 ".github/agents/repo_analyst.agent.md",
                 ".github/agents/spec_reviewer.agent.md",
                 ".github/agents/utility_worker.agent.md",
+                ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
                 ".agents/skills/github-codex-pr-review-comments/SKILL.md",
                 ".agents/skills/github-codex-pr-review-comments/agents/openai.yaml",
                 ".agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh",
@@ -759,7 +785,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/github-pr-merge-preparer/SKILL.md",
         ".agents/skills/github-pr-merge-preparer/agents/openai.yaml",
         ".agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md",
-        ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
+        ".agents/skills/spec-dock-hub/SKILL.md",
         ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
         ".agents/skills/spec-dock-epic-planning/SKILL.md",
         ".agents/skills/spec-dock-initiative-planning/SKILL.md",
@@ -820,7 +846,7 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/github-pr-merge-preparer/SKILL.md",
             ".agents/skills/github-pr-merge-preparer/agents/openai.yaml",
             ".agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md",
-            ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
+            ".agents/skills/spec-dock-hub/SKILL.md",
             ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
             ".agents/skills/spec-dock-epic-planning/SKILL.md",
             ".agents/skills/spec-dock-initiative-planning/SKILL.md",
@@ -885,12 +911,12 @@ class TestInitUpdate(CliRuntimeHarness):
         Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "codex_skills"
     )
     _ISSUE_68_PROVIDER_DUPLICATE_BOUNDARY = {
-        "spec-driven-tdd-workflow skill": {
+        "spec-dock-hub skill": {
             "search_globs": (
-                "**/spec-driven-tdd-workflow/SKILL.md",
+                "**/spec-dock-hub/SKILL.md",
             ),
             "allowed_provider_paths": (
-                "src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md",
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md",
             ),
         },
         "spec-dock-adr-facilitation skill": {
@@ -991,7 +1017,7 @@ class TestInitUpdate(CliRuntimeHarness):
         },
     }
     _ISSUE_69_REPRESENTATIVE_ARTIFACT_RELATIVE_PATHS = (
-        "spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md",
+        "spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md",
         "spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/trigger_codex_review.sh",
         "spec_dock/assets/install_root/.agents/skills/spec-dock-codex-adapter/SKILL.md",
         "spec_dock/assets/install_root/.agents/skills/spec-dock-copilot-adapter/SKILL.md",
@@ -2907,7 +2933,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert (docs_dir / "reference_sync.md").is_file()
 
             docs_readme = (docs_dir / "README.md").read_text(encoding="utf-8")
-            assert "spec-driven-tdd-workflow" in docs_readme
+            assert "spec-dock-hub" in docs_readme
             assert "spec-dock-clarification" in docs_readme
             assert "spec-dock-initiative-planning" in docs_readme
             assert "spec-dock-epic-planning" in docs_readme
@@ -3249,7 +3275,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert (target / ".codex" / "agents" / "spec-manager.toml").is_file()
             assert (target / ".github" / "agents" / "orchestrator.agent.md").is_file()
 
-            workflow_skill_text = (skills_root / "spec-driven-tdd-workflow" / "SKILL.md").read_text(
+            workflow_skill_text = (skills_root / "spec-dock-hub" / "SKILL.md").read_text(
                 encoding="utf-8"
             )
             assert "`discussions/`" in workflow_skill_text
@@ -3414,7 +3440,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 "spec-dock/docs/README.md",
                 "spec-dock/docs/guide.md",
                 "spec-dock/scripts/README.md",
-                ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
+                ".agents/skills/spec-dock-hub/SKILL.md",
             ]
             text_map = self._read_text_map(target, guidance_paths)
             self._assert_canonical_rules_files_contract(text_map)
@@ -3521,7 +3547,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 "spec-dock/docs/README.md",
                 "spec-dock/docs/guide.md",
                 "spec-dock/scripts/README.md",
-                ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
+                ".agents/skills/spec-dock-hub/SKILL.md",
             ]
             text_map = self._read_text_map(target, guidance_paths)
             self._assert_canonical_rules_files_contract(text_map)
@@ -3605,7 +3631,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "src/spec_dock/assets/spec_dock/docs/README.md",
             "src/spec_dock/assets/spec_dock/docs/guide.md",
             "src/spec_dock/assets/spec_dock/scripts/README.md",
-            "src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md",
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md",
         ]
         text_map = self._read_text_map(repo_root, guidance_paths)
         self._assert_canonical_rules_files_contract(text_map)
@@ -4586,7 +4612,7 @@ class TestInitUpdate(CliRuntimeHarness):
 
         workflow_skill = (
             repo_root
-            / "src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md"
+            / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md"
         ).read_text(encoding="utf-8")
         assert "minimum authoring scaffolds" in workflow_skill
         assert "add, remove, merge, reorder, or rewrite" in workflow_skill
@@ -9240,9 +9266,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             skills_root = target / ".agents" / "skills"
             meta_path = target / ".agents" / "host-adapters" / "meta.json"
             for skill_name in _EXPECTED_MANAGED_SKILL_NAMES:
-                if skill_name == "spec-driven-tdd-workflow":
+                if skill_name == "spec-dock-hub":
                     continue
                 shutil.rmtree(skills_root / skill_name)
+            obsolete_hub_path = skills_root / "spec-driven-tdd-workflow" / "SKILL.md"
+            obsolete_hub_path.parent.mkdir(parents=True, exist_ok=True)
+            self._write_text_force(obsolete_hub_path, "# obsolete hub\n")
             self._write_text_force(meta_path, '{"schema_version": 99}\n')
 
             custom_dir = skills_root / "my-custom-skill"
@@ -9256,6 +9285,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 self._EXPECTED_HOST_ADAPTER_META
             assert (custom_dir / "SKILL.md").is_file()
             assert (custom_dir / "notes.txt").is_file()
+            assert not obsolete_hub_path.exists()
 
     def test_update_installs_full_skill_set_for_legacy_no_skill_repo(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -10381,7 +10411,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         with cli._assets_dir() as assets_dir:
             skills_dir = assets_dir / "install_root" / ".agents" / "skills"
-            hub_text = (skills_dir / "spec-driven-tdd-workflow" / "SKILL.md").read_text(encoding="utf-8")
+            hub_text = (skills_dir / "spec-dock-hub" / "SKILL.md").read_text(encoding="utf-8")
             initiative_text = (skills_dir / "spec-dock-initiative-planning" / "SKILL.md").read_text(encoding="utf-8")
             epic_text = (skills_dir / "spec-dock-epic-planning" / "SKILL.md").read_text(encoding="utf-8")
             issue_planning_text = (skills_dir / "spec-dock-issue-planning" / "SKILL.md").read_text(
