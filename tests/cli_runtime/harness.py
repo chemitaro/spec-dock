@@ -31,7 +31,7 @@ def _expected_spec_dock_version() -> str:
 
 
 _EXPECTED_MANAGED_SKILL_NAMES = (
-    "spec-driven-tdd-workflow",
+    "spec-dock-hub",
     "spec-dock-initiative-planning",
     "spec-dock-epic-planning",
     "spec-dock-issue-planning",

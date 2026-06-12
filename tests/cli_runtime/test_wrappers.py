@@ -70,7 +70,7 @@ class TestCliRulesContract(CliRuntimeHarness):
                 target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md"
             ).read_text(encoding="utf-8")
             hub_skill = (
-                target / ".agents" / "skills" / "spec-driven-tdd-workflow" / "SKILL.md"
+                target / ".agents" / "skills" / "spec-dock-hub" / "SKILL.md"
             ).read_text(encoding="utf-8")
             issue_skill = (
                 target / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md"
@@ -161,6 +161,10 @@ class TestCliRulesContract(CliRuntimeHarness):
             for skill_text in (hub_skill, issue_skill, codex_adapter_skill, copilot_adapter_skill):
                 assert "./spec-dock/scripts/spec-dock" in skill_text
                 assert "./spec " not in skill_text
+            assert "name: spec-dock-hub" in hub_skill
+            assert "SpecDock Hub" in hub_skill
+            assert "route selector" in hub_skill
+            assert "global invariant" in hub_skill
 
             assert "./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>" in issue_skill
             assert "./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>" in issue_skill
