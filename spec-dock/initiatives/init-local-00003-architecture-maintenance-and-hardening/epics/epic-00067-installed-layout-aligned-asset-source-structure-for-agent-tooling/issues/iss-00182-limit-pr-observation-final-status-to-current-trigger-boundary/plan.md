@@ -113,6 +113,7 @@ Fresh pass だけを gate pass とする。
 - scope:
   - 実装・文書化する範囲:
     - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh`
+    - `.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh`（dogfooding mirror parity）
     - focused tests in `tests/unit/infra/test_init_update.py`
 - テスト義務:
   - closure id:
@@ -151,6 +152,7 @@ Fresh pass だけを gate pass とする。
   - target script and existing tests
 - 許可 paths:
   - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh`
+  - `.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh`（provider asset と同一内容へ同期する dogfooding mirror）
   - `tests/unit/infra/test_init_update.py`
 - 禁止 changes:
   - `fetch_pr_observation_snapshot.sh`
