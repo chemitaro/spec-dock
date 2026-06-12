@@ -449,6 +449,8 @@ def align_decision_observation_complete(payload: dict, observation_complete: boo
     decision = decision_payload(payload)
     if not decision:
         return
+    if decision.get("status") == "passed":
+        return
     if decision.get("observation_complete") is observation_complete:
         return
     decision["observation_complete"] = observation_complete
