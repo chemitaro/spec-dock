@@ -18602,6 +18602,33 @@ esac
                     assert codex_review["collection_summary"]["review_threads"]["selected_ids"] == ["RT_selected"]
                     assert codex_review["collection_summary"]["review_threads"]["unresolved_ids"] == ["RT_selected"]
                     assert codex_review["collection_summary"]["review_threads"]["boundary_before_excluded_ids"] == ["RT_old"]
+                    decision = payload["decision"]
+                    assert decision["scope"] == "current_trigger_boundary"
+                    assert decision["trigger"] == {
+                        "source": "explicit",
+                        "comment_id": 99,
+                        "created_at": "2026-06-08T01:00:00Z",
+                    }
+                    assert decision["selected_review_ids"] == [201]
+                    assert decision["selected_review_comment_ids"] == [301]
+                    assert decision["selected_review_thread_ids"] == ["RT_selected"]
+                    assert decision["selected_unresolved_thread_ids"] == ["RT_selected"]
+                    assert decision["selected_unresolved_count"] == 1
+                    assert decision["completion_signal"] == "submitted_pull_request_review"
+                    assert decision["confidence"] == "high"
+                    assert decision["fallback_pass_candidate"]["present"] is False
+                    assert decision["fingerprint"] == payload["decision_fingerprint"]
+                    assert payload["review"]["current"]["selected_thread_ids"] == ["RT_selected"]
+                    assert payload["review"]["current"]["selected_unresolved_thread_ids"] == ["RT_selected"]
+                    assert payload["review"]["audit"]["scope"] == "all_fetched"
+                    assert payload["review"]["audit"]["decision_authoritative"] is False
+                    assert payload["review"]["audit"]["fingerprint"] == payload["audit_fingerprint"]
+                    assert payload["review"]["threads_scope"] == "all_fetched"
+                    assert payload["review"]["threads_decision_authoritative"] is False
+                    assert payload["review"]["signals_scope"] == "all_fetched"
+                    assert payload["review"]["signals_decision_authoritative"] is False
+                    assert payload["review"]["codex_authored_scope"] == "all_fetched"
+                    assert payload["review"]["codex_authored_decision_authoritative"] is False
 
     def test_issue_176_s03_review_collector_does_not_mark_fallback_as_primary(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -18681,6 +18708,94 @@ esac
             assert lifecycle["confidence"] == "low"
             assert lifecycle["selected_review_ids"] == []
             assert lifecycle["selected_review_comment_ids"] == []
+            decision = payload["decision"]
+            assert decision["completion_signal"] == "fallback_issue_comment"
+            assert decision["confidence"] == "low"
+            assert decision["selected_unresolved_count"] == 0
+            assert decision["fallback_pass_candidate"]["present"] is False
+            assert decision["fallback_pass_candidate"]["promotes_top_level_status"] is False
+
+    def test_issue_182_s01_review_collector_marks_no_major_issues_fallback_candidate(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"No major issues found."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            fallback = payload["decision"]["fallback_pass_candidate"]
+            assert fallback == {
+                "present": True,
+                "source": "issue_comment",
+                "source_ids": [100],
+                "reason": "current_boundary_no_major_issues_comment",
+                "promotes_top_level_status": False,
+            }
+            assert payload["review"]["current"]["selected_unresolved_thread_ids"] == []
 
     def test_issue_176_s03_review_collector_excludes_pending_and_unrelated_threads_from_primary(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -18987,6 +19102,13 @@ esac
             inferred_payload = json.loads(inferred.stdout)
             assert inferred_payload["trigger"]["source"] == "inferred"
             assert inferred_payload["trigger"]["comment_id"] == 11
+            assert inferred_payload["decision"]["scope"] == "inferred_current_boundary"
+            assert inferred_payload["decision"]["trigger"] == {
+                "source": "inferred",
+                "comment_id": 11,
+                "created_at": "2026-06-08T01:00:00Z",
+            }
+            assert inferred_payload["review"]["current"]["scope"] == "inferred_current_boundary"
             assert "trigger_inferred" in [
                 item["code"] for item in inferred_payload["limitations"]
             ]
@@ -21038,6 +21160,182 @@ esac
                 if item["kind"] == "pull_review" and item["id"] == 201
             )
             assert pull_review["stale"] is True
+
+    def test_issue_182_s01_review_collector_exposes_current_changes_requested_evidence(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"codex"},"state":"CHANGES_REQUESTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"please fix this"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"inline fix required"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":"CHANGES_REQUESTED","reviewThreads":{"nodes":[{"id":"RT_selected","isResolved":true,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:06:00Z","body":"inline fix required"}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            decision = payload["decision"]
+            assert decision["status_reason"] == "current_selected_changes_requested"
+            assert decision["selected_changes_requested_review_ids"] == [201]
+            assert decision["selected_changes_requested_review_comment_ids"] == [301]
+            assert decision["selected_changes_requested_evidence"] == [
+                {"kind": "pull_review", "id": 201, "state": "changes_requested"},
+                {
+                    "kind": "pull_review_comment",
+                    "id": 301,
+                    "review_id": 201,
+                    "thread_id": "RT_selected",
+                },
+            ]
+            assert payload["review"]["current"]["selected_changes_requested_evidence"] == decision[
+                "selected_changes_requested_evidence"
+            ]
+
+    def test_issue_182_s01_review_collector_decision_fingerprint_ignores_historical_threads(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":90,"user":{"login":"codex"},"created_at":"2026-06-08T00:10:00Z","body":"@codex review old"},{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"No major issues found."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<JSON
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"${HISTORICAL_THREAD_ID}","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_old","databaseId":300,"author":{"login":"codex"},"createdAt":"${HISTORICAL_THREAD_AT}","body":"old feedback"}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            def run_with_historical_thread(thread_id: str, created_at: str) -> dict[str, object]:
+                result = subprocess.run(
+                    [
+                        str(script_path),
+                        "--repo",
+                        "owner/repo",
+                        "--pr",
+                        "13",
+                        "--head-sha",
+                        "a" * 40,
+                        "--trigger-comment-id",
+                        "99",
+                        "--trigger-created-at",
+                        "2026-06-08T01:00:00Z",
+                    ],
+                    env={
+                        **env,
+                        "HISTORICAL_THREAD_ID": thread_id,
+                        "HISTORICAL_THREAD_AT": created_at,
+                    },
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                assert result.returncode == 0, result.stdout + result.stderr
+                return json.loads(result.stdout)
+
+            first = run_with_historical_thread("RT_old_1", "2026-06-08T00:20:00Z")
+            second = run_with_historical_thread("RT_old_2", "2026-06-08T00:30:00Z")
+            assert first["decision"]["selected_unresolved_count"] == 0
+            assert first["decision_fingerprint"] == second["decision_fingerprint"]
+            assert first["audit_fingerprint"] != second["audit_fingerprint"]
 
     def test_issue_75_pr_observation_review_collector_compares_trigger_timestamps_by_instant(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
