@@ -10,7 +10,7 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 
 `spec-dock init/update` は次の skill を導入します。これらが operational entrypoint / first-read spine であり、docs は skill から到達する detail / reference surface です。
 
-- Hub: `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+- Hub: `.agents/skills/spec-dock-hub/SKILL.md`
 - Clarification: `.agents/skills/spec-dock-clarification/SKILL.md`
 - Initiative: `.agents/skills/spec-dock-initiative-planning/SKILL.md`
 - Epic: `.agents/skills/spec-dock-epic-planning/SKILL.md`

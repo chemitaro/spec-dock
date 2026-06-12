@@ -170,7 +170,7 @@ See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + 
   - `.agent/` (generated agent state; gitignored)
   - `.gitignore` (ignores `active/` and `.agent/` (and legacy `.work/`))
 - `.agents/skills/` (Codex-compatible multi-skill set)
-  - `spec-driven-tdd-workflow/` (hub; entry point)
+  - `spec-dock-hub/` (hub; entry point)
   - `spec-dock-initiative-planning/` (leaf: initiative workflow)
   - `spec-dock-epic-planning/` (leaf: epic workflow)
   - `spec-dock-issue-execution/` (leaf: issue workflow)
