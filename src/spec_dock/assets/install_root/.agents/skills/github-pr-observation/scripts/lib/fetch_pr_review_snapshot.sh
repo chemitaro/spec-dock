@@ -1247,13 +1247,6 @@ selected_changes_requested_evidence.extend(
     }
     for item in selected_changes_requested_comments
 )
-if review_decision_changes_requested and not selected_changes_requested_evidence:
-    selected_changes_requested_evidence.append(
-        {
-            "kind": "pull_request_review_decision",
-            "state": "changes_requested",
-        }
-    )
 if selected_unresolved_thread_ids:
     decision_status_reason = "current_selected_unresolved_thread"
     decision_status = "human_gate"

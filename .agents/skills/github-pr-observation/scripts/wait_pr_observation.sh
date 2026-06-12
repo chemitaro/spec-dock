@@ -463,6 +463,25 @@ def align_decision_observation_complete(payload: dict, observation_complete: boo
     payload["decision_fingerprint"] = fingerprint
 
 
+def mark_decision_timeout(payload: dict) -> None:
+    decision = decision_payload(payload)
+    if not decision:
+        return
+    if decision.get("status") != "passed":
+        return
+    decision["status"] = "timeout"
+    decision["status_reason"] = "wait_timeout"
+    decision["recommended_next_action"] = "wait_or_resume"
+    decision["observation_complete"] = False
+    fingerprint_source = dict(decision)
+    fingerprint_source.pop("fingerprint", None)
+    fingerprint = hashlib.sha256(
+        json.dumps(fingerprint_source, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    decision["fingerprint"] = fingerprint
+    payload["decision_fingerprint"] = fingerprint
+
+
 def codex_review_payload(payload: dict) -> dict:
     codex_review = payload.get("codex_review")
     if isinstance(codex_review, dict):
@@ -1117,6 +1136,8 @@ def mark_latest_timeout(
     payload.setdefault("wait", {})["deadline_reached"] = True
     payload["wait"]["quiet_seconds_observed"] = quiet_elapsed
     payload["wait"]["same_fingerprint_observed"] = same_count
+    mark_decision_timeout(payload)
+    payload["fingerprint"] = semantic_fingerprint(payload)
     attach_resume_metadata(payload)
 
 
@@ -1300,6 +1321,7 @@ while True:
         normalized_status = "timeout"
         overall_status = "timeout"
         next_action = "wait_or_resume"
+        mark_decision_timeout(payload)
     elif terminal_now:
         final_phase = "terminal"
     elif time.monotonic() >= deadline:
@@ -1308,6 +1330,7 @@ while True:
         normalized_status = "timeout"
         overall_status = "timeout"
         next_action = "wait_or_resume"
+        mark_decision_timeout(payload)
     else:
         final_phase = "wait"
 
@@ -1317,6 +1340,8 @@ while True:
     payload["normalized_status"] = normalized_status
     payload["observation_complete"] = observation_complete
     payload["recommended_next_action"] = next_action
+    if payload.get("normalized_status") == "timeout":
+        mark_decision_timeout(payload)
     align_decision_observation_complete(payload, observation_complete)
     fingerprint = semantic_fingerprint(payload)
     payload["fingerprint"] = fingerprint
