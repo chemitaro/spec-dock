@@ -30,14 +30,7 @@ from tests.cli_runtime.harness import (
 )
 import pytest
 
-_EXPECTED_MANAGED_SKILL_NAMES = (
-    "spec-dock-hub",
-    *(
-        skill_name
-        for skill_name in _HARNESS_EXPECTED_MANAGED_SKILL_NAMES
-        if skill_name != "spec-driven-tdd-workflow"
-    ),
-)
+_EXPECTED_MANAGED_SKILL_NAMES = _HARNESS_EXPECTED_MANAGED_SKILL_NAMES
 
 
 @contextmanager
