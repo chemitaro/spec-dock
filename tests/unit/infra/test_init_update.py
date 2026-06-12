@@ -19264,6 +19264,85 @@ esac
                     assert payload["review"]["codex_authored_scope"] == "all_fetched"
                     assert payload["review"]["codex_authored_decision_authoritative"] is False
 
+    def test_issue_182_s01_review_collector_passed_decision_uses_merge_prepared_action(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"codex"},"state":"APPROVED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"approved"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                    "--out",
+                    str(tmp_path / "out"),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status"] == "passed"
+            assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+
     def test_issue_176_s03_review_collector_does_not_mark_fallback_as_primary(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -19399,19 +19478,33 @@ esac
                 "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
             }
 
+            base_command = [
+                str(script_path),
+                "--repo",
+                "owner/repo",
+                "--pr",
+                "13",
+                "--head-sha",
+                "a" * 40,
+                "--trigger-comment-id",
+                "99",
+                "--trigger-created-at",
+                "2026-06-08T01:00:00Z",
+            ]
+
             result = subprocess.run(
+                base_command,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            out_only_result = subprocess.run(
                 [
-                    str(script_path),
-                    "--repo",
-                    "owner/repo",
-                    "--pr",
-                    "13",
-                    "--head-sha",
-                    "a" * 40,
-                    "--trigger-comment-id",
-                    "99",
-                    "--trigger-created-at",
-                    "2026-06-08T01:00:00Z",
+                    *base_command,
+                    "--body-mode",
+                    "out-only",
                 ],
                 env=env,
                 capture_output=True,
@@ -19420,7 +19513,20 @@ esac
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
+            assert out_only_result.returncode == 0, out_only_result.stdout + out_only_result.stderr
             payload = json.loads(result.stdout)
+            out_only_payload = json.loads(out_only_result.stdout)
+            fallback = payload["decision"]["fallback_pass_candidate"]
+            assert out_only_payload["decision"]["fallback_pass_candidate"] == fallback
+            assert all(
+                "_fallback_pass_raw_body" not in item
+                for item in out_only_payload["review"]["signals"]
+            )
+            assert all("body" not in item for item in out_only_payload["review"]["signals"])
+            assert all(
+                item.get("omitted_reason") == "body_mode_out_only"
+                for item in out_only_payload["review"]["signals"]
+            )
             fallback = payload["decision"]["fallback_pass_candidate"]
             assert fallback == {
                 "present": True,

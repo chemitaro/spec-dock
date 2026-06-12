@@ -482,6 +482,7 @@ def body_hash(body):
 def add_body_metadata(signal, body_state):
     raw_body = str(signal.pop("_raw_body", "") or "")
     signal["_raw_body_artifact"] = raw_body
+    signal["_fallback_pass_raw_body"] = raw_body
     signal["_selected_full_body"] = raw_body
     signal["body_sha256"] = body_hash(raw_body)
     signal["body_original_length"] = len(raw_body)
@@ -1173,7 +1174,12 @@ def fingerprint_thread(item):
 
 
 def is_no_major_issues_fallback(item):
-    raw_body = str(item.get("_raw_body_artifact") or item.get("body") or "").strip().lower()
+    raw_body = str(
+        item.get("_fallback_pass_raw_body")
+        or item.get("_raw_body_artifact")
+        or item.get("body")
+        or ""
+    ).strip().lower()
     normalized_lines = [" ".join(line.strip().split()) for line in raw_body.splitlines()]
     allowed_lines = {
         "no major issues found",
@@ -1196,6 +1202,8 @@ fallback_pass_source_ids = [
     for item in current_codex_issue_comments
     if item.get("id") is not None and is_no_major_issues_fallback(item)
 ]
+for signal in signals:
+    signal.pop("_fallback_pass_raw_body", None)
 fallback_pass_candidate = {
     "present": bool(completion_signal == "fallback_issue_comment" and fallback_pass_source_ids),
     "source": "issue_comment" if fallback_pass_source_ids else None,
@@ -1262,7 +1270,7 @@ elif completion_signal == "none":
 else:
     decision_status_reason = "passed"
     decision_status = "passed"
-    decision_action = "merge_prepare"
+    decision_action = "merge_prepared"
 decision_scope = (
     "current_trigger_boundary"
     if trigger_source == "explicit"
