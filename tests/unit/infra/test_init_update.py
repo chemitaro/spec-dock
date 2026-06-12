@@ -15513,6 +15513,14 @@ payload = {
     }),
     "artifacts": {},
 }
+if "decision" in current:
+    payload["decision"] = current["decision"]
+if "decision_fingerprint" in current:
+    payload["decision_fingerprint"] = current["decision_fingerprint"]
+if "audit_fingerprint" in current:
+    payload["audit_fingerprint"] = current["audit_fingerprint"]
+if "fingerprint" in current:
+    payload["fingerprint"] = current["fingerprint"]
 print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
 """,
             encoding="utf-8",
@@ -16240,6 +16248,322 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             second_snapshot = json.loads((snapshots_dir / "poll-0002.json").read_text(encoding="utf-8"))
             assert first_snapshot["review"]["fingerprint"] != second_snapshot["review"]["fingerprint"]
 
+    def test_issue_182_s03_wait_uses_decision_fingerprint_for_audit_only_changes(self) -> None:
+        base_decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "completion_signal": "none",
+            "fingerprint": "decision-stable-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": base_decision,
+                        "decision_fingerprint": "decision-stable-s03",
+                        "audit_fingerprint": "audit-v1",
+                        "review_fingerprint": "audit-review-v1",
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "old-thread"}]},
+                    },
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": base_decision,
+                        "decision_fingerprint": "decision-stable-s03",
+                        "audit_fingerprint": "audit-v2",
+                        "review_fingerprint": "audit-review-v2",
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 2, "unresolved": 2, "items": [{"id": "old-thread"}, {"id": "older-thread"}]},
+                    },
+                ],
+                timeout_seconds=4,
+                quiet_seconds=1,
+                same_fingerprint_count=2,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["fingerprint"] == "decision-stable-s03"
+            assert payload["wait"]["same_fingerprint_observed"] >= 2
+            assert payload["wait"]["latest_change_poll"] == 1
+            events = [
+                json.loads(line)
+                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
+            ]
+            assert [event["changed"] for event in events[:2]] == [True, False]
+            assert all(event["changed"] is False for event in events[1:])
+
+    def test_issue_182_s03_wait_progress_uses_decision_current_counts_not_audit_threads(self) -> None:
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "human_gate",
+            "status_reason": "fallback_issue_comment_low_confidence",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "completion_signal": "fallback_issue_comment",
+            "fallback_pass_candidate": {
+                "present": True,
+                "source": "issue_comment",
+                "source_ids": [902],
+                "reason": "current_boundary_no_major_issues_comment",
+                "promotes_top_level_status": False,
+            },
+            "fingerprint": "fallback-decision-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "status": "human_gate",
+                        "overall_status": "human_gate",
+                        "normalized_status": "human_gate",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "fallback-decision-s03",
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 5, "unresolved": 5, "items": []},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "human_gate"
+            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["observation_complete"] is False
+            assert payload["decision"]["fallback_pass_candidate"]["present"] is True
+            stderr_line = result.stderr.strip().splitlines()[-1]
+            assert "review=commented" in stderr_line
+            assert "unresolved=5" not in stderr_line
+            assert "threads=5" not in stderr_line
+
+    def test_issue_182_s03_wait_current_selected_unresolved_and_changes_requested_gate(self) -> None:
+        cases = [
+            (
+                "current_selected_unresolved_thread",
+                {
+                    "selected_review_thread_ids": ["thread-current"],
+                    "selected_unresolved_thread_ids": ["thread-current"],
+                    "selected_unresolved_count": 1,
+                    "selected_changes_requested_review_ids": [],
+                    "selected_changes_requested_review_comment_ids": [],
+                },
+            ),
+            (
+                "current_selected_changes_requested",
+                {
+                    "selected_review_thread_ids": [],
+                    "selected_unresolved_thread_ids": [],
+                    "selected_unresolved_count": 0,
+                    "selected_changes_requested_review_ids": [301],
+                    "selected_changes_requested_review_comment_ids": [],
+                },
+            ),
+        ]
+        for status_reason, extra_decision in cases:
+            with _case(status_reason=status_reason):
+                decision = {
+                    "scope": "current_trigger_boundary",
+                    "status": "human_gate",
+                    "status_reason": status_reason,
+                    "recommended_next_action": "address_review_feedback",
+                    "observation_complete": False,
+                    "selected_review_ids": [301] if status_reason == "current_selected_changes_requested" else [],
+                    "selected_review_comment_ids": [],
+                    "completion_signal": "submitted_pull_request_review",
+                    "fingerprint": f"decision-{status_reason}",
+                    **extra_decision,
+                }
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                        Path(tmp_dir),
+                        [
+                            {
+                                "ci": "passed",
+                                "review": "approved",
+                                "status": "human_gate",
+                                "overall_status": "human_gate",
+                                "normalized_status": "human_gate",
+                                "recommended_next_action": "address_review_feedback",
+                                "decision": decision,
+                                "decision_fingerprint": f"decision-{status_reason}",
+                                "check_runs": {"total": 1, "success": 1},
+                                "threads": {"total": 0, "unresolved": 0, "items": []},
+                            }
+                        ],
+                        timeout_seconds=2,
+                        quiet_seconds=1,
+                        same_fingerprint_count=1,
+                        progress="none",
+                    )
+
+                    assert result.returncode == 0, result.stdout + result.stderr
+                    payload = json.loads(result.stdout)
+                    assert payload["normalized_status"] == "human_gate"
+                    assert payload["overall_status"] == "human_gate"
+                    assert payload["recommended_next_action"] == "address_review_feedback"
+                    assert payload["observation_complete"] is False
+                    assert payload["decision"]["status_reason"] == status_reason
+
+    def test_issue_182_s03_wait_missing_current_completion_signal_stays_pending(self) -> None:
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "completion_signal": "none",
+            "fingerprint": "missing-completion-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "missing-completion-s03",
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] in {"pending", "timeout"}
+            assert payload["normalized_status"] != "passed"
+            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["observation_complete"] is False
+
+    def test_issue_182_s03_wait_decision_pass_overrides_legacy_audit_review_status(self) -> None:
+        legacy_statuses = ("unresolved", "commented", "changes_requested")
+        for legacy_status in legacy_statuses:
+            with _case(legacy_status=legacy_status):
+                decision = {
+                    "scope": "current_trigger_boundary",
+                    "status": "passed",
+                    "status_reason": "submitted_pull_request_review",
+                    "recommended_next_action": "merge_prepared",
+                    "observation_complete": True,
+                    "selected_review_ids": [401],
+                    "selected_review_comment_ids": [],
+                    "selected_review_thread_ids": [],
+                    "selected_unresolved_thread_ids": [],
+                    "selected_unresolved_count": 0,
+                    "completion_signal": "submitted_pull_request_review",
+                    "fingerprint": f"decision-pass-{legacy_status}",
+                }
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                        Path(tmp_dir),
+                        [
+                            {
+                                "ci": "passed",
+                                "review": legacy_status,
+                                "review_summary": {"review": legacy_status, "all": {"total": 1}},
+                                "status": "passed",
+                                "overall_status": "passed",
+                                "normalized_status": "passed",
+                                "recommended_next_action": "merge_prepared",
+                                "decision": decision,
+                                "decision_fingerprint": f"decision-pass-{legacy_status}",
+                                "check_runs": {"total": 1, "success": 1},
+                                "threads": {
+                                    "total": 1,
+                                    "unresolved": 1,
+                                    "items": [{"id": f"legacy-{legacy_status}"}],
+                                },
+                            }
+                        ],
+                        timeout_seconds=2,
+                        quiet_seconds=1,
+                        same_fingerprint_count=1,
+                        progress="none",
+                    )
+
+                    assert result.returncode == 0, result.stdout + result.stderr
+                    payload = json.loads(result.stdout)
+                    assert payload["normalized_status"] == "passed"
+                    assert payload["overall_status"] == "passed"
+                    assert payload["recommended_next_action"] == "merge_prepared"
+                    assert payload["observation_complete"] is True
+
+    def test_issue_182_s03_wait_preserves_legacy_review_status_without_decision_surface(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "review_summary": {"review": "commented", "all": {"total": 1}},
+                        "status": "human_gate",
+                        "overall_status": "human_gate",
+                        "normalized_status": "human_gate",
+                        "recommended_next_action": "address_review_feedback",
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "legacy-thread"}]},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "human_gate"
+            assert payload["overall_status"] == "human_gate"
+            assert payload["recommended_next_action"] == "address_review_feedback"
+            assert payload["observation_complete"] is True
+
     def test_issue_174_pr_observation_wait_preserves_output_boundary_and_line_budget(self) -> None:
         forbidden_tokens = (
             "https://example.test",
@@ -16738,15 +17062,16 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
             assert payload["summary"]["review"] == "commented"
-            assert payload["normalized_status"] == "human_gate"
-            assert payload["recommended_next_action"] == "address_review_feedback"
+            assert payload["normalized_status"] == "passed"
+            assert payload["recommended_next_action"] == "merge_prepared"
             assert payload["wait"]["same_fingerprint_observed"] >= 2
-            assert payload["wait"]["latest_change_poll"] == 2
+            assert payload["wait"]["latest_change_poll"] == 1
             events = [
                 json.loads(line)
                 for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
             ]
-            assert [event["changed"] for event in events[:3]] == [True, True, False]
+            assert [event["changed"] for event in events[:2]] == [True, False]
+            assert all(event["changed"] is False for event in events[1:])
             snapshots_dir = out_dir / "snapshots"
             first_snapshot = json.loads((snapshots_dir / "poll-0001.json").read_text(encoding="utf-8"))
             second_snapshot = json.loads((snapshots_dir / "poll-0002.json").read_text(encoding="utf-8"))
@@ -17123,7 +17448,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["normalized_status"] == "human_gate"
+            assert payload["normalized_status"] == "passed"
             assert payload["observation_complete"] is True
             assert all("body" not in item for item in payload["review"]["signals"])
             raw_bodies = json.loads((out_dir / "raw" / "review_bodies.json").read_text(encoding="utf-8"))
@@ -17371,9 +17696,9 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             payload = json.loads(result.stdout)
             assert payload["summary"]["ci"] == "passed"
             assert payload["summary"]["review"] == "commented"
-            assert payload["normalized_status"] == "human_gate"
+            assert payload["normalized_status"] == "passed"
             assert payload["observation_complete"] is True
-            assert payload["recommended_next_action"] == "address_review_feedback"
+            assert payload["recommended_next_action"] == "merge_prepared"
             assert payload["wait"]["polls"] >= 3
 
     def test_issue_75_pr_observation_checks_collector_classifies_failure_with_actions_steps(self) -> None:
