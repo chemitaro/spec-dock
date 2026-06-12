@@ -164,16 +164,21 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S01 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only: old provider/mirror `spec-driven-tdd-workflow/SKILL.md` exists and new `spec-dock-hub/SKILL.md` does not exist | old provider and mirror paths existed; new provider and mirror paths did not exist before S01 | `test -e src/.../spec-driven-tdd-workflow/SKILL.md`; `test -e .agents/.../spec-driven-tdd-workflow/SKILL.md`; `test ! -e src/.../spec-dock-hub/SKILL.md`; `test ! -e .agents/.../spec-dock-hub/SKILL.md` | pass | pre-change characterization matched S01 plan |
 | S01 | 緑フェーズ（Green） | rename provider/mirror hub skill to `spec-dock-hub`, preserve byte parity, remove old current path, keep hub/leaf boundary | new provider/mirror `spec-dock-hub/SKILL.md` files exist and are byte-equivalent; old provider/mirror `spec-driven-tdd-workflow/SKILL.md` files do not exist; text contains `name: spec-dock-hub`, `SpecDock Hub`, `route selector`, and `global invariant` | `cmp -s src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md .agents/skills/spec-dock-hub/SKILL.md`; `rg -n "name: spec-dock-hub|SpecDock Hub|route selector|global invariant" ...`; old-path `test ! -e ...`; `git diff --check` | pass | doc-writer Erdos implemented S01; parent re-ran the planned checks |
 | S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | no additional refactor performed; changes remained inside S01 allowed paths | `git status --short`; `git diff --name-status`; reviewer checks | pass | S02 docs/tests/runtime/manifest updates intentionally not mixed into S01 |
+| S02 | 赤フェーズ / 代替証跡（Red / alternative） | covered-existing / red-required: focused installer/update tests should fail while current managed skill still points at the removed old asset | focused pytest failed because `_MANAGED_SKILL_NAMES` / tests still treated `spec-driven-tdd-workflow` as current and init/update looked for the missing provider asset | `uv run pytest tests/unit/infra/test_init_update.py -k "managed or obsolete or manifest or prunes or skill"` | fail-as-expected | failure class: `Missing asset file: .../spec-driven-tdd-workflow/SKILL.md` |
+| S02 | 緑フェーズ（Green） | update current managed skill to `spec-dock-hub`; represent old hub as obsolete exact-file cleanup; focused tests pass | `_MANAGED_SKILL_NAMES` uses `spec-dock-hub`; old hub exact path is in `managed_assets.obsolete_exact_file_paths`; focused pytest passed `59 passed, 296 deselected`; current/obsolete overlap absent by inspection | `uv run pytest tests/unit/infra/test_init_update.py -k "managed or obsolete or manifest or prunes or skill"`; `rg` inspection; `git diff --check` | pass | dev-coder Sagan implemented S02; parent re-ran focused tests and inspection |
+| S02 | リファクタリング（Refactor） | guardrail satisfied / no broad installer cleanup rewrite | no installer architecture rewrite; no compatibility alias / forwarding skill / symlink; S04 harness/test_wrappers and S03 docs left for later steps | `git diff --stat`; `git diff --check`; code-reviewer Lorentz | pass | S02 remained in allowed paths |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
 | S01 | docs/tests/runtime/manifest still reference old name | implementation / worker note | recorded as planned downstream work for S02+; not a S01 risk | cl-ac-001 / cl-ec-002 partial | no | worker note: old-name docs/tests/runtime references are S02+ scope |
+| S02 | `tests/cli_runtime/harness.py` and wrapper tests still use old name | implementation / worker note | recorded as planned S04 work; S02 prohibited harness/test_wrappers edits | cl-ac-006 / cl-ec-001 partial | no | worker note and `rg` inspection show remaining harness references are downstream S04 scope |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
 | S01 | cl-ac-001, cl-ac-003, cl-ec-002; cl-ac-004 partial only | S01 verification commands pass and required reviewers pass; do not mark cl-ac-004 fully closed in this step | provider/mirror skill renamed to `spec-dock-hub`; old current path absent; `cmp`, `rg`, old-path `test ! -e`, `git diff --check` pass; `spec-reviewer` Franklin pass; `code-reviewer` Parfit pass with report-evidence P2 addressed here | pass | cl-ac-004 final closure waits for S05/S99 sync/validate evidence |
+| S02 | cl-ac-006, cl-ec-001 | Focused tests pass and code-reviewer passes | `_MANAGED_SKILL_NAMES` current hub is `spec-dock-hub`; manifest obsolete exact path includes `.agents/skills/spec-driven-tdd-workflow/SKILL.md`; focused pytest passed; code-reviewer Lorentz pass | pass | S04 will update runtime harness/wrapper expectations; no compatibility alias added |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -182,6 +187,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | cl-ac-003 | S01 | yes | inspect-only + reviewer | existing hub text routed to leaf skills | `spec-reviewer` Franklin reviewed skill wording and hub/leaf boundary | pass | no leaf workflow spine absorbed |
 | cl-ec-002 | S01 | yes | inspect-only + reviewer | old name was vague; new path absent | new skill text includes `SpecDock Hub`, `route selector`, and `global invariant`; `spec-reviewer` pass | pass | short name clarified by heading/description/first bullets |
 | cl-ac-004 | S01 | yes | command partial | provider/mirror old paths existed before S01 | `cmp -s src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md .agents/skills/spec-dock-hub/SKILL.md` | pass | partial parity evidence only; final closure waits for S05/S99 sync/validate |
+| cl-ac-006 | S02 | yes | pytest + inspect-only | focused pytest failed before S02 with missing old hub asset | `uv run pytest tests/unit/infra/test_init_update.py -k "managed or obsolete or manifest or prunes or skill"` | pass | `59 passed, 296 deselected`; old hub exact path is obsolete cleanup |
+| cl-ec-001 | S02 | yes | pytest | old path dependency was still treated as current before S02 | focused pytest plus current/obsolete boundary inspection | pass | no compatibility alias / forwarding skill / symlink |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -192,11 +199,14 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | cl-ac-003 | S01 | `spec-reviewer` Franklin pass | pass | hub/leaf boundary maintained |
 | cl-ec-002 | S01 | wording inspection and `spec-reviewer` pass | pass | short name clarity satisfied for skill text |
 | cl-ac-004 | S01 | provider/mirror `cmp` | partial-pass | final closure waits for S05/S99 |
+| cl-ac-006 | S02 | focused update/install tests and manifest inspection | pass | old hub exact path is obsolete cleanup, not current managed target |
+| cl-ec-001 | S02 | focused tests and current/obsolete inspection | pass | old path dependency fixed for installer/update cleanup without alias |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
 | none | S01 closure set | N/A | cl-ac-001, cl-ac-003, cl-ec-002, cl-ac-004 partial | S01 executed as planned | no | no |
+| none | S02 closure set | N/A | cl-ac-006, cl-ec-001 | S02 executed as planned | no | no |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
@@ -211,11 +221,13 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | shipped skill text and provider/mirror scaffold asset change; parent direct implementation prohibited by workflow | doc-writer | provider/mirror hub skill rename and skill wording only | `requirement.md`; `design.md`; `plan.md` S01 | `src/.../.agents/skills/spec-dock-hub/SKILL.md`; `src/.../spec-driven-tdd-workflow/SKILL.md` deletion only; `.agents/skills/spec-dock-hub/SKILL.md`; `.agents/.../spec-driven-tdd-workflow/SKILL.md` deletion only | runtime code; tests; README/docs; `src/spec_dock/cli.py`; `host-adapters/meta.json`; canonical issue docs; historical specs; compatibility alias / forwarding skill / symlink | `cmp`; `rg` wording; old-path `test ! -e`; `git diff --check`; step reviewers | allowed paths insufficient; compatibility alias needed; boundary conflict with `iss-00164` | changed files; deleted paths; verification; unresolved risks; no-material-decision note | pass |
+| S02 | delegated | installer/update cleanup contract touches runtime installer, manifest, and focused tests | dev-coder | current managed skill name, obsolete exact cleanup manifest, and focused unit tests | `requirement.md`; `design.md`; `plan.md` S02; `src/spec_dock/cli.py`; `host-adapters/meta.json`; focused tests | `src/spec_dock/cli.py`; `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json`; focused assertions/fixtures in `tests/unit/infra/test_init_update.py` | skill text/files; README/docs; `tests/cli_runtime/harness.py`; `tests/cli_runtime/test_wrappers.py`; broad test rewrites; compatibility alias / forwarding skill / symlink | focused pytest; `git diff --check`; current/obsolete inspection; code-reviewer | compatibility alias required; manifest obsolete overlap; allowed paths insufficient | changed files; red/green evidence; inspection; unresolved risks; no-material-decision note | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
 | S01 | doc-writer | Renamed provider/mirror hub skill to `spec-dock-hub`, updated frontmatter/heading/description/first bullets, removed old current path, preserved provider/mirror byte parity | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md`; `.agents/skills/spec-dock-hub/SKILL.md`; deleted old provider/mirror `spec-driven-tdd-workflow/SKILL.md` | worker and parent verification: `cmp` pass; wording `rg` pass; old-path `test ! -e` pass; `git diff --check` pass | `spec-reviewer` pass; `code-reviewer` pass with report-evidence note addressed | none for S01; downstream old-name references remain planned S02+ work | accepted |
+| S02 | dev-coder | Updated installer current managed hub to `spec-dock-hub`, added old hub exact file to obsolete cleanup manifest, and updated focused unit tests / prune fixture | `src/spec_dock/cli.py`; `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json`; `tests/unit/infra/test_init_update.py` | Red focused pytest failed before S02; Green focused pytest `59 passed, 296 deselected`; `git diff --check` pass; inspection confirmed current/obsolete boundary | `code-reviewer` pass | `tests/cli_runtime/harness.py` and wrapper tests remain S04 scope; docs remain S03 scope | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -230,11 +242,13 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | plan | plan phase reviewer | spec-reviewer | fresh after precision fixes | passed | N/A | execution handoff ready | Gauss `019ebad0-c01f-7ff2-bcfb-9f1f2688b3c5`; `review_status=pass` with P2/P3 non-blocking findings; plan updated to clarify cl-ac-004 final closure and S01 no-op gate. Hypatia `019ebad6-580b-7db3-b89c-ec5dcf3e4280`; fresh re-review passed with no findings |
 | S01 | skill wording / hub-leaf boundary | spec-reviewer | fresh | passed | N/A | S01 reviewer gate passed | Franklin `019ebaf1-0ddf-70f3-8817-6083fefc121d`; no findings; confirmed `spec-dock-hub` wording and boundary |
 | S01 | shipped asset path behavior | code-reviewer | fresh | passed | N/A | S01 reviewer gate passed after report evidence update | Parfit `019ebaf1-0eaf-75e0-b44f-0e7f9aee1635`; implementation pass; P2 report evidence gap addressed in this report update |
+| S02 | installer/update cleanup contract | code-reviewer | fresh | passed | N/A | S02 reviewer gate passed | Lorentz `019ebafd-b1ad-7512-bbce-df69b8ee0a95`; no findings; confirmed current managed hub, obsolete exact path cleanup, no compatibility alias |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed | S01 skill rename plus S01 report evidence only | S01 commit hash is post-commit external evidence; report records closure state without self-referential hash | `git status --short` after S01 commit -> clean | N/A | N/A | N/A | N/A |
+| S02 | committed | S02 installer/update cleanup plus S02 report evidence only | S02 commit hash is post-commit external evidence; report records closure state without self-referential hash | `git status --short` after S02 commit -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `path/to/file1` - ...
