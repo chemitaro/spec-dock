@@ -371,6 +371,7 @@ Fresh pass だけを gate pass とする。
 
 - scope:
   - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`
+  - `.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`（dogfooding mirror parity）
   - focused tests in `tests/unit/infra/test_init_update.py`
 - テスト義務:
   - closure id:
@@ -396,6 +397,7 @@ Fresh pass だけを gate pass とする。
   - `dev-coder`
 - 許可 paths:
   - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`
+  - `.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`（provider asset と同一内容へ同期する dogfooding mirror）
   - `tests/unit/infra/test_init_update.py`
 - 禁止 changes:
   - `trigger_codex_review.sh`
