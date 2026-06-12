@@ -482,6 +482,7 @@ def body_hash(body):
 def add_body_metadata(signal, body_state):
     raw_body = str(signal.pop("_raw_body", "") or "")
     signal["_raw_body_artifact"] = raw_body
+    signal["_fallback_pass_raw_body"] = raw_body
     signal["_selected_full_body"] = raw_body
     signal["body_sha256"] = body_hash(raw_body)
     signal["body_original_length"] = len(raw_body)
@@ -983,6 +984,16 @@ current_unresolved_thread_ids = [
     and item.get("id") is not None
     and (not body_state["trigger_known"] or thread_after_trigger(item))
 ]
+unresolved_thread_id_set = {
+    str(item.get("id"))
+    for item in threads
+    if item.get("state") == "unresolved" and item.get("id") is not None
+}
+selected_unresolved_thread_ids = [
+    thread_id
+    for thread_id in selected_thread_ids
+    if str(thread_id) in unresolved_thread_id_set
+]
 
 def selected_review_item(item):
     raw_body = str(item.get("_selected_full_body", "") or "")
@@ -1162,7 +1173,148 @@ def fingerprint_thread(item):
     }
 
 
-fingerprint_source = {
+def is_no_major_issues_fallback(item):
+    raw_body = str(
+        item.get("_fallback_pass_raw_body")
+        or item.get("_raw_body_artifact")
+        or item.get("body")
+        or ""
+    ).strip().lower()
+    normalized_lines = [" ".join(line.strip().split()) for line in raw_body.splitlines()]
+    allowed_lines = {
+        "no major issues found",
+        "no major issues found.",
+        "no major issues were found",
+        "no major issues were found.",
+    }
+    return any(line in allowed_lines for line in normalized_lines)
+
+
+current_codex_issue_comments = [
+    item
+    for item in signals
+    if item.get("kind") == "issue_comment"
+    and item.get("codex_authored")
+    and item.get("current_status_signal")
+]
+fallback_pass_source_ids = [
+    item.get("id")
+    for item in current_codex_issue_comments
+    if item.get("id") is not None and is_no_major_issues_fallback(item)
+]
+for signal in signals:
+    signal.pop("_fallback_pass_raw_body", None)
+fallback_pass_candidate = {
+    "present": bool(completion_signal == "fallback_issue_comment" and fallback_pass_source_ids),
+    "source": "issue_comment" if fallback_pass_source_ids else None,
+    "source_ids": fallback_pass_source_ids,
+    "reason": "current_boundary_no_major_issues_comment" if fallback_pass_source_ids else None,
+    "promotes_top_level_status": False,
+}
+selected_changes_requested_reviews = [
+    item for item in selected_review_signals if item.get("state") == "changes_requested"
+]
+selected_changes_requested_review_ids = [
+    item.get("id") for item in selected_changes_requested_reviews if item.get("id") is not None
+]
+selected_changes_requested_review_id_set = {
+    str(value) for value in selected_changes_requested_review_ids
+}
+selected_changes_requested_comments = [
+    item
+    for item in status_signals
+    if item.get("review_id") is not None
+    and str(item.get("review_id")) in selected_changes_requested_review_id_set
+    and item.get("kind") == "pull_review_comment"
+]
+selected_changes_requested_comment_ids = [
+    item.get("id") for item in selected_changes_requested_comments if item.get("id") is not None
+]
+selected_changes_requested_evidence = [
+    {
+        "kind": "pull_review",
+        "id": item.get("id"),
+        "state": item.get("state"),
+    }
+    for item in selected_changes_requested_reviews
+]
+selected_changes_requested_evidence.extend(
+    {
+        "kind": "pull_review_comment",
+        "id": item.get("id"),
+        "review_id": item.get("review_id"),
+        "thread_id": item.get("thread_id"),
+    }
+    for item in selected_changes_requested_comments
+)
+if selected_unresolved_thread_ids:
+    decision_status_reason = "current_selected_unresolved_thread"
+    decision_status = "human_gate"
+    decision_action = "address_review_feedback"
+elif selected_changes_requested_evidence:
+    decision_status_reason = "current_selected_changes_requested"
+    decision_status = "human_gate"
+    decision_action = "address_review_feedback"
+elif completion_signal == "fallback_issue_comment":
+    decision_status_reason = "fallback_issue_comment_low_confidence"
+    decision_status = "human_gate"
+    decision_action = "wait_or_resume"
+elif blocking_collection_failure:
+    decision_status_reason = "blocking_limitation"
+    decision_status = "unknown"
+    decision_action = "human_gate"
+elif completion_signal == "none":
+    decision_status_reason = "missing_current_completion_signal"
+    decision_status = "unknown"
+    decision_action = "wait_or_resume"
+else:
+    decision_status_reason = "passed"
+    decision_status = "passed"
+    decision_action = "merge_prepared"
+decision_scope = (
+    "current_trigger_boundary"
+    if trigger_source == "explicit"
+    else "inferred_current_boundary"
+    if trigger_source == "inferred"
+    else "unknown_current_boundary"
+)
+trigger_payload = {
+    "source": trigger_source,
+    "comment_id": trigger_comment_id,
+    "created_at": trigger_created_at,
+}
+decision_source = {
+    "scope": decision_scope,
+    "trigger": trigger_payload,
+    "expected_head_sha": expected_head_sha,
+    "status": decision_status,
+    "status_reason": decision_status_reason,
+    "recommended_next_action": decision_action,
+    "observation_complete": decision_status == "passed",
+    "selected_review_ids": selected_review_ids,
+    "selected_review_comment_ids": selected_review_comment_ids,
+    "selected_review_thread_ids": selected_thread_ids,
+    "selected_unresolved_thread_ids": selected_unresolved_thread_ids,
+    "selected_unresolved_count": len(selected_unresolved_thread_ids),
+    "selected_changes_requested_review_ids": selected_changes_requested_review_ids,
+    "selected_changes_requested_review_comment_ids": selected_changes_requested_comment_ids,
+    "selected_changes_requested_evidence": selected_changes_requested_evidence,
+    "completion_signal": completion_signal,
+    "confidence": lifecycle_confidence,
+    "fallback_pass_candidate": fallback_pass_candidate,
+    "blocking_limitations": [
+        item.get("code")
+        for item in limitations
+        if item.get("severity") == "blocking"
+    ],
+}
+decision_fingerprint = hashlib.sha256(
+    json.dumps(decision_source, sort_keys=True, separators=(",", ":")).encode()
+).hexdigest()
+decision_payload = dict(decision_source)
+decision_payload["fingerprint"] = decision_fingerprint
+
+audit_fingerprint_source = {
     "status": status,
     "signals": [fingerprint_signal(item) for item in signals],
     "codex_authored": [
@@ -1183,9 +1335,39 @@ fingerprint_source = {
     "codex_review": codex_review_payload,
     "limitations": limitations,
 }
-fingerprint = hashlib.sha256(
-    json.dumps(fingerprint_source, sort_keys=True, separators=(",", ":")).encode()
+audit_fingerprint = hashlib.sha256(
+    json.dumps(audit_fingerprint_source, sort_keys=True, separators=(",", ":")).encode()
 ).hexdigest()
+fingerprint = audit_fingerprint
+
+review_current_payload = {
+    "scope": decision_scope,
+    "signals": status_signals,
+    "codex_authored": [
+        item
+        for item in status_signals + review_request_signals
+        if item.get("codex_authored")
+    ],
+    "selected_reviews": [selected_review_item(item) for item in selected_review_signals],
+    "selected_review_comments": [
+        selected_review_comment_item(item) for item in selected_comment_signals
+    ],
+    "selected_review_ids": selected_review_ids,
+    "selected_review_comment_ids": selected_review_comment_ids,
+    "selected_thread_ids": selected_thread_ids,
+    "selected_unresolved_thread_ids": selected_unresolved_thread_ids,
+    "selected_changes_requested_evidence": selected_changes_requested_evidence,
+}
+review_audit_payload = {
+    "scope": "all_fetched",
+    "decision_authoritative": False,
+    "signals": signals,
+    "codex_authored": [
+        item for item in signals + review_request_signals if item.get("codex_authored")
+    ],
+    "threads": thread_counts,
+    "fingerprint": audit_fingerprint,
+}
 
 payload = {
     "script": "fetch_pr_review_snapshot.sh",
@@ -1195,19 +1377,30 @@ payload = {
     "pr": pr,
     "expected_head_sha": expected_head_sha,
     "fingerprint": fingerprint,
+    "decision_fingerprint": decision_fingerprint,
+    "audit_fingerprint": audit_fingerprint,
+    "decision": decision_payload,
     "review": {
         "collector": "s04",
         "status": status,
         "progress_status": status,
         "statuses": STATUSES,
         "signals": signals,
+        "signals_scope": "all_fetched",
+        "signals_decision_authoritative": False,
         "review_requests": review_request_signals,
         "review_decision": review_decision,
         "codex_authored": [
             item for item in signals + review_request_signals if item.get("codex_authored")
         ],
+        "codex_authored_scope": "all_fetched",
+        "codex_authored_decision_authoritative": False,
         "summary": counts,
         "threads": thread_counts,
+        "threads_scope": "all_fetched",
+        "threads_decision_authoritative": False,
+        "current": review_current_payload,
+        "audit": review_audit_payload,
         "body_mode": {
             "mode": body_mode,
             "item_body_char_cap": None if body_mode == "trigger-window-full" else ITEM_BODY_CAP,
@@ -1221,11 +1414,7 @@ payload = {
         "codex_review": codex_review_payload,
     },
     "codex_review": codex_review_payload,
-    "trigger": {
-        "source": trigger_source,
-        "comment_id": trigger_comment_id,
-        "created_at": trigger_created_at,
-    },
+    "trigger": trigger_payload,
     "limitations": limitations,
 }
 

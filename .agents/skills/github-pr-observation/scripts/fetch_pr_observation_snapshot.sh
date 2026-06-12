@@ -412,9 +412,41 @@ def pr_metadata_failure_limitation(*, exit_code, stderr, default_code, default_m
     }
 
 
+def collector_decision_payload():
+    if isinstance(review_wrapper_payload, dict) and isinstance(review_wrapper_payload.get("decision"), dict):
+        return review_wrapper_payload["decision"]
+    if isinstance(review_payload, dict) and isinstance(review_payload.get("decision"), dict):
+        return review_payload["decision"]
+    return {}
+
+
 def classify_snapshot():
     ci_status = ci_payload.get("status") or summary.get("ci") or "unknown"
     review_status = review_payload.get("status") or summary.get("review") or "unknown"
+    decision = collector_decision_payload()
+    decision_status = decision.get("status") if isinstance(decision.get("status"), str) else None
+    decision_status_reason = (
+        decision.get("status_reason") if isinstance(decision.get("status_reason"), str) else None
+    )
+    decision_action = (
+        decision.get("recommended_next_action")
+        if isinstance(decision.get("recommended_next_action"), str)
+        else None
+    )
+    decision_observation_complete = decision.get("observation_complete")
+    selected_unresolved_thread_ids = (
+        decision.get("selected_unresolved_thread_ids")
+        if isinstance(decision.get("selected_unresolved_thread_ids"), list)
+        else []
+    )
+    selected_unresolved_count = decision.get("selected_unresolved_count")
+    if not isinstance(selected_unresolved_count, int):
+        selected_unresolved_count = len(selected_unresolved_thread_ids)
+    selected_changes_requested_evidence = (
+        decision.get("selected_changes_requested_evidence")
+        if isinstance(decision.get("selected_changes_requested_evidence"), list)
+        else []
+    )
     codex_review = (
         review_wrapper_payload.get("codex_review")
         if isinstance(review_wrapper_payload, dict) and isinstance(review_wrapper_payload.get("codex_review"), dict)
@@ -425,36 +457,73 @@ def classify_snapshot():
         )
     )
     codex_lifecycle = codex_review.get("lifecycle") if isinstance(codex_review.get("lifecycle"), dict) else {}
-    completion_signal = codex_lifecycle.get("completion_signal")
+    completion_signal = decision.get("completion_signal") or codex_lifecycle.get("completion_signal")
     if head_matches_expected is False or normalized_status == "stale_head":
-        return "stale_head", "rerun_for_current_head", False
+        return "stale_head", "rerun_for_current_head", False, "stale_head"
     if metadata.get("isDraft") is True:
-        return "human_gate", "mark_pr_ready_for_review", False
+        return "human_gate", "mark_pr_ready_for_review", False, "draft_pr"
     if metadata.get("state") and str(metadata.get("state") or "").upper() != "OPEN":
-        return "human_gate", "reopen_or_use_open_pr", False
+        return "human_gate", "reopen_or_use_open_pr", False, "non_open_pr"
     if ci_status == "failed":
-        return "failed", "fix_ci", False
+        return "failed", "fix_ci", False, "ci_failed"
     if ci_status in {"pending", "running", "none"}:
         if has_blocking_limitation(ignored_codes={"required_checks_missing_or_pending"}):
             if has_permission_limitation():
-                return "unknown", "fix_github_token_permissions", False
-            return "unknown", "human_gate", False
-        return ci_status, "wait", False
+                return "unknown", "fix_github_token_permissions", False, "blocking_limitation"
+            return "unknown", "human_gate", False, "blocking_limitation"
+        return ci_status, "wait", False, "ci_pending"
     if has_permission_limitation():
-        return "unknown", "fix_github_token_permissions", False
+        return "unknown", "fix_github_token_permissions", False, "blocking_limitation"
     if has_blocking_limitation():
-        return "unknown", "human_gate", False
+        return "unknown", "human_gate", False, "blocking_limitation"
     if ci_status != "passed":
-        return "unknown", "human_gate", False
+        return "unknown", "human_gate", False, "blocking_limitation"
+    if decision_status_reason == "current_selected_unresolved_thread" or selected_unresolved_count > 0:
+        return (
+            "human_gate",
+            "address_review_feedback",
+            True,
+            "current_selected_unresolved_thread",
+        )
+    if decision_status_reason == "current_selected_changes_requested" or selected_changes_requested_evidence:
+        return (
+            "human_gate",
+            "address_review_feedback",
+            True,
+            "current_selected_changes_requested",
+        )
     if completion_signal == "fallback_issue_comment":
-        return "human_gate", "wait_or_resume", False
+        return "human_gate", "wait_or_resume", False, "fallback_issue_comment_low_confidence"
+    if decision_status_reason == "missing_current_completion_signal":
+        missing_status = decision_status if decision_status not in {None, "", "unknown"} else "pending"
+        missing_action = decision_action or "wait_or_resume"
+        if (
+            missing_action == "wait_or_resume"
+            and not os.environ["OBS_TRIGGER_COMMENT_ID"]
+            and not os.environ["OBS_TRIGGER_CREATED_AT"]
+        ):
+            missing_action = "wait"
+        return missing_status, missing_action, False, "missing_current_completion_signal"
+    if decision_status == "passed":
+        return "passed", "merge_prepared", True, "passed"
+    if decision_status_reason:
+        return (
+            decision_status or "unknown",
+            decision_action or "human_gate",
+            bool(decision_observation_complete) if isinstance(decision_observation_complete, bool) else False,
+            decision_status_reason,
+        )
     if review_status in {"requested", "commented", "changes_requested", "unresolved"}:
-        return "human_gate", "address_review_feedback", True
+        return "human_gate", "address_review_feedback", True, (
+            "current_selected_changes_requested"
+            if review_status == "changes_requested"
+            else "current_selected_unresolved_thread"
+        )
     if completion_signal != "submitted_pull_request_review":
-        return "pending", "wait", False
+        return "pending", "wait", False, "missing_current_completion_signal"
     if review_status in {"none", "approved"}:
-        return "passed", "merge_prepared", True
-    return "unknown", "human_gate", False
+        return "passed", "merge_prepared", True, "passed"
+    return "unknown", "human_gate", False, decision_status_reason
 
 if gh_exit != 0:
     stderr_text = ""
@@ -609,10 +678,21 @@ else:
             }
         )
 
-normalized_status, recommended_next_action, observation_complete = classify_snapshot()
+normalized_status, recommended_next_action, observation_complete, status_reason = classify_snapshot()
 review_collector_fingerprint = (
     review_wrapper_payload.get("fingerprint")
     if "review_wrapper_payload" in locals() and isinstance(review_wrapper_payload, dict)
+    else None
+)
+review_decision_payload = collector_decision_payload()
+review_decision_fingerprint = (
+    review_wrapper_payload.get("decision_fingerprint")
+    if isinstance(review_wrapper_payload, dict) and review_wrapper_payload.get("decision_fingerprint")
+    else review_decision_payload.get("fingerprint")
+)
+review_audit_fingerprint = (
+    review_wrapper_payload.get("audit_fingerprint")
+    if isinstance(review_wrapper_payload, dict)
     else None
 )
 if isinstance(review_payload, dict) and review_collector_fingerprint:
@@ -636,8 +716,7 @@ fingerprint_source = {
     "limitations": [item["code"] for item in limitations],
     "ci_status": ci_payload.get("status"),
     "ci_fingerprint": checks_payload.get("fingerprint") if "checks_payload" in locals() else None,
-    "review_status": review_payload.get("status"),
-    "review_fingerprint": review_collector_fingerprint,
+    "review_decision_fingerprint": review_decision_fingerprint,
 }
 fingerprint = hashlib.sha256(
     json.dumps(fingerprint_source, sort_keys=True, separators=(",", ":")).encode()
@@ -659,6 +738,19 @@ if isinstance(review_wrapper_payload.get("trigger"), dict):
     trigger["comment_id"] = review_wrapper_payload["trigger"].get("comment_id")
     trigger["created_at"] = review_wrapper_payload["trigger"].get("created_at")
 
+decision_payload = {
+    **review_decision_payload,
+    "status": normalized_status,
+    "status_reason": status_reason,
+    "recommended_next_action": recommended_next_action,
+    "observation_complete": observation_complete,
+    "fingerprint": fingerprint,
+}
+decision_payload.setdefault("scope", "current_trigger_boundary")
+decision_payload.setdefault("trigger", trigger)
+decision_payload.setdefault("completion_signal", None)
+decision_payload.setdefault("fallback_pass_candidate", {"present": False, "promotes_top_level_status": False})
+
 payload = {
     "script": script,
     "status": normalized_status,
@@ -672,6 +764,8 @@ payload = {
     "current_head_sha": current_head_sha,
     "head_matches_expected": head_matches_expected,
     "fingerprint": fingerprint,
+    "decision_fingerprint": fingerprint,
+    "audit_fingerprint": review_audit_fingerprint or review_collector_fingerprint,
     "summary": summary,
     "limitations": limitations,
     "recommended_next_action": recommended_next_action,
@@ -679,6 +773,7 @@ payload = {
         **ci_payload,
     },
     "review": review_payload,
+    "decision": decision_payload,
     "codex_review": codex_review_payload,
     "trigger": trigger,
     "body_mode": body_mode,
