@@ -253,6 +253,7 @@ Fresh pass だけを gate pass とする。
 
 - scope:
   - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh`
+  - `.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh`（dogfooding mirror parity）
   - focused tests in `tests/unit/infra/test_init_update.py`
 - テスト義務:
   - closure id:
@@ -282,6 +283,7 @@ Fresh pass だけを gate pass とする。
   - `dev-coder`
 - 許可 paths:
   - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh`
+  - `.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh`（provider asset と同一内容へ同期する dogfooding mirror）
   - `tests/unit/infra/test_init_update.py`
 - 禁止 changes:
   - S01 の collector contract を無断変更しない。
