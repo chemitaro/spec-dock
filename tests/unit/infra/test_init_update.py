@@ -16477,6 +16477,57 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     assert payload["decision"]["fingerprint"] == payload["decision_fingerprint"]
                     assert payload["fingerprint"] == payload["decision_fingerprint"]
 
+    def test_issue_182_s03_wait_timeout_clears_nested_passed_decision(self) -> None:
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "passed",
+            "status_reason": "passed",
+            "recommended_next_action": "merge_prepared",
+            "observation_complete": True,
+            "selected_review_ids": [301],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "completion_signal": "submitted_pull_request_review",
+            "fingerprint": "decision-pass-timeout-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "passed",
+                        "overall_status": "passed",
+                        "normalized_status": "passed",
+                        "recommended_next_action": "merge_prepared",
+                        "observation_complete": True,
+                        "decision": decision,
+                        "decision_fingerprint": "decision-pass-timeout-s03",
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=1,
+                quiet_seconds=90,
+                same_fingerprint_count=2,
+                progress="none",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "timeout"
+            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["observation_complete"] is False
+            assert payload["decision"]["status"] == "timeout"
+            assert payload["decision"]["status_reason"] == "wait_timeout"
+            assert payload["decision"]["recommended_next_action"] == "wait_or_resume"
+            assert payload["decision"]["observation_complete"] is False
+            assert payload["decision"]["fingerprint"] == payload["decision_fingerprint"]
+            assert payload["fingerprint"] == payload["decision_fingerprint"]
+
     def test_issue_182_s03_wait_missing_current_completion_signal_stays_pending(self) -> None:
         decision = {
             "scope": "current_trigger_boundary",
@@ -22033,7 +22084,7 @@ esac
                 "selected_changes_requested_evidence"
             ]
 
-    def test_issue_182_s01_review_collector_gates_active_changes_requested_decision(self) -> None:
+    def test_issue_182_s01_review_collector_does_not_promote_global_changes_requested_decision(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -22111,12 +22162,10 @@ esac
             payload = json.loads(result.stdout)
             decision = payload["decision"]
             assert payload["review"]["status"] == "changes_requested"
-            assert decision["status"] == "human_gate"
-            assert decision["status_reason"] == "current_selected_changes_requested"
-            assert decision["recommended_next_action"] == "address_review_feedback"
-            assert decision["selected_changes_requested_evidence"] == [
-                {"kind": "pull_request_review_decision", "state": "changes_requested"}
-            ]
+            assert decision["status"] == "passed"
+            assert decision["status_reason"] == "passed"
+            assert decision["recommended_next_action"] == "merge_prepared"
+            assert decision["selected_changes_requested_evidence"] == []
 
     def test_issue_182_s01_review_collector_decision_fingerprint_ignores_historical_threads(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
