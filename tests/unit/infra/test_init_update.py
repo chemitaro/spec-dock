@@ -14513,6 +14513,42 @@ esac
             {"kind": "pull_review", "id": 201, "state": "changes_requested"}
         ]
 
+    def test_issue_182_s02_snapshot_decision_fingerprint_ignores_audit_review_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            approved_dir = Path(tmp_dir) / "approved"
+            unresolved_dir = Path(tmp_dir) / "unresolved"
+            approved_dir.mkdir()
+            unresolved_dir.mkdir()
+            approved_payload = self._issue_182_s02_run_snapshot_with_collectors(
+                approved_dir,
+                review_payload=self._issue_182_s02_review_payload(
+                    decision_status="passed",
+                    status_reason="passed",
+                    recommended_next_action="merge_prepared",
+                    observation_complete=True,
+                    completion_signal="submitted_pull_request_review",
+                    legacy_review_status="approved",
+                    legacy_unresolved_count=0,
+                ),
+            )
+            unresolved_payload = self._issue_182_s02_run_snapshot_with_collectors(
+                unresolved_dir,
+                review_payload=self._issue_182_s02_review_payload(
+                    decision_status="passed",
+                    status_reason="passed",
+                    recommended_next_action="merge_prepared",
+                    observation_complete=True,
+                    completion_signal="submitted_pull_request_review",
+                    legacy_review_status="unresolved",
+                    legacy_unresolved_count=1,
+                ),
+            )
+
+        assert approved_payload["normalized_status"] == "passed"
+        assert unresolved_payload["normalized_status"] == "passed"
+        assert unresolved_payload["review"]["status"] == "unresolved"
+        assert approved_payload["decision_fingerprint"] == unresolved_payload["decision_fingerprint"]
+
     def test_issue_182_s02_snapshot_missing_current_completion_signal_is_not_pass(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             payload = self._issue_182_s02_run_snapshot_with_collectors(
@@ -16437,6 +16473,9 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     assert payload["recommended_next_action"] == "address_review_feedback"
                     assert payload["observation_complete"] is False
                     assert payload["decision"]["status_reason"] == status_reason
+                    assert payload["decision"]["observation_complete"] is False
+                    assert payload["decision"]["fingerprint"] == payload["decision_fingerprint"]
+                    assert payload["fingerprint"] == payload["decision_fingerprint"]
 
     def test_issue_182_s03_wait_missing_current_completion_signal_stays_pending(self) -> None:
         decision = {
@@ -21992,6 +22031,91 @@ esac
             ]
             assert payload["review"]["current"]["selected_changes_requested_evidence"] == decision[
                 "selected_changes_requested_evidence"
+            ]
+
+    def test_issue_182_s01_review_collector_gates_active_changes_requested_decision(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"codex"},"state":"APPROVED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"approved"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":"CHANGES_REQUESTED","reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                    "--out",
+                    str(tmp_path / "out"),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            decision = payload["decision"]
+            assert payload["review"]["status"] == "changes_requested"
+            assert decision["status"] == "human_gate"
+            assert decision["status_reason"] == "current_selected_changes_requested"
+            assert decision["recommended_next_action"] == "address_review_feedback"
+            assert decision["selected_changes_requested_evidence"] == [
+                {"kind": "pull_request_review_decision", "state": "changes_requested"}
             ]
 
     def test_issue_182_s01_review_collector_decision_fingerprint_ignores_historical_threads(self) -> None:

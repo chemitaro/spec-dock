@@ -628,7 +628,14 @@ uv run pytest tests/unit/infra/test_init_update.py -k "github_pr_observation or 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| S90 evidence updated; final QA/code/spec gates pass; final P2 findings remediated; `uv run pytest tests/unit/infra/test_init_update.py` -> 352 passed | final review remediation + report ledger | final response / PR records amended commit hash and clean worktree evidence | committed in final remediation commit |
+| S90 evidence updated; final QA/code/spec gates pass; final P2 findings remediated; `uv run pytest tests/unit/infra/test_init_update.py` -> 352 passed before PR, 354 passed after PR review remediation | final review remediation + report ledger | final response / PR records amended commit hash and clean worktree evidence | committed in final remediation commit and follow-up PR review remediation commit |
+
+### PR review remediation（PR #183）
+| 観測 / review | 指摘 | 修正 | 検証 | 結果 |
+|---|---|---|---|---|
+| `wait_pr_observation.sh` current boundary review | nested `decision.observation_complete` が top-level `observation_complete` と矛盾する | wait final payload で nested decision completion と fingerprint を top-level wait 判定へ同期。ただし値が変わらない場合は既存 fingerprint を維持 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_182` -> 16 passed; full file -> 354 passed | remediated |
+| `fetch_pr_observation_snapshot.sh` current boundary review | audit-only `review.status` が decision-facing fingerprint に混ざる | snapshot fingerprint source から legacy `review_status` を除外 | `uv run pytest tests/unit/infra/test_init_update.py -k issue_182` -> 16 passed; full file -> 354 passed | remediated |
+| `fetch_pr_review_snapshot.sh` current boundary review | GitHub `reviewDecision=CHANGES_REQUESTED` が残る状態で passed / `merge_prepared` になり得る | active review decision の CHANGES_REQUESTED を `selected_changes_requested_evidence` に反映し、human gate にする | `uv run pytest tests/unit/infra/test_init_update.py -k issue_182` -> 16 passed; full file -> 354 passed | remediated |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...

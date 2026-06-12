@@ -445,6 +445,22 @@ def decision_fingerprint(payload: dict) -> str | None:
     return None
 
 
+def align_decision_observation_complete(payload: dict, observation_complete: bool) -> None:
+    decision = decision_payload(payload)
+    if not decision:
+        return
+    if decision.get("observation_complete") is observation_complete:
+        return
+    decision["observation_complete"] = observation_complete
+    fingerprint_source = dict(decision)
+    fingerprint_source.pop("fingerprint", None)
+    fingerprint = hashlib.sha256(
+        json.dumps(fingerprint_source, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    decision["fingerprint"] = fingerprint
+    payload["decision_fingerprint"] = fingerprint
+
+
 def codex_review_payload(payload: dict) -> dict:
     codex_review = payload.get("codex_review")
     if isinstance(codex_review, dict):
@@ -1299,6 +1315,8 @@ while True:
     payload["normalized_status"] = normalized_status
     payload["observation_complete"] = observation_complete
     payload["recommended_next_action"] = next_action
+    align_decision_observation_complete(payload, observation_complete)
+    fingerprint = semantic_fingerprint(payload)
     payload["fingerprint"] = fingerprint
     payload["observed_at"] = utc_now()
     payload["wait"] = {
