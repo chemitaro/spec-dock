@@ -467,8 +467,6 @@ def mark_decision_timeout(payload: dict) -> None:
     decision = decision_payload(payload)
     if not decision:
         return
-    if decision.get("status") != "passed":
-        return
     decision["status"] = "timeout"
     decision["status_reason"] = "wait_timeout"
     decision["recommended_next_action"] = "wait_or_resume"

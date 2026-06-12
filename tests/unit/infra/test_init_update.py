@@ -16341,7 +16341,11 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["fingerprint"] == "decision-stable-s03"
+            assert payload["normalized_status"] == "timeout"
+            assert payload["decision"]["status"] == "timeout"
+            assert payload["decision"]["status_reason"] == "wait_timeout"
+            assert payload["decision"]["fingerprint"] == payload["decision_fingerprint"]
+            assert payload["fingerprint"] == payload["decision_fingerprint"]
             assert payload["wait"]["same_fingerprint_observed"] >= 2
             assert payload["wait"]["latest_change_poll"] == 1
             events = [
