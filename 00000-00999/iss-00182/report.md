@@ -52,6 +52,8 @@ Disposition ごとの必須証跡:
 | D-001 | resolved | interpretation | user / orchestrator | `fallback_issue_comment` を pass 扱いするか human gate として残すか | Option A: 常に gate; Option B: 条件付き pass; Option C: top-level gate 維持 + 準成功信号 | Option C を採用し、top-level は `human_gate` / `wait_or_resume` のまま、current boundary の no-major-issues fallback comment は `fallback_pass_candidate` として観測可能にする | submitted PR review ではない issue comment を merge-ready 判定へ昇格せず、古い thread 由来ではない gate であることを後続 agent が判別できる | applied | `discussions/20260612t014627z-interview-fallback-issue-comment-decision-boundary.md`; `requirement.md`; `design.md` | なし |
 | D-002 | resolved | scope | orchestrator / test result | S01 で provider-side asset だけを更新すると checked-in dogfooding mirror parity tests が失敗した | Option A: 後続 S90 で同期; Option B: S01 scope に mirror parity 同期を追加 | S01 scope に `.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh` の機械同期を追加する | repo guideline は provider side を正本としつつ dogfooding mirror の確認を求め、`test_issue_71` / `test_issue_75` は同一内容を契約として固定している | promoted_to_plan | `plan.md` S01 scope / allowed paths; `uv run pytest tests/unit/infra/test_init_update.py -k "issue_71_checked_in_dogfooding_agent_tooling_parity or issue_75_pr_monitor_assets_retired"` -> 2 passed | なし |
 | D-003 | resolved | scope | orchestrator / S02 implementation | S02 でも provider-side snapshot script 更新に対して checked-in dogfooding mirror parity が必要になった | Option A: provider のみ更新; Option B: S02 scope に mirror parity 同期を含める | S02 scope に `.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh` の機械同期を追加する | S01 と同じく shipped provider asset と dogfooding checked-in host-pack の同一性が repository contract である | promoted_to_plan | `plan.md` S02 scope / allowed paths; `diff -u provider mirror` -> no diff; focused pytest 16 passed | なし |
+| D-004 | resolved | scope | orchestrator / S03 implementation | S03 でも provider-side wait script 更新に対して checked-in dogfooding mirror parity が必要になった | Option A: provider のみ更新; Option B: S03 scope に mirror parity 同期を含める | S03 scope に `.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` の機械同期を追加する | wait script も checked-in host-pack parity の対象であり、provider asset と dogfooding mirror の同一性を保つ必要がある | promoted_to_plan | `plan.md` S03 scope / allowed paths; `diff -u provider mirror` -> no diff; focused pytest 38 passed | なし |
+| D-005 | resolved | implementation | code-reviewer `019eb9ec-b471-7b70-ae8b-f02e57734c43` | S03 で `decision.status=passed` でも legacy audit `summary.review` が unresolved/commented/changes_requested の場合に human gate へ戻る P1 が見つかった | Option A: legacy review branch を維持; Option B: decision surface がある場合は decision semantics を完結し、legacy branch は no-decision fallback に限定 | Option B を採用し、decision surface がある場合は legacy audit review status で final wait action を上書きしない | S03 の primary contract は current-boundary decision を authoritative にすることであり、legacy audit は decision 不在時の互換 fallback に留める必要がある | applied | P1 re-review pass; `test_issue_182_s03_wait_decision_pass_overrides_legacy_audit_review_status`; `test_issue_182_s03_wait_preserves_legacy_review_status_without_decision_surface` | なし |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -71,6 +73,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-004 | adopted | sub-agent: implementation-planner | `plan.md` | implementation-planner draft の closure index、S01-S04 behavior slices、delegation contracts、test seeds、S90/S99 gates を canonical plan へ統合した。差分 guard では許可済み draft 1 ファイルのみが追加され、canonical docs は main orchestrator が編集した | `discussions/20260612t021000z-draft-plan-pr-observation-boundary.md`; `git status --short` | plan fresh review |
 | EAL-005 | adopted | sub-agent: dev-coder `019eb9b1-4d2e-70b3-b0bb-12a95aa495a1` | S01 implementation | collector の `decision` / `review.current` / `review.audit` / fingerprint split / fallback candidate / changes-requested evidence を計画どおり採用した。親検証と code-reviewer pass により S01 scope の実装証跡として採用する | working tree diff; focused pytest 38 passed; code-reviewer `019eb9ba-f151-7410-a371-1f9d81680d5b` -> `review_status: pass` | S01 commit |
 | EAL-006 | adopted | sub-agent: dev-coder `019eb9c5-08b5-72f0-ac7f-afb8c2428496` | S02 implementation | snapshot classification を collector `decision` surface ベースへ移す実装を採用した。親検証で S02 focused lane が通過し、legacy audit-only thread が final feedback action を汚染しないことを確認した | working tree diff; `uv run pytest tests/unit/infra/test_init_update.py -k "issue_182_s02 or observation_snapshot or pr_observation_snapshot or github_pr_observation"` -> 16 passed | S02 code review / commit |
+| EAL-007 | adopted | sub-agent: dev-coder `019eb9d5-4f64-7122-8861-dd5bd7c97c85` / `019eb9ef-cbf6-71e1-a5e1-3bd84b7c161a` | S03 implementation | wait stability / progress を decision fingerprint と decision/current counts ベースへ移す実装を採用した。P1 修正後の親検証と code-reviewer pass により、audit-only drift が wait stability/final action を汚染しないことを確認した | working tree diff; `uv run pytest tests/unit/infra/test_init_update.py -k "issue_182_s03 or wait_pr_observation or pr_observation_wait or issue_176_s04_wait or issue_170_pr_observation_wait"` -> 38 passed; code-reviewer `019eb9ec-b471-7b70-ae8b-f02e57734c43` -> `review_status: pass` | S03 commit |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -370,7 +373,7 @@ uv run pytest tests/unit/infra/test_init_update.py -k "issue_182_s02 or observat
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S02 | pending review | S02 snapshot classification + tests + dogfooding mirror + execution ledger | pending | pending | N/A | N/A | N/A | N/A |
+| S02 | committed | S02 snapshot classification + tests + dogfooding mirror + execution ledger | `b1949f2a` | `git status --short` -> clean before S03 | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh` - provider-side snapshot classification
@@ -384,6 +387,124 @@ uv run pytest tests/unit/infra/test_init_update.py -k "issue_182_s02 or observat
 
 #### メモ
 - Full `uv run pytest tests/unit/infra/test_init_update.py` remains red only on `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`, where checked-in dogfooding `.meta.json` path snapshot does not yet include current `iss-00182`. This is recorded as discovered-meta-snapshot for later resolution and is not a snapshot classification failure.
+
+---
+
+### セッションログ（2026-06-12 12:10 - 12:42 JST）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, EC-002, EC-003
+- 計画上の出典（Planned source）:
+  - `plan.md` section: 実装ステップ S03 — wait stability/progress uses decision fingerprint
+  - closure ids: `cli-001`, `cli-002`, `cli-010`, `cli-003`, `cli-004`, `cli-005`, `cli-008`
+
+#### 実施内容
+- `dev-coder` に S03 の wait stability / progress 実装を委任した。
+- `wait_pr_observation.sh` の stability fingerprint を `decision_fingerprint` / `decision.fingerprint` 優先に変更した。
+- progress の review counts を decision/current selected counts ベースへ移し、audit/all-fetched `review.threads` を current blocker 表示に使わないようにした。
+- decision reason に基づいて current selected unresolved / changes-requested、fallback issue comment、missing current completion の wait classification を固定した。
+- code-reviewer の P1 指摘を受け、decision surface がある場合は decision semantics を legacy `summary.review` / `review.status` より優先し、legacy branch は decision 不在時だけ使うよう修正した。
+- S03 でも provider-side shipped asset と checked-in dogfooding mirror の同一性を維持するため、D-004 として S03 scope に mirror parity を昇格した。
+- `code-reviewer` `019eb9ec-b471-7b70-ae8b-f02e57734c43` に S03 diff の read-only review を依頼し、P1 修正後に `review_status: pass` を得た。
+
+#### 実行コマンド / 結果
+```bash
+bash -n src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh
+
+pass
+
+bash -n .agents/skills/github-pr-observation/scripts/wait_pr_observation.sh
+
+pass
+
+git diff --check
+
+pass
+
+uv run pytest tests/unit/infra/test_init_update.py -k "issue_182_s03 or wait_pr_observation or pr_observation_wait or issue_176_s04_wait or issue_170_pr_observation_wait"
+
+38 passed, 313 deselected
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ（Red） | red-required | `issue_182_s03` tests failed before implementation | delegated worker report | pass | 4 failed: decision fingerprint not used, audit counts leaked, current decision gates not enforced, missing completion passed |
+| S03 | 緑フェーズ（Green） | wait stability/progress via decision surface | focused wait lane passed | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_182_s03 or wait_pr_observation or pr_observation_wait or issue_176_s04_wait or issue_170_pr_observation_wait"` | pass | 38 passed |
+| S03 | リファクタリング（Refactor） | guardrail satisfied | syntax, whitespace, mirror parity inspected | `bash -n`; `git diff --check`; `diff -u provider mirror` | pass | provider and mirror script contents match |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | checked-in dogfooding mirror parity must match provider wait asset | implementation / repository contract | amended plan and synced mirror | D-004 / `cli-009` | yes | `diff -u src/.../wait_pr_observation.sh .agents/.../wait_pr_observation.sh` -> no diff |
+| S03 | legacy audit review status could override authoritative decision pass | code-reviewer | fixed classification order and added tests | D-005 / `cli-001` | no | P1 review finding; re-review pass |
+| S03 | checked-in dogfooding `.meta.json` snapshot divergence continues | full file pytest from worker | recorded for later non-S03 resolution | discovered-meta-snapshot | yes, later step | worker full file: 348 passed, 1 failed on `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | `cli-001`, `cli-002`, `cli-010`, `cli-003`, `cli-004`, `cli-005`, `cli-008` | wait stability and progress use decision-scoped fields with CI/head/limitations behavior preserved | focused pytest 38 passed; syntax/diff check pass; code-reviewer pass | pass | full file remains red only on `.meta.json` snapshot |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `cli-001` | S03 | yes | red-required | `issue_182_s03` failed before implementation | focused wait pytest | pass | historical audit-only changes do not reset stability |
+| `cli-002` | S03 | yes | red-required | `issue_182_s03` failed before implementation | focused wait pytest | pass | current selected unresolved thread drives `human_gate` |
+| `cli-010` | S03 | yes | red-required | `issue_182_s03` failed before implementation | focused wait pytest | pass | current changes-requested drives `human_gate` |
+| `cli-003` | S03 | yes | red-required | fallback behavior guarded by new S03 test | focused wait pytest | pass | fallback issue comment remains non-promoting |
+| `cli-004` | S03 | yes | red-required | fallback candidate visibility guarded by new S03 test | focused wait pytest | pass | fallback candidate remains visible |
+| `cli-005` | S03 | yes | red-required | `issue_182_s03` failed before implementation | focused wait pytest | pass | wait stability uses decision fingerprint |
+| `cli-008` | S03 | yes | red-required | `issue_182_s03` failed before implementation | focused wait pytest | pass | missing current completion is not pass |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| `cli-001` | S03 | focused wait pytest | pass | historical audit separation |
+| `cli-002` | S03 | focused wait pytest | pass | current unresolved feedback |
+| `cli-010` | S03 | focused wait pytest | pass | current changes-requested feedback |
+| `cli-003` | S03 | focused wait pytest | pass | fallback non-promotion |
+| `cli-004` | S03 | focused wait pytest | pass | fallback candidate |
+| `cli-005` | S03 | focused wait pytest | pass | decision fingerprint stability |
+| `cli-008` | S03 | focused wait pytest | pass | missing completion safe-side |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| changed | `cli-009` | provider/mirror parity | `cli-009` | provider-side shipped wait asset change requires checked-in dogfooding mirror parity | yes | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | shipped scaffold / wait stability / test additions | dev-coder | wait stability/progress only | `requirement.md`, `design.md`, `plan.md` | provider wait script, focused tests, mirror parity | collector script, snapshot script, SKILL.md, canonical docs | focused wait pytest, shell syntax, diff check | need collector/snapshot/SKILL/docs change | worker summary, changed files, verification, risks, ledger note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | wait stability を decision fingerprint 優先、progress を decision/current counts 優先へ更新し、decision pass を legacy audit review status より優先 | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`; `.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`; `tests/unit/infra/test_init_update.py` | worker: `issue_182_s03` 4 passed, focused wait lane 38 passed, full file 348 passed / 1 failed; parent: focused lane 38 passed | code-reviewer pass by `019eb9ec-b471-7b70-ae8b-f02e57734c43` | full `test_init_update.py` has one remaining `.meta.json` snapshot failure outside S03 logic | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer `019eb9ec-b471-7b70-ae8b-f02e57734c43` | fresh | passed | N/A | proceed | initial P1 legacy audit override finding fixed; re-review no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | pending review | S03 wait stability/progress + tests + dogfooding mirror + execution ledger | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` - provider-side wait stability/progress
+- `.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` - checked-in dogfooding mirror parity
+- `tests/unit/infra/test_init_update.py` - focused wait decision contract tests
+- `spec-dock/active/issue/plan.md` - S03 mirror parity scope amendment
+- `spec-dock/active/issue/report.md` - S03 execution evidence
+
+#### コミット
+- pending
+
+#### メモ
+- Full `uv run pytest tests/unit/infra/test_init_update.py` remains red only on `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`, where checked-in dogfooding `.meta.json` path snapshot does not yet include current `iss-00182`. This is recorded as discovered-meta-snapshot for later resolution and is not a wait stability/progress failure.
 
 ---
 
