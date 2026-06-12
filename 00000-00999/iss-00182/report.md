@@ -491,7 +491,7 @@ uv run pytest tests/unit/infra/test_init_update.py -k "issue_182_s03 or wait_pr_
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S03 | pending review | S03 wait stability/progress + tests + dogfooding mirror + execution ledger | pending | pending | N/A | N/A | N/A | N/A |
+| S03 | committed | S03 wait stability/progress + tests + dogfooding mirror + execution ledger | `f0d8937a` | `git status --short` -> clean before S04 | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` - provider-side wait stability/progress
@@ -505,6 +505,100 @@ uv run pytest tests/unit/infra/test_init_update.py -k "issue_182_s03 or wait_pr_
 
 #### メモ
 - Full `uv run pytest tests/unit/infra/test_init_update.py` remains red only on `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`, where checked-in dogfooding `.meta.json` path snapshot does not yet include current `iss-00182`. This is recorded as discovered-meta-snapshot for later resolution and is not a wait stability/progress failure.
+
+---
+
+### セッションログ（2026-06-12 12:45 - 12:52 JST）
+
+#### 対象
+- Step: S04
+- AC/EC: AC-006, EC-004
+- 計画上の出典（Planned source）:
+  - `plan.md` section: 実装ステップ S04 — shipped docs explain output semantics
+  - closure ids: `cli-006`, `cli-009`
+
+#### 実施内容
+- `doc-writer` に S04 の shipped skill docs 更新を委任した。
+- `github-pr-observation/SKILL.md` に `decision` / `decision_fingerprint` が current trigger/resume boundary の authoritative final-status surface であることを追記した。
+- `review.current` は explanatory current-boundary context、`review.audit` と legacy `review.signals` / `review.threads` / `review.codex_authored` は all-fetched audit/debug context で非 authoritative と明記した。
+- `audit_fingerprint`、`fallback_issue_comment`、`fallback_pass_candidate` の non-promoting semantics を明記した。
+- provider-side SKILL.md と checked-in dogfooding mirror SKILL.md を同一内容に保った。
+- `spec-reviewer` `019eb9fe-830a-7380-ac73-9e25fab6cf56` に S04 docs/spec alignment review を依頼し、`review_status: pass` を得た。
+
+#### 実行コマンド / 結果
+```bash
+diff -u src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md .agents/skills/github-pr-observation/SKILL.md
+
+no diff
+
+git diff --check
+
+pass
+
+uv run pytest tests/unit/infra/test_init_update.py -k "github_pr_observation or pr_observation or issue_182_s04"
+
+68 passed, 283 deselected
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only | pre-change docs lacked explicit decision/audit/fallback output boundary semantics | docs inspection | pass | script behavior was already implemented in S01-S03 |
+| S04 | 緑フェーズ（Green） | docs semantics | shipped SKILL.md states authoritative/audit-only surfaces and fallback non-promotion | docs inspection + focused pytest | pass | 68 passed |
+| S04 | リファクタリング（Refactor） | guardrail satisfied | provider/mirror parity and whitespace checked | `diff -u`; `git diff --check` | pass | no script changes |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | none | docs inspection | N/A | N/A | no | N/A |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | `cli-006`, `cli-009` | shipped docs explain authoritative/current/audit output semantics and preserve mirror parity | focused pytest 68 passed; diff check pass; spec-reviewer pass | pass | docs-only |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `cli-006` | S04 | yes | inspect-only | docs lacked explicit S01-S03 output boundary semantics | docs inspection + focused pytest | pass | authoritative/audit/non-promoting semantics documented |
+| `cli-009` | S04 | yes | compatibility | provider/mirror parity required | `diff -u provider mirror` | pass | no diff |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| `cli-006` | S04 | docs inspection + focused pytest | pass | output semantics fixed |
+| `cli-009` | S04 | provider/mirror diff | pass | mirror parity |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | delegated | shipped skill docs / output semantics | doc-writer | SKILL.md output boundary docs only | `requirement.md`, `design.md`, `plan.md` | provider SKILL.md, mirror SKILL.md, tests if needed | scripts, canonical docs | mirror diff, focused pytest, diff check | script change required | worker summary, changed files, verification, risks, ledger note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 | doc-writer | `decision` authoritative / audit-only / fallback non-promoting semantics を SKILL.md に追記 | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md`; `.agents/skills/github-pr-observation/SKILL.md` | worker: focused pytest 68 passed; parent: focused pytest 68 passed; mirror diff no diff | spec-reviewer pass by `019eb9fe-830a-7380-ac73-9e25fab6cf56` | none | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | spec-reviewer `019eb9fe-830a-7380-ac73-9e25fab6cf56` | fresh | passed | N/A | proceed | no findings; `review_status: pass` |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | pending review | S04 shipped docs + dogfooding mirror + execution ledger | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md` - provider-side output semantics docs
+- `.agents/skills/github-pr-observation/SKILL.md` - checked-in dogfooding mirror parity
+- `spec-dock/active/issue/report.md` - S04 execution evidence
+
+#### コミット
+- pending
+
+#### メモ
+- S04 では script / behavior changes は行っていない。
 
 ---
 
