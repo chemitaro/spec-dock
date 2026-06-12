@@ -185,6 +185,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S03 | additional current docs surfaces may exist outside known 3 files | plan / worker note | defer to S05/S90 scoped current-surface inspection | cl-ac-005 / cl-ec-003 | no | S03 worker notes additional current docs/tests/runtime surfaces are S05/S90 scope |
 | S04 | dogfooding mirror `meta.json` lagged provider obsolete cleanup manifest | focused pytest / parity test | synchronized mirror `.agents/host-adapters/meta.json` with provider obsolete exact path entry | cl-ac-004 / cl-ac-006 | no | parity failure was within S04 dogfooding/harness expectation scope; provider source was already updated in S02 |
 | S05 | scoped current-surface old-name inspection still reports cleanup/test matches | current-surface `rg` | classified allowed exceptions: `_LEGACY_MANAGED_SKILL_NAMES`, provider/mirror obsolete exact path metadata, and prune/legacy cleanup fixtures | cl-ac-005 / cl-ec-003 | no | no README/docs/skills/harness wrapper current discovery match remains |
+| S90 | no additional current docs impact after S05 | S05 scoped current-surface inspection | record approved no-op for docs impact resolution; no doc-writer edit required | cl-ac-005 / cl-ec-003 | no | S03 already updated known current docs; historical references remain excluded evidence |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
@@ -291,6 +292,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S04 | tests / harness expectations | code-reviewer | fresh before report evidence fix | failed | N/A | report evidence fix required before S04 completion | Arendt `019ebb10-4e55-75f1-b417-49204f276619`; P1 finding: S04 report evidence absent; code/test changes otherwise aligned |
 | S04 | tests / harness expectations re-review | code-reviewer | fresh after report evidence fix | passed | N/A | S04 reviewer gate passed | Avicenna `019ebb15-0672-7ec2-8aa4-3653217f28ef`; no findings; confirmed harness/wrapper expectations, old-name cleanup-only references, mirror parity, and sufficient report evidence |
 | S05 | dogfooding sync / current-surface inspections | N/A | approved no-op | not required | N/A | proceed to S90 | No generated/runtime/docs diff remained after sync; plan requires reviewer only if generated/runtime/docs diff is non-trivial or docs/spec references change |
+| S90 | docs impact no-op | spec-reviewer | fresh | passed | N/A | proceed to S99 | Aristotle `019ebb1a-f35e-7af3-8759-aa07553b860b`; no findings; confirmed S90 no-op is consistent with requirement/design/plan and current docs show `spec-dock-hub` |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -368,7 +370,7 @@ pass: id=iss-00184 github=#184; new issue auto-sync passed.
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / README / workflow / skill / migration notes | no | N/A | S03 updated known current docs; S05 scoped inspection found no additional current docs old-name references; remaining old-name matches are cleanup metadata, prune fixtures, or historical `spec-dock/initiatives/**` evidence | pass: Aristotle `019ebb1a-f35e-7af3-8759-aa07553b860b` |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
