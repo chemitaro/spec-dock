@@ -53,6 +53,7 @@
             ".github/agents/repo_analyst.agent.md",
             ".github/agents/spec_reviewer.agent.md",
             ".github/agents/utility_worker.agent.md",
+            ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
             ".agents/skills/github-codex-pr-review-comments/SKILL.md",
             ".agents/skills/github-codex-pr-review-comments/agents/openai.yaml",
             ".agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh",
