@@ -716,7 +716,6 @@ fingerprint_source = {
     "limitations": [item["code"] for item in limitations],
     "ci_status": ci_payload.get("status"),
     "ci_fingerprint": checks_payload.get("fingerprint") if "checks_payload" in locals() else None,
-    "review_status": review_payload.get("status"),
     "review_decision_fingerprint": review_decision_fingerprint,
 }
 fingerprint = hashlib.sha256(
