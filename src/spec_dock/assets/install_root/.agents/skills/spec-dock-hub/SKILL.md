@@ -1,11 +1,12 @@
 ---
-name: spec-driven-tdd-workflow
-description: Entry skill that routes work to the correct spec-dock leaf workflow.
+name: spec-dock-hub
+description: Entry/routing skill for SpecDock work; use it as the route selector for leaf workflows and the global invariant surface.
 ---
 
-# Spec-driven TDD Workflow (Hub)
+# SpecDock Hub
 
-- Use this as the entry/routing skill, route selector, and global invariant surface for spec-dock work.
+- Use this as the SpecDock Hub: the entry/routing skill, route selector, and global invariant surface for SpecDock work.
+- Keep this hub focused on route selection and cross-workflow invariants; leaf skills own task-specific workflow spines.
 - Use skills for the first-read workflow spine: mandatory next actions, stop conditions, reviewer gates, and handoff boundaries an agent must know before following links.
 - Use `spec-dock/docs/` for detailed semantics, field meanings, lifecycle policy, hard cases, and reference material.
 - Use templates as minimum authoring scaffolds, evidence slots, and examples. Templates are not compliance authorities.
