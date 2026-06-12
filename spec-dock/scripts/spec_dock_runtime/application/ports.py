@@ -7,6 +7,8 @@ from typing import Protocol
 
 from .contracts import ArtifactWriteResult
 from .contracts import BootstrapResult
+from .contracts import GitHubCapabilityDiagnostic
+from .contracts import GitHubCapabilityProbeRequest
 from .contracts import GitWorktreeRecord
 from .contracts import SyncCommandResult
 from .contracts import SyncRequest
@@ -167,6 +169,11 @@ class GitGateway(Protocol):
         ...
 
 
+class GitHubCapabilityGateway(Protocol):
+    def probe(self, request: GitHubCapabilityProbeRequest) -> list[GitHubCapabilityDiagnostic]:
+        ...
+
+
 class BootstrapGateway(Protocol):
     def run_make_init_if_available(self, worktree_path: Path) -> BootstrapResult:
         ...
@@ -228,6 +235,7 @@ class Ports:
     active_state_store: ActiveStateStore | None = None
     deps_topology_reader: DepsTopologyReader | None = None
     git_gateway: GitGateway | None = None
+    github_capability_gateway: GitHubCapabilityGateway | None = None
     json_store: JsonStore | None = None
     clock: Clock | None = None
     artifact_writer: ArtifactWriter | None = None

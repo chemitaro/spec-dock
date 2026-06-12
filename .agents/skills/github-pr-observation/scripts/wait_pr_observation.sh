@@ -250,6 +250,13 @@ def has_zero_check_limitation(payload: dict) -> bool:
     )
 
 
+def has_permission_limitation(payload: dict) -> bool:
+    return any(
+        isinstance(item, dict) and item.get("code") == "github_token_permission_denied"
+        for item in payload.get("limitations", [])
+    )
+
+
 def sanitized_review_signals(payload: dict) -> list:
     review = payload.get("review")
     if not isinstance(review, dict):
@@ -626,7 +633,10 @@ def trigger_failure_result(trigger_payload: dict, trigger_stdout: str, trigger_s
     normalized_status = trigger_payload.get("overall_status") or trigger_payload.get("status") or "unknown"
     if normalized_status == "trigger_posted":
         normalized_status = "unknown"
-    if normalized_status == "stale_head":
+    if has_permission_limitation(trigger_payload):
+        normalized_status = "human_gate"
+        next_action = "fix_github_token_permissions"
+    elif normalized_status == "stale_head":
         next_action = "rerun_for_current_head"
     elif normalized_status == "draft_pr":
         normalized_status = "human_gate"
@@ -809,6 +819,8 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
         return "human_gate", "human_gate", top_level_next_action, False, True
     if ci_status == "none" and has_zero_check_limitation(payload):
         if has_blocking_limitation(payload, ignored_codes={"zero_checks_s03_non_success"}):
+            if has_permission_limitation(payload):
+                return "unknown", "unknown", "fix_github_token_permissions", False, True
             return "unknown", "unknown", "human_gate", False, True
         if poll < zero_check_grace_polls:
             return "none", "none", "wait", False, False
@@ -817,8 +829,12 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
         return "failed", "failed", "fix_ci", False, True
     if ci_status in {"pending", "running", "none"}:
         if has_blocking_limitation(payload, ignored_codes={"required_checks_missing_or_pending"}):
+            if has_permission_limitation(payload):
+                return "unknown", "unknown", "fix_github_token_permissions", False, True
             return "unknown", "unknown", "human_gate", False, True
         return ci_status, ci_status, "wait", False, False
+    if has_permission_limitation(payload):
+        return "unknown", "unknown", "fix_github_token_permissions", False, True
     if has_blocking_limitation(payload):
         return "unknown", "unknown", "human_gate", False, True
     if ci_status != "passed":

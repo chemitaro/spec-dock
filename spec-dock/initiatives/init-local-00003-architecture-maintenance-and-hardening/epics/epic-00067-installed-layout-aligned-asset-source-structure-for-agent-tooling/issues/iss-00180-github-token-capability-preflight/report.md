@@ -3,277 +3,298 @@
 ID: "iss-00180"
 タイトル: "Github Token Capability Preflight"
 関連GitHub: ["#180"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-11"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00067", "init-local-00003"]
 ---
 
-# iss-00180 Github Token Capability Preflight — 実装報告（観測証跡台帳 / Observed Evidence Ledger）
+# iss-00180 Github Token Capability Preflight — 実装報告（観測証跡台帳）
 
-> `report.md` は観測証跡台帳（observed evidence ledger）の scaffold です。planned requirements、evidence destination、closure 条件は `plan.md` が持ち、この文書は実際の Red / Green / Refactor evidence、発見された tests、closure delta、reviewer status、commit/no-op evidence を記録する evidence slot です。workflow / compliance authority は skills、docs、accepted ADRs、reviewer gates に置きます。
+## 現在の状態
+- 仕様 authoring:
+  - `requirement.md`: 作成済み、fresh spec-reviewer pass。
+  - `design.md`: 作成済み、fresh spec-reviewer pass。
+  - `plan.md`: 作成済み、fresh spec-reviewer pass。
+- 実装:
+  - S01 Runtime doctor capability diagnostics: 実装済み、focused tests pass、code-reviewer pass、commit 済み。
+  - S02 PR observation permission limitation classification: 実装済み、focused / nearby tests pass、code-reviewer pass、commit 済み。
+  - S03 Guidance / dogfooding parity: 実装済み、provider/mirror parity pass、code-reviewer pass、commit 済み。
+  - S99 final gate: 初回 final reviewers の P1/P2 指摘を反映済み。`doctor` malformed target rejection、PR metadata / commit status / statusCheckRollup permission coverage、`Resource not accessible by integration` 分類を追補実装済み。fresh final QA / code / spec reviewer pass。
+- handoff readiness:
+  - PR #181 created and merge-prepared。
+  - 初回 PR observation で provider-tests failure と Codex P2 comments を検出し、repair batch `discussions/20260611t161800z-disc-pr-repair-batch.md` の U001 を実装・検証済み。local code-review P2 で PR metadata / trigger write の `GITHUB_TOKEN` source coverage と trigger integration wording も追補済み。
+  - repair commit `cdb4a39c0818d10ee3d151c8cac8fd1b5002fd13` を push 後、PR #181 を再観測し、CI は全 pass、最新 Codex review は major issues なし、PR は `MERGEABLE`。
 
-## 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger / 必須）
-
-`report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
-
-Material な判断がない場合もこの section は残し、次を明示する。
-
-- No material interpretation changes.
-- No decision entries.
-
-Ledger entry は次の契約値を使う。
-
-- `Status`: `open` / `resolved` / `superseded`
-- `Type`: `interpretation` / `scope` / `implementation` / `compatibility` / `test-strategy` / `operation` / `deviation` / `follow-up`
-- `Disposition`: `applied` / `rejected` / `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` / `converted_to_followup` / `deferred` / `no_action` / `superseded`
-
-完了時の意味論（completion semantics）:
-- issue completion 前に `Status=open` の entry を残してはならない。
-- `Status=resolved` は `Disposition`、evidence、必要な follow-up を持つ。
-- `Status=superseded` または `Disposition=superseded` は置換先 entry ID を持つ。
-- `Disposition=promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` は昇格先 artifact と evidence を持つ。
-- `Disposition=converted_to_followup` は follow-up issue / discussion / ADR candidate の参照を持つ。
-- `Disposition=deferred` は scope 外である理由、blocking でない根拠、revisit 条件を持つ。
-- `Disposition=no_action` は issue-local な判断で追加対応不要である理由を持つ。将来も効く durable decision を `report.md` だけに閉じ込めてはならない。
-
-Disposition ごとの必須証跡:
-- `applied`: 変更した artifact / 実装証跡と、issue-local 適用で十分な理由。
-- `rejected`: 却下した選択肢、理由、blocking impact が残らない根拠。
-- `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan`: 昇格先 artifact 参照と証跡。
-- `converted_to_followup`: follow-up issue / discussion / ADR candidate 参照と blocking / non-blocking の分類。
-- `deferred`: scope-out 理由、non-blocking の根拠、revisit 条件。
-- `no_action`: 判断が issue-local で durable ではない理由。
-- `superseded`: 置換先 entry ID と置換理由。
-
-| 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
+## 仕様解釈・判断台帳
+| ID | Status | Type | Raised By | Gap | 検討した選択肢 | 判断 / 解釈 | Rationale | Disposition | Evidence | Follow-up |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | clarification | `doctor` だけか PR observation も含めるか | A: doctor only; B: PR observation only; C: both | Option C を採用し、`doctor` と PR observation の両方を scope に含める | ユーザーが Option C を採用。権限不足は手動診断と runtime observation の両面で露出する必要がある | promoted_to_requirement | `discussions/20260611t135317z-interview-github-token-capability-scope.md`; `requirement.md` | none |
+| D-002 | resolved | scope | clarification | probe profile を固定するか拡張可能にするか | A: minimal; B: broad; C: fixed core + optional extensions | Option C を採用。Core は metadata / PR read / check-runs / statuses / statusCheckRollup、doctor optional は actions / issue comments に限定 | ユーザーが Option C を採用。arbitrary API checker 化を避けつつ実用診断を確保する | promoted_to_requirement | `discussions/20260611t135608z-interview-github-capability-probe-profile.md`; `requirement.md` | none |
+| D-003 | resolved | compatibility | clarification | capability failure を process error にするか semantic non-success にするか | A: fail fast; B: warning only; C: final JSON semantic non-success | Option C を採用。`doctor` は exit 0 + findings、PR observation は final JSON semantic non-success、malformed/runtime error は non-zero | ユーザーが Option C を採用。下流 workflow が stdout final JSON を authority として判断できる | promoted_to_requirement | `discussions/20260611t135901z-interview-github-capability-failure-semantics.md`; `requirement.md`; `design.md` | none |
+| D-004 | resolved | implementation | design reviewer | Runtime GitHub probe の port / adapter / wiring が曖昧 | A: existing ports に暗黙追加; B: explicit Protocol / infra adapter | `GitHubCapabilityGateway` Protocol、`infra/github_capability_cli.py`、`cli/bootstrap.py` injection を design に明記 | 実装者が source-of-truth layer を迷わず変更できるようにする | applied | spec-reviewer finding; `design.md` | none |
+| D-005 | resolved | compatibility | design reviewer | PR observation permission failure 時の status mapping が曖昧 | A: new top-level `permission_denied`; B: existing enum + limitation | top-level status は増やさず、read failure は `unknown`、trigger write failure は `human_gate`、next action は `fix_github_token_permissions` に固定 | Existing callers の enum compatibility を維持しつつ machine-readable limitation を足す | applied | spec-reviewer finding; `design.md` | none |
+| D-006 | resolved | test-strategy | plan reviewer | EC-001/EC-002/EC-003 と exit-code semantics の closure が不足 | A: implementation 中に補う; B: plan closure に固定 | `tc-005` / `tc-006` / `tc-009` と `tc-007` / `tc-008` の `exit_code=0` 義務を追加 | 実装者が edge cases と process/semantic 分離を省略できないようにする | promoted_to_plan | spec-reviewer finding; `plan.md` | none |
 
-## 証跡採用台帳（Evidence Adoption Ledger / 必須）
-
-Delegated draft、worker note、research、reviewer finding、discussion、command output を canonical artifact や実装判断へ取り込む場合、この台帳に採用判断を記録する。raw transcript ではなく、orchestrator が検証した採否・理由・証跡・次アクションだけを記録する。
-
-- `adoption_status`: `adopted` / `partially_adopted` / `rejected` / `deferred` / `stale` / `blocked`
-- `blocked` または `stale` の unresolved entry は promotion / implementation start / issue ready / issue finish / phase completion を止める。
-- `deferred` は blocking でない根拠と revisit 条件を持つ場合だけ完了時に残せる。
-- Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
-- Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
-
-| 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
+## 証跡採用台帳
+| ID | adoption_status | source | target | rationale | evidence | next_action |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | discussion | `requirement.md` scope / AC | User-adopted Option C。`doctor` と PR observation の両 surface を scope に固定した | `discussions/20260611t135317z-interview-github-token-capability-scope.md` | none |
+| EAL-002 | adopted | discussion | `requirement.md` scope / EC | User-adopted Option C。fixed core + limited optional extensions を採用した | `discussions/20260611t135608z-interview-github-capability-probe-profile.md` | none |
+| EAL-003 | adopted | discussion | `requirement.md` / `design.md` failure semantics | User-adopted Option C。process exit と semantic status の分離を採用した | `discussions/20260611t135901z-interview-github-capability-failure-semantics.md` | none |
+| EAL-004 | adopted | reviewer | `requirement.md` | Reviewer findings を反映し、target handling、optional extended set、trigger write surface を確定した | spec-reviewer rounds: fail -> fail -> fail -> pass | none |
+| EAL-005 | adopted | reviewer | `design.md` | Reviewer findings を反映し、port / adapter / status mapping / capability code を確定した | spec-reviewer rounds: fail -> pass | none |
+| EAL-006 | adopted | reviewer | `plan.md` | Reviewer findings を反映し、EC closure と exit-code obligation を追加した | spec-reviewer rounds: fail -> pass | none |
 
-## 目的整合台帳（Objective Alignment Ledger / 必須）
-
-主要目的と副次要件の主従が逆転していないことを記録する。特に clarification / authoring / handoff の変更では、primary objective evidence、secondary requirement evidence、inversion risk、reviewer verdict を残す。
-
-| 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
+## 目的整合台帳
+| 対象 | primary objective evidence | secondary requirement evidence | inversion risk | reviewer verdict |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | `requirement.md` は GitHub token capability の事前診断と PR observation semantic non-success を主目的として固定 | fixed endpoint、secret redaction、provider/mirror parity を制約として固定 | low | requirement / design / plan spec-reviewer pass |
 
-## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
-
-Requirement / design / plan の phase promotion ごとに、調査、未確定事項、回答、採用判断、reviewer verdict、blocking / non-blocking、次アクションを記録する。
-
-| フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
+## 仕様 authoring ゲート
+| phase | investigated facts | open questions / answers | adoption decision | reviewer verdict | blocking | promotion / next_action |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | GitHub issue #180、active issue docs、clarification discussions、existing `doctor` runtime、PR observation scripts | Option C x3 採用済み。未確定なし | adopted | pass | no | promoted to design |
+| design | `application/contracts.py`、`application/doctor.py`、`commands/doctor.py`、`application/ports.py`、`cli/bootstrap.py`、`infra/github_cli.py`、PR observation scripts | reviewer 指摘により port / adapter / status mapping / capability code を修正済み | adopted | pass | no | promoted to plan |
+| plan | requirement / design、existing doctor tests、PR observation tests in `tests/unit/infra/test_init_update.py` | reviewer 指摘により EC closure と exit-code obligation を修正済み | adopted | pass | no | ready for issue execution |
 
-## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
+## 委任ドラフト証跡
 - 委任 authoring の使用:
-  - used / not used
-- 未使用の場合:
-  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
-- lifecycle state（契約値）:
-  - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
-- 昇格不可 state:
-  - `stale`, `rejected`, `superseded`, `blocked`
-- 標準出力先:
-  - 対象 scope の `discussions/` direct child にある flat Markdown
-  - filename: `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md`
-- 軽量 provenance:
-  - `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, fallback decision, report evidence destination, adoption ledger note
-  - 互換 label: source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
-- 禁止 self-claim:
-  - `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`, reviewer pass, phase completion, implementation readiness
-- 禁止 wildcard token:
-  - `*`, `grants.*`, `all`
-- 標準必須にしない field:
-  - task manifest hash, Permission Profile hash, session invocation hash, probe run id, session hash
-- historical note:
-  - 既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない。
+  - not used for system-architect / implementation-planner draft artifacts。
+- 未使用理由:
+  - `spec-dock-issue-planning` の delegated direct-write authoring は scope-local discussion direct-write consent と clean target discussions を前提にする。
+  - この issue では clarification interview artifacts が target `discussions/` に未追跡状態で存在し、scope-local direct-write authoring consent も明示されていないため、delegated draft adoption eligibility を満たさない。
+  - そのため design / plan は main orchestrator が canonical docs を直接 authoring し、fresh `spec-reviewer` gates で品質を担保した。
 
-| ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
+| created_by_role | scope_id | discussion draft path | source_paths | intended_targets | adoption_status | reflected_to | diff_guard_result | integration result | rejected portions | blockers | reviewer result | promotion decision |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| system-architect | iss-00180 | N/A | N/A | `design.md` | not used | [] | not_run | manual authoring fallback | N/A | direct-write precondition not met | design spec-reviewer pass | no delegated draft promotion |
+| implementation-planner | iss-00180 | N/A | N/A | `plan.md` | not used | [] | not_run | manual authoring fallback | N/A | direct-write precondition not met | plan spec-reviewer pass | no delegated draft promotion |
 
-### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
-| 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
-|---|---|---|---|---|
-| 同意なし（missing consent） | blocked / incomplete | 範囲付き同意を取得する、または手動 authoring に戻す | この section | ineligible |
-| 前段 reviewer pass 不足 / stale（missing/stale previous reviewer pass） | blocked / incomplete | レビューゲートを再実行する（rerun reviewer gate） | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
-| 設計中の要件 gap（requirement gap during design） | blocked / incomplete | requirement phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| 計画中の設計 gap（design gap during plan） | blocked / incomplete | design phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| ロール利用不可（role unavailable） | blocked / manual path | 利用不可を記録し、妥当なら手動で続行する | この section | ineligible |
-| 禁止行為の試行（forbidden action attempt） | rejected | ドラフトを破棄し incident を記録する | この section / decision ledger | ineligible |
-| 古いドラフト（stale draft） | stale | 再生成または差分調整する | この section | ineligible |
-| 置換済みドラフト（superseded draft） | superseded | 置換先ドラフトを参照する | この section | ineligible |
-| 委任使用主張に対する証跡不足（missing draft evidence when delegated use is claimed） | incomplete | 証跡を追加する、または委任使用 claim を外す | この section | ineligible |
-| reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
+## ワークフロー委任同意の証跡
+| consent source | repo/worktree | active issue | session | named roles | boundary | expires / invalidation condition | denied / unavailable reason | next action |
+|---|---|---|---|---|---|---|---|---|
+| user instruction `$spec-dock-issue-planning` | `/Users/iwasawayuuta/.codex/worktrees/0799/spec-dock` | iss-00180 | current session | spec-reviewer | read-only review gates for requirement / design / plan | issue complete / session end / scope change / user revocation | none | proceed |
+| none for delegated direct-write authoring | `/Users/iwasawayuuta/.codex/worktrees/0799/spec-dock` | iss-00180 | current session | system-architect / implementation-planner | discussion draft direct-write not granted | until explicit scope-local consent and clean target discussions | direct-write precondition not met | manual authoring fallback |
 
-## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+## レビューゲート状態
+| step / phase | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| requirement | authoring gate round 1 | spec-reviewer | stale | failed | no | re-review | P1 target resolution ambiguity; P2 optional extended positive AC missing |
+| requirement | authoring gate round 2 | spec-reviewer | stale | failed | no | re-review | Optional extended set was still open-ended |
+| requirement | authoring gate round 3 | spec-reviewer | stale | failed | no | re-review | Doctor trigger write display contradiction |
+| requirement | authoring gate round 4 | spec-reviewer | fresh at promotion | passed | N/A | promoted to design | No blockers |
+| design | authoring gate round 1 | spec-reviewer | stale | failed | no | re-review | Missing explicit port / adapter; PR observation status mapping ambiguous; capability code mismatch |
+| design | authoring gate round 2 | spec-reviewer | fresh at promotion | passed | N/A | promoted to plan | No blockers |
+| plan | authoring gate round 1 | spec-reviewer | stale | failed | no | re-review | Missing EC closure rows; missing `exit_code=0` obligations |
+| plan | authoring gate round 2 | spec-reviewer | fresh | passed | N/A | ready for issue execution | No blockers |
 
-## 実装記録（セッションログ） (必須)
+## 実装委任ゲート
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated | runtime contract / tests / infra adapter | dev-coder | Runtime doctor capability diagnostics | `plan.md` S01 | S01 allowed paths | raw API checker, live GitHub tests, unrelated doctor findings | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py`; forbidden raw API surface inspection; `git diff --check` | broad command redesign, endpoint scope expansion, secret redaction cannot be asserted | changed files / tests / closure evidence / risks | pass: dev-coder implemented S01, follow-up fixed schema classification, code-reviewer pass |
+| S02 | delegated | shipped script behavior / final JSON compatibility | dev-coder | PR observation permission limitation classification | `plan.md` S02 | S02 allowed paths | arbitrary API args, extra write probes, retired wrapper | focused `tests/unit/infra/test_init_update.py` selection; nearby regression selector; `git diff --check` | status enum conflict, JSON compatibility break | changed files / tests / final JSON examples / risks | pass: dev-coder implemented S02, focused/nearby tests pass, code-reviewer pass after follow-ups |
+| S03 | delegated | shipped asset guidance / dogfooding parity | dev-coder | Guidance and parity | `plan.md` S03 | S03 allowed paths | broad docs rewrite, credential storage guidance | provider/mirror diff inspection; focused install/parity tests; `validate`; `git diff --check` | mirror overwrite risk, scope expansion | changed files / parity evidence / risks | pass: provider guidance updated and dogfooding mirrors synced; code-reviewer pass |
+| S99 | delegated / passed | issue-wide closure | qa-reviewer / code-reviewer / spec-reviewer / dev-coder | final quality gates and reviewer follow-ups | `plan.md` S99 | issue-wide diff; bounded follow-up paths | unreviewed completion, live GitHub tests, arbitrary API expansion | required validation commands and reviewer pass | missing closure evidence, implementation reviewer finding | gate verdicts / final risk | pass: first final reviewers failed on stale report and P2 coverage gaps; follow-up implementation verified; final QA/code/spec reviewers passed |
 
-### セッションログ（2026-06-11 HH:MM - HH:MM）
+## 実装記録
+- S01 complete:
+  - Runtime doctor capability diagnostics を追加した。
+  - `DoctorResult.ok` / structural `DoctorFinding` と GitHub capability diagnostics を分離した。
+  - `doctor` command surface は fixed target fields と optional extended flag に限定した。
+  - `GitHubCapabilityGateway` port と fixed `gh` CLI adapter を追加した。
+  - `tc-001`-`tc-006` を focused runtime tests で閉じた。
+- S02 complete:
+  - PR observation scripts が GitHub token permission denied を machine-readable limitation として返すようにした。
+  - Checks / statuses / statusCheckRollup の read permission failure は `unknown` semantic non-success として扱う。
+  - Fixed trigger comment write permission failure は `trigger_comment_write` limitation と `human_gate` として扱う。
+  - auth missing / rate limit / transient / schema unavailable / invalid input を permission denied と分離した。
+  - `tc-007`-`tc-011` を focused script tests で閉じた。
+- S03 complete:
+  - Provider `github-pr-observation/SKILL.md` に permission limitation semantics を追記した。
+  - Provider-side PR observation skill assets を dogfooding `.agents/skills/github-pr-observation/` に反映した。
+  - Provider-side runtime S01 changes を dogfooding `spec-dock/scripts/spec_dock_runtime/` に反映した。
+  - `tc-012` を parity inspection と focused install/parity tests で閉じた。
+- S99 in progress:
+  - 初回 final QA / code / spec reviewer で stale report evidence と追補 coverage gaps を確認した。
+  - `doctor --github-repo/--github-pr/--github-head-sha` の malformed target を CLI misuse として reject する追補を実装した。
+  - PR observation read permission coverage を PR metadata `pull_request_read`、commit status `/status`、`statusCheckRollup` に拡張した。
+  - PR metadata permission denied でも raw stderr / token marker を出さず、`stderr_sha256` と `secret_redacted=true` を返す。
+  - code-reviewer P2 により、GitHub App / `GITHUB_TOKEN` 系の `Resource not accessible by integration` を permission denied として扱う追補が必要と判定されたため、dev-coder に委任し、provider / dogfooding mirror とテストを更新した。
 
-#### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
-
-#### 実施内容
-- ...
-
-#### 実行コマンド / 結果
+## 実行コマンド / 結果
 ```bash
-<command>
+uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py
+# 34 passed
 
-<result>
+rg -n -- '--(endpoint|method|jq|header|raw|api|graphql)|raw gh|GraphQL|headers' \
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/doctor.py \
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/doctor.py \
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_capability_cli.py
+# no matches
+
+git diff --check
+# pass
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'
+# 6 passed
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'github_pr_observation or codex_review or checks_snapshot'
+# 6 passed
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02 or issue_75_pr_observation_checks_collector or issue_170_pr_observation_checks_collector or issue_176_s01_trigger_helper or issue_176_s04_wait'
+# 41 passed
+
+uv run pytest tests/unit/infra/test_init_update.py
+# 326 passed / 4 failed
+# failures are outside S02 allowed scope: dogfooding mirror/S03 parity and existing dogfooding snapshot mismatch
+
+diff -qr src/spec_dock/assets/install_root/.agents/skills/github-pr-observation .agents/skills/github-pr-observation
+# clean
+
+diff -qr -x __pycache__ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime spec-dock/scripts/spec_dock_runtime
+# clean
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'github_pr_observation or checked_in_dogfooding_runtime'
+# 40 passed
+
+uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py
+# 37 passed
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02 or github_pr_observation or codex_review or checks_snapshot or checked_in_dogfooding_runtime'
+# 56 passed, 279 deselected
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02 and pr_metadata'
+# 2 passed, 333 deselected
+
+diff -qr -x __pycache__ src/spec_dock/assets/install_root/.agents/skills/github-pr-observation .agents/skills/github-pr-observation
+# clean
+
+diff -qr -x __pycache__ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime spec-dock/scripts/spec_dock_runtime
+# clean
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=92
+
+git diff --check
+# pass
 ```
 
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+## テスト駆動開発証跡
+| step | phase | planned evidence | observed evidence | method | result | notes |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | Red / characterization | tc-001-tc-006 red-required / inspect-only | S01 closure tests failed before capability contract / port implementation | dev-coder focused test run | fail as expected | `GitHubCapabilityDiagnostic` / `Ports.github_capability_gateway` missing caused failures |
+| S01 | Green | tc-001-tc-006 pass | Runtime doctor focused suite passed | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` | pass | 34 passed |
+| S01 | Refactor / guardrail | forbidden raw API surface absent | Implementation files have no forbidden raw API args | `rg -n -- ... commands/doctor.py application/doctor.py infra/github_capability_cli.py` | pass | Test forbidden-list strings exist only in tests |
+| S02 | Red / characterization | tc-007-tc-011 red-required | Focused `issue_180_s02` tests failed before implementation | dev-coder focused test run | fail as expected | 4 failed / 1 passed for planned permission/secret/status semantics gaps |
+| S02 | Green | tc-007-tc-011 pass | Focused and nearby PR observation suites passed | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'`; nearby selector | pass | 6 passed; 41 passed nearby |
+| S02 | Reviewer follow-up | code-reviewer P2 generic permission denied | Generic `permission denied` fixture failed before follow-up and passed after classifier broadening | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | `tc-007` strengthened for S01/S02 classifier parity |
+| S02 | Reviewer follow-up | code-reviewer P2 trigger generic permission denied | Generic `permission denied while posting issue comment` fixture failed before follow-up and passed after trigger classifier broadening | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | `tc-008` strengthened for read/trigger classifier parity |
+| S02 | Refactor / guardrail | fixed contract retained | Diff stayed within S02 allowed paths; no raw endpoint/method args added | diff inspection; `git diff --check` | pass | Dogfooding mirror intentionally left for S03 |
+| S03 | Red / alternative | tc-012 inspect-only | Provider/mirror diff failed before sync; focused parity test failed 1/40 before dogfooding runtime sync | `diff -qr ...`; focused pytest selector | fail as expected | S01/S02 provider changes had not yet been mirrored |
+| S03 | Green | tc-012 pass | Provider/mirror diffs clean and focused parity tests pass | `diff -qr ...`; `uv run pytest tests/unit/infra/test_init_update.py -k 'github_pr_observation or checked_in_dogfooding_runtime'` | pass | 40 passed |
+| S03 | Refactor / guardrail | guidance/mirror only | Diff limited to SKILL guidance and dogfooding mirrors | diff inspection; `git diff --check` | pass | No broad docs rewrite or credential storage guidance |
+| S99 | Red / reviewer follow-up | final reviewer P2 coverage gaps | Malformed doctor target test failed before follow-up; PR metadata permission denied mapped to generic path before follow-up | dev-coder focused red runs | fail as expected | `malformed_github_targets`: 3 failed before fix; `pr_metadata` permission path: 1 failed / 2 passed before fix |
+| S99 | Green / follow-up | tc-004 / tc-007 / tc-011 strengthened | Runtime doctor suite and PR observation issue-wide selector passed | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py`; PR observation selector | pass | 37 passed; 56 passed / 279 deselected |
+| S99 | Red / reviewer follow-up | code-reviewer P2 integration permission wording | `Resource not accessible by integration` PR metadata classification gap found | code-reviewer review; dev-coder red test | fail as expected | `recommended_next_action` fell to `human_gate` before fix |
+| S99 | Green / reviewer follow-up | code-reviewer P2 integration permission wording | Integration-denied PR metadata fixture passes and maps to token permission limitation | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02 and pr_metadata'`; broader PR observation selector | pass | 2 passed; 56 passed / 279 deselected |
+| PR repair U001 | Red / observation | PR #181 initial observation | Provider CI failed; Codex review returned 3 unresolved P2 comments | `wait_pr_observation.sh` on PR #181 head `2fa6da0d...`; `gh run view`; local focused reproduction | fail as expected | failure classes: `check_failure:provider-tests`, `review_feedback:github-capability-classifier`, `review_feedback:token-source`, `review_feedback:missing-gh` |
+| PR repair U001 | Green | I001-I007 repair | Full provider unit lane and focused repair tests passed | focused pytest commands; full `tests/unit/infra/test_init_update.py`; mirror diffs; validate; diff check | pass | 41 runtime doctor tests passed; focused trigger selector 4 passed; 338 `test_init_update.py` tests passed |
+| PR re-observation | Green / human-gate triage | PR #181 latest head after U001 | CI passed; latest Codex review fallback comment reported no major issues; previous review threads were outside current trigger boundary, with two outdated and one residual unresolved old thread | `wait_pr_observation.sh` on head `cdb4a39c0818d10ee3d151c8cac8fd1b5002fd13`; `gh pr checks 181`; `gh pr view 181` | pass with residual disclosed | final JSON `overall_status=human_gate` due legacy unresolved thread state, but no latest-head blocking feedback remained; PR `mergeable=MERGEABLE` and all checks pass |
 
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
-
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+## ステップ契約の完了証跡
+| step | closure ids | close condition from plan | observed evidence | result | notes |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | tc-001-tc-006 | Runtime doctor capability diagnostics implemented, verified, and reviewed | Tests `34 passed`; forbidden surface inspection pass; code-reviewer pass | pass | S01 scope complete |
+| S02 | tc-007-tc-011 | PR observation permission limitation classification implemented, verified, and reviewed | Focused tests 6 passed; nearby regression 41 passed; code-reviewer pass after generic permission follow-ups | pass | S02 provider-side scope complete; S03 parity pending |
+| S03 | tc-012 | Guidance and dogfooding parity implemented, verified, and reviewed | Provider/mirror diffs clean; focused parity tests 40 passed; code-reviewer pass | pass | S03 scope complete |
+| S99 | tc-013 | Issue-wide validation / QA / code / spec review / handoff gates pass | Focused runtime tests 37 passed; PR observation selector 56 passed; `issue_180_s02 and pr_metadata` 2 passed; provider/mirror diffs clean; validate ok; `git diff --check` pass; final QA pass; final code-reviewer pass; final spec-reviewer pass | pass | S99 scope complete before final commit / PR delivery |
 
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+## テスト契約の完了証跡
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or path | observed result | notes |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | yes | red-required | Added test failed before implementation due missing capability contract / port | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` | pass | `check_runs_read` permission denied renders status/api/source/action without token value |
+| tc-002 | S01 | yes | red-required | Added test failed before implementation due missing no-target diagnostic | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` | pass | No target returns `target_unavailable`, gateway not called, structural success retained |
+| tc-003 | S01 | yes | red-required | Added test failed before implementation due missing extended diagnostics | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` | pass | `actions_read` / `issue_comments_read` render as `[github:extended]` |
+| tc-004 | S01 | yes | inspect-only | Parser surface lacked explicit fixed GitHub args before S01; malformed target arguments were accepted before S99 follow-up | parser negative test; implementation `rg` inspection; malformed target parser test | pass | No raw endpoint / method / jq / header / raw surface in implementation; malformed `--github-repo`, non-positive `--github-pr`, and non-hex `--github-head-sha` reject at parse time |
+| tc-005 | S01 | yes | red-required | Added test failed before implementation due missing auth diagnostics | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` | pass | `auth_missing` remains distinct from `permission_denied` and token source is non-secret |
+| tc-006 | S01 | yes | red-required | Initial implementation classified `Unknown JSON field` as `transient_unknown`; follow-up red evidence reproduced it | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` | pass | rate limit / transient / schema unavailable render distinctly; `Unknown JSON field` maps to `schema_unavailable` |
+| tc-007 | S02 | yes | red-required | Focused S02 test failed before implementation because checks permission denied stayed generic; PR metadata permission denied mapped to generic path before S99 follow-up; integration wording mapped to `human_gate` before final follow-up | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02 and pr_metadata'`; S99 PR observation selector | pass | check-runs, commit status `/status`, statusCheckRollup, PR metadata PAT wording, and PR metadata integration wording permission denied paths are covered |
+| tc-008 | S02 | yes | red-required | Focused S02 test failed before implementation because trigger permission denied leaked raw marker and did not map to human gate | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | trigger comment permission denied exits 0 and yields `trigger_comment_write` / `human_gate` |
+| tc-009 | S02 | yes | red-required | Focused S02 test failed before implementation because non-permission failures collapsed into generic failure | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | auth/rate/transient/schema are distinct and not `github_token_permission_denied` |
+| tc-010 | S02 | yes | red-required | Existing usage contract characterized invalid input as exit 64 | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | invalid `--head-sha` remains usage error and emits no token limitation |
+| tc-011 | S02 | yes | red-required | Focused S02 tests failed before implementation because token marker could leak in trigger helper JSON | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_180_s02'` | pass | raw token-like stderr marker absent; limitation includes `stderr_sha256` and `secret_redacted=true` |
+| tc-012 | S03 | yes | inspect-only | Provider/mirror diffs and focused dogfooding parity test failed before sync | provider/mirror `diff -qr`; `uv run pytest tests/unit/infra/test_init_update.py -k 'github_pr_observation or checked_in_dogfooding_runtime'` | pass | PR observation skill mirror and dogfooding runtime mirror match provider-side sources excluding `__pycache__` |
+| tc-013 | S99 | yes | manual-required | First final reviewer pass failed on stale report and P2 coverage gaps | final QA / code / spec reviewer gates; final validation commands | pass | Final QA pass with P2 ledger update request; final code-reviewer pass; final spec-reviewer pass |
 
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+## クロージャ網羅
+| closure id | step | verification evidence | result | notes |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | `test_doctor_renders_targeted_github_permission_diagnostic_without_secret` | pass | Secret token marker excluded from rendered output |
+| tc-002 | S01 | `test_doctor_without_github_target_skips_capability_probe_without_structural_failure` | pass | No false permission failure |
+| tc-003 | S01 | `test_doctor_renders_optional_extended_diagnostics_separately` | pass | Core and extended groups separated |
+| tc-004 | S01 | `test_doctor_command_surface_rejects_raw_github_api_arguments`; implementation `rg` | pass | Fixed command surface only |
+| tc-005 | S01 | `test_doctor_distinguishes_auth_missing_from_permission_denied_without_gh_token` | pass | Auth missing and token source handled without secret |
+| tc-006 | S01 | `test_doctor_renders_rate_transient_and_schema_statuses_distinctly`; `test_github_capability_cli_classifies_unknown_json_field_as_schema_unavailable` | pass | EC-003 classification covered |
+| tc-007 | S02 | `test_issue_180_s02_snapshot_maps_check_runs_permission_denied_to_unknown_limitation` | pass | Read permission failure semantic non-success covered |
+| tc-008 | S02 | `test_issue_180_s02_wait_maps_trigger_comment_permission_denied_to_human_gate` | pass | Trigger write failure semantic non-success covered |
+| tc-009 | S02 | `test_issue_180_s02_checks_collector_keeps_non_permission_failures_distinct` | pass | Auth/rate/transient/schema classification covered |
+| tc-010 | S02 | `test_issue_180_s02_checks_collector_invalid_input_remains_usage_error` | pass | Usage error remains non-zero |
+| tc-011 | S02 | `test_issue_180_s02_trigger_helper_classifies_comment_permission_denied_without_secret`; snapshot permission test | pass | Secret marker excluded from final JSON |
+| tc-012 | S03 | provider/mirror diff inspections; checked-in dogfooding parity tests | pass | Shipped guidance and dogfooding mirrors align |
+| tc-013 | S99 | focused tests, parity diff, `validate`, `git diff --check`, final reviewer gates | pass | S99 final gate closed |
 
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+## クロージャ差分
+| change | closure id | test id alias | resolved closure id | reason | plan amendment required | re-review required |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| none | tc-001-tc-006 | S01 runtime doctor focused tests | tc-001-tc-006 | Planned closure ids closed as written | no | no |
+| changed | tc-007 | generic permission denied fixture | tc-007 | code-reviewer P2 requested parity with S01 runtime classifier | no | yes, S02 code-reviewer re-review |
+| changed | tc-008 | generic trigger permission denied fixture | tc-008 | code-reviewer P2 requested parity with read-side classifier | no | yes, S02 code-reviewer re-review |
+| none | tc-009-tc-011 | S02 PR observation focused tests | tc-009-tc-011 | Planned closure ids closed as written | no | no |
+| none | tc-012 | S03 parity inspection and focused tests | tc-012 | Planned closure id closed as written | no | yes, S03 code-reviewer re-review |
+| changed | tc-004 | malformed GitHub target parser test | tc-004 | final code-reviewer requested malformed local target rejection instead of accepting invalid target values | no | yes, S99 code-reviewer re-review |
+| changed | tc-007 | PR metadata / commit status / statusCheckRollup permission fixtures | tc-007 | final QA/code reviewers requested branch coverage for all PR observation read permission paths | no | yes, S99 code-reviewer re-review |
+| changed | tc-007 | PR metadata integration permission fixture | tc-007 | code-reviewer P2 identified `Resource not accessible by integration` as unclassified permission wording | no | yes, S99 code-reviewer re-review |
+| changed | tc-011 | PR metadata secret redaction fixture | tc-011 | final reviewers requested secret redaction evidence for PR metadata permission failure path | no | yes, S99 code-reviewer re-review |
+| changed | tc-013 | final reviewer gates | tc-013 | Final QA/code/spec reviewers passed after S99 follow-up implementation and report evidence update | no | no |
 
-#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
-`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
-
-| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
-|---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00180 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
-
-#### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
-
-| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
-
-#### 委任 worker 証跡（Delegated Worker Evidence）
-| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+## 委任 worker 証跡
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | dev-coder | Added runtime GitHub capability diagnostics, fixed CLI probe port/adapter, added focused tests; follow-up fixed `Unknown JSON field` schema classification | `application/contracts.py`; `application/ports.py`; `application/doctor.py`; `commands/doctor.py`; `cli/bootstrap.py`; `infra/github_capability_cli.py`; `presentation/cli_text.py`; `tests/cli_runtime/test_runtime_doctor_s04.py` | `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` -> 34 passed; `git diff --check` -> pass | code-reviewer pass after follow-up | Live GitHub API behavior intentionally not tested per plan; S02 remains pending | accepted |
+| S02 | dev-coder | Added PR observation permission limitation classification for checks/status/rollup and trigger comment write, with focused script tests; follow-ups broadened generic `permission denied` matching for read and trigger paths | `fetch_pr_checks_snapshot.sh`; `fetch_pr_observation_snapshot.sh`; `trigger_codex_review.sh`; `wait_pr_observation.sh`; `tests/unit/infra/test_init_update.py` | `issue_180_s02` -> 6 passed; nearby PR observation selector -> 41 passed; `git diff --check` -> pass | code-reviewer pass after follow-ups | Full `test_init_update.py` has 4 failures in S03 parity / existing dogfooding snapshot scope | accepted |
+| S03 | dev-coder | Updated provider skill guidance and mirrored PR observation assets plus runtime dogfooding files | provider `github-pr-observation/SKILL.md`; `.agents/skills/github-pr-observation/**`; `spec-dock/scripts/spec_dock_runtime/**` | provider/mirror diffs clean; focused parity tests -> 40 passed; `validate` -> ok; `git diff --check` -> pass | code-reviewer pass | Live GitHub API not exercised per plan | accepted |
+| S99 follow-up 1 | dev-coder | Added malformed doctor target rejection and expanded read permission coverage for PR metadata, commit status, and statusCheckRollup | `commands/doctor.py`; `fetch_pr_observation_snapshot.sh`; dogfooding mirrors; `tests/cli_runtime/test_runtime_doctor_s04.py`; `tests/unit/infra/test_init_update.py` | runtime doctor suite -> 37 passed; PR observation selector -> 55 passed; provider/mirror diffs clean; `validate` -> ok; `git diff --check` -> pass | code-reviewer fail | live GitHub API intentionally not exercised; integration wording gap found | accepted with follow-up |
+| S99 follow-up 2 | dev-coder | GitHub App / `GITHUB_TOKEN` integration permission wording classification | `fetch_pr_observation_snapshot.sh`; dogfooding mirror; `tests/unit/infra/test_init_update.py` | `issue_180_s02 and pr_metadata` -> 2 passed; PR observation selector -> 56 passed; provider/mirror diff clean; `git diff --check` -> pass | final code-reviewer pass | live GitHub API intentionally not exercised | accepted |
+| PR repair U001 | dev-coder | Closed PR #181 provider-tests failures and Codex P2 review comments by updating dogfooding snapshot, rate-limit expectation, integration wording classifiers, `GITHUB_TOKEN` token source, and missing `gh` diagnostic handling | runtime doctor adapter/contracts; PR observation scripts; dogfooding mirrors; runtime doctor tests; `test_init_update.py`; repair batch discussion | runtime doctor -> 41 passed; focused trigger selector -> 4 passed; full `test_init_update.py` -> 338 passed; mirror diffs clean; `validate` -> ok; `git diff --check` -> pass | code-reviewer pass with P2 follow-up applied; PR re-observation pending | live GitHub API limited to PR observation; previous review threads unresolved until new head is pushed and reobserved | accepted |
 
-#### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+## ステップ commit ゲート
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01 | committed | Runtime doctor capability diagnostics and S01 report evidence | `a8d128d5` | clean after commit | N/A | N/A | N/A | N/A |
+| S02 | committed | Provider-side PR observation permission limitation classification and S02 report evidence | `0bfe1049` | clean after commit | N/A | N/A | N/A | N/A |
+| S03 | committed | Guidance and dogfooding mirror parity plus S03 report evidence | `8499971d` | clean after commit | N/A | N/A | N/A | N/A |
+| S99 follow-up | ready_to_commit | Final reviewer implementation follow-ups and final report evidence | pending final commit | pending | N/A | N/A | N/A | N/A |
 
-#### レビューゲート状態（Reviewer Gate Status）
-| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
-
-#### ステップ commit ゲート（Step Commit Gate）
-| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
-
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
-
-#### コミット
-- <hash> <message>
-
-#### メモ
-- ...
-
----
-
-### セッションログ（2026-06-11 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
-
----
-
-## 最終品質ゲート（Final Quality Gate / 必須）
-
-### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
-| 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
+## 最終品質ゲート
+| gate | scope | result | evidence | next action |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| authoring requirement gate | `requirement.md` | pass | fresh spec-reviewer pass | complete |
+| authoring design gate | `design.md` | pass | fresh spec-reviewer pass | complete |
+| authoring plan gate | `plan.md` | pass | fresh spec-reviewer pass | complete |
+| issue execution gate | S01-S99 | pass | S01 complete; S02 complete; S03 complete; S99 final QA/code/spec reviewers passed | commit final follow-up and create PR |
+| PR delivery gate | PR #181 | pass | PR created against `main`; initial observation failed; repair batch U001 implemented, committed, pushed, and reobserved; latest checks pass; latest Codex review found no major issues; PR is `MERGEABLE` | human merge decision |
 
-### 最終 QA ゲート（Final QA Gate）
-| レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
-|---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
-
-### 最終コードレビューゲート（Final Code Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
-|---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
-
-### 最終 spec review ゲート（Final Spec Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
-|---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
-
-### 最終 commit（Final Commit）
-| 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
-|---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
-
-## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
-
-## 学んだこと (任意)
-- ...
-
-## 今後の推奨事項 (任意)
-- ...
-
-## 省略/例外メモ (必須)
-- 該当なし
+## PR delivery / merge-prepared evidence
+| item | evidence |
+|---|---|
+| PR | https://github.com/chemitaro/spec-dock/pull/181 |
+| Base / head | `main` <- `iss-00180-github-token-capability-preflight` |
+| Latest observed repair head | `cdb4a39c0818d10ee3d151c8cac8fd1b5002fd13` |
+| PR state | `OPEN`, ready, `MERGEABLE` |
+| Checks | `validate` x2 pass; `provider-tests` x2 pass |
+| Latest Codex review signal | fallback issue comment: no major issues |
+| Observation result | `overall_status=human_gate` because one old review thread remained unresolved outside the latest trigger boundary |
+| Triage decision | old unresolved thread is non-blocking residual risk: latest repair addressed the finding, newer Codex review did not re-raise it, and checks passed |
+| Merge-prepared | yes, for human merge decision |
