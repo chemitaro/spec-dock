@@ -68,9 +68,9 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
 | EAL-001 | adopted | research | `requirement.md`, `design.md` | PR #181 の observation evidence から、historical context と final decision が混在して見える問題、`fallback_issue_comment` が直接の human gate 要因である可能性、fingerprint 分離の必要性を採用した | `discussions/20260612t012333z-research-pr-observation-final-output-boundary-analysis.md` | なし |
-| EAL-002 | adopted | interview | `requirement.md`, `design.md`, future `plan.md` | Option C の user-approved 方針を requirement scope / AC と design の fallback policy へ反映した | `discussions/20260612t014627z-interview-fallback-issue-comment-decision-boundary.md` | plan へ反映する |
-| EAL-003 | adopted | sub-agent: system-architect | `design.md` | system-architect draft の三面 surface、Option C、fingerprint 分離、file responsibility、test strategy を canonical design へ統合した。差分 guard では許可済み draft 1 ファイルのみが追加され、canonical docs は main orchestrator が編集した | `discussions/20260612t015200z-draft-design-pr-observation-boundary.md`; `git status --short` | design fresh re-review |
-| EAL-004 | adopted | sub-agent: implementation-planner | `plan.md` | implementation-planner draft の closure index、S01-S04 behavior slices、delegation contracts、test seeds、S90/S99 gates を canonical plan へ統合した。差分 guard では許可済み draft 1 ファイルのみが追加され、canonical docs は main orchestrator が編集した | `discussions/20260612t021000z-draft-plan-pr-observation-boundary.md`; `git status --short` | plan fresh review |
+| EAL-002 | adopted | interview | `requirement.md`, `design.md`, `plan.md` | Option C の user-approved 方針を requirement scope / AC、design fallback policy、plan test/exit contracts へ反映した | `discussions/20260612t014627z-interview-fallback-issue-comment-decision-boundary.md`; plan reviewer pass `019eb9a8-3582-7173-be4c-1d4b088c6fb5` | complete |
+| EAL-003 | adopted | sub-agent: system-architect | `design.md` | system-architect draft の三面 surface、Option C、fingerprint 分離、file responsibility、test strategy を canonical design へ統合した。差分 guard では許可済み draft 1 ファイルのみが追加され、canonical docs は main orchestrator が編集した | `discussions/20260612t015200z-draft-design-pr-observation-boundary.md`; `git status --short`; design reviewer pass `019eb99b-1603-7d73-8d55-a6db5afef860` | complete |
+| EAL-004 | adopted | sub-agent: implementation-planner | `plan.md` | implementation-planner draft の closure index、S01-S04 behavior slices、delegation contracts、test seeds、S90/S99 gates を canonical plan へ統合した。差分 guard では許可済み draft 1 ファイルのみが追加され、canonical docs は main orchestrator が編集した | `discussions/20260612t021000z-draft-plan-pr-observation-boundary.md`; `git status --short`; plan reviewer pass `019eb9a8-3582-7173-be4c-1d4b088c6fb5` | complete |
 | EAL-005 | adopted | sub-agent: dev-coder `019eb9b1-4d2e-70b3-b0bb-12a95aa495a1` | S01 implementation | collector の `decision` / `review.current` / `review.audit` / fingerprint split / fallback candidate / changes-requested evidence を計画どおり採用した。親検証と code-reviewer pass により S01 scope の実装証跡として採用する | working tree diff; focused pytest 38 passed; code-reviewer `019eb9ba-f151-7410-a371-1f9d81680d5b` -> `review_status: pass` | S01 commit |
 | EAL-006 | adopted | sub-agent: dev-coder `019eb9c5-08b5-72f0-ac7f-afb8c2428496` | S02 implementation | snapshot classification を collector `decision` surface ベースへ移す実装を採用した。親検証で S02 focused lane が通過し、legacy audit-only thread が final feedback action を汚染しないことを確認した | working tree diff; `uv run pytest tests/unit/infra/test_init_update.py -k "issue_182_s02 or observation_snapshot or pr_observation_snapshot or github_pr_observation"` -> 16 passed | S02 code review / commit |
 | EAL-007 | adopted | sub-agent: dev-coder `019eb9d5-4f64-7122-8861-dd5bd7c97c85` / `019eb9ef-cbf6-71e1-a5e1-3bd84b7c161a` | S03 implementation | wait stability / progress を decision fingerprint と decision/current counts ベースへ移す実装を採用した。P1 修正後の親検証と code-reviewer pass により、audit-only drift が wait stability/final action を汚染しないことを確認した | working tree diff; `uv run pytest tests/unit/infra/test_init_update.py -k "issue_182_s03 or wait_pr_observation or pr_observation_wait or issue_176_s04_wait or issue_170_pr_observation_wait"` -> 38 passed; code-reviewer `019eb9ec-b471-7b70-ae8b-f02e57734c43` -> `review_status: pass` | S03 commit |
@@ -81,7 +81,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | `requirement.md` は final decision を current trigger / resume boundary の selected artifacts に限定することを主目的にしている | Option C の `fallback_pass_candidate` は top-level pass ではなく説明用の準成功信号に留める | low | requirement reviewer: passed; design reviewer: re-review pending |
+| OAL-001 | `requirement.md` は final decision を current trigger / resume boundary の selected artifacts に限定することを主目的にしている | Option C の `fallback_pass_candidate` は top-level pass ではなく説明用の準成功信号に留める | low | requirement reviewer passed `019eb98c-2607-78a0-8235-c049a8de0684`; design reviewer passed `019eb99b-1603-7d73-8d55-a6db5afef860`; plan reviewer passed `019eb9a8-3582-7173-be4c-1d4b088c6fb5` |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -260,7 +260,7 @@ uv run pytest tests/unit/infra/test_init_update.py
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | pending commit | S01 collector contract + tests + dogfooding mirror + execution ledger | pending | pending | N/A | N/A | N/A | N/A |
+| S01 | committed | S01 collector contract + tests + dogfooding mirror + execution ledger | `1c76b740` | `git status --short` -> clean before S02 | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh` - provider-side collector output contract
@@ -270,7 +270,7 @@ uv run pytest tests/unit/infra/test_init_update.py
 - `spec-dock/active/issue/report.md` - S01 execution evidence
 
 #### コミット
-- pending
+- `1c76b740` `feat(pr-observation): review collectorにdecision境界を追加`
 
 #### メモ
 - Full `uv run pytest tests/unit/infra/test_init_update.py` remains red only on `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`, where checked-in dogfooding `.meta.json` path snapshot does not yet include current `iss-00182`. This is recorded as discovered-meta-snapshot for later resolution and is not a collector behavior failure.
@@ -383,7 +383,7 @@ uv run pytest tests/unit/infra/test_init_update.py -k "issue_182_s02 or observat
 - `spec-dock/active/issue/report.md` - S02 execution evidence
 
 #### コミット
-- pending
+- `b1949f2a` `feat(pr-observation): snapshot判定をdecision境界へ切り替え`
 
 #### メモ
 - Full `uv run pytest tests/unit/infra/test_init_update.py` remains red only on `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`, where checked-in dogfooding `.meta.json` path snapshot does not yet include current `iss-00182`. This is recorded as discovered-meta-snapshot for later resolution and is not a snapshot classification failure.
@@ -501,7 +501,7 @@ uv run pytest tests/unit/infra/test_init_update.py -k "issue_182_s03 or wait_pr_
 - `spec-dock/active/issue/report.md` - S03 execution evidence
 
 #### コミット
-- pending
+- `f0d8937a` `feat(pr-observation): wait判定をdecision fingerprintへ切り替え`
 
 #### メモ
 - Full `uv run pytest tests/unit/infra/test_init_update.py` remains red only on `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`, where checked-in dogfooding `.meta.json` path snapshot does not yet include current `iss-00182`. This is recorded as discovered-meta-snapshot for later resolution and is not a wait stability/progress failure.
@@ -595,7 +595,7 @@ uv run pytest tests/unit/infra/test_init_update.py -k "github_pr_observation or 
 - `spec-dock/active/issue/report.md` - S04 execution evidence
 
 #### コミット
-- pending
+- `b552b53d` `docs(pr-observation): decision境界の出力契約を明記`
 
 #### メモ
 - S04 では script / behavior changes は行っていない。
@@ -608,27 +608,27 @@ uv run pytest tests/unit/infra/test_init_update.py -k "github_pr_observation or 
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
 | `github-pr-observation/SKILL.md` provider / dogfooding mirror | yes | doc-writer | S04: `decision` / `review.current` / `review.audit` / `fallback_pass_candidate` semantics documented; focused pytest 68 passed | pass by `019eb9fe-830a-7380-ac73-9e25fab6cf56` |
-| checked-in dogfooding `.meta.json` snapshot | yes | orchestrator | S90: added current `iss-00182` `.meta.json` to checked-in path/deps snapshots; `uv run pytest tests/unit/infra/test_init_update.py` -> 351 passed | N/A |
+| checked-in dogfooding `.meta.json` snapshot | yes | orchestrator | S90: added current `iss-00182` `.meta.json` to checked-in path/deps snapshots; `uv run pytest tests/unit/infra/test_init_update.py` -> 351 passed, later 352 passed after final P2 regression test addition | N/A |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| pending | whole issue obligation coverage | full file green before reviewer handoff | `uv run pytest tests/unit/infra/test_init_update.py` -> 351 passed; final QA reviewer pending | pending |
+| qa-reviewer `019eba08-2120-7583-bf89-d4ad807ccfa1` | whole issue obligation coverage | full file green before reviewer handoff | `uv run pytest tests/unit/infra/test_init_update.py` -> 351 passed; reviewer returned no findings | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| pending | issue-wide integrated diff | pending | 0 | pending |
+| code-reviewer `019eba11-9b3d-7c90-9b6c-ca1cf3eed5e3` | issue-wide integrated diff after final remediation | pass re-review: no P0/P1. P2 findings remediated by preserving `fallback_pass_candidate` under `--body-mode out-only`, removing helper fields from stdout, and changing direct collector pass action from `merge_prepare` to documented `merge_prepared`; focused pytest 2 passed; provider/mirror diff no diff. | 1 | pass; P2 remediated |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| pending | requirement / design / plan / report / implementation / tests / docs alignment | pending | 0 | pending |
+| spec-reviewer `019eba11-aea9-7f22-bb5c-5af801560f58` | requirement / design / plan / report / implementation / tests / docs alignment | pass re-review: prior P1 findings were remediated. P2 stale pre-promotion ledger next actions were also updated to completed reviewer IDs / complete state. | 1 | pass; P2 remediated |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| S90 evidence updated; final reviewer gates pending | dogfooding `.meta.json` snapshot update + report | final response / PR | pending |
+| S90 evidence updated; final QA/code/spec gates pass; final P2 findings remediated; `uv run pytest tests/unit/infra/test_init_update.py` -> 352 passed | final review remediation + report ledger | final response / PR records amended commit hash and clean worktree evidence | committed in final remediation commit |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
