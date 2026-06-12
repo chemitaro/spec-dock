@@ -587,7 +587,7 @@ uv run pytest tests/unit/infra/test_init_update.py -k "github_pr_observation or 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S04 | pending review | S04 shipped docs + dogfooding mirror + execution ledger | pending | pending | N/A | N/A | N/A | N/A |
+| S04 | committed | S04 shipped docs + dogfooding mirror + execution ledger | `b552b53d` | `git status --short` -> clean before S90 | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md` - provider-side output semantics docs
@@ -607,27 +607,28 @@ uv run pytest tests/unit/infra/test_init_update.py -k "github_pr_observation or 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| `github-pr-observation/SKILL.md` provider / dogfooding mirror | yes | doc-writer | S04: `decision` / `review.current` / `review.audit` / `fallback_pass_candidate` semantics documented; focused pytest 68 passed | pass by `019eb9fe-830a-7380-ac73-9e25fab6cf56` |
+| checked-in dogfooding `.meta.json` snapshot | yes | orchestrator | S90: added current `iss-00182` `.meta.json` to checked-in path/deps snapshots; `uv run pytest tests/unit/infra/test_init_update.py` -> 351 passed | N/A |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| pending | whole issue obligation coverage | full file green before reviewer handoff | `uv run pytest tests/unit/infra/test_init_update.py` -> 351 passed; final QA reviewer pending | pending |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| pending | issue-wide integrated diff | pending | 0 | pending |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| pending | requirement / design / plan / report / implementation / tests / docs alignment | pending | 0 | pending |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S90 evidence updated; final reviewer gates pending | dogfooding `.meta.json` snapshot update + report | final response / PR | pending |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
