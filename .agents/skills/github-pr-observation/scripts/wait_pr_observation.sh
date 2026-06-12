@@ -376,8 +376,9 @@ def ci_progress_counts(payload: dict) -> dict:
 def review_progress_counts(payload: dict) -> dict:
     review = payload.get("review") if isinstance(payload.get("review"), dict) else {}
     summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
-    threads = review.get("threads") if isinstance(review.get("threads"), dict) else {}
     signals = review.get("signals") if isinstance(review.get("signals"), list) else []
+    decision = decision_payload(payload)
+    current = review.get("current") if isinstance(review.get("current"), dict) else {}
     codex_review = payload.get("codex_review")
     if not isinstance(codex_review, dict):
         nested_codex_review = review.get("codex_review")
@@ -385,20 +386,98 @@ def review_progress_counts(payload: dict) -> dict:
     selected_review_comments = codex_review.get("selected_review_comments")
     selected_reviews = codex_review.get("selected_reviews")
     comments = len(review_progress_signal_items(payload)) if signals else 0
+    decision_comment_count = len(decision.get("selected_review_comment_ids", [])) if isinstance(decision.get("selected_review_comment_ids"), list) else 0
+    decision_review_count = len(decision.get("selected_review_ids", [])) if isinstance(decision.get("selected_review_ids"), list) else 0
+    current_comment_count = len(current.get("selected_review_comments", [])) if isinstance(current.get("selected_review_comments"), list) else 0
+    current_review_count = len(current.get("selected_reviews", [])) if isinstance(current.get("selected_reviews"), list) else 0
+    current_signal_count = len(current.get("signals", [])) if isinstance(current.get("signals"), list) else 0
+    comments = max(
+        comments,
+        decision_comment_count + decision_review_count,
+        current_comment_count + current_review_count,
+        current_signal_count,
+    )
     if isinstance(selected_review_comments, list):
         comments = max(comments, len(selected_review_comments))
     if isinstance(selected_reviews, list):
         comments = max(comments, len(selected_reviews))
     review_requests = review.get("review_requests")
     requested = len(review_requests) if isinstance(review_requests, list) else 0
+    selected_thread_ids = decision.get("selected_review_thread_ids")
+    if not isinstance(selected_thread_ids, list):
+        selected_thread_ids = current.get("selected_thread_ids")
+    selected_unresolved_ids = decision.get("selected_unresolved_thread_ids")
+    if not isinstance(selected_unresolved_ids, list):
+        selected_unresolved_ids = current.get("selected_unresolved_thread_ids")
+    selected_unresolved_count = int_count(decision, "selected_unresolved_count")
+    if selected_unresolved_count == 0 and isinstance(selected_unresolved_ids, list):
+        selected_unresolved_count = len(selected_unresolved_ids)
+    if not decision and not current:
+        threads = review.get("threads") if isinstance(review.get("threads"), dict) else {}
+        thread_count = int_count(threads, "total")
+        unresolved_count = int_count(threads, "unresolved")
+    else:
+        thread_count = len(selected_thread_ids) if isinstance(selected_thread_ids, list) else 0
+        unresolved_count = selected_unresolved_count
     return {
         "status": review.get("status") or summary.get("review") or "unknown",
         "comments": comments,
-        "threads": int_count(threads, "total"),
-        "unresolved": int_count(threads, "unresolved"),
+        "threads": thread_count,
+        "unresolved": unresolved_count,
         "requested": requested,
         "limits": len(payload.get("limitations")) if isinstance(payload.get("limitations"), list) else 0,
     }
+
+
+def decision_payload(payload: dict) -> dict:
+    decision = payload.get("decision")
+    return decision if isinstance(decision, dict) else {}
+
+
+def decision_fingerprint(payload: dict) -> str | None:
+    value = payload.get("decision_fingerprint")
+    if isinstance(value, str) and value:
+        return value
+    decision = decision_payload(payload)
+    value = decision.get("fingerprint")
+    if isinstance(value, str) and value:
+        return value
+    return None
+
+
+def align_decision_observation_complete(payload: dict, observation_complete: bool) -> None:
+    decision = decision_payload(payload)
+    if not decision:
+        return
+    if decision.get("status") == "passed":
+        return
+    if decision.get("observation_complete") is observation_complete:
+        return
+    decision["observation_complete"] = observation_complete
+    fingerprint_source = dict(decision)
+    fingerprint_source.pop("fingerprint", None)
+    fingerprint = hashlib.sha256(
+        json.dumps(fingerprint_source, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    decision["fingerprint"] = fingerprint
+    payload["decision_fingerprint"] = fingerprint
+
+
+def mark_decision_timeout(payload: dict) -> None:
+    decision = decision_payload(payload)
+    if not decision:
+        return
+    decision["status"] = "timeout"
+    decision["status_reason"] = "wait_timeout"
+    decision["recommended_next_action"] = "wait_or_resume"
+    decision["observation_complete"] = False
+    fingerprint_source = dict(decision)
+    fingerprint_source.pop("fingerprint", None)
+    fingerprint = hashlib.sha256(
+        json.dumps(fingerprint_source, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    decision["fingerprint"] = fingerprint
+    payload["decision_fingerprint"] = fingerprint
 
 
 def codex_review_payload(payload: dict) -> dict:
@@ -416,9 +495,13 @@ def codex_review_lifecycle(payload: dict) -> dict:
 
 
 def semantic_fingerprint(payload: dict) -> str:
+    authoritative_fingerprint = decision_fingerprint(payload)
+    if authoritative_fingerprint:
+        return authoritative_fingerprint
     ci_progress = ci_progress_counts(payload)
     review_progress = review_progress_counts(payload)
     lifecycle = codex_review_lifecycle(payload)
+    decision = decision_payload(payload)
     source = {
         "repo": payload.get("repo"),
         "pr": payload.get("pr"),
@@ -440,18 +523,25 @@ def semantic_fingerprint(payload: dict) -> str:
             "status": payload.get("review", {}).get("status")
             if isinstance(payload.get("review"), dict)
             else None,
-            "signals": review_semantic_signal_items(payload),
-            "review_requests": payload.get("review", {}).get("review_requests")
-            if isinstance(payload.get("review"), dict)
-            else None,
-            "threads": payload.get("review", {}).get("threads")
-            if isinstance(payload.get("review"), dict)
-            else None,
+            **(
+                {}
+                if decision
+                else {
+                    "signals": review_semantic_signal_items(payload),
+                    "review_requests": payload.get("review", {}).get("review_requests")
+                    if isinstance(payload.get("review"), dict)
+                    else None,
+                    "threads": payload.get("review", {}).get("threads")
+                    if isinstance(payload.get("review"), dict)
+                    else None,
+                }
+            ),
             "body_mode": payload.get("review", {}).get("body_mode")
             if isinstance(payload.get("review"), dict)
             else None,
             "progress": review_progress,
         },
+        "decision": decision,
         "codex_review": {
             "lifecycle": {
                 "status": lifecycle.get("status"),
@@ -802,11 +892,17 @@ def clear_managed_out_artifacts(out_dir: Path) -> None:
 def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str, str, str, bool, bool]:
     ci = payload.get("ci") if isinstance(payload.get("ci"), dict) else {}
     review = payload.get("review") if isinstance(payload.get("review"), dict) else {}
-    ci_status = ci.get("status") or payload.get("summary", {}).get("ci") or "unknown"
-    review_status = review.get("status") or payload.get("summary", {}).get("review") or "unknown"
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    ci_status = ci.get("status") or summary.get("ci") or "unknown"
+    summary_review_status = summary.get("review")
+    review_status = review.get("status") or summary_review_status or "unknown"
+    decision = decision_payload(payload)
+    decision_status = decision.get("status")
+    decision_reason = decision.get("status_reason")
+    decision_next_action = decision.get("recommended_next_action")
     lifecycle = codex_review_lifecycle(payload)
     lifecycle_status = lifecycle.get("status")
-    completion_signal = lifecycle.get("completion_signal")
+    completion_signal = decision.get("completion_signal") or lifecycle.get("completion_signal")
     top_level_status = payload.get("normalized_status")
     top_level_next_action = payload.get("recommended_next_action")
 
@@ -839,8 +935,24 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
         return "unknown", "unknown", "human_gate", False, True
     if ci_status != "passed":
         return "unknown", "unknown", "human_gate", False, True
+    if decision:
+        if decision_reason in {"current_selected_unresolved_thread", "current_selected_changes_requested"}:
+            return "human_gate", "human_gate", "address_review_feedback", False, True
+        if completion_signal == "fallback_issue_comment" or decision_reason == "fallback_issue_comment_low_confidence":
+            return "human_gate", "human_gate", "wait_or_resume", False, True
+        if decision_reason == "missing_current_completion_signal":
+            return "pending", "pending", "wait_or_resume", False, False
+        if decision_status == "passed" and decision_next_action == "merge_prepared":
+            return "passed", "passed", "merge_prepared", True, False
+        if decision_status == "human_gate":
+            return "human_gate", "human_gate", decision_next_action or "human_gate", False, True
+        if decision_status in {"pending", "none"}:
+            return "pending", "pending", decision_next_action or "wait_or_resume", False, False
+        return "unknown", "unknown", decision_next_action or "human_gate", False, True
     if completion_signal == "fallback_issue_comment":
         return "human_gate", "human_gate", "wait_or_resume", False, True
+    if summary_review_status in {"requested", "commented", "changes_requested", "unresolved"}:
+        return "human_gate", "human_gate", "address_review_feedback", True, False
     if review_status in {"requested", "commented", "changes_requested", "unresolved"}:
         return "human_gate", "human_gate", "address_review_feedback", True, False
     if review_status in {"none", "pending"} and lifecycle_status in {"pending", "unknown"}:
@@ -1022,6 +1134,8 @@ def mark_latest_timeout(
     payload.setdefault("wait", {})["deadline_reached"] = True
     payload["wait"]["quiet_seconds_observed"] = quiet_elapsed
     payload["wait"]["same_fingerprint_observed"] = same_count
+    mark_decision_timeout(payload)
+    payload["fingerprint"] = semantic_fingerprint(payload)
     attach_resume_metadata(payload)
 
 
@@ -1205,6 +1319,7 @@ while True:
         normalized_status = "timeout"
         overall_status = "timeout"
         next_action = "wait_or_resume"
+        mark_decision_timeout(payload)
     elif terminal_now:
         final_phase = "terminal"
     elif time.monotonic() >= deadline:
@@ -1213,6 +1328,7 @@ while True:
         normalized_status = "timeout"
         overall_status = "timeout"
         next_action = "wait_or_resume"
+        mark_decision_timeout(payload)
     else:
         final_phase = "wait"
 
@@ -1222,6 +1338,10 @@ while True:
     payload["normalized_status"] = normalized_status
     payload["observation_complete"] = observation_complete
     payload["recommended_next_action"] = next_action
+    if payload.get("normalized_status") == "timeout":
+        mark_decision_timeout(payload)
+    align_decision_observation_complete(payload, observation_complete)
+    fingerprint = semantic_fingerprint(payload)
     payload["fingerprint"] = fingerprint
     payload["observed_at"] = utc_now()
     payload["wait"] = {

@@ -120,6 +120,18 @@ Triage and judgment over collected evidence belong to
   separate authority.
 - Selected Codex PR review bodies and selected review comment bodies are present
   in the final `stdout` JSON. They are not available only through `--out`.
+- Final readiness is scoped to the current `@codex review` trigger or resume
+  boundary. The top-level `decision` object and `decision_fingerprint` are the
+  authoritative final-status inputs for that boundary.
+- `review.current` is explanatory current-boundary context for the same
+  decision. It helps explain selected reviews, comments, and threads, but
+  callers should treat `decision` as the final decision-facing contract.
+- `review.audit`, legacy `review.signals`, legacy `review.threads`, and legacy
+  `review.codex_authored` are all-fetched audit/debug context. They can include
+  historical artifacts and are not decision-authoritative.
+- `audit_fingerprint` is a debug fingerprint for all-fetched audit context. It
+  may change because historical or otherwise non-current artifacts changed, and
+  must not drive final readiness or wait stability.
 
 ## Observation Semantics
 
@@ -127,6 +139,9 @@ Snapshot, wait CI, review, thread, body-window, quiet-window, timeout, and final
 status collection are implemented by the public scripts.
 
 - The final JSON written to `stdout` is authoritative.
+- Within that JSON, `decision` and `decision_fingerprint` are authoritative for
+  the final status, recommended next action, observation completion, progress,
+  and wait stability for the current trigger or resume boundary.
 - `stderr` progress is bounded and non-authoritative.
 - `--out` artifacts are optional debug/audit copies.
 - Observation statuses include `passed`, `failed`, `pending`, `running`,
@@ -136,6 +151,16 @@ status collection are implemented by the public scripts.
 - Codex review completion is primarily detected from Codex-authored submitted PR
   review objects. Issue comments, reactions, or quiet windows are fallback or
   supporting evidence only.
+- `fallback_issue_comment` remains low-confidence evidence. It keeps the final
+  status in the `human_gate` / `wait_or_resume` path and does not promote a run
+  to `passed`, complete, or merge-ready.
+- `fallback_pass_candidate` is a non-promoting signal that a current-boundary
+  fallback issue comment appears positive. It is useful context, but it does not
+  override the `fallback_issue_comment` gate.
+- Historical unresolved threads in `review.audit` or the legacy all-fetched
+  review fields are audit/debug context only. Only current-boundary selected
+  blockers represented through `decision` can drive final review-feedback
+  readiness decisions.
 - Review bodies selected for the current trigger boundary are included in the
   final `stdout` JSON regardless of `--body-mode`.
 - When a timeout or limit occurs before CI and review complete, the final JSON
