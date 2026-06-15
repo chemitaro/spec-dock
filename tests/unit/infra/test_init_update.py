@@ -15255,7 +15255,7 @@ esac
             payload = json.loads(result.stdout)
             assert payload["ci"]["status"] == "unknown"
             assert payload["ci"]["status"] != "passed"
-            assert payload["ci"]["actions"]["jobs"]["collection"]["failed_runs"] == 1
+            assert payload["ci"]["actions"]["jobs_summary"]["collection"]["failed_runs"] == 1
             assert payload["limitations"][0]["source"] == "repos/owner/repo/actions/runs/202/jobs"
 
     def test_issue_187_status_rollup_failure_blocks_actions_green(self) -> None:
@@ -15667,8 +15667,19 @@ esac
             assert payload["ci"]["actions"]["available"] is True
             assert payload["ci"]["actions"]["workflow_runs"]["total"] == 1
             assert payload["ci"]["actions"]["workflow_runs"]["counts"]["success"] == 1
-            assert payload["ci"]["actions"]["jobs"]["total"] == 1
-            assert payload["ci"]["actions"]["jobs"]["counts"]["success"] == 1
+            assert payload["ci"]["actions"]["jobs_summary"]["total"] == 1
+            assert payload["ci"]["actions"]["jobs_summary"]["counts"]["success"] == 1
+            assert payload["ci"]["actions"]["jobs"] == [
+                {
+                    "id": 303,
+                    "run_id": 202,
+                    "name": "test",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "html_url": "https://example.test/job/303",
+                }
+            ]
+            assert payload["ci"]["actions"]["jobs_detail"] == payload["ci"]["actions"]["jobs"]
             limitations = payload["limitations"]
             coverage = next(
                 item
@@ -15685,6 +15696,205 @@ esac
             assert payload.get("decision", {}).get("recommended_next_action") != (
                 "fix_github_token_permissions"
             )
+
+    def test_issue_187_actions_job_details_are_documented_and_fingerprinted(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env python3
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+
+def emit(payload):
+    print(json.dumps(payload, separators=(",", ":")))
+
+if args[:2] == ["api", "repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]:
+    emit({"total_count": 1, "workflow_runs": [{
+        "id": 202,
+        "name": "CI",
+        "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://example.test/run/202",
+    }]})
+elif args[:2] == ["api", "repos/owner/repo/actions/runs/202/jobs"]:
+    emit({"total_count": 1, "jobs": [{
+        "id": int(os.environ["GH_FAKE_JOB_ID"]),
+        "run_id": 202,
+        "name": os.environ["GH_FAKE_JOB_NAME"],
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": f"https://example.test/job/{os.environ['GH_FAKE_JOB_ID']}",
+        "steps": [],
+    }]})
+elif args[:2] == ["api", "repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs"]:
+    emit({"total_count": 0, "check_runs": []})
+elif args[:2] == ["api", "repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status"]:
+    emit({"state": "success", "statuses": []})
+elif args == ["pr", "view", "13", "--repo", "owner/repo", "--json", "mergeStateStatus,statusCheckRollup"]:
+    emit({"mergeStateStatus": "CLEAN", "statusCheckRollup": []})
+else:
+    print(f"unexpected gh call: {' '.join(args)}", file=sys.stderr)
+    sys.exit(44)
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_JOB_ID": "303",
+                "GH_FAKE_JOB_NAME": "test",
+            }
+
+            first = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            changed = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env={**env, "GH_FAKE_JOB_ID": "404", "GH_FAKE_JOB_NAME": "lint"},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert first.returncode == 0, first.stdout + first.stderr
+            assert changed.returncode == 0, changed.stdout + changed.stderr
+            first_payload = json.loads(first.stdout)
+            changed_payload = json.loads(changed.stdout)
+            assert first_payload["ci"]["status"] == "passed"
+            assert first_payload["ci"]["actions"]["jobs"] == [
+                {
+                    "id": 303,
+                    "run_id": 202,
+                    "name": "test",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "html_url": "https://example.test/job/303",
+                }
+            ]
+            assert first_payload["ci"]["actions"]["jobs_detail"] == first_payload["ci"]["actions"]["jobs"]
+            assert first_payload["ci"]["actions"]["jobs_summary"]["counts"]["success"] == 1
+            assert changed_payload["ci"]["actions"]["jobs"][0]["id"] == 404
+            assert changed_payload["fingerprint"] != first_payload["fingerprint"]
+
+    def test_issue_187_actions_failed_step_details_are_fingerprinted(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env python3
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+
+def emit(payload):
+    print(json.dumps(payload, separators=(",", ":")))
+
+if args[:2] == ["api", "repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]:
+    emit({"total_count": 1, "workflow_runs": [{
+        "id": 202,
+        "run_attempt": 2,
+        "name": "CI",
+        "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "completed",
+        "conclusion": "failure",
+        "html_url": "https://example.test/run/202",
+    }]})
+elif args[:2] == ["api", "repos/owner/repo/actions/runs/202/jobs"]:
+    emit({"total_count": 1, "jobs": [{
+        "id": 303,
+        "run_id": 202,
+        "run_attempt": 2,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "failure",
+        "html_url": "https://example.test/job/303",
+        "steps": [
+            {"number": 1, "name": "Install", "status": "completed", "conclusion": "success"},
+            {
+                "number": 2,
+                "name": os.environ["GH_FAKE_FAILED_STEP_NAME"],
+                "status": "completed",
+                "conclusion": "failure",
+            },
+        ],
+    }]})
+elif args[:2] == ["api", "repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs"]:
+    emit({"total_count": 0, "check_runs": []})
+elif args[:2] == ["api", "repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status"]:
+    emit({"state": "success", "statuses": []})
+elif args == ["pr", "view", "13", "--repo", "owner/repo", "--json", "mergeStateStatus,statusCheckRollup"]:
+    emit({"mergeStateStatus": "CLEAN", "statusCheckRollup": []})
+else:
+    print(f"unexpected gh call: {' '.join(args)}", file=sys.stderr)
+    sys.exit(44)
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_FAILED_STEP_NAME": "Run tests",
+            }
+
+            first = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            changed = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env={**env, "GH_FAKE_FAILED_STEP_NAME": "Run lint"},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert first.returncode == 0, first.stdout + first.stderr
+            assert changed.returncode == 0, changed.stdout + changed.stderr
+            first_payload = json.loads(first.stdout)
+            changed_payload = json.loads(changed.stdout)
+            assert first_payload["ci"]["status"] == "failed"
+            assert first_payload["ci"]["failures"][0]["failed_steps"] == [
+                {
+                    "number": 2,
+                    "name": "Run tests",
+                    "status": "completed",
+                    "conclusion": "failure",
+                }
+            ]
+            assert changed_payload["ci"]["failures"][0]["failed_steps"][0]["name"] == "Run lint"
+            assert changed_payload["fingerprint"] != first_payload["fingerprint"]
 
     def test_issue_187_actions_only_green_redacts_supplemental_permission_stderr(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -15826,7 +16036,7 @@ esac
             assert payload["ci"]["actions"]["available"] is True
             assert payload["ci"]["actions"]["workflow_runs"]["total"] == 1
             assert payload["ci"]["actions"]["workflow_runs"]["counts"]["success"] == 1
-            assert payload["ci"]["actions"]["jobs"]["total"] == 0
+            assert payload["ci"]["actions"]["jobs_summary"]["total"] == 0
             assert any(
                 item.get("capability") == "actions_read"
                 and item.get("severity") == "blocking"
@@ -15902,7 +16112,7 @@ esac
             payload = json.loads(result.stdout)
             assert payload["ci"]["status"] == "failed"
             assert payload["ci"]["actions"]["workflow_runs"]["counts"]["failed"] == 1
-            assert payload["ci"]["actions"]["jobs"]["counts"]["failed"] == 1
+            assert payload["ci"]["actions"]["jobs_summary"]["counts"]["failed"] == 1
             assert payload["ci"]["failures"] == [
                 {
                     "kind": "github_actions_job",
@@ -15996,7 +16206,7 @@ esac
             payload = json.loads(result.stdout)
             assert payload["ci"]["status"] == "failed"
             assert payload["ci"]["actions"]["workflow_runs"]["counts"]["failed"] == 1
-            assert payload["ci"]["actions"]["jobs"]["counts"]["failed"] == 1
+            assert payload["ci"]["actions"]["jobs_summary"]["counts"]["failed"] == 1
             assert payload["ci"]["failures"] == [
                 {
                     "kind": "github_actions_job",
@@ -16590,7 +16800,7 @@ esac
             checks_script.write_text(
                 """#!/usr/bin/env bash
 cat <<'JSON'
-{"ci":{"status":"passed","progress_status":"passed","checks":[],"failures":[],"actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0}},"jobs":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0}}}},"limitations":[{"code":"github_token_permission_denied","capability":"check_runs_read","api":"repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs","source":"gh_api","status":"permission_denied","severity":"informational","blocking":false,"recommended_next_action":"fix_github_token_permissions","secret_redacted":true,"stderr_sha256":"redacted"},{"code":"ci_coverage_limited_to_github_actions","source":"actions_collector","severity":"informational","blocking":false}],"decision":{"status":"passed","recommended_next_action":"merge_prepared","observation_complete":true}}
+{"ci":{"status":"passed","progress_status":"passed","checks":[],"failures":[],"actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0}},"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303"}],"jobs_summary":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0},"collection":{"successful_runs":1,"failed_runs":0}},"jobs_detail":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303"}]}},"limitations":[{"code":"github_token_permission_denied","capability":"check_runs_read","api":"repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs","source":"gh_api","status":"permission_denied","severity":"informational","blocking":false,"recommended_next_action":"fix_github_token_permissions","secret_redacted":true,"stderr_sha256":"redacted"},{"code":"ci_coverage_limited_to_github_actions","source":"actions_collector","severity":"informational","blocking":false}],"decision":{"status":"passed","recommended_next_action":"merge_prepared","observation_complete":true}}
 JSON
 """,
                 encoding="utf-8",
@@ -16670,7 +16880,7 @@ esac
             snapshot_script.write_text(
                 """#!/usr/bin/env bash
 cat <<'JSON'
-{"script":"fetch_pr_observation_snapshot.sh","status":"running","overall_status":"running","normalized_status":"running","observation_complete":false,"repo":"owner/repo","pr":13,"expected_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","current_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","head_matches_expected":true,"fingerprint":"issue-187-running","summary":{"ci":"running","review":"pending","head":"matched"},"limitations":[{"code":"github_token_permission_denied","capability":"status_check_rollup_read","source":"gh_pr_view","status":"permission_denied","severity":"informational","blocking":false,"recommended_next_action":"fix_github_token_permissions","secret_redacted":true,"stderr_sha256":"redacted"}],"recommended_next_action":"wait","ci":{"status":"running","progress_status":"running","actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0}},"jobs":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0}}}},"review":{"status":"pending","signals":[]},"decision":{"status":"running","status_reason":"ci_pending","recommended_next_action":"wait","observation_complete":false}}
+{"script":"fetch_pr_observation_snapshot.sh","status":"running","overall_status":"running","normalized_status":"running","observation_complete":false,"repo":"owner/repo","pr":13,"expected_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","current_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","head_matches_expected":true,"fingerprint":"issue-187-running","summary":{"ci":"running","review":"pending","head":"matched"},"limitations":[{"code":"github_token_permission_denied","capability":"status_check_rollup_read","source":"gh_pr_view","status":"permission_denied","severity":"informational","blocking":false,"recommended_next_action":"fix_github_token_permissions","secret_redacted":true,"stderr_sha256":"redacted"}],"recommended_next_action":"wait","ci":{"status":"running","progress_status":"running","actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0}},"jobs":[{"id":303,"run_id":202,"name":"test","status":"in_progress","conclusion":null,"html_url":"https://example.test/job/303"}],"jobs_summary":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0},"collection":{"successful_runs":1,"failed_runs":0}},"jobs_detail":[{"id":303,"run_id":202,"name":"test","status":"in_progress","conclusion":null,"html_url":"https://example.test/job/303"}]}},"review":{"status":"pending","signals":[]},"decision":{"status":"running","status_reason":"ci_pending","recommended_next_action":"wait","observation_complete":false}}
 JSON
 """,
                 encoding="utf-8",
