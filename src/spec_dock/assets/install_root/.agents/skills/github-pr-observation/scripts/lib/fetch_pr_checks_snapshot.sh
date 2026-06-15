@@ -205,9 +205,14 @@ def github_failure_limitation(*, api, source, exit_code, stderr, default_code, d
         }
     return {
         "code": default_code,
+        "capability": capability_for_api(api),
+        "api": api,
         "source": source,
+        "status": classification,
+        "token_source": token_source(),
         "severity": default_severity,
         "message": default_message,
+        "secret_redacted": True,
         "exit_code": exit_code,
         "stderr_sha256": stderr_sha256,
     }
@@ -237,12 +242,15 @@ def gh_api(path):
     try:
         return parse_gh_paginated_stdout(completed.stdout), None
     except json.JSONDecodeError:
-        return None, {
-            "code": "github_api_schema_unavailable",
-            "source": path,
-            "severity": "blocking",
-            "message": "fixed read-only GitHub API returned non-JSON output",
-        }
+        return None, github_failure_limitation(
+            api=path,
+            source=path,
+            exit_code=completed.returncode,
+            stderr=completed.stderr,
+            default_code="github_api_schema_unavailable",
+            default_message="fixed read-only GitHub API returned non-JSON output",
+            default_severity="blocking",
+        )
 
 
 def gh_pr_view():
@@ -403,13 +411,72 @@ def job_matches_check(job, check_id):
     return terminal_segment == str(check_id)
 
 
+FAILED_ACTION_CONCLUSIONS = {
+    "failure",
+    "error",
+    "cancelled",
+    "timed_out",
+    "action_required",
+    "startup_failure",
+    "stale",
+}
+
+
+def failed_action_steps(job):
+    steps = job.get("steps") if isinstance(job.get("steps"), list) else []
+    return [
+        {
+            "number": step.get("number"),
+            "name": step.get("name"),
+            "status": step.get("status"),
+            "conclusion": step.get("conclusion"),
+        }
+        for step in steps
+        if str(step.get("conclusion") or "").lower() in FAILED_ACTION_CONCLUSIONS
+    ]
+
+
+def actions_failure_entry(run, job=None):
+    run_id = run.get("id")
+    run_attempt = (
+        (job or {}).get("run_attempt")
+        or run.get("run_attempt")
+        or run.get("run_number")
+    )
+    job_id = (job or {}).get("id")
+    dedupe_key = (
+        f"actions:{run_id}:{job_id}:{run_attempt}"
+        if job_id is not None
+        else f"actions:{run_id}:run"
+    )
+    return {
+        "kind": "github_actions_job",
+        "source": "actions",
+        "workflow_run_id": run_id,
+        "workflow_name": run.get("name"),
+        "workflow_status": run.get("status"),
+        "workflow_conclusion": run.get("conclusion"),
+        "workflow_run_attempt": run_attempt,
+        "job_id": job_id,
+        "job_name": (job or {}).get("name"),
+        "job_status": (job or {}).get("status"),
+        "job_conclusion": (job or {}).get("conclusion"),
+        "html_url": (job or {}).get("html_url") or run.get("html_url"),
+        "failed_steps": failed_action_steps(job or {}),
+        "dedupe_key": dedupe_key,
+    }
+
+
 limitations = []
 supplemental_limitations = []
+actions_failures = []
+actions_failure_dedupe_keys = set()
 actions_runs_payload, actions_limitation = gh_api(
     f"repos/{repo}/actions/runs?head_sha={expected_head_sha}"
 )
 actions_available = actions_limitation is None
 if actions_limitation:
+    limitations.append(actions_limitation)
     actions_runs_payload = {}
 workflow_runs = as_list(actions_runs_payload or {}, "workflow_runs")
 action_run_counts = {
@@ -467,13 +534,24 @@ for run in workflow_runs:
                 "message": "GitHub Actions workflow run did not include an id, so jobs could not be collected",
             }
         )
+        if run_classification == "failed":
+            failure = actions_failure_entry(run)
+            if failure["dedupe_key"] not in actions_failure_dedupe_keys:
+                actions_failure_dedupe_keys.add(failure["dedupe_key"])
+                actions_failures.append(failure)
         continue
     jobs_payload, job_limitation = gh_api(f"repos/{repo}/actions/runs/{run_id}/jobs")
     if job_limitation:
         action_job_collection_failures += 1
         limitations.append(job_limitation)
+        if run_classification == "failed":
+            failure = actions_failure_entry(run)
+            if failure["dedupe_key"] not in actions_failure_dedupe_keys:
+                actions_failure_dedupe_keys.add(failure["dedupe_key"])
+                actions_failures.append(failure)
         continue
     action_job_collection_successes += 1
+    run_failed_jobs = []
     for job in as_list(jobs_payload or {}, "jobs"):
         job_classification = normalize_actions_status(job)
         if job_classification in action_job_counts:
@@ -490,6 +568,29 @@ for run in workflow_runs:
                 "html_url": job.get("html_url"),
             }
         )
+        if job_classification == "failed":
+            run_failed_jobs.append(job)
+            failure = actions_failure_entry(run, job)
+            if failure["dedupe_key"] not in actions_failure_dedupe_keys:
+                actions_failure_dedupe_keys.add(failure["dedupe_key"])
+                actions_failures.append(failure)
+    if run_classification == "failed" and not run_failed_jobs:
+        failure = actions_failure_entry(run)
+        if failure["dedupe_key"] not in actions_failure_dedupe_keys:
+            actions_failure_dedupe_keys.add(failure["dedupe_key"])
+            actions_failures.append(failure)
+
+if actions_available and not workflow_runs:
+    limitations.append(
+        {
+            "code": "zero_actions_runs_non_success",
+            "source": "actions_collector",
+            "capability": "actions_read",
+            "severity": "informational",
+            "blocking": False,
+            "message": "no GitHub Actions workflow runs were observed for the expected PR head SHA",
+        }
+    )
 
 actions_summary = {
     "available": actions_available,
@@ -665,6 +766,7 @@ required_check_rollup_pending = any(
 )
 
 failures = []
+failures.extend(actions_failures)
 for status in statuses:
     if normalize_status_state(status) == "failed":
         failures.append(
@@ -711,34 +813,18 @@ for check in failed_checks:
         continue
 
     for job in matching_failed_jobs:
-        steps = job.get("steps") if isinstance(job.get("steps"), list) else []
-        failed_steps = [
-            {
-                "number": step.get("number"),
-                "name": step.get("name"),
-                "status": step.get("status"),
-                "conclusion": step.get("conclusion"),
-            }
-            for step in steps
-            if str(step.get("conclusion") or "").lower()
-            in {"failure", "error", "cancelled", "timed_out", "action_required", "startup_failure", "stale"}
-        ]
-        failures.append(
-            {
-                "kind": "github_actions_job",
-                "workflow_name": check.get("workflow_name"),
-                "workflow_run_id": workflow_run_id,
-                "workflow_run_attempt": run_attempt or job.get("run_attempt"),
-                "job_name": job.get("name"),
-                "job_id": job.get("id"),
-                "check_run_id": check.get("id"),
-                "status": job.get("status"),
-                "conclusion": job.get("conclusion"),
-                "failed_steps": failed_steps,
-                "html_url": job.get("html_url"),
-                "details_url": check.get("details_url"),
-            }
-        )
+        run = {
+            "id": workflow_run_id,
+            "run_attempt": run_attempt,
+            "name": check.get("workflow_name"),
+            "status": check.get("status"),
+            "conclusion": check.get("conclusion"),
+            "html_url": check.get("details_url"),
+        }
+        failure = actions_failure_entry(run, job)
+        if failure["dedupe_key"] not in actions_failure_dedupe_keys:
+            actions_failure_dedupe_keys.add(failure["dedupe_key"])
+            failures.append(failure)
 
 required_checks_missing_or_pending = (
     merge_state_status == "BLOCKED"
@@ -798,7 +884,51 @@ elif merge_state_blocking:
         }
     )
 
-if actions_decisive_green and not (
+actions_primary_unavailable = any(
+    item.get("capability") == "actions_read" and item.get("severity") == "blocking"
+    for item in limitations
+) and not actions_available
+actions_zero_runs = actions_available and actions_summary["workflow_runs"]["total"] == 0
+actions_failed = bool(action_run_counts["failed"] or action_job_counts["failed"])
+actions_running = bool(action_run_counts["running"] or action_job_counts["running"])
+actions_pending = bool(action_run_counts["pending"] or action_job_counts["pending"])
+actions_unknown = bool(action_run_counts["unknown"] or action_job_counts["unknown"])
+
+if actions_primary_unavailable:
+    ci_status = "unknown"
+elif actions_failed or (
+    check_counts["failed"]
+    or status_counts["failure"]
+    or status_counts["error"]
+    or aggregate_status_failed_backstop
+    or check_counts["stale"]
+):
+    ci_status = "failed"
+elif actions_running or check_counts["running"]:
+    ci_status = "running"
+elif (
+    actions_pending
+    or check_counts["pending"]
+    or status_counts["pending"]
+    or aggregate_status_pending_backstop
+    or required_checks_missing_or_pending
+    or merge_state_unknown
+):
+    ci_status = "pending"
+elif actions_unknown:
+    ci_status = "unknown"
+elif actions_zero_runs:
+    ci_status = "none"
+    if check_counts["total"] == 0 and status_counts["total"] == 0:
+        limitations.append(
+            {
+                "code": "zero_checks_s03_non_success",
+                "source": "ci_collector",
+                "severity": "blocking",
+                "message": "no check runs or commit statuses were observed; S03 keeps this non-success until S05 grace/deadline handling",
+            }
+        )
+elif actions_decisive_green and not (
     check_counts["failed"]
     or status_counts["failure"]
     or status_counts["error"]
@@ -821,26 +951,8 @@ elif any(
     for item in limitations
 ):
     ci_status = "unknown"
-elif (
-    check_counts["failed"]
-    or status_counts["failure"]
-    or status_counts["error"]
-    or aggregate_status_failed_backstop
-    or check_counts["stale"]
-):
-    ci_status = "failed"
 elif limitations and any(item.get("severity") == "blocking" and item.get("code", "").startswith("github_api") for item in limitations):
     ci_status = "unknown"
-elif check_counts["running"]:
-    ci_status = "running"
-elif (
-    check_counts["pending"]
-    or status_counts["pending"]
-    or aggregate_status_pending_backstop
-    or required_checks_missing_or_pending
-    or merge_state_unknown
-):
-    ci_status = "pending"
 elif merge_state_blocking or (
     not required_check_state["available"] and (check_counts["total"] or status_counts["total"])
 ):

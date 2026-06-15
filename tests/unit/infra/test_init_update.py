@@ -11948,6 +11948,61 @@ elif args[:2] == ["pr", "view"] and "--json" in args and "mergeStateStatus,statu
         "mergeStateStatus": current.get("merge_state_status", "CLEAN"),
         "statusCheckRollup": current.get("status_check_rollup", []),
     })
+elif args[:2] == ["api", f"repos/owner/repo/actions/runs?head_sha={head}"]:
+    if ci == "passed":
+        emit({"total_count": 1, "workflow_runs": [{
+            "id": 202,
+            "name": "CI",
+            "head_sha": head,
+            "status": "completed",
+            "conclusion": "success",
+        }]})
+    elif ci == "failed":
+        emit({"total_count": 1, "workflow_runs": [{
+            "id": 202,
+            "name": "CI",
+            "head_sha": head,
+            "status": "completed",
+            "conclusion": "failure",
+        }]})
+    elif ci == "none":
+        emit({"total_count": 0, "workflow_runs": []})
+    else:
+        emit({"total_count": 1, "workflow_runs": [{
+            "id": 202,
+            "name": "CI",
+            "head_sha": head,
+            "status": "queued",
+            "conclusion": None,
+        }]})
+elif args[:2] == ["api", "repos/owner/repo/actions/runs/202/jobs"]:
+    if ci == "passed":
+        emit({"total_count": 1, "jobs": [{
+            "id": 303,
+            "run_id": 202,
+            "name": "test",
+            "status": "completed",
+            "conclusion": "success",
+            "steps": [],
+        }]})
+    elif ci == "failed":
+        emit({"total_count": 1, "jobs": [{
+            "id": 303,
+            "run_id": 202,
+            "name": "test",
+            "status": "completed",
+            "conclusion": "failure",
+            "steps": [{"number": 1, "name": "Run tests", "status": "completed", "conclusion": "failure"}],
+        }]})
+    else:
+        emit({"total_count": 1, "jobs": [{
+            "id": 303,
+            "run_id": 202,
+            "name": "test",
+            "status": "queued",
+            "conclusion": None,
+            "steps": [],
+        }]})
 elif args[:2] == ["api", f"repos/owner/repo/commits/{head}/check-runs"]:
             if ci == "passed":
                 emit({"total_count": 1, "check_runs": [{
@@ -15481,6 +15536,630 @@ esac
                 item.get("code") for item in payload["limitations"]
             ]
 
+    def test_issue_187_actions_failed_job_surfaces_step_detail(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"run_attempt":2,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"failure","html_url":"https://example.test/run/202"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"run_attempt":2,"name":"test","status":"completed","conclusion":"failure","html_url":"https://example.test/job/303","steps":[{"number":1,"name":"Install","status":"completed","conclusion":"success"},{"number":2,"name":"Run tests","status":"completed","conclusion":"failure"}]}]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{"total_count":0,"check_runs":[]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{"state":"success","statuses":[]}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "failed"
+            assert payload["ci"]["actions"]["workflow_runs"]["counts"]["failed"] == 1
+            assert payload["ci"]["actions"]["jobs"]["counts"]["failed"] == 1
+            assert payload["ci"]["failures"] == [
+                {
+                    "kind": "github_actions_job",
+                    "source": "actions",
+                    "workflow_run_id": 202,
+                    "workflow_name": "CI",
+                    "workflow_status": "completed",
+                    "workflow_conclusion": "failure",
+                    "workflow_run_attempt": 2,
+                    "job_id": 303,
+                    "job_name": "test",
+                    "job_status": "completed",
+                    "job_conclusion": "failure",
+                    "html_url": "https://example.test/job/303",
+                    "failed_steps": [
+                        {
+                            "number": 2,
+                            "name": "Run tests",
+                            "status": "completed",
+                            "conclusion": "failure",
+                        }
+                    ],
+                    "dedupe_key": "actions:202:303:2",
+                }
+            ]
+
+    def test_issue_187_check_run_derived_actions_job_dedupes_to_actions_shape(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"run_attempt":2,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"failure","html_url":"https://example.test/run/202"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"run_attempt":2,"name":"test","status":"completed","conclusion":"failure","check_run_url":"https://api.github.com/repos/owner/repo/check-runs/404","html_url":"https://example.test/job/303","steps":[{"number":2,"name":"Run tests","status":"completed","conclusion":"failure"}]}]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{"total_count":1,"check_runs":[{"id":404,"name":"test","workflow_name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"failure","details_url":"https://example.test/check/404","workflow_run":{"id":202,"run_attempt":2}}]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{"state":"success","statuses":[]}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "failed"
+            assert payload["ci"]["failures"] == [
+                {
+                    "kind": "github_actions_job",
+                    "source": "actions",
+                    "workflow_run_id": 202,
+                    "workflow_name": "CI",
+                    "workflow_status": "completed",
+                    "workflow_conclusion": "failure",
+                    "workflow_run_attempt": 2,
+                    "job_id": 303,
+                    "job_name": "test",
+                    "job_status": "completed",
+                    "job_conclusion": "failure",
+                    "html_url": "https://example.test/job/303",
+                    "failed_steps": [
+                        {
+                            "number": 2,
+                            "name": "Run tests",
+                            "status": "completed",
+                            "conclusion": "failure",
+                        }
+                    ],
+                    "dedupe_key": "actions:202:303:2",
+                }
+            ]
+
+    def test_issue_187_actions_stale_conclusion_is_ci_failure_not_stale_head(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"run_attempt":1,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"stale","html_url":"https://example.test/run/202"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"run_attempt":1,"name":"test","status":"completed","conclusion":"stale","html_url":"https://example.test/job/303","steps":[{"number":1,"name":"Run tests","status":"completed","conclusion":"stale"}]}]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{"total_count":0,"check_runs":[]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{"state":"success","statuses":[]}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "failed"
+            assert payload["ci"]["failures"][0]["workflow_conclusion"] == "stale"
+            assert "stale_head_check" not in [
+                item.get("code") for item in payload["limitations"]
+            ]
+
+    def test_issue_187_actions_running_and_pending_states_are_not_passed(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        cases = (
+            ("running", "in_progress", "", "in_progress", "", "running"),
+            ("queued", "queued", "", "queued", "", "pending"),
+            ("requested", "requested", "", "requested", "", "pending"),
+            ("waiting", "waiting", "", "waiting", "", "pending"),
+            ("pending", "pending", "", "pending", "", "pending"),
+        )
+        for name, run_status, run_conclusion, job_status, job_conclusion, expected in cases:
+            with _case(name=name):
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    tmp_path = Path(tmp_dir)
+                    fake_bin = tmp_path / "bin"
+                    fake_bin.mkdir()
+                    fake_gh = fake_bin / "gh"
+                    fake_gh.write_text(
+                        f"""#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{{"total_count":1,"workflow_runs":[{{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"{run_status}","conclusion":"{run_conclusion}","html_url":"https://example.test/run/202"}}]}}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{{"total_count":1,"jobs":[{{"id":303,"run_id":202,"name":"test","status":"{job_status}","conclusion":"{job_conclusion}","html_url":"https://example.test/job/303","steps":[]}}]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{{"total_count":0,"check_runs":[]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{{"state":"success","statuses":[]}}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                        encoding="utf-8",
+                    )
+                    fake_gh.chmod(0o755)
+                    env = {
+                        **os.environ,
+                        "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                    }
+
+                    result = subprocess.run(
+                        [
+                            str(script_path),
+                            "--repo",
+                            "owner/repo",
+                            "--pr",
+                            "13",
+                            "--head-sha",
+                            "a" * 40,
+                        ],
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+
+                    assert result.returncode == 0, result.stdout + result.stderr
+                    payload = json.loads(result.stdout)
+                    assert payload["ci"]["status"] == expected
+                    assert payload["ci"]["status"] != "passed"
+
+    def test_issue_187_actions_primary_api_failure_is_blocking_unknown_and_redacted(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+        token_marker = "ghp_issue_187_actions_secret"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    printf 'permission denied while reading actions {token_marker}\\n' >&2
+    exit 1
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{{"total_count":1,"check_runs":[{{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}}]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{{"state":"success","statuses":[]}}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_TOKEN": token_marker,
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            assert token_marker not in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "unknown"
+            limitation = next(
+                item
+                for item in payload["limitations"]
+                if item.get("capability") == "actions_read"
+            )
+            assert limitation["severity"] == "blocking"
+            assert limitation["secret_redacted"] is True
+            assert "stderr_sha256" in limitation
+
+    def test_issue_187_actions_primary_generic_api_failure_is_actions_read_and_redacted(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+        token_marker = "ghp_issue_187_generic_secret"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    printf 'unexpected collector failure {token_marker}\\n' >&2
+    exit 17
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{{"total_count":1,"check_runs":[{{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}}]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{{"state":"success","statuses":[]}}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_TOKEN": token_marker,
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            assert token_marker not in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "unknown"
+            limitation = next(
+                item
+                for item in payload["limitations"]
+                if item.get("code") == "github_api_collection_failed"
+            )
+            assert limitation["capability"] == "actions_read"
+            assert limitation["severity"] == "blocking"
+            assert limitation["secret_redacted"] is True
+            assert limitation["stderr_sha256"]
+            assert limitation["exit_code"] == 17
+
+    def test_issue_187_actions_primary_non_json_response_is_actions_read_and_redacted(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+        token_marker = "ghp_issue_187_non_json_secret"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    printf 'not json {token_marker}\\n'
+    exit 0
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{{"total_count":1,"check_runs":[{{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}}]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{{"state":"success","statuses":[]}}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_TOKEN": token_marker,
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            assert token_marker not in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "unknown"
+            limitation = next(
+                item
+                for item in payload["limitations"]
+                if item.get("code") == "github_api_schema_unavailable"
+            )
+            assert limitation["capability"] == "actions_read"
+            assert limitation["severity"] == "blocking"
+            assert limitation["secret_redacted"] is True
+            assert limitation["stderr_sha256"]
+            assert limitation["exit_code"] == 0
+
+    def test_issue_187_zero_actions_runs_is_never_passed(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":0,"workflow_runs":[]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{"total_count":1,"check_runs":[{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{"state":"success","statuses":[]}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] in {"none", "unknown"}
+            assert payload["ci"]["status"] != "passed"
+            assert payload["ci"]["actions"]["workflow_runs"]["total"] == 0
+            assert "zero_actions_runs_non_success" in [
+                item.get("code") for item in payload["limitations"]
+            ]
+
     def test_issue_170_pr_observation_snapshot_keeps_required_checks_pending_as_wait(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -18077,6 +18756,11 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                 """#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$GH_FAKE_LOG"
 case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"run_attempt":1,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"failure","html_url":"https://example.test/run/202"}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":101,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"failure","html_url":"https://example.test/check/101","details_url":"https://example.test/details/101","workflow_name":"CI","workflow_run":{"id":202,"run_attempt":1}}]}
