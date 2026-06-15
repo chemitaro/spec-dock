@@ -447,6 +447,103 @@ uv run pytest tests/unit/infra/test_init_update.py
 
 ---
 
+### セッションログ（2026-06-16 S04）
+
+#### 対象
+- Step: S04 — Alignment Check and Small Severe Fixes / Follow-Up Decisions
+- AC/EC: AC-005, EC-005
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S04 — Alignment Check and Small Severe Fixes / Follow-Up Decisions`
+  - closure ids: `tc-005`
+
+#### 実施内容
+- 4 alignment targets を inspection し、`src/spec_dock/assets/spec_dock/templates/issue/plan.md` に small severe fix が必要と判断した。
+- `doc-writer` に S04 alignment fix を委任し、plan template の `原則として` による softening と delegated role `N/A` の通常 success path 誤読リスクを修正した。
+- `spec-reviewer` に S04 alignment change / four target inspection の fresh review を依頼し、`review_status=pass` を得た。
+
+#### 実行コマンド / 結果
+```bash
+git diff --check -- src/spec_dock/assets/spec_dock/templates/issue/plan.md
+
+<no output; pass>
+```
+
+```bash
+git status --short
+
+ M src/spec_dock/assets/spec_dock/templates/issue/plan.md
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | 代替証跡（Red / alternative） | inspect-only | template plan had wording that could weaken the hard gate: `原則として` and delegated role `N/A` | `rg` targeted inspection; worker inventory | pass | small fix chosen within S04 allowed targets |
+| S04 | 緑フェーズ（Green） | targeted inspection | plan template now requires 1 behavior slice / 1 review scope / 1 commit boundary unless plan amendment + fresh re-review, and constrains `N/A` delegation | `git diff -- src/spec_dock/assets/spec_dock/templates/issue/plan.md`; `spec-reviewer` pass | pass | four target inspection found no remaining severe contradiction |
+| S04 | リファクタリング（Refactor） | guardrail satisfied | allowed path 1ファイルのみの targeted wording fix | `git diff --check -- src/spec_dock/assets/spec_dock/templates/issue/plan.md` | pass | no broad rewrite |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | `templates/issue/plan.md` の `原則として` と delegated role `N/A` が hardened gate を弱め得る | orchestrator / `doc-writer` | small severe fix applied in allowed template | tc-005 | no | `src/spec_dock/assets/spec_dock/templates/issue/plan.md` diff |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | tc-005 | severe contradictions are absent, fixed in small scope, or recorded as follow-up/deferred with non-blocking rationale | four target inspection; small template fix; `spec-reviewer` pass (`019ecc26-e8df-7510-aec7-ccf90964836d`) | pass | no broad follow-up required |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-005 | S04 | yes | inspect-only | `rg` targeted inspection found small severe template drift | `git diff --check -- src/spec_dock/assets/spec_dock/templates/issue/plan.md`; S04 `spec-reviewer` pass | pass | docs/template-only; no pytest required by plan |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-005 | S04 | four target inspection + plan template diff + `spec-reviewer` pass (`019ecc26-e8df-7510-aec7-ccf90964836d`) | pass | no remaining severe contradiction |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-005 | tc-s04-001 / tc-s04-002 / tc-s04-003 | tc-005 | planned closure unchanged | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | delegated | shipped template alignment fix | `doc-writer` | S04 allowed alignment targets only | `plan.md` S04; execution skill; `workflow_issue.md` | `src/spec_dock/assets/spec_dock/templates/issue/plan.md` | all other files | targeted inspection; `git diff --check`; spec-reviewer pass | broad rewrite; runtime enforcement; empirical harness; scope expansion | changed files or no-op rationale, severe contradiction inventory, verification, risks, no-material-decision | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 | `doc-writer` | Tightened plan template around 1 step / 1 review / 1 commit and constrained delegated role `N/A`; inspected all four alignment targets. | `src/spec_dock/assets/spec_dock/templates/issue/plan.md` | `git diff --check -- src/spec_dock/assets/spec_dock/templates/issue/plan.md` -> pass; targeted inspection -> pass | `spec-reviewer` pass (`019ecc26-e8df-7510-aec7-ccf90964836d`) | S90 mirror validation remains required | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | N/A: delegated to `doc-writer` | N/A | N/A | N/A | revert S04 commit if needed | targeted inspection and `git diff --check` -> pass | `spec-reviewer` passed | none |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | `spec-reviewer` | fresh | passed | N/A | proceed to S04 commit gate | agent `019ecc26-e8df-7510-aec7-ccf90964836d`; findings none |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | committed | S04 plan template alignment fix + S04 report evidence | S04 step commit; hash recorded after commit as external evidence | `git status --short` checked after commit | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/templates/issue/plan.md` - 1 step / 1 review / 1 commit と `N/A` delegated role の境界を補強。
+- `spec-dock/active/issue/report.md` - S04 observed evidence ledger を記録。
+
+#### コミット
+- S04 step commit will be created after this report evidence is staged.
+
+#### メモ
+- Worker output ended with: `No material implementation decisions beyond the approved plan.`
+- No plan amendment required.
+
+---
+
 ### セッションログ（2026-06-13 HH:MM - HH:MM）
 
 #### 対象
