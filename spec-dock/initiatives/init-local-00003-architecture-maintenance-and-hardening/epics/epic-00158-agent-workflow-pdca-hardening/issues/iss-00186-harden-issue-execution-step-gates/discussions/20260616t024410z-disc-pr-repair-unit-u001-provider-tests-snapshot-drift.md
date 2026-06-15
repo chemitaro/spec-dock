@@ -93,12 +93,19 @@ Bring the branch up to date with `origin/main` and update only the dogfooding sn
 
 ## Commit Evidence
 
-- pending until orchestrator commit.
+- Commit: `bfa48893` test(spec-dock): dogfooding snapshotをmain追従
 
 ## Re-observation Result
 
-- pending
+- Post-repair observation:
+  - Latest head SHA: `bfa488939e24bb2d399b6260a56b5ef69cdd68ca`
+  - Observation result: `/private/tmp/iss-00186-pr-observation-r2/result.json`
+  - Resume result: `/private/tmp/iss-00186-pr-observation-r2-resume/result.json`
+  - CI: passed, 4/4 checks success (`validate` x2, `provider-tests` x2)
+  - PR metadata: open, ready, mergeable
+  - Review: Codex issue-comment fallback says no major issues; no unresolved threads; script status remains `human_gate` due `fallback_issue_comment_low_confidence`
 
 ## Residual Risk / Follow-up
 
 - Snapshot can drift again if `main` gains another dogfooding node before merge.
+- Observation-script semantics do not promote fallback issue-comment review completion to `passed`; final merge remains a human action.
