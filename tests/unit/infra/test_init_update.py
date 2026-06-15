@@ -15929,6 +15929,112 @@ esac
                 }
             ]
 
+    def test_issue_187_actions_failed_job_downgrades_supplemental_permission_limitations(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+        token_marker = "ghp_issue_187_failed_secret"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{{"total_count":1,"workflow_runs":[{{"id":202,"run_attempt":2,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"failure","html_url":"https://example.test/run/202"}}]}}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{{"total_count":1,"jobs":[{{"id":303,"run_id":202,"run_attempt":2,"name":"test","status":"completed","conclusion":"failure","html_url":"https://example.test/job/303","steps":[{{"number":1,"name":"Install","status":"completed","conclusion":"success"}},{{"number":2,"name":"Run tests","status":"completed","conclusion":"failure"}}]}}]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    printf 'permission denied while reading checks {token_marker}\\n' >&2
+    exit 1
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    printf 'permission denied while reading statuses {token_marker}\\n' >&2
+    exit 1
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    printf 'permission denied while reading rollup {token_marker}\\n' >&2
+    exit 1
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_TOKEN": token_marker,
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            assert token_marker not in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "failed"
+            assert payload["ci"]["actions"]["workflow_runs"]["counts"]["failed"] == 1
+            assert payload["ci"]["actions"]["jobs"]["counts"]["failed"] == 1
+            assert payload["ci"]["failures"] == [
+                {
+                    "kind": "github_actions_job",
+                    "source": "actions",
+                    "workflow_run_id": 202,
+                    "workflow_name": "CI",
+                    "workflow_status": "completed",
+                    "workflow_conclusion": "failure",
+                    "workflow_run_attempt": 2,
+                    "job_id": 303,
+                    "job_name": "test",
+                    "job_status": "completed",
+                    "job_conclusion": "failure",
+                    "html_url": "https://example.test/job/303",
+                    "failed_steps": [
+                        {
+                            "number": 2,
+                            "name": "Run tests",
+                            "status": "completed",
+                            "conclusion": "failure",
+                        }
+                    ],
+                    "dedupe_key": "actions:202:303:2",
+                }
+            ]
+            coverage_limitation = next(
+                item
+                for item in payload["limitations"]
+                if item.get("code") == "ci_coverage_limited_to_github_actions"
+            )
+            assert coverage_limitation["severity"] == "informational"
+            assert coverage_limitation["blocking"] is False
+            assert not any(
+                item.get("code") == "github_token_permission_denied"
+                and item.get("severity") == "blocking"
+                for item in payload["limitations"]
+            )
+
     def test_issue_187_check_run_derived_actions_job_dedupes_to_actions_shape(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
