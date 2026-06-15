@@ -242,6 +242,104 @@ First-Read Gate Spine added near the top of the provider skill.
 
 ---
 
+### セッションログ（2026-06-16 S02）
+
+#### 対象
+- Step: S02 — Workflow Exact Semantics
+- AC/EC: AC-004, EC-002, EC-004
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S02 — Workflow Exact Semantics`
+  - closure ids: `tc-003`
+
+#### 実施内容
+- `doc-writer` に S02 の provider workflow doc 更新を委任した。
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` に Step Result Approval、non-pass states、final commit boundary の exact semantics を追加した。
+- 変更は allowed path 1ファイルのみで、skill、tests、templates、prompts、runtime code、canonical issue docs は変更していない。
+- `spec-reviewer` に S02 provider workflow doc diff only の fresh review を依頼し、`review_status=pass` を得た。
+
+#### 実行コマンド / 結果
+```bash
+git diff --check -- src/spec_dock/assets/spec_dock/docs/workflow_issue.md
+
+<no output; pass>
+```
+
+```bash
+git status --short
+
+ M src/spec_dock/assets/spec_dock/docs/workflow_issue.md
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 代替証跡（Red / alternative） | docs-only / inspect-only | workflow docs が exact Step Result Approval semantics を明示する必要を plan が固定済み | `plan.md` S02 / `git diff` inspection | pass | S03 で structural assertion を追加予定 |
+| S02 | 緑フェーズ（Green） | targeted inspection | workflow docs define Step Result Approval, non-pass / exception states, and final commit catch-up prohibition | `sed -n '130,175p' src/spec_dock/assets/spec_dock/docs/workflow_issue.md` | pass | broad policy rewrite なし |
+| S02 | リファクタリング（Refactor） | guardrail satisfied | allowed path 1ファイルのみの差分、diff check pass | `git status --short`; `git diff --check -- src/spec_dock/assets/spec_dock/docs/workflow_issue.md` | pass | no refactor needed |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | S03 の structural assertion 追加前なので future drift protection は未完了 | delegated worker | S03 の計画済み obligation として維持 | tc-004 | no | `plan.md` S03 |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | tc-003 | provider workflow docs define exact semantics without moving full policy into skill | `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`; `spec-reviewer` pass (`019ecc13-5676-70c1-9e23-c399eb2f51b1`) | pass | S03 assertion follow-up remains planned |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-003 | S02 | yes | inspect-only + structural assertion | plan fixed exact semantics as target | `sed -n '130,175p' src/spec_dock/assets/spec_dock/docs/workflow_issue.md`; S02 `spec-reviewer` pass | pass | structural assertion deferred to S03 / tc-004 |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-003 | S02 | provider workflow doc diff + targeted inspection + `spec-reviewer` pass (`019ecc13-5676-70c1-9e23-c399eb2f51b1`) | pass | S03 will add regression assertion |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-003 | tc-s02-001 / tc-s02-002 / tc-s02-003 | tc-003 | planned closure unchanged | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | shipped workflow text update | `doc-writer` | S02 provider workflow exact semantics only | `plan.md` S02; provider workflow doc | `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` | all other files | targeted inspection; `git diff --check`; S03 assertion follow-up | path outside allowed scope; broad workflow rewrite; templates/prompts edits | changed files, wording summary, inspection result, risks, no-material-decision | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | `doc-writer` | Added Step Result Approval definition, non-pass / exception semantics, and final commit catch-up prohibition. | `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` | `git diff --check -- src/spec_dock/assets/spec_dock/docs/workflow_issue.md` -> pass; docs-only targeted inspection -> pass | `spec-reviewer` pass (`019ecc13-5676-70c1-9e23-c399eb2f51b1`) | S03 assertion still pending by plan | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | N/A: delegated to `doc-writer` | N/A | N/A | N/A | revert S02 commit if needed | targeted inspection and `git diff --check` -> pass | `spec-reviewer` passed | none |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | `spec-reviewer` | fresh | passed | N/A | proceed to S02 commit gate | agent `019ecc13-5676-70c1-9e23-c399eb2f51b1`; findings none |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | committed | S02 provider workflow doc change + S02 report evidence | S02 step commit; hash recorded after commit as external evidence | `git status --short` checked after commit | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - Step Result Approval / non-pass / final commit boundary semantics を追加。
+- `spec-dock/active/issue/report.md` - S02 observed evidence ledger を記録。
+
+#### コミット
+- S02 step commit will be created after this report evidence is staged.
+
+#### メモ
+- Worker output ended with: `No material implementation decisions beyond the approved plan.`
+- No plan amendment required.
+
+---
+
 ### セッションログ（2026-06-13 HH:MM - HH:MM）
 
 #### 対象
