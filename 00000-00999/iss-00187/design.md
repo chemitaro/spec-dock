@@ -166,10 +166,12 @@ Skill --> Collector : documents required permission
     - `available: bool`
     - `workflow_runs.total`
     - `workflow_runs.counts.success|neutral|skipped|failed|running|pending|unknown`
-    - `jobs.total`
-    - `jobs.counts.success|neutral|skipped|failed|running|pending|unknown`
+    - `jobs_summary.total`
+    - `jobs_summary.counts.success|neutral|skipped|failed|running|pending|unknown`
+    - `jobs_summary.collection.successful_runs|failed_runs`
     - `runs[]`: sanitized `id`, `name`, `status`, `conclusion`, `head_sha`, `html_url`
     - `jobs[]`: sanitized `id`, `run_id`, `name`, `status`, `conclusion`, `html_url`
+    - `jobs_detail[]`: legacy alias of `jobs[]` retained for compatibility with consumers that adopted the pre-final detail-list key during this issue.
   - Actions-derived `ci.failures[]` entries:
     - `kind: "github_actions_job"`
     - `source: "actions"`
