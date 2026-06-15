@@ -15247,6 +15247,240 @@ esac
             assert limitation["secret_redacted"] is True
             assert "stderr_sha256" in limitation
 
+    def test_issue_187_actions_only_green_passes_with_coverage_limitation(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success","html_url":"https://example.test/run/202"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303","steps":[{"number":1,"name":"Run tests","status":"completed","conclusion":"success"}]}]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    printf 'GraphQL: Resource not accessible by personal access token\\n' >&2
+    exit 1
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    printf 'GraphQL: Resource not accessible by personal access token\\n' >&2
+    exit 1
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    printf 'GraphQL: Resource not accessible by personal access token\\n' >&2
+    exit 1
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["actions"]["available"] is True
+            assert payload["ci"]["actions"]["workflow_runs"]["total"] == 1
+            assert payload["ci"]["actions"]["workflow_runs"]["counts"]["success"] == 1
+            assert payload["ci"]["actions"]["jobs"]["total"] == 1
+            assert payload["ci"]["actions"]["jobs"]["counts"]["success"] == 1
+            limitations = payload["limitations"]
+            coverage = next(
+                item
+                for item in limitations
+                if item.get("code") == "ci_coverage_limited_to_github_actions"
+            )
+            assert coverage["severity"] == "informational"
+            assert coverage.get("blocking") is False
+            assert not any(
+                item.get("code") == "github_token_permission_denied"
+                and item.get("severity") == "blocking"
+                for item in limitations
+            )
+            assert payload.get("decision", {}).get("recommended_next_action") != (
+                "fix_github_token_permissions"
+            )
+
+    def test_issue_187_actions_only_green_redacts_supplemental_permission_stderr(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+        token_marker = "ghp_issue_187_secret_marker"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{{"total_count":1,"workflow_runs":[{{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success","html_url":"https://example.test/run/202"}}]}}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{{"total_count":1,"jobs":[{{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303","steps":[]}}]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    printf 'permission denied while reading checks {token_marker}\\n' >&2
+    exit 1
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    printf 'permission denied while reading statuses {token_marker}\\n' >&2
+    exit 1
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    printf 'permission denied while reading rollup {token_marker}\\n' >&2
+    exit 1
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_TOKEN": token_marker,
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            assert token_marker not in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "passed"
+            assert "fix_github_token_permissions" not in result.stdout
+            assert not any(
+                item.get("code") == "github_token_permission_denied"
+                and item.get("severity") == "blocking"
+                for item in payload["limitations"]
+            )
+            assert "ci_coverage_limited_to_github_actions" in [
+                item.get("code") for item in payload["limitations"]
+            ]
+
+    def test_issue_187_actions_jobs_unavailable_prevents_actions_only_pass(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success","html_url":"https://example.test/run/202"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    printf 'GraphQL: Resource not accessible by personal access token\\n' >&2
+    exit 1
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    printf 'GraphQL: Resource not accessible by personal access token\\n' >&2
+    exit 1
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    printf 'GraphQL: Resource not accessible by personal access token\\n' >&2
+    exit 1
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    printf 'GraphQL: Resource not accessible by personal access token\\n' >&2
+    exit 1
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "unknown"
+            assert payload["ci"]["actions"]["available"] is True
+            assert payload["ci"]["actions"]["workflow_runs"]["total"] == 1
+            assert payload["ci"]["actions"]["workflow_runs"]["counts"]["success"] == 1
+            assert payload["ci"]["actions"]["jobs"]["total"] == 0
+            assert any(
+                item.get("capability") == "actions_read"
+                and item.get("severity") == "blocking"
+                for item in payload["limitations"]
+            )
+            assert "ci_coverage_limited_to_github_actions" not in [
+                item.get("code") for item in payload["limitations"]
+            ]
+
     def test_issue_170_pr_observation_snapshot_keeps_required_checks_pending_as_wait(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
