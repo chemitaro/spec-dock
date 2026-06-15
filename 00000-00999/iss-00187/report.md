@@ -81,6 +81,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-013 | adopted | dev-coder | `fetch_pr_checks_snapshot.sh`, `tests/unit/infra/test_init_update.py`, `report.md` | S02 delegated implementation added Actions taxonomy/failure/zero/API failure behavior. P1 reviewer findings were fixed by bounded dev-coder follow-ups; fresh code-reviewer re-review passed with no findings | S02 dev-coder outputs; parent test reruns; code-reviewer fail results; final code-reviewer pass; focused pytest `33 passed` | Commit S02 and continue to S03 |
 | EAL-014 | adopted | dev-coder | `fetch_pr_observation_snapshot.sh`, `wait_pr_observation.sh`, `tests/unit/infra/test_init_update.py`, `report.md` | S03 delegated implementation made wrapper permission remediation depend on blocking limitations and refreshed wrapper fake-gh tests for Actions-primary output | S03 dev-coder output; parent focused pytest `49 passed`; `git diff --check` pass; fresh code-reviewer pass | Commit S03 and continue to S90 |
 | EAL-015 | adopted | doc-writer / utility-worker | provider/mirror `SKILL.md`, mirror scripts, `report.md` | S90 delegated docs update names Actions read as normal CI observation permission and mirror sync copied S01-S03 provider scripts into dogfooding `.agents` | doc-writer output; utility-worker output; parent `cmp` provider/mirror checks all exit 0; `git diff --check` pass; fresh S90 spec-reviewer/code-reviewer pass | Commit S90 and continue to S99 |
+| EAL-016 | adopted | dev-coder | `tests/unit/infra/test_init_update.py`, `report.md` | S99 integration verification exposed older pr_observation fake-gh fixtures that lacked Actions runs/jobs endpoints after the collector became Actions-primary; bounded dev-coder fixture alignment preserved exact assertions and parent rerun passed the intended S99 lane | Initial parent S99 focused pytest failed `14 failed, 67 passed`; dev-coder fixture alignment; parent rerun `uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation or issue_187"` -> `81 passed, 287 deselected`; `git diff --check` pass; `spec-dock validate` pass | Run S99 code/QA/spec review and commit final verification evidence |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -144,27 +145,37 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- `github-pr-observation` の CI 観測は Actions workflow runs/jobs を primary source とし、Checks/statuses/status rollup は supplemental evidence として扱う実装へ更新された。
+- S01-S03 で collector と wrappers を段階実装し、S90 で provider/mirror docs と mirror scripts を同期した。S99 では最終統合検証で露出した旧 fake-gh fixture drift を修正し、親セッションで正しい focused pytest lane を再実行して green を確認した。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-06-16 HH:MM - HH:MM）
+### セッションログ（2026-06-16）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01, S02, S03, S90, S99
+- AC/EC: AC-001..AC-005, EC-001..EC-004
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` Spec-Locked Closure Index
+  - closure ids: `tc-s01-001`, `tc-s01-002`, `tc-s02-001`..`tc-s02-005`, `tc-s03-001`..`tc-s03-003`, `tc-s90-001`, `tc-s90-002`, `tc-s99-001`
 
 #### 実施内容
-- ...
+- S01: Actions-only green and supplemental permission behavior.
+- S02: Actions failure/running/pending/zero/API-failure taxonomy and sanitized failure details.
+- S03: snapshot/wait wrapper permission severity and stale-head preservation.
+- S90: skill docs and dogfooding mirror synchronization.
+- S99: final integrated verification, legacy fake-gh fixture alignment, and final reviewer gates.
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation or issue_187"
+# 81 passed, 287 deselected
 
-<result>
+git diff --check
+# pass
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=96
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
@@ -259,6 +270,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S03 | delegated | runtime/test implementation step | dev-coder | snapshot/wait wrapper classification and stale-head regression | `plan.md` S03; `design.md`; `requirement.md`; S01/S02 evidence | wrapper scripts and focused tests | review lifecycle, trigger script, merge automation, SKILL.md, mirror files, report edits by worker | focused pytest and `git diff --check` | stale head and CI failure cannot remain distinct | changed files, tests, closure evidence, ledger note | pass for implementation and closure evidence; fresh code-reviewer pass obtained |
 | S90-docs | delegated | docs impact resolution step | doc-writer | provider/mirror skill-text wording | `plan.md` S90; `design.md`; `requirement.md`; S01-S03 evidence | provider and mirror `SKILL.md` | scripts, tests, source behavior, issue docs by worker | docs inspection, provider/mirror diff, `git diff --check` | docs contradict Actions-primary contract | changed files, docs inspection, residual risks | pass for worker verification; reviewer pending |
 | S90-mirror | delegated | mechanical mirror sync step | utility-worker | dogfooding mirror copies of changed provider scripts | `plan.md` S90; S01-S03 provider diffs | `.agents/skills/github-pr-observation/scripts/**` mirror copies only | provider source, tests, SKILL.md, issue docs | provider/mirror `cmp`, `git diff --check` | provider/mirror cannot align | changed files, comparison result, residual risks | pass for worker verification; reviewer pending |
+| S99-fixture-alignment | delegated | final integrated verification remediation | dev-coder | old fake-gh fixture alignment for Actions-primary collector | `plan.md` S99; S01-S90 committed evidence; initial S99 pytest failure | `tests/unit/infra/test_init_update.py` only | provider scripts, mirror scripts, SKILL.md, issue docs by worker | parent rerun of `uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation or issue_187"`; `git diff --check`; `spec-dock validate` | fixture changes mask behavior or alter provider/runtime behavior | changed files, exact assertion rationale, tests, residual risks | pass for worker verification; reviewer pending |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -284,11 +296,16 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S90-mirror-sync | utility-worker | Copied changed provider PR observation scripts into dogfooding mirror and verified byte equality | `.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh`; `.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh`; `.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` | `cmp -s` for all three provider/mirror script pairs -> exit 0; `git diff --check` -> pass | pass | behavior tests remain S01-S03/S99 responsibility | accepted |
 | S90-spec-review-1 | spec-reviewer | Reviewed S90 docs/report alignment against requirement/design/plan | none | provider/mirror SKILL.md inspection; `cmp -s` checks; `diff -u`; `git diff --check` | pass | none | accepted |
 | S90-code-review-1 | code-reviewer | Reviewed S90 mechanical mirror sync and confirmed no provider script behavior edits in the uncommitted diff | none | provider/mirror `cmp -s` checks; provider script diff empty; `git diff --check` | pass | none | accepted |
+| S99-dev | dev-coder | Added Actions runs/jobs fake-gh responses to older pr_observation tests and adjusted exact expected metadata to the current Actions-primary output shape without touching provider or mirror scripts | `tests/unit/infra/test_init_update.py` | dev-coder reported a non-authoritative selector with stale `issue_180_s02`; parent authoritative rerun used `uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation or issue_187"` -> `81 passed, 287 deselected`; `git diff --check` -> pass; `./spec-dock/scripts/spec-dock validate` -> pass | code-reviewer pass; qa-reviewer pass; spec-reviewer initial fail remediated and fresh re-review pass | none | accepted |
+| S99-code-review-1 | code-reviewer | Reviewed S99 test/report diff and found no masking of Actions-primary behavior or weakened exact assertions | none | `git diff --check` -> pass; `uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation or issue_187"` -> 81 passed; `./spec-dock/scripts/spec-dock validate` -> pass | pass | none | accepted |
+| S99-qa-review-1 | qa-reviewer | Confirmed AC/EC coverage and S99 fixture remediation are sufficient; live GitHub API test is not required by plan | none | focused pytest 81 passed; provider/mirror `cmp -s` checks; `git diff --check`; `spec-dock validate` | pass | fake-gh based coverage only, accepted by plan | accepted |
+| S99-spec-review-1 | spec-reviewer | Initial final spec review failed on placeholder rows and stale S99 worker selector overclaim | none | read-only spec review | fail | remediated in report | accepted for remediation |
+| S99-spec-review-2 | spec-reviewer | Fresh final spec re-review found no blocking findings after placeholder cleanup and parent-authoritative S99 verification wording | none | `git diff --check` -> pass; `uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation or issue_187"` -> 81 passed; `./spec-dock/scripts/spec-dock validate` -> pass | pass | none | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| N/A | none | N/A | N/A | N/A | N/A | N/A | N/A | All implementation/test/docs changes were delegated to the planned roles; orchestrator direct edits were limited to issue-level `report.md` evidence. |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
@@ -301,6 +318,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S03 | step code review gate | code-reviewer | passed | pass | S03-review-1 | proceed to S03 commit | Dev-coder, parent focused pytest, reviewer focused pytest, and `git diff --check` passed |
 | S90 | step docs/spec review gate | spec-reviewer | fresh | passed | N/A | proceed to S90 commit | No findings; docs/report align with Actions-primary contract |
 | S90 | step mirror/code review gate | code-reviewer | fresh | passed | N/A | proceed to S90 commit | No findings; provider/mirror byte equality confirmed |
+| S99 | final integrated verification remediation gate | code-reviewer / qa-reviewer / spec-reviewer | fresh | passed | N/A | proceed to S99 commit | code-reviewer pass, qa-reviewer pass, and fresh spec-reviewer re-review pass |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -309,27 +327,22 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S02 | committed | provider collector + focused tests + S02 report evidence | S02 commit hash recorded in external delivery evidence; row updated by amend | `git status --short` -> clean after commit | N/A | N/A | N/A | code-reviewer pass obtained before commit; amend used only to record post-commit gate state |
 | S03 | committed | wrapper scripts + focused tests + S03 report evidence | committed | `git status --short` clean after commit | hash recorded in external delivery evidence; row updated by amend | N/A | N/A | fresh code-reviewer pass obtained before commit |
 | S90 | committed | provider/mirror skill docs + dogfooding mirror scripts + S90 report evidence | committed | `git status --short` clean after commit | hash recorded in external delivery evidence; row updated by amend | N/A | N/A | fresh spec-reviewer and code-reviewer pass obtained before commit |
+| S99 | committed | final fixture alignment + final report evidence | S99 commit hash recorded in external delivery evidence; row updated by amend | `git status --short` -> clean after commit | N/A | N/A | N/A | code-reviewer, qa-reviewer, and fresh spec-reviewer re-review passed before commit; amend used only to record post-commit gate state |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `tests/unit/infra/test_init_update.py` - S99 final integrated verification fixture alignment for Actions-primary fake GitHub responses.
+- `spec-dock/active/issue/report.md` - S99 evidence ledger and final gate status.
 
 #### コミット
-- <hash> <message>
+- `62991a539582de9cbe852c319e37090090b0c99c` `docs(spec-dock): iss-00187の実装委任ハンドオフ証跡を更新`
+- `0cb15bfd` `feat(github-pr-observation): Actions 証跡で CI green を判定`
+- `2668c90a` `feat(github-pr-observation): Actions CI 状態分類を強化`
+- `57cad25d` `feat(github-pr-observation): Actions wrapper の権限判定を整理`
+- `e7377989` `docs(github-pr-observation): Actions primary 契約を文書と mirror に反映`
+- S99 committed; exact hash recorded in external delivery evidence
 
 #### メモ
-- ...
-
----
-
-### セッションログ（2026-06-16 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
+- S99 initial parent verification failed because legacy fake-gh fixtures did not expose the new Actions-primary endpoint; no provider behavior change was required.
 
 ---
 
@@ -343,32 +356,32 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | already sufficient after S99 fixture alignment; live GitHub API test not required by plan | `uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation or issue_187"` -> `81 passed, 287 deselected`; `git diff --check` -> pass; `./spec-dock/scripts/spec-dock validate` -> pass; provider/mirror `cmp -s` checks for `SKILL.md` and three scripts -> pass | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | S99 uncommitted diff (`tests/unit/infra/test_init_update.py`, `report.md`) | no findings; confirmed fixture updates do not mask Actions-primary behavior, exact assertions remain strict, and no provider/mirror/source behavior files are touched | 0 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | initial fail: placeholder rows remained and S99 worker selector was stale; remediation applied; fresh re-review found no blocking findings | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S99 report ledger ready for commit | `tests/unit/infra/test_init_update.py`; `spec-dock/active/issue/report.md` | PR body / final response / issue closeout evidence | ready |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: S99 の親 focused pytest で、旧 pr_observation fake-gh fixture が Actions-primary endpoint を返さず、`actions_read` unknown で 14 件失敗した。
+  - 解決: dev-coder に `tests/unit/infra/test_init_update.py` のみを委任し、旧 fixture に Actions runs/jobs 応答を追加した。親セッションで正しい S99 lane を再実行し `81 passed, 287 deselected` を確認した。
 
 ## 学んだこと (任意)
-- ...
+- Actions-primary collector へ切り替えた後は、新規 issue_187 tests だけでなく、既存 pr_observation fake-gh tests にも primary endpoint の期待状態を明示する必要がある。
 
 ## 今後の推奨事項 (任意)
-- ...
+- Future PR observation tests should make the intended primary CI source explicit in each fake-gh fixture so fallback-path tests are not accidentally driven by missing Actions endpoints.
 
 ## 省略/例外メモ (必須)
 - 該当なし
