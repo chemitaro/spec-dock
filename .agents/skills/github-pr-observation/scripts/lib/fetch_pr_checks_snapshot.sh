@@ -643,6 +643,14 @@ actions_decisive_non_terminal = (
         or action_job_counts["pending"]
     )
 )
+actions_decisive_failed = (
+    actions_available
+    and actions_summary["workflow_runs"]["total"] > 0
+    and action_job_collection_successes == actions_summary["workflow_runs"]["total"]
+    and action_job_collection_failures == 0
+    and not (action_run_counts["unknown"] or action_job_counts["unknown"])
+    and bool(action_run_counts["failed"] or action_job_counts["failed"])
+)
 check_runs_payload, limitation = gh_api(f"repos/{repo}/commits/{expected_head_sha}/check-runs")
 if limitation:
     supplemental_limitations.append(limitation)
@@ -655,7 +663,9 @@ pr_view_payload, limitation = gh_pr_view()
 if limitation:
     supplemental_limitations.append(limitation)
 
-if (actions_decisive_green or actions_decisive_non_terminal) and supplemental_limitations:
+if (
+    actions_decisive_green or actions_decisive_non_terminal or actions_decisive_failed
+) and supplemental_limitations:
     limitations.append(
         {
             "code": "ci_coverage_limited_to_github_actions",
