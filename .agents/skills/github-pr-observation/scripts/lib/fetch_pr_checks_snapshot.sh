@@ -625,6 +625,24 @@ actions_decisive_green = (
         or action_job_counts["unknown"]
     )
 )
+actions_decisive_non_terminal = (
+    actions_available
+    and actions_summary["workflow_runs"]["total"] > 0
+    and action_job_collection_successes == actions_summary["workflow_runs"]["total"]
+    and action_job_collection_failures == 0
+    and not (
+        action_run_counts["failed"]
+        or action_run_counts["unknown"]
+        or action_job_counts["failed"]
+        or action_job_counts["unknown"]
+    )
+    and bool(
+        action_run_counts["running"]
+        or action_run_counts["pending"]
+        or action_job_counts["running"]
+        or action_job_counts["pending"]
+    )
+)
 check_runs_payload, limitation = gh_api(f"repos/{repo}/commits/{expected_head_sha}/check-runs")
 if limitation:
     supplemental_limitations.append(limitation)
@@ -637,14 +655,14 @@ pr_view_payload, limitation = gh_pr_view()
 if limitation:
     supplemental_limitations.append(limitation)
 
-if actions_decisive_green and supplemental_limitations:
+if (actions_decisive_green or actions_decisive_non_terminal) and supplemental_limitations:
     limitations.append(
         {
             "code": "ci_coverage_limited_to_github_actions",
             "source": "actions_collector",
             "severity": "informational",
             "blocking": False,
-            "message": "GitHub Actions evidence is terminal green; supplemental check/status rollup coverage was unavailable",
+            "message": "GitHub Actions evidence determines CI state; supplemental check/status rollup coverage was unavailable",
             "supplemental_unavailable": [
                 {
                     "code": item.get("code"),
