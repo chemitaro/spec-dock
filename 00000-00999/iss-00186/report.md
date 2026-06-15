@@ -229,14 +229,14 @@ First-Read Gate Spine added near the top of the provider skill.
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed | S01 provider skill change + S01 report evidence | S01 step commit; hash recorded after commit as external evidence | `git status --short` checked after commit | N/A | N/A | N/A | N/A |
+| S01 | committed | S01 provider skill change + S01 report evidence | `266e45e5` docs(spec-dock): issue実行スキルに単一ステップゲートを追加 | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md` - S01 first-read gate spine を追加。
 - `spec-dock/active/issue/report.md` - S01 observed evidence ledger を記録。
 
 #### コミット
-- S01 step commit will be created after this report evidence is staged.
+- `266e45e5` docs(spec-dock): issue実行スキルに単一ステップゲートを追加
 
 #### メモ
 - Worker output ended with: `No material implementation decisions beyond the approved plan.`
@@ -327,14 +327,14 @@ git status --short
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S02 | committed | S02 provider workflow doc change + S02 report evidence | S02 step commit; hash recorded after commit as external evidence | `git status --short` checked after commit | N/A | N/A | N/A | N/A |
+| S02 | committed | S02 provider workflow doc change + S02 report evidence | `67f86f0a` docs(spec-dock): issue実行ワークフローのステップ承認を明確化 | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - Step Result Approval / non-pass / final commit boundary semantics を追加。
 - `spec-dock/active/issue/report.md` - S02 observed evidence ledger を記録。
 
 #### コミット
-- S02 step commit will be created after this report evidence is staged.
+- `67f86f0a` docs(spec-dock): issue実行ワークフローのステップ承認を明確化
 
 #### メモ
 - Worker output ended with: `No material implementation decisions beyond the approved plan.`
@@ -434,14 +434,14 @@ uv run pytest tests/unit/infra/test_init_update.py
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S03 | committed | S03 test assertion change + S03 report evidence | S03 step commit; hash recorded after commit as external evidence | `git status --short` checked after commit | N/A | N/A | N/A | N/A |
+| S03 | committed | S03 test assertion change + S03 report evidence | `338cdbda` test(spec-dock): issue実行ゲート文言の回帰テストを追加 | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `tests/unit/infra/test_init_update.py` - S01/S02 critical fragments の provider asset assertions を追加。
 - `spec-dock/active/issue/report.md` - S03 observed evidence ledger を記録。
 
 #### コミット
-- S03 step commit will be created after this report evidence is staged.
+- `338cdbda` test(spec-dock): issue実行ゲート文言の回帰テストを追加
 
 #### メモ
 - Worker output ended with: `No material implementation decisions beyond the approved plan.`
@@ -531,14 +531,14 @@ git status --short
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S04 | committed | S04 plan template alignment fix + S04 report evidence | S04 step commit; hash recorded after commit as external evidence | `git status --short` checked after commit | N/A | N/A | N/A | N/A |
+| S04 | committed | S04 plan template alignment fix + S04 report evidence | `22a4146c` docs(spec-dock): issue計画テンプレートのステップ境界を強化 | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/templates/issue/plan.md` - 1 step / 1 review / 1 commit と `N/A` delegated role の境界を補強。
 - `spec-dock/active/issue/report.md` - S04 observed evidence ledger を記録。
 
 #### コミット
-- S04 step commit will be created after this report evidence is staged.
+- `22a4146c` docs(spec-dock): issue計画テンプレートのステップ境界を強化
 
 #### メモ
 - Worker output ended with: `No material implementation decisions beyond the approved plan.`
@@ -649,7 +649,7 @@ git diff --check -- .agents/skills/spec-dock-issue-execution/SKILL.md spec-dock/
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S90 | committed | mirror / snapshot refresh + S90 report evidence | S90 step commit; hash recorded after commit as external evidence | `git status --short` checked after commit | N/A | N/A | N/A | N/A |
+| S90 | committed | mirror / snapshot refresh + S90 report evidence | `dc1b38c6` docs(spec-dock): issue実行ゲート変更をdogfoodingへ反映 | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `.agents/skills/spec-dock-issue-execution/SKILL.md` - provider install_root skill mirror を更新。
@@ -659,7 +659,7 @@ git diff --check -- .agents/skills/spec-dock-issue-execution/SKILL.md spec-dock/
 - `spec-dock/active/issue/report.md` - S90 observed evidence ledger を記録。
 
 #### コミット
-- S90 step commit will be created after this report evidence is staged.
+- `dc1b38c6` docs(spec-dock): issue実行ゲート変更をdogfoodingへ反映
 
 #### メモ
 - D-S90-001 records the worker Ledger Note disposition.
@@ -787,22 +787,22 @@ git diff --check -- .agents/skills/spec-dock-issue-execution/SKILL.md spec-dock/
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer (`019ecc3e-958e-76c0-b567-c9bc78ac6980`) | whole issue obligation coverage; integration test decision; S99 QA follow-up re-review | already sufficient; no additional integration test required | initial QA pass with P2; S99 follow-up commit `39076dd3` added issue plan template boundary assertions; follow-up `code-reviewer` pass (`019ecc45-4df2-74c1-b3bf-d70c55b20afd`); final QA re-review findings none; `./spec-dock/scripts/spec-dock validate` -> ok; `uv run pytest tests/unit/infra/test_init_update.py` -> 355 passed | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer (`019ecc4a-4f18-7e30-9ab2-e97f8a23231e`) | issue-wide integrated diff from branch base through S99 QA follow-up | initial fail: missing final QA evidence and stale step commit placeholders in `report.md`; fixed by recording S01/S02/S03/S04/S90 commit hashes and final QA gate evidence | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer (`019ecc4e-9716-71e1-af28-2dfab16766eb`) | requirement / design / plan / report / implementation / tests / docs alignment | initial fail: final code-review verdict and tc-007 ledger evidence were not recorded in durable report; fixed by recording issue-wide code-review verdict and final ledger boundary | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| closure ids `tc-001` through `tc-007` closed through final QA, issue-wide code review, final spec review, and final report ledger evidence | final report ledger / S99 evidence updates only | final response / PR / issue comment / other external delivery evidence will record final commit hash and clean worktree check | ready for final commit |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
