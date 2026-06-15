@@ -340,6 +340,113 @@ git status --short
 
 ---
 
+### セッションログ（2026-06-16 S03）
+
+#### 対象
+- Step: S03 — Tests / Assertion Update
+- AC/EC: AC-001, AC-002, AC-003, AC-004, EC-001, EC-002, EC-003, EC-004
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S03 — Tests / Assertion Update`
+  - closure ids: `tc-004`
+
+#### 実施内容
+- `dev-coder` に S03 の provider asset assertion 更新を委任した。
+- `tests/unit/infra/test_init_update.py` に S01 skill fragments と S02 workflow fragments を守る targeted assertions を追加した。
+- `code-reviewer` の P2 指摘を同じ `dev-coder` に bounded follow-up として戻し、`Step Result Approval` 定義に結びつく assertion へ修正した。
+- 変更は allowed path 1ファイルのみで、provider docs、skills、templates、prompts、runtime code、canonical issue docs は変更していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_spec_document_templates_keep_policy_out_of_scaffold
+
+1 passed
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_init_creates_expected_structure
+
+1 passed
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py
+
+351 passed, 4 failed
+```
+
+- full-file pytest の 4 failures は delegated worker が S03 許可パス外の provider/mirror/snapshot divergence と報告した。S90 の mirror/sync scope で扱う。
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ / characterization | red-required or covered-existing | S01/S02 新規 fragments の assertion が不足していることを delegated worker が既存 assertion inspection で確認 | worker inspection; `git diff` | pass | existing preservation assertions は維持 |
+| S03 | 緑フェーズ（Green） | focused pytest | two focused tests passed | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_spec_document_templates_keep_policy_out_of_scaffold`; `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_init_creates_expected_structure` | pass | full-file pytest は 4 failures, S90 scope |
+| S03 | リファクタリング（Refactor） | guardrail satisfied | allowed path 1ファイルのみの targeted assertions | `git diff -- tests/unit/infra/test_init_update.py` | pass | unrelated refactorなし |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | full-file pytest の provider/mirror/snapshot divergence 4件 | delegated worker | S03 許可パス外として未修正。S90 mirror/sync validation scope に送る。 | tc-006 | no | `uv run pytest tests/unit/infra/test_init_update.py` -> 351 passed, 4 failed |
+| S03 | `required verification` assertion が Step Result Approval 定義に十分結びついていない | `code-reviewer` | `dev-coder` bounded follow-up で adjacent fragment assertion に修正 | tc-004 | no | `code-reviewer` pass after re-review (`019ecc1f-6812-7ee2-a9e0-b0e822e86ca9`) |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | tc-004 | tests assert new critical fragments and preserve existing fragments | `tests/unit/infra/test_init_update.py`; focused pytest pass; `code-reviewer` pass (`019ecc1f-6812-7ee2-a9e0-b0e822e86ca9`) | pass | full-file divergence deferred to S90 / tc-006 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-004 | S03 | yes | red-required or covered-existing | delegated worker confirmed new S01/S02 fragments lacked targeted assertions while existing preservation assertions covered existing fragments | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_spec_document_templates_keep_policy_out_of_scaffold`; `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_init_creates_expected_structure` | pass | full-file pytest 4 failures deferred to S90 |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-004 | S03 | test diff + focused pytest pass + `code-reviewer` pass (`019ecc1f-6812-7ee2-a9e0-b0e822e86ca9`) | pass | covers tc-s03-001, tc-s03-002, tc-s03-003 |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-004 | tc-s03-001 / tc-s03-002 / tc-s03-003 | tc-004 | planned closure unchanged | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | tests / assertion change | `dev-coder` | S03 provider assertion update only | `plan.md` S03; S01/S02 final wording | `tests/unit/infra/test_init_update.py` | all other files | focused pytest; code-reviewer pass | unrelated refactor; provider doc/skill edit; broad fixture rewrite | changed files, test result, coverage, risks, no-material-decision | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | `dev-coder` | Added targeted assertions for S01 skill and S02 workflow fragments; follow-up bound `required verification` to the Step Result Approval definition. | `tests/unit/infra/test_init_update.py` | focused pytest 2 tests -> pass; full-file pytest -> 351 passed, 4 failed | `code-reviewer` pass after re-review (`019ecc1f-6812-7ee2-a9e0-b0e822e86ca9`) | full-file mirror/snapshot failures deferred to S90 | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | N/A: delegated to `dev-coder` | N/A | N/A | N/A | revert S03 commit if needed | focused pytest -> pass | `code-reviewer` passed | none |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | `code-reviewer` | fresh | passed | N/A | proceed to S03 commit gate | agent `019ecc1f-6812-7ee2-a9e0-b0e822e86ca9`; P2 resolved on re-review |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | committed | S03 test assertion change + S03 report evidence | S03 step commit; hash recorded after commit as external evidence | `git status --short` checked after commit | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/unit/infra/test_init_update.py` - S01/S02 critical fragments の provider asset assertions を追加。
+- `spec-dock/active/issue/report.md` - S03 observed evidence ledger を記録。
+
+#### コミット
+- S03 step commit will be created after this report evidence is staged.
+
+#### メモ
+- Worker output ended with: `No material implementation decisions beyond the approved plan.`
+- No plan amendment required.
+
+---
+
 ### セッションログ（2026-06-13 HH:MM - HH:MM）
 
 #### 対象
