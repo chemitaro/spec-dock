@@ -9761,6 +9761,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Red / 代替証跡の要件",
             "Green 検証",
             "Refactor / cleanup ガードレール",
+            "1 behavior slice / 1 review scope / 1 commit boundary",
+            "plan amendment",
+            "fresh re-review",
+            "final review / final commit",
+            "per-step review / commit",
+            "N/A は read-only / approved-no-op step",
+            "Parent Implementation Exception",
+            "file mutation を伴う通常の implementation success path として使わない",
         ):
             with _case(asset="issue plan template", fragment=fragment):
                 assert fragment in plan_text
