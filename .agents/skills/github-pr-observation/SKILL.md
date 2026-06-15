@@ -48,12 +48,25 @@ Triage and judgment over collected evidence belong to
 
 - The final JSON written to `stdout` is the authority for permission limitation
   semantics; `stderr` progress is non-authoritative.
-- GitHub token permission failures are reported with
-  `limitations[].code="github_token_permission_denied"` and
+- `Actions` read is the normal GitHub token permission for CI observation. It
+  covers the GitHub Actions workflow runs and jobs used as the primary CI
+  evidence for a PR head SHA.
+- Checks, commit statuses, and PR status rollup are supplemental observation
+  surfaces. When Actions evidence is decisive, unavailable supplemental
+  coverage is represented as an informational limitation rather than the normal
+  remediation path.
+- Blocking GitHub token permission failures are reported with
+  `limitations[].code="github_token_permission_denied"` and, when permission
+  repair is the needed operator action,
   `recommended_next_action="fix_github_token_permissions"`.
-- Read permission failures for checks, statuses, or status rollup keep process
-  exit success when final JSON can be built, but return semantic non-success:
+- If `Actions` read is unavailable or CI cannot otherwise be observed
+  decisively, final JSON can still be returned with process exit success, but
+  the semantic result remains non-success such as
   `normalized_status="unknown"` and `overall_status="unknown"`.
+- Do not treat missing Checks read or unavailable status rollup as the ordinary
+  fix for Actions-decisive green CI. Treat it as supplemental coverage that may
+  limit what was proven, unless readable supplemental evidence shows a failure,
+  pending state, or other blocker.
 - The fixed `@codex review` trigger comment write failure is separate from read
   collection failures. It returns `normalized_status="human_gate"`,
   `overall_status="human_gate"`, and a
