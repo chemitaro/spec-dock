@@ -3037,7 +3037,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "executable `plan.md`" in workflow_issue
             assert "spec-dock-adr-facilitation" in workflow_adr
             assert "plan upfront approval" in workflow_issue
-            assert "step result approval" in workflow_issue
+            assert "Step Result Approval" in workflow_issue
             assert "docs impact" in workflow_issue
             assert "final quality gate" in workflow_issue
             assert "`qa-reviewer`" in workflow_issue
@@ -4569,6 +4569,21 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "integration test / migration / backward compatibility / filesystem / GitHub / active state" in workflow_issue
         assert "`delegated` / `approved-local-execution` / degraded mode" in workflow_issue
         assert "implementation delegation は reviewer gate の代替ではない" in workflow_issue
+        for fragment in (
+            "required reviewer gate を満たすのは fresh `passed` だけである",
+            "waiver は reviewer pass ではなく",
+            "unavailable / denied / host conflict は degraded success でも",
+            "fresh reviewer pass、Step Result Approval、normal implementation success の代替ではない",
+            "reviewer `failed`、`unavailable`、`denied`、`waived`、`provisional`",
+            "`Step Result Approval` は",
+            "required verification、fresh step reviewer `passed`",
+            "`Step Commit Gate`",
+            "post-commit clean check",
+            "final commit は final report ledger と delivery evidence boundary",
+            "catch-up implementation commit ではない",
+            "final commit で救済してはならない",
+        ):
+            assert fragment in workflow_issue
         assert "Parent Implementation Exception" in workflow_issue
         assert "delegation 不可理由、user approval、allowed files、allowed operation、rollback plan、post-change verification、reviewer gate" in workflow_issue
         assert "reviewer gate mapping" in workflow_issue
@@ -4595,10 +4610,18 @@ class TestInitUpdate(CliRuntimeHarness):
             "spec-dock/docs/workflow_issue.md as the source of truth",
             "concise reminder for issue execution",
             "parent agent responsible for orchestration",
+            "Execute exactly one current implementation step at a time",
+            "Do not start implementation, review, or commit work for the next step until the current step is closed",
+            "required verification",
+            "a fresh step reviewer pass",
+            "the Step Commit Gate",
+            "a post-commit clean check",
             "Route runtime, tests, and scaffold behavior to `dev-coder`",
             "Route shipped docs, templates, skills, and workflow text to `doc-writer`",
+            "Parent direct implementation or direct reviewer-fail fixes require a documented Parent Implementation Exception",
             "bounded delegated follow-up",
             "Parent direct fixes require a documented Parent Implementation Exception",
+            "not reviewer passes or normal implementation success",
         ):
             assert fragment in issue_execution_skill
         self._assert_issue_execution_runtime_command_reminders(
