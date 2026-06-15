@@ -252,7 +252,9 @@ def has_zero_check_limitation(payload: dict) -> bool:
 
 def has_permission_limitation(payload: dict) -> bool:
     return any(
-        isinstance(item, dict) and item.get("code") == "github_token_permission_denied"
+        isinstance(item, dict)
+        and item.get("code") == "github_token_permission_denied"
+        and item.get("severity") == "blocking"
         for item in payload.get("limitations", [])
     )
 

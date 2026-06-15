@@ -79,6 +79,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-011 | adopted | reviewer | `plan.md`, `report.md` | Second fresh plan re-review found no findings and confirmed implementation handoff readiness | Fresh `spec-reviewer` plan re-review result; `plan.md`; `report.md` | Ready for implementation handoff |
 | EAL-012 | adopted | dev-coder | `fetch_pr_checks_snapshot.sh`, `tests/unit/infra/test_init_update.py`, `report.md` | S01 delegated implementation and follow-up fixed Actions-only green and supplemental permission behavior; code-reviewer re-review passed | S01 dev-coder outputs; parent test reruns; S01 code-reviewer results; commit `0cb15bfd` | Continue to S02 |
 | EAL-013 | adopted | dev-coder | `fetch_pr_checks_snapshot.sh`, `tests/unit/infra/test_init_update.py`, `report.md` | S02 delegated implementation added Actions taxonomy/failure/zero/API failure behavior. P1 reviewer findings were fixed by bounded dev-coder follow-ups; fresh code-reviewer re-review passed with no findings | S02 dev-coder outputs; parent test reruns; code-reviewer fail results; final code-reviewer pass; focused pytest `33 passed` | Commit S02 and continue to S03 |
+| EAL-014 | adopted | dev-coder | `fetch_pr_observation_snapshot.sh`, `wait_pr_observation.sh`, `tests/unit/infra/test_init_update.py`, `report.md` | S03 delegated implementation made wrapper permission remediation depend on blocking limitations and refreshed wrapper fake-gh tests for Actions-primary output | S03 dev-coder output; parent focused pytest `49 passed`; `git diff --check` pass; fresh code-reviewer pass | Commit S03 and continue to S90 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -174,6 +175,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S02 | Red | `tc-s02-001`..`tc-s02-005` red-required | Initial S02 tests failed before implementation for failed/stale/running/API-failure paths; zero Actions runs was confirmed to pass incorrectly on S01 collector | `uv run pytest tests/unit/infra/test_init_update.py -k issue_187_actions`; S01 collector temporary check for zero Actions runs | pass | Red evidence observed by dev-coder |
 | S02 | Green | Actions failure/running/pending/zero/API failure taxonomy | Parent rerun after schema-unavailable follow-up: `33 passed, 333 deselected` | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187 or actions or stale or zero"` | pass | Includes `actions_primary_non_json` schema-unavailable metadata regression |
 | S02 | Refactor | guardrail satisfied / no wrapper/docs/mirror edits | `git diff --check` passed after all S02 follow-ups | `git diff --check`; diff inspection | pass | Report update is parent evidence-only |
+| S03 | Red | `tc-s03-001`, `tc-s03-002` red-required; `tc-s03-003` covered-existing | New wrapper tests initially failed because informational supplemental permission limitation was treated as permission blocker; wait fixture also exposed missing resume boundary until corrected | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187_snapshot_propagates_actions_pass_with_informational_supplemental_permission or issue_187_wait_preserves_actions_pending_with_informational_supplemental_permission"` | pass | Red evidence observed by dev-coder before wrapper severity fix |
+| S03 | Green | snapshot/wait wrappers ignore informational supplemental permission blockers and preserve stale-head behavior | Parent rerun: `49 passed, 319 deselected` | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187 or pr_observation_snapshot or pr_observation_wait or stale_head"` | pass | Includes stale-head regressions and wrapper fake-gh Actions-primary fixtures |
+| S03 | Refactor | guardrail satisfied / only wrapper scripts and tests changed | `git diff --check` passed; diff limited to S03 allowed paths | `git diff --check`; `git diff --stat` | pass | No mirror/docs/report edits by dev-coder |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
@@ -182,12 +186,14 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S02 | zero Actions runs limitation severity | implementation / broad verification | recorded decision D-003; kept status non-pass and limitation informational to preserve existing zero-check grace | `tc-s02-005` | no | `test_issue_187_zero_actions_runs_is_never_passed`; existing zero-check grace test |
 | S02 | generic API failure metadata and check-run-derived Actions failure shape | code-reviewer P1 | bounded dev-coder follow-up added tests and fixes | `tc-s02-001`, `tc-s02-004` | no | code-reviewer fail; follow-up `32 passed` |
 | S02 | schema-unavailable Actions metadata | code-reviewer P1 | bounded dev-coder follow-up added non-JSON response regression and metadata fix | `tc-s02-004` | no | `test_issue_187_actions_primary_non_json_response_is_actions_read_and_redacted`; follow-up `33 passed` |
+| S03 | existing wrapper fake-gh tests lacked Actions endpoints after Actions-primary collector became required | focused pytest failure during S03 | added Actions success runs/jobs payloads to affected wrapper fake-gh tests | `tc-s03-001`, `tc-s03-003` | no | focused pytest `49 passed` |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
 | S01 | `tc-s01-001`, `tc-s01-002` | Actions-only green passes with explicit coverage limitation; supplemental permission is not normal blocker; no raw token/stderr leak | dev-coder implementation; parent focused pytest rerun; code-reviewer re-review pass | pass | S01 committed after reviewer gate |
 | S02 | `tc-s02-001`..`tc-s02-005` | Actions failures/running/pending/zero/API failures are non-pass and failure details follow design shape | dev-coder implementation and follow-ups; parent focused pytest rerun `33 passed`; `git diff --check` pass; fresh code-reviewer re-review pass with no findings | pass | Ready for S02 commit |
+| S03 | `tc-s03-001`..`tc-s03-003` | wrapper tests and stale head regression pass; informational supplemental permission limitations do not become permission blockers | dev-coder implementation; parent focused pytest rerun `49 passed`; `git diff --check` pass; fresh code-reviewer pass | pass | Ready for S03 commit |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -199,6 +205,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | `tc-s02-003` | S02 | yes | red-required | running/pending states initially not classified from Actions | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187 or actions or stale or zero"` -> 33 passed | pass | `test_issue_187_actions_running_and_pending_states_are_not_passed` |
 | `tc-s02-004` | S02 | yes | red-required | Actions API failure initially could pass or lack required metadata; schema-unavailable non-JSON path lacked metadata before follow-up | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187 or actions or stale or zero"` -> 33 passed; `git diff --check` -> pass | pass | API failure/redaction tests plus `test_issue_187_actions_primary_non_json_response_is_actions_read_and_redacted` |
 | `tc-s02-005` | S02 | yes | red-required | zero Actions runs on S01 collector could pass with supplemental green | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187 or actions or stale or zero"` -> 33 passed | pass | `test_issue_187_zero_actions_runs_is_never_passed` |
+| `tc-s03-001` | S03 | yes | red-required | snapshot initially treated informational supplemental permission limitation as permission blocker | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187 or pr_observation_snapshot or pr_observation_wait or stale_head"` -> 49 passed | pass | `test_issue_187_snapshot_propagates_actions_pass_with_informational_supplemental_permission` |
+| `tc-s03-002` | S03 | yes | red-required | wait wrapper initially needed fixture correction after Red; final behavior preserves running as wait/resume | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187 or pr_observation_snapshot or pr_observation_wait or stale_head"` -> 49 passed | pass | `test_issue_187_wait_preserves_actions_pending_with_informational_supplemental_permission` |
+| `tc-s03-003` | S03 | yes | covered-existing | existing stale-head tests cover head mismatch / rerun action | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187 or pr_observation_snapshot or pr_observation_wait or stale_head"` -> 49 passed | pass | Existing stale-head regressions remained green |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -212,6 +221,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | `tc-s02-003` | S02 | running/pending Actions states are non-pass | pass | Focused tests and fresh code-reviewer pass |
 | `tc-s02-004` | S02 | primary Actions API failures, including schema-unavailable, are blocking `actions_read` unknown with sanitized metadata | pass | Focused tests and fresh code-reviewer pass |
 | `tc-s02-005` | S02 | zero Actions runs is never passed | pass | Focused tests and fresh code-reviewer pass |
+| `tc-s03-001` | S03 | Snapshot propagates Actions-primary passed status and avoids permission remediation for informational supplemental limitation | pass | Parent rerun: 49 focused tests passed; fresh code-reviewer pass |
+| `tc-s03-002` | S03 | Wait preserves Actions running/pending as wait/resume and ignores informational supplemental permission limitation | pass | Parent rerun: 49 focused tests passed; fresh code-reviewer pass |
+| `tc-s03-003` | S03 | Stale head remains freshness failure with `rerun_for_current_head` | pass | Existing stale-head regressions included in focused suite; fresh code-reviewer pass |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -219,6 +231,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | added | `tc-s01-002` | `test_issue_187_actions_jobs_unavailable_prevents_actions_only_pass` | `tc-s01-002` | code-reviewer found primary Actions jobs unavailable could false-pass; this is within AC-005/S01 false-pass safety | no | no; re-review pass obtained |
 | added | `tc-s02-001` | check-run-derived Actions failure shape/dedupe regression | `tc-s02-001` | code-reviewer found legacy shape could appear from supplemental check-run path | no | no; fresh code-reviewer pass obtained |
 | added | `tc-s02-004` | generic and schema-unavailable Actions API failure metadata regressions | `tc-s02-004` | code-reviewer found primary Actions failure metadata gaps | no | no; fresh code-reviewer pass obtained |
+| added | `tc-s03-001`, `tc-s03-002` | informational supplemental permission wrapper regressions | `tc-s03-001`, `tc-s03-002` | S03 Red showed wrapper permission gating needed severity/blocking semantics | no | no; fresh code-reviewer pass obtained |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
@@ -237,6 +250,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | authoring-plan | approved-local-authoring | dirty delegated-draft baseline | N/A for draft; spec-reviewer for gate | canonical plan authoring and review | `plan.md`; `report.md` | issue-local docs | source code/test edits | fresh spec-reviewer | plan blocker | findings, status, rationale | pass; ready for implementation handoff |
 | S01 | delegated | runtime/test implementation step | dev-coder | Actions-only green and supplemental permission collector behavior | `plan.md` S01; `design.md`; `requirement.md` | provider collector and focused tests | wrappers, SKILL.md, mirror, Codex review collector, trigger script, merge automation | focused pytest and `git diff --check` | public CLI change; arbitrary endpoint input; secret leak; jobs unavailable false-pass | changed files, tests, closure evidence, ledger note | pass; code-reviewer re-review passed |
 | S02 | delegated | runtime/test implementation step | dev-coder | Actions taxonomy, failure details, zero runs, primary API failures | `plan.md` S02; `design.md`; `requirement.md`; S01 evidence | provider collector and focused tests | wrappers, SKILL.md, mirror, docs, report edits by worker | focused pytest and `git diff --check` | inability to distinguish failure/running/pending; API failure metadata gaps | changed files, tests, closure evidence, ledger notes | pass; fresh code-reviewer re-review passed with no findings |
+| S03 | delegated | runtime/test implementation step | dev-coder | snapshot/wait wrapper classification and stale-head regression | `plan.md` S03; `design.md`; `requirement.md`; S01/S02 evidence | wrapper scripts and focused tests | review lifecycle, trigger script, merge automation, SKILL.md, mirror files, report edits by worker | focused pytest and `git diff --check` | stale head and CI failure cannot remain distinct | changed files, tests, closure evidence, ledger note | pass for implementation and closure evidence; fresh code-reviewer pass obtained |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -256,6 +270,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S02-review-2 | code-reviewer | Fresh S02 review found P1: schema-unavailable Actions primary path missing metadata; report closure evidence incomplete | none | read-only code review | fail | dev-coder schema follow-up completed; report evidence updated | accepted for remediation |
 | S02-review-3 | code-reviewer | Third S02 review found no additional code P1, but report evidence was stale/pending | none | read-only code review | fail | report evidence updated to latest 33-pass result | accepted for remediation |
 | S02-review-4 | code-reviewer | Fresh S02 re-review found no findings; confirmed taxonomy, failure shape, API failure metadata, zero-runs behavior, and report closure evidence | none | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_187 or actions or stale or zero'` -> 33 passed; `git diff --check` -> pass | pass | none | accepted |
+| S03-dev | dev-coder | Implemented wrapper permission-blocker severity checks, added S03 wrapper regressions, and refreshed affected wrapper fake-gh fixtures for Actions-primary collector output | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`; `tests/unit/infra/test_init_update.py` | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187 or pr_observation_snapshot or pr_observation_wait or stale_head"` -> 49 passed; `git diff --check` -> pass | pass | none | accepted |
+| S03-review-1 | code-reviewer | Reviewed uncommitted S03 wrapper/test/report changes after parent verification | same S03 files | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_187 or pr_observation_snapshot or pr_observation_wait or stale_head'` -> 49 passed; `git diff --check` -> pass | pass | none | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -270,12 +286,14 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | plan | spec authoring gate | spec-reviewer | fresh | passed | N/A | ready for implementation handoff | Second fresh re-review had no findings |
 | S01 | step code review gate | code-reviewer | fresh after follow-up | passed | N/A | proceed to S01 commit | No findings after jobs-unavailable P1 fix |
 | S02 | step code review gate | code-reviewer | fresh after follow-ups and report update | passed | N/A | proceed to S02 commit | No findings; focused pytest 33 passed and diff check passed |
+| S03 | step code review gate | code-reviewer | passed | pass | S03-review-1 | proceed to S03 commit | Dev-coder, parent focused pytest, reviewer focused pytest, and `git diff --check` passed |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed | provider collector + focused tests + S01 report evidence | S01 commit hash recorded in external delivery evidence; row updated by amend | `git status --short` -> clean after commit | N/A | N/A | N/A | code-reviewer pass obtained before commit; amend used only to record post-commit gate state |
 | S02 | committed | provider collector + focused tests + S02 report evidence | S02 commit hash recorded in external delivery evidence; row updated by amend | `git status --short` -> clean after commit | N/A | N/A | N/A | code-reviewer pass obtained before commit; amend used only to record post-commit gate state |
+| S03 | committed | wrapper scripts + focused tests + S03 report evidence | committed | `git status --short` clean after commit | hash recorded in external delivery evidence; row updated by amend | N/A | N/A | fresh code-reviewer pass obtained before commit |
 
 #### 変更したファイル
 - `path/to/file1` - ...

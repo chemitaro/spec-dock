@@ -14045,6 +14045,16 @@ case "$*" in
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
 JSON
     ;;
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
@@ -14131,6 +14141,16 @@ case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
 JSON
     ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
@@ -14670,6 +14690,16 @@ case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<JSON
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"${PR_STATE:-OPEN}","isDraft":${PR_IS_DRAFT:-false},"number":13}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
 JSON
     ;;
   "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
@@ -16159,6 +16189,159 @@ esac
             assert "zero_actions_runs_non_success" in [
                 item.get("code") for item in payload["limitations"]
             ]
+
+    def test_issue_187_snapshot_propagates_actions_pass_with_informational_supplemental_permission(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        source_script = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            script_dir = tmp_path / "scripts"
+            lib_dir = script_dir / "lib"
+            fake_bin = tmp_path / "bin"
+            script_dir.mkdir()
+            lib_dir.mkdir()
+            fake_bin.mkdir()
+            snapshot_script = script_dir / "fetch_pr_observation_snapshot.sh"
+            shutil.copy2(source_script, snapshot_script)
+            snapshot_script.chmod(0o755)
+            checks_script = lib_dir / "fetch_pr_checks_snapshot.sh"
+            checks_script.write_text(
+                """#!/usr/bin/env bash
+cat <<'JSON'
+{"ci":{"status":"passed","progress_status":"passed","checks":[],"failures":[],"actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0}},"jobs":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0}}}},"limitations":[{"code":"github_token_permission_denied","capability":"check_runs_read","api":"repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs","source":"gh_api","status":"permission_denied","severity":"informational","blocking":false,"recommended_next_action":"fix_github_token_permissions","secret_redacted":true,"stderr_sha256":"redacted"},{"code":"ci_coverage_limited_to_github_actions","source":"actions_collector","severity":"informational","blocking":false}],"decision":{"status":"passed","recommended_next_action":"merge_prepared","observation_complete":true}}
+JSON
+""",
+                encoding="utf-8",
+            )
+            checks_script.chmod(0o755)
+            review_script = lib_dir / "fetch_pr_review_snapshot.sh"
+            review_script.write_text(
+                """#!/usr/bin/env bash
+cat <<'JSON'
+{"review":{"status":"approved","signals":[]},"decision":{"status":"passed","status_reason":"passed","recommended_next_action":"merge_prepared","observation_complete":true,"completion_signal":"submitted_pull_request_review"},"codex_review":{"lifecycle":{"status":"submitted","completion_signal":"submitted_pull_request_review"}}}
+JSON
+""",
+                encoding="utf-8",
+            )
+            review_script.chmod(0o755)
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
+    cat <<'JSON'
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [str(snapshot_script), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "passed"
+            assert payload["normalized_status"] == "passed"
+            assert payload["overall_status"] == "passed"
+            assert payload["recommended_next_action"] == "merge_prepared"
+            assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+            assert not any(
+                item.get("code") == "github_token_permission_denied"
+                and item.get("severity") == "blocking"
+                for item in payload["limitations"]
+            )
+
+    def test_issue_187_wait_preserves_actions_pending_with_informational_supplemental_permission(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        source_script = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            script_dir = tmp_path / "scripts"
+            script_dir.mkdir()
+            wait_script = script_dir / "wait_pr_observation.sh"
+            shutil.copy2(source_script, wait_script)
+            wait_script.chmod(0o755)
+            snapshot_script = script_dir / "fetch_pr_observation_snapshot.sh"
+            snapshot_script.write_text(
+                """#!/usr/bin/env bash
+cat <<'JSON'
+{"script":"fetch_pr_observation_snapshot.sh","status":"running","overall_status":"running","normalized_status":"running","observation_complete":false,"repo":"owner/repo","pr":13,"expected_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","current_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","head_matches_expected":true,"fingerprint":"issue-187-running","summary":{"ci":"running","review":"pending","head":"matched"},"limitations":[{"code":"github_token_permission_denied","capability":"status_check_rollup_read","source":"gh_pr_view","status":"permission_denied","severity":"informational","blocking":false,"recommended_next_action":"fix_github_token_permissions","secret_redacted":true,"stderr_sha256":"redacted"}],"recommended_next_action":"wait","ci":{"status":"running","progress_status":"running","actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0}},"jobs":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0}}}},"review":{"status":"pending","signals":[]},"decision":{"status":"running","status_reason":"ci_pending","recommended_next_action":"wait","observation_complete":false}}
+JSON
+""",
+                encoding="utf-8",
+            )
+            snapshot_script.chmod(0o755)
+
+            result = subprocess.run(
+                [
+                    str(wait_script),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--timeout-seconds",
+                    "1",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "2",
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                    "--progress",
+                    "none",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "running"
+            assert payload["normalized_status"] in {"running", "timeout"}
+            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert not any(
+                item.get("code") == "github_token_permission_denied"
+                and item.get("severity") == "blocking"
+                for item in payload["limitations"]
+            )
 
     def test_issue_170_pr_observation_snapshot_keeps_required_checks_pending_as_wait(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -19736,6 +19919,16 @@ case "$*" in
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
 JSON
     ;;
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
@@ -19998,6 +20191,16 @@ case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
 JSON
     ;;
   "api repos/owner/repo/commits/aaaaaaa/check-runs --paginate")
@@ -23471,6 +23674,16 @@ case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
 JSON
     ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
