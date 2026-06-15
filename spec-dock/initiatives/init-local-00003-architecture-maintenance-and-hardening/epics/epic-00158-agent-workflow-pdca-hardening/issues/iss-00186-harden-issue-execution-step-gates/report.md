@@ -136,6 +136,112 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装記録（セッションログ） (必須)
 
+### セッションログ（2026-06-16 S01）
+
+#### 対象
+- Step: S01 — Skill Spine Update
+- AC/EC: AC-001, AC-002, AC-003, EC-001, EC-003
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S01 — Skill Spine Update`
+  - closure ids: `tc-001`, `tc-002`
+
+#### 実施内容
+- `doc-writer` に S01 の provider skill 更新を委任した。
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md` の first-read surface に compact gate spine を追加した。
+- 変更は allowed path 1ファイルのみで、workflow docs、tests、templates、prompts、runtime code、canonical issue docs は変更していない。
+- `spec-reviewer` に S01 provider skill diff only の fresh review を依頼し、`review_status=pass` を得た。
+
+#### 実行コマンド / 結果
+```bash
+git status --short
+
+ M src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md
+```
+
+```bash
+git diff -- src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md
+
+First-Read Gate Spine added near the top of the provider skill.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S01 | 代替証跡（Red / alternative） | docs-only / inspect-only | provider skill に step gate spine が未追加である前提を plan が固定済み | `plan.md` S01 / `git diff` inspection | pass | S03 で structural assertion を追加予定 |
+| S01 | 緑フェーズ（Green） | targeted inspection | skill now states exactly one current implementation step, next-step unlock gates, delegated mutation routing, Parent Implementation Exception, and non-pass blocker semantics | `sed -n '1,90p' src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md` | pass | workflow policy / field schema / completion matrix は追加していない |
+| S01 | リファクタリング（Refactor） | guardrail satisfied | allowed path 1ファイルのみの差分 | `git status --short` / `git diff -- ...SKILL.md` | pass | no refactor needed |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S01 | S03 の structural assertion 追加前なので future drift protection は未完了 | delegated worker | S03 の計画済み obligation として維持 | tc-004 | no | `plan.md` S03 |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S01 | tc-001, tc-002 | provider skill has compact gate spine and preserves existing required routing fragments | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md`; `spec-reviewer` pass (`019ecc0d-7c8a-75c0-80d7-c6b67c8a30d2`) | pass | S03 assertion follow-up remains planned |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-001 | S01 | yes | inspect-only + structural assertion | plan fixed missing top-loaded loop as target | `sed -n '1,90p' src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md`; S01 `spec-reviewer` pass | pass | structural assertion deferred to S03 / tc-004 |
+| tc-002 | S01 | yes | inspect-only + structural assertion | existing delegated routing required preservation | `sed -n '1,90p' src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md`; S01 `spec-reviewer` pass | pass | structural assertion deferred to S03 / tc-004 |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-001 | S01 | provider skill diff + targeted inspection + `spec-reviewer` pass (`019ecc0d-7c8a-75c0-80d7-c6b67c8a30d2`) | pass | S03 will add regression assertion |
+| tc-002 | S01 | provider skill diff + targeted inspection + `spec-reviewer` pass (`019ecc0d-7c8a-75c0-80d7-c6b67c8a30d2`) | pass | S03 will add regression assertion |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-001 | tc-s01-001 | tc-001 | planned closure unchanged | no | no |
+| none | tc-002 | tc-s01-002 | tc-002 | planned closure unchanged | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/3c32/spec-dock` | iss-00186 | current session | `doc-writer`, `dev-coder`, `spec-reviewer`, `code-reviewer`, `qa-reviewer` | same repo, active issue, current session, named roles; no destructive action or scope expansion | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed with S01 only |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated | shipped skill text update | `doc-writer` | S01 provider skill spine only | `plan.md` S01; provider skill file | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md` | all other files | targeted inspection; S03 assertion follow-up | path outside allowed scope; full policy copy; workflow semantics change | changed files, wording summary, inspection result, risks, no-material-decision | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S01 | `doc-writer` | Added `First-Read Gate Spine` with one-step-at-a-time, next-step unlock gates, delegated routing, Parent Implementation Exception, and non-pass blocker semantics. | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md` | docs-only targeted inspection -> pass | `spec-reviewer` pass (`019ecc0d-7c8a-75c0-80d7-c6b67c8a30d2`) | S03 assertion still pending by plan | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S01 | N/A: delegated to `doc-writer` | N/A | N/A | N/A | revert S01 commit if needed | targeted inspection -> pass | `spec-reviewer` passed | none |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S01 | step reviewer | `spec-reviewer` | fresh | passed | N/A | proceed to S01 commit gate | agent `019ecc0d-7c8a-75c0-80d7-c6b67c8a30d2`; findings none |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S01 | committed | S01 provider skill change + S01 report evidence | S01 step commit; hash recorded after commit as external evidence | `git status --short` checked after commit | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md` - S01 first-read gate spine を追加。
+- `spec-dock/active/issue/report.md` - S01 observed evidence ledger を記録。
+
+#### コミット
+- S01 step commit will be created after this report evidence is staged.
+
+#### メモ
+- Worker output ended with: `No material implementation decisions beyond the approved plan.`
+- No plan amendment required.
+
+---
+
 ### セッションログ（2026-06-13 HH:MM - HH:MM）
 
 #### 対象
