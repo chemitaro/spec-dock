@@ -5,7 +5,7 @@ ID: "iss-00186"
 関連GitHub: ["#186"]
 状態: "draft | approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-06-13"
+最終更新: "2026-06-16"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00158", "init-local-00003"]
 ---
@@ -49,7 +49,7 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| none | resolved | no_action | orchestrator | material decision ledger entries are not present during spec authoring beyond EAL / Spec Authoring Gate records | no action | Keep this section explicit without template placeholder rows. | Planning decisions are captured in requirement/design/plan and EAL entries. | no_action | `requirement.md`; `design.md`; `plan.md`; this report | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +63,10 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | research | `requirement.md` / `design.md` / `plan.md` | issue execution の step gate failure mode、skill/docs/templates responsibility、deep-consultant findings を requirement scope と Option B design input として採用する。 | `discussions/20260613t082454z-research-issue-execution-step-gate-analysis.md`; `discussions/20260613t082641z-research-skill-workflow-spine-policy-analysis.md`; `discussions/20260613t083027z-research-deep-consultant-skill-policy-findings.md`; `discussions/20260613t084318z-disc-issue-execution-skill-update-direction.md` | requirement review 後、design / plan へ反映する |
+| EAL-002 | adopted | interview | `requirement.md` / `design.md` / `plan.md` | ユーザーが Option B を採用したため、skill + minimal workflow docs + assertion update + mirror validation を必須 scope とし、templates / prompt は alignment check と重大矛盾の小修正に限定する。 | `discussions/20260615t152809z-interview-issue-execution-hardening-scope-boundary.md` | requirement review にかけ、pass 後に design phase へ進む |
+| EAL-003 | adopted | system-architect delegated draft | `design.md` | delegated draft は Option B architecture、surface responsibility、file change plan、verification、risks / rollback を requirement と既存 ADR に沿って整理しており、canonical `design.md` に採用できる。 | `discussions/20260615t153746z-draft-design-issue-execution-step-gate-hardening.md` | run fresh design `spec-reviewer`; pass 後に plan phase へ進む |
+| EAL-004 | adopted | implementation-planner delegated draft | `plan.md` | delegated draft は passed requirement / design を sequential implementation steps、delegation contracts、concrete test cases、review / commit gates、S90 / S99 に落としており、canonical `plan.md` に採用できる。 | `discussions/20260615t154722z-draft-plan-issue-execution-step-gate-hardening.md` | run fresh plan `spec-reviewer`; pass 後に issue execution handoff ready とする |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -79,6 +82,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
+| requirement | Active issue docs; parent epic requirement/design; accepted context-surface ADR; issue research/disc artifacts; `workflow_issue.md`; `authoring/issue-plan.md`; `spec-dock-issue-execution` skill | `discussions/20260615t152809z-interview-issue-execution-hardening-scope-boundary.md`: Option B adopted | adopted into `requirement.md`; scope / non-scope / AC / EC fixed | passed by fresh `spec-reviewer` (`019ecbeb-8232-7543-b337-8ae7e3ff5990`), findings none | no | promote to design phase; request `system-architect` discussion draft before canonical `design.md` integration |
+| design | Fresh requirement; `system-architect` draft; accepted ADR; provider skill/docs; relevant test assertions; report delegated draft evidence | none blocking; non-blocking design questions deferred to plan/follow-up handling | adopted `system-architect` draft into canonical `design.md`; surface responsibility and file change plan fixed | passed by fresh `spec-reviewer` (`019ecbf3-277c-7b93-82e4-c10c1596135b`), findings none | no | promote to plan phase; request `implementation-planner` discussion draft before canonical `plan.md` integration |
+| plan | Fresh requirement/design; `implementation-planner` draft; `workflow_issue.md`; `phase_plan_issue.md`; `authoring/issue-plan.md`; target provider files/tests | none blocking; Option B adopted as scope boundary | adopted `implementation-planner` draft into canonical `plan.md`; sequential step contract, delegation contract, concrete cases, reviewer gates, commit/no-op gates, S90 / S99 fixed | passed by fresh `spec-reviewer` (`019ecc00-60a7-7820-a834-01ecca23db66`), findings resolved / none blocking on re-review | no | issue execution handoff ready; implementation must follow S01-S90 sequential gates |
 | 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
@@ -107,6 +113,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
+| system-architect | iss-00186 | `discussions/20260615t153746z-draft-design-issue-execution-step-gate-hardening.md` | `requirement.md`; `report.md`; issue research/disc/interview; parent epic requirement/design; accepted ADR; provider skill/docs; tests | `design.md`; `report.md` | adopted | `design.md`; `report.md` | pass: only one new flat Markdown discussion draft under target scope; no canonical/implementation/test/config/GitHub edits by delegated agent | integrated into canonical `design.md` by main orchestrator | none material; broad empirical harness remains deferred | none | passed by fresh `spec-reviewer` (`019ecbf3-277c-7b93-82e4-c10c1596135b`), findings none | promoted to plan; design phase unblocked |
+| implementation-planner | iss-00186 | `discussions/20260615t154722z-draft-plan-issue-execution-step-gate-hardening.md` | `requirement.md`; `design.md`; `report.md`; `workflow_issue.md`; `phase_plan_issue.md`; `authoring/issue-plan.md`; provider skill/docs/templates/prompt/tests | `plan.md`; `report.md` | adopted | `plan.md`; `report.md` | pass: only one new flat Markdown discussion draft under target scope; no canonical/implementation/test/config/GitHub edits by delegated agent | integrated into canonical `plan.md` by main orchestrator | none material; S04 broad drift remains scoped to triage/follow-up | none | passed by fresh `spec-reviewer` (`019ecc00-60a7-7820-a834-01ecca23db66`), findings resolved / none blocking on re-review | promoted to issue execution handoff ready |
 | 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
