@@ -302,6 +302,7 @@ def has_blocking_limitation(ignored_codes=None):
 def has_permission_limitation():
     return any(
         item.get("code") == "github_token_permission_denied"
+        and item.get("severity") == "blocking"
         for item in limitations
         if isinstance(item, dict)
     )
