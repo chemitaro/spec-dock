@@ -1204,6 +1204,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00171-improve-issue-planning-actor-workflow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00184-rename-spec-dock-hub-skill/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00186-harden-issue-execution-step-gates/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1376,6 +1377,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00167-migrate-tests-to-pytest/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00171-improve-issue-planning-actor-workflow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00184-rename-spec-dock-hub-skill/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00186-harden-issue-execution-step-gates/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
