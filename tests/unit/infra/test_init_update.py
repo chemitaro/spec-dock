@@ -16046,6 +16046,96 @@ esac
                 item.get("code") for item in payload["limitations"]
             ]
 
+    @pytest.mark.parametrize(
+        "jobs_response",
+        [
+            '{"total_count":1}',
+            '{"total_count":1,"jobs":{}}',
+            '{"total_count":1,"jobs":null}',
+        ],
+        ids=["missing-jobs", "object-jobs", "null-jobs"],
+    )
+    def test_issue_187_actions_jobs_missing_field_prevents_actions_only_pass(
+        self, jobs_response: str
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success","html_url":"https://example.test/run/202"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+__JOBS_RESPONSE__
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    printf 'GraphQL: Resource not accessible by personal access token\\n' >&2
+    exit 1
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    printf 'GraphQL: Resource not accessible by personal access token\\n' >&2
+    exit 1
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    printf 'GraphQL: Resource not accessible by personal access token\\n' >&2
+    exit 1
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""".replace("__JOBS_RESPONSE__", jobs_response),
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "unknown"
+            assert payload["ci"]["status"] != "passed"
+            assert payload["ci"]["actions"]["jobs_summary"]["collection"] == {
+                "successful_runs": 0,
+                "failed_runs": 1,
+            }
+            assert payload["ci"]["actions"]["jobs_summary"]["total"] == 0
+            limitation = next(
+                item
+                for item in payload["limitations"]
+                if item.get("code") == "github_actions_jobs_unavailable"
+            )
+            assert limitation["capability"] == "actions_read"
+            assert limitation["severity"] == "blocking"
+            assert "ci_coverage_limited_to_github_actions" not in [
+                item.get("code") for item in payload["limitations"]
+            ]
+
     def test_issue_187_actions_failed_job_surfaces_step_detail(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -19782,10 +19872,17 @@ esac
             fake_bin = tmp_path / "bin"
             fake_bin.mkdir()
             fake_gh = fake_bin / "gh"
+            gh_log = tmp_path / "gh.log"
             fake_gh.write_text(
                 """#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$GH_FAKE_LOG"
 case "$*" in
-  "api repos/owner/repo/actions/runs?head_sha=aaaaaaa --paginate")
+  "pr view 13 --repo owner/repo --json headRefOid")
+    cat <<'JSON'
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
     cat <<'JSON'
 {"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
 JSON
@@ -19795,9 +19892,91 @@ JSON
 {"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
 JSON
     ;;
-  "api repos/owner/repo/commits/aaaaaaa/check-runs --paginate")
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":101,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{"state":"success","statuses":[]}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"CLEAN","statusCheckRollup":[{"name":"test","status":"COMPLETED","conclusion":"SUCCESS"}]}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 7],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["check_runs"]["success"] == 1
+            assert payload["ci"]["check_runs"]["stale"] == 0
+            assert payload["expected_head_sha"] == "a" * 40
+            gh_calls = gh_log.read_text(encoding="utf-8").splitlines()
+            assert (
+                "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate"
+                in gh_calls
+            )
+            assert "api repos/owner/repo/actions/runs?head_sha=aaaaaaa --paginate" not in gh_calls
+            assert "stale_head_check" not in [item["code"] for item in payload["limitations"]]
+
+    def test_issue_187_abbreviated_head_sha_resolution_failure_blocks_green_ci(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "pr view 13 --repo owner/repo --json headRefOid")
+    cat <<'JSON'
+{"headRefOid":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{"total_count":1,"check_runs":[{"id":101,"name":"test","head_sha":"aaaaaaa","status":"completed","conclusion":"success"}]}
 JSON
     ;;
   "api repos/owner/repo/commits/aaaaaaa/status --paginate")
@@ -19834,10 +20013,15 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "passed"
-            assert payload["ci"]["check_runs"]["success"] == 1
-            assert payload["ci"]["check_runs"]["stale"] == 0
-            assert "stale_head_check" not in [item["code"] for item in payload["limitations"]]
+            assert payload["ci"]["status"] == "unknown"
+            assert payload["ci"]["status"] != "passed"
+            limitation = next(
+                item
+                for item in payload["limitations"]
+                if item.get("code") == "pr_head_sha_resolution_failed"
+            )
+            assert limitation["source"] == "gh_pr_view"
+            assert limitation["severity"] == "blocking"
 
     def test_issue_180_s02_snapshot_maps_check_runs_permission_denied_to_unknown_limitation(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -20984,7 +21168,12 @@ case "$*" in
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
 JSON
     ;;
-  "api repos/owner/repo/actions/runs?head_sha=aaaaaaa --paginate")
+  "pr view 13 --repo owner/repo --json headRefOid")
+    cat <<'JSON'
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
     cat <<'JSON'
 {"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
 JSON
@@ -20994,12 +21183,12 @@ JSON
 {"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
 JSON
     ;;
-  "api repos/owner/repo/commits/aaaaaaa/check-runs --paginate")
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
 JSON
     ;;
-  "api repos/owner/repo/commits/aaaaaaa/status --paginate")
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
     cat <<'JSON'
 {"state":"success","statuses":[]}
 JSON
@@ -21038,7 +21227,17 @@ esac
             assert payload["head_matches_expected"] is True
             assert payload["summary"]["ci"] == "passed"
             assert payload["ci"]["status"] == "passed"
-            assert "commits/aaaaaaa/check-runs --paginate" in gh_log.read_text(encoding="utf-8")
+            gh_calls = gh_log.read_text(encoding="utf-8").splitlines()
+            assert (
+                "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate"
+                in gh_calls
+            )
+            assert (
+                "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate"
+                in gh_calls
+            )
+            assert "api repos/owner/repo/actions/runs?head_sha=aaaaaaa --paginate" not in gh_calls
+            assert "api repos/owner/repo/commits/aaaaaaa/check-runs --paginate" not in gh_calls
 
     def test_issue_75_pr_observation_review_collector_explicit_trigger_body_caps_and_threads(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]

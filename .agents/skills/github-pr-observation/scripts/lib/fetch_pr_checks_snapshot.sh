@@ -278,6 +278,31 @@ def gh_pr_view():
     return payload if isinstance(payload, dict) else {}, None
 
 
+def gh_pr_head_oid():
+    command = ["gh", "pr", "view", str(pr), "--repo", repo, "--json", "headRefOid"]
+    completed = subprocess.run(command, capture_output=True, text=True, check=False)
+    if completed.returncode != 0:
+        return {}, github_failure_limitation(
+            api="gh_pr_view.headRefOid",
+            source="gh_pr_view",
+            exit_code=completed.returncode,
+            stderr=completed.stderr,
+            default_code="pr_head_sha_resolution_failed",
+            default_message="fixed read-only PR head SHA resolution failed",
+            default_severity="blocking",
+        )
+    try:
+        payload = json.loads(completed.stdout or "{}")
+    except json.JSONDecodeError:
+        return {}, {
+            "code": "pr_head_sha_resolution_failed",
+            "source": "gh_pr_view",
+            "severity": "blocking",
+            "message": "fixed read-only PR head SHA resolution returned non-JSON output",
+        }
+    return payload if isinstance(payload, dict) else {}, None
+
+
 def parse_gh_paginated_stdout(stdout):
     text = stdout or "{}"
     decoder = json.JSONDecoder()
@@ -471,6 +496,28 @@ limitations = []
 supplemental_limitations = []
 actions_failures = []
 actions_failure_dedupe_keys = set()
+if len(expected_head_sha_lower) < 40:
+    head_payload, head_limitation = gh_pr_head_oid()
+    if head_limitation:
+        limitations.append(head_limitation)
+    current_head_sha = str(head_payload.get("headRefOid") or "").lower()
+    if (
+        len(current_head_sha) == 40
+        and all(char in "0123456789abcdef" for char in current_head_sha)
+        and current_head_sha.startswith(expected_head_sha_lower)
+    ):
+        expected_head_sha = current_head_sha
+        expected_head_sha_lower = current_head_sha
+    else:
+        limitations.append(
+            {
+                "code": "pr_head_sha_resolution_failed",
+                "source": "gh_pr_view",
+                "severity": "blocking",
+                "message": "abbreviated PR head SHA could not be resolved to the current full head SHA",
+            }
+        )
+
 actions_runs_payload, actions_limitation = gh_api(
     f"repos/{repo}/actions/runs?head_sha={expected_head_sha}"
 )
@@ -550,9 +597,28 @@ for run in workflow_runs:
                 actions_failure_dedupe_keys.add(failure["dedupe_key"])
                 actions_failures.append(failure)
         continue
-    action_job_collection_successes += 1
     run_failed_jobs = []
-    for job in as_list(jobs_payload or {}, "jobs"):
+    jobs = (jobs_payload or {}).get("jobs") if isinstance(jobs_payload, dict) else None
+    if not isinstance(jobs, list):
+        action_job_collection_failures += 1
+        action_job_counts["unknown"] += 1
+        limitations.append(
+            {
+                "code": "github_actions_jobs_unavailable",
+                "source": "actions_collector",
+                "capability": "actions_read",
+                "severity": "blocking",
+                "message": "GitHub Actions jobs response did not include a jobs list",
+            }
+        )
+        if run_classification == "failed":
+            failure = actions_failure_entry(run)
+            if failure["dedupe_key"] not in actions_failure_dedupe_keys:
+                actions_failure_dedupe_keys.add(failure["dedupe_key"])
+                actions_failures.append(failure)
+        continue
+    action_job_collection_successes += 1
+    for job in jobs:
         job_classification = normalize_actions_status(job)
         if job_classification in action_job_counts:
             action_job_counts[job_classification] += 1
@@ -961,6 +1027,11 @@ actions_primary_unavailable = any(
     item.get("capability") == "actions_read" and item.get("severity") == "blocking"
     for item in limitations
 ) and not actions_available
+head_sha_resolution_failed = any(
+    item.get("code") == "pr_head_sha_resolution_failed"
+    and item.get("severity") == "blocking"
+    for item in limitations
+)
 actions_zero_runs = actions_available and actions_summary["workflow_runs"]["total"] == 0
 actions_failed = bool(action_run_counts["failed"] or action_job_counts["failed"])
 actions_running = bool(action_run_counts["running"] or action_job_counts["running"])
@@ -968,7 +1039,7 @@ actions_pending = bool(action_run_counts["pending"] or action_job_counts["pendin
 actions_unknown = bool(action_run_counts["unknown"] or action_job_counts["unknown"])
 actions_jobs_unavailable = actions_available and action_job_collection_failures > 0
 
-if actions_primary_unavailable:
+if actions_primary_unavailable or head_sha_resolution_failed:
     ci_status = "unknown"
 elif actions_failed or (
     check_counts["failed"]

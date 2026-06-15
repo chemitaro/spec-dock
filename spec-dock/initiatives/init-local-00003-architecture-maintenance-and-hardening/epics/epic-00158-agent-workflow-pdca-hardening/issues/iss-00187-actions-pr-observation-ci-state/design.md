@@ -148,6 +148,7 @@ Skill --> Collector : documents required permission
 ## インターフェース契約
 - CLI:
   - `fetch_pr_checks_snapshot.sh --repo OWNER/REPO --pr NUMBER --head-sha SHA` を維持する。
+  - `--head-sha` が既存互換の abbreviated SHA の場合は、fixed read-only `gh pr view {pr} --repo {repo} --json headRefOid` で current full head SHA に解決してから Actions / supplemental API query に使う。解決できない場合は `passed` にせず、blocking `pr_head_sha_resolution_failed` limitation で `unknown` にする。
   - `fetch_pr_observation_snapshot.sh` と `wait_pr_observation.sh` の既存 CLI を維持する。
 - GitHub API:
   - Primary:
@@ -188,6 +189,7 @@ Skill --> Collector : documents required permission
     - `dedupe_key`: `actions:{workflow_run_id}:{job_id}:{run_attempt}` when job id is available, otherwise `actions:{workflow_run_id}:run`
   - Failure detail fallback:
     - If Actions run is failed but jobs cannot be read, emit a run-level `ci.failures[]` entry with `kind="github_actions_job"`, `job_id=null`, empty `failed_steps`, and the blocking jobs limitation.
+    - If Actions jobs API returns successful JSON without a `jobs` list, treat it as jobs unavailable: do not increment `jobs_summary.collection.successful_runs`, increment `failed_runs`, and keep `ci.status` non-pass with blocking `github_actions_jobs_unavailable`.
     - If jobs are readable but steps are missing, emit the job-level failure with empty `failed_steps`.
     - Deduplicate by `dedupe_key` so the same run/job failure is not emitted twice when check-run-derived and Actions-derived paths overlap.
   - Coverage limitation:
