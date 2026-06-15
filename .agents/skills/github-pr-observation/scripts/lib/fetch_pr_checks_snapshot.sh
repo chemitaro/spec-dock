@@ -761,7 +761,25 @@ for item in status_check_rollup:
     )
 
 required_check_rollup_pending = any(
-    item.get("state") in {"EXPECTED", "IN_PROGRESS", "PENDING", "QUEUED", "REQUESTED", "WAITING"}
+    item.get("state") in {"EXPECTED", "PENDING", "QUEUED", "REQUESTED", "WAITING"}
+    for item in required_check_state["status_check_rollup_states"]
+)
+required_check_rollup_running = any(
+    item.get("state") in {"IN_PROGRESS", "RUNNING"}
+    for item in required_check_state["status_check_rollup_states"]
+)
+required_check_rollup_failed = any(
+    item.get("state") in {"FAILURE", "FAILED", "ERROR", "CANCELLED"}
+    or item.get("conclusion")
+    in {
+        "FAILURE",
+        "ERROR",
+        "CANCELLED",
+        "TIMED_OUT",
+        "ACTION_REQUIRED",
+        "STARTUP_FAILURE",
+        "STALE",
+    }
     for item in required_check_state["status_check_rollup_states"]
 )
 
@@ -788,6 +806,26 @@ if aggregate_status_failed_backstop and not (
             "description": "combined commit status aggregate state was non-success",
         }
     )
+for item in required_check_state["status_check_rollup_states"]:
+    if item.get("state") in {"FAILURE", "FAILED", "ERROR", "CANCELLED"} or item.get(
+        "conclusion"
+    ) in {
+        "FAILURE",
+        "ERROR",
+        "CANCELLED",
+        "TIMED_OUT",
+        "ACTION_REQUIRED",
+        "STARTUP_FAILURE",
+        "STALE",
+    }:
+        failures.append(
+            {
+                "kind": "status_check_rollup",
+                "name": item.get("name"),
+                "state": item.get("state"),
+                "conclusion": item.get("conclusion"),
+            }
+        )
 
 for check in failed_checks:
     workflow_run = check.get("workflow_run") if isinstance(check.get("workflow_run"), dict) else {}
@@ -834,6 +872,7 @@ required_checks_missing_or_pending = (
         or status_counts["failure"]
         or status_counts["error"]
         or aggregate_status_failed_backstop
+        or required_check_rollup_failed
         or check_counts["stale"]
     )
     and not (
@@ -841,6 +880,7 @@ required_checks_missing_or_pending = (
         or check_counts["pending"]
         or status_counts["pending"]
         or aggregate_status_pending_backstop
+        or required_check_rollup_running
     )
 )
 merge_state_blocking = (
@@ -852,6 +892,7 @@ merge_state_blocking = (
         or status_counts["failure"]
         or status_counts["error"]
         or aggregate_status_failed_backstop
+        or required_check_rollup_failed
         or check_counts["stale"]
     )
     and not (
@@ -859,6 +900,8 @@ merge_state_blocking = (
         or check_counts["pending"]
         or status_counts["pending"]
         or aggregate_status_pending_backstop
+        or required_check_rollup_running
+        or required_check_rollup_pending
     )
 )
 merge_state_unknown = merge_state_status == "UNKNOWN"
@@ -893,6 +936,7 @@ actions_failed = bool(action_run_counts["failed"] or action_job_counts["failed"]
 actions_running = bool(action_run_counts["running"] or action_job_counts["running"])
 actions_pending = bool(action_run_counts["pending"] or action_job_counts["pending"])
 actions_unknown = bool(action_run_counts["unknown"] or action_job_counts["unknown"])
+actions_jobs_unavailable = actions_available and action_job_collection_failures > 0
 
 if actions_primary_unavailable:
     ci_status = "unknown"
@@ -901,21 +945,23 @@ elif actions_failed or (
     or status_counts["failure"]
     or status_counts["error"]
     or aggregate_status_failed_backstop
+    or required_check_rollup_failed
     or check_counts["stale"]
 ):
     ci_status = "failed"
-elif actions_running or check_counts["running"]:
+elif actions_running or check_counts["running"] or required_check_rollup_running:
     ci_status = "running"
 elif (
     actions_pending
     or check_counts["pending"]
     or status_counts["pending"]
     or aggregate_status_pending_backstop
+    or required_check_rollup_pending
     or required_checks_missing_or_pending
     or merge_state_unknown
 ):
     ci_status = "pending"
-elif actions_unknown:
+elif actions_unknown or actions_jobs_unavailable:
     ci_status = "unknown"
 elif actions_zero_runs:
     ci_status = "none"
@@ -933,11 +979,14 @@ elif actions_decisive_green and not (
     or status_counts["failure"]
     or status_counts["error"]
     or aggregate_status_failed_backstop
+    or required_check_rollup_failed
     or check_counts["stale"]
     or check_counts["running"]
     or check_counts["pending"]
     or status_counts["pending"]
     or aggregate_status_pending_backstop
+    or required_check_rollup_running
+    or required_check_rollup_pending
     or required_checks_missing_or_pending
     or merge_state_unknown
     or merge_state_blocking
