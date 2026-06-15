@@ -804,6 +804,17 @@ git diff --check -- .agents/skills/spec-dock-issue-execution/SKILL.md spec-dock/
 |---|---|---|---|
 | closure ids `tc-001` through `tc-007` closed through final QA, issue-wide code review, final spec review, and final report ledger evidence | final report ledger / S99 evidence updates only | final response / PR / issue comment / other external delivery evidence will record final commit hash and clean worktree check | ready for final commit |
 
+### PR 送達 / マージ準備ゲート（PR Delivery / Merge Preparation Gate）
+| 項目 | 証跡 | 結果 |
+|---|---|---|
+| PR 作成 | PR #189: https://github.com/chemitaro/spec-dock/pull/189; base `main`; head `iss-00186-harden-issue-execution-step-gates`; ready PR | created |
+| 初回 observation | `/private/tmp/iss-00186-pr-observation/result.json`; head `e1b1fd25443eeeb283f9dff50f370323fc8c0fb7` | `provider-tests` failed due checked-in dogfooding `.meta.json` snapshot drift from base `iss-00187` |
+| repair batch / unit | `discussions/20260616t024310z-disc-pr-repair-batch.md`; `discussions/20260616t024410z-disc-pr-repair-unit-u001-provider-tests-snapshot-drift.md` | I001 / U001 classified as valid blocking `check_failure:provider-tests`, disposition `fix-now` |
+| repair implementation | `dev-coder` (`019ecc62-a647-7bc2-8e26-391a3518d79a`) synced branch with `origin/main`, updated `tests/unit/infra/test_init_update.py` snapshot baselines for `iss-00187`; `code-reviewer` (`019ecc68-b04b-7fe2-a35d-7bb129570879`) pass | committed as `bfa48893` |
+| local repair verification | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` -> 1 passed; `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=96`; `git diff --check` -> pass | pass |
+| post-repair PR observation | `/private/tmp/iss-00186-pr-observation-r2/result.json`; `/private/tmp/iss-00186-pr-observation-r2-resume/result.json`; latest head `bfa488939e24bb2d399b6260a56b5ef69cdd68ca` | CI passed 4/4 checks; no unresolved review threads; Codex comment says no major issues |
+| merge-preparer disposition | `gh pr view 189 --json ...` reports `state=OPEN`, `isDraft=false`, `mergeable=MERGEABLE`, checks success; observation script still reports `human_gate` because review completion is `fallback_issue_comment_low_confidence` | GitHub mergeable / checks green; conservative observation human gate recorded; merge remains human action |
+
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
   - 解決: ...
