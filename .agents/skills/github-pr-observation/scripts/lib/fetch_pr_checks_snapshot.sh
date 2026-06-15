@@ -592,21 +592,23 @@ if actions_available and not workflow_runs:
         }
     )
 
+actions_jobs_summary = {
+    "total": len(sanitized_action_jobs),
+    "counts": action_job_counts,
+    "collection": {
+        "successful_runs": action_job_collection_successes,
+        "failed_runs": action_job_collection_failures,
+    },
+}
 actions_summary = {
     "available": actions_available,
     "workflow_runs": {
         "total": len(sanitized_action_runs),
         "counts": action_run_counts,
     },
-    "jobs": {
-        "total": len(sanitized_action_jobs),
-        "counts": action_job_counts,
-        "collection": {
-            "successful_runs": action_job_collection_successes,
-            "failed_runs": action_job_collection_failures,
-        },
-    },
     "runs": sanitized_action_runs,
+    "jobs": sanitized_action_jobs,
+    "jobs_summary": actions_jobs_summary,
     "jobs_detail": sanitized_action_jobs,
 }
 actions_decisive_green = (
@@ -1081,6 +1083,50 @@ for status in statuses:
 fingerprint_source = {
     "head_sha": expected_head_sha,
     "ci_status": ci_status,
+    "actions": {
+        "available": actions_summary.get("available"),
+        "workflow_runs": actions_summary.get("workflow_runs"),
+        "jobs_summary": actions_summary.get("jobs_summary"),
+        "runs": [
+            {
+                "id": item.get("id"),
+                "name": item.get("name"),
+                "status": item.get("status"),
+                "conclusion": item.get("conclusion"),
+                "head_sha": item.get("head_sha"),
+            }
+            for item in sanitized_action_runs
+        ],
+        "jobs": [
+            {
+                "id": item.get("id"),
+                "run_id": item.get("run_id"),
+                "name": item.get("name"),
+                "status": item.get("status"),
+                "conclusion": item.get("conclusion"),
+            }
+            for item in sanitized_action_jobs
+        ],
+        "failures": [
+            {
+                "kind": item.get("kind"),
+                "source": item.get("source"),
+                "workflow_run_id": item.get("workflow_run_id"),
+                "workflow_name": item.get("workflow_name"),
+                "workflow_status": item.get("workflow_status"),
+                "workflow_conclusion": item.get("workflow_conclusion"),
+                "workflow_run_attempt": item.get("workflow_run_attempt"),
+                "job_id": item.get("job_id"),
+                "job_name": item.get("job_name"),
+                "job_status": item.get("job_status"),
+                "job_conclusion": item.get("job_conclusion"),
+                "failed_steps": item.get("failed_steps"),
+                "dedupe_key": item.get("dedupe_key"),
+            }
+            for item in actions_failures
+            if item.get("source") == "actions"
+        ],
+    },
     "check_runs": [
         {
             "id": item.get("id"),
