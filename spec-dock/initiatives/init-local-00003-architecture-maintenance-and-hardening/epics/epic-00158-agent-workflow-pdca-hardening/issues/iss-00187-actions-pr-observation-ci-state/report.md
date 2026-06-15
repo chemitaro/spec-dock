@@ -164,36 +164,38 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | Red | `tc-s01-001`, `tc-s01-002` red-required | Added issue_187 tests failed before implementation: Actions-only green remained `unknown`; later added jobs-unavailable regression failed as `passed` vs expected `unknown` before follow-up fix | `uv run pytest tests/unit/infra/test_init_update.py -k issue_187`; `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187_actions_jobs_unavailable or actions_only or checks_collector"` | pass | Red evidence observed by dev-coder before green fixes |
+| S01 | Green | Actions-only green and supplemental permission non-blocking path | `23 passed, 335 deselected`; parent rerun confirmed same result | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187_actions_jobs_unavailable or actions_only or checks_collector"` | pass | Covers S01 tests and discovered jobs-unavailable regression |
+| S01 | Refactor | guardrail satisfied / no broad refactor | `git diff --check` passed; no wrapper/docs/mirror edits in S01 | `git diff --check`; diff inspection | pass | Refactor/tidy limited to scoped collector/test changes |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | `test_issue_187_actions_jobs_unavailable_prevents_actions_only_pass` | code-reviewer P1 | added regression test and bounded dev-coder follow-up fix | `tc-s01-002` / discovered false-pass coverage | no | code-reviewer initial fail; follow-up green command `23 passed` |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | `tc-s01-001`, `tc-s01-002` | Actions-only green passes with explicit coverage limitation; supplemental permission is not normal blocker; no raw token/stderr leak | dev-coder implementation; parent focused pytest rerun; code-reviewer re-review pass | pass | S01 committed after reviewer gate |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| `tc-s01-001` | S01 | yes | red-required | issue_187 test failed before collector used Actions primary | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187_actions_jobs_unavailable or actions_only or checks_collector"` -> 23 passed | pass | `test_issue_187_actions_only_green_passes_with_coverage_limitation` |
+| `tc-s01-002` | S01 | yes | red-required | supplemental permission / jobs-unavailable false-pass regressions failed before fixes | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187_actions_jobs_unavailable or actions_only or checks_collector"` -> 23 passed; `git diff --check` -> pass | pass | `test_issue_187_actions_only_green_redacts_supplemental_permission_stderr`; `test_issue_187_actions_jobs_unavailable_prevents_actions_only_pass` |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| `tc-s01-001` | S01 | Actions workflow runs/jobs success with supplemental permission denied returns `ci.status="passed"` and informational `ci_coverage_limited_to_github_actions` | pass | Parent rerun: 23 focused tests passed |
+| `tc-s01-002` | S01 | token marker absent; blocking supplemental `github_token_permission_denied` absent; jobs API unavailable prevents `passed` | pass | Parent rerun: 23 focused tests passed; code-reviewer re-review pass |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| added | `tc-s01-002` | `test_issue_187_actions_jobs_unavailable_prevents_actions_only_pass` | `tc-s01-002` | code-reviewer found primary Actions jobs unavailable could false-pass; this is within AC-005/S01 false-pass safety | no | no; re-review pass obtained |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
@@ -210,6 +212,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | authoring-requirement | delegated-review | workflow gate | spec-reviewer | requirement review | `requirement.md`; `report.md`; discussions | read-only review | file edits | reviewer findings and `review_status` | P0/P1 blocker | findings, status, rationale | fresh pass |
 | authoring-design | approved-local-authoring | dirty delegated-draft baseline | N/A for draft; spec-reviewer for gate | canonical design authoring and review | `design.md`; `report.md` | issue-local docs | source code/test edits | fresh spec-reviewer | design blocker | findings, status, rationale | pass; promoted to plan review |
 | authoring-plan | approved-local-authoring | dirty delegated-draft baseline | N/A for draft; spec-reviewer for gate | canonical plan authoring and review | `plan.md`; `report.md` | issue-local docs | source code/test edits | fresh spec-reviewer | plan blocker | findings, status, rationale | pass; ready for implementation handoff |
+| S01 | delegated | runtime/test implementation step | dev-coder | Actions-only green and supplemental permission collector behavior | `plan.md` S01; `design.md`; `requirement.md` | provider collector and focused tests | wrappers, SKILL.md, mirror, Codex review collector, trigger script, merge automation | focused pytest and `git diff --check` | public CLI change; arbitrary endpoint input; secret leak; jobs unavailable false-pass | changed files, tests, closure evidence, ledger note | pass; code-reviewer re-review passed |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -221,6 +224,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | plan-review-1 | spec-reviewer | Initial plan review failed on missing delegation contract fields, missing S90 delegation contract, vague report evidence destinations, and stale design gate state | none | read-only spec review | fail | P1/P2 cleanup applied; re-review pending | accepted for remediation |
 | plan-review-2 | spec-reviewer | Fresh plan re-review failed on incomplete concrete test cards and S90 skill-text role ownership | none | read-only spec review | fail | P1/P2 cleanup applied; second re-review pending | accepted for remediation |
 | plan-review-3 | spec-reviewer | Second fresh plan re-review returned no findings and confirmed implementation handoff readiness | none | read-only spec review | pass | none | accepted |
+| S01-dev | dev-coder | Implemented Actions workflow runs/jobs primary green path, supplemental permission non-blocking coverage limitation, `ci.actions` summary, and jobs-unavailable false-pass regression fix | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh`; `tests/unit/infra/test_init_update.py` | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187_actions_jobs_unavailable or actions_only or checks_collector"` -> 23 passed; `git diff --check` -> pass | pass after reviewer follow-up | S02/S03 remain for failure taxonomy and wrappers | accepted |
+| S01-review-1 | code-reviewer | Initial S01 review found P1: jobs API unavailable could still pass | none | read-only code review | fail | dev-coder follow-up added regression/fix | accepted for remediation |
+| S01-review-2 | code-reviewer | Fresh S01 re-review found no findings; previous P1 fixed | none | read-only code review | pass | none | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -237,7 +243,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | committed | provider collector + focused tests + S01 report evidence | S01 commit hash recorded in external delivery evidence; row updated by amend | `git status --short` -> clean after commit | N/A | N/A | N/A | code-reviewer pass obtained before commit; amend used only to record post-commit gate state |
 
 #### 変更したファイル
 - `path/to/file1` - ...
