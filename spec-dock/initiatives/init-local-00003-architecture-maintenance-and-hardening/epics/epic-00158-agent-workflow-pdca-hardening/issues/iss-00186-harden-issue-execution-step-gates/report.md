@@ -50,6 +50,7 @@ Disposition ごとの必須証跡:
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
 | none | resolved | no_action | orchestrator | material decision ledger entries are not present during spec authoring beyond EAL / Spec Authoring Gate records | no action | Keep this section explicit without template placeholder rows. | Planning decisions are captured in requirement/design/plan and EAL entries. | no_action | `requirement.md`; `design.md`; `plan.md`; this report | none |
+| D-S90-001 | resolved | implementation | `doc-writer` Ledger Note | S90 snapshot path update for `iss-00186` also required the same snapshot contract's `depends_on: []` baseline to make the targeted snapshot test pass. | add only `.meta.json` path and leave targeted test failing; add matching `depends_on: []` baseline in the same snapshot contract | Add the `depends_on: []` baseline as part of S90 dogfooding snapshot refresh. | The checked-in issue `.meta.json` exists and has `depends_on: []`; the same test asserts both the path set and dependency baseline. Leaving the baseline stale would keep S90 validation incomplete. | applied | `tests/unit/infra/test_init_update.py`; `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` included in targeted 5-test pass | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -67,6 +68,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-002 | adopted | interview | `requirement.md` / `design.md` / `plan.md` | ユーザーが Option B を採用したため、skill + minimal workflow docs + assertion update + mirror validation を必須 scope とし、templates / prompt は alignment check と重大矛盾の小修正に限定する。 | `discussions/20260615t152809z-interview-issue-execution-hardening-scope-boundary.md` | requirement review にかけ、pass 後に design phase へ進む |
 | EAL-003 | adopted | system-architect delegated draft | `design.md` | delegated draft は Option B architecture、surface responsibility、file change plan、verification、risks / rollback を requirement と既存 ADR に沿って整理しており、canonical `design.md` に採用できる。 | `discussions/20260615t153746z-draft-design-issue-execution-step-gate-hardening.md` | run fresh design `spec-reviewer`; pass 後に plan phase へ進む |
 | EAL-004 | adopted | implementation-planner delegated draft | `plan.md` | delegated draft は passed requirement / design を sequential implementation steps、delegation contracts、concrete test cases、review / commit gates、S90 / S99 に落としており、canonical `plan.md` に採用できる。 | `discussions/20260615t154722z-draft-plan-issue-execution-step-gate-hardening.md` | run fresh plan `spec-reviewer`; pass 後に issue execution handoff ready とする |
+| EAL-005 | adopted | `doc-writer` Ledger Note | S90 report evidence / `tests/unit/infra/test_init_update.py` | S90 worker の snapshot baseline 追加は、`iss-00186` `.meta.json` path と同一の checked-in dogfooding snapshot contract を復元する変更であり、S90 provider/mirror validation scope 内に収まる。 | `tests/unit/infra/test_init_update.py`; targeted 5-test pass; D-S90-001 | S90 `spec-reviewer` re-review にかけ、pass 後に S90 commit gate へ進む |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -544,6 +546,127 @@ git status --short
 
 ---
 
+### セッションログ（2026-06-16 S90）
+
+#### 対象
+- Step: S90 — Docs Impact Resolution / Provider-Mirror Validation
+- AC/EC: AC-006
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `ドキュメント影響の解消ステップ S90`
+  - closure ids: `tc-006`
+
+#### 実施内容
+- `./spec-dock/scripts/spec-dock sync` と `./spec-dock/scripts/spec-dock validate` を実行した。
+- `uv run pytest tests/unit/infra/test_init_update.py` の S03 時点 failure を S90 範囲として確認し、checked-in dogfooding mirror / snapshot refresh を `doc-writer` に委任した。
+- `doc-writer` が provider asset と dogfooding mirror の parity を復元し、`iss-00186` の `.meta.json` snapshot path と同じ snapshot contract の `depends_on: []` baseline を追加した。
+- S90 `spec-reviewer` 初回 review は report evidence 不足で fail。実体変更への blocking finding はなく、report evidence 追記後の re-review で `review_status=pass` を得た。
+
+#### 実行コマンド / 結果
+```bash
+./spec-dock/scripts/spec-dock sync
+
+spec-dock: sync: active unchanged (matched id in branch: iss-00186)
+spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+```
+
+```bash
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=95
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_mirror_docs_match_provider_assets tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_mirror_templates_match_provider_assets tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets tests/unit/infra/test_init_update.py::TestInitUpdate::test_workflow_issue_doc_matches_bundled_asset
+
+5 passed
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py
+
+355 passed
+```
+
+```bash
+git diff --check -- .agents/skills/spec-dock-issue-execution/SKILL.md spec-dock/docs/workflow_issue.md spec-dock/templates/issue/plan.md tests/unit/infra/test_init_update.py
+
+<no output; pass>
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S90 | manual-required / pre-refresh | provider/mirror validation | full-file pytest showed provider/mirror/snapshot divergence before S90 refresh | `uv run pytest tests/unit/infra/test_init_update.py` -> 5 failed before refresh | pass | S90 refresh required |
+| S90 | Green | mirror validation and SpecDock validate | targeted parity/snapshot tests, full-file pytest, sync, validate all pass after refresh | commands above | pass | `sync` itself left no unstaged diff |
+| S90 | Refactor | guardrail satisfied | S90 changes limited to dogfooding mirror files and snapshot baseline | `git status --short`; `git diff --stat`; `git diff --check` | pass | no provider source edits in S90 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S90 | `iss-00186` `.meta.json` path update also requires matching `depends_on: []` snapshot baseline | `doc-writer` Ledger Note | D-S90-001 として採用し、same snapshot contract の refresh として `tests/unit/infra/test_init_update.py` に追加 | tc-006 | no | targeted 5-test pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | tc-006 | Provider source and dogfooding mirror are intentionally aligned, and SpecDock validate passes. | mirror files refreshed; snapshot baseline updated; `./spec-dock/scripts/spec-dock validate` -> ok; targeted 5 tests -> pass; full `tests/unit/infra/test_init_update.py` -> 355 passed; `spec-reviewer` re-review pass (`019ecc35-3590-73b0-9422-6fbba0910eb4`) | pass | no blocking S90 findings remain |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-006 | S90 | yes | manual-required + command evidence | full-file pytest had checked-in dogfooding mirror / snapshot failures before refresh | `./spec-dock/scripts/spec-dock sync`; `./spec-dock/scripts/spec-dock validate`; targeted 5 pytest tests; full `uv run pytest tests/unit/infra/test_init_update.py` | pass | S90 review re-run required |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-006 | S90 | sync ok; validate ok; targeted parity/snapshot tests 5 passed; full init/update unit file 355 passed; S90 `spec-reviewer` pass after report evidence update | pass | no blocking S90 findings remain |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-006 | tc-s90-001 | tc-006 | planned closure unchanged | no | yes: report evidence added after first S90 review fail |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S90 | delegated | dogfooding mirror / docs refresh | `doc-writer` | checked-in mirror parity and dogfooding snapshot refresh | `plan.md` S90; provider assets; failing parity/snapshot tests | `.agents/skills/spec-dock-issue-execution/SKILL.md`; `spec-dock/docs/workflow_issue.md`; `spec-dock/templates/issue/plan.md`; `tests/unit/infra/test_init_update.py` snapshot entries | provider source assets, runtime code, canonical issue docs, report by worker | sync, validate, targeted parity tests, full unit file pytest, diff check | provider source edits; unrelated test changes; unresolved parity failure | changed files, commands, addressed failures, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S90 | `doc-writer` | Refreshed three checked-in dogfooding mirror files to match provider assets and added `iss-00186` `.meta.json` snapshot path plus `depends_on: []` baseline. | `.agents/skills/spec-dock-issue-execution/SKILL.md`; `spec-dock/docs/workflow_issue.md`; `spec-dock/templates/issue/plan.md`; `tests/unit/infra/test_init_update.py` | targeted 5 pytest tests -> pass; `git diff --check` -> pass; `cmp -s` mirror checks -> pass | `spec-reviewer` pass after re-review (`019ecc35-3590-73b0-9422-6fbba0910eb4`) | none | accepted; Ledger Note disposition recorded as D-S90-001 |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | N/A: delegated to `doc-writer` | N/A | N/A | N/A | revert S90 commit if needed | sync / validate / pytest / diff-check -> pass | `spec-reviewer` passed | none |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | step reviewer | `spec-reviewer` | fresh | failed | N/A | follow-up required | agent `019ecc35-3590-73b0-9422-6fbba0910eb4`; initial finding was missing report evidence only |
+| S90 | step reviewer re-review | `spec-reviewer` | fresh | passed | N/A | proceed to S90 commit gate | agent `019ecc35-3590-73b0-9422-6fbba0910eb4`; findings none after report evidence update |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | committed | mirror / snapshot refresh + S90 report evidence | S90 step commit; hash recorded after commit as external evidence | `git status --short` checked after commit | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `.agents/skills/spec-dock-issue-execution/SKILL.md` - provider install_root skill mirror を更新。
+- `spec-dock/docs/workflow_issue.md` - provider workflow doc mirror を更新。
+- `spec-dock/templates/issue/plan.md` - provider issue plan template mirror を更新。
+- `tests/unit/infra/test_init_update.py` - checked-in dogfooding `.meta.json` snapshot に `iss-00186` path と `depends_on: []` baseline を追加。
+- `spec-dock/active/issue/report.md` - S90 observed evidence ledger を記録。
+
+#### コミット
+- S90 step commit will be created after this report evidence is staged.
+
+#### メモ
+- D-S90-001 records the worker Ledger Note disposition.
+- No plan amendment required.
+
+---
+
 ### セッションログ（2026-06-13 HH:MM - HH:MM）
 
 #### 対象
@@ -659,7 +782,7 @@ git status --short
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| dogfooding mirror: skill / workflow doc / issue plan template; checked-in dogfooding snapshot | yes | `doc-writer` | `.agents/skills/spec-dock-issue-execution/SKILL.md`; `spec-dock/docs/workflow_issue.md`; `spec-dock/templates/issue/plan.md`; `tests/unit/infra/test_init_update.py`; sync ok; validate ok; targeted 5 pytest tests pass; full `uv run pytest tests/unit/infra/test_init_update.py` -> 355 passed | passed by fresh `spec-reviewer` (`019ecc35-3590-73b0-9422-6fbba0910eb4`) |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
