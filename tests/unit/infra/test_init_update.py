@@ -14893,6 +14893,16 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"observed","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":1,"name":"observed","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
@@ -14954,6 +14964,16 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"observed","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":1,"name":"observed","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
@@ -15015,6 +15035,16 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"observed","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":1,"name":"observed","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
@@ -15076,6 +15106,16 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"unknown_conclusion"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"observed","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":1,"name":"observed","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
@@ -15119,14 +15159,19 @@ esac
             assert payload["ci"]["required_check_state"]["available"] is False
             assert payload["limitations"] == [
                 {
+                    "api": "gh_pr_view.statusCheckRollup",
+                    "capability": "status_check_rollup_read",
                     "code": "pr_required_check_state_unavailable",
                     "exit_code": 44,
                     "message": "fixed read-only PR required check state collection failed",
+                    "secret_redacted": True,
                     "severity": "informational",
                     "source": "gh_pr_view",
+                    "status": "unknown",
                     "stderr_sha256": hashlib.sha256(
                         b"required check metadata unavailable\n"
                     ).hexdigest(),
+                    "token_source": "GH_TOKEN",
                 }
             ]
 
@@ -19017,6 +19062,16 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":203,"run_attempt":1,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success","html_url":"https://example.test/run/203"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/203/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":304,"run_id":203,"run_attempt":1,"name":"preflight","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":101,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"failure","html_url":"https://example.test/check/101","details_url":"https://example.test/details/101","workflow_name":"CI","workflow_run":{"id":202,"run_attempt":1}}]}
@@ -19059,15 +19114,7 @@ esac
             assert payload["ci"]["status"] == "failed"
             assert payload["ci"]["failures"] == [
                 {
-                    "kind": "github_actions_job",
-                    "workflow_name": "CI",
-                    "workflow_run_id": 202,
-                    "workflow_run_attempt": 1,
-                    "job_name": "test",
-                    "job_id": 302,
-                    "check_run_id": 101,
-                    "status": "completed",
-                    "conclusion": "failure",
+                    "dedupe_key": "actions:202:302:1",
                     "failed_steps": [
                         {
                             "number": 1,
@@ -19077,7 +19124,17 @@ esac
                         }
                     ],
                     "html_url": "https://example.test/job/302",
-                    "details_url": "https://example.test/details/101",
+                    "job_conclusion": "failure",
+                    "job_id": 302,
+                    "job_name": "test",
+                    "job_status": "completed",
+                    "kind": "github_actions_job",
+                    "source": "actions",
+                    "workflow_conclusion": "failure",
+                    "workflow_name": "CI",
+                    "workflow_run_id": 202,
+                    "workflow_run_attempt": 1,
+                    "workflow_status": "completed",
                 }
             ]
 
@@ -19096,6 +19153,16 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":101,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
@@ -19336,6 +19403,16 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":203,"run_attempt":1,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success","html_url":"https://example.test/run/203"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/203/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":304,"run_id":203,"run_attempt":1,"name":"preflight","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":101,"name":"lint","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
@@ -19398,15 +19475,7 @@ esac
                     "target_url": "https://example.test/status/2",
                 },
                 {
-                    "kind": "github_actions_job",
-                    "workflow_name": "CI",
-                    "workflow_run_id": 202,
-                    "workflow_run_attempt": 1,
-                    "job_name": "test",
-                    "job_id": 302,
-                    "check_run_id": 102,
-                    "status": "completed",
-                    "conclusion": "failure",
+                    "dedupe_key": "actions:202:302:1",
                     "failed_steps": [
                         {
                             "number": 1,
@@ -19416,7 +19485,17 @@ esac
                         }
                     ],
                     "html_url": "https://example.test/job/302",
-                    "details_url": "https://example.test/details/102",
+                    "job_conclusion": "failure",
+                    "job_id": 302,
+                    "job_name": "test",
+                    "job_status": "completed",
+                    "kind": "github_actions_job",
+                    "source": "actions",
+                    "workflow_conclusion": "failure",
+                    "workflow_name": "CI",
+                    "workflow_run_id": 202,
+                    "workflow_run_attempt": 1,
+                    "workflow_status": "completed",
                 },
             ]
 
@@ -19435,6 +19514,16 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":101,"name":"lint","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"failure","html_url":"https://example.test/check/101","details_url":"https://example.test/details/101"}]}
@@ -19503,6 +19592,16 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":203,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/203/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":304,"run_id":203,"name":"preflight","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":101,"name":"lint","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"failure","html_url":"https://example.test/check/101","details_url":"https://example.test/details/101","workflow_name":"CI","workflow_run":{"id":202,"run_attempt":1}}]}
@@ -19611,10 +19710,30 @@ esac
                     fake_bin = tmp_path / "bin"
                     fake_bin.mkdir()
                     fake_gh = fake_bin / "gh"
+                    actions_runs_json = (
+                        '{"total_count":0,"workflow_runs":[]}'
+                        if name in {"status-pending", "zero-checks"}
+                        else '{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}'
+                    )
+                    actions_jobs_case = (
+                        ""
+                        if name in {"status-pending", "zero-checks"}
+                        else """  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
+"""
+                    )
                     fake_gh.write_text(
                         f"""#!/usr/bin/env bash
 case "$*" in
-  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{actions_runs_json}
+JSON
+    ;;
+{actions_jobs_case}  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {check_runs_json}
 JSON
@@ -19674,6 +19793,16 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
@@ -19734,6 +19863,16 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
@@ -19792,6 +19931,16 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":1,"check_runs":[{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
@@ -19855,6 +20004,16 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+JSON
+    ;;
+  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+    cat <<'JSON'
+{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"provider-tests","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
 {"total_count":4,"check_runs":[{"id":1,"name":"provider-tests","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"},{"id":2,"name":"provider-tests","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"},{"id":3,"name":"validate","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"},{"id":4,"name":"validate","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
