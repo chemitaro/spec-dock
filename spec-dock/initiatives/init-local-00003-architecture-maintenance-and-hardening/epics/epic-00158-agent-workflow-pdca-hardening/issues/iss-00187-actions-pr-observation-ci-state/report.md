@@ -49,7 +49,8 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | orchestrator + user interview | Actions-only green evidence を `passed` と扱えるかが requirement / design / plan を左右する | Option A: Actions-only green を pass 許可し limitation を残す; Option B: full rollup なしでは unknown | Option A を採用する | #187 の目的は Fine-grained PAT で付与可能な Actions read surface へ通常観測を寄せること。未証明 surface は limitation として残せば false-pass risk を可視化できる | applied | `discussions/20260615t154753z-01-research-actions-ci-observation-scope.md`; `discussions/20260615t154753z-02-interview-actions-only-pass-contract.md`; `requirement.md` | design / plan で collector contract と test obligation に展開する |
+| D-002 | resolved | deviation | orchestrator | `system-architect` / `implementation-planner` delegated authoring は diff-guard 付き discussion draft を標準とするが、既存の requirement evidence discussions が未コミットで target `discussions/` baseline を dirty にしている | Option A: 現在の dirty discussions を前提に手動 authoring fallback; Option B: 途中 commit/stage して delegated draft precondition を作る | Option A を採用する | ユーザーは仕様書作成を要求しており、途中 commit は要求されていない。dirty baseline 上で delegated draft を昇格証跡にすると diff-guard 契約が弱くなるため、canonical design/plan は orchestrator が直接作成し、fresh spec-reviewer gate で品質保証する | applied | `git status --short`; `design.md`; `plan.md`; Delegated Draft Evidence | 実装開始前に design / plan spec-reviewer gate を通す |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +64,17 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | research | `requirement.md` | Current implementation, existing tests, and GitHub permission surfaces define the concrete requirement boundary for #187 | `discussions/20260615t154753z-01-research-actions-ci-observation-scope.md` | Continue to design authoring |
+| EAL-002 | adopted | discussion / user answer | `requirement.md` | User explicitly allowed Actions-only green evidence to produce `ci.status="passed"` when limitation semantics remain visible | `discussions/20260615t154753z-02-interview-actions-only-pass-contract.md` | Continue to design authoring |
+| EAL-003 | adopted | reviewer | `requirement.md` | Requirement reviewer identified non-blocking ambiguity between workflow-run stale conclusion and stale head freshness failure; requirement now separates CI failure from rerun-needed freshness failure | Initial `spec-reviewer` pass with P2 cleanup; `requirement.md` | Fresh requirement re-review completed |
+| EAL-004 | adopted | reviewer | `requirement.md` | Fresh requirement re-review found no findings and confirmed requirement is ready for design promotion | Fresh `spec-reviewer` pass result; `requirement.md`; `report.md` | Promote to design authoring |
+| EAL-005 | adopted | orchestrator analysis | `design.md` | Existing provider scripts and tests define the lowest-risk implementation boundary: keep public collector CLI, move CI primary source to Actions, retain supplemental signals as compatibility evidence | `rg` / source inspection of PR observation scripts and tests; `design.md` | Run design spec review |
+| EAL-006 | adopted | orchestrator analysis | `plan.md` | Implementation order follows dependency graph: collector contract first, taxonomy second, wrappers third, docs/mirror fourth, final gates last | `design.md`; `plan.md` closure index | Run plan spec review |
+| EAL-007 | adopted | reviewer | `design.md`, `plan.md` | Design reviewer passed the gate with P2 improvements: wrapper permission handling must be mandatory, and Actions-derived `ci.failures[]` shape must be explicit | `spec-reviewer` design review result; `design.md`; `plan.md` | Run fresh design re-review |
+| EAL-008 | adopted | reviewer | `design.md` | Fresh design re-review found no findings and confirmed P2 cleanup was reflected into design and plan obligations | Fresh `spec-reviewer` design re-review result; `design.md`; `plan.md`; `report.md` | Promote to plan review |
+| EAL-009 | adopted | reviewer | `plan.md`, `report.md` | Plan reviewer failed the first plan gate on missing delegation-contract fields, S90 delegation contract, concrete report evidence destinations, and stale design gate state; plan/report were updated accordingly | `spec-reviewer` plan review result; `plan.md`; `report.md` | Run fresh plan re-review |
+| EAL-010 | adopted | reviewer | `plan.md` | Fresh plan re-review failed on incomplete concrete test cards and S90 role mismatch; plan now adds full card fields for S01/S02/S03/S90 and assigns doc-writer to skill-text wording with dev-coder/utility for mechanical sync | Fresh `spec-reviewer` plan re-review result; `plan.md` | Run second fresh plan re-review |
+| EAL-011 | adopted | reviewer | `plan.md`, `report.md` | Second fresh plan re-review found no findings and confirmed implementation handoff readiness | Fresh `spec-reviewer` plan re-review result; `plan.md`; `report.md` | Ready for implementation handoff |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +82,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | #187 と `requirement.md` は Fine-grained PAT で付与可能な Actions read surface を通常 CI 観測に使うことを主要目的にしている | False-pass safety は limitation と unknown/pending/failed classification で保持する | low | requirement/design/plan spec-reviewer pass |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +90,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | GitHub issue #187; active issue scaffold; parent epic requirement/design; current PR observation scripts; fake `gh` tests; GitHub REST docs; research discussion | Answered: Actions-only green pass is allowed with explicit limitation; reviewer P2 clarified stale conclusion vs stale head freshness failure | adopted into `requirement.md` | initial pass with P2 cleanup; fresh re-review pass with no findings | no | promoted to design |
+| design | `requirement.md`; provider PR observation scripts; wrapper classification; fake `gh` tests; parent dogfooding/provider rules | None blocking; delegated architecture draft not used due dirty discussion baseline and no mid-authoring commit; P2 reviewer findings applied | adopted into `design.md` | fresh re-review pass with no findings | no | promoted to plan review |
+| plan | `design.md`; `docs/authoring/issue-plan.md`; closure requirements; affected test harness | None blocking; delegated implementation-planner draft not used due same diff-guard precondition; updated to reflect mandatory wrapper change, failure detail closure, required delegation fields, S90 contract, report evidence destinations, complete concrete test cards, and skill-text doc-writer ownership | adopted into `plan.md` | second fresh re-review pass with no findings | no | ready for implementation handoff |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -107,7 +120,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| system-architect | iss-00187 | 該当なし | `requirement.md`; research/interview discussions; PR observation scripts/tests | `design.md` | not used | [] | not_run; target `discussions/` baseline dirty from uncommitted requirement evidence | 手動 authoring fallback | 該当なし | diff-guard precondition unavailable without mid-authoring commit/stage | pending spec-reviewer | delegated draft 昇格なし。canonical design は fresh spec-reviewer gate で昇格判断 |
+| implementation-planner | iss-00187 | 該当なし | `requirement.md`; `design.md`; authoring docs | `plan.md` | not used | [] | not_run; same target `discussions/` baseline dirty | 手動 authoring fallback | 該当なし | diff-guard precondition unavailable without mid-authoring commit/stage | pending spec-reviewer | delegated draft 昇格なし。canonical plan は fresh spec-reviewer gate で昇格判断 |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -186,19 +200,27 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00187 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction invoking `$spec-dock-issue-planning` workflow | `/Users/iwasawayuuta/.codex/worktrees/1fe5/spec-dock` | iss-00187 | current session | spec-reviewer; system-architect; implementation-planner; future dev-coder/code-reviewer/qa-reviewer as named in `plan.md` | same repo/worktree, active issue, issue-local docs and bounded implementation steps; no destructive action, publishing, credential expansion, or scope expansion without separate instruction | issue complete / session end / scope change / host policy conflict / user revocation | system-architect and implementation-planner discussion-draft authoring not used because target discussions baseline is dirty; reviewer roles available | proceed with canonical docs plus fresh spec-reviewer gates |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| authoring-requirement | delegated-review | workflow gate | spec-reviewer | requirement review | `requirement.md`; `report.md`; discussions | read-only review | file edits | reviewer findings and `review_status` | P0/P1 blocker | findings, status, rationale | fresh pass |
+| authoring-design | approved-local-authoring | dirty delegated-draft baseline | N/A for draft; spec-reviewer for gate | canonical design authoring and review | `design.md`; `report.md` | issue-local docs | source code/test edits | fresh spec-reviewer | design blocker | findings, status, rationale | pass; promoted to plan review |
+| authoring-plan | approved-local-authoring | dirty delegated-draft baseline | N/A for draft; spec-reviewer for gate | canonical plan authoring and review | `plan.md`; `report.md` | issue-local docs | source code/test edits | fresh spec-reviewer | plan blocker | findings, status, rationale | initial fail; cleanup applied; re-review pending |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| requirement-review-1 | spec-reviewer | Initial requirement review returned pass with P2 cleanup findings for stale taxonomy and research metadata alignment | none | read-only spec review | pass | P2 cleanup applied before promotion | accepted |
+| requirement-review-2 | spec-reviewer | Fresh requirement re-review returned no findings and confirmed design promotion readiness | none | read-only spec review | pass | none | accepted |
+| design-review-1 | spec-reviewer | Initial design review returned pass with P2 cleanup findings for wrapper permission handling and Actions failure detail shape | none | read-only spec review | pass | P2 cleanup applied before re-review | accepted |
+| design-review-2 | spec-reviewer | Fresh design re-review returned no findings and confirmed design promotion readiness | none | read-only spec review | pass | none | accepted |
+| plan-review-1 | spec-reviewer | Initial plan review failed on missing delegation contract fields, missing S90 delegation contract, vague report evidence destinations, and stale design gate state | none | read-only spec review | fail | P1/P2 cleanup applied; re-review pending | accepted for remediation |
+| plan-review-2 | spec-reviewer | Fresh plan re-review failed on incomplete concrete test cards and S90 skill-text role ownership | none | read-only spec review | fail | P1/P2 cleanup applied; second re-review pending | accepted for remediation |
+| plan-review-3 | spec-reviewer | Second fresh plan re-review returned no findings and confirmed implementation handoff readiness | none | read-only spec review | pass | none | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -208,7 +230,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| requirement | spec authoring gate | spec-reviewer | fresh | passed | N/A | proceed to design | Fresh re-review had no findings |
+| design | spec authoring gate | spec-reviewer | fresh | passed | N/A | proceed to plan review | Fresh re-review had no findings |
+| plan | spec authoring gate | spec-reviewer | fresh | passed | N/A | ready for implementation handoff | Second fresh re-review had no findings |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
