@@ -41,6 +41,7 @@ ID: "iss-00187"
   - Unsupported / ambiguous / unobserved failure-risk state は explicit limitation または `unknown` に留める。
   - Workflow run / job conclusion の `stale` は CI failure class。PR head mismatch / snapshot 中の head change は `stale_head` freshness failure として再実行へ誘導する。
   - `selected_comments == 0`、`selected_unresolved_count == 0`、または historical unresolved thread がないことだけを review completion / merge-ready の証明にしない。
+  - PR #190 latest head `1bb19acdf512d71f45a39ce7a3790862b36b0295` で確認された current P1 review feedback は merge-ready blocker と扱い、CI pass / mergeable だけで完了判定しない。
 
 ## 既存実装 / 規約の理解
 - 参照した実装 / docs:
@@ -59,7 +60,7 @@ ID: "iss-00187"
   - PR #190 head `fc3041f86a7f9defba2d3fd8b48ff1c48126151a` の観測では、CI passed / head matched / selected blockers zero でも completion signal が `none` のまま `wait_timeout` に潰れた。これは review endpoint 未取得ではなく、completion signal contract の不足として扱う。
   - 既存 regression tests は fake `gh` script で provider-side scripts を直接実行し、permission classification、required checks、stale head、failure detail を検証している。
 - 採用するパターン:
-  - Python-in-shell collector の既存形を維持し、GitHub API normalization と JSON shape を同じ script 内で閉じる。
+  - Public shell command は互換 wrapper として維持し、非自明な GitHub API normalization / JSON classification は standalone Python entrypoint へ切り出す。最初の対象は P1 review が集中している `fetch_pr_checks_snapshot.sh` とする。
   - API path は fixed strings とし、caller 入力は `--repo` / `--pr` / `--head-sha` の validation 済み値だけにする。
   - Fake `gh` tests で API call order / payload / secret absence / final JSON を固定する。
 - 採用しないもの:
@@ -99,6 +100,24 @@ ID: "iss-00187"
 - 論点 6: No-findings issue comment / reaction の扱い
   - 決定:
     - Generic `fallback_issue_comment` は引き続き low-confidence human gate とする。もし current-boundary の allowlisted no-findings comment が実際に観測可能なら、`codex_no_findings_issue_comment` のような distinct secondary signal として別ステップで追加する。trigger comment reaction と review request disappearance は、actor/time/trigger 証跡が不足する限り単独 completion signal にしない。
+- 論点 7: shell wrapper と Python collector の責務分離
+  - 選択肢:
+    - A: P1 を既存 heredoc の中で直接修正する。
+    - B: `fetch_pr_checks_snapshot.sh` の Python 本体を `pr_observation_checks.py` へ切り出し、shell は fixed CLI / validation / Python entrypoint 呼び出しだけを担う。
+  - 決定:
+    - B を採用する。今回の P1 は shell ではなく Python の collection / classification policy に関する問題であり、1000 行超の heredoc に修正を重ねるとレビュー性・保守性が下がる。公開 CLI と stdout JSON contract は維持する。
+- 論点 8: zero Actions runs と external CI
+  - 選択肢:
+    - A: Actions runs が 0 件なら常に `ci.status="none"` とする。
+    - B: zero Actions runs は「Actions evidence がない」と扱い、readable check-runs / commit statuses / status rollup が green なら `passed` を許可する。
+  - 決定:
+    - B を採用する。GitHub Actions を使わない repo では Actions runs が 0 件でも external checks / commit statuses が正当な CI evidence になり得る。zero Actions runs 単独では pass しないが、external green evidence は pass source として評価する。
+- 論点 9: `review_completion_unknown` の timing
+  - 選択肢:
+    - A: quiet / same-fingerprint stability だけで `review_completion_unknown` に昇格する。
+    - B: quiet / same-fingerprint に加えて、trigger age と CI-passed age の明示的な最小猶予を満たすまで missing completion を wait/resume 側に残す。
+  - 決定:
+    - B を採用する。PR #190 では CI pass 後に Codex review が数分遅れて投稿されたため、payload stability だけでは review publication latency を証明できない。`review_completion_unknown` は non-pass human gate のまま、通常の Codex review 到着猶予を経た後にだけ terminal-like とする。
 
 ## 依存関係分析
 - module / file 依存:
@@ -113,7 +132,7 @@ ID: "iss-00187"
 - 下流 / 依存先:
   - `github-pr-merge-preparer` / PR observation users consume `normalized_status`, `recommended_next_action`, `limitations`, `ci.failures`, and `decision.status_reason`.
 - 実装起点:
-  - First stabilize collector output in `fetch_pr_checks_snapshot.sh`; wrappers should need minimal change once collector contract is fixed.
+  - First preserve the public shell contract while extracting the collector body from `fetch_pr_checks_snapshot.sh` to `pr_observation_checks.py`; then stabilize collector output in the extracted Python module.
   - Post-observation review fix starts in `fetch_pr_review_snapshot.sh` so raw review/comment semantics are normalized before wrappers consume them.
 - 順序への影響:
   - Plan must start with Actions primary collector and permission/coverage contract, then taxonomy/failure details, then wrapper classification, docs/mirror, final gates.
@@ -240,7 +259,7 @@ Skill --> Collector : documents required permission
     - `codex_review.lifecycle.status="none"` or `"completion_unknown_candidate"` before wait stability.
     - `codex_review.lifecycle.completion_signal="none"`
     - Collector-level `decision.status_reason` may remain `missing_current_completion_signal` until wrapper stability is proven.
-    - Wait / combined snapshot may promote to `decision.status_reason="review_completion_unknown"` only after CI passed, head matched, no current blocker/pending evidence, and quiet/same-fingerprint stability are observed.
+    - Wait / combined snapshot may promote to `decision.status_reason="review_completion_unknown"` only after CI passed, head matched, no current blocker/pending evidence, quiet/same-fingerprint stability, and explicit review-latency guards are observed.
     - Promoted state uses `decision.status="unknown"` or top-level-normalized `human_gate`, `decision.recommended_next_action="human_gate"`, and `decision.observation_complete=true`.
     - This state means: current trigger boundary no-completion evidence has stabilized enough to stop blind waiting, CI/head are already satisfactory at the combined snapshot layer, no current selected blocker exists, and no trusted completion signal was observed.
   - Preserve existing primary / fallback signals:
@@ -277,12 +296,12 @@ Skill --> Collector : documents required permission
   1. Snapshot obtains current PR head as today.
   2. Snapshot invokes CI collector with expected head SHA as today.
   3. CI collector first collects Actions workflow runs for expected head SHA.
-  4. CI collector fetches Actions jobs for relevant runs to classify failures and running/pending jobs.
+  4. CI collector fetches Actions jobs only for relevant runs under the bounded diagnostic policy. Failed, running, pending, and unknown runs are relevant; terminal-green run job expansion is skipped or capped in default wait/snapshot collection.
   5. CI collector optionally collects check runs / commit statuses / PR rollup as supplemental evidence.
   6. CI collector emits stdout JSON with Actions-derived status and coverage limitations.
   7. Review collector classifies current-boundary review lifecycle from reviews/comments/threads.
   8. If no trusted completion signal is present and no current blocker/pending signal remains, the review collector keeps machine-readable no-completion evidence; it does not by itself prove stability.
-  9. `wait_pr_observation.sh` promotes that evidence to `review_completion_unknown` only when CI is `passed`, head is matched, the semantic fingerprint is stable for the configured same-count, and the quiet window has elapsed.
+  9. `wait_pr_observation.sh` promotes that evidence to `review_completion_unknown` only when CI is `passed`, head is matched, the semantic fingerprint is stable for the configured same-count, the quiet window has elapsed, and explicit review-latency guards are satisfied.
   10. Snapshot / wait wrappers classify top-level observation from the same `ci.status` and review `decision.status_reason` contracts, and use limitation blocking/severity/capability rather than any presence of supplemental permission-denied text.
 - Retry / external API:
   - No new retry loop in collector. Existing wait loop continues to poll wrapper output.
@@ -293,11 +312,15 @@ Skill --> Collector : documents required permission
   - N/A. This is shipped script asset behavior, not Python runtime domain model.
 - Policy / specification:
   - CI state policy changes from check-run-primary to Actions-primary with supplemental rollup.
-  - Review lifecycle policy adds a non-pass terminal-like `review_completion_unknown` state so CI/head completed observations do not degrade to generic timeout when Codex does not submit a PR review.
+  - CI detail policy separates high-level classification from bounded diagnostic expansion. Green Actions workflow runs do not require unbounded jobs API expansion before a snapshot can complete.
+  - Zero Actions runs is not by itself CI success, but it also does not suppress readable green external check/status evidence.
+  - Review lifecycle policy adds a non-pass terminal-like `review_completion_unknown` state so CI/head completed observations do not degrade to generic timeout when Codex does not submit a PR review, while timing guards prevent the state from racing ahead of normal Codex review publication latency.
 - Invariants:
   - No arbitrary endpoint input.
   - No secret/raw stderr leak.
-  - `passed` requires no observed failure/running/pending/unknown in decisive primary/supplemental evidence.
+  - `passed` requires no observed failure/running/pending/unknown in decisive Actions or external supplemental evidence.
+  - Zero Actions runs plus no external evidence remains non-pass.
+  - Zero Actions runs plus readable green external evidence may pass if required/pending/failure blockers are absent.
   - Head freshness failure remains separate from CI failure.
   - Review completion requires an explicit trusted completion signal; absence of selected feedback is not completion.
 
@@ -309,13 +332,15 @@ Skill --> Collector : documents required permission
 |   |   `-- 変更: required permission / remediation wording を Actions-primary contract に更新
 |   `-- scripts/
 |       |-- lib/fetch_pr_checks_snapshot.sh
-|       |   `-- 変更: Actions workflow runs/jobs primary collector, status taxonomy, coverage limitations
+|       |   `-- 変更: fixed CLI validation and compatibility wrapper for the extracted Python collector
+|       |-- lib/pr_observation_checks.py
+|       |   `-- 追加: Actions/external CI collection, bounded job diagnostics, status taxonomy, coverage limitations
 |       |-- lib/fetch_pr_review_snapshot.sh
 |       |   `-- 変更: review_completion_unknown と optional no-findings secondary signal の review lifecycle contract
 |       |-- fetch_pr_observation_snapshot.sh
 |       |   `-- 変更: supplemental permission limitations と review_completion_unknown を top-level contract に反映
 |       `-- wait_pr_observation.sh
-|           `-- 変更: supplemental permission limitations と review_completion_unknown の wait termination を調整
+|           `-- 変更: supplemental permission limitations, review_completion_unknown, and review-latency timing guards を調整
 |-- .agents/skills/github-pr-observation/
 |   `-- 変更: provider source と同期した dogfooding mirror
 |-- tests/unit/infra/test_init_update.py
@@ -333,12 +358,13 @@ Skill --> Collector : documents required permission
 - AC-003 -> Failure taxonomy and `ci.failures` from Actions jobs / failed steps.
 - AC-004 -> Running/pending taxonomy from Actions run/job status and wrapper wait semantics.
 - AC-005 -> GitHub failure limitation classification with `capability`, redacted stderr hash, and no raw secret output.
-- EC-001 -> Zero Actions runs remains `none` or `unknown` and never `passed`.
+- EC-001 -> Zero Actions runs alone remains `none` or `unknown` and never `passed`; post-review P1 finding refines this so zero Actions runs plus readable green external check/status evidence may produce `passed`.
 - EC-002 -> Actions green + unproven external/full rollup returns `passed` plus coverage limitation.
 - EC-003 -> Existing head mismatch / head change handling remains `stale_head` / `rerun_for_current_head`.
 - EC-004 -> Actions primary unavailable returns `unknown` with `capability="actions_read"`.
 - Constraints -> fixed CLI, stdout JSON authority, provider source first, no arbitrary GitHub API proxy.
 - Post-observation review addendum -> `review_completion_unknown` decision contract, no generic comment promotion, optional explicit no-findings secondary signal.
+- Post-review P1 addendum -> Python extraction boundary, bounded Actions jobs collection, zero-Actions external-green fallback, and delayed `review_completion_unknown` timing gate.
 
 ## テスト戦略
 - Unit / script-level:
@@ -370,6 +396,87 @@ Skill --> Collector : documents required permission
 - Review completion unknown addendum -> `tc-s100-001`, `tc-s101-001`, `tc-s101-002`
 - Optional no-findings secondary signal -> `tc-s102-001`..`tc-s102-004`
 
+## 追加設計修正（S200+ / PR #190 P1 and Script Boundary Amendment）
+
+### 追加設計の目的
+- PR #190 latest head `1bb19acdf512d71f45a39ce7a3790862b36b0295` に付いた current P1 review 2件を修正対象にする。
+- `fetch_pr_checks_snapshot.sh` の大きな Python heredoc を standalone Python entrypoint へ切り出し、shell wrapper / Python collector の責務を分離する。
+- Actions-primary CI collector が external-CI-only repository を false-negative にしないよう、zero Actions runs と external green evidence の関係を再定義する。
+- wait wrapper が `review_completion_unknown` を通常の Codex review publication latency より早く確定しないよう、review timing gate を追加する。
+
+### 追加アーキテクチャ境界
+- Shell wrapper:
+  - 公開コマンド名、引数、usage、exit code、stdout final JSON authority を維持する。
+  - `--repo` / `--pr` / `--head-sha` の固定 validation と script-relative Python entrypoint 呼び出しを担う。
+  - 任意 API path、GraphQL query、raw `gh` args、header、request body は受け取らない。
+- Python collector:
+  - `gh` read、JSON parsing、secret-safe limitation classification、CI taxonomy、fingerprint、payload rendering を担う。
+  - 初期追加ファイルは `scripts/lib/pr_observation_checks.py` とし、`fetch_pr_checks_snapshot.sh` から呼び出す。
+  - helper は具体的複雑性を下げる範囲に限る。候補は `collect_actions_runs`、`should_expand_actions_jobs`、`collect_actions_jobs_for_relevant_runs`、`classify_ci_status`、`build_actions_summary`。
+- Wait wrapper:
+  - 当面 heredoc 構造を維持し、review timing guard のみを追加する。
+  - Full extraction of review/wait scripts は今回の P1 修正に必要な範囲を超えるため、必要になった場合だけ follow-up とする。
+
+### Bounded Actions job collection
+- 問題:
+  - 現行 collector は workflow run ごとに jobs API を呼ぶため、wait snapshot 1回の取得時間が workflow run 数に比例する。
+  - 短い `--timeout-seconds` の中で API detail collection が wait budget を消費し、CI/review の安定観測へ到達できない可能性がある。
+- 設計:
+  - High-level classification は workflow run status/conclusion と readable supplemental evidence で先に決める。
+  - Jobs expansion は failed / running / pending / unknown など、分類または repair evidence に必要な run を優先する。
+  - Terminal green run の jobs expansion は default snapshot / wait path では skip または固定 cap に収める。
+  - Expansion を制限した場合は、`ci.actions.jobs_summary.collection` に mode / expanded count / skipped green count / cap など machine-readable metadata を追加できる。
+  - Failed Actions は引き続き job / step detail を優先取得し、取得不能なら blocking `github_actions_jobs_unavailable` limitation と run-level failure evidence を出す。
+
+### Zero Actions runs and external green checks
+- 問題:
+  - `actions_zero_runs` が external check/status 成功判定より先に `ci.status="none"` を返すと、Actions を使わない repo の green CI を false-negative にする。
+- 設計:
+  - `actions_zero_runs` は "Actions evidence absent" であり、"CI absent" ではない。
+  - 判定順序は external failure / pending / required missing を先に尊重し、readable external evidence がすべて green なら `passed` を許可する。
+  - Actions runs も external checks/statuses も観測できない場合は、既存どおり `none` / `unknown` / blocking zero-check limitation の non-pass とする。
+  - Zero Actions runs 単独で `passed` にはしない。
+
+### Review completion unknown timing gate
+- 問題:
+  - PR #190 では CI pass 後に Codex review が遅れて投稿され、先に no-completion evidence が安定すると `review_completion_unknown` が早すぎる human gate になり得る。
+- 設計:
+  - `review_completion_unknown` promotion requires:
+    - CI `passed`
+    - head matched
+    - current selected blocker なし
+    - pending review signal なし
+    - blocking collection failure なし
+    - same-fingerprint stability
+    - quiet window
+    - current trigger age が最小猶予以上
+    - CI-passed observation age が最小猶予以上
+  - 推奨初期値:
+    - `review_completion_unknown_min_trigger_age_seconds = 300`
+    - `review_completion_unknown_min_ci_passed_age_seconds = 90`
+  - これらの値は plan 上の初期実装定数であり、reviewer が運用上の過不足を指摘した場合は明示的に調整する。
+  - Threshold 未満では `decision.status_reason="missing_current_completion_signal"` または pending / wait-or-resume を維持し、`review_completion_unknown` に昇格しない。
+  - Threshold 後も `review_completion_unknown` は non-pass human gate であり、`passed` / `merge_prepared` にはしない。
+
+### 追加 output metadata
+- `ci.actions.jobs_summary.collection.mode`
+- `ci.actions.jobs_summary.collection.expanded_runs`
+- `ci.actions.jobs_summary.collection.skipped_green_runs`
+- `ci.actions.jobs_summary.collection.cap`
+- `wait.review_trigger_age_seconds`
+- `wait.ci_passed_age_seconds`
+- `wait.review_completion_unknown_min_trigger_age_seconds`
+- `wait.review_completion_unknown_min_ci_passed_age_seconds`
+- `wait.review_completion_unknown_latency_satisfied`
+
+### 追加設計 invariants
+- Public shell commands remain stable.
+- New Python file is part of shipped provider asset surface and must be covered by init/update asset behavior.
+- Provider source remains authority; dogfooding `.agents/...` mirror is synchronized after provider changes.
+- Existing JSON fields are additive-compatible; removals require explicit design amendment.
+- External green evidence can pass only when no failure/pending/unknown/required-missing blocker is observed.
+- Review completion unknown remains non-pass and cannot be inferred from selected count zero.
+
 ## リスク / 移行 / ロールバック
 - リスク:
   - Actions runs API query shape or pagination behavior differs from fake expectations.
@@ -377,6 +484,8 @@ Skill --> Collector : documents required permission
   - Required checks from branch protection may be incompletely represented when supplemental rollup is unavailable.
   - Review completion unknown may be classified too early if pending review requests or current in-progress signals are not recognized.
   - Explicit no-findings issue-comment support could false-pass if body matching, actor identity, trigger boundary, or selected blocker precedence is too broad.
+  - Extracted Python asset may be omitted from scaffold/update output if installer asset coverage is incomplete.
+  - Bounded green-run job expansion may remove diagnostic detail that consumers had begun to inspect, even though high-level CI state remains correct.
 - 緩和:
   - Tests assert exact fake `gh` API paths and wrapper classification.
   - Supplemental permission limitations must be non-blocking or coverage-only when Actions is decisive.
