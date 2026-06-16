@@ -774,6 +774,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh",
         ".agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py",
         ".agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py",
+        ".agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py",
         ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh",
         ".agents/skills/github-pr-creator/SKILL.md",
         ".agents/skills/github-pr-creator/agents/openai.yaml",
@@ -837,6 +838,7 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh",
             ".agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py",
             ".agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py",
+            ".agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py",
             ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh",
             ".agents/skills/github-pr-creator/SKILL.md",
             ".agents/skills/github-pr-creator/agents/openai.yaml",
@@ -9468,6 +9470,31 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 f"missing PR observation snapshot Python asset after update: {relative_path}"
             assert installed_asset.read_bytes() == provider_asset.read_bytes()
 
+    def test_issue_187_s320_observation_wait_python_asset_installed_by_init_and_update(self) -> None:
+        relative_path = Path(
+            ".agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+
+            assert main(["init", str(target)]) == 0
+
+            installed_asset = target / relative_path
+            provider_asset = self._ISSUE_68_INSTALL_ROOT / relative_path
+            assert installed_asset.is_file(), \
+                f"missing PR observation wait Python asset after init: {relative_path}"
+            assert installed_asset.read_bytes() == provider_asset.read_bytes()
+
+            installed_asset.unlink()
+            assert not installed_asset.exists()
+
+            assert main(["update", str(target)]) == 0
+
+            assert installed_asset.is_file(), \
+                f"missing PR observation wait Python asset after update: {relative_path}"
+            assert installed_asset.read_bytes() == provider_asset.read_bytes()
+
     def test_issue_68_workflow_seed_matches_repo_root_ci_workflow(self) -> None:
         install_root_workflow = self._ISSUE_68_INSTALL_ROOT / ".github/workflows/ci.yml"
         repo_root_workflow = Path(".github/workflows/ci.yml")
@@ -13108,6 +13135,9 @@ esac
         wait_script = script_dir / "wait_pr_observation.sh"
         shutil.copy2(source_wait, wait_script)
         wait_script.chmod(0o755)
+        wait_lib_dir = script_dir / "lib"
+        wait_lib_dir.mkdir()
+        shutil.copy2(source_wait.parent / "lib" / "pr_observation_wait.py", wait_lib_dir)
 
         trigger_script = script_dir / "trigger_codex_review.sh"
         trigger_script.write_text(
@@ -13323,6 +13353,9 @@ PY
         wait_script = script_dir / "wait_pr_observation.sh"
         shutil.copy2(source_wait, wait_script)
         wait_script.chmod(0o755)
+        wait_lib_dir = script_dir / "lib"
+        wait_lib_dir.mkdir()
+        shutil.copy2(source_wait.parent / "lib" / "pr_observation_wait.py", wait_lib_dir)
 
         trigger_script = script_dir / "trigger_codex_review.sh"
         trigger_script.write_text(
@@ -17839,6 +17872,9 @@ esac
             wait_script = script_dir / "wait_pr_observation.sh"
             shutil.copy2(source_script, wait_script)
             wait_script.chmod(0o755)
+            wait_lib_dir = script_dir / "lib"
+            wait_lib_dir.mkdir()
+            shutil.copy2(source_script.parent / "lib" / "pr_observation_wait.py", wait_lib_dir)
             snapshot_script = script_dir / "fetch_pr_observation_snapshot.sh"
             snapshot_script.write_text(
                 """#!/usr/bin/env bash
@@ -18358,6 +18394,9 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
         state_path = tmp_path / "state.txt"
         out_dir = out_dir or tmp_path / "out"
         shutil.copy2(source_script_path, wait_script_path)
+        wait_lib_dir = script_dir / "lib"
+        wait_lib_dir.mkdir()
+        shutil.copy2(source_script_path.parent / "lib" / "pr_observation_wait.py", wait_lib_dir)
         self._issue_174_write_wait_fake_snapshot_script(snapshot_script_path)
         wait_script_path.chmod(0o755)
         scenario_path.write_text(json.dumps(scenario), encoding="utf-8")
@@ -20519,6 +20558,9 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             state_path = tmp_path / "state.txt"
             out_dir = tmp_path / "out"
             shutil.copy2(source_script_path, wait_script_path)
+            wait_lib_dir = script_dir / "lib"
+            wait_lib_dir.mkdir()
+            shutil.copy2(source_script_path.parent / "lib" / "pr_observation_wait.py", wait_lib_dir)
             snapshot_script_path.write_text(
                 """#!/usr/bin/env python3
 import json
