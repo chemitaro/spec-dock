@@ -2834,6 +2834,8 @@ class TestInitUpdate(CliRuntimeHarness):
             f"spec_dock/{candidate.relative_to(package_root).as_posix()}"
             for candidate in install_root.rglob("*")
             if candidate.is_file()
+            and "__pycache__" not in candidate.parts
+            and not candidate.name.endswith(".pyc")
         }
 
     def _issue_69_collect_install_root_artifact_surfaces(self) -> dict[str, set[str]]:
