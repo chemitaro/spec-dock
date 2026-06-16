@@ -772,6 +772,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/github-pr-observation/scripts/wait_pr_observation.sh",
         ".agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh",
         ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh",
+        ".agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py",
         ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh",
         ".agents/skills/github-pr-creator/SKILL.md",
         ".agents/skills/github-pr-creator/agents/openai.yaml",
@@ -833,6 +834,7 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/github-pr-observation/scripts/wait_pr_observation.sh",
             ".agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh",
             ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh",
+            ".agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py",
             ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh",
             ".agents/skills/github-pr-creator/SKILL.md",
             ".agents/skills/github-pr-creator/agents/openai.yaml",
@@ -9411,6 +9413,31 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 f"missing Codex review trigger helper after update: {relative_path}"
             assert os.access(installed_helper, os.X_OK), \
                 f"Codex review trigger helper is not executable after update: {relative_path}"
+
+    def test_issue_187_s201_actions_checks_python_asset_installed_by_init_and_update(self) -> None:
+        relative_path = Path(
+            ".agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+
+            assert main(["init", str(target)]) == 0
+
+            installed_asset = target / relative_path
+            provider_asset = self._ISSUE_68_INSTALL_ROOT / relative_path
+            assert installed_asset.is_file(), \
+                f"missing PR observation checks Python asset after init: {relative_path}"
+            assert installed_asset.read_bytes() == provider_asset.read_bytes()
+
+            installed_asset.unlink()
+            assert not installed_asset.exists()
+
+            assert main(["update", str(target)]) == 0
+
+            assert installed_asset.is_file(), \
+                f"missing PR observation checks Python asset after update: {relative_path}"
+            assert installed_asset.read_bytes() == provider_asset.read_bytes()
 
     def test_issue_68_workflow_seed_matches_repo_root_ci_workflow(self) -> None:
         install_root_workflow = self._ISSUE_68_INSTALL_ROOT / ".github/workflows/ci.yml"
@@ -20409,23 +20436,52 @@ esac
                     assert expected_code in codes
                     assert "github_token_permission_denied" not in codes
 
-    def test_issue_180_s02_checks_collector_invalid_input_remains_usage_error(self) -> None:
+    def test_issue_187_s201_actions_checks_wrapper_validation_rejects_invalid_args_before_gh(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
             / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
         )
 
-        result = subprocess.run(
-            [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "not-a-sha"],
-            capture_output=True,
-            text=True,
-            check=False,
+        cases = (
+            ("invalid_repo", ("--repo", "owner/repo/extra", "--pr", "13", "--head-sha", "a" * 40)),
+            ("invalid_pr", ("--repo", "owner/repo", "--pr", "0", "--head-sha", "a" * 40)),
+            ("invalid_sha", ("--repo", "owner/repo", "--pr", "13", "--head-sha", "not-a-sha")),
         )
 
-        assert result.returncode == 64
-        assert "github_token_permission_denied" not in result.stdout
-        assert "github_token_permission_denied" not in result.stderr
+        for name, args in cases:
+            with _case(name=name):
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    tmp_path = Path(tmp_dir)
+                    fake_bin = tmp_path / "bin"
+                    fake_bin.mkdir()
+                    gh_log = tmp_path / "gh-calls.log"
+                    fake_gh = fake_bin / "gh"
+                    fake_gh.write_text(
+                        f"""#!/usr/bin/env bash
+printf '%s\\n' "$*" >> {shlex.quote(str(gh_log))}
+exit 44
+""",
+                        encoding="utf-8",
+                    )
+                    fake_gh.chmod(0o755)
+                    env = {
+                        **os.environ,
+                        "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                    }
+
+                    result = subprocess.run(
+                        [str(script_path), *args],
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+
+                    assert result.returncode == 64
+                    assert not gh_log.exists(), "invalid wrapper args must be rejected before gh is called"
+                    assert "github_token_permission_denied" not in result.stdout
+                    assert "github_token_permission_denied" not in result.stderr
 
     def test_issue_75_pr_observation_checks_collector_merges_paginated_json_objects(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
