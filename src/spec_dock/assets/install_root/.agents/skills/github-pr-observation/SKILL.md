@@ -158,18 +158,29 @@ status collection are implemented by the public scripts.
 - `stderr` progress is bounded and non-authoritative.
 - `--out` artifacts are optional debug/audit copies.
 - Observation statuses include `passed`, `failed`, `pending`, `running`,
-  `none`, `timeout`, `stale_head`, `unknown`, and `human_gate`.
+  `none`, `timeout`, `stale_head`, `unknown`, `review_completion_unknown`,
+  and `human_gate`.
 - CI terminal state and Codex review lifecycle are observed independently and
   merged only in the final wait result.
 - Codex review completion is primarily detected from Codex-authored submitted PR
   review objects. Issue comments, reactions, or quiet windows are fallback or
   supporting evidence only.
+- `review_completion_unknown` is a non-pass terminal-like review state. It means
+  CI passed, the observed head matched, no current blocker was selected, and no
+  trusted Codex review completion signal was found.
+- Stable no-completion evidence for the current boundary must not be collapsed
+  into a generic timeout. The top-level result is `human_gate`, with the decision
+  reason indicating `review_completion_unknown`, so a human can review the
+  no-completion condition explicitly.
 - `fallback_issue_comment` remains low-confidence evidence. It keeps the final
   status in the `human_gate` / `wait_or_resume` path and does not promote a run
   to `passed`, complete, or merge-ready.
 - `fallback_pass_candidate` is a non-promoting signal that a current-boundary
   fallback issue comment appears positive. It is useful context, but it does not
   override the `fallback_issue_comment` gate.
+- S102 is deferred until there is an explicit no-findings artifact contract.
+  Generic issue comments, zero selected comments, or review request disappearance
+  alone must not mark review completion.
 - Historical unresolved threads in `review.audit` or the legacy all-fetched
   review fields are audit/debug context only. Only current-boundary selected
   blockers represented through `decision` can drive final review-feedback
