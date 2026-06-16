@@ -17294,6 +17294,101 @@ esac
                 item.get("code") for item in payload["limitations"]
             ]
 
+    @pytest.mark.parametrize(
+        ("case_name", "stderr_text", "expected_code"),
+        [
+            ("auth", "HTTP 401: Requires authentication", "github_auth_missing"),
+            ("rate", "API rate limit exceeded for user", "github_rate_limited"),
+            (
+                "transient",
+                "HTTP 502: upstream temporarily unavailable",
+                "github_transient_unknown",
+            ),
+        ],
+    )
+    def test_issue_187_s202_zero_actions_runs_with_green_check_runs_and_blocking_supplemental_error_is_non_pass(
+        self,
+        case_name: str,
+        stderr_text: str,
+        expected_code: str,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with _case(name=case_name):
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                tmp_path = Path(tmp_dir)
+                fake_bin = tmp_path / "bin"
+                fake_bin.mkdir()
+                fake_gh = fake_bin / "gh"
+                fake_gh.write_text(
+                    f"""#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{{"total_count":0,"workflow_runs":[]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{{"total_count":1,"check_runs":[{{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}}]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    printf '{stderr_text}\\n' >&2
+    exit 1
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                    encoding="utf-8",
+                )
+                fake_gh.chmod(0o755)
+                env = {
+                    **os.environ,
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                }
+
+                result = subprocess.run(
+                    [
+                        str(script_path),
+                        "--repo",
+                        "owner/repo",
+                        "--pr",
+                        "13",
+                        "--head-sha",
+                        "a" * 40,
+                    ],
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+
+                assert result.returncode == 0, result.stdout + result.stderr
+                payload = json.loads(result.stdout)
+                assert payload["ci"]["status"] in {"unknown", "none"}
+                assert payload["ci"]["status"] != "passed"
+                limitation = next(
+                    item
+                    for item in payload["limitations"]
+                    if item.get("code") == expected_code
+                )
+                assert limitation["severity"] == "blocking"
+                assert limitation["capability"] == "commit_statuses_read"
+                assert limitation["secret_redacted"] is True
+
     def test_issue_187_s202_zero_actions_runs_with_zero_external_evidence_stays_non_pass(
         self,
     ) -> None:
