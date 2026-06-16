@@ -17792,6 +17792,7 @@ esac
             snapshot_script = script_dir / "fetch_pr_observation_snapshot.sh"
             shutil.copy2(source_script, snapshot_script)
             snapshot_script.chmod(0o755)
+            shutil.copy2(source_script.parent / "lib" / "pr_observation_snapshot.py", lib_dir)
             checks_script = lib_dir / "fetch_pr_checks_snapshot.sh"
             checks_script.write_text(
                 """#!/usr/bin/env bash
