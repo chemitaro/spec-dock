@@ -18030,6 +18030,8 @@ payload = {
     }),
     "artifacts": {},
 }
+if "observed_at" in current:
+    payload["observed_at"] = current["observed_at"]
 if "decision" in current:
     payload["decision"] = current["decision"]
 if "decision_fingerprint" in current:
@@ -18054,6 +18056,8 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
         quiet_seconds: int = 1,
         same_fingerprint_count: int = 2,
         zero_check_grace_polls: int = 2,
+        trigger_created_at: str = "2026-06-08T01:00:00Z",
+        out_dir: Path | None = None,
     ) -> tuple[subprocess.CompletedProcess[str], Path]:
         repo_root = Path(__file__).resolve().parents[3]
         source_script_path = (
@@ -18066,7 +18070,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
         snapshot_script_path = script_dir / "fetch_pr_observation_snapshot.sh"
         scenario_path = tmp_path / "scenario.json"
         state_path = tmp_path / "state.txt"
-        out_dir = tmp_path / "out"
+        out_dir = out_dir or tmp_path / "out"
         shutil.copy2(source_script_path, wait_script_path)
         self._issue_174_write_wait_fake_snapshot_script(snapshot_script_path)
         wait_script_path.chmod(0o755)
@@ -18090,7 +18094,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                 "--trigger-comment-id",
                 "99",
                 "--trigger-created-at",
-                "2026-06-08T01:00:00Z",
+                trigger_created_at,
                 "--timeout-seconds",
                 str(timeout_seconds),
                 "--poll-interval-seconds",
@@ -19110,6 +19114,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                         "decision": decision,
                         "decision_fingerprint": "no-completion-s101",
                         "codex_review": codex_review,
+                        "observed_at": "2000-01-01T00:00:00Z",
                         "check_runs": {"total": 1, "success": 1},
                         "threads": {"total": 0, "unresolved": 0, "items": []},
                     }
@@ -19134,6 +19139,416 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert payload["decision"]["recommended_next_action"] != "merge_prepared"
             assert payload["wait"]["same_fingerprint_observed"] >= 2
             assert payload["wait"]["quiet_seconds_observed"] >= 1
+
+    def test_issue_187_s204_wait_does_not_promote_unknown_before_trigger_age(self) -> None:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "reason": "current_boundary_has_no_completion_or_blocking_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "selected_changes_requested_evidence": [],
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": "no-completion-s204-young-trigger",
+        }
+        trigger = {
+            "source": "explicit",
+            "comment_id": 99,
+            "created_at": "2999-01-01T00:00:00Z",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "no-completion-s204-young-trigger",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "confidence": "medium",
+                                "no_completion_evidence": evidence,
+                            },
+                            "collection_summary": {
+                                "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
+                            },
+                        },
+                        "observed_at": "2000-01-01T00:00:00Z",
+                        "trigger": trigger,
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=3,
+                quiet_seconds=1,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at=trigger["created_at"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] != "human_gate"
+            assert payload["decision"]["status_reason"] != "review_completion_unknown"
+            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["observation_complete"] is False
+            assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
+            assert payload["wait"]["review_trigger_age_seconds"] < 300
+
+    def test_issue_187_s204_wait_does_not_promote_unknown_before_ci_passed_age(self) -> None:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": "no-completion-s204-young-ci",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "no-completion-s204-young-ci",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "confidence": "medium",
+                                "no_completion_evidence": evidence,
+                            },
+                            "collection_summary": {
+                                "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
+                            },
+                        },
+                        "observed_at": "2999-01-01T00:00:00Z",
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=3,
+                quiet_seconds=1,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] != "human_gate"
+            assert payload["decision"]["status_reason"] != "review_completion_unknown"
+            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["observation_complete"] is False
+            assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
+            assert payload["wait"]["ci_passed_age_seconds"] < 90
+
+    def test_issue_187_s204_wait_resume_preserves_prior_ci_passed_age(self) -> None:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": "no-completion-s204-resume",
+        }
+        trigger_created_at = "2000-01-01T00:00:00Z"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            out_dir = tmp_path / "out"
+            out_dir.mkdir(parents=True)
+            (out_dir / "result.json").write_text(
+                json.dumps(
+                    {
+                        "repo": "owner/repo",
+                        "pr": 13,
+                        "expected_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                        "observed_at": "2000-01-01T00:02:00Z",
+                        "resume": {
+                            "repo": "owner/repo",
+                            "pr": 13,
+                            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                            "trigger_comment_id": 99,
+                            "trigger_created_at": trigger_created_at,
+                        },
+                        "wait": {
+                            "ci_passed_age_seconds": 95,
+                        },
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                tmp_path,
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "no-completion-s204-resume",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "confidence": "medium",
+                                "no_completion_evidence": evidence,
+                            },
+                            "collection_summary": {
+                                "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
+                            },
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=3,
+                quiet_seconds=1,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at=trigger_created_at,
+                out_dir=out_dir,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "human_gate"
+            assert payload["decision"]["status_reason"] == "review_completion_unknown"
+            assert payload["wait"]["review_completion_unknown_latency_satisfied"] is True
+            assert payload["wait"]["ci_passed_age_seconds"] >= 90
+            assert payload["wait"]["ci_passed_since"]
+
+    def test_issue_187_s204_wait_promotes_unknown_after_trigger_and_ci_ages(self) -> None:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": "no-completion-s204-aged",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "no-completion-s204-aged",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "confidence": "medium",
+                                "no_completion_evidence": evidence,
+                            },
+                            "collection_summary": {
+                                "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
+                            },
+                        },
+                        "observed_at": "2000-01-01T00:00:00Z",
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=3,
+                quiet_seconds=1,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "human_gate"
+            assert payload["decision"]["status_reason"] == "review_completion_unknown"
+            assert payload["decision"]["recommended_next_action"] == "human_gate"
+            assert payload["wait"]["review_completion_unknown_latency_satisfied"] is True
+            assert payload["wait"]["review_trigger_age_seconds"] >= 300
+            assert payload["wait"]["ci_passed_age_seconds"] >= 90
+
+    def test_issue_187_s204_wait_late_unresolved_review_overrides_unknown_candidate(self) -> None:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        no_completion_decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": "no-completion-s204-late-review",
+        }
+        blocker_decision = {
+            "scope": "current_trigger_boundary",
+            "status": "human_gate",
+            "status_reason": "current_selected_unresolved_thread",
+            "recommended_next_action": "address_review_feedback",
+            "observation_complete": False,
+            "selected_review_ids": [201],
+            "selected_review_comment_ids": [301],
+            "selected_review_thread_ids": ["RT_current"],
+            "selected_unresolved_thread_ids": ["RT_current"],
+            "selected_unresolved_count": 1,
+            "completion_signal": "submitted_pull_request_review",
+            "fingerprint": "blocker-s204-late-review",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": no_completion_decision,
+                        "decision_fingerprint": "no-completion-s204-late-review",
+                        "observed_at": "2000-01-01T00:00:00Z",
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    },
+                    {
+                        "ci": "passed",
+                        "review": "unresolved",
+                        "status": "human_gate",
+                        "overall_status": "human_gate",
+                        "normalized_status": "human_gate",
+                        "recommended_next_action": "address_review_feedback",
+                        "decision": blocker_decision,
+                        "decision_fingerprint": "blocker-s204-late-review",
+                        "observed_at": "2000-01-01T00:00:02Z",
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_current"}]},
+                    },
+                ],
+                timeout_seconds=4,
+                quiet_seconds=1,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "human_gate"
+            assert payload["recommended_next_action"] == "address_review_feedback"
+            assert payload["decision"]["status_reason"] == "current_selected_unresolved_thread"
+            assert payload["decision"]["status_reason"] != "review_completion_unknown"
+            assert payload["decision"]["selected_unresolved_thread_ids"] == ["RT_current"]
 
     def test_issue_187_s101_wait_pending_review_no_completion_evidence_still_times_out(self) -> None:
         evidence = {
