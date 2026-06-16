@@ -63,6 +63,10 @@ def capability_for_api(api):
     return "unknown"
 
 
+def is_blocking_limitation(limitation):
+    return limitation.get("severity") == "blocking" or limitation.get("blocking") is True
+
+
 def github_failure_limitation(*, api, source, exit_code, stderr, default_code, default_message, default_severity):
     classification = classify_github_stderr(stderr)
     stderr_sha256 = hashlib.sha256((stderr or "").encode()).hexdigest()
@@ -1050,11 +1054,11 @@ elif actions_decisive_green and not (
     ci_status = "passed"
 elif any(
     item.get("code") == "github_token_permission_denied"
-    and item.get("severity") == "blocking"
+    and is_blocking_limitation(item)
     for item in limitations
 ):
     ci_status = "unknown"
-elif limitations and any(item.get("severity") == "blocking" and item.get("code", "").startswith("github_api") for item in limitations):
+elif limitations and any(is_blocking_limitation(item) for item in limitations):
     ci_status = "unknown"
 elif merge_state_blocking or (
     not required_check_state["available"] and (check_counts["total"] or status_counts["total"])
