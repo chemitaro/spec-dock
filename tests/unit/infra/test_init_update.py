@@ -773,6 +773,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh",
         ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh",
         ".agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py",
+        ".agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py",
         ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh",
         ".agents/skills/github-pr-creator/SKILL.md",
         ".agents/skills/github-pr-creator/agents/openai.yaml",
@@ -835,6 +836,7 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh",
             ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh",
             ".agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py",
+            ".agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py",
             ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh",
             ".agents/skills/github-pr-creator/SKILL.md",
             ".agents/skills/github-pr-creator/agents/openai.yaml",
@@ -9441,6 +9443,31 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 f"missing PR observation checks Python asset after update: {relative_path}"
             assert installed_asset.read_bytes() == provider_asset.read_bytes()
 
+    def test_issue_187_s310_observation_snapshot_python_asset_installed_by_init_and_update(self) -> None:
+        relative_path = Path(
+            ".agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+
+            assert main(["init", str(target)]) == 0
+
+            installed_asset = target / relative_path
+            provider_asset = self._ISSUE_68_INSTALL_ROOT / relative_path
+            assert installed_asset.is_file(), \
+                f"missing PR observation snapshot Python asset after init: {relative_path}"
+            assert installed_asset.read_bytes() == provider_asset.read_bytes()
+
+            installed_asset.unlink()
+            assert not installed_asset.exists()
+
+            assert main(["update", str(target)]) == 0
+
+            assert installed_asset.is_file(), \
+                f"missing PR observation snapshot Python asset after update: {relative_path}"
+            assert installed_asset.read_bytes() == provider_asset.read_bytes()
+
     def test_issue_68_workflow_seed_matches_repo_root_ci_workflow(self) -> None:
         install_root_workflow = self._ISSUE_68_INSTALL_ROOT / ".github/workflows/ci.yml"
         repo_root_workflow = Path(".github/workflows/ci.yml")
@@ -12210,6 +12237,55 @@ exit 44
             assert payload["limitations"][0]["code"] == "pr_metadata_collection_failed"
             assert gh_log.read_text(encoding="utf-8").startswith("pr view 13 --repo owner/repo --json ")
 
+    def test_issue_187_s310_snapshot_wrapper_validation_rejects_invalid_args_before_gh(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            gh_log = tmp_path / "gh.log"
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$GH_FAKE_LOG"
+exit 44
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            cases = [
+                ["--repo", "owner/repo", "--pr", "13", "--head-sha", "x"],
+                ["--repo", "owner/repo", "--pr", "0"],
+                ["--repo", "owner/repo", "--pr", "13", "--body-mode", "raw-api"],
+                ["--repo", "owner/repo", "--pr", "13", "--out", "--bad"],
+                ["--repo", "owner/repo", "--pr", "13", "--raw-gh-args", "api"],
+            ]
+            for args in cases:
+                with _case(name=" ".join(args)):
+                    result = subprocess.run(
+                        [str(script_path), *args],
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+
+                    assert result.returncode == 64
+                    assert "usage: fetch_pr_observation_snapshot.sh" in result.stderr
+
+            assert not gh_log.exists(), "invalid snapshot args must not call gh"
+
     def test_issue_75_pr_review_wrapper_rejects_unsafe_inputs_before_gh_api(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -13912,6 +13988,114 @@ exit 44
             assert payload["limitations"][0]["code"] == "pr_metadata_collection_failed"
             assert gh_log.read_text(encoding="utf-8").startswith("pr view 13 --repo owner/repo --json ")
 
+    def test_issue_187_s310_snapshot_reports_missing_gh_launch_failure_as_json(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            empty_path = Path(tmp_dir) / "bin"
+            empty_path.mkdir()
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                ],
+                env={**os.environ, "PATH": str(empty_path)},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "Traceback" not in result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            limitation = payload["limitations"][0]
+            assert payload["normalized_status"] == "unknown"
+            assert payload["observation_complete"] is False
+            assert limitation["code"] == "pr_metadata_collection_failed"
+            assert limitation["exit_code"] == 127
+            assert re.fullmatch(r"[0-9a-f]{64}", limitation["stderr_sha256"])
+
+    def test_issue_187_s310_snapshot_reports_missing_fixed_collector_as_json(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        source_snapshot_py = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            script_dir = tmp_path / "scripts"
+            lib_dir = script_dir / "lib"
+            fake_bin = tmp_path / "bin"
+            lib_dir.mkdir(parents=True)
+            fake_bin.mkdir()
+            shutil.copy2(source_snapshot_py, lib_dir / "pr_observation_snapshot.py")
+
+            review_script = lib_dir / "fetch_pr_review_snapshot.sh"
+            review_script.write_text(
+                """#!/usr/bin/env bash
+cat <<'JSON'
+{"review":{"status":"approved","signals":[],"codex_authored":[],"collector":"s04"},"limitations":[],"fingerprint":"review-ok"}
+JSON
+""",
+                encoding="utf-8",
+            )
+            review_script.chmod(0o755)
+
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
+    cat <<'JSON'
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(lib_dir / "pr_observation_snapshot.py"),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                ],
+                env={**os.environ, "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "Traceback" not in result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            limitation = next(item for item in payload["limitations"] if item["code"] == "ci_collection_failed")
+            assert limitation["source"] == "fetch_pr_checks_snapshot.sh"
+            assert limitation["exit_code"] == 127
+            assert re.fullmatch(r"[0-9a-f]{64}", limitation["stderr_sha256"])
+
     def test_issue_180_s02_snapshot_maps_pr_metadata_permission_denied_to_limitation(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -14417,6 +14601,10 @@ esac
             repo_root
             / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
         )
+        source_snapshot_py = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py"
+        )
         script_dir = tmp_path / "scripts"
         lib_dir = script_dir / "lib"
         fake_bin = tmp_path / "bin"
@@ -14427,6 +14615,7 @@ esac
         snapshot_script = script_dir / "fetch_pr_observation_snapshot.sh"
         shutil.copy2(source_snapshot, snapshot_script)
         snapshot_script.chmod(0o755)
+        shutil.copy2(source_snapshot_py, lib_dir / "pr_observation_snapshot.py")
 
         checks_payload = {
             "ci": {
