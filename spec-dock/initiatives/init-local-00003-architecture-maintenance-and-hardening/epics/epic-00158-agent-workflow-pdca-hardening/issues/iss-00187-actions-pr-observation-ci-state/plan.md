@@ -745,3 +745,358 @@ ID: "iss-00187"
   - Whether top-level `review_completion_unknown` normalizes to `human_gate` or `unknown`; recommended default is `human_gate`.
   - Whether an allowlisted no-findings issue comment is actually observable for the no-PR-review completion form; if not, S102 should be deferred.
   - Whether the post-observation review completion work remains in `iss-00187` or should later be split to a follow-up issue. This plan records it as an appended addendum because the user requested追加修正 in the existing plan.
+
+## 追加実装計画（S200+ / PR #190 P1 Review and Script Boundary Addendum）
+
+### 追加の背景
+- PR #190 latest head `1bb19acdf512d71f45a39ce7a3790862b36b0295` に対して、current Codex review が P1 unresolved thread 2件を返した。
+- 1件目は `fetch_pr_checks_snapshot.sh` が workflow run ごとに jobs API を呼び、bounded wait snapshot の時間予算を消費し得る問題である。
+- 2件目は Actions runs が 0 件の repo で external checks / commit statuses が green でも `ci.status="none"` に落ちる問題である。
+- S101 で追加した `review_completion_unknown` は non-pass ではあるが、Codex review が通常遅延で後から投稿される前に早く確定する可能性がある。
+- これらの修正は、既存 S01-S199 の実施済み計画をやり直すものではない。追加発見に対する S200+ の後続レーンとして末尾に追加する。
+
+### 追加ステップ一覧
+- S200:
+  - 観測可能な振る舞い: S200+ lane の canonical plan adoption と report evidence が記録され、fresh spec-reviewer gate の対象になる。
+  - 依存: S199, discussions `05`..`09`
+  - 対象ファイル: `design.md`, `plan.md`, `report.md`
+  - レビューゲート: spec-reviewer pass
+- S201:
+  - 観測可能な振る舞い: `fetch_pr_checks_snapshot.sh` の公開 CLI / stdout JSON contract を維持したまま、Python 本体を `pr_observation_checks.py` へ切り出す。
+  - 依存: S200
+  - unblock: S202, S203
+  - 対象ファイル: provider `fetch_pr_checks_snapshot.sh`, new provider `pr_observation_checks.py`, `tests/unit/infra/test_init_update.py`
+  - レビューゲート: code-reviewer pass
+- S202:
+  - 観測可能な振る舞い: zero Actions runs でも readable green external checks/statuses があれば `ci.status="passed"` になり、外部CI-only repo を false-negative にしない。
+  - 依存: S201
+  - unblock: S203
+  - 対象ファイル: `pr_observation_checks.py`, `tests/unit/infra/test_init_update.py`
+  - レビューゲート: code-reviewer pass
+- S203:
+  - 観測可能な振る舞い: default / wait snapshot は successful Actions run 全件の jobs API expansion に依存せず、failed / non-terminal / unknown diagnostics は保持する。
+  - 依存: S201, S202
+  - unblock: S204
+  - 対象ファイル: `pr_observation_checks.py`, `tests/unit/infra/test_init_update.py`
+  - レビューゲート: code-reviewer pass
+- S204:
+  - 観測可能な振る舞い: `review_completion_unknown` は quiet / same-fingerprint だけでは昇格せず、trigger age と CI-passed age の最小猶予を満たしてから non-pass human gate になる。
+  - 依存: S100, S101, S203
+  - unblock: S290
+  - 対象ファイル: `wait_pr_observation.sh`, `tests/unit/infra/test_init_update.py`
+  - レビューゲート: code-reviewer pass
+- S290:
+  - 観測可能な振る舞い: provider docs and dogfooding mirror reflect extracted Python asset, bounded Actions collection, external green fallback, and delayed `review_completion_unknown`.
+  - 依存: S201-S204
+  - 対象ファイル: provider/mirror `SKILL.md`, mirror `fetch_pr_checks_snapshot.sh`, mirror `pr_observation_checks.py`, mirror `wait_pr_observation.sh`
+  - レビューゲート: spec-reviewer for docs, code-reviewer for mirror/scaffold sync
+- S299:
+  - 観測可能な振る舞い: S200+ lane の focused / broad tests、provider/mirror checks、SpecDock validation、reviewer gates、PR #190 re-observation が完了する。
+  - 依存: S201-S204, S290
+  - 対象ファイル: issue-wide diff and `report.md`
+  - レビューゲート: qa-reviewer, code-reviewer, spec-reviewer pass
+
+### 追加クロージャ索引 S200+
+
+| 識別子（ID） | ステップ | スライス | 種別 | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 |
+|---|---|---|---|---|---|---|---|
+| tc-s201-001 | S201 | extraction-preservation | characterization | Existing checks collector JSON shape and exit behavior remain compatible after Python extraction | fake `gh` checks collector scenarios | wrapper/extraction behavior drift | yes |
+| tc-s201-002 | S201 | wrapper-validation | negative | invalid repo / PR / SHA are rejected before `gh` is called | invalid CLI args with fake `gh` call log | unsafe caller input reaches GitHub API | yes |
+| tc-s201-003 | S201/S290 | scaffold-asset | scaffold | `pr_observation_checks.py` is shipped by init/update asset surface | temp target init/update or asset inspection | installed wrapper cannot find Python entrypoint | yes |
+| tc-s202-001 | S202 | zero-actions-check-runs-green | acceptance | zero Actions runs plus green check-runs can produce `ci.status="passed"` | Actions total 0; check-runs success | external-CI-only false-negative | yes |
+| tc-s202-002 | S202 | zero-actions-statuses-green | acceptance | zero Actions runs plus green commit statuses can produce `ci.status="passed"` | Actions total 0; statuses success | status-only CI false-negative | yes |
+| tc-s202-003 | S202 | zero-actions-zero-external | negative | zero Actions runs plus zero external evidence remains non-pass | Actions/check/status total 0 | no-CI false pass | yes |
+| tc-s202-004 | S202 | zero-actions-external-non-green | negative | external pending/failure still wins over zero-Actions fallback | Actions total 0; check/status pending or failed | blocker masked by fallback | yes |
+| tc-s203-001 | S203 | bounded-green-job-expansion | performance/regression | multiple green workflow runs do not force jobs API call for every run | fake `gh` call log with multiple green runs | wait budget exhaustion / rate pressure | yes |
+| tc-s203-002 | S203 | failed-diagnostics-preserved | acceptance | failed Actions still emits sanitized job/step failure evidence | failed run/job/step payload | loss of repair evidence | yes |
+| tc-s203-003 | S203 | expansion-cap-limitation | negative | cap/skip is explicit and non-secret when diagnostics are bounded | more diagnostic-relevant runs than cap | silent evidence omission / unbounded calls | yes if cap path exists |
+| tc-s203-004 | S203 | failure-dedupe | regression | Actions/check-run duplicated failure evidence remains deduplicated | overlapping failed run/job evidence | duplicate/noisy failures | yes |
+| tc-s204-001 | S204 | no-premature-unknown-trigger-age | negative | below trigger-age threshold, stable no-completion does not become `review_completion_unknown` | CI passed/head matched/recent trigger/no completion | review unknown races ahead of Codex review | yes |
+| tc-s204-002 | S204 | no-premature-unknown-ci-age | negative | below CI-passed-age threshold, stable no-completion still waits/resumes | trigger old enough; CI just became passed | CI pass instant terminalizes review unknown | yes |
+| tc-s204-003 | S204 | delayed-review-unknown | acceptance | beyond both thresholds, stable no-completion becomes human-gate `review_completion_unknown` | old trigger, CI passed long enough, stable fingerprint | loss of S101 no-completion escape hatch | yes |
+| tc-s204-004 | S204 | late-review-wins | regression | late submitted Codex review with unresolved threads overrides no-completion state | sequence no-completion then submitted review | actionable review lost behind unknown | yes |
+| tc-s290-001 | S290 | docs | docs | SKILL docs describe bounded Actions collection, external fallback, delayed review unknown | provider/mirror docs inspection | operator misinformation | yes |
+| tc-s290-002 | S290 | mirror | scaffold | provider and dogfooding mirror changed files match where intended | `cmp -s` for changed files | dogfooding stale behavior | yes |
+| tc-s290-003 | S290 | installed-asset | scaffold | new Python asset is installed/updated with wrapper | init/update asset test | broken shipped wrapper | yes |
+| tc-s299-001 | S299 | final-validation | quality | focused/broad tests, validation, reviews, and PR observation evidence close S200+ lane | final issue-wide diff | incomplete closure | yes |
+
+### 実装ステップ S200 — S200+ canonical adoption gate
+- 振る舞いの目標:
+  - discussions `20260616t025000z-05` through `20260616t031000z-09` の採用判断を canonical `design.md` / `plan.md` / `report.md` に反映し、実装前に fresh spec-reviewer gate を通す。
+- 対象ファイル:
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/plan.md`
+  - `spec-dock/active/issue/report.md`
+- 計画済み契約:
+  - 既存 S01-S199 の実施済み計画は書き換えず、S200+ を末尾に追加する。
+  - `design.md` は Python extraction / P1 fixes / timing guard を統合設計として反映する。
+  - `report.md` に decision / Evidence Adoption Ledger / Delegated Draft Evidence を記録する。
+- review:
+  - spec-reviewer pass required before S201.
+- report evidence destination:
+  - Spec Authoring Gate, Evidence Adoption Ledger, Delegated Draft Evidence, Reviewer Gate Status.
+
+### S200+ 共通実行契約
+- 適用範囲:
+  - S201, S202, S203, S204, S290, S299.
+- orchestration:
+  - Parent orchestrator executes exactly one step at a time.
+  - Do not start the next step until the current step has: required Red or approved alternative evidence, Green verification, fresh step reviewer pass, report evidence, step commit, and post-commit clean check.
+  - Runtime/test/scaffold behavior changes must be delegated to `dev-coder`.
+  - Shipped docs / skill text changes must be delegated to `doc-writer`.
+  - Mechanical mirror sync may be delegated to `utility-worker` or `dev-coder`, but reviewer gate remains parent-owned.
+- required worker output:
+  - changed files list.
+  - Red evidence or explicit approved-no-op / characterization-only rationale.
+  - Green command output summary.
+  - scope boundaries observed.
+  - Ledger Note, or `No material implementation decisions beyond the approved plan.`
+- common forbidden changes:
+  - no arbitrary GitHub API proxy.
+  - no raw token / raw auth stderr output.
+  - no merge-ready / passed promotion from review no-completion evidence.
+  - no selected-count-only completion inference.
+  - no unrelated refactor outside the step target files.
+  - no edits to completed S01-S199 evidence except report rows required to integrate S200+.
+- stop conditions:
+  - If S201 reveals the new Python asset is not shipped by init/update, stop S201 and fix asset inclusion before any S202 behavior change.
+  - If S202 reveals requirement/design conflict around external-CI pass semantics, return to design/plan authoring before code changes.
+  - If S203 cannot preserve failed diagnostics while bounding green expansion, stop for design amendment; do not silently drop failure evidence.
+  - If S204 requires broad review/wait extraction beyond timing guard, stop for design/plan amendment unless a reviewer explicitly accepts a narrow heredoc change.
+  - Any reviewer `fail` blocks commit for that step until bounded follow-up and fresh pass.
+- common report evidence destination:
+  - `report.md` TDD Evidence, Discovered Tests / Risk, Test Contract Closure, Closure Coverage, Closure Delta if IDs change, Reviewer Gate Status, Step Commit Gate.
+
+### 実装ステップ S201 — Extract checks collector Python
+- 振る舞いの目標:
+  - Shell wrapper は fixed public CLI の互換レイヤーに戻し、Python collector 本体を `pr_observation_checks.py` へ移す。
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py`
+  - `tests/unit/infra/test_init_update.py`
+- 計画済み契約:
+  - No CI classification behavior change in S201.
+  - Wrapper validation and stdout JSON contract are preserved.
+  - Python entrypoint uses only standard library and existing `gh` invocation semantics.
+  - Installer/update must ship the new `.py` asset.
+- 委任契約:
+  - delegated role: `dev-coder`
+  - allowed paths:
+    - provider `fetch_pr_checks_snapshot.sh`
+    - provider `pr_observation_checks.py`
+    - focused tests in `tests/unit/infra/test_init_update.py`
+    - minimal report rows for S201 evidence if the worker is explicitly asked to update report; otherwise parent records report evidence.
+  - forbidden changes:
+    - no CI status taxonomy change.
+    - no wait/review script changes.
+    - no dogfooding mirror sync in S201 unless the parent explicitly scopes it into the step; mirror sync normally waits for S290.
+    - no new third-party dependency.
+- テスト義務:
+  - `tc-s201-001`, `tc-s201-002`, `tc-s201-003`
+- Red / alternative evidence:
+  - `tc-s201-003` should fail or be absent before the new Python asset is added; if existing asset tests already cover copied files generically, record characterization evidence instead.
+  - Existing focused collector tests serve as before/after behavior-preservation evidence.
+- Green 検証:
+  - `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187 and actions"`
+  - focused wrapper validation / asset presence tests
+  - `git diff --check`
+- reviewer:
+  - code-reviewer pass focused on shell/Python boundary, fixed API surface, secret redaction, stdout/stderr behavior.
+- commit gate:
+  - S201 commit after reviewer pass and clean check.
+- report evidence destination:
+  - TDD Evidence for extraction/asset test behavior, Test Contract Closure for `tc-s201-001`..`tc-s201-003`, Closure Coverage, Reviewer Gate Status, Step Commit Gate.
+
+### 実装ステップ S202 — Zero Actions runs with external green evidence
+- 振る舞いの目標:
+  - Actions runs が 0 件でも external check-runs / commit statuses が green なら CI passed として扱える。
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py`
+  - `tests/unit/infra/test_init_update.py`
+- 計画済み契約:
+  - Zero Actions runs alone is still non-pass.
+  - External failure/pending/required missing evidence still wins.
+  - No wait/review behavior changes in this step.
+- 委任契約:
+  - delegated role: `dev-coder`
+  - allowed paths:
+    - provider `pr_observation_checks.py`
+    - focused tests in `tests/unit/infra/test_init_update.py`
+    - parent-owned report evidence unless explicitly delegated.
+  - forbidden changes:
+    - no shell wrapper restructuring beyond S201 output.
+    - no wait/review script changes.
+    - no pass when Actions/check-runs/statuses/rollup provide no evidence.
+- テスト義務:
+  - `tc-s202-001`..`tc-s202-004`
+- Red / alternative evidence:
+  - `tc-s202-001` and `tc-s202-002` must fail or be shown absent before implementation.
+  - `tc-s202-003` preserves existing zero-evidence non-pass behavior.
+- Green 検証:
+  - `uv run pytest tests/unit/infra/test_init_update.py -k "zero_actions or external or issue_187"`
+  - `git diff --check`
+- reviewer:
+  - code-reviewer pass focused on false-pass safety and external-CI compatibility.
+- commit gate:
+  - S202 commit after reviewer pass.
+- report evidence destination:
+  - TDD Evidence, Test Contract Closure for `tc-s202-001`..`tc-s202-004`, Closure Coverage, Reviewer Gate Status, Step Commit Gate.
+
+### 実装ステップ S203 — Bound Actions jobs collection
+- 振る舞いの目標:
+  - Successful Actions runs 全件に対する jobs API expansion を避け、wait snapshot の bounded behavior を守る。
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py`
+  - `tests/unit/infra/test_init_update.py`
+- 計画済み契約:
+  - Failed / running / pending / unknown run diagnostics are preserved or explicitly limited with sanitized limitation.
+  - Terminal green run jobs are skipped or capped by documented internal policy.
+  - Existing `ci.actions.jobs[]`, `jobs_detail[]`, and `jobs_summary` compatibility is preserved additively.
+- 委任契約:
+  - delegated role: `dev-coder`
+  - allowed paths:
+    - provider `pr_observation_checks.py`
+    - focused tests in `tests/unit/infra/test_init_update.py`
+    - parent-owned report evidence unless explicitly delegated.
+  - forbidden changes:
+    - no external-green status ladder regression from S202.
+    - no loss of failed job/step evidence when jobs are readable.
+    - no public `--mode` flag unless design is amended.
+    - no raw API stderr/token exposure in new limitations.
+- テスト義務:
+  - `tc-s203-001`..`tc-s203-004`
+- Red / alternative evidence:
+  - `tc-s203-001` must fail on unbounded current behavior or be represented by a call-log characterization proving current unbounded calls.
+  - `tc-s203-002` and `tc-s203-004` may be covered by existing tests if the worker maps them explicitly.
+  - `tc-s203-003` is required only if a cap path is implemented; if green runs are skipped without cap, record no-op rationale for the cap-specific path.
+- Green 検証:
+  - `uv run pytest tests/unit/infra/test_init_update.py -k "jobs_summary or jobs_detail or actions_job or issue_187"`
+  - `git diff --check`
+- reviewer:
+  - code-reviewer pass focused on wait-budget impact, failure diagnostics, and API call bounding.
+- commit gate:
+  - S203 commit after reviewer pass.
+- report evidence destination:
+  - TDD Evidence, Discovered Tests / Risk for any cap-vs-skip decision, Test Contract Closure for `tc-s203-001`..`tc-s203-004`, Closure Coverage, Reviewer Gate Status, Step Commit Gate.
+
+### 実装ステップ S204 — Review completion unknown timing hardening
+- 振る舞いの目標:
+  - `review_completion_unknown` promotion に trigger age / CI-passed age の latency guard を追加し、Codex review 到着前の premature unknown を防ぐ。
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`
+  - `tests/unit/infra/test_init_update.py`
+- 計画済み契約:
+  - 推奨初期定数:
+    - `review_completion_unknown_min_trigger_age_seconds = 300`
+    - `review_completion_unknown_min_ci_passed_age_seconds = 90`
+  - Promotion requires CI passed, head matched, no selected blocker, no pending review signal, no blocking collection failure, same-fingerprint stability, quiet window, and both age thresholds.
+  - Threshold 未満では `review_completion_unknown` にしない。
+  - Submitted review / unresolved thread が後から来た場合は `address_review_feedback` が勝つ。
+- 委任契約:
+  - delegated role: `dev-coder`
+  - allowed paths:
+    - provider `wait_pr_observation.sh`
+    - focused tests in `tests/unit/infra/test_init_update.py`
+    - parent-owned report evidence unless explicitly delegated.
+  - forbidden changes:
+    - no review collector semantic broadening.
+    - no no-findings secondary signal.
+    - no `passed` / `merge_prepared` from missing completion.
+    - no full wait/review Python extraction unless returned as a plan gap.
+- テスト義務:
+  - `tc-s204-001`..`tc-s204-004`
+- Red / alternative evidence:
+  - `tc-s204-001` or `tc-s204-002` must fail on current S101 timing behavior, or worker must provide a source-grounded explanation if current behavior already contains equivalent timing gates.
+  - `tc-s204-003` updates the existing S101 stable unknown test to use aged trigger/CI evidence.
+  - `tc-s204-004` requires sequence coverage for late review override.
+- Green 検証:
+  - `uv run pytest tests/unit/infra/test_init_update.py -k "review_completion_unknown or issue_187_s101 or wait_review"`
+  - `git diff --check`
+- reviewer:
+  - code-reviewer pass focused on timing semantics, non-pass safety, and timeout overwrite behavior.
+- commit gate:
+  - S204 commit after reviewer pass.
+- report evidence destination:
+  - TDD Evidence, Test Contract Closure for `tc-s204-001`..`tc-s204-004`, Closure Coverage, Reviewer Gate Status, Step Commit Gate.
+
+### ドキュメント / ミラー追加ステップ S290
+- 振る舞いの目標:
+  - Provider docs, mirror scripts, mirror docs, and installed asset behavior align with S201-S204.
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md`
+  - `.agents/skills/github-pr-observation/SKILL.md`
+  - `.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh`
+  - `.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py`
+  - `.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`
+  - any provider/mirror script files changed by S201-S204.
+- 計画済み契約:
+  - Docs describe external green fallback, bounded Actions job expansion, and delayed `review_completion_unknown`.
+  - Provider/mirror changed files are byte-identical where intended.
+  - New Python asset is present in scaffold/update output.
+- 委任契約:
+  - delegated roles:
+    - `doc-writer` for provider/mirror `SKILL.md`.
+    - `utility-worker` or `dev-coder` for mechanical mirror sync and scaffold asset verification.
+  - allowed paths:
+    - provider/mirror `SKILL.md`
+    - mirror script files corresponding to S201-S204 provider changes
+    - focused asset tests if not already added in S201
+    - parent-owned report evidence unless explicitly delegated.
+  - forbidden changes:
+    - no new behavior changes in provider scripts except mechanical mirror sync.
+    - no modification of S201-S204 logic while doing docs/mirror sync.
+    - no claim that PR #190 is merge-ready.
+- verification:
+  - provider/mirror `cmp -s`
+  - focused init/update asset test
+  - `git diff --check`
+- reviewer:
+  - spec-reviewer for docs wording.
+  - code-reviewer for mirror/scaffold sync.
+- commit gate:
+  - S290 commit after reviewer pass.
+- report evidence destination:
+  - Docs Impact Resolution, Test Contract Closure for `tc-s290-001`..`tc-s290-003`, Closure Coverage, Reviewer Gate Status, Step Commit Gate.
+
+### 追加最終品質ゲート S299
+- branch diff 範囲:
+  - S201-S204 behavior changes, S290 docs/mirror/scaffold changes, and final `report.md` evidence.
+- 必須 validation:
+  - `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187 or pr_observation or actions or review_completion_unknown"`
+  - `uv run pytest tests/unit/infra/test_init_update.py -q`
+  - `git diff --check`
+  - `./spec-dock/scripts/spec-dock validate`
+  - provider/mirror `cmp -s` for changed assets
+- PR observation gate:
+  - Re-run PR observation on latest PR #190 head after push.
+  - Record whether previous selected unresolved P1 threads are resolved, superseded, or still blocking.
+  - Do not claim merge readiness while P1 threads remain unresolved.
+- 委任契約:
+  - delegated roles:
+    - qa-reviewer for final test sufficiency.
+    - code-reviewer for integrated runtime/test/docs diff.
+    - spec-reviewer for final spec alignment.
+  - parent-owned work:
+    - final report evidence integration.
+    - PR observation orchestration.
+    - commit gate and PR delivery handoff.
+  - forbidden changes:
+    - no behavior changes unless a final reviewer finding requires a bounded follow-up assigned to the relevant previous step or an explicit S299 follow-up.
+    - no final commit before all required reviewers pass.
+- reviewer gates:
+  - qa-reviewer: test sufficiency and race coverage pass.
+  - code-reviewer: integrated scripts/tests/docs diff pass.
+  - spec-reviewer: requirement/design/plan/report alignment pass.
+- commit gate:
+  - S299 final evidence commit only after reviewers pass.
+  - Do not bundle uncommitted S201-S204 behavior changes into S299.
+- report evidence destination:
+  - Final QA Gate, Final Code Review Gate, Final Spec Review Gate, Closure Coverage, Step Commit Gate, Final Commit, PR Observation Gate.
+
+### 追加計画の未確定事項
+- Blocking before S201:
+  - S200 canonical adoption and fresh spec-reviewer pass.
+- Non-blocking:
+  - Exact timing constants may be adjusted by reviewer feedback.
+  - Whether green-run job expansion is skipped entirely or capped with a small diagnostic sample is implementation-local, as long as bounded behavior and failure diagnostics are preserved.
+  - Full extraction of review/wait scripts remains a future follow-up unless S204 reveals the heredoc boundary blocks safe implementation.
