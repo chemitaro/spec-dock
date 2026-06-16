@@ -482,6 +482,24 @@ def mark_decision_timeout(payload: dict) -> None:
     payload["decision_fingerprint"] = fingerprint
 
 
+def mark_decision_review_completion_unknown(payload: dict) -> None:
+    decision = decision_payload(payload)
+    if not decision:
+        return
+    decision["status"] = "unknown"
+    decision["status_reason"] = "review_completion_unknown"
+    decision["recommended_next_action"] = "human_gate"
+    decision["observation_complete"] = True
+    decision.setdefault("completion_signal", "none")
+    fingerprint_source = dict(decision)
+    fingerprint_source.pop("fingerprint", None)
+    fingerprint = hashlib.sha256(
+        json.dumps(fingerprint_source, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    decision["fingerprint"] = fingerprint
+    payload["decision_fingerprint"] = fingerprint
+
+
 def codex_review_payload(payload: dict) -> dict:
     codex_review = payload.get("codex_review")
     if isinstance(codex_review, dict):
@@ -494,6 +512,34 @@ def codex_review_payload(payload: dict) -> dict:
 def codex_review_lifecycle(payload: dict) -> dict:
     lifecycle = codex_review_payload(payload).get("lifecycle")
     return lifecycle if isinstance(lifecycle, dict) else {}
+
+
+def no_completion_evidence(payload: dict) -> dict:
+    decision = decision_payload(payload)
+    evidence = decision.get("no_completion_evidence")
+    if isinstance(evidence, dict):
+        return evidence
+    lifecycle = codex_review_lifecycle(payload)
+    evidence = lifecycle.get("no_completion_evidence")
+    return evidence if isinstance(evidence, dict) else {}
+
+
+def is_review_completion_unknown_candidate(payload: dict) -> bool:
+    evidence = no_completion_evidence(payload)
+    if evidence.get("present") is not True:
+        return False
+    if evidence.get("requires_wait_stability") is not True:
+        return False
+    if evidence.get("promotes_top_level_status") is True:
+        return False
+    disqualifying_flags = (
+        "pending_review_present",
+        "blocking_limitation_present",
+        "selected_blocker_present",
+        "explicit_completion_present",
+        "fallback_issue_comment_present",
+    )
+    return not any(evidence.get(flag) is True for flag in disqualifying_flags)
 
 
 def semantic_fingerprint(payload: dict) -> str:
@@ -943,6 +989,8 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
         if completion_signal == "fallback_issue_comment" or decision_reason == "fallback_issue_comment_low_confidence":
             return "human_gate", "human_gate", "wait_or_resume", False, True
         if decision_reason == "missing_current_completion_signal":
+            if is_review_completion_unknown_candidate(payload):
+                return "pending", "pending", "wait_or_resume", True, False
             return "pending", "pending", "wait_or_resume", False, False
         if decision_status == "passed" and decision_next_action == "merge_prepared":
             return "passed", "passed", "merge_prepared", True, False
@@ -1333,6 +1381,12 @@ while True:
         mark_decision_timeout(payload)
     else:
         final_phase = "wait"
+
+    if observation_complete and is_review_completion_unknown_candidate(payload):
+        normalized_status = "human_gate"
+        overall_status = "human_gate"
+        next_action = "human_gate"
+        mark_decision_review_completion_unknown(payload)
 
     payload["script"] = "wait_pr_observation.sh"
     payload["status"] = normalized_status
