@@ -1125,12 +1125,12 @@ blocking_limitation_present = bool(blocking_collection_failure)
 selected_blocker_present = bool(selected_unresolved_thread_ids or selected_changes_requested_evidence)
 explicit_completion_present = completion_signal == "submitted_pull_request_review"
 fallback_issue_comment_present = completion_signal == "fallback_issue_comment"
-if explicit_completion_present:
+if selected_blocker_present:
+    no_completion_category = "selected_blocker"
+elif explicit_completion_present:
     no_completion_category = "explicit_completion"
 elif fallback_issue_comment_present:
     no_completion_category = "fallback_issue_comment"
-elif selected_blocker_present:
-    no_completion_category = "selected_blocker"
 elif pending_review_present:
     no_completion_category = "pending_review"
 elif blocking_limitation_present:
