@@ -337,10 +337,14 @@ Skill --> Collector : documents required permission
 |       |   `-- 追加: Actions/external CI collection, bounded job diagnostics, status taxonomy, coverage limitations
 |       |-- lib/fetch_pr_review_snapshot.sh
 |       |   `-- 変更: review_completion_unknown と optional no-findings secondary signal の review lifecycle contract
+|       |-- lib/pr_observation_snapshot.py
+|       |   `-- 追加予定: observation snapshot merge/classification logic extracted from shell heredoc
+|       |-- lib/pr_observation_wait.py
+|       |   `-- 追加予定: wait loop/fingerprint/latency logic extracted from shell heredoc
 |       |-- fetch_pr_observation_snapshot.sh
-|       |   `-- 変更: supplemental permission limitations と review_completion_unknown を top-level contract に反映
+|       |   `-- 変更: supplemental permission limitations と review_completion_unknown を top-level contract に反映し、follow-up で Python entrypoint wrapper へ薄くする
 |       `-- wait_pr_observation.sh
-|           `-- 変更: supplemental permission limitations, review_completion_unknown, and review-latency timing guards を調整
+|           `-- 変更: supplemental permission limitations, review_completion_unknown, and review-latency timing guards を調整し、follow-up で Python entrypoint wrapper へ薄くする
 |-- .agents/skills/github-pr-observation/
 |   `-- 変更: provider source と同期した dogfooding mirror
 |-- tests/unit/infra/test_init_update.py
@@ -365,6 +369,7 @@ Skill --> Collector : documents required permission
 - Constraints -> fixed CLI, stdout JSON authority, provider source first, no arbitrary GitHub API proxy.
 - Post-observation review addendum -> `review_completion_unknown` decision contract, no generic comment promotion, optional explicit no-findings secondary signal.
 - Post-review P1 addendum -> Python extraction boundary, bounded Actions jobs collection, zero-Actions external-green fallback, and delayed `review_completion_unknown` timing gate.
+- Snapshot/wait extraction addendum -> `fetch_pr_observation_snapshot.sh` and `wait_pr_observation.sh` retain public shell CLI while heredoc Python logic moves to standalone Python entrypoints.
 
 ## テスト戦略
 - Unit / script-level:
@@ -415,7 +420,8 @@ Skill --> Collector : documents required permission
   - helper は具体的複雑性を下げる範囲に限る。候補は `collect_actions_runs`、`should_expand_actions_jobs`、`collect_actions_jobs_for_relevant_runs`、`classify_ci_status`、`build_actions_summary`。
 - Wait wrapper:
   - 当面 heredoc 構造を維持し、review timing guard のみを追加する。
-  - Full extraction of review/wait scripts は今回の P1 修正に必要な範囲を超えるため、必要になった場合だけ follow-up とする。
+  - S200+ 実装時点では full extraction は今回の P1 修正に必要な範囲を超えるため follow-up として残した。
+  - S300+ follow-up では、このうち snapshot / wait wrapper の heredoc extraction を直接対象に昇格する。review collector / trigger heredoc は引き続き別 follow-up とする。
 
 ### Bounded Actions job collection
 - 問題:
@@ -476,6 +482,122 @@ Skill --> Collector : documents required permission
 - Existing JSON fields are additive-compatible; removals require explicit design amendment.
 - External green evidence can pass only when no failure/pending/unknown/required-missing blocker is observed.
 - Review completion unknown remains non-pass and cannot be inferred from selected count zero.
+
+## 追加設計修正（S300+ / Snapshot and Wait Python Entrypoint Extraction）
+
+### 追加設計の目的
+- `fetch_pr_observation_snapshot.sh` と `wait_pr_observation.sh` に残る大きな Python heredoc を standalone Python entrypoint へ抽出する。
+- 既存の shell public CLI、usage、validation、exit code、stdout final JSON authority、stderr progress / diagnostics を維持する。
+- `fetch_pr_checks_snapshot.sh -> lib/pr_observation_checks.py` で採用した shell wrapper / Python logic 分離を、observation snapshot と wait wrapper に拡張する。
+- 抽出は behavior-preserving hardening として扱い、`review_completion_unknown`、CI/head/review status taxonomy、out artifact、fingerprint の意味を変えない。
+
+### 現状の責務
+- `fetch_pr_observation_snapshot.sh`:
+  - PR metadata JSON からの `headRefOid` 抽出。
+  - initial / final head freshness 判定。
+  - checks collector と review collector の stdout JSON merge。
+  - `limitations`、`summary`、`normalized_status`、`decision`、`recommended_next_action`、`artifacts` の final JSON 生成。
+- `wait_pr_observation.sh`:
+  - trigger handling 後の snapshot polling。
+  - semantic fingerprint、quiet / same-fingerprint stability、zero-check grace。
+  - `review_completion_unknown` の trigger age / CI-passed age guard。
+  - timeout / fallback JSON、`out_dir` artifacts、resume metadata、stderr progress rendering。
+- これらは shell file 内の heredoc Python として実装されており、CLI wrapper と application logic が同じ file に密結合している。
+
+### 追加アーキテクチャ境界
+- Shell wrapper:
+  - 現行 script 名と公開引数を維持する。
+  - usage/help、引数 validation、invalid usage exit `64` を維持する。
+  - `script_dir` から adjacent Python entrypoint を解決して呼び出す。
+  - arbitrary endpoint、method、GraphQL query、raw `gh` args、header、request body は受け付けない。
+  - stdout は Python entrypoint の final JSON をそのまま出力し、stderr は progress / diagnostics のみとする。
+- Python snapshot entrypoint:
+  - 追加予定 file: `scripts/lib/pr_observation_snapshot.py`
+  - fixed `gh pr view --json headRefOid,url,state,isDraft,number` を実行する。
+  - expected/current/final head freshness を判定する。
+  - `lib/fetch_pr_checks_snapshot.sh` と `lib/fetch_pr_review_snapshot.sh` を fixed subprocess として呼び出す。
+  - checks/review JSON を merge し、top-level `normalized_status`、`recommended_next_action`、`decision`、`fingerprint`、`artifacts` を生成する。
+  - `--out` 指定時の snapshot artifacts を現行互換で書く。
+- Python wait entrypoint:
+  - 追加予定 file: `scripts/lib/pr_observation_wait.py`
+  - `post-once` では fixed `trigger_codex_review.sh` を呼ぶ。
+  - `resume` では shell validation 済みの trigger metadata を前提にする。
+  - public `fetch_pr_observation_snapshot.sh` contract を poll し、`pr_observation_snapshot.py` の内部関数を直接 import しない。
+  - semantic fingerprint、quiet / same-fingerprint、zero-check grace、review-completion latency guard、timeout、out artifacts、progress rendering を管理する。
+
+### 依存方向
+```text
+fetch_pr_observation_snapshot.sh
+  -> lib/pr_observation_snapshot.py
+       -> lib/fetch_pr_checks_snapshot.sh
+       -> lib/fetch_pr_review_snapshot.sh
+       -> gh pr view fixed metadata
+
+wait_pr_observation.sh
+  -> lib/pr_observation_wait.py
+       -> fetch_pr_observation_snapshot.sh
+       -> trigger_codex_review.sh
+
+lib/pr_observation_checks.py
+lib/pr_observation_snapshot.py
+lib/pr_observation_wait.py
+  -> optional lib/pr_observation_common.py
+```
+
+### 共通 helper 方針
+- 最初から大きな shared framework は作らない。
+- 抽出後に実際の重複が問題になる場合だけ `scripts/lib/pr_observation_common.py` を検討する。
+- 候補は `classify_github_stderr`、`token_source`、`sha256_json`、`parse_utc_timestamp`、`sha_prefix_matches`、safe JSON load/dump に限定する。
+
+### Direct target / follow-up target
+- Direct target:
+  - `fetch_pr_observation_snapshot.sh`
+  - `wait_pr_observation.sh`
+  - `scripts/lib/pr_observation_snapshot.py`
+  - `scripts/lib/pr_observation_wait.py`
+- Follow-up target:
+  - `fetch_pr_review_snapshot.sh`
+  - `trigger_codex_review.sh`
+- 理由:
+  - `fetch_pr_review_snapshot.sh` は review lifecycle collector であり、current-boundary semantics の blast radius が大きい。
+  - `trigger_codex_review.sh` は review initiation であり、observation snapshot / wait aggregation とは責務が異なる。
+  - すべてを一括抽出すると、PR observation 自体を final evidence として使いにくくなる。
+
+### 互換性 invariants
+- Existing shell command names remain unchanged.
+- Existing options remain unchanged.
+- Invalid usage remains exit `64`.
+- stdout remains single final JSON authority.
+- stderr remains progress / diagnostics only.
+- `out_dir` artifact names and shape remain compatible.
+- trigger resume metadata remains compatible.
+- semantic fingerprint / decision fingerprint behavior remains compatible unless explicitly recharacterized by tests and reviewer approval.
+- `review_completion_unknown` remains:
+  - `normalized_status="human_gate"`
+  - `decision.status="unknown"`
+  - `decision.status_reason="review_completion_unknown"`
+  - `recommended_next_action="human_gate"`
+  - not `passed`
+  - not `merge_prepared`
+
+### テスト方針
+- Characterization first:
+  - 現在の heredoc inventory と既存 snapshot/wait tests mapping を記録する。
+  - 既存 behavior tests を抽出前後の equivalence evidence として使う。
+- Required checks:
+  - snapshot invalid args reject before `gh`.
+  - wait invalid args reject before trigger/snapshot/`gh`.
+  - metadata failure returns JSON with redacted stderr hash.
+  - initial/final head mismatch remains `stale_head`.
+  - missing review completion remains pending before wait stability.
+  - wait preserves pending/running CI as wait/resume.
+  - quiet / same-fingerprint behavior is preserved.
+  - `review_completion_unknown` is delayed by trigger age and CI-passed age.
+  - late submitted/unresolved review overrides unknown candidate.
+  - timeout preserves latest payload.
+  - stdout/stderr/progress/out artifacts remain compatible.
+  - `pr_observation_snapshot.py` and `pr_observation_wait.py` are installed by init/update.
+  - provider/mirror changed files match.
 
 ## リスク / 移行 / ロールバック
 - リスク:
