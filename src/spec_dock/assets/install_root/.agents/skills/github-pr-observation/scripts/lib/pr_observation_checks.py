@@ -9,6 +9,7 @@ pr = int(os.environ["OBS_PR"])
 expected_head_sha = os.environ["OBS_HEAD_SHA"]
 expected_head_sha_lower = expected_head_sha.lower()
 TERMINAL_GREEN_JOB_EXPANSION_CAP = 1
+NON_TERMINAL_JOB_EXPANSION_CAP = 1
 
 
 def token_source():
@@ -491,6 +492,8 @@ sanitized_action_jobs = []
 action_job_collection_successes = 0
 action_job_collection_failures = 0
 action_job_collection_skipped_green_runs = 0
+action_job_collection_non_terminal_attempts = 0
+action_job_collection_skipped_non_terminal_runs = 0
 for run in workflow_runs:
     run_head_sha = str(run.get("head_sha") or "")
     if run_head_sha and not sha_prefix_matches(run_head_sha, expected_head_sha_lower):
@@ -536,6 +539,14 @@ for run in workflow_runs:
     ):
         action_job_collection_skipped_green_runs += 1
         continue
+    if (
+        run_classification in {"running", "pending"}
+        and action_job_collection_non_terminal_attempts >= NON_TERMINAL_JOB_EXPANSION_CAP
+    ):
+        action_job_collection_skipped_non_terminal_runs += 1
+        continue
+    if run_classification in {"running", "pending"}:
+        action_job_collection_non_terminal_attempts += 1
     jobs_payload, job_limitation = gh_api(f"repos/{repo}/actions/runs/{run_id}/jobs")
     if job_limitation:
         action_job_collection_failures += 1
@@ -611,13 +622,26 @@ actions_jobs_collection = {
     "successful_runs": action_job_collection_successes,
     "failed_runs": action_job_collection_failures,
 }
-if action_job_collection_skipped_green_runs:
+if action_job_collection_skipped_green_runs or action_job_collection_skipped_non_terminal_runs:
     actions_jobs_collection.update(
         {
             "mode": "bounded",
             "expanded_runs": action_job_collection_successes + action_job_collection_failures,
+        }
+    )
+if action_job_collection_skipped_green_runs:
+    actions_jobs_collection.update(
+        {
             "skipped_green_runs": action_job_collection_skipped_green_runs,
             "cap": TERMINAL_GREEN_JOB_EXPANSION_CAP,
+        }
+    )
+if action_job_collection_skipped_non_terminal_runs:
+    actions_jobs_collection.update(
+        {
+            "skipped_non_terminal_runs": action_job_collection_skipped_non_terminal_runs,
+            "non_terminal_cap": NON_TERMINAL_JOB_EXPANSION_CAP,
+            "non_terminal_attempts": action_job_collection_non_terminal_attempts,
         }
     )
 actions_jobs_summary = {
@@ -641,6 +665,7 @@ actions_decisive_green = (
     and actions_summary["workflow_runs"]["total"] > 0
     and (
         action_job_collection_successes + action_job_collection_skipped_green_runs
+        + action_job_collection_skipped_non_terminal_runs
         == actions_summary["workflow_runs"]["total"]
     )
     and action_job_collection_failures == 0
@@ -660,6 +685,7 @@ actions_decisive_non_terminal = (
     and actions_summary["workflow_runs"]["total"] > 0
     and (
         action_job_collection_successes + action_job_collection_skipped_green_runs
+        + action_job_collection_skipped_non_terminal_runs
         == actions_summary["workflow_runs"]["total"]
     )
     and action_job_collection_failures == 0
@@ -1006,6 +1032,37 @@ actions_running = bool(action_run_counts["running"] or action_job_counts["runnin
 actions_pending = bool(action_run_counts["pending"] or action_job_counts["pending"])
 actions_unknown = bool(action_run_counts["unknown"] or action_job_counts["unknown"])
 actions_jobs_unavailable = actions_available and action_job_collection_failures > 0
+blocking_limitations = [item for item in limitations if is_blocking_limitation(item)]
+only_check_runs_permission_blocked = bool(blocking_limitations) and all(
+    item.get("code") == "github_token_permission_denied"
+    and item.get("capability") == "check_runs_read"
+    for item in blocking_limitations
+)
+external_green_statuses_with_check_runs_permission_limited = (
+    actions_zero_runs
+    and status_counts["total"] > 0
+    and status_counts["success"] == status_counts["total"]
+    and check_counts["failed"] == 0
+    and check_counts["running"] == 0
+    and check_counts["pending"] == 0
+    and check_counts["other"] == 0
+    and check_counts["stale"] == 0
+    and status_counts["failure"] == 0
+    and status_counts["error"] == 0
+    and status_counts["pending"] == 0
+    and status_counts["other"] == 0
+    and not aggregate_status_failed_backstop
+    and not aggregate_status_pending_backstop
+    and required_check_state["available"]
+    and merge_state_status == "CLEAN"
+    and not required_check_rollup_failed
+    and not required_check_rollup_running
+    and not required_check_rollup_pending
+    and not required_checks_missing_or_pending
+    and not merge_state_unknown
+    and not merge_state_blocking
+    and only_check_runs_permission_blocked
+)
 
 if actions_primary_unavailable or head_sha_resolution_failed:
     ci_status = "unknown"
@@ -1052,6 +1109,8 @@ elif actions_decisive_green and not (
     or status_counts["other"]
 ):
     ci_status = "passed"
+elif external_green_statuses_with_check_runs_permission_limited:
+    ci_status = "passed"
 elif any(
     item.get("code") == "github_token_permission_denied"
     and is_blocking_limitation(item)
@@ -1078,6 +1137,16 @@ elif check_counts["other"] or status_counts["other"]:
     ci_status = "unknown"
 else:
     ci_status = "passed"
+
+if external_green_statuses_with_check_runs_permission_limited:
+    for item in limitations:
+        if (
+            item.get("code") == "github_token_permission_denied"
+            and item.get("capability") == "check_runs_read"
+            and is_blocking_limitation(item)
+        ):
+            item["severity"] = "informational"
+            item["blocking"] = False
 
 sanitized_checks = []
 for check in check_runs:
