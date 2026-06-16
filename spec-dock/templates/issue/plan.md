@@ -80,7 +80,7 @@ ID: "<ISS_ID>"
   - 範囲: requirement / design / plan / report / docs 整合
 
 ## 実行ルール（全ステップ共通）
-- 各 implementation step は原則として 1 behavior slice / 1 review scope / 1 commit boundary とする。
+- 各 implementation step は 1 behavior slice / 1 review scope / 1 commit boundary とする。例外が必要な場合は実装前に plan amendment と fresh re-review を通し、final review / final commit で per-step review / commit を代替しない。
 - `plan.md` には planned requirements、evidence destination、closure 条件だけを書く。observed result は `report.md` に書く。
 - docs-only / inspect-only / manual-required step は code test 前提にせず、代替 evidence path と rationale を implementation 前に固定する。
 - implementation 中に新しい仕様、bug class、外部 contract risk、未計画の closure が見つかった場合は、report 記録だけで足りるか、plan amendment と re-review が必要かを判断する。
@@ -136,6 +136,7 @@ ID: "<ISS_ID>"
 #### 委任契約（delegation contract）
 - 委任ロール（delegated role）:
   - dev-coder / doc-writer / other named worker / N/A
+  - N/A は read-only / approved-no-op step、または `workflow_issue.md` に従う事前承認済み Parent Implementation Exception だけに使う。file mutation を伴う通常の implementation success path として使わない。
 - 入力 docs:
   - `requirement.md`
   - `design.md`
