@@ -8,6 +8,7 @@ repo = os.environ["OBS_REPO"]
 pr = int(os.environ["OBS_PR"])
 expected_head_sha = os.environ["OBS_HEAD_SHA"]
 expected_head_sha_lower = expected_head_sha.lower()
+TERMINAL_GREEN_JOB_EXPANSION_CAP = 1
 
 
 def token_source():
@@ -485,6 +486,7 @@ sanitized_action_runs = []
 sanitized_action_jobs = []
 action_job_collection_successes = 0
 action_job_collection_failures = 0
+action_job_collection_skipped_green_runs = 0
 for run in workflow_runs:
     run_head_sha = str(run.get("head_sha") or "")
     if run_head_sha and not sha_prefix_matches(run_head_sha, expected_head_sha_lower):
@@ -523,6 +525,12 @@ for run in workflow_runs:
             if failure["dedupe_key"] not in actions_failure_dedupe_keys:
                 actions_failure_dedupe_keys.add(failure["dedupe_key"])
                 actions_failures.append(failure)
+        continue
+    if (
+        run_classification in {"success", "neutral", "skipped"}
+        and action_job_collection_successes >= TERMINAL_GREEN_JOB_EXPANSION_CAP
+    ):
+        action_job_collection_skipped_green_runs += 1
         continue
     jobs_payload, job_limitation = gh_api(f"repos/{repo}/actions/runs/{run_id}/jobs")
     if job_limitation:
@@ -595,13 +603,23 @@ if actions_available and not workflow_runs:
         }
     )
 
+actions_jobs_collection = {
+    "successful_runs": action_job_collection_successes,
+    "failed_runs": action_job_collection_failures,
+}
+if action_job_collection_skipped_green_runs:
+    actions_jobs_collection.update(
+        {
+            "mode": "bounded",
+            "expanded_runs": action_job_collection_successes + action_job_collection_failures,
+            "skipped_green_runs": action_job_collection_skipped_green_runs,
+            "cap": TERMINAL_GREEN_JOB_EXPANSION_CAP,
+        }
+    )
 actions_jobs_summary = {
     "total": len(sanitized_action_jobs),
     "counts": action_job_counts,
-    "collection": {
-        "successful_runs": action_job_collection_successes,
-        "failed_runs": action_job_collection_failures,
-    },
+    "collection": actions_jobs_collection,
 }
 actions_summary = {
     "available": actions_available,
@@ -617,7 +635,10 @@ actions_summary = {
 actions_decisive_green = (
     actions_available
     and actions_summary["workflow_runs"]["total"] > 0
-    and action_job_collection_successes == actions_summary["workflow_runs"]["total"]
+    and (
+        action_job_collection_successes + action_job_collection_skipped_green_runs
+        == actions_summary["workflow_runs"]["total"]
+    )
     and action_job_collection_failures == 0
     and not (
         action_run_counts["failed"]
@@ -633,7 +654,10 @@ actions_decisive_green = (
 actions_decisive_non_terminal = (
     actions_available
     and actions_summary["workflow_runs"]["total"] > 0
-    and action_job_collection_successes == actions_summary["workflow_runs"]["total"]
+    and (
+        action_job_collection_successes + action_job_collection_skipped_green_runs
+        == actions_summary["workflow_runs"]["total"]
+    )
     and action_job_collection_failures == 0
     and not (
         action_run_counts["failed"]
@@ -651,7 +675,10 @@ actions_decisive_non_terminal = (
 actions_decisive_failed = (
     actions_available
     and actions_summary["workflow_runs"]["total"] > 0
-    and action_job_collection_successes == actions_summary["workflow_runs"]["total"]
+    and (
+        action_job_collection_successes + action_job_collection_skipped_green_runs
+        == actions_summary["workflow_runs"]["total"]
+    )
     and action_job_collection_failures == 0
     and not (action_run_counts["unknown"] or action_job_counts["unknown"])
     and bool(action_run_counts["failed"] or action_job_counts["failed"])

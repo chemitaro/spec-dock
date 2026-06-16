@@ -15801,6 +15801,260 @@ esac
                 "fix_github_token_permissions"
             )
 
+    def test_issue_187_s203_multiple_green_runs_do_not_expand_every_job(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            gh_log = tmp_path / "gh.log"
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env python3
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+with open(os.environ["GH_FAKE_LOG"], "a", encoding="utf-8") as handle:
+    handle.write(" ".join(args) + "\\n")
+
+def emit(payload):
+    print(json.dumps(payload, separators=(",", ":")))
+
+if args[:2] == ["api", "repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]:
+    emit({"total_count": 3, "workflow_runs": [
+        {
+            "id": 202,
+            "name": "CI",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://example.test/run/202",
+        },
+        {
+            "id": 203,
+            "name": "Lint",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://example.test/run/203",
+        },
+        {
+            "id": 204,
+            "name": "Docs",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://example.test/run/204",
+        },
+    ]})
+elif args[:2] in [
+    ["api", "repos/owner/repo/actions/runs/202/jobs"],
+    ["api", "repos/owner/repo/actions/runs/203/jobs"],
+    ["api", "repos/owner/repo/actions/runs/204/jobs"],
+]:
+    run_id = int(args[1].split("/")[-2])
+    emit({"total_count": 1, "jobs": [{
+        "id": run_id + 100,
+        "run_id": run_id,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": f"https://example.test/job/{run_id + 100}",
+        "steps": [],
+    }]})
+elif args[:2] == ["api", "repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs"]:
+    emit({"total_count": 0, "check_runs": []})
+elif args[:2] == ["api", "repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status"]:
+    emit({"state": "success", "statuses": []})
+elif args == ["pr", "view", "13", "--repo", "owner/repo", "--json", "mergeStateStatus,statusCheckRollup"]:
+    emit({"mergeStateStatus": "CLEAN", "statusCheckRollup": []})
+else:
+    print(f"unexpected gh call: {' '.join(args)}", file=sys.stderr)
+    sys.exit(44)
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            jobs_calls = [
+                line
+                for line in gh_log.read_text(encoding="utf-8").splitlines()
+                if "/actions/runs/" in line and line.endswith("/jobs --paginate")
+            ]
+            assert payload["ci"]["status"] == "passed"
+            assert jobs_calls == ["api repos/owner/repo/actions/runs/202/jobs --paginate"]
+            assert payload["ci"]["actions"]["jobs_summary"]["collection"] == {
+                "successful_runs": 1,
+                "failed_runs": 0,
+                "mode": "bounded",
+                "expanded_runs": 1,
+                "skipped_green_runs": 2,
+                "cap": 1,
+            }
+            assert payload["ci"]["actions"]["jobs_summary"]["total"] == 1
+            assert payload["ci"]["actions"]["jobs_detail"] == payload["ci"]["actions"]["jobs"]
+
+    def test_issue_187_s203_failed_actions_with_skipped_green_downgrades_supplemental_permissions(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            gh_log = tmp_path / "gh.log"
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env python3
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+with open(os.environ["GH_FAKE_LOG"], "a", encoding="utf-8") as handle:
+    handle.write(" ".join(args) + "\\n")
+
+def emit(payload):
+    print(json.dumps(payload, separators=(",", ":")))
+
+if args[:2] == ["api", "repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]:
+    emit({"total_count": 2, "workflow_runs": [
+        {
+            "id": 202,
+            "name": "CI",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "completed",
+            "conclusion": "failure",
+            "html_url": "https://example.test/run/202",
+        },
+        {
+            "id": 203,
+            "name": "Docs",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://example.test/run/203",
+        },
+    ]})
+elif args[:2] == ["api", "repos/owner/repo/actions/runs/202/jobs"]:
+    emit({"total_count": 1, "jobs": [{
+        "id": 303,
+        "run_id": 202,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "failure",
+        "html_url": "https://example.test/job/303",
+        "steps": [
+            {"number": 1, "name": "Install", "status": "completed", "conclusion": "success"},
+            {"number": 2, "name": "Test", "status": "completed", "conclusion": "failure"},
+        ],
+    }]})
+elif args[:2] == ["api", "repos/owner/repo/actions/runs/203/jobs"]:
+    emit({"total_count": 1, "jobs": [{
+        "id": 304,
+        "run_id": 203,
+        "name": "docs",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://example.test/job/304",
+        "steps": [],
+    }]})
+elif args[:2] == ["api", "repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs"]:
+    print("GraphQL: Resource not accessible by personal access token", file=sys.stderr)
+    sys.exit(1)
+elif args[:2] == ["api", "repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status"]:
+    print("GraphQL: Resource not accessible by personal access token", file=sys.stderr)
+    sys.exit(1)
+elif args == ["pr", "view", "13", "--repo", "owner/repo", "--json", "mergeStateStatus,statusCheckRollup"]:
+    print("GraphQL: Resource not accessible by personal access token", file=sys.stderr)
+    sys.exit(1)
+else:
+    print(f"unexpected gh call: {' '.join(args)}", file=sys.stderr)
+    sys.exit(44)
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            jobs_calls = [
+                line
+                for line in gh_log.read_text(encoding="utf-8").splitlines()
+                if "/actions/runs/" in line and line.endswith("/jobs --paginate")
+            ]
+            assert payload["ci"]["status"] == "failed"
+            assert jobs_calls == ["api repos/owner/repo/actions/runs/202/jobs --paginate"]
+            assert payload["ci"]["actions"]["jobs_summary"]["collection"] == {
+                "successful_runs": 1,
+                "failed_runs": 0,
+                "mode": "bounded",
+                "expanded_runs": 1,
+                "skipped_green_runs": 1,
+                "cap": 1,
+            }
+            assert payload["ci"]["failures"][0]["kind"] == "github_actions_job"
+            assert payload["ci"]["failures"][0]["failed_steps"] == [
+                {
+                    "number": 2,
+                    "name": "Test",
+                    "status": "completed",
+                    "conclusion": "failure",
+                }
+            ]
+            assert any(
+                item.get("code") == "ci_coverage_limited_to_github_actions"
+                and item.get("severity") == "informational"
+                and item.get("blocking") is False
+                for item in payload["limitations"]
+            )
+            assert not any(
+                item.get("code") == "github_token_permission_denied"
+                and item.get("severity") == "blocking"
+                for item in payload["limitations"]
+            )
+            assert "fix_github_token_permissions" not in result.stdout
+
     def test_issue_187_actions_job_details_are_documented_and_fingerprinted(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
