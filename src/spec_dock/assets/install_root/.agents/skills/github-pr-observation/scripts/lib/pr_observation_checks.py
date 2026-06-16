@@ -1001,17 +1001,6 @@ elif (
     ci_status = "pending"
 elif actions_unknown or actions_jobs_unavailable:
     ci_status = "unknown"
-elif actions_zero_runs:
-    ci_status = "none"
-    if check_counts["total"] == 0 and status_counts["total"] == 0:
-        limitations.append(
-            {
-                "code": "zero_checks_s03_non_success",
-                "source": "ci_collector",
-                "severity": "blocking",
-                "message": "no check runs or commit statuses were observed; S03 keeps this non-success until S05 grace/deadline handling",
-            }
-        )
 elif actions_decisive_green and not (
     check_counts["failed"]
     or status_counts["failure"]
