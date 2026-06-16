@@ -716,6 +716,61 @@ git diff --check
 | S299 post-observation follow-up ledger committed | provider/mirror `pr_observation_checks.py`; `tests/unit/infra/test_init_update.py`; `spec-dock/active/issue/report.md` | PR #190 post-commit latest-head check / final response | behavior fix committed in `af080f1c60a691e06e801101cfa5afeaf0834203`; pre-final-ledger-sync observed head `bc13813895064b4282e83b30a3ff164f11d2a765` was human-gate due to `review_completion_unknown`, while PR #190 was observed checks-green and mergeable for human judgement; after this doc-only commit, the orchestrator must re-check PR #190 latest head/check/mergeability and report external delivery evidence in the final response |
 | S399 bounded-fix ledger ready for commit | `tests/unit/infra/test_init_update.py`; `spec-dock/active/issue/report.md` | PR #190 re-push / latest-head PR observation rerun / final response | ready after QA reviewer PASS, code-reviewer PASS, final spec-reviewer PASS, full `test_init_update.py -q` `408 passed`, `git diff --check` pass, and `spec-dock validate` pass |
 
+---
+
+## 追加 PR repair unit U001 evidence（2026-06-17）
+
+Source of truth:
+- `discussions/20260616t161435z-13-disc-pr-repair-unit-u001-ci-observation-p1.md`
+- `discussions/20260616t161435z-12-disc-pr-repair-batch-after-s399-observation.md`
+
+Scope:
+- PR review comment `3418873984`: bound/defer job-detail calls for non-terminal Actions runs where run-level status already makes CI non-terminal, while preserving failed-run diagnostics.
+- PR review comment `3418873991`: no-Actions + green legacy commit statuses + clean merge state may pass when check-runs endpoint has `github_token_permission_denied`; the Checks limitation remains informational/coverage-only and non-green external statuses remain non-pass.
+
+### U001 Red / alternative evidence
+| unit | closure id | evidence | command | result | notes |
+|---|---|---|---|---|---|
+| U001 | `u001-inv-001` | focused Red regression added before implementation | `uv run pytest tests/unit/infra/test_init_update.py -k "u001"` | `2 failed, 408 deselected` | many running/pending Actions runs expanded all three `actions/runs/{id}/jobs` endpoints |
+| U001 | `u001-inv-002` | focused Red regression added before implementation | `uv run pytest tests/unit/infra/test_init_update.py -k "u001"` | `2 failed, 408 deselected` | no-Actions + green legacy status + check-runs permission-denied returned `ci.status="unknown"` |
+| U001-P2 | `u001-p2-non-terminal-attempt-cap` | focused Red regression added after code-reviewer P2 | `uv run pytest tests/unit/infra/test_init_update.py -k "u001"` | `1 failed, 3 passed, 408 deselected` | first non-terminal jobs API permission denial left `successful_runs=0`, so success-count cap did not stop later non-terminal jobs endpoint calls |
+| U001-P2 | `u001-p2-failed-legacy-status-negative` | coverage-only direct negative regression added after QA P2 | same Red command above | passed in pre-fix selector | failed legacy status + check-runs permission denied already stayed non-pass; test locks direct negative path |
+
+### U001 Green / refactor evidence
+| unit | closure id | evidence | command | result | notes |
+|---|---|---|---|---|---|
+| U001 | `u001-inv-001` | non-terminal Actions jobs expansion capped at internal value `1` by attempt count; run-level `running`/`pending` remains decisive; collection metadata exposes `skipped_non_terminal_runs`, `non_terminal_cap`, and `non_terminal_attempts` | `uv run pytest tests/unit/infra/test_init_update.py -k "u001"` | `4 passed, 408 deselected` | failed-run diagnostics preserved by separate guard selector |
+| U001 | `u001-inv-002` | no-Actions + green legacy commit status + clean merge state passes when only Checks/check-runs read is permission-denied; limitation downgraded to informational | `uv run pytest tests/unit/infra/test_init_update.py -k "u001"` | `4 passed, 408 deselected` | token marker redaction asserted; failed legacy status negative remains non-pass/blocking |
+| U001 | `u001-negative-guards` | failed/pending/non-green external statuses and failed-run diagnostics remain non-pass / preserved | `uv run pytest tests/unit/infra/test_init_update.py -k "u001 or s202_zero_actions_runs_external_non_green or s203_failed_actions"` | `7 passed, 405 deselected` | covers non-green external status guard and failed Actions job details |
+| U001 | `u001-broad-lane` | broader PR observation / issue 187 lane remains green | `uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation or issue_187"` | `127 passed, 285 deselected` | rerun after P2 follow-up |
+| U001 | `u001-validation` | whitespace, provider/mirror parity, and SpecDock validation | `git diff --check`; `cmp -s src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py .agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py`; `./spec-dock/scripts/spec-dock validate` | pass; pass; `spec-dock: ok (validate) nodes=96` | `find ... -name __pycache__ -o -name '*.pyc'` returned no files after cleanup |
+
+### U001 closure coverage
+| closure id | covered concern | verification evidence | result | notes |
+|---|---|---|---|---|
+| `u001-inv-001` | INV-001 / PR review comment `3418873984` | `test_issue_187_u001_multiple_running_runs_do_not_expand_every_job`; focused and broad selectors above | pass | Non-terminal job expansion is bounded without changing run-level non-terminal CI status |
+| `u001-inv-002` | INV-002 / PR review comment `3418873991` | `test_issue_187_u001_zero_actions_green_legacy_status_passes_with_checks_permission_denied`; existing S202 non-green external status negatives | pass | Only `check_runs_read` permission denial is downgraded in the strict legacy-green path |
+| `u001-p2-non-terminal-attempt-cap` | code-reviewer P2-1 | `test_issue_187_u001_non_terminal_job_failures_are_bounded_by_attempts`; focused and broad selectors above | pass | Non-terminal expansion is bounded by attempted non-terminal job-detail calls, not successful collections |
+| `u001-p2-failed-legacy-status-negative` | QA P2-2 | `test_issue_187_u001_zero_actions_failed_legacy_status_keeps_checks_permission_blocking`; focused and broad selectors above | pass | Same check-runs permission-denied path remains failed/non-pass and the limitation remains blocking when legacy status is failed |
+| `u001-mirror-sync` | provider/mirror parity | provider/mirror `cmp -s` for `pr_observation_checks.py` | pass | Dogfooding mirror is byte-identical |
+
+### U001 implementation delegation / commit gate
+| gate | status | evidence | notes |
+|---|---|---|---|
+| Implementation Delegation Gate | dev-coder local implementation per user instruction | changed provider collector, mirror sync, and focused tests only | no `.codex/`, config layers, workflow files, new deps, GitHub comments, commit, or push |
+| Reviewer Gate | not run in this DevCoder unit | parent/orchestrator owns fresh reviewer gate if required before commit | local verification is green |
+| Step Commit Gate | not committed | user explicitly instructed do not commit/push | commit hash and post-commit clean check are pending orchestrator action |
+| Ledger Note | no material implementation decisions beyond approved repair unit | implementation followed U001 recommended design | no plan amendment requested |
+| P2 Follow-up | applied before commit | code-reviewer P2-1 and QA P2-2 incorporated into the same U001 diff | no commit/push/GitHub operation performed |
+
+### U001 changed files
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py`
+- `.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py`
+- `tests/unit/infra/test_init_update.py`
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00187-actions-pr-observation-ci-state/report.md`
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00187-actions-pr-observation-ci-state/discussions/20260616t161435z-12-disc-pr-repair-batch-after-s399-observation.md`
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00187-actions-pr-observation-ci-state/discussions/20260616t161435z-13-disc-pr-repair-unit-u001-ci-observation-p1.md`
+
 ## 遭遇した問題と解決 (任意)
 - 問題: S99 の親 focused pytest で、旧 pr_observation fake-gh fixture が Actions-primary endpoint を返さず、`actions_read` unknown で 14 件失敗した。
   - 解決: dev-coder に `tests/unit/infra/test_init_update.py` のみを委任し、旧 fixture に Actions runs/jobs 応答を追加した。親セッションで正しい S99 lane を再実行し `81 passed, 287 deselected` を確認した。

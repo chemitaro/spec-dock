@@ -16140,6 +16140,240 @@ else:
             assert payload["ci"]["actions"]["jobs_summary"]["total"] == 1
             assert payload["ci"]["actions"]["jobs_detail"] == payload["ci"]["actions"]["jobs"]
 
+    def test_issue_187_u001_multiple_running_runs_do_not_expand_every_job(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            gh_log = tmp_path / "gh.log"
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env python3
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+with open(os.environ["GH_FAKE_LOG"], "a", encoding="utf-8") as handle:
+    handle.write(" ".join(args) + "\\n")
+
+def emit(payload):
+    print(json.dumps(payload, separators=(",", ":")))
+
+if args[:2] == ["api", "repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]:
+    emit({"total_count": 3, "workflow_runs": [
+        {
+            "id": 202,
+            "name": "CI",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "in_progress",
+            "conclusion": None,
+            "html_url": "https://example.test/run/202",
+        },
+        {
+            "id": 203,
+            "name": "Lint",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "queued",
+            "conclusion": None,
+            "html_url": "https://example.test/run/203",
+        },
+        {
+            "id": 204,
+            "name": "Docs",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "pending",
+            "conclusion": None,
+            "html_url": "https://example.test/run/204",
+        },
+    ]})
+elif args[:2] in [
+    ["api", "repos/owner/repo/actions/runs/202/jobs"],
+    ["api", "repos/owner/repo/actions/runs/203/jobs"],
+    ["api", "repos/owner/repo/actions/runs/204/jobs"],
+]:
+    run_id = int(args[1].split("/")[-2])
+    emit({"total_count": 1, "jobs": [{
+        "id": run_id + 100,
+        "run_id": run_id,
+        "name": "test",
+        "status": "in_progress",
+        "conclusion": None,
+        "html_url": f"https://example.test/job/{run_id + 100}",
+        "steps": [],
+    }]})
+elif args[:2] == ["api", "repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs"]:
+    emit({"total_count": 0, "check_runs": []})
+elif args[:2] == ["api", "repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status"]:
+    emit({"state": "success", "statuses": []})
+elif args == ["pr", "view", "13", "--repo", "owner/repo", "--json", "mergeStateStatus,statusCheckRollup"]:
+    emit({"mergeStateStatus": "CLEAN", "statusCheckRollup": []})
+else:
+    print(f"unexpected gh call: {' '.join(args)}", file=sys.stderr)
+    sys.exit(44)
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            jobs_calls = [
+                line
+                for line in gh_log.read_text(encoding="utf-8").splitlines()
+                if "/actions/runs/" in line and line.endswith("/jobs --paginate")
+            ]
+            assert payload["ci"]["status"] == "running"
+            assert jobs_calls == ["api repos/owner/repo/actions/runs/202/jobs --paginate"]
+            assert payload["ci"]["actions"]["jobs_summary"]["collection"] == {
+                "successful_runs": 1,
+                "failed_runs": 0,
+                "mode": "bounded",
+                "expanded_runs": 1,
+                "skipped_non_terminal_runs": 2,
+                "non_terminal_cap": 1,
+                "non_terminal_attempts": 1,
+            }
+            assert payload["ci"]["actions"]["jobs_summary"]["total"] == 1
+            assert payload["ci"]["actions"]["jobs_detail"] == payload["ci"]["actions"]["jobs"]
+
+    def test_issue_187_u001_non_terminal_job_failures_are_bounded_by_attempts(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+        token_marker = "ghp_issue_187_u001_attempt_secret"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            gh_log = tmp_path / "gh.log"
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env python3
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+with open(os.environ["GH_FAKE_LOG"], "a", encoding="utf-8") as handle:
+    handle.write(" ".join(args) + "\\n")
+
+def emit(payload):
+    print(json.dumps(payload, separators=(",", ":")))
+
+if args[:2] == ["api", "repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]:
+    emit({{"total_count": 3, "workflow_runs": [
+        {{
+            "id": 202,
+            "name": "CI",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "in_progress",
+            "conclusion": None,
+            "html_url": "https://example.test/run/202",
+        }},
+        {{
+            "id": 203,
+            "name": "Lint",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "queued",
+            "conclusion": None,
+            "html_url": "https://example.test/run/203",
+        }},
+        {{
+            "id": 204,
+            "name": "Docs",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "pending",
+            "conclusion": None,
+            "html_url": "https://example.test/run/204",
+        }},
+    ]}})
+elif args[:2] in [
+    ["api", "repos/owner/repo/actions/runs/202/jobs"],
+    ["api", "repos/owner/repo/actions/runs/203/jobs"],
+    ["api", "repos/owner/repo/actions/runs/204/jobs"],
+]:
+    print("GraphQL: Resource not accessible by personal access token {token_marker}", file=sys.stderr)
+    sys.exit(1)
+elif args[:2] == ["api", "repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs"]:
+    emit({{"total_count": 0, "check_runs": []}})
+elif args[:2] == ["api", "repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status"]:
+    emit({{"state": "success", "statuses": []}})
+elif args == ["pr", "view", "13", "--repo", "owner/repo", "--json", "mergeStateStatus,statusCheckRollup"]:
+    emit({{"mergeStateStatus": "CLEAN", "statusCheckRollup": []}})
+else:
+    print(f"unexpected gh call: {{' '.join(args)}}", file=sys.stderr)
+    sys.exit(44)
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+                "GH_TOKEN": token_marker,
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            assert token_marker not in result.stderr
+            payload = json.loads(result.stdout)
+            jobs_calls = [
+                line
+                for line in gh_log.read_text(encoding="utf-8").splitlines()
+                if "/actions/runs/" in line and line.endswith("/jobs --paginate")
+            ]
+            assert payload["ci"]["status"] == "running"
+            assert jobs_calls == ["api repos/owner/repo/actions/runs/202/jobs --paginate"]
+            assert payload["ci"]["actions"]["jobs_summary"]["collection"] == {
+                "successful_runs": 0,
+                "failed_runs": 1,
+                "mode": "bounded",
+                "expanded_runs": 1,
+                "skipped_non_terminal_runs": 2,
+                "non_terminal_cap": 1,
+                "non_terminal_attempts": 1,
+            }
+            limitation = next(
+                item
+                for item in payload["limitations"]
+                if item.get("code") == "github_token_permission_denied"
+                and item.get("capability") == "actions_read"
+            )
+            assert limitation["severity"] == "blocking"
+            assert limitation["secret_redacted"] is True
+
     def test_issue_187_s203_failed_actions_with_skipped_green_downgrades_supplemental_permissions(
         self,
     ) -> None:
@@ -17515,6 +17749,165 @@ esac
             assert "zero_actions_runs_non_success" in [
                 item.get("code") for item in payload["limitations"]
             ]
+
+    def test_issue_187_u001_zero_actions_green_legacy_status_passes_with_checks_permission_denied(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+        token_marker = "ghp_issue_187_u001_secret"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{{"total_count":0,"workflow_runs":[]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    printf 'GraphQL: Resource not accessible by personal access token {token_marker}\\n' >&2
+    exit 1
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{{"state":"success","statuses":[{{"context":"legacy/status","state":"success","target_url":"https://example.test/status"}}]}}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_TOKEN": token_marker,
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            assert token_marker not in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["actions"]["workflow_runs"]["total"] == 0
+            assert payload["ci"]["commit_statuses"]["total"] == 1
+            assert payload["ci"]["commit_statuses"]["success"] == 1
+            limitation = next(
+                item
+                for item in payload["limitations"]
+                if item.get("code") == "github_token_permission_denied"
+            )
+            assert limitation["capability"] == "check_runs_read"
+            assert limitation["severity"] == "informational"
+            assert limitation.get("blocking") is False
+            assert "zero_actions_runs_non_success" in [
+                item.get("code") for item in payload["limitations"]
+            ]
+            assert payload.get("decision", {}).get("recommended_next_action") != (
+                "fix_github_token_permissions"
+            )
+
+    def test_issue_187_u001_zero_actions_failed_legacy_status_keeps_checks_permission_blocking(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+        token_marker = "ghp_issue_187_u001_failed_secret"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{{"total_count":0,"workflow_runs":[]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    printf 'GraphQL: Resource not accessible by personal access token {token_marker}\\n' >&2
+    exit 1
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    cat <<'JSON'
+{{"state":"failure","statuses":[{{"context":"legacy/status","state":"failure","target_url":"https://example.test/status"}}]}}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_TOKEN": token_marker,
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            assert token_marker not in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "failed"
+            assert payload["ci"]["status"] != "passed"
+            assert payload["ci"]["commit_statuses"]["failure"] == 1
+            limitation = next(
+                item
+                for item in payload["limitations"]
+                if item.get("code") == "github_token_permission_denied"
+            )
+            assert limitation["capability"] == "check_runs_read"
+            assert limitation["severity"] == "blocking"
+            assert limitation.get("blocking") is not False
 
     @pytest.mark.parametrize(
         ("case_name", "stderr_text", "expected_code"),
