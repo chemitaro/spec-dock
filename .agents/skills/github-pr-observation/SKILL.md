@@ -33,6 +33,11 @@ Triage and judgment over collected evidence belong to
   with the fixed body `@codex review`.
 - `fetch_pr_observation_snapshot.sh` and the collector libraries remain
   read-only and call only fixed GitHub read APIs internally.
+- Check snapshot collection uses a shell wrapper plus the
+  `scripts/lib/pr_observation_checks.py` Python entrypoint. The wrapper owns
+  public argument validation and script-relative dispatch; the Python entrypoint
+  owns fixed `gh` reads, JSON parsing, CI taxonomy, limitations, and payload
+  rendering.
 - The scripts reject invalid `--repo`, `--pr`, `--head-sha`, timing, progress,
   trigger, body mode, and output options before any `gh` command can run.
 - The scripts do not accept arbitrary GitHub endpoints, methods, GraphQL
@@ -162,16 +167,30 @@ status collection are implemented by the public scripts.
   and `human_gate`.
 - CI terminal state and Codex review lifecycle are observed independently and
   merged only in the final wait result.
+- Zero Actions workflow runs do not by themselves prove CI success. Readable
+  green external check-runs or commit statuses may be sufficient pass evidence
+  when no required-missing, pending, failed, unknown, or other blocking evidence
+  is observed; no Actions runs plus no readable external evidence remains
+  non-pass, and any external non-green evidence wins.
+- Actions job expansion is bounded. Failed, running, pending, and unknown
+  workflow runs keep diagnostic priority, while terminal-green run expansion may
+  be skipped or capped. Collection metadata under
+  `ci.actions.jobs_summary.collection` is non-secret operational context;
+  failed and non-terminal diagnostics remain preserved where available.
 - Codex review completion is primarily detected from Codex-authored submitted PR
   review objects. Issue comments, reactions, or quiet windows are fallback or
   supporting evidence only.
 - `review_completion_unknown` is a non-pass terminal-like review state. It means
   CI passed, the observed head matched, no current blocker was selected, and no
-  trusted Codex review completion signal was found.
+  trusted Codex review completion signal was found after the trigger-age and
+  CI-passed-age guards are satisfied.
 - Stable no-completion evidence for the current boundary must not be collapsed
   into a generic timeout. The top-level result is `human_gate`, with the decision
   reason indicating `review_completion_unknown`, so a human can review the
   no-completion condition explicitly.
+- `review_completion_unknown` remains a human gate, not `passed` or
+  merge-ready. Below the latency guards, stable no-completion evidence stays in
+  the wait/resume path instead of being promoted early.
 - `fallback_issue_comment` remains low-confidence evidence. It keeps the final
   status in the `human_gate` / `wait_or_resume` path and does not promote a run
   to `passed`, complete, or merge-ready.
@@ -190,6 +209,9 @@ status collection are implemented by the public scripts.
 - When a timeout or limit occurs before CI and review complete, the final JSON
   includes resume metadata and a resume command hint for continuing the same
   boundary without posting another trigger.
+- Same-boundary resume preserves CI-passed age through additive wait metadata so
+  delayed `review_completion_unknown` evaluation can continue without posting a
+  new trigger.
 
 ## Safe Usage
 
