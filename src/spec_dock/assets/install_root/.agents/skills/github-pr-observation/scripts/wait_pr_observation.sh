@@ -211,12 +211,56 @@ import signal
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+
+REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS = 300
+REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS = 90
 
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def parse_utc_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    normalized = value
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def age_seconds_from_timestamp(value: object, *, now: datetime | None = None) -> int:
+    parsed = parse_utc_timestamp(value)
+    if parsed is None:
+        return 0
+    now = now or datetime.now(timezone.utc)
+    return int(max(0, (now - parsed).total_seconds()))
+
+
+def utc_text(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def numeric_age_seconds(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return int(max(0, value))
+    if isinstance(value, str):
+        try:
+            return int(max(0, float(value)))
+        except ValueError:
+            return None
+    return None
 
 
 def sha256_json(payload: object) -> str:
@@ -540,6 +584,72 @@ def is_review_completion_unknown_candidate(payload: dict) -> bool:
         "fallback_issue_comment_present",
     )
     return not any(evidence.get(flag) is True for flag in disqualifying_flags)
+
+
+def ci_status(payload: dict) -> str:
+    ci = payload.get("ci") if isinstance(payload.get("ci"), dict) else {}
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    return str(ci.get("status") or summary.get("ci") or "unknown")
+
+
+def trigger_created_at_for_latency(payload: dict, fallback_created_at: str) -> object:
+    trigger = payload.get("trigger") if isinstance(payload.get("trigger"), dict) else {}
+    return trigger.get("created_at") or fallback_created_at
+
+
+def previous_wait_ci_passed_since(
+    out_dir: Path | None,
+    *,
+    repo: str,
+    pr: str,
+    head_sha: str,
+    trigger_comment_id: str,
+    trigger_created_at: str,
+) -> datetime | None:
+    if out_dir is None:
+        return None
+    result_path = out_dir / "result.json"
+    if not result_path.is_file():
+        return None
+    try:
+        payload = json.loads(result_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+
+    resume = payload.get("resume") if isinstance(payload.get("resume"), dict) else {}
+    trigger = payload.get("trigger") if isinstance(payload.get("trigger"), dict) else {}
+    wait = payload.get("wait") if isinstance(payload.get("wait"), dict) else {}
+    if not wait:
+        return None
+
+    previous_repo = resume.get("repo") or payload.get("repo")
+    previous_pr = resume.get("pr") or payload.get("pr")
+    previous_head_sha = resume.get("head_sha") or payload.get("expected_head_sha")
+    previous_trigger_comment_id = resume.get("trigger_comment_id") or trigger.get("comment_id")
+    previous_trigger_created_at = resume.get("trigger_created_at") or trigger.get("created_at")
+
+    if previous_repo and str(previous_repo) != repo:
+        return None
+    if previous_pr and str(previous_pr) != str(pr):
+        return None
+    if previous_head_sha and str(previous_head_sha) != head_sha:
+        return None
+    if previous_trigger_comment_id and str(previous_trigger_comment_id) != str(trigger_comment_id):
+        return None
+    if previous_trigger_created_at and str(previous_trigger_created_at) != str(trigger_created_at):
+        return None
+
+    ci_passed_since = parse_utc_timestamp(wait.get("ci_passed_since"))
+    if ci_passed_since is not None:
+        return ci_passed_since
+
+    observed_at = parse_utc_timestamp(payload.get("observed_at"))
+    ci_passed_age_seconds = numeric_age_seconds(wait.get("ci_passed_age_seconds"))
+    if observed_at is None or ci_passed_age_seconds is None:
+        return None
+    return observed_at - timedelta(seconds=ci_passed_age_seconds)
 
 
 def semantic_fingerprint(payload: dict) -> str:
@@ -1209,6 +1319,14 @@ out_dir = Path(out_dir_text) if out_dir_text else None
 start_monotonic = time.monotonic()
 deadline = start_monotonic + timeout_seconds
 trigger_helper_metadata: dict = {}
+previous_ci_passed_since = previous_wait_ci_passed_since(
+    out_dir,
+    repo=repo,
+    pr=pr,
+    head_sha=head_sha,
+    trigger_comment_id=trigger_comment_id,
+    trigger_created_at=trigger_created_at,
+)
 
 if out_dir:
     clear_managed_out_artifacts(out_dir)
@@ -1285,6 +1403,7 @@ latest_snapshot_text = "{}\n"
 latest_delta: dict = {}
 latest_snapshot_out_dir: Path | None = None
 final_phase = "timeout"
+ci_passed_first_monotonic: float | None = None
 
 while True:
     if latest_payload is not None and time.monotonic() >= deadline:
@@ -1353,13 +1472,53 @@ while True:
         changed = True
 
     quiet_elapsed = int(max(0, time.monotonic() - latest_change_monotonic))
+    if ci_status(payload) == "passed":
+        if ci_passed_first_monotonic is None:
+            observed_age = age_seconds_from_timestamp(payload.get("observed_at"))
+            ci_passed_first_monotonic = time.monotonic() - observed_age
+            if previous_ci_passed_since is not None:
+                previous_age = int(
+                    max(0, (datetime.now(timezone.utc) - previous_ci_passed_since).total_seconds())
+                )
+                ci_passed_first_monotonic = min(
+                    ci_passed_first_monotonic,
+                    time.monotonic() - previous_age,
+                )
+    else:
+        ci_passed_first_monotonic = None
+        previous_ci_passed_since = None
     normalized_status, overall_status, next_action, can_complete_when_stable, terminal_now = classify(
         payload,
         poll,
         zero_check_grace_polls,
     )
     stable = same_count >= same_fingerprint_count and quiet_elapsed >= quiet_seconds
-    observation_complete = bool(can_complete_when_stable and stable)
+    review_completion_unknown_candidate = is_review_completion_unknown_candidate(payload)
+    review_trigger_age_seconds = age_seconds_from_timestamp(
+        trigger_created_at_for_latency(payload, trigger_created_at)
+    )
+    ci_passed_age_seconds = (
+        int(max(0, time.monotonic() - ci_passed_first_monotonic))
+        if ci_passed_first_monotonic is not None
+        else 0
+    )
+    ci_passed_since = (
+        utc_text(datetime.now(timezone.utc) - timedelta(seconds=ci_passed_age_seconds))
+        if ci_passed_first_monotonic is not None
+        else None
+    )
+    review_completion_unknown_latency_satisfied = (
+        review_trigger_age_seconds >= REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS
+        and ci_passed_age_seconds >= REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS
+    )
+    observation_complete = bool(
+        can_complete_when_stable
+        and stable
+        and (
+            not review_completion_unknown_candidate
+            or review_completion_unknown_latency_satisfied
+        )
+    )
     elapsed = int(max(0, time.monotonic() - start_monotonic))
     remain = int(max(0, deadline - time.monotonic()))
     if observation_complete:
@@ -1382,7 +1541,7 @@ while True:
     else:
         final_phase = "wait"
 
-    if observation_complete and is_review_completion_unknown_candidate(payload):
+    if observation_complete and review_completion_unknown_candidate:
         normalized_status = "human_gate"
         overall_status = "human_gate"
         next_action = "human_gate"
@@ -1408,6 +1567,12 @@ while True:
         "quiet_seconds_observed": quiet_elapsed,
         "same_fingerprint_required": same_fingerprint_count,
         "same_fingerprint_observed": same_count,
+        "review_trigger_age_seconds": review_trigger_age_seconds,
+        "ci_passed_age_seconds": ci_passed_age_seconds,
+        "ci_passed_since": ci_passed_since,
+        "review_completion_unknown_min_trigger_age_seconds": REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS,
+        "review_completion_unknown_min_ci_passed_age_seconds": REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS,
+        "review_completion_unknown_latency_satisfied": review_completion_unknown_latency_satisfied,
         "zero_check_grace_polls": zero_check_grace_polls,
         "latest_change_poll": latest_delta.get("poll", poll),
         "deadline_reached": final_phase == "timeout",
