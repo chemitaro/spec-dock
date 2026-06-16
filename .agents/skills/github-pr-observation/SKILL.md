@@ -33,11 +33,24 @@ Triage and judgment over collected evidence belong to
   with the fixed body `@codex review`.
 - `fetch_pr_observation_snapshot.sh` and the collector libraries remain
   read-only and call only fixed GitHub read APIs internally.
+- Operators still invoke the public `.sh` scripts directly. The adjacent
+  Python files under `scripts/lib/` are implementation entrypoints for those
+  wrappers, not a separate operator CLI.
 - Check snapshot collection uses a shell wrapper plus the
   `scripts/lib/pr_observation_checks.py` Python entrypoint. The wrapper owns
   public argument validation and script-relative dispatch; the Python entrypoint
   owns fixed `gh` reads, JSON parsing, CI taxonomy, limitations, and payload
   rendering.
+- PR observation snapshot aggregation uses `fetch_pr_observation_snapshot.sh`
+  plus the adjacent `scripts/lib/pr_observation_snapshot.py` Python entrypoint.
+  The shell wrapper keeps the public CLI and validation boundary; the Python
+  entrypoint owns the non-trivial snapshot assembly, collector orchestration,
+  metadata parsing, and artifact rendering.
+- PR observation wait orchestration uses `wait_pr_observation.sh` plus the
+  adjacent `scripts/lib/pr_observation_wait.py` Python entrypoint. The shell
+  wrapper keeps the public CLI and validation boundary; the Python entrypoint
+  owns polling, stability, timing, progress, timeout, resume metadata, and
+  `--out` artifact handling.
 - The scripts reject invalid `--repo`, `--pr`, `--head-sha`, timing, progress,
   trigger, body mode, and output options before any `gh` command can run.
 - The scripts do not accept arbitrary GitHub endpoints, methods, GraphQL
