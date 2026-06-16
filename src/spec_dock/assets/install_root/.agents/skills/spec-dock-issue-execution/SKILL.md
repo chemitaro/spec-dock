@@ -7,6 +7,14 @@ description: Execute an active spec-dock issue while keeping spec-dock/docs/work
 
 Use `spec-dock/docs/workflow_issue.md` as the source of truth. This skill is only a concise reminder for issue execution.
 
+## First-Read Gate Spine
+
+- Execute exactly one current implementation step at a time. Do not start implementation, review, or commit work for the next step until the current step is closed.
+- Unlock the next step only after current step closure, required verification, a fresh step reviewer pass, the Step Commit Gate, and a post-commit clean check are complete.
+- Keep normal file mutation delegated: route runtime, tests, and scaffold behavior to `dev-coder`; route shipped docs, templates, skills, and workflow text to `doc-writer`.
+- Parent direct implementation or direct reviewer-fail fixes require a documented Parent Implementation Exception before mutation.
+- Treat unavailable tooling, denied access, host conflicts, waiver requests, degraded mode, and similar blockers as stop/incomplete states unless `workflow_issue.md` explicitly says otherwise. They are not reviewer passes or normal implementation success.
+
 - Keep the parent agent responsible for orchestration, context, acceptance evidence, and final closure. Delegates may implement bounded tasks, but they do not own the issue.
 - Preserve parent invariants before, during, and after delegated work: active issue context, allowed paths, acceptance criteria, reviewer requirements, and stop conditions remain the parent agent's responsibility.
 - Start execution only after `requirement.md`, `design.md`, and `plan.md` are approved / reviewer-pass and recorded as ready under the issue workflow. If any of the three artifacts is draft, template-only, unresolved, or missing reviewer-pass evidence, stop and return to planning / spec authoring instead of implementing.
