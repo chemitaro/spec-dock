@@ -1099,4 +1099,235 @@ ID: "iss-00187"
 - Non-blocking:
   - Exact timing constants may be adjusted by reviewer feedback.
   - Whether green-run job expansion is skipped entirely or capped with a small diagnostic sample is implementation-local, as long as bounded behavior and failure diagnostics are preserved.
-  - Full extraction of review/wait scripts remains a future follow-up unless S204 reveals the heredoc boundary blocks safe implementation.
+  - Full extraction of review/wait scripts was left as a future follow-up at S200+ closure time. S300+ below adopts the snapshot/wait portion of that follow-up while leaving review collector / trigger extraction outside the direct scope.
+
+## 追加実装計画 S300+ — Snapshot / Wait Python Entrypoint Extraction
+
+### 追加計画の位置づけ
+- この追加計画は、既存 S01-S299 の実施済み計画を裏書き・修正・再判定するものではない。
+- `discussions/20260616t072719z-10-disc-snapshot-wait-python-extraction-architecture-draft.md` と `discussions/20260616t072719z-11-disc-snapshot-wait-python-extraction-implementation-plan-draft.md` を canonical docs へ採用した follow-up lane として扱う。
+- 目的は、`fetch_pr_observation_snapshot.sh` と `wait_pr_observation.sh` に残る Python heredoc を standalone Python entrypoint へ抽出し、shell wrapper を public CLI / validation / Python invocation に薄くすること。
+- Direct target は snapshot / wait に限定する。`fetch_pr_review_snapshot.sh` と `trigger_codex_review.sh` の heredoc は別 follow-up 対象とし、S300+ の直接 scope には含めない。
+
+### S300+ 依存順序
+```text
+S300
+  -> S310
+      -> S320
+          -> S390
+              -> S399
+```
+
+### 追加クロージャ索引 S300+
+
+| 識別子（ID） | ステップ | スライス | 種別 | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 |
+|---|---|---|---|---|---|---|---|
+| `tc-s300-001` | S300 | heredoc-inventory | characterization | Remaining snapshot/wait heredoc responsibilities and tests are mapped before extraction | provider snapshot/wait scripts and focused test inventory | extraction proceeds without behavior baseline | yes |
+| `tc-s300-002` | S300 | focused-test-map | characterization | Existing snapshot/wait focused tests are identified for before/after evidence | `tests/unit/infra/test_init_update.py` PR observation tests | false confidence from broad tests only | yes |
+| `tc-s310-001` | S310 | snapshot-cli | regression | `fetch_pr_observation_snapshot.sh` public CLI and fixed command surface remain compatible | fake `gh` snapshot scenarios | shell/Python extraction breaks callers | yes |
+| `tc-s310-002` | S310 | snapshot-validation | negative | invalid snapshot args are rejected before `gh` / collectors are called | invalid CLI args with fake call log | unsafe input reaches GitHub/API scripts | yes |
+| `tc-s310-003` | S310 | snapshot-artifacts | regression | snapshot stdout JSON and `--out` artifacts remain compatible | snapshot command with `--out` | artifact consumers break after extraction | yes |
+| `tc-s310-004` | S310 | snapshot-head-freshness | regression | initial/final head revalidation and `stale_head` behavior are preserved | head changes during snapshot collection | stale PR head is misreported as current | yes |
+| `tc-s310-005` | S310 | snapshot-failure-json | negative | metadata/collector failures still produce secret-redacted limitation JSON | failing fixed `gh` / collector output | raw stderr leaks or failure becomes pass | yes |
+| `tc-s310-006` | S310/S390 | snapshot-python-asset | scaffold | `pr_observation_snapshot.py` is installed/updated with shipped assets | init/update target tree | installed wrapper cannot find Python entrypoint | yes |
+| `tc-s320-001` | S320 | wait-cli | regression | `wait_pr_observation.sh` public CLI validation remains compatible | invalid and valid wait args | wait callers break after extraction | yes |
+| `tc-s320-002` | S320 | wait-stdout-stderr-out | regression | wait stdout final JSON, stderr progress, and `--out` contract are preserved | fake snapshot/trigger wait run | progress/artifact consumers break | yes |
+| `tc-s320-003` | S320 | wait-stability | regression | quiet / same-fingerprint gate behavior is preserved | stable and changing snapshot sequence | terminal state occurs too early or never | yes |
+| `tc-s320-004` | S320 | wait-timeout | regression | timeout preserves latest payload and wait metadata | snapshot sequence through timeout | resume evidence is lost | yes |
+| `tc-s320-005` | S320 | review-unknown-latency | regression | S204 `review_completion_unknown` trigger-age and CI-age timing remains preserved | aged and non-aged no-completion evidence | premature human gate or lost unknown escape hatch | yes |
+| `tc-s320-006` | S320 | late-review-overrides | regression | late submitted/unresolved review overrides unknown candidate | no-completion then current review finding | actionable feedback hidden by unknown | yes |
+| `tc-s320-007` | S320/S390 | wait-python-asset | scaffold | `pr_observation_wait.py` is installed/updated with shipped assets | init/update target tree | installed wrapper cannot find wait Python entrypoint | yes |
+| `tc-s390-001` | S390 | mirror-sync | scaffold | provider/mirror changed snapshot/wait files match where intended | provider/mirror `cmp -s` | dogfooding mirror executes stale logic | yes |
+| `tc-s390-002` | S390 | operator-docs | docs | provider/mirror docs describe standalone snapshot/wait Python entrypoints | `SKILL.md` inspection | operator documentation contradicts shipped behavior | yes |
+| `tc-s399-001` | S399 | final-validation | quality | S300+ focused/broad validation, reviewers, and latest PR evidence are complete | final branch diff and PR #190 observation | incomplete extraction closure | yes |
+
+### S300+ 共通実行契約
+- Parent orchestrator executes exactly one step at a time.
+- Runtime/test/scaffold changes must be delegated to `dev-coder`.
+- Shipped docs / skill text changes must be delegated to `doc-writer`.
+- Mirror-only mechanical sync may be delegated to `utility-worker` or `dev-coder`.
+- Each implementation step must close with required evidence, fresh reviewer pass, step commit, and post-commit clean check before the next step starts.
+- Forbidden across S300+:
+  - no public shell flag change without design amendment.
+  - no arbitrary GitHub API proxy.
+  - no raw token / raw auth stderr output.
+  - no `review_completion_unknown` promotion to `passed` / `merge_prepared`.
+  - no selected-count-only review completion inference.
+  - no bundling `fetch_pr_review_snapshot.sh` or `trigger_codex_review.sh` extraction unless the plan is explicitly amended.
+  - no behavior changes inside docs/mirror-only steps.
+
+### 実装ステップ S300 — Characterization / Current Heredoc Inventory
+- 振る舞いの目標:
+  - 現在残っている snapshot/wait heredoc と既存テスト契約を棚卸しし、S310/S320 が behavior-preserving extraction であることを検証できる状態にする。
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py`
+  - `tests/unit/infra/test_init_update.py`
+  - `spec-dock/active/issue/report.md`
+- 委任契約:
+  - delegated role: `dev-coder` for characterization evidence only.
+  - behavior mutation is forbidden in this step.
+- Red / alternative evidence:
+  - Dedicated extraction asset tests may be absent before extraction.
+  - Existing snapshot/wait focused tests can serve as characterization evidence if mapped explicitly.
+- Green 検証:
+  - `rg -n "python3 - <<|'PY'|PY$" src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`
+  - focused existing snapshot/wait test mapping recorded in `report.md`.
+- reviewer:
+  - code-reviewer inspect-only pass.
+- commit gate:
+  - If S300 changes only `report.md`, commit after reviewer pass. If no file change is needed, record no-op evidence.
+- report evidence destination:
+  - TDD Evidence, Test Contract Closure for `tc-s300-001` / `tc-s300-002`, Reviewer Gate Status, Step Commit Gate.
+
+### 実装ステップ S310 — Extract `fetch_pr_observation_snapshot.sh`
+- 振る舞いの目標:
+  - `fetch_pr_observation_snapshot.sh` の payload-building heredoc と metadata JSON parsing heredoc を `scripts/lib/pr_observation_snapshot.py` へ移し、shell wrapper は argument validation と adjacent Python entrypoint 呼び出しに限定する。
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py`
+  - `tests/unit/infra/test_init_update.py`
+  - `spec-dock/active/issue/report.md`
+- 計画済み契約:
+  - No snapshot classification behavior change.
+  - checks/review collector semantics are unchanged.
+  - Public flags, stdout final JSON, stderr diagnostics, and `--out` artifact names are preserved.
+  - Python entrypoint uses only standard library and fixed local script / `gh` invocations.
+- 委任契約:
+  - delegated role: `dev-coder`.
+  - forbidden changes:
+    - no checks collector behavior change.
+    - no review collector semantic change.
+    - no wait wrapper extraction in S310.
+    - no new third-party dependency.
+- Red / alternative evidence:
+  - `pr_observation_snapshot.py` asset presence test should fail or be absent before extraction.
+  - Existing snapshot behavior tests serve as before/after characterization evidence.
+- Green 検証:
+  - focused snapshot tests for `tc-s310-001`..`tc-s310-005`.
+  - focused asset/scaffold test for `tc-s310-006` if added in this step.
+  - `git diff --check`.
+- reviewer:
+  - code-reviewer pass focused on shell/Python boundary, temp/out artifact compatibility, fixed API surface, and secret redaction.
+- commit gate:
+  - S310 commit after reviewer pass and post-commit clean check.
+- report evidence destination:
+  - TDD Evidence, Test Contract Closure for `tc-s310-001`..`tc-s310-006`, Closure Coverage, Reviewer Gate Status, Step Commit Gate.
+
+### 実装ステップ S320 — Extract `wait_pr_observation.sh`
+- 振る舞いの目標:
+  - `wait_pr_observation.sh` の poll loop、snapshot invocation orchestration、quiet/same-fingerprint stability、zero-check grace、review-completion timing、progress rendering、out artifact handling を `scripts/lib/pr_observation_wait.py` へ移す。
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+  - `tests/unit/infra/test_init_update.py`
+  - `spec-dock/active/issue/report.md`
+- 計画済み契約:
+  - S204 timing constants and semantics are unchanged.
+  - `review_completion_unknown` remains non-pass `human_gate`.
+  - trigger script semantics are unchanged.
+  - snapshot script public contract is consumed through the shell script boundary, not direct Python imports.
+- 委任契約:
+  - delegated role: `dev-coder`.
+  - forbidden changes:
+    - no trigger script behavior change.
+    - no review collector semantic broadening.
+    - no `passed` / `merge_prepared` from missing completion.
+    - no extraction of `fetch_pr_review_snapshot.sh` or `trigger_codex_review.sh`.
+- Red / alternative evidence:
+  - `pr_observation_wait.py` asset presence test should fail or be absent before extraction.
+  - Existing wait tests serve as before/after characterization evidence.
+- Green 検証:
+  - wait stdout/stderr/out contract tests.
+  - quiet / same-fingerprint tests.
+  - timeout preserves latest payload tests.
+  - S204 review-completion timing tests.
+  - late review feedback override tests.
+  - focused asset/scaffold test for `tc-s320-007` if added in this step.
+  - `git diff --check`.
+- reviewer:
+  - code-reviewer pass focused on polling semantics, timeout handling, progress line budget, resume metadata, and non-pass safety.
+- commit gate:
+  - S320 commit after reviewer pass and post-commit clean check.
+- report evidence destination:
+  - TDD Evidence, Test Contract Closure for `tc-s320-001`..`tc-s320-007`, Closure Coverage, Reviewer Gate Status, Step Commit Gate.
+
+### ドキュメント / ミラー追加ステップ S390
+- 振る舞いの目標:
+  - Provider extraction files, dogfooding mirror, operator docs, and init/update scaffold output align with S310/S320.
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md`
+  - `.agents/skills/github-pr-observation/SKILL.md`
+  - `.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh`
+  - `.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`
+  - `.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py`
+  - `.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+  - focused asset tests if not already added in S310/S320.
+- 計画済み契約:
+  - Docs describe that operators still invoke `.sh` scripts directly.
+  - Docs describe that snapshot/wait wrappers delegate Python logic to adjacent `scripts/lib/*.py` entrypoints.
+  - Required permissions and recommended actions are unchanged.
+  - Provider/mirror changed files are byte-identical where intended.
+- 委任契約:
+  - delegated roles:
+    - `doc-writer` for provider/mirror `SKILL.md`.
+    - `utility-worker` or `dev-coder` for mechanical mirror sync and scaffold verification.
+  - forbidden changes:
+    - no behavior changes in provider scripts.
+    - no modification of S310/S320 implementation logic while doing docs/mirror sync.
+    - no claim that PR #190 is auto merge-ready.
+- verification:
+  - provider/mirror `cmp -s` for changed files.
+  - focused init/update asset tests for new Python files.
+  - `git diff --check`.
+- reviewer:
+  - spec-reviewer for docs wording.
+  - code-reviewer for mirror/scaffold sync.
+- commit gate:
+  - S390 commit after reviewer pass and post-commit clean check.
+- report evidence destination:
+  - Docs Impact Resolution, Test Contract Closure for `tc-s390-001` / `tc-s390-002`, Closure Coverage, Reviewer Gate Status, Step Commit Gate.
+
+### 追加最終品質ゲート S399
+- branch diff 範囲:
+  - S300 characterization, S310 snapshot extraction, S320 wait extraction, S390 docs/mirror/scaffold changes, and final `report.md` evidence.
+- 必須 validation:
+  - `uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation_snapshot or pr_observation_wait or review_completion_unknown or issue_187"`
+  - `uv run pytest tests/unit/infra/test_init_update.py -q`
+  - `git diff --check`
+  - `./spec-dock/scripts/spec-dock validate`
+  - provider/mirror `cmp -s` for changed assets
+- PR observation gate:
+  - Re-run PR observation on latest PR #190 head after push.
+  - Do not use stale pre-final PR observation as final evidence.
+  - If `review_completion_unknown` appears, report it as non-pass human gate and distinguish it from GitHub mergeability/check status.
+- 委任契約:
+  - delegated roles:
+    - qa-reviewer for final test sufficiency.
+    - code-reviewer for integrated runtime/test/docs diff.
+    - spec-reviewer for final spec alignment.
+  - parent-owned work:
+    - final report evidence integration.
+    - PR observation orchestration.
+    - commit gate and PR delivery handoff.
+  - forbidden changes:
+    - no behavior changes unless a final reviewer finding requires a bounded follow-up assigned to the relevant previous step or an explicit S399 follow-up.
+    - no final commit before all required reviewers pass.
+- reviewer gates:
+  - qa-reviewer: test sufficiency and race coverage pass.
+  - code-reviewer: integrated scripts/tests/docs diff pass.
+  - spec-reviewer: requirement/design/plan/report alignment pass.
+- commit gate:
+  - S399 final evidence commit only after reviewers pass.
+  - Do not bundle uncommitted S310/S320 behavior changes into S399.
+- report evidence destination:
+  - Final QA Gate, Final Code Review Gate, Final Spec Review Gate, Closure Coverage, Step Commit Gate, Final Commit, PR Observation Gate.
+
+### S300+ 未確定事項
+- Blocking:
+  - なし。
+- Non-blocking:
+  - Whether `pr_observation_common.py` is needed should be decided after S310/S320 expose concrete duplication.
+  - Metadata `gh pr view` execution should move into `pr_observation_snapshot.py` if focused tests lock current JSON and exit behavior tightly; otherwise split into a narrower follow-up inside S310.
+  - `fetch_pr_review_snapshot.sh` / `trigger_codex_review.sh` heredoc extraction should remain a separate follow-up unless S310/S320 reveals a hard dependency.
