@@ -63,6 +63,8 @@ ID: "iss-00187"
   - Actions-only green evidence を `ci.status="passed"` として許可する。ただし full check/status rollup または external check provider coverage を証明できない場合は final JSON に明示的な limitation を残す。
   - 失敗、実行中、pending、queued、requested、waiting、cancelled、timed_out、action_required、unsupported、ambiguous は `passed` に昇格しない。
   - Workflow run / job 自体の `stale` conclusion は CI failure 系として扱うが、PR head SHA mismatch / snapshot 中の head change は CI failure ではなく stale head freshness failure として再実行へ誘導する。
+  - Post-observation 追加修正として、CI passed / head matched かつ current trigger boundary に unresolved feedback や pending review signal がない一方で Codex review completion signal が観測できない状態を、generic `wait_timeout` ではなく `review_completion_unknown` 系の non-pass terminal-like state として表現する。
+  - `review_completion_unknown` は merge-ready / pass ではなく、人間または orchestration layer の確認を要求する状態として扱う。
   - Downstream contract として `ci.status`、`normalized_status`、`overall_status`、`recommended_next_action`、`limitations`、`ci.failures`、`decision` の実用上の意味を維持する。
   - Fake `gh` による script-level regression tests を追加 / 更新する。
 - 禁止:
@@ -70,14 +72,15 @@ ID: "iss-00187"
   - Fine-grained PAT dashboard の UI を変更する。
   - PR merge の自動実行を追加する。
   - GitHub Actions workflow 定義そのものを再設計する。
-  - Codex review lifecycle 観測の仕様を変更する。
+  - Codex review lifecycle 観測を、current-boundary completion unknown の分類とその安全な wait termination 以外へ広げる。
   - Caller-provided endpoint、method、GraphQL query、headers、request body、`jq`、raw `gh` arguments を受け取る拡張を追加する。
   - 観測不能な CI surface を暗黙に成功扱いする。
 - 対象外:
   - GitHub Actions 以外の全 check provider を完全同等に観測できるようにすること。
   - Branch protection / required checks policy の全面再現。
   - CI log download / log parsing の追加。
-  - Codex review comment / review thread collector の仕様変更。
+  - Codex review comment / review thread collector の全面再設計。
+  - Generic issue comment、review request disappearance、selected comments zero、selected unresolved zero を completion / pass とみなすこと。
   - `github-pr-merge-preparer` の triage / repair grouping 仕様変更。
 
 ## 境界
@@ -87,14 +90,18 @@ ID: "iss-00187"
   - Workflow run / job の in-progress / queued / pending 系は `running` または `pending` とし、wait / resume 可能な状態にする。
   - Actions-only green を `passed` にする場合でも、full rollup / external provider coverage が未証明なら limitation を明示する。
   - Permission / auth / rate limit / schema / transient failure は token や stderr 本文を漏らさず、既存と同様に machine-readable limitation として返す。
+  - `review_completion_unknown` は、CI/head が完了し、current-boundary review evidence が安定して変化していないことを wait wrapper が確認した後にだけ terminal-like に扱う。
 - 判断が必要:
   - Commit statuses / PR status rollup を supplemental signal として残す場合、permission denied を blocking とするか、Actions primary の limitation とするか。
   - External provider の存在をどこまで検出できるか。検出できない場合は「未証明の範囲」として limitation に留める。
   - 既存 `ci.check_runs` / `ci.commit_statuses` shape を互換目的で残す場合の値の埋め方。
+  - `review_completion_unknown` の top-level `normalized_status` を `human_gate` とするか `unknown` とするか。現時点の推奨は inspect-before-merge を明示する `human_gate`。
+  - Strict allowlisted no-findings issue comment を distinct secondary signal として追加できるか。観測可能な actor/time/trigger evidence が不足する場合は deferred とする。
 - 行わない:
   - `Checks` read permission denial を、Actions で判断可能な GitHub Actions-centered CI の通常 blocker として扱わない。
   - Actions-only green の limitation を下流 agent から見えない場所に隠さない。
   - `unknown` を `passed` と同義に扱わない。
+  - `review_completion_unknown` を `passed`、`merge_prepared`、または selected feedback zero の別名にしない。
 
 ## 非交渉制約
 - Final JSON の stdout machine-readable contract を壊さない。
@@ -103,6 +110,7 @@ ID: "iss-00187"
 - Fixed script surface を維持し、任意 GitHub API proxy にしない。
 - Provider source を先に更新し、dogfooding mirror は検証対象として扱う。
 - False pass を避けるため、unsupported / ambiguous / unobserved failure-risk state は explicit limitation または `unknown` にする。
+- Review completion を証明できない状態は pass にせず、`review_completion_unknown` または pending / timeout として明示する。
 
 ## 前提
 - この issue の対象 repo は GitHub Actions-centered CI を主対象にする。
@@ -141,6 +149,18 @@ ID: "iss-00187"
   - 操作: fake `gh` regression tests または実 script を実行する。
   - 期待結果: final JSON に machine-readable limitation が入り、secret / token / raw stderr は漏れない。Actions で判断可能な通常 green path では `fix_github_token_permissions` を不要に要求しない。
   - 観測点: `limitations`、`stderr_sha256`、stdout/stderr secret absence assertions。
+- AC-006:
+  - アクター: PR observation を実行する agent。
+  - 前提: PR head SHA は期待 head と一致し、CI は `passed`。current trigger boundary では Codex-authored submitted PR review、allowlisted no-findings signal、current unresolved thread、changes-requested evidence、pending review request / pending review signal、blocking collection failure のいずれも観測されない。
+  - 操作: `wait_pr_observation.sh` が同じ current-boundary no-completion evidence を quiet / same-fingerprint stability 条件まで観測する。
+  - 期待結果: final JSON は generic `wait_timeout` ではなく `review_completion_unknown` 系の `decision.status_reason` と `recommended_next_action="human_gate"` を返す。`passed` / `merge_prepared` にはならない。
+  - 観測点: `normalized_status`、`decision.status_reason`、`decision.completion_signal`、`wait.quiet_seconds_observed`、`wait.same_fingerprint_observed`、fake `gh` wait test。
+- AC-007:
+  - アクター: PR observation を実行する agent。
+  - 前提: current-boundary に pending review request または current pending PR review signal がある。
+  - 操作: `fetch_pr_observation_snapshot.sh` または `wait_pr_observation.sh` を実行する。
+  - 期待結果: pending state は `review_completion_unknown` に昇格せず、待機 / resume の対象として扱われる。
+  - 観測点: `codex_review.lifecycle.status`、`decision.status_reason`、`recommended_next_action`。
 
 ## 例外・エッジケース
 - EC-001:
