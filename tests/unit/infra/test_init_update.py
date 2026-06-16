@@ -14463,6 +14463,7 @@ esac
         selected_changes_requested_evidence: list[dict[str, object]] | None = None,
         completion_signal: str = "none",
         fallback_pass_candidate: dict[str, object] | None = None,
+        no_completion_evidence: dict[str, object] | None = None,
         legacy_review_status: str = "unresolved",
         legacy_unresolved_count: int = 1,
     ) -> dict[str, object]:
@@ -14492,6 +14493,11 @@ esac
             "completion_signal": completion_signal,
             "confidence": "low" if completion_signal == "fallback_issue_comment" else "medium",
             "fallback_pass_candidate": fallback_pass_candidate,
+            "no_completion_evidence": no_completion_evidence
+            or {
+                "present": False,
+                "promotes_top_level_status": False,
+            },
             "fingerprint": f"decision-{status_reason}",
         }
         return {
@@ -14522,6 +14528,7 @@ esac
                         "completion_signal": completion_signal,
                         "status": decision_status,
                         "confidence": decision["confidence"],
+                        "no_completion_evidence": decision["no_completion_evidence"],
                     },
                     "collection_summary": {
                         "review_threads": {
@@ -14538,6 +14545,7 @@ esac
                     "status": decision_status,
                     "confidence": decision["confidence"],
                     "fallback_pass_candidate": fallback_pass_candidate,
+                    "no_completion_evidence": decision["no_completion_evidence"],
                 },
                 "collection_summary": {
                     "review_threads": {
@@ -14685,6 +14693,44 @@ esac
         assert payload["observation_complete"] is False
         assert payload["decision"]["status_reason"] == "missing_current_completion_signal"
         assert payload["recommended_next_action"] == "wait_or_resume"
+
+    def test_issue_187_s101_snapshot_preserves_no_completion_evidence_as_pending(self) -> None:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "reason": "current_boundary_has_no_completion_or_blocking_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            payload = self._issue_182_s02_run_snapshot_with_collectors(
+                Path(tmp_dir),
+                review_payload=self._issue_182_s02_review_payload(
+                    decision_status="pending",
+                    status_reason="missing_current_completion_signal",
+                    recommended_next_action="wait_or_resume",
+                    completion_signal="none",
+                    no_completion_evidence=evidence,
+                    legacy_review_status="approved",
+                    legacy_unresolved_count=0,
+                ),
+            )
+
+        assert payload["ci"]["status"] == "passed"
+        assert payload["head_matches_expected"] is True
+        assert payload["normalized_status"] == "pending"
+        assert payload["overall_status"] == "pending"
+        assert payload["recommended_next_action"] == "wait_or_resume"
+        assert payload["observation_complete"] is False
+        assert payload["decision"]["status_reason"] == "missing_current_completion_signal"
+        assert payload["decision"]["no_completion_evidence"] == evidence
+        assert payload["codex_review"]["lifecycle"]["no_completion_evidence"] == evidence
+        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
 
     def test_issue_170_pr_observation_snapshot_blocks_draft_and_non_open_prs(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -18466,6 +18512,152 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             payload = json.loads(result.stdout)
             assert payload["normalized_status"] in {"pending", "timeout"}
             assert payload["normalized_status"] != "passed"
+            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["observation_complete"] is False
+
+    def test_issue_187_s101_wait_promotes_stable_no_completion_to_human_gate_unknown(self) -> None:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "reason": "current_boundary_has_no_completion_or_blocking_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "selected_changes_requested_evidence": [],
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": "no-completion-s101",
+        }
+        codex_review = {
+            "lifecycle": {
+                "status": "none",
+                "completion_signal": "none",
+                "confidence": "medium",
+                "no_completion_evidence": evidence,
+            },
+            "collection_summary": {
+                "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "no-completion-s101",
+                        "codex_review": codex_review,
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=3,
+                quiet_seconds=1,
+                same_fingerprint_count=2,
+                progress="none",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "human_gate"
+            assert payload["overall_status"] == "human_gate"
+            assert payload["recommended_next_action"] == "human_gate"
+            assert payload["observation_complete"] is True
+            assert payload["decision"]["status"] == "unknown"
+            assert payload["decision"]["status_reason"] == "review_completion_unknown"
+            assert payload["decision"]["recommended_next_action"] == "human_gate"
+            assert payload["decision"]["observation_complete"] is True
+            assert payload["decision"]["no_completion_evidence"] == evidence
+            assert payload["decision"]["recommended_next_action"] != "merge_prepared"
+            assert payload["wait"]["same_fingerprint_observed"] >= 2
+            assert payload["wait"]["quiet_seconds_observed"] >= 1
+
+    def test_issue_187_s101_wait_pending_review_no_completion_evidence_still_times_out(self) -> None:
+        evidence = {
+            "present": False,
+            "category": "pending_review",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": True,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": "pending-review-s101",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "pending-review-s101",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "pending",
+                                "completion_signal": "none",
+                                "confidence": "medium",
+                                "no_completion_evidence": evidence,
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] in {"pending", "timeout"}
+            assert payload["normalized_status"] != "human_gate"
+            assert payload["decision"]["status_reason"] != "review_completion_unknown"
+            assert payload["decision"]["no_completion_evidence"]["pending_review_present"] is True
             assert payload["recommended_next_action"] == "wait_or_resume"
             assert payload["observation_complete"] is False
 
