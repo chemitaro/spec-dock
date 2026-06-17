@@ -1215,6 +1215,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00184-rename-spec-dock-hub-skill/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00186-harden-issue-execution-step-gates/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00187-actions-pr-observation-ci-state/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00197-extract-pr-review-snapshot-python/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1389,6 +1390,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00184-rename-spec-dock-hub-skill/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00186-harden-issue-execution-step-gates/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00187-actions-pr-observation-ci-state/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00197-extract-pr-review-snapshot-python/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -26307,7 +26309,8 @@ esac
             assert "<<PY" not in script_text
             assert "<<'PY'" not in script_text
             assert "def parse_gh_paginated_stdout" not in script_text
-            assert 'python3 "$script_dir/pr_review_snapshot.py"' in script_text
+            assert "OBS_" not in script_text
+            assert 'python3 "$script_dir/pr_review_snapshot.py" "${python_args[@]}"' in script_text
         assert mirror_script.read_bytes() == provider_script.read_bytes()
         assert mirror_python.read_bytes() == provider_python.read_bytes()
 
@@ -26359,6 +26362,86 @@ exit 44
             assert help_result.returncode == 0, help_result.stdout + help_result.stderr
             assert "usage: fetch_pr_review_snapshot.sh" in help_result.stderr
             assert not gh_log.exists()
+
+    def test_issue_197_pr_review_snapshot_python_entrypoint_accepts_argv_without_obs_env(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        python_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                key: value for key, value in os.environ.items() if not key.startswith("OBS_")
+            }
+            env["PATH"] = f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(python_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["script"] == "fetch_pr_review_snapshot.sh"
+            assert payload["collector"] == "s04"
+            assert payload["repo"] == "owner/repo"
+            assert payload["pr"] == 13
+            assert payload["review"]["status"] == "none"
+            assert payload["trigger"]["comment_id"] == 99
 
     def test_issue_75_pr_observation_review_collector_excludes_stale_feedback_from_commented_status(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]

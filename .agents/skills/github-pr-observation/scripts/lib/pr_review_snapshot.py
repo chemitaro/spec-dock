@@ -1,18 +1,65 @@
+import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
+import sys
 from datetime import datetime, timezone
 
-repo = os.environ["OBS_REPO"]
-owner = os.environ["OBS_OWNER"]
-name = os.environ["OBS_NAME"]
-pr = int(os.environ["OBS_PR"])
-expected_head_sha = os.environ["OBS_HEAD_SHA"] or None
-trigger_comment_id = int(os.environ["OBS_TRIGGER_COMMENT_ID"]) if os.environ["OBS_TRIGGER_COMMENT_ID"] else None
-trigger_created_at = os.environ["OBS_TRIGGER_CREATED_AT"] or None
-body_mode = os.environ["OBS_BODY_MODE"]
-out_dir = os.environ["OBS_OUT_DIR"]
+
+def fail_usage(parser):
+    parser.print_usage(sys.stderr)
+    raise SystemExit(64)
+
+
+def parse_args(argv):
+    parser = argparse.ArgumentParser(add_help=True)
+    parser.add_argument("--repo", required=True)
+    parser.add_argument("--pr", required=True)
+    parser.add_argument("--head-sha", default="")
+    parser.add_argument("--trigger-comment-id", default="")
+    parser.add_argument("--trigger-created-at", default="")
+    parser.add_argument(
+        "--body-mode",
+        default="trigger-window-truncated",
+        choices=("none", "trigger-window-truncated", "trigger-window-full", "out-only"),
+    )
+    parser.add_argument("--out", default="")
+    try:
+        args = parser.parse_args(argv)
+    except SystemExit as exc:
+        raise SystemExit(0 if exc.code == 0 else 64) from exc
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", args.repo):
+        fail_usage(parser)
+    if not re.fullmatch(r"[1-9][0-9]*", args.pr):
+        fail_usage(parser)
+    if args.head_sha and not re.fullmatch(r"[0-9A-Fa-f]{7,64}", args.head_sha):
+        fail_usage(parser)
+    if args.trigger_comment_id and not re.fullmatch(r"[1-9][0-9]*", args.trigger_comment_id):
+        fail_usage(parser)
+    if args.trigger_created_at and not re.fullmatch(
+        r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})?",
+        args.trigger_created_at,
+    ):
+        fail_usage(parser)
+    if args.out.startswith("-"):
+        fail_usage(parser)
+    return args
+
+
+parsed_args = parse_args(sys.argv[1:])
+repo = parsed_args.repo
+owner = repo.split("/", 1)[0]
+name = repo.split("/", 1)[1]
+pr = int(parsed_args.pr)
+expected_head_sha = parsed_args.head_sha or None
+trigger_comment_id = (
+    int(parsed_args.trigger_comment_id) if parsed_args.trigger_comment_id else None
+)
+trigger_created_at = parsed_args.trigger_created_at or None
+body_mode = parsed_args.body_mode
+out_dir = parsed_args.out
 
 STATUSES = [
     "unknown",
