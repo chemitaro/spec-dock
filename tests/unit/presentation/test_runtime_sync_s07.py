@@ -3579,19 +3579,30 @@ class TestRuntimeSyncS07:
             ["close", "--help"],
             ["issue", "finish", "--help"],
         ]
-        combined_help: list[str] = []
+        help_by_command: dict[tuple[str, ...], str] = {}
         for argv in help_commands:
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 with pytest.raises(SystemExit) as cm:
                     parser.parse_args(argv)
             assert cm.value.code == 0
-            combined_help.append(stdout.getvalue())
+            help_by_command[tuple(argv)] = stdout.getvalue()
 
-        help_text = "\n".join(combined_help)
+        help_text = "\n".join(help_by_command.values())
         assert "--no-auto-sync" not in help_text
         assert "--disable-auto-sync" not in help_text
         assert "no_auto_sync" not in help_text
+
+        deps_add_help = " ".join(help_by_command[("deps", "add", "--help")].split())
+        deps_remove_help = " ".join(help_by_command[("deps", "remove", "--help")].split())
+        assert "Existing initiative, epic, or issue node id for dependency source" in deps_add_help
+        assert "Existing initiative, epic, or issue node id for dependency target" in deps_add_help
+        assert "Existing initiative, epic, or issue node id for dependency source" in deps_remove_help
+        assert "Existing initiative, epic, or issue node id for dependency target" in deps_remove_help
+        assert "Issue node id for dependency source" not in deps_add_help
+        assert "Issue node id for dependency target" not in deps_add_help
+        assert "Issue node id for dependency source" not in deps_remove_help
+        assert "Issue node id for dependency target" not in deps_remove_help
 
     def test_sync_github_bulk_does_not_use_backfill_path_even_with_issue_index(self) -> None:
         (
