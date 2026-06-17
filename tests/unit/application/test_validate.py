@@ -43,6 +43,71 @@ class _StubNodeReader:
 
 
 class TestValidateApplication:
+    def test_discussion_doc_parser_catalog_handles_hyphenated_and_existing_types(self) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[3]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.domain import discussion_docs
+        finally:
+            sys.path.pop(0)
+
+        parsed = discussion_docs.parse_timestamp_discussion_doc_filename(
+            "20260329t123456z-draft-requirement-kickoff.md"
+        )
+        assert parsed is not None
+        assert parsed.doc_type == "draft-requirement"
+        assert parsed.doc_id == "20260329t123456z-draft-requirement"
+
+        suffixed = discussion_docs.parse_timestamp_discussion_doc_filename(
+            "20260329t123456z-09-draft-plan-plan.md"
+        )
+        assert suffixed is not None
+        assert suffixed.doc_type == "draft-plan"
+        assert suffixed.doc_id == "20260329t123456z-09-draft-plan"
+
+        note = discussion_docs.parse_timestamp_discussion_doc_filename("20260329t123457z-note-current.md")
+        assert note is not None
+        assert note.doc_id == "20260329t123457z-note"
+        assert not discussion_docs.is_creatable_discussion_doc_type("note")
+        assert discussion_docs.is_retired_discussion_doc_type("note")
+
+        legacy = discussion_docs.parse_legacy_discussion_doc_filename("001-research-legacy-spike.md")
+        assert legacy is not None
+        assert legacy.doc_type == "research"
+        assert discussion_docs.parse_legacy_discussion_doc_filename("001-scratch-legacy-capture.md") is None
+
+    def test_discussion_doc_malformed_candidates_remain_fail_closed(self) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[3]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.domain import discussion_docs
+        finally:
+            sys.path.pop(0)
+
+        for name in (
+            "draft-requirement-kickoff.md",
+            "20260329t123456z-00-draft-plan-bad-suffix.md",
+            "20260329t123456z-draft-design.md",
+            "001-scratch-legacy-capture.md",
+            "20260329x-draft-requirement-kickoff.md",
+            "pr-repair-batch.md",
+        ):
+            assert discussion_docs.is_malformed_discussion_doc_candidate(Path(name)), name
+
     def _records(self, infra_contracts, repo_root: Path):
         init_dir = repo_root / "spec-dock" / "initiatives" / "init-00001-platform"
         epic_dir = init_dir / "epics" / "epic-00002-delivery"

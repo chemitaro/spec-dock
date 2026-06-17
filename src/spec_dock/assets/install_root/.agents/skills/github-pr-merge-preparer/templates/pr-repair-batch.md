@@ -1,18 +1,12 @@
----
-種別: disc
-ID: "<DISC_ID>"
-タイトル: "PR repair batch"
-状態: "draft | proposed | archived"
-作成者: "<YOUR_NAME>"
-最終更新: "YYYY-MM-DD"
-親: ["<ISSUE_ID>"]
-関連: []
-authority: "proposed"
-derived_from: []
-reflected_to: []
----
+<!--
+Body-section scaffold only.
 
-# PR repair batch
+For writable SpecDock scopes, create the artifact with:
+`./spec-dock/scripts/spec-dock new doc pr-repair-batch --issue <issue-id> --title "PR Repair Batch"`
+
+The runtime-generated file owns front matter identity and the generated heading.
+Do not copy front matter from this skill-local template over the generated file.
+-->
 
 ## PR / Observation Metadata
 
