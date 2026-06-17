@@ -1178,6 +1178,8 @@ def plan_discussion_doc(
             "<INTERVIEW_TITLE>": title,
             "<SCRATCH_ID>": doc_id,
             "<SCRATCH_TITLE>": title,
+            "<PR_REPAIR_BATCH_ID>": doc_id,
+            "<PR_REPAIR_BATCH_TITLE>": title,
             "<NOTE_ID>": doc_id,
             "<NOTE_TITLE>": title,
             "<SCOPE_ID>": scope.id,

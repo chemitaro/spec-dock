@@ -393,6 +393,10 @@ class TestCliValidate(CliRuntimeHarness):
             (discussions_dir / "20260329t123456z-note-current.md").write_text("current\n", encoding="utf-8")
             (discussions_dir / "20260329t123457z-scratch-capture.md").write_text("scratch\n", encoding="utf-8")
             (discussions_dir / "20260329t123458z-interview-hearing.md").write_text("interview\n", encoding="utf-8")
+            (discussions_dir / "20260329t123459z-pr-repair-batch-review-fix.md").write_text(
+                "batch\n",
+                encoding="utf-8",
+            )
             (discussions_dir / "20260329todo.md").write_text("ignore me\n", encoding="utf-8")
             (discussions_dir / "rules.md").write_text("notes\n", encoding="utf-8")
 
@@ -438,6 +442,10 @@ class TestCliValidate(CliRuntimeHarness):
             "draft-requirement-kickoff.md",
             "draft-design-kickoff.md",
             "draft-plan-kickoff.md",
+            "pr-repair-batch-kickoff.md",
+            "20260329t123456z-pr-repair-batch.md",
+            "20260329t123456z-PR-repair-batch-kickoff.md",
+            "20260329t123456z-pr-repair-batch_.md",
             "interview_kickoff.md",
             "adr_kickoff.md",
         )
@@ -496,6 +504,14 @@ class TestCliValidate(CliRuntimeHarness):
             (discussions_dir / "20260329t123459z-draft-requirement-req.md").write_text("req\n", encoding="utf-8")
             (discussions_dir / "20260329t123500z-01-draft-design-design.md").write_text("design\n", encoding="utf-8")
             (discussions_dir / "20260329t123501z-99-draft-plan-plan.md").write_text("plan\n", encoding="utf-8")
+            (discussions_dir / "20260329t123502z-pr-repair-batch-review-fix.md").write_text(
+                "batch\n",
+                encoding="utf-8",
+            )
+            (discussions_dir / "20260329t123502z-01-pr-repair-batch-review-follow-up.md").write_text(
+                "batch suffix\n",
+                encoding="utf-8",
+            )
 
             p = self._run_runtime_capture(target, ["validate"])
             assert p.returncode == 0, p.stdout + p.stderr

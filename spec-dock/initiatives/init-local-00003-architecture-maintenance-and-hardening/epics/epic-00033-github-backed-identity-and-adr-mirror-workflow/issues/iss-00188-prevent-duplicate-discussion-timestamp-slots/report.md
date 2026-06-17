@@ -61,6 +61,7 @@ Disposition ごとの必須証跡:
 | D-010 | resolved | test-strategy | spec-reviewer | Plan re-review found S02 and S04 mixed code/template/test/scaffold surfaces but routed reviewer gates to only one reviewer role. | Split steps; add both reviewer gates | `plan.md` now requires both `code-reviewer` and `spec-reviewer` where S02/S04 touch mixed runtime/template/test/scaffold/spec surfaces, and report evidence must record both reviewer results where required. | Aligns step gates with `workflow_issue.md` reviewer mapping without changing behavior scope. | applied | plan re-review by fresh `spec-reviewer` `019ed34d-8a72-7352-93f2-a9ff209f90f4`; `plan.md` S02/S04 reviewer focus and close condition fixes; final fresh plan review passed | Closed by final plan reviewer pass |
 | D-011 | resolved | test-strategy | spec-reviewer | Plan pass review left P2 findings: plan gate row still reflected pre-pass pending state, and S04 dogfooding allowed paths were broader than AC-003/design enumerated surfaces. | Treat P2 as follow-up; apply immediately and re-review | S04 now enumerates exact dogfooding copies and requires reporting/reviewing any update/sync side effect outside those files. | Keeps the executable plan narrow and prevents `.agents` / `.codex` scope creep. | applied | plan pass review by fresh `spec-reviewer` `019ed350-7d19-74c2-9f82-b2d8811504f9`; `plan.md` S04 allowed path fix; final fresh `spec-reviewer` `019ed353-84a8-71e3-8d27-b246905e8807`, findings=[] | Closed by final plan reviewer pass |
 | D-012 | resolved | operation | orchestrator | Requirement, design, and plan authoring gates must be closed before issue execution handoff. | Start execution with provisional/self-checked plan; wait for fresh reviewer pass | Issue execution handoff is ready because requirement, design, and plan each have fresh `spec-reviewer` pass evidence; `plan.md` is executable under issue-plan workflow. | Satisfies `spec-dock-issue-planning` mandatory workflow step 7 for authoring handoff readiness. | applied | `spec-reviewer` passes: requirement `019ed333-714b-7581-a46e-9d7ab5a91fc4`; design `019ed33e-40be-7f91-9d3a-0b722f7e337c`; plan `019ed353-84a8-71e3-8d27-b246905e8807`; `./spec-dock/scripts/spec-dock validate` pass | Proceed to issue execution |
+| D-013 | resolved | operation | dev-coder / orchestrator | S02 worker reported requirement/design/plan front matter still said `状態: "draft"` despite fresh reviewer pass and execution handoff readiness. | Stop execution and return to planning; treat report evidence as sufficient; align front matter to approved | Requirement, design, and plan front matter now use `状態: "approved"`; execution continues because fresh reviewer pass evidence and D-012 already proved handoff readiness. | Removes metadata ambiguity without changing S02 behavior scope. | applied | S02 worker Ledger Note from `dev-coder` `019ed367-5cff-7f33-b7cc-76b54badf829`; `requirement.md`; `design.md`; `plan.md`; `report.md` D-012 | Continue S02 review gates |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -263,14 +264,120 @@ pass
 
 ---
 
-### セッションログ（2026-06-17 HH:MM - HH:MM）
+### セッションログ（2026-06-17 S02）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S02 Runtime-owned `pr-repair-batch` creation
+- AC/EC: AC-001, AC-002, AC-005; tc-003, tc-004, tc-005
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S02 — Runtime-owned pr-repair-batch creation`
+  - closure ids: tc-003, tc-004, tc-005
 
 #### 実施内容
-- ...
+- Delegated S02 implementation to `dev-coder` agent `019ed367-5cff-7f33-b7cc-76b54badf829`.
+- Added `pr-repair-batch` to the runtime-owned creatable discussion doc catalog and CLI help surface.
+- Added provider template `src/spec_dock/assets/spec_dock/templates/discussions/pr-repair-batch.md` with generated identity placeholders.
+- Added/updated CLI runtime and validation tests for creation stdout/path/template, forbidden option absence, and valid/malformed `pr-repair-batch` validation.
+- Resolved worker Ledger Note D-013 by aligning requirement/design/plan front matter from `draft` to `approved`; execution readiness had already been proven by fresh reviewer pass evidence D-012.
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_runtime_new_doc_s09.py tests/cli_runtime/test_validate.py tests/unit/commands/test_runtime_new_s08.py
+
+138 passed, 11 skipped
+
+git diff --check
+
+pass
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=97
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / inspect-only | Added S02 tests before implementation; required command failed with 6 failures for unknown `pr-repair-batch`, missing help listing, validation rejection, and malformed intent gap. | Worker-observed required pytest command before implementation | pass | Red evidence covers tc-003/tc-005; tc-004 covered by help/parser inspection tests |
+| S02 | 緑フェーズ（Green） | required focused verification | `pr-repair-batch` creation, stdout/path/template, help listing, forbidden option rejection, and validation cases pass. | required pytest command -> 138 passed, 11 skipped; `./spec-dock/scripts/spec-dock validate` -> pass | pass | Parent re-ran required verification |
+| S02 | リファクタリング（Refactor） | guardrail satisfied | CLI help catalog now reads from shared discussion catalog to avoid drift; no broader CLI restructuring. | diff inspection; `git diff --check` -> pass | pass | No body/template options, `pr-repair-unit`, wait allocator, docs/skill guidance, or migration changes |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | CLI creation/stdout/template test for `pr-repair-batch` | implementation | added test | tc-003 | no | `tests/cli_runtime/test_new.py` |
+| S02 | CLI help/parser absence checks for forbidden options | implementation | added assertions | tc-004 | no | `tests/cli_runtime/test_new.py` |
+| S02 | valid/malformed `pr-repair-batch` validation cases | implementation | added tests | tc-005 | no | `tests/cli_runtime/test_validate.py` |
+| S02 | front matter status drift between reviewer pass and `状態: "draft"` | dev-coder Ledger Note | recorded D-013 and aligned front matter to `approved` | D-013 | no | `requirement.md`, `design.md`, `plan.md`, D-012/D-013 |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | tc-003, tc-004, tc-005 | tc-003/tc-004/tc-005 pass, code-reviewer pass, spec-reviewer pass for template/spec alignment, step commit recorded. | required pytest passes; validate passes; initial reviewers failed only because S02 report evidence was missing; fresh code-reviewer `019ed375-c831-7eb2-8309-d71adf2db5fc` passed findings=[]; fresh spec-reviewer `019ed375-f15d-7542-b741-5e94c42bc948` passed findings=[] | pass | Step commit gate pending until commit recorded below |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-003 | S02 | yes | red-required | required pytest command failed before implementation: unknown `pr-repair-batch` / missing help listing | required pytest command | pass | CLI creates generated path/id/template/stdout |
+| tc-004 | S02 | yes | inspect-only | help did not list `pr-repair-batch`; forbidden options absent by inspection tests | `tests/cli_runtime/test_new.py` | pass | no `--template-file`, `--body-file`, `--basename`, `--doc-id`, or `--id` support for `new doc` |
+| tc-005 | S02 | yes | red-required | required pytest command failed before implementation for valid/malformed `pr-repair-batch` validation cases | required pytest command | pass | valid `pr-repair-batch` passes; malformed intent fails closed |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-003 | S02 | `tests/cli_runtime/test_new.py`; `tests/cli_runtime/test_runtime_new_doc_s09.py`; required pytest command | pass | Runtime-owned `pr-repair-batch` creation is implemented |
+| tc-004 | S02 | `tests/cli_runtime/test_new.py` help/parser checks | pass | Existing `new doc` interface shape preserved |
+| tc-005 | S02 | `tests/cli_runtime/test_validate.py`; required pytest command | pass | Hyphenated `pr-repair-batch` validation works |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-003, tc-004, tc-005 | `test_new_doc_creates_pr_repair_batch_with_generated_identity_and_template`; help/parser assertions; validation cases | tc-003, tc-004, tc-005 | Tests are concrete aliases for planned S02 closure ids. | no | yes: fresh re-review after report evidence update |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | runtime/template/test behavior | dev-coder | Runtime-owned `pr-repair-batch` creation only | `plan.md` S02; `requirement.md`; `design.md` | shared catalog, new command help, create/template rendering, provider template, focused tests | body/template/id/basename options, `pr-repair-unit`, wait allocator, docs/skill guidance, migration | required pytest command | public grammar/output shape change, body/template option, `pr-repair-unit`, outside allowed paths | changed files, verification, CLI summary, template summary, Ledger Note, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Added `pr-repair-batch` runtime creation, provider template, CLI/help validation tests; reported front matter status Ledger Note. | `domain/discussion_docs.py`; `commands/new.py`; `application/create_node.py`; `templates/discussions/pr-repair-batch.md`; `tests/cli_runtime/test_new.py`; `tests/cli_runtime/test_runtime_new_doc_s09.py`; `tests/cli_runtime/test_validate.py` | required pytest -> 138 passed, 11 skipped | passed: fresh code-reviewer `019ed375-c831-7eb2-8309-d71adf2db5fc`, findings=[]; fresh spec-reviewer `019ed375-f15d-7542-b741-5e94c42bc948`, findings=[] | no implementation risk; S03/S04 remain future scope | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | N/A: normal delegation used | N/A | N/A | N/A | revert S02 commit if needed | required pytest -> pass | fresh code-reviewer and spec-reviewer re-review pending | none |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | first step reviewer | code-reviewer | fresh before report evidence update | failed | no | fixed by this report evidence update; re-review required | agent `019ed371-3de7-7443-8d49-69b38e5e10f9`, P1 missing S02 report evidence |
+| S02 | first template/spec reviewer | spec-reviewer | fresh before report evidence update | failed | no | fixed by this report evidence update; re-review required | agent `019ed371-68d5-7623-b910-e47ff94c3b9d`, P1 missing S02 report evidence |
+| S02 | step reviewer | code-reviewer | fresh after report evidence update | passed | N/A | proceed to S02 commit gate | agent `019ed375-c831-7eb2-8309-d71adf2db5fc`, findings=[] |
+| S02 | template/spec reviewer | spec-reviewer | fresh after report evidence update | passed | N/A | proceed to S02 commit gate | agent `019ed375-f15d-7542-b741-5e94c42bc948`, findings=[] |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | pending commit | S02 runtime-owned `pr-repair-batch` creation and report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/discussion_docs.py` - add `pr-repair-batch` to creatable timestamp discussion docs.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py` - use shared creatable doc type catalog for help.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - add `pr-repair-batch` template placeholders.
+- `src/spec_dock/assets/spec_dock/templates/discussions/pr-repair-batch.md` - provider template for runtime-created PR repair batch artifact.
+- `tests/cli_runtime/test_new.py` - creation/stdout/template and forbidden option tests.
+- `tests/cli_runtime/test_runtime_new_doc_s09.py` - application-level doc type/template parity.
+- `tests/cli_runtime/test_validate.py` - valid/malformed `pr-repair-batch` validation cases.
+- `spec-dock/active/issue/report.md` - S02 observed evidence ledger and D-013 disposition.
+
+#### コミット
+- pending
+
+#### メモ
+- Wait-before-suffix allocator remains S03 scope.
+- Shipped guidance / dogfooding parity remains S04 scope.
 
 ---
 
