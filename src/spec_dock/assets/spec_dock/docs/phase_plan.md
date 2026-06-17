@@ -72,7 +72,7 @@ Delegated plan draft を使う場合、orchestrator は draft 生成前に次を
 - invocation contract が scope、source artifacts、allowed actions、forbidden actions、boundary、invalidation conditions を含む
 - read-only specialist consent と scope-local discussion direct-write consent は分離されている
 - allowed actions は、対象 scope の `discussions/` direct child にある naming-rule compliant Markdown 1 ファイルの新規作成に限定される。既存 proposed discussion draft の更新は static adapter contract の対象外であり、将来必要な場合は別 workflow / follow-up で narrower allowlist と追加 gate を定義する
-- filename は既存 discussion rules に従い、標準は `<ts>-<kind>-<slug>.md`、same-second collision は `<ts>-<nn>-<kind>-<slug>.md` とする
+- new discussion draft は runtime-owned `new doc <type>` で作成し、返された `path=...` を正本として本文を更新する。post-run diff guard は generated filename が既存 discussion rules（標準 `<ts>-<kind>-<slug>.md`、same-second collision fallback `<ts>-<nn>-<kind>-<slug>.md`）に一致することを確認する
 - forbidden actions は canonical `requirement.md` / `design.md` / `plan.md` / `report.md`、implementation、tests、package/config、`.agents`、`.codex`、`.github`、`.env*`、GitHub mutation、phase promotion、reviewer-pass claim、implementation-readiness claim、user への直接質問を含む
 - forbidden locations は per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/` を含む
 - required plan draft output contract が、計画要約（Plan Summary）、要件 / 設計 traceability（Requirement / Design Traceability）、milestone（Milestones）、依存関係から導く実行順序（Dependency-Derived Execution Order）、Issue / step 分割（Issue / Step Slicing）、テスト戦略 mapping（Test Strategy Mapping）、review gate（Review Gates）、rollback / compatibility（Rollback / Compatibility）、docs impact（Docs Impact）、最終品質ゲート（Final Quality Gate）、plan blocker（Plan Blockers）、integration notes（Integration Notes）を含む

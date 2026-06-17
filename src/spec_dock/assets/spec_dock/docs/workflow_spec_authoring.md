@@ -27,7 +27,7 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 
 Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator の single-writer authority です。Sub-agent は canonical docs を直接編集しません。Sub-agent が作る authoring output は、対象 initiative / epic / issue の scope-local `discussions/` 直下に置く flat Markdown draft / analysis / discussion-local report です。
 
-Discussion output filenames follow existing discussion rules:
+Discussion output は runtime-owned `new doc <type>` generation で作成し、returned `path=...` を本文更新の正本にします。Generated filenames は existing discussion rules に従います:
 
 - `<ts>-<kind>-<slug>.md`
 - `<ts>-<nn>-<kind>-<slug>.md` for same-second collisions
@@ -99,7 +99,7 @@ Main orchestrator が canonical artifact と final reviewer gate を所有しま
 
 System architect / implementation planner の static adapter は、guarded workspace-write により scope-local `discussions/` Markdown draft を作成する delegated authoring surface です。Workspace-write は hard path allow-list ではなく、canonical target write の許可でもありません。Run ごとの permission context 生成は標準経路にせず、post-run diff guard pass と canonical `report.md` の ledger entry 記録まで adoption-ineligible として扱います。
 
-Allowed delegated output は target scope `discussions/` direct-child Markdown file 1 件の新規作成に限定し、filename は `<ts>-<kind>-<slug>.md` または `<ts>-<nn>-<kind>-<slug>.md` に一致させます。新規 discussion draft は frontmatter に `created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result` を持たなければなりません。`created_by_role` は supported delegated authoring role、`scope_id` は requested scope id と一致する値、`source_paths` と `intended_targets` は non-empty block list である必要があります。inline scalar や `source_paths: []` / `intended_targets: []` は post-run diff guard で不合格になります。
+Allowed delegated output は target scope `discussions/` direct-child Markdown file 1 件の新規作成に限定し、creation は runtime-owned `new doc <type>` を使って returned `path=...` を正本にします。post-run diff guard は generated filename が `<ts>-<kind>-<slug>.md` または `<ts>-<nn>-<kind>-<slug>.md` に一致することを確認します。新規 discussion draft は frontmatter に `created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result` を持たなければなりません。`created_by_role` は supported delegated authoring role、`scope_id` は requested scope id と一致する値、`source_paths` と `intended_targets` は non-empty block list である必要があります。inline scalar や `source_paths: []` / `intended_targets: []` は post-run diff guard で不合格になります。
 
 ```yaml
 source_paths:

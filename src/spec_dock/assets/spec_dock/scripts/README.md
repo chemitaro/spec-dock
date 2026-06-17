@@ -8,7 +8,7 @@ v2 では、日常運用（initiative/epic/issue/doc の作成、active 切り�
 - `new initiative` / `new epic` / `new issue` はデフォルトで GitHub Issue を作成します。
 - 既存 current-repo Issue へ紐づける場合は `--github-issue <n>` を使います。
 - `--no-github` は node creation option ではありません。
-- discussion docs は `new doc <type>` のみを使います（current catalog: `scratch` / `interview` / `research` / `disc` / `adr` / `draft-requirement` / `draft-design` / `draft-plan`）。
+- discussion docs は `new doc <type>` のみを使います（current catalog: `scratch` / `interview` / `research` / `disc` / `adr` / `pr-repair-batch` / `draft-requirement` / `draft-design` / `draft-plan`）。
 - `note` は retired です。既存 `note` artifact は grandfathered として壊さず、新規 raw capture は `scratch` を使います。
 - `new/import {initiative,epic,issue}` と `new doc <type>` の `--slug` は kebab-case が必要です（詳細は `spec-dock/docs/reference_naming.md`）。
 
@@ -29,6 +29,7 @@ v2 では、日常運用（initiative/epic/issue/doc の作成、active 切り�
 ./spec-dock/scripts/spec-dock new doc research --issue iss-00123 --title "Benchmarks"         # 20260329t123458z-research-...
 ./spec-dock/scripts/spec-dock new doc disc --issue iss-00123 --title "API options"            # 20260329t123459z-disc-...
 ./spec-dock/scripts/spec-dock new doc adr --issue iss-00123 --title "Token rotation"          # 20260329t123500z-adr-...
+./spec-dock/scripts/spec-dock new doc pr-repair-batch --issue iss-00123 --title "PR Repair Batch" # 20260329t123501z-pr-repair-batch-...
 
 # active（現在作業中）を設定
 ./spec-dock/scripts/spec-dock active set 123
