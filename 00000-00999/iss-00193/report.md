@@ -612,7 +612,124 @@ clean
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| CLI help / provider docs / dogfooding docs mirror | yes | doc-writer + dev-coder | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py`; `src/spec_dock/assets/spec_dock/docs/reference_deps.md`; `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`; `spec-dock/docs/reference_deps.md`; `spec-dock/docs/workflow_issue.md`; `tests/unit/presentation/test_runtime_sync_s07.py`; `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_wrappers.py` -> `62 passed`; doc mirror `diff -u` -> no diff; `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=97`; `git diff --check` -> pass | pass: fresh spec-reviewer returned no findings |
+
+### セッションログ（2026-06-17 S90）
+
+#### 対象
+- Step: S90
+- AC/EC: AC-009
+- 計画上の出典（Planned source）:
+  - `plan.md` section: S90 docs and help alignment
+  - closure ids: slci-ac-009
+
+#### 実施内容
+- `doc-writer` に provider docs / dogfooding docs mirror を委任し、node-level mutation、direct-edge semantics、raw validation boundary、empty-container behavior、preflight / no legacy fallback / atomic write を反映した。
+- `dev-coder` に CLI help text と help assertion 更新を委任し、`deps add/remove --from/--to` が existing initiative / epic / issue node id を受け付ける表示へ変更した。
+- 親側で docs mirror 一致、help/wrapper tests、SpecDock validation、diff whitespace を確認した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_wrappers.py
+
+62 passed
+
+diff -u src/spec_dock/assets/spec_dock/docs/reference_deps.md spec-dock/docs/reference_deps.md
+
+no diff
+
+diff -u src/spec_dock/assets/spec_dock/docs/workflow_issue.md spec-dock/docs/workflow_issue.md
+
+no diff
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=97
+
+git diff --check
+
+pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S90 | 赤フェーズ / 代替証跡（Red / alternative） | docs inspect-only + help red | help assertion added before help text update failed because old wording still said `Issue node id for dependency source/target` | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k test_tc_s06_004_mutation_parser_help_exposes_no_auto_sync_opt_out` by `dev-coder` | pass | docs side was inspect-only |
+| S90 | 緑フェーズ（Green） | help/docs Green | help/wrapper tests `62 passed`; provider/dogfooding docs mirror no diff; validate pass | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_wrappers.py`; `diff -u`; `./spec-dock/scripts/spec-dock validate` | pass | parent rerun confirmed |
+| S90 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | scoped docs/help/test changes only | diff inspection; `git diff --check` | pass | no source behavior change |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S90 | CLI help still described issue-only mutation | implementation | help text and assertion updated to existing initiative / epic / issue node id wording | slci-ac-009 | no | `commands/deps.py`; `tests/unit/presentation/test_runtime_sync_s07.py` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | slci-ac-009 | CLI help / provider docs / workflow docs describe node-level mutation and direct-edge semantics | help tests `62 passed`; provider/dogfooding docs mirror no diff; validate pass | pass | pending fresh spec-reviewer |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s90-001 | S90 | yes | inspect-only | docs had stale issue-only mutation contract in `reference_deps.md` / `workflow_issue.md` | `diff -u` provider vs dogfooding docs; `./spec-dock/scripts/spec-dock validate` | pass | docs now describe node-level mutation/direct-edge semantics |
+| tc-s90-002 | S90 | yes | red-required | help test failed before help wording update | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_wrappers.py` | pass | help now says existing initiative / epic / issue node id |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| slci-ac-009 | S90 | docs diff/mirror checks, help tests, validate | pass | docs/help alignment complete pending spec review |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s90-001..tc-s90-002 | docs inspection and help assertion | slci-ac-009 | Plan required docs/help evidence but not concrete function names | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/e0dd/spec-dock` | iss-00193 | current session | doc-writer, dev-coder, spec-reviewer | same repo, active issue, session, named role; S90 bounded docs/help scope; no destructive action / publishing / credentialed access / scope expansion / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S90-docs | delegated | workflow assigns persistent docs to doc-writer | doc-writer | provider/dogfooding dependency docs only | `plan.md` S90 | provider docs and dogfooding mirror docs | source code, tests, issue docs/report, GitHub state | doc diff/mirror checks | docs/source boundary violation | worker summary / verification / risks | pass |
+| S90-help | delegated | help text/test change is source/test edit | dev-coder | CLI help text and help assertions only | `plan.md` S90 | `commands/deps.py`; help-related tests | provider/dogfooding docs, issue docs/report, GitHub state | focused help/wrapper tests | runtime behavior change beyond help | worker summary / verification / risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S90 | doc-writer | Updated provider and dogfooding docs for node-level mutation/direct-edge semantics | provider and dogfooding `reference_deps.md` / `workflow_issue.md` | `git diff --check -- <changed docs>`; provider/dogfooding `diff -u` -> no diff | pass: fresh spec-reviewer returned no findings | none for docs scope | accepted |
+| S90 | dev-coder | Updated deps add/remove help wording and help assertions | `commands/deps.py`; `tests/unit/presentation/test_runtime_sync_s07.py` | focused help test pass; `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_wrappers.py` -> `62 passed`; `git diff --check` -> pass | pass: fresh spec-reviewer returned no findings | `test_init_update.py` not run because no init/update assertions changed | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | N/A | N/A | N/A | N/A | N/A | N/A | N/A | no parent implementation exception used |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | step reviewer | spec-reviewer | fresh | passed | no | proceed to commit gate | Fresh review returned no findings; separate code-reviewer not required because code/test changes are help-only |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | pending reviewer | docs/help/tests/report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py` - deps add/remove help を node-level wording に更新。
+- `tests/unit/presentation/test_runtime_sync_s07.py` - deps add/remove help assertion を更新。
+- `src/spec_dock/assets/spec_dock/docs/reference_deps.md` - provider dependency docs を node-level mutation contract に更新。
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - provider workflow docs の deps add/remove 表記を node-level に更新。
+- `spec-dock/docs/reference_deps.md` - dogfooding docs mirror を同期。
+- `spec-dock/docs/workflow_issue.md` - dogfooding docs mirror を同期。
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00193-node-level-deps-add-remove/report.md` - S90 observed evidence ledger を記録。
+
+#### コミット
+- pending
+
+#### メモ
+- Source behavior is unchanged; S90 changes docs/help/tests only.
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
