@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 
 def _runtime_modules():
     runtime_scripts_dir = (
@@ -32,12 +34,16 @@ class _StubNodeReader:
 
 
 class _StubDepsTopologyReader:
-    def __init__(self, issue_depends_on_map, warnings=None):
+    def __init__(self, issue_depends_on_map, warnings=None, node_depends_on_map=None):
         self.issue_depends_on_map = {
             issue_id: list(depends_on)
             for issue_id, depends_on in issue_depends_on_map.items()
         }
         self.warnings = list(warnings or [])
+        self.node_depends_on_map = {
+            node_id: list(depends_on)
+            for node_id, depends_on in (node_depends_on_map or {}).items()
+        }
 
     def load_issue_depends_on_map(self, specdock_dir, graph):
         _app_check_deps, _app_contracts, _app_ports, _domain_models, infra_contracts = _runtime_modules()
@@ -45,6 +51,16 @@ class _StubDepsTopologyReader:
             issue_depends_on_map=dict(self.issue_depends_on_map),
             warnings=list(self.warnings),
         )
+
+    def load_node_dependency_resolutions(self, specdock_dir, graph):
+        _app_check_deps, _app_contracts, _app_ports, _domain_models, infra_contracts = _runtime_modules()
+        return {
+            node_id: [
+                infra_contracts.DirectDependencyResolution(raw_ref=dep_id, resolved_node_id=dep_id)
+                for dep_id in depends_on
+            ]
+            for node_id, depends_on in self.node_depends_on_map.items()
+        }
 
 
 class _StubDerivedStateReader:
@@ -190,6 +206,49 @@ class TestCheckDepsApplication:
             ),
         ]
 
+    def _empty_epic_records(self, infra_contracts):
+        root = Path("/repo/spec-dock/initiatives/init-00103-empty-containers")
+        epic_one_dir = root / "epics" / "epic-00203-empty-one"
+        epic_two_dir = root / "epics" / "epic-00204-empty-two"
+        return [
+            infra_contracts.StoredMetaRecord(
+                kind="initiative",
+                id="init-00103",
+                title="Empty containers",
+                slug="empty-containers",
+                path=root.as_posix(),
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=103,
+                meta_path=(root / ".meta.json").as_posix(),
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="epic",
+                id="epic-00203",
+                title="Empty one",
+                slug="empty-one",
+                path=epic_one_dir.as_posix(),
+                parent_id="init-00103",
+                initiative_id="init-00103",
+                epic_id=None,
+                github_issue_number=203,
+                meta_path=(epic_one_dir / ".meta.json").as_posix(),
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="epic",
+                id="epic-00204",
+                title="Empty two",
+                slug="empty-two",
+                path=epic_two_dir.as_posix(),
+                parent_id="init-00103",
+                initiative_id="init-00103",
+                epic_id=None,
+                github_issue_number=204,
+                meta_path=(epic_two_dir / ".meta.json").as_posix(),
+            ),
+        ]
+
     def _request(self, app_contracts, *, use_github, node_id="iss-00302"):
         return app_contracts.CheckDepsRequest(
             target=app_contracts.TargetRef(
@@ -308,6 +367,28 @@ class TestCheckDepsApplication:
 
         assert result.inspection.effective_depends_on == ["iss-00401", "iss-00402"]
         assert result.inspection.evaluation.blockers == ["iss-00401", "iss-00402"]
+
+    def test_deps_check_fails_raw_node_preflight_before_empty_container_ready(self) -> None:
+        app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
+        ports = app_ports.Ports(
+            node_reader=_StubNodeReader(self._empty_epic_records(infra_contracts)),
+            repo_root=Path("/repo"),
+            specdock_dir=Path("/repo/spec-dock"),
+            derived_state_reader=_StubDerivedStateReader(),
+            deps_topology_reader=_StubDepsTopologyReader(
+                {},
+                node_depends_on_map={
+                    "epic-00203": ["epic-00204"],
+                    "epic-00204": ["epic-00203"],
+                },
+            ),
+        )
+
+        with pytest.raises(RuntimeError, match="Dependency cycle detected"):
+            app_check_deps.check_deps(
+                self._request(app_contracts, use_github=False, node_id="epic-00203"),
+                ports,
+            )
 
     def test_no_github_missing_cache_defaults_to_unknown_and_blocks(self) -> None:
         app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()

@@ -304,6 +304,63 @@ class TestDepsDomain:
             ]
         )
 
+    def _target_container_cycle_graph(self):
+        _domain_deps, domain_models, domain_tree = _runtime_modules()
+        root = Path("/repo/spec-dock/initiatives")
+        return domain_tree.build_graph(
+            [
+                domain_models.SpecNodeSeed(
+                    kind="initiative",
+                    id="init-00001",
+                    title="Future source",
+                    slug="future-source",
+                    path=root / "init-00001-future-source",
+                    meta_path=root / "init-00001-future-source" / ".meta.json",
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=1,
+                    github_repo_owner="example",
+                    github_repo_name="repo",
+                ),
+                domain_models.SpecNodeSeed(
+                    kind="initiative",
+                    id="init-00002",
+                    title="Target container",
+                    slug="target-container",
+                    path=root / "init-00002-target-container",
+                    meta_path=root / "init-00002-target-container" / ".meta.json",
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=2,
+                    github_repo_owner="example",
+                    github_repo_name="repo",
+                ),
+                domain_models.SpecNodeSeed(
+                    kind="issue",
+                    id="iss-00002",
+                    title="Target child",
+                    slug="target-child",
+                    path=root
+                    / "init-00002-target-container"
+                    / "issues"
+                    / "iss-00002-target-child",
+                    meta_path=root
+                    / "init-00002-target-container"
+                    / "issues"
+                    / "iss-00002-target-child"
+                    / ".meta.json",
+                    parent_id="init-00002",
+                    initiative_id="init-00002",
+                    epic_id=None,
+                    github_issue_number=20,
+                    github_repo_owner="example",
+                    github_repo_name="repo",
+                ),
+            ]
+        )
+
     def test_raw_node_dependency_cycle_between_empty_epics_is_rejected(self) -> None:
         domain_deps, _domain_models, _domain_tree = _runtime_modules()
         graph = self._empty_epic_graph()
@@ -344,6 +401,18 @@ class TestDepsDomain:
                 {"iss-00023": ["epic-00021"]},
                 from_node_id="epic-00021",
                 to_node_id="epic-00022",
+            )
+
+    def test_raw_node_dependency_candidate_rejects_target_container_future_cycle(self) -> None:
+        domain_deps, _domain_models, _domain_tree = _runtime_modules()
+        graph = self._target_container_cycle_graph()
+
+        with pytest.raises(RuntimeError, match="Dependency cycle detected"):
+            domain_deps.ensure_node_dependency_add_would_be_valid(
+                graph,
+                {"init-00002": ["init-00001"]},
+                from_node_id="init-00001",
+                to_node_id="iss-00002",
             )
 
     def test_raw_node_dependency_candidate_rejects_ancestor_container(self) -> None:
