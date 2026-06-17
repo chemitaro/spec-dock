@@ -26257,6 +26257,69 @@ esac
             assert payload["review"]["status"] == "none"
             assert all("body" not in item for item in payload["review"]["signals"])
 
+    def test_issue_197_pr_review_snapshot_wrapper_baseline_heredoc_markers_are_present(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_paths = [
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh",
+            repo_root
+            / ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh",
+        ]
+
+        for script_path in script_paths:
+            with _case(path=script_path.relative_to(repo_root).as_posix()):
+                text = script_path.read_text(encoding="utf-8")
+                assert "python3 - <<'PY'" in text
+
+    def test_issue_197_pr_review_snapshot_wrapper_usage_exits_before_gh(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            gh_log = tmp_path / "gh.log"
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+printf '%s\\n' "$*" >> {shlex.quote(str(gh_log))}
+printf 'unexpected gh call: %s\\n' "$*" >&2
+exit 44
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            invalid = subprocess.run(
+                [str(script_path), "--repo", "bad", "--pr", "13"],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert invalid.returncode == 64, invalid.stdout + invalid.stderr
+            assert "usage: fetch_pr_review_snapshot.sh" in invalid.stderr
+            assert not gh_log.exists()
+
+            help_result = subprocess.run(
+                [str(script_path), "--help"],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert help_result.returncode == 0, help_result.stdout + help_result.stderr
+            assert "usage: fetch_pr_review_snapshot.sh" in help_result.stderr
+            assert not gh_log.exists()
+
     def test_issue_75_pr_observation_review_collector_excludes_stale_feedback_from_commented_status(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
