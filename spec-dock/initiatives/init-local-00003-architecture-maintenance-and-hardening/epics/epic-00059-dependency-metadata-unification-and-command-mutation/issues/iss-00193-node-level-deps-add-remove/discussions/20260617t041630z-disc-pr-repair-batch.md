@@ -56,6 +56,7 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 | C007 | `active set` must reject pre-existing raw node dependency cycles before readiness succeeds | I008 | Active selection still validates only compiled issue dependencies and can miss raw-only cycles between empty containers | U007 | Runtime repair required |
 | C008 | Delete must treat raw dependencies from deleted nodes to surviving nodes as boundary conflicts | I009 | U005 covered surviving raw refs into the deleted subtree, but outbound raw refs from the deleted subtree to survivors can bypass the no-force conflict guard | U008 | Runtime repair required |
 | C009 | `doctor` must report raw node dependency validation failures | I010 | Doctor still validates only issue-level graph/deps and can report ok for repositories that `validate` rejects due to raw empty-container cycles | U009 | Runtime repair required |
+| C010 | Delete raw dependency resolver failures must fail closed | I011 | Delete catches `load_node_dependency_resolutions` failures and falls back to literal node-id scan, losing GitHub number/scoped/URL raw-ref semantics | U010 | Runtime repair required |
 
 ## Inventory
 
@@ -71,6 +72,7 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 | I008 | review_feedback | C007 | review_feedback:active-set-raw-preflight | Review comment 3426282934 on `application/set_active.py` line 458 | `active set` can accept a scope whose empty-container raw dependencies form a cycle because it only checks compiled issue dependencies | valid | blocking | yes | fix-now | U007 | implemented | Added raw node dependency preflight to active selection before readiness succeeds | Pending PR re-observation |
 | I009 | review_feedback | C008 | review_feedback:delete-outbound-raw-conflict | Review comment 3426282937 on `application/delete_node.py` line 332 | Deleting a subtree can skip raw outbound dependencies from deleted empty nodes to surviving empty containers, unlike existing boundary dependency conflict semantics | valid | blocking | yes | fix-now | U008 | implemented | Delete boundary conflict detection now includes raw outbound refs resolved by topology reader | Pending PR re-observation |
 | I010 | review_feedback | C009 | review_feedback:doctor-raw-preflight | Review comment 3426282941 on `application/doctor.py` line 80 | `doctor` can report ok for raw empty-container dependency cycles because it does not run raw node dependency validation | valid | blocking | yes | fix-now | U009 | implemented | Doctor now reports raw node dependency validation findings | Pending PR re-observation |
+| I011 | review_feedback | C010 | review_feedback:delete-raw-resolution-fail-closed | Review comment 3426476954 on `application/delete_node.py` line 675 | If raw dependency resolution fails globally, delete falls back to literal node-id scan and may miss surviving raw refs expressed as GitHub numbers, scoped refs, or URLs | valid | blocking | yes | fix-now | U010 | implemented | Delete now fails closed on raw dependency resolution failure before local mutation | Pending PR re-observation |
 
 ## Classification Values
 
@@ -201,6 +203,19 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 - Rationale: This brings doctor into the same structural invariant family as validate/sync/deps check/active set.
 - Residual risk: Low after CLI regression verifies doctor reports raw empty-container cycles.
 
+### C010
+
+- Covered inventory IDs: I011
+- Validity analysis: Valid. Resolver failure means delete cannot know whether raw refs using numeric, scoped, or URL forms cross the deleted subtree boundary.
+- Need-to-fix decision: yes
+- Root cause: `_collect_surviving_raw_node_dependency_refs` discards resolver exceptions and continues with a literal node-id fallback.
+- Options considered:
+  - Keep fallback after resolver failure. Rejected because it is fail-open for non-literal raw refs.
+  - Propagate a dependency topology load failure and stop before local delete mutation. Recommended.
+- Recommended disposition: fix-now
+- Rationale: Delete is destructive; unresolved dependency topology must not allow no-force success or force with dangling surviving metadata.
+- Residual risk: Low after regression proves resolver exceptions return a non-ok preflight result and skip delete/scrub mutation.
+
 ## Repair Queue
 
 | unit_id | source_batch | covered_ids | disposition | risk_class | repair_unit_disc | status | Implementation Plan | Re-observation Result | Residual Risk |
@@ -214,6 +229,7 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 | U007 | disc-20260617t041630z-pr-repair-batch | I008 | fix-now | blocking | `20260617t060000z-disc-pr-repair-unit-u007-active-set-raw-preflight.md` | implemented | Added raw node dependency validation preflight to `active set`; optional-port compatibility preserved | pending push / re-observation | Low; focused and integrated tests pass |
 | U008 | disc-20260617t041630z-pr-repair-batch | I009 | fix-now | blocking | `20260617t060001z-disc-pr-repair-unit-u008-delete-outbound-raw-conflicts.md` | implemented | Added raw outbound deleted-source to surviving-target dependency conflicts; no-force blocks, force proceeds because source metadata is deleted | pending push / re-observation | Low; focused and integrated tests pass |
 | U009 | disc-20260617t041630z-pr-repair-batch | I010 | fix-now | blocking | `20260617t060002z-disc-pr-repair-unit-u009-doctor-raw-preflight.md` | implemented | Added raw node dependency validation finding to `doctor` | pending push / re-observation | Low; focused and integrated tests pass |
+| U010 | disc-20260617t041630z-pr-repair-batch | I011 | fix-now | blocking | `20260617t080000z-disc-pr-repair-unit-u010-delete-raw-resolution-fail-closed.md` | implemented | Return dependency topology load failure when raw dependency resolution fails during delete preflight | pending push / re-observation | Low; focused and integrated tests pass |
 
 ## Unit Discussion Plan
 

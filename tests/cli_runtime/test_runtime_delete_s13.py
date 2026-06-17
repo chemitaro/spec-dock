@@ -128,7 +128,17 @@ class _StubDepsTopologyReader:
         return deps_reader.load_node_dependency_resolutions(specdock_dir, graph)
 
 
-class _FallbackDepsTopologyReader(_StubDepsTopologyReader):
+class _FallbackDepsTopologyReader:
+    def __init__(self, infra_contracts, dep_map):
+        self._infra_contracts = infra_contracts
+        self._dep_map = dict(dep_map)
+
+    def load_issue_depends_on_map(self, specdock_dir, graph):
+        del specdock_dir, graph
+        return self._infra_contracts.DepsTopologyLoadResult(issue_depends_on_map=dict(self._dep_map), warnings=[])
+
+
+class _RaisingNodeDependencyResolutionReader(_StubDepsTopologyReader):
     def load_node_dependency_resolutions(self, specdock_dir, graph):
         del specdock_dir, graph
         raise RuntimeError("node dependency resolution unavailable")
@@ -528,7 +538,7 @@ class TestRuntimeDeleteS13:
         assert "epic-local-00002" in result.offending_node_ids
         assert "iss-local-00056" in result.offending_node_ids
 
-    def test_unrelated_invalid_id_record_is_ignored(self) -> None:
+    def test_unrelated_invalid_id_record_fails_closed_before_local_delete(self) -> None:
         app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
             _runtime_modules()
         )
@@ -550,9 +560,11 @@ class TestRuntimeDeleteS13:
             self._request(app_contracts, node_id="iss-local-00056", confirmed=True),
             ports,
         )
-        assert result.status == "ok"
+        assert result.status == "metadata_validation_failed"
         assert result.target_id == "iss-local-00056"
-        assert result.deleted_node_ids == ["iss-local-00056"]
+        assert result.deleted_node_ids == []
+        assert result.validation_reasons[0].code == "metadata_validation_failed"
+        assert "not-a-canonical-id" in result.validation_reasons[0].message
         assert result.remaining_node_ids == []
 
     def test_preflight_precedence_confirmation_before_recursive_active_deps(self) -> None:
@@ -659,6 +671,64 @@ class TestRuntimeDeleteS13:
         assert result.remote_close.skipped_not_attempted == []
         assert issue_gateway.close_calls == []
         assert node_repo.delete_calls == []
+        assert Path(records[2].path).exists()
+
+    def test_node_dependency_resolution_failure_fails_closed_before_local_delete_or_scrub(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = self._records(infra_contracts, repo_root, with_github_links=True)
+        issue_gateway = _StubIssueGateway(
+            domain_models=domain_models,
+            view_states={("example/repo", 56): "CLOSED"},
+        )
+        node_repo = _DeletingNodeRepository()
+        ports = self._ports(
+            records=records,
+            repo_root=repo_root,
+            dep_map={},
+            deps_topology_reader=_RaisingNodeDependencyResolutionReader(infra_contracts, {}),
+            issue_gateway=issue_gateway,
+            node_repo=node_repo,
+        )
+        survivor_meta = Path(records[3].path) / ".meta.json"
+        survivor_meta.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "depends_on": ["https://github.com/example/repo/issues/56"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        result = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="iss-local-00056",
+                confirmed=True,
+                force=True,
+            ),
+            ports,
+        )
+
+        assert result.status == "metadata_validation_failed"
+        assert result.target_id == "iss-local-00056"
+        assert result.deleted_node_ids == []
+        assert result.remaining_node_ids == []
+        assert result.offending_node_ids == []
+        assert [item.code for item in result.validation_reasons] == ["metadata_validation_failed"]
+        assert result.validation_reasons[0].node_id == "iss-local-00056"
+        assert "node dependency resolution unavailable" in result.validation_reasons[0].message
+        assert issue_gateway.close_calls == []
+        assert node_repo.delete_calls == []
+        assert json.loads(survivor_meta.read_text(encoding="utf-8"))["depends_on"] == [
+            "https://github.com/example/repo/issues/56"
+        ]
         assert Path(records[2].path).exists()
 
     def test_parent_dependency_conflict_without_force_stops_before_local_delete_mutation(self) -> None:
@@ -2398,12 +2468,9 @@ class TestRuntimeDeleteS13:
                     "schema_version": 1,
                     "depends_on": [
                         "57",
-                        "56",
                         "example/repo#56",
                         "https://github.com/other/repo/issues/56",
                         "iss-local-00058",
-                        "https://github.com/missing/repo/issues/56",
-                        "example/repo#999",
                     ],
                 },
                 ensure_ascii=False,
@@ -2431,10 +2498,7 @@ class TestRuntimeDeleteS13:
         assert result.active_restore_result == "not_needed"
         assert result.dependency_scrub_failures == []
         assert json.loads(survivor_meta.read_text(encoding="utf-8"))["depends_on"] == [
-                "https://github.com/other/repo/issues/56",
                 "iss-local-00058",
-                "https://github.com/missing/repo/issues/56",
-                "example/repo#999",
             ]
         assert not Path(records[1].path).exists()
         assert not Path(records[2].path).exists()
@@ -2443,7 +2507,7 @@ class TestRuntimeDeleteS13:
         assert Path(records[5].path).exists()
         assert Path(records[6].path).exists()
 
-    def test_forced_parent_delete_dependency_scrub_keeps_ambiguous_numeric_refs_for_survivor_context(self) -> None:
+    def test_forced_parent_delete_dependency_scrub_fails_closed_on_ambiguous_numeric_ref(self) -> None:
         app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
             _runtime_modules()
         )
@@ -2576,20 +2640,23 @@ class TestRuntimeDeleteS13:
             ports,
         )
 
-        assert result.status == "ok"
+        assert result.status == "metadata_validation_failed"
         assert result.target_id == "epic-local-00001"
-        assert result.deleted_node_ids == ["iss-local-00056", "iss-local-00057", "iss-local-00059", "epic-local-00001"]
+        assert result.deleted_node_ids == []
         assert result.remaining_node_ids == []
-        assert result.active_restore_result == "not_needed"
-        assert result.dependency_scrub_failures == []
+        assert result.validation_reasons[0].code == "metadata_validation_failed"
+        assert "Ambiguous github.issue_number=56" in result.validation_reasons[0].message
+        assert issue_gateway.close_calls == []
         assert json.loads(survivor_meta.read_text(encoding="utf-8"))["depends_on"] == [
                 "56",
+                "example/repo#56",
+                "https://github.com/other/repo/issues/56",
                 "iss-local-00058",
             ]
-        assert not Path(records[1].path).exists()
-        assert not Path(records[2].path).exists()
-        assert not Path(records[3].path).exists()
-        assert not Path(records[4].path).exists()
+        assert Path(records[1].path).exists()
+        assert Path(records[2].path).exists()
+        assert Path(records[3].path).exists()
+        assert Path(records[4].path).exists()
         assert Path(records[5].path).exists()
         assert Path(records[6].path).exists()
 
@@ -2666,6 +2733,10 @@ class TestRuntimeDeleteS13:
             records=records,
             repo_root=repo_root,
             dep_map={"iss-local-00058": ["iss-local-00056"]},
+            deps_topology_reader=_FallbackDepsTopologyReader(
+                infra_contracts,
+                {"iss-local-00058": ["iss-local-00056"]},
+            ),
             node_repo=_DeletingNodeRepository(),
         )
         survivor_meta = Path(records[5].path) / ".meta.json"
