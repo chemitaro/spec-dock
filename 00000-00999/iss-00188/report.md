@@ -63,6 +63,9 @@ Disposition ごとの必須証跡:
 | D-012 | resolved | operation | orchestrator | Requirement, design, and plan authoring gates must be closed before issue execution handoff. | Start execution with provisional/self-checked plan; wait for fresh reviewer pass | Issue execution handoff is ready because requirement, design, and plan each have fresh `spec-reviewer` pass evidence; `plan.md` is executable under issue-plan workflow. | Satisfies `spec-dock-issue-planning` mandatory workflow step 7 for authoring handoff readiness. | applied | `spec-reviewer` passes: requirement `019ed333-714b-7581-a46e-9d7ab5a91fc4`; design `019ed33e-40be-7f91-9d3a-0b722f7e337c`; plan `019ed353-84a8-71e3-8d27-b246905e8807`; `./spec-dock/scripts/spec-dock validate` pass | Proceed to issue execution |
 | D-013 | resolved | operation | dev-coder / orchestrator | S02 worker reported requirement/design/plan front matter still said `状態: "draft"` despite fresh reviewer pass and execution handoff readiness. | Stop execution and return to planning; treat report evidence as sufficient; align front matter to approved | Requirement, design, and plan front matter now use `状態: "approved"`; execution continues because fresh reviewer pass evidence and D-012 already proved handoff readiness. | Removes metadata ambiguity without changing S02 behavior scope. | applied | S02 worker Ledger Note from `dev-coder` `019ed367-5cff-7f33-b7cc-76b54badf829`; `requirement.md`; `design.md`; `plan.md`; `report.md` D-012 | Continue S02 review gates |
 | D-014 | resolved | dogfooding-parity | dev-coder / orchestrator | S04 focused asset tests exposed dogfooding mirror drift outside the initially named S04 guidance files: provider S02/S03 added `pr-repair-batch` template and runtime dependencies not yet mirrored under `spec-dock/`. | Revert extra mirror files; relax validation; treat as generated parity output required by S04 | Treat `spec-dock/templates/discussions/pr-repair-batch.md` and `spec-dock/scripts/spec_dock_runtime/{application/create_node.py,commands/new.py,domain/validation.py,domain/discussion_docs.py}` as generated dogfooding parity output needed to satisfy S04 verification. | `plan.md` S04 requires reporting/reviewing update/sync side effects outside enumerated dogfooding copies; required `validate` and runtime mirror tests cannot pass with only `create_node.py` mirrored because provider runtime imports the shared catalog. | applied | Red `test_init_update.py` -> 5 failed, 350 passed; green `test_init_update.py` -> 355 passed; `./spec-dock/scripts/spec-dock validate` pass | Review as S04 parity side effect; no provider runtime implementation changed |
+| D-015 | resolved | implementation | Codex PR review / orchestrator | PR review found rendered discussion body dates could be stale when timestamp retry crosses UTC midnight. | Keep pre-allocation `today`; derive rendered date from allocated `doc_id`; broaden allocator return contract | Derive discussion body date placeholders from the actual allocated `doc_id` timestamp after `plan_discussion_doc` resolves collisions. | This is issue-local repair of runtime-owned artifact consistency and preserves public CLI shape, timestamp grammar, and wait/retry policy. | applied | PR review comment 3425692862; repair unit `20260617t050751z-disc-pr-repair-unit-u002-body-date-after-timestamp-retry.md`; focused red -> 3 failed; green -> 3 passed; draft hardening test -> 1 passed, 27 deselected; related suite -> 68 passed, 6 skipped | PR re-observation pending; no durable ADR needed because accepted ADR already says runtime owns generated identity/path |
+| D-016 | resolved | operation | Codex PR review / orchestrator | PR review found skill-local PR repair batch template still looked like a stale `disc` identity source and could overwrite generated `pr-repair-batch` front matter. | Convert template to full `pr-repair-batch`; make template body-section scaffold only; remove writable-scope template reference | Keep `new doc pr-repair-batch` generated file as front matter identity owner; skill-local template is body-section scaffold only. | This directly preserves #188's runtime-owned filename/path/identity invariant while avoiding another generated-template identity owner. | applied | PR review comment 3425692868; repair unit `20260617t050753z-disc-pr-repair-unit-u003-repair-batch-template-identity.md`; stale-guidance `rg` no matches; provider/dogfooding template diff no output; asset tests -> 3 passed | PR re-observation pending; no durable ADR needed because it is an application of ADR `20260617t003044z-adr` |
+| D-017 | resolved | implementation | Codex PR review / orchestrator | PR review found exact bare `pr-repair-batch.md` in `discussions/` was silently ignored by validation. | Ignore bare stem; reject exact known doc-type stems; reject only hyphenated exact stems | Treat exact bare known discussion doc type stems as malformed manual intent files. | This closes the fail-closed validation gap for hyphenated `pr-repair-batch` without changing valid timestamped filename grammar. | applied | PR review comment 3425692872; repair unit `20260617t050752z-disc-pr-repair-unit-u004-bare-hyphenated-doc-type-validation.md`; focused red -> 3 failed; green -> 3 passed; related suite -> 68 passed, 6 skipped | PR re-observation pending; no follow-up needed unless future doc types need different bare-stem policy |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -636,6 +639,51 @@ spec-dock: ok (validate) nodes=97
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
 | complete through final spec-review pass; commit pending | final S99 report evidence only | final response | ready for final report commit |
+
+## PR Delivery / Merge Preparation Evidence
+
+### PR Delivery Gate
+
+| 項目 | 証跡 | 結果 |
+|---|---|---|
+| PR | https://github.com/chemitaro/spec-dock/pull/195 | open |
+| base branch | repository default branch `main` | selected |
+| head branch | `iss-00188-prevent-duplicate-discussion-timestamp-slots` | pushed |
+| initial PR head SHA | `821eb10993b299e3daaa0dba8496c88e1062c034` | observed |
+| current repair head SHA before U002-U004 commit | `b04c0b1da21f23adc50859ed7c32c2d029f28765` | observed |
+| draft / ready | `isDraft=false` from `gh pr view 195 --json ...` | ready PR |
+| issue linkage | PR body includes `Closes #188` | linked |
+| PR creation decision | no existing PR was found for branch before creation; PR #195 created | complete |
+
+### PR Observation / Repair Loop
+
+| iteration | head SHA | observation evidence | status | action |
+|---|---|---|---|---|
+| 0 | `821eb10993b299e3daaa0dba8496c88e1062c034` | `/private/tmp/pr-195-observation/result.json`; trigger comment id 4725934579 | failed; `provider-tests` CI failure | repair batch created; U001 fixed forbidden command-layer domain import |
+| 1 | `b04c0b1da21f23adc50859ed7c32c2d029f28765` | `/private/tmp/pr-195-observation-b04c0b1d/result.json`; trigger comment id 4726082469 | human_gate; CI passed; Codex review returned 3 unresolved P2 threads | U002/U003/U004 repair units created and implemented |
+
+### PR Repair Batch Evidence
+
+| repair unit | inventory | source | disposition | implementation status | local verification | PR re-observation |
+|---|---|---|---|---|---|---|
+| U001 | I001 `check_failure:provider-tests` | `20260617t043551z-disc-pr-repair-unit-u001-provider-tests-layer-import.md` | fix-now | implemented in commit `b04c0b1d` | structural and focused new-doc tests pass | superseded by iteration 1; CI passed on `b04c0b1d` |
+| U002 | I002 `review_feedback:body-date-after-timestamp-retry` | `20260617t050751z-disc-pr-repair-unit-u002-body-date-after-timestamp-retry.md` | fix-now | implemented; commit pending | focused red -> 3 failed; green -> 3 passed; draft hardening test -> 1 passed, 27 deselected; related suite -> 68 passed, 6 skipped; validate pass | pending |
+| U003 | I003 `review_feedback:repair-batch-template-identity` | `20260617t050753z-disc-pr-repair-unit-u003-repair-batch-template-identity.md` | fix-now | implemented; commit pending | stale-guidance `rg` no matches; parity diff no output; asset tests -> 3 passed | pending |
+| U004 | I004 `review_feedback:bare-hyphenated-doc-type-validation` | `20260617t050752z-disc-pr-repair-unit-u004-bare-hyphenated-doc-type-validation.md` | fix-now | implemented; commit pending | focused red -> 3 failed; green -> 3 passed; related suite -> 67 passed, 6 skipped; validate pass | pending |
+
+### Merge Preparation Gate
+
+| 項目 | 現在の証跡 | 結果 |
+|---|---|---|
+| latest observed head matches PR head | last completed observation matched `b04c0b1da21f23adc50859ed7c32c2d029f28765`; U002-U004 commit is still pending | no |
+| required checks | CI passed on `b04c0b1da21f23adc50859ed7c32c2d029f28765` | pending recheck after repair commit |
+| non-required checks | no remaining non-required failures reported in latest observation | pending recheck after repair commit |
+| Codex review | 3 unresolved current-trigger threads in latest observation | pending repair re-observation |
+| review-thread state | available; unresolved count 3 on latest observation | pending |
+| merge conflict / visible blocker | latest observation reported `merge_state_status=CLEAN` | pending recheck after repair commit |
+| repair batch state | `20260617t043527z-pr-repair-batch-pr-repair-batch.md` updated through U002-U004 implementation | pending re-observation |
+| review-clean | no | pending |
+| merge-prepared | no | pending repair commit, push, and latest-head re-observation |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: Final spec-reviewer failed because S99 evidence rows and `tc-012` closure were still placeholders.
