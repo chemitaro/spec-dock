@@ -542,7 +542,7 @@ spec-dock: ok (validate) nodes=97
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S04 | pending commit | S04 guidance, focused asset tests, generated dogfooding parity output, and report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S04 | committed | S04 guidance, focused asset tests, generated dogfooding parity output, and report evidence | `67359451` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`
@@ -564,7 +564,7 @@ spec-dock: ok (validate) nodes=97
 - `spec-dock/active/issue/report.md`
 
 #### コミット
-- pending S04 reviewer pass and step commit gate
+- `67359451` docs(spec-dock): discussion artifact guidanceをruntime生成へ揃える
 
 #### メモ
 - S90 remains the final docs impact resolution gate for issue-wide docs surface confirmation.
