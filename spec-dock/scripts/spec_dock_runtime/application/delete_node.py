@@ -647,6 +647,59 @@ def _collect_boundary_dependency_edges(
     return conflict_node_ids, surviving_node_to_deleted_issue_ids
 
 
+def _collect_surviving_raw_node_dependency_refs(
+    *,
+    subtree_ids: set[str],
+    graph: SpecGraph,
+    ports: Ports,
+) -> tuple[dict[str, set[str]], dict[str, list[object]]]:
+    deleted_node_ids = {node_id for node_id in subtree_ids if graph.nodes_by_id.get(node_id) is not None}
+    if not deleted_node_ids:
+        return {}, {}
+    surviving_node_to_deleted_node_ids: dict[str, set[str]] = {}
+    surviving_node_to_deleted_raw_refs: dict[str, list[object]] = {}
+
+    load_node_dependency_resolutions = (
+        getattr(ports.deps_topology_reader, "load_node_dependency_resolutions", None)
+        if ports.deps_topology_reader is not None
+        else None
+    )
+    if callable(load_node_dependency_resolutions):
+        try:
+            resolutions_by_node = load_node_dependency_resolutions(_resolve_specdock_dir(ports), graph)
+        except Exception:
+            resolutions_by_node = None
+        if resolutions_by_node is not None:
+            for survivor_id, resolutions in resolutions_by_node.items():
+                if survivor_id in subtree_ids:
+                    continue
+                for resolution in resolutions:
+                    if resolution.resolved_node_id not in deleted_node_ids:
+                        continue
+                    surviving_node_to_deleted_node_ids.setdefault(survivor_id, set()).add(resolution.resolved_node_id)
+                    surviving_node_to_deleted_raw_refs.setdefault(survivor_id, []).append(resolution.raw_ref)
+            return surviving_node_to_deleted_node_ids, surviving_node_to_deleted_raw_refs
+
+    deleted_node_id_by_lower = {node_id.lower(): node_id for node_id in deleted_node_ids}
+
+    for node in _iter_managed_nodes(graph):
+        if node.id in subtree_ids:
+            continue
+        try:
+            payload = _load_meta_payload(node.path / ".meta.json", ports=ports)
+        except Exception:
+            continue
+        for ref in cast(list[object], payload["depends_on"]):
+            if not isinstance(ref, str):
+                continue
+            deleted_node_id = deleted_node_id_by_lower.get(ref.strip().lower())
+            if deleted_node_id is None:
+                continue
+            surviving_node_to_deleted_node_ids.setdefault(node.id, set()).add(deleted_node_id)
+
+    return surviving_node_to_deleted_node_ids, surviving_node_to_deleted_raw_refs
+
+
 def _active_ids(manifest: ActiveManifest | None) -> set[str]:
     if manifest is None:
         return set()
@@ -930,6 +983,7 @@ def _build_survivor_ref_match_context(
 def _scrub_surviving_dependency_refs(
     *,
     surviving_node_to_deleted_issue_ids: dict[str, set[str]],
+    surviving_node_to_deleted_raw_refs: dict[str, list[object]] | None = None,
     deleted_subtree_node_ids: set[str],
     graph: SpecGraph,
     ports: Ports,
@@ -958,17 +1012,11 @@ def _scrub_surviving_dependency_refs(
         try:
             payload = _load_meta_payload(meta_path, ports=ports)
             depends_on = cast(list[object], payload["depends_on"])
-            filtered_depends_on = [
-                ref
-                for ref in depends_on
-                if not _ref_matches_deleted_node(
-                    ref=ref,
-                    deleted_node_ids_lower=deleted_node_ids_lower,
-                    deleted_issue_number_to_node_ids=deleted_issue_number_to_node_ids,
-                    deleted_scoped_refs=deleted_scoped_refs,
-                )
-            ]
-            if len(filtered_depends_on) != len(depends_on):
+            exact_refs_to_remove = list((surviving_node_to_deleted_raw_refs or {}).get(survivor_id, []))
+            if exact_refs_to_remove:
+                refs_to_remove = [ref for ref in depends_on if any(ref == exact for exact in exact_refs_to_remove)]
+                filtered_depends_on = [ref for ref in depends_on if not any(ref == exact for exact in exact_refs_to_remove)]
+            else:
                 refs_to_remove = [
                     ref
                     for ref in depends_on
@@ -979,6 +1027,17 @@ def _scrub_surviving_dependency_refs(
                         deleted_scoped_refs=deleted_scoped_refs,
                     )
                 ]
+                filtered_depends_on = [
+                    ref
+                    for ref in depends_on
+                    if not _ref_matches_deleted_node(
+                        ref=ref,
+                        deleted_node_ids_lower=deleted_node_ids_lower,
+                        deleted_issue_number_to_node_ids=deleted_issue_number_to_node_ids,
+                        deleted_scoped_refs=deleted_scoped_refs,
+                    )
+                ]
+            if len(filtered_depends_on) != len(depends_on):
                 remove_issue_dependency = (
                     getattr(ports.node_repo, "remove_issue_dependency", None) if ports.node_repo is not None else None
                 )
@@ -1169,6 +1228,16 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
             subtree_issue_ids=subtree_issue_ids,
             graph=graph,
         )
+        surviving_node_to_deleted_node_ids, surviving_node_to_deleted_raw_refs = _collect_surviving_raw_node_dependency_refs(
+            subtree_ids=subtree_ids,
+            graph=graph,
+            ports=ports,
+        )
+        for survivor_id, deleted_node_ids in surviving_node_to_deleted_node_ids.items():
+            if deleted_node_ids:
+                dep_conflicts.add(survivor_id)
+                dep_conflicts.update(deleted_node_ids)
+                surviving_node_to_deleted_issue_ids.setdefault(survivor_id, set()).update(deleted_node_ids)
         if dep_conflicts:
             if not req.force:
                 return _result(
@@ -1262,6 +1331,7 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
     if req.force and surviving_node_to_deleted_issue_ids:
         dependency_scrub_failures = _scrub_surviving_dependency_refs(
             surviving_node_to_deleted_issue_ids=surviving_node_to_deleted_issue_ids,
+            surviving_node_to_deleted_raw_refs=surviving_node_to_deleted_raw_refs,
             deleted_subtree_node_ids=subtree_ids,
             graph=graph,
             ports=ports,

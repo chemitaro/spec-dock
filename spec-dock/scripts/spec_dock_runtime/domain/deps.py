@@ -247,6 +247,28 @@ def _ancestor_node_ids(graph: SpecGraph, node_id: str) -> set[str]:
     return ancestors
 
 
+def _descendant_node_ids(graph: SpecGraph, node_id: str) -> set[str]:
+    _require_graph_node(graph, node_id)
+    descendants: set[str] = set()
+    stack = [
+        child_id
+        for child_id, child in graph.nodes_by_id.items()
+        if child.parent_id == node_id
+    ]
+    while stack:
+        current_id = stack.pop()
+        _require_graph_node(graph, current_id)
+        if current_id in descendants:
+            continue
+        descendants.add(current_id)
+        stack.extend(
+            child_id
+            for child_id, child in graph.nodes_by_id.items()
+            if child.parent_id == current_id
+        )
+    return descendants
+
+
 def validate_raw_node_dependency_graph(graph: SpecGraph, raw_node_depends_on_map: dict[str, list[str]]) -> None:
     candidate_map: dict[str, list[str]] = {}
     for node_id in _safe_sorted_node_ids(list(graph.nodes_by_id.keys())):
@@ -274,6 +296,9 @@ def validate_raw_node_dependency_graph(graph: SpecGraph, raw_node_depends_on_map
                 raise RuntimeError(f"Raw node dependency targets descendant: {source_id} -> {target_id}")
 
             candidate_map[source_id].append(target_id)
+            for descendant_id in _safe_sorted_node_ids(_descendant_node_ids(graph, source_id)):
+                candidate_map.setdefault(descendant_id, [])
+                candidate_map[descendant_id].append(target_id)
 
     validate_deps_cycles(candidate_map)
 
