@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 import os
-import re
 import shlex
 import time
 import uuid
 from dataclasses import replace
 from datetime import date, datetime, timezone
 from pathlib import Path
+from typing import Callable
 from typing import Literal
 from typing import cast
 
+from ..domain.discussion_docs import (
+    CREATABLE_DISCUSSION_DOC_TYPES as _CREATABLE_DISCUSSION_DOC_TYPES,
+    DRAFT_DISCUSSION_DOC_TYPES as _DRAFT_DISCUSSION_DOC_TYPES,
+    RETIRED_DISCUSSION_DOC_TYPES as _RETIRED_DISCUSSION_DOC_TYPES,
+    discussion_doc_id_from_path,
+    parse_timestamp_discussion_doc_filename,
+)
 from ..domain.ids import (
     find_existing_id_by_num,
     format_id,
@@ -36,14 +43,6 @@ from .repo_context import require_current_repo_slug, resolve_current_repo_slug, 
 from .sync_state import post_mutation_sync
 
 _META_FILENAME = ".meta.json"
-_DRAFT_DISCUSSION_DOC_TYPES = ("draft-requirement", "draft-design", "draft-plan")
-_CREATABLE_DISCUSSION_DOC_TYPES = ("adr", "disc", "research", "interview", "scratch", *_DRAFT_DISCUSSION_DOC_TYPES)
-_RETIRED_DISCUSSION_DOC_TYPES = ("note",)
-_DISCUSSION_DOC_FILENAME_RE = re.compile(
-    r"^(?P<ts>[0-9]{8}t[0-9]{6}z)(?:-(?P<nn>0[1-9]|[1-9][0-9]))?"
-    r"-(?P<doc_type>adr|disc|research|interview|scratch|draft-requirement|draft-design|draft-plan|note)-"
-    r"(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
-)
 _DRAFT_TARGET_BY_DOC_TYPE = {
     "draft-requirement": "requirement",
     "draft-design": "design",
@@ -57,6 +56,10 @@ _ENV_CREATE_LOCK_STALE_SECONDS = "SPEC_DOCK_CREATE_LOCK_STALE_SECONDS"
 _DEFAULT_CREATE_LOCK_WAIT_SECONDS = 3.0
 _DEFAULT_CREATE_LOCK_POLL_SECONDS = 0.05
 _DEFAULT_CREATE_LOCK_STALE_SECONDS = 600.0
+_ENV_DISCUSSION_TIMESTAMP_WAIT_SECONDS = "SPEC_DOCK_DISCUSSION_TIMESTAMP_WAIT_SECONDS"
+_ENV_DISCUSSION_TIMESTAMP_POLL_SECONDS = "SPEC_DOCK_DISCUSSION_TIMESTAMP_POLL_SECONDS"
+_DEFAULT_DISCUSSION_TIMESTAMP_WAIT_SECONDS = 1.1
+_DEFAULT_DISCUSSION_TIMESTAMP_POLL_SECONDS = 0.05
 
 CreateWritePhase = Literal["none", "scaffold_copied", "meta_written", "post_write_verified"]
 _PARTIAL_LOCAL_WRITE_PHASES: tuple[CreateWritePhase, ...] = (
@@ -82,6 +85,19 @@ def _resolve_duration_seconds(env_name: str, default: float, *, minimum: float) 
         raise RuntimeError(f"Invalid {env_name}: {raw!r}") from exc
     if value < minimum:
         raise RuntimeError(f"Invalid {env_name}: {value} (must be >= {minimum})")
+    return value
+
+
+def _resolve_duration_seconds_exclusive(env_name: str, default: float, *, minimum: float) -> float:
+    raw = os.environ.get(env_name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"Invalid {env_name}: {raw!r}") from exc
+    if value <= minimum:
+        raise RuntimeError(f"Invalid {env_name}: {value} (must be > {minimum})")
     return value
 
 
@@ -1043,6 +1059,11 @@ def _format_discussion_date(now_iso: str | None = None) -> str:
     return _resolve_discussion_instant_utc(now_iso).date().isoformat()
 
 
+def _format_discussion_date_from_doc_id(doc_id: str) -> str:
+    timestamp = doc_id.split("-", 1)[0]
+    return datetime.strptime(timestamp, "%Y%m%dt%H%M%Sz").date().isoformat()
+
+
 def _scan_discussion_timestamp_sources(
     discussions_dir: Path,
 ) -> list[tuple[str, int | None, str, Path]]:
@@ -1050,15 +1071,14 @@ def _scan_discussion_timestamp_sources(
     if not discussions_dir.exists():
         return refs
     for path in sorted(discussions_dir.glob("*.md"), key=lambda p: p.as_posix()):
-        matched = _DISCUSSION_DOC_FILENAME_RE.fullmatch(path.name)
-        if not matched:
+        parsed = parse_timestamp_discussion_doc_filename(path.name)
+        if parsed is None:
             continue
-        suffix_raw = matched.group("nn")
         refs.append(
             (
-                str(matched.group("ts")),
-                int(suffix_raw) if suffix_raw is not None else None,
-                str(matched.group("doc_type")),
+                parsed.timestamp,
+                parsed.suffix,
+                parsed.doc_type,
                 path,
             )
         )
@@ -1072,7 +1092,30 @@ def _format_discussion_doc_identity(
     return f"{stem_prefix}-{slug}", stem_prefix
 
 
-def _allocate_discussion_doc_filename(
+def _sleep_discussion_timestamp_poll(seconds: float) -> None:
+    time.sleep(seconds)
+
+
+def _resolve_discussion_timestamp_wait_config() -> tuple[float, float]:
+    wait_seconds = _resolve_duration_seconds_exclusive(
+        _ENV_DISCUSSION_TIMESTAMP_WAIT_SECONDS,
+        _DEFAULT_DISCUSSION_TIMESTAMP_WAIT_SECONDS,
+        minimum=0.0,
+    )
+    poll_seconds = _resolve_duration_seconds(
+        _ENV_DISCUSSION_TIMESTAMP_POLL_SECONDS,
+        _DEFAULT_DISCUSSION_TIMESTAMP_POLL_SECONDS,
+        minimum=0.001,
+    )
+    return wait_seconds, poll_seconds
+
+
+def _discussion_standard_slot_is_free(discussions_dir: Path, timestamp: str) -> bool:
+    refs = _scan_discussion_timestamp_sources(discussions_dir)
+    return not any(existing_timestamp == timestamp for existing_timestamp, _suffix, _doc_type, _path in refs)
+
+
+def _allocate_discussion_doc_filename_for_timestamp(
     discussions_dir: Path,
     *,
     timestamp: str,
@@ -1108,6 +1151,59 @@ def _allocate_discussion_doc_filename(
     )
 
 
+def _allocate_discussion_doc_filename(
+    discussions_dir: Path,
+    *,
+    timestamp: str,
+    doc_type: str,
+    slug: str,
+    now_iso_provider: Callable[[], str | None] | None = None,
+    sleep_fn: Callable[[float], None] | None = None,
+) -> tuple[Path, str]:
+    wait_config = _resolve_discussion_timestamp_wait_config() if now_iso_provider is not None else None
+    if _discussion_standard_slot_is_free(discussions_dir, timestamp):
+        return _allocate_discussion_doc_filename_for_timestamp(
+            discussions_dir,
+            timestamp=timestamp,
+            doc_type=doc_type,
+            slug=slug,
+        )
+    if now_iso_provider is None:
+        return _allocate_discussion_doc_filename_for_timestamp(
+            discussions_dir,
+            timestamp=timestamp,
+            doc_type=doc_type,
+            slug=slug,
+        )
+
+    assert wait_config is not None
+    wait_seconds, poll_seconds = wait_config
+    effective_sleep_fn = sleep_fn if sleep_fn is not None else _sleep_discussion_timestamp_poll
+    remaining_seconds = wait_seconds
+    while remaining_seconds > 0:
+        sleep_seconds = min(poll_seconds, remaining_seconds)
+        if sleep_seconds <= 0:
+            break
+        effective_sleep_fn(sleep_seconds)
+        remaining_seconds -= sleep_seconds
+        next_timestamp = _format_discussion_timestamp(now_iso_provider())
+        if next_timestamp > timestamp:
+            if _discussion_standard_slot_is_free(discussions_dir, next_timestamp):
+                return _allocate_discussion_doc_filename_for_timestamp(
+                    discussions_dir,
+                    timestamp=next_timestamp,
+                    doc_type=doc_type,
+                    slug=slug,
+                )
+
+    return _allocate_discussion_doc_filename_for_timestamp(
+        discussions_dir,
+        timestamp=timestamp,
+        doc_type=doc_type,
+        slug=slug,
+    )
+
+
 def _resolve_specdock_root(path: Path) -> Path:
     for current in [path, *path.parents]:
         if current.name == "spec-dock":
@@ -1116,13 +1212,7 @@ def _resolve_specdock_root(path: Path) -> Path:
 
 
 def _doc_id_from_path(path: Path) -> str:
-    matched = _DISCUSSION_DOC_FILENAME_RE.fullmatch(path.name)
-    if matched is None:
-        raise RuntimeError(f"Invalid discussion document filename: {path.name}")
-    suffix_raw = matched.group("nn")
-    if suffix_raw is None:
-        return f"{matched.group('ts')}-{matched.group('doc_type')}"
-    return f"{matched.group('ts')}-{suffix_raw}-{matched.group('doc_type')}"
+    return discussion_doc_id_from_path(path)
 
 
 def _draft_canonical_template_path(*, specdock_dir: Path, scope_kind: SpecNodeKind, doc_type: str) -> Path | None:
@@ -1138,6 +1228,8 @@ def plan_discussion_doc(
     *,
     today: str | None = None,
     timestamp: str | None = None,
+    now_iso_provider: Callable[[], str | None] | None = None,
+    sleep_fn: Callable[[float], None] | None = None,
 ) -> tuple[Path, Path, dict[str, str]]:
     scope = _resolve_scope_node(req, graph)
     doc_type, title, slug = _normalize_discussion_doc_inputs(req)
@@ -1160,10 +1252,13 @@ def plan_discussion_doc(
         timestamp=effective_timestamp,
         doc_type=doc_type,
         slug=slug,
+        now_iso_provider=now_iso_provider,
+        sleep_fn=sleep_fn,
     )
     if dest_path.exists():
         raise RuntimeError(f"Discussion doc already exists: {dest_path}")
 
+    rendered_date = _format_discussion_date_from_doc_id(doc_id)
     if doc_type in _DRAFT_DISCUSSION_DOC_TYPES:
         replacements = _replacements(
             kind=scope.kind,
@@ -1172,7 +1267,7 @@ def plan_discussion_doc(
             parent_id=scope.parent_id,
             initiative_id=scope.initiative_id,
             github_issue_number=scope.github_issue_number,
-            today=today if today is not None else date.today().isoformat(),
+            today=rendered_date,
         )
         replacements["<SCOPE_ID>"] = scope.id
     else:
@@ -1187,11 +1282,13 @@ def plan_discussion_doc(
             "<INTERVIEW_TITLE>": title,
             "<SCRATCH_ID>": doc_id,
             "<SCRATCH_TITLE>": title,
+            "<PR_REPAIR_BATCH_ID>": doc_id,
+            "<PR_REPAIR_BATCH_TITLE>": title,
             "<NOTE_ID>": doc_id,
             "<NOTE_TITLE>": title,
             "<SCOPE_ID>": scope.id,
             "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
-            "YYYY-MM-DD": today if today is not None else date.today().isoformat(),
+            "YYYY-MM-DD": rendered_date,
         }
     return template_path, dest_path, replacements
 
@@ -1205,10 +1302,20 @@ def create_discussion_doc(req: CreateDiscussionDocRequest, ports: Ports) -> Crea
     body_error: Exception | None = None
     try:
         graph = load_graph(ports, validate=False)
-        now_iso = ports.clock.now_iso() if ports.clock is not None else None
+
+        def _now_iso() -> str | None:
+            return ports.clock.now_iso() if ports.clock is not None else None
+
+        now_iso = _now_iso()
         today = _format_discussion_date(now_iso)
         timestamp = _format_discussion_timestamp(now_iso)
-        template_path, dest_path, replacements = plan_discussion_doc(req, graph, today=today, timestamp=timestamp)
+        template_path, dest_path, replacements = plan_discussion_doc(
+            req,
+            graph,
+            today=today,
+            timestamp=timestamp,
+            now_iso_provider=_now_iso,
+        )
         duplicate_error, _doc_ids = _scan_discussion_timestamp_duplicate_state(dest_path.parent)
         if duplicate_error is not None:
             raise RuntimeError(duplicate_error)
