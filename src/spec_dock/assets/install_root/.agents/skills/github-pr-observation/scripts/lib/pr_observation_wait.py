@@ -11,7 +11,9 @@ from pathlib import Path
 
 
 REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS = 300
-REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS = 90
+REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS = 300
+NEXT_SNAPSHOT_BUDGET_FLOOR_SECONDS = 0.25
+NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS = 0.25
 
 
 def utc_now() -> str:
@@ -1272,16 +1274,36 @@ latest_delta: dict = {}
 latest_snapshot_out_dir: Path | None = None
 final_phase = "timeout"
 ci_passed_first_monotonic: float | None = None
+recent_snapshot_elapsed_seconds = NEXT_SNAPSHOT_BUDGET_FLOOR_SECONDS
+next_poll_min_budget_seconds = (
+    recent_snapshot_elapsed_seconds + NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS
+)
+final_poll_skipped_reason: str | None = None
 
 while True:
     if latest_payload is not None and time.monotonic() >= deadline:
         final_phase = "timeout"
         mark_latest_timeout(latest_payload, latest_change_monotonic, same_count)
+        latest_payload.setdefault("wait", {})["next_poll_min_budget_seconds"] = round(
+            next_poll_min_budget_seconds,
+            3,
+        )
         break
 
-    if latest_payload is not None and (deadline - time.monotonic()) < 0.05:
+    remaining_before_poll = deadline - time.monotonic()
+    if latest_payload is not None and remaining_before_poll < next_poll_min_budget_seconds:
         final_phase = "timeout"
+        final_poll_skipped_reason = "insufficient_next_snapshot_budget"
         mark_latest_timeout(latest_payload, latest_change_monotonic, same_count)
+        latest_payload.setdefault("wait", {})["next_poll_min_budget_seconds"] = round(
+            next_poll_min_budget_seconds,
+            3,
+        )
+        latest_payload["wait"]["final_poll_skipped_reason"] = final_poll_skipped_reason
+        latest_payload["wait"]["remaining_seconds_before_final_poll"] = round(
+            max(0, remaining_before_poll),
+            3,
+        )
         break
 
     poll += 1
@@ -1297,6 +1319,11 @@ while True:
         poll_snapshot_args,
         snapshot_timeout,
     )
+    recent_snapshot_elapsed_seconds = max(0, time.monotonic() - now_before)
+    next_poll_min_budget_seconds = max(
+        NEXT_SNAPSHOT_BUDGET_FLOOR_SECONDS,
+        recent_snapshot_elapsed_seconds,
+    ) + NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS
     if snapshot_poll_timed_out and latest_payload is not None:
         payload = latest_payload
         append_snapshot_poll_timeout_limitation(
@@ -1440,6 +1467,7 @@ while True:
         "polls": poll,
         "timeout_seconds": timeout_seconds,
         "poll_interval_seconds": poll_interval_seconds,
+        "next_poll_min_budget_seconds": round(next_poll_min_budget_seconds, 3),
         "quiet_seconds_required": quiet_seconds,
         "quiet_seconds_observed": quiet_elapsed,
         "same_fingerprint_required": same_fingerprint_count,
@@ -1455,6 +1483,10 @@ while True:
         "deadline_reached": final_phase == "timeout",
         "contract_phase": "s05_stable_wait_loop",
     }
+    if observation_complete and review_completion_unknown_candidate:
+        payload["wait"]["post_unknown_fresh_audit_required"] = True
+    if final_poll_skipped_reason:
+        payload["wait"]["final_poll_skipped_reason"] = final_poll_skipped_reason
     payload.setdefault("artifacts", {})
     payload["artifacts"].update(
         {
@@ -1517,7 +1549,9 @@ while True:
     if observation_complete or terminal_now or final_phase == "timeout":
         break
 
-    sleep_seconds = min(poll_interval_seconds, max(0, deadline - time.monotonic()))
+    remaining_after_poll = max(0, deadline - time.monotonic())
+    sleep_budget = max(0, remaining_after_poll - next_poll_min_budget_seconds)
+    sleep_seconds = min(poll_interval_seconds, sleep_budget)
     if sleep_seconds <= 0:
         continue
     time.sleep(sleep_seconds)

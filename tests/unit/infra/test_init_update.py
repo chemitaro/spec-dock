@@ -13,6 +13,7 @@ import tempfile
 import time
 import zipfile
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -18670,6 +18671,7 @@ exit 44
             """#!/usr/bin/env python3
 import json
 import os
+import time
 from pathlib import Path
 
 scenario = json.loads(Path(os.environ["FAKE_SNAPSHOT_SCENARIO"]).read_text(encoding="utf-8"))
@@ -18677,6 +18679,9 @@ state_path = Path(os.environ["FAKE_SNAPSHOT_STATE"])
 poll = int(state_path.read_text(encoding="utf-8")) + 1 if state_path.exists() else 1
 state_path.write_text(str(poll), encoding="utf-8")
 current = scenario[min(poll - 1, len(scenario) - 1)]
+sleep_seconds = current.get("sleep_seconds")
+if sleep_seconds is not None:
+    time.sleep(float(sleep_seconds))
 head = current.get("head", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 ci_status = current.get("ci", "running")
 review_status = current.get("review", "none")
@@ -18771,6 +18776,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
         timeout_seconds: int = 8,
         quiet_seconds: int = 1,
         same_fingerprint_count: int = 2,
+        poll_interval_seconds: int = 1,
         zero_check_grace_polls: int = 2,
         trigger_created_at: str = "2026-06-08T01:00:00Z",
         out_dir: Path | None = None,
@@ -18817,7 +18823,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                 "--timeout-seconds",
                 str(timeout_seconds),
                 "--poll-interval-seconds",
-                "1",
+                str(poll_interval_seconds),
                 "--quiet-seconds",
                 str(quiet_seconds),
                 "--same-fingerprint-count",
@@ -20796,7 +20802,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     "--trigger-created-at",
                     "2026-06-08T01:00:00Z",
                     "--timeout-seconds",
-                    "6",
+                    "12",
                     "--poll-interval-seconds",
                     "1",
                     "--quiet-seconds",
@@ -20810,7 +20816,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                 capture_output=True,
                 text=True,
                 check=False,
-                timeout=8,
+                timeout=14,
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
@@ -23687,6 +23693,330 @@ esac
             assert payload["decision"]["status_reason"] == "review_completion_unknown"
             assert payload["decision"]["recommended_next_action"] == "human_gate"
             assert payload["decision"]["recommended_next_action"] != "merge_prepared"
+
+    def _issue_187_s430_no_completion_decision(self, fingerprint: str) -> dict:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        return {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_unresolved_count": 0,
+            "selected_unresolved_thread_ids": [],
+            "current_selected_unresolved_count": 0,
+            "current_selected_unresolved_thread_ids": [],
+            "carryover_unresolved_count": 0,
+            "carryover_unresolved_thread_ids": [],
+            "actionable_unresolved_count": 0,
+            "actionable_unresolved_thread_ids": [],
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": fingerprint,
+        }
+
+    def test_issue_187_s430_wait_reserves_next_poll_budget(self) -> None:
+        decision = self._issue_187_s430_no_completion_decision("no-completion-s430-budget")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "no-completion-s430-budget",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "no_completion_evidence": decision["no_completion_evidence"],
+                            }
+                        },
+                        "observed_at": "2000-01-01T00:00:00Z",
+                        "sleep_seconds": 0.6,
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=2,
+                poll_interval_seconds=2,
+                quiet_seconds=90,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["summary"]["ci"] == "passed"
+            assert payload["wait"]["polls"] == 1
+            assert payload["wait"]["next_poll_min_budget_seconds"] >= 0.6
+            assert payload["wait"]["final_poll_skipped_reason"] == "insufficient_next_snapshot_budget"
+
+    def test_issue_187_s430_under_budget_final_poll_preserves_latest_useful_payload(self) -> None:
+        decision = self._issue_187_s430_no_completion_decision("no-completion-s430-preserve")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "no-completion-s430-preserve",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "no_completion_evidence": decision["no_completion_evidence"],
+                            }
+                        },
+                        "observed_at": "2000-01-01T00:00:00Z",
+                        "sleep_seconds": 0.7,
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=1,
+                poll_interval_seconds=1,
+                quiet_seconds=90,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["summary"] == {"ci": "passed", "head": "current", "review": "approved"}
+            assert payload["decision"]["actionable_unresolved_count"] == 0
+            assert payload["wait"]["polls"] == 1
+            assert payload["wait"]["deadline_reached"] is True
+            assert payload["wait"]["final_poll_skipped_reason"] == "insufficient_next_snapshot_budget"
+            assert not any(
+                item.get("source") == "fetch_pr_observation_snapshot.sh"
+                and item.get("code") == "snapshot_poll_timeout"
+                for item in payload.get("limitations", [])
+            )
+
+    def test_issue_187_s430_slow_snapshot_budget_is_not_capped_by_poll_interval(self) -> None:
+        decision = self._issue_187_s430_no_completion_decision("no-completion-s430-slow")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "no-completion-s430-slow",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "no_completion_evidence": decision["no_completion_evidence"],
+                            }
+                        },
+                        "observed_at": "2000-01-01T00:00:00Z",
+                        "sleep_seconds": 1.5,
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=3,
+                poll_interval_seconds=1,
+                quiet_seconds=90,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["summary"] == {"ci": "passed", "head": "current", "review": "approved"}
+            assert payload["wait"]["polls"] == 1
+            assert payload["wait"]["next_poll_min_budget_seconds"] >= 1.5
+            assert payload["wait"]["final_poll_skipped_reason"] == "insufficient_next_snapshot_budget"
+            assert payload["wait"]["remaining_seconds_before_final_poll"] < payload["wait"][
+                "next_poll_min_budget_seconds"
+            ]
+            assert not any(
+                item.get("source") == "fetch_pr_observation_snapshot.sh"
+                and item.get("code") == "snapshot_poll_timeout"
+                for item in payload.get("limitations", [])
+            )
+
+    def test_issue_187_s430_budget_guard_does_not_hide_terminal_failures(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "failed",
+                        "review": "approved",
+                        "status": "failed",
+                        "overall_status": "failed",
+                        "normalized_status": "failed",
+                        "recommended_next_action": "inspect_ci_failure",
+                        "sleep_seconds": 0.7,
+                        "check_runs": {"total": 1, "failed": 1},
+                        "failures": [{"name": "test", "conclusion": "failure"}],
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=1,
+                poll_interval_seconds=1,
+                quiet_seconds=90,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["summary"]["ci"] == "failed"
+            assert payload["normalized_status"] == "failed"
+            assert payload["recommended_next_action"] == "fix_ci"
+            assert payload["wait"].get("final_poll_skipped_reason") is None
+
+    def test_issue_187_s430_ci_passed_age_below_300_does_not_promote_unknown(self) -> None:
+        decision = self._issue_187_s430_no_completion_decision("no-completion-s430-young-ci")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            out_dir = tmp_path / "out"
+            out_dir.mkdir(parents=True)
+            ci_passed_since = datetime.now(timezone.utc) - timedelta(seconds=124)
+            (out_dir / "result.json").write_text(
+                json.dumps(
+                    {
+                        "repo": "owner/repo",
+                        "pr": 13,
+                        "expected_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                        "observed_at": datetime.now(timezone.utc)
+                        .isoformat()
+                        .replace("+00:00", "Z"),
+                        "resume": {
+                            "repo": "owner/repo",
+                            "pr": 13,
+                            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                            "trigger_comment_id": 99,
+                            "trigger_created_at": "2000-01-01T00:00:00Z",
+                        },
+                        "wait": {
+                            "ci_passed_since": ci_passed_since.isoformat().replace("+00:00", "Z"),
+                        },
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                tmp_path,
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "no-completion-s430-young-ci",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "no_completion_evidence": decision["no_completion_evidence"],
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+                out_dir=out_dir,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["wait"]["ci_passed_age_seconds"] < 300
+            assert payload["wait"]["review_completion_unknown_min_ci_passed_age_seconds"] == 300
+            assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
+            assert payload["decision"]["status_reason"] != "review_completion_unknown"
+            assert payload["recommended_next_action"] == "wait_or_resume"
+
+    def test_issue_187_s430_post_unknown_fresh_audit_metadata_is_emitted(self) -> None:
+        decision = self._issue_187_s430_no_completion_decision("no-completion-s430-post-audit")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "no-completion-s430-post-audit",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "no_completion_evidence": decision["no_completion_evidence"],
+                            },
+                            "collection_summary": {
+                                "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
+                            },
+                        },
+                        "observed_at": "2000-01-01T00:00:00Z",
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=3,
+                quiet_seconds=1,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status_reason"] == "review_completion_unknown"
+            assert payload["wait"]["post_unknown_fresh_audit_required"] is True
+            assert payload["decision"]["actionable_unresolved_count"] == 0
+            assert payload["decision"]["current_selected_unresolved_thread_ids"] == []
+            assert payload["decision"]["carryover_unresolved_thread_ids"] == []
 
     def test_issue_75_pr_observation_review_collector_explicit_trigger_body_caps_and_threads(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
