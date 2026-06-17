@@ -390,6 +390,118 @@ pass
 
 ---
 
+### セッションログ（2026-06-17 S03）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-003, AC-004, AC-008, EC-005
+- 計画上の出典（Planned source）:
+  - `plan.md` section: S03 direct-edge semantics and issue regression
+  - closure ids: slci-ac-003, slci-ac-004, slci-ac-008, slci-ec-005
+
+#### 実施内容
+- `dev-coder` に S03 のみを委任し、node-level shorthand duplicate add と node-level shorthand remove の regression tests を追加した。
+- Runtime repair は不要で、S02 implementation が S03 contract を既に満たすことを characterization tests として固定した。
+- 親側で diff scope、CLI runtime test、diff whitespace、SpecDock validation を確認した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime/test_deps.py
+
+90 passed, 10 skipped in 107.71s
+
+git diff --check
+
+pass
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=97
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / characterization accepted | S03 対象 gap inspection で node-level shorthand duplicate/remove regression が未固定だった。追加 tests は S02 runtime で即 Green | diff inspection; `uv run pytest tests/cli_runtime/test_deps.py -k "duplicate_epic_shorthand or shorthand_direct_refs_by_epic_id"` by `dev-coder` | approved-no-op | production repair 不要の regression characterization |
+| S03 | 緑フェーズ（Green） | CLI runtime Green | focused `2 passed, 98 deselected`; full `90 passed, 10 skipped` | `uv run pytest tests/cli_runtime/test_deps.py` by `dev-coder` and parent rerun | pass | parent rerun observed `90 passed, 10 skipped in 107.71s` |
+| S03 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | 変更は `tests/cli_runtime/test_deps.py` のみ。runtime repair / refactor なし | diff inspection; `git diff --check` | pass | S04/S90 remain pending |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | Node-level shorthand duplicate/remove regression was not explicitly fixed by S02 tests | implementation | added S03 aliases for epic shorthand duplicate and remove | slci-ac-003 / slci-ec-005 | no | `tests/cli_runtime/test_deps.py` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | slci-ac-003, slci-ac-004, slci-ac-008, slci-ec-005 | Duplicate add, inherited-only remove, raw shorthand matching, and existing issue->issue add/remove pass | `uv run pytest tests/cli_runtime/test_deps.py` -> `90 passed, 10 skipped` | pass | S04 still owns preflight-first/no-write/post-sync consolidation |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s03-001 | S03 | yes | characterization | node-level shorthand duplicate test absent before S03 | `uv run pytest tests/cli_runtime/test_deps.py` | pass | duplicate epic shorthand direct ref returns unchanged and does not duplicate storage |
+| tc-s03-002 | S03 | yes | covered-existing | inherited-only remove test already existed | `uv run pytest tests/cli_runtime/test_deps.py` | pass | inherited-only remove returns `edge_not_found` |
+| tc-s03-003 | S03 | yes | characterization | node-level shorthand remove test absent before S03 | `uv run pytest tests/cli_runtime/test_deps.py` | pass | epic target raw refs `202`, `"202"`, `example/repo#202`, URL remove correctly |
+| tc-s03-004 | S03 | yes | covered-existing | issue->issue add/remove/duplicate/not-found tests already existed | `uv run pytest tests/cli_runtime/test_deps.py` | pass | existing issue->issue contracts remain passing |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| slci-ac-003 | S03 | `test_deps_add_duplicate_epic_shorthand_direct_ref_returns_unchanged_without_duplicate_storage`; full CLI runtime test | pass | duplicate direct add returns unchanged/no duplicate storage |
+| slci-ac-004 | S03 | existing `test_deps_remove_inherited_only_edge_returns_edge_not_found`; full CLI runtime test | pass | inherited-only edge is not direct |
+| slci-ac-008 | S03 | existing issue->issue add/remove/duplicate/not-found tests; full CLI runtime test | pass | issue-level compatibility remains passing |
+| slci-ec-005 | S03 | `test_deps_remove_removes_shorthand_direct_refs_by_issue_id`; `test_deps_remove_removes_shorthand_direct_refs_by_epic_id`; full CLI runtime test | pass | numeric/scoped/URL raw refs match direct dependency target |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s03-001..tc-s03-004 | new and existing CLI runtime test methods in `tests/cli_runtime/test_deps.py` | slci-ac-003, slci-ac-004, slci-ac-008, slci-ec-005 | Plan listed behaviors but not function names; test names are implementation aliases | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/e0dd/spec-dock` | iss-00193 | current session | dev-coder, code-reviewer | same repo, active issue, session, named role; S03 bounded write scope; no destructive action / publishing / credentialed access / scope expansion / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | workflow requires implementation delegation for tests/source changes | dev-coder | direct-edge semantics regression only | `plan.md` S03 | `tests/cli_runtime/test_deps.py`; runtime minimal repair if needed | docs/help; canonical issue docs/report; GitHub state; S04/S90 scope | `uv run pytest tests/cli_runtime/test_deps.py` | scope expansion, source/test outside allowed paths, failed CLI runtime tests | worker summary / changed files / verification / risks / integration decision | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | Added node-level shorthand duplicate add and shorthand remove regression tests; no runtime repair needed | `tests/cli_runtime/test_deps.py` | focused `2 passed, 98 deselected`; full `90 passed, 10 skipped`; `git diff --check` -> pass | pending fresh code-reviewer | S04 preflight/no-write/post-sync and S90 docs/help remain pending | accepted for fresh code review |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | N/A | N/A | N/A | N/A | N/A | N/A | N/A | no parent implementation exception used |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | pending | pending | no | blocked until fresh review | Review request pending after parent evidence update |
+| S03 | step reviewer | code-reviewer | fresh | failed | no | follow-up required | First review found `slci-ec-005` overclaimed because duplicate add covered only numeric epic shorthand |
+| S03 | step reviewer rerun | code-reviewer | fresh | passed | no | proceed to commit gate | Fresh rerun returned no findings after duplicate add shorthand variants were added |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | pending reviewer | S03 regression tests and report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/cli_runtime/test_deps.py` - node-level shorthand duplicate add / shorthand remove regression tests を追加。
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00193-node-level-deps-add-remove/report.md` - S03 observed evidence ledger を記録。
+
+#### コミット
+- pending
+
+#### メモ
+- First S03 review failed on duplicate-add shorthand variant coverage. Follow-up expanded duplicate add regression to `202`, `"202"`, `example/repo#202`, and `https://github.com/example/repo/issues/202`; fresh rerun passed.
+- S03 は runtime repair なし。S04/S90 は後続 step で扱う。
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
