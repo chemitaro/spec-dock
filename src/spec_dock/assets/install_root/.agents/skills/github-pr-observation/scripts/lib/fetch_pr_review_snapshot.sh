@@ -812,9 +812,18 @@ for thread in thread_nodes:
         for comment in comments
         for timestamp in (comment.get("createdAt"), comment.get("updatedAt"))
     )
-    resolved = bool(thread.get("isResolved"))
-    outdated = bool(thread.get("isOutdated"))
-    state = "resolved" if resolved else "outdated" if outdated else "unresolved"
+    resolved = thread.get("isResolved")
+    outdated = thread.get("isOutdated")
+    if resolved is True:
+        state = "resolved"
+    elif resolved is False and outdated is True:
+        state = "outdated"
+    elif resolved is False and outdated is False:
+        state = "unresolved"
+    elif resolved is False:
+        state = "unknown_outdated"
+    else:
+        state = "unknown"
     thread_id = thread.get("id")
     if thread_id is not None:
         thread_states_by_thread_id[str(thread_id)] = {
@@ -994,6 +1003,23 @@ selected_unresolved_thread_ids = [
     for thread_id in selected_thread_ids
     if str(thread_id) in unresolved_thread_id_set
 ]
+selected_unresolved_thread_id_set = {
+    str(thread_id) for thread_id in selected_unresolved_thread_ids
+}
+carryover_non_outdated_unresolved_threads = [
+    item
+    for item in threads
+    if item.get("state") == "unresolved"
+    and item.get("id") is not None
+    and str(item.get("id")) not in selected_unresolved_thread_id_set
+]
+carryover_unresolved_thread_ids = [
+    item.get("id") for item in carryover_non_outdated_unresolved_threads
+]
+actionable_unresolved_thread_ids = list(selected_unresolved_thread_ids)
+for thread_id in carryover_unresolved_thread_ids:
+    if thread_id not in actionable_unresolved_thread_ids:
+        actionable_unresolved_thread_ids.append(thread_id)
 
 def selected_review_item(item):
     raw_body = str(item.get("_selected_full_body", "") or "")
@@ -1049,6 +1075,14 @@ review_collection_summary = {
         current_unresolved_thread_ids,
     ),
 }
+review_collection_summary["review_threads"]["non_outdated_unresolved_ids"] = [
+    item.get("id")
+    for item in threads
+    if item.get("state") == "unresolved" and item.get("id") is not None
+]
+review_collection_summary["review_threads"]["carryover_non_outdated_unresolved_ids"] = (
+    carryover_unresolved_thread_ids
+)
 if selected_review_signals:
     lifecycle_status = "unresolved" if selected_thread_ids else "completed"
     completion_signal = "submitted_pull_request_review"
@@ -1330,6 +1364,12 @@ decision_source = {
     "selected_review_comment_ids": selected_review_comment_ids,
     "selected_review_thread_ids": selected_thread_ids,
     "selected_unresolved_thread_ids": selected_unresolved_thread_ids,
+    "current_selected_unresolved_thread_ids": selected_unresolved_thread_ids,
+    "current_selected_unresolved_count": len(selected_unresolved_thread_ids),
+    "carryover_unresolved_thread_ids": carryover_unresolved_thread_ids,
+    "carryover_unresolved_count": len(carryover_unresolved_thread_ids),
+    "actionable_unresolved_thread_ids": actionable_unresolved_thread_ids,
+    "actionable_unresolved_count": len(actionable_unresolved_thread_ids),
     "selected_unresolved_count": len(selected_unresolved_thread_ids),
     "selected_changes_requested_review_ids": selected_changes_requested_review_ids,
     "selected_changes_requested_review_comment_ids": selected_changes_requested_comment_ids,
@@ -1392,6 +1432,12 @@ review_current_payload = {
     "selected_review_comment_ids": selected_review_comment_ids,
     "selected_thread_ids": selected_thread_ids,
     "selected_unresolved_thread_ids": selected_unresolved_thread_ids,
+    "current_selected_unresolved_thread_ids": selected_unresolved_thread_ids,
+    "current_selected_unresolved_count": len(selected_unresolved_thread_ids),
+    "carryover_non_outdated_unresolved_thread_ids": carryover_unresolved_thread_ids,
+    "carryover_non_outdated_unresolved_count": len(carryover_unresolved_thread_ids),
+    "actionable_unresolved_thread_ids": actionable_unresolved_thread_ids,
+    "actionable_unresolved_count": len(actionable_unresolved_thread_ids),
     "selected_changes_requested_evidence": selected_changes_requested_evidence,
 }
 review_audit_payload = {
@@ -1402,6 +1448,14 @@ review_audit_payload = {
         item for item in signals + review_request_signals if item.get("codex_authored")
     ],
     "threads": thread_counts,
+    "non_outdated_unresolved_thread_ids": review_collection_summary["review_threads"][
+        "non_outdated_unresolved_ids"
+    ],
+    "unknown_outdated_unresolved_thread_ids": [
+        item.get("id")
+        for item in threads
+        if item.get("state") == "unknown_outdated" and item.get("id") is not None
+    ],
     "fingerprint": audit_fingerprint,
 }
 

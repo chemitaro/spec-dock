@@ -23138,6 +23138,251 @@ esac
             assert "api repos/owner/repo/actions/runs?head_sha=aaaaaaa --paginate" not in gh_calls
             assert "api repos/owner/repo/commits/aaaaaaa/check-runs --paginate" not in gh_calls
 
+    def _issue_187_s410_run_review_inventory_snapshot(
+        self,
+        *,
+        graphql_threads: list[dict[str, object]],
+        reviews_json: str = "[]",
+        review_comments_json: str = "[]",
+    ) -> dict[str, object]:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+        graphql_payload = {
+            "data": {
+                "repository": {
+                    "pullRequest": {
+                        "reviewDecision": None,
+                        "reviewThreads": {"nodes": graphql_threads},
+                    }
+                }
+            }
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{{"id":99,"user":{{"login":"codex"}},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+{reviews_json}
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+{review_comments_json}
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{{"requested_reviewers":[],"requested_teams":[]}}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{json.dumps(graphql_payload, separators=(",", ":"))}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            return json.loads(result.stdout)
+
+    def test_issue_187_s410_current_selected_unresolved_is_actionable(self) -> None:
+        payload = self._issue_187_s410_run_review_inventory_snapshot(
+            reviews_json='[{"id":201,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"review"}]',
+            review_comments_json='[{"id":301,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","body":"inline"}]',
+            graphql_threads=[
+                {
+                    "id": "RT_current",
+                    "isResolved": False,
+                    "isOutdated": False,
+                    "comments": {
+                        "nodes": [
+                            {
+                                "id": "RTC_301",
+                                "databaseId": 301,
+                                "author": {"login": "codex"},
+                                "createdAt": "2026-06-08T01:06:00Z",
+                                "body": "inline",
+                            }
+                        ]
+                    },
+                }
+            ],
+        )
+
+        decision = payload["decision"]
+        assert decision["selected_unresolved_count"] == 1
+        assert decision["current_selected_unresolved_count"] == 1
+        assert decision["actionable_unresolved_count"] == 1
+        assert decision["actionable_unresolved_thread_ids"] == ["RT_current"]
+        assert decision["carryover_unresolved_count"] == 0
+        assert decision["carryover_unresolved_thread_ids"] == []
+
+    def test_issue_187_s410_carryover_non_outdated_unresolved_is_actionable(self) -> None:
+        payload = self._issue_187_s410_run_review_inventory_snapshot(
+            graphql_threads=[
+                {
+                    "id": "RT_carryover",
+                    "isResolved": False,
+                    "isOutdated": False,
+                    "comments": {
+                        "nodes": [
+                            {
+                                "id": "RTC_300",
+                                "databaseId": 300,
+                                "author": {"login": "codex"},
+                                "createdAt": "2026-06-08T00:30:00Z",
+                                "body": "old but still applicable",
+                            }
+                        ]
+                    },
+                }
+            ],
+        )
+
+        decision = payload["decision"]
+        assert decision["selected_unresolved_count"] == 0
+        assert decision["current_selected_unresolved_count"] == 0
+        assert decision["carryover_unresolved_count"] == 1
+        assert decision["actionable_unresolved_count"] == 1
+        assert decision["carryover_unresolved_thread_ids"] == ["RT_carryover"]
+        assert decision["actionable_unresolved_thread_ids"] == ["RT_carryover"]
+        assert payload["review"]["current"]["carryover_non_outdated_unresolved_thread_ids"] == [
+            "RT_carryover"
+        ]
+
+    def test_issue_187_s410_outdated_unresolved_remains_audit_only(self) -> None:
+        payload = self._issue_187_s410_run_review_inventory_snapshot(
+            graphql_threads=[
+                {
+                    "id": "RT_outdated",
+                    "isResolved": False,
+                    "isOutdated": True,
+                    "comments": {
+                        "nodes": [
+                            {
+                                "id": "RTC_300",
+                                "databaseId": 300,
+                                "author": {"login": "codex"},
+                                "createdAt": "2026-06-08T00:30:00Z",
+                                "body": "old outdated feedback",
+                            }
+                        ]
+                    },
+                }
+            ],
+        )
+
+        decision = payload["decision"]
+        assert decision["carryover_unresolved_count"] == 0
+        assert decision["actionable_unresolved_count"] == 0
+        assert payload["review"]["threads"]["outdated"] == 1
+        assert payload["review"]["threads"]["items"][0]["id"] == "RT_outdated"
+
+    def test_issue_187_s410_unknown_outdated_state_is_not_promoted(self) -> None:
+        payload = self._issue_187_s410_run_review_inventory_snapshot(
+            graphql_threads=[
+                {
+                    "id": "RT_unknown_outdated",
+                    "isResolved": False,
+                    "isOutdated": None,
+                    "comments": {
+                        "nodes": [
+                            {
+                                "id": "RTC_300",
+                                "databaseId": 300,
+                                "author": {"login": "codex"},
+                                "createdAt": "2026-06-08T00:30:00Z",
+                                "body": "uncertain outdated state",
+                            }
+                        ]
+                    },
+                }
+            ],
+        )
+
+        decision = payload["decision"]
+        assert decision["carryover_unresolved_count"] == 0
+        assert decision["actionable_unresolved_count"] == 0
+        assert payload["review"]["threads"]["items"][0]["is_outdated"] is None
+        assert payload["review"]["threads"]["items"][0]["state"] == "unknown_outdated"
+
+    def test_issue_187_s410_selected_and_carryover_inventory_dedupe(self) -> None:
+        payload = self._issue_187_s410_run_review_inventory_snapshot(
+            reviews_json='[{"id":201,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"review"}]',
+            review_comments_json='[{"id":301,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","body":"inline"}]',
+            graphql_threads=[
+                {
+                    "id": "RT_selected",
+                    "isResolved": False,
+                    "isOutdated": False,
+                    "comments": {
+                        "nodes": [
+                            {
+                                "id": "RTC_301",
+                                "databaseId": 301,
+                                "author": {"login": "codex"},
+                                "createdAt": "2026-06-08T01:06:00Z",
+                                "body": "inline",
+                            }
+                        ]
+                    },
+                }
+            ],
+        )
+
+        decision = payload["decision"]
+        assert decision["selected_unresolved_thread_ids"] == ["RT_selected"]
+        assert decision["current_selected_unresolved_thread_ids"] == ["RT_selected"]
+        assert decision["carryover_unresolved_thread_ids"] == []
+        assert decision["actionable_unresolved_thread_ids"] == ["RT_selected"]
+        assert decision["actionable_unresolved_count"] == 1
+
     def test_issue_75_pr_observation_review_collector_explicit_trigger_body_caps_and_threads(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
