@@ -40,7 +40,15 @@ def validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult:
     del req
     records = ports.node_reader.load_node_records()
     graph = build_graph([_to_spec_node_seed(record) for record in records])
-    issue_depends_on_map: dict[str, list[str]] | None = None
+    report = validate_graph_and_deps(
+        graph,
+        issue_depends_on_map=None,
+        repo_root=ports.repo_root,
+        current_repo_slug=resolve_current_repo_slug(ports),
+    )
+    if report.errors:
+        return ValidationResult(report=report, checked_node_count=len(records))
+
     if ports.deps_topology_reader is not None:
         if ports.specdock_dir is not None:
             specdock_dir = ports.specdock_dir
@@ -49,7 +57,15 @@ def validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult:
         else:
             raise RuntimeError("specdock_dir is required when deps_topology_reader is configured")
         topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
-        issue_depends_on_map = dict(topology.issue_depends_on_map)
+        report = validate_graph_and_deps(
+            graph,
+            issue_depends_on_map=dict(topology.issue_depends_on_map),
+            repo_root=ports.repo_root,
+            current_repo_slug=resolve_current_repo_slug(ports),
+        )
+        if report.errors:
+            return ValidationResult(report=report, checked_node_count=len(records))
+
         load_node_dependency_resolutions = getattr(
             ports.deps_topology_reader,
             "load_node_dependency_resolutions",
@@ -67,12 +83,6 @@ def validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult:
                     checked_node_count=len(records),
                 )
 
-    report = validate_graph_and_deps(
-        graph,
-        issue_depends_on_map=issue_depends_on_map,
-        repo_root=ports.repo_root,
-        current_repo_slug=resolve_current_repo_slug(ports),
-    )
     if not report.errors:
         try:
             validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
