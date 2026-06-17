@@ -17910,6 +17910,162 @@ esac
             assert limitation["severity"] == "blocking"
             assert limitation.get("blocking") is not False
 
+    def test_issue_187_u001_zero_actions_green_check_runs_passes_with_status_permission_denied(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+        token_marker = "ghp_issue_187_u001_status_secret"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{{"total_count":0,"workflow_runs":[]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{{"total_count":1,"check_runs":[{{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}}]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    printf 'GraphQL: Resource not accessible by personal access token {token_marker}\\n' >&2
+    exit 1
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_TOKEN": token_marker,
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            assert token_marker not in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["actions"]["workflow_runs"]["total"] == 0
+            assert payload["ci"]["check_runs"]["success"] == 1
+            limitation = next(
+                item
+                for item in payload["limitations"]
+                if item.get("code") == "github_token_permission_denied"
+            )
+            assert limitation["capability"] == "commit_statuses_read"
+            assert limitation["severity"] == "informational"
+            assert limitation.get("blocking") is False
+            assert payload.get("decision", {}).get("recommended_next_action") != (
+                "fix_github_token_permissions"
+            )
+
+    def test_issue_187_u001_zero_actions_neutral_check_runs_pass_with_status_permission_denied(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+        token_marker = "ghp_issue_187_u001_neutral_status_secret"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    cat <<'JSON'
+{{"total_count":0,"workflow_runs":[]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+    cat <<'JSON'
+{{"total_count":3,"check_runs":[{{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}},{{"id":2,"name":"docs","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"skipped"}},{{"id":3,"name":"lint","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"neutral"}}]}}
+JSON
+    ;;
+  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
+    printf 'GraphQL: Resource not accessible by personal access token {token_marker}\\n' >&2
+    exit 1
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_TOKEN": token_marker,
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert token_marker not in result.stdout
+            assert token_marker not in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["check_runs"]["success"] == 1
+            assert payload["ci"]["check_runs"]["skipped"] == 1
+            assert payload["ci"]["check_runs"]["neutral"] == 1
+            limitation = next(
+                item
+                for item in payload["limitations"]
+                if item.get("code") == "github_token_permission_denied"
+            )
+            assert limitation["capability"] == "commit_statuses_read"
+            assert limitation["severity"] == "informational"
+            assert limitation.get("blocking") is False
+
     @pytest.mark.parametrize(
         ("case_name", "stderr_text", "expected_code"),
         [
@@ -23768,6 +23924,168 @@ esac
             assert payload["wait"]["next_poll_min_budget_seconds"] >= 0.6
             assert payload["wait"]["final_poll_skipped_reason"] == "insufficient_next_snapshot_budget"
 
+    def test_issue_187_s430_short_timeout_still_attempts_confirmation_poll(self) -> None:
+        decision = self._issue_187_s430_no_completion_decision("no-completion-s430-confirm")
+        first_payload = {
+            "ci": "passed",
+            "review": "approved",
+            "status": "pending",
+            "overall_status": "pending",
+            "normalized_status": "pending",
+            "recommended_next_action": "wait_or_resume",
+            "decision": decision,
+            "decision_fingerprint": "no-completion-s430-confirm",
+            "codex_review": {
+                "lifecycle": {
+                    "status": "none",
+                    "completion_signal": "none",
+                    "no_completion_evidence": decision["no_completion_evidence"],
+                }
+            },
+            "observed_at": "2000-01-01T00:00:00Z",
+            "sleep_seconds": 0.9,
+            "check_runs": {"total": 1, "success": 1},
+            "threads": {"total": 0, "unresolved": 0, "items": []},
+        }
+        second_payload = {**first_payload, "sleep_seconds": 0}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [first_payload, second_payload],
+                timeout_seconds=3,
+                poll_interval_seconds=1,
+                quiet_seconds=1,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["wait"]["polls"] >= 2
+            assert payload["normalized_status"] == "human_gate"
+            assert payload["decision"]["status_reason"] == "review_completion_unknown"
+            assert payload["wait"].get("final_poll_skipped_reason") is None
+
+    def test_issue_187_s430_under_budget_still_attempts_zero_check_grace_poll(self) -> None:
+        zero_check_limitation = {
+            "code": "zero_checks_s03_non_success",
+            "severity": "blocking",
+            "status": "none",
+        }
+        first_payload = {
+            "ci": "none",
+            "review": "none",
+            "status": "none",
+            "overall_status": "none",
+            "normalized_status": "none",
+            "recommended_next_action": "wait",
+            "limitations": [zero_check_limitation],
+            "sleep_seconds": 1.2,
+        }
+        second_payload = {**first_payload, "sleep_seconds": 0}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [first_payload, second_payload],
+                timeout_seconds=2,
+                poll_interval_seconds=1,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                zero_check_grace_polls=2,
+                progress="none",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["summary"]["ci"] == "none"
+            assert payload["wait"]["polls"] == 2
+            assert payload["wait"].get("final_poll_skipped_reason") is None
+            assert payload["normalized_status"] == "unknown"
+            assert payload["recommended_next_action"] == "human_gate"
+            assert "zero_checks_s03_non_success" in [
+                item.get("code") for item in payload.get("limitations", [])
+            ]
+
+    def test_issue_187_s430_zero_check_grace_does_not_hide_permission_under_budget(self) -> None:
+        zero_check_limitation = {
+            "code": "zero_checks_s03_non_success",
+            "severity": "blocking",
+            "status": "none",
+        }
+        permission_limitation = {
+            "code": "github_token_permission_denied",
+            "severity": "blocking",
+            "status": "permission_denied",
+            "recommended_next_action": "fix_github_token_permissions",
+        }
+        first_payload = {
+            "ci": "none",
+            "review": "none",
+            "status": "none",
+            "overall_status": "none",
+            "normalized_status": "none",
+            "recommended_next_action": "wait",
+            "limitations": [zero_check_limitation, permission_limitation],
+            "sleep_seconds": 0.7,
+        }
+        second_payload = {**first_payload, "sleep_seconds": 0}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [first_payload, second_payload],
+                timeout_seconds=1,
+                poll_interval_seconds=1,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                zero_check_grace_polls=3,
+                progress="none",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["wait"]["polls"] == 1
+            assert payload["normalized_status"] == "unknown"
+            assert payload["recommended_next_action"] == "fix_github_token_permissions"
+            assert payload["wait"].get("final_poll_skipped_reason") is None
+
+    def test_issue_187_s430_under_budget_grace_poll_is_single_attempt(self) -> None:
+        zero_check_limitation = {
+            "code": "zero_checks_s03_non_success",
+            "severity": "blocking",
+            "status": "none",
+        }
+        first_payload = {
+            "ci": "none",
+            "review": "none",
+            "status": "none",
+            "overall_status": "none",
+            "normalized_status": "none",
+            "recommended_next_action": "wait",
+            "limitations": [zero_check_limitation],
+            "sleep_seconds": 1.4,
+        }
+        fast_payload = {**first_payload, "sleep_seconds": 0}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [first_payload, fast_payload, fast_payload, fast_payload],
+                timeout_seconds=2,
+                poll_interval_seconds=1,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                zero_check_grace_polls=4,
+                progress="none",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["wait"]["polls"] == 2
+            assert payload["wait"]["final_poll_skipped_reason"] == "insufficient_next_snapshot_budget"
+            assert "zero_checks_s03_non_success" in [
+                item.get("code") for item in payload.get("limitations", [])
+            ]
+
     def test_issue_187_s430_under_budget_final_poll_preserves_latest_useful_payload(self) -> None:
         decision = self._issue_187_s430_no_completion_decision("no-completion-s430-preserve")
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -23880,13 +24198,13 @@ esac
                         "overall_status": "failed",
                         "normalized_status": "failed",
                         "recommended_next_action": "inspect_ci_failure",
-                        "sleep_seconds": 0.7,
+                        "sleep_seconds": 1.0,
                         "check_runs": {"total": 1, "failed": 1},
                         "failures": [{"name": "test", "conclusion": "failure"}],
                         "threads": {"total": 0, "unresolved": 0, "items": []},
                     }
                 ],
-                timeout_seconds=1,
+                timeout_seconds=2,
                 poll_interval_seconds=1,
                 quiet_seconds=90,
                 same_fingerprint_count=2,

@@ -1033,24 +1033,31 @@ actions_pending = bool(action_run_counts["pending"] or action_job_counts["pendin
 actions_unknown = bool(action_run_counts["unknown"] or action_job_counts["unknown"])
 actions_jobs_unavailable = actions_available and action_job_collection_failures > 0
 blocking_limitations = [item for item in limitations if is_blocking_limitation(item)]
-only_check_runs_permission_blocked = bool(blocking_limitations) and all(
+only_external_ci_read_permission_blocked = bool(blocking_limitations) and all(
     item.get("code") == "github_token_permission_denied"
-    and item.get("capability") == "check_runs_read"
+    and item.get("capability") in {"check_runs_read", "commit_statuses_read"}
     for item in blocking_limitations
 )
-external_green_statuses_with_check_runs_permission_limited = (
-    actions_zero_runs
-    and status_counts["total"] > 0
-    and status_counts["success"] == status_counts["total"]
+external_green_check_runs = (
+    check_counts["total"] > 0
+    and check_counts["success"] + check_counts["skipped"] + check_counts["neutral"] == check_counts["total"]
     and check_counts["failed"] == 0
     and check_counts["running"] == 0
     and check_counts["pending"] == 0
     and check_counts["other"] == 0
     and check_counts["stale"] == 0
+)
+external_green_statuses = (
+    status_counts["total"] > 0
+    and status_counts["success"] == status_counts["total"]
     and status_counts["failure"] == 0
     and status_counts["error"] == 0
     and status_counts["pending"] == 0
     and status_counts["other"] == 0
+)
+external_green_with_ci_read_permission_limited = (
+    actions_zero_runs
+    and (external_green_check_runs or external_green_statuses)
     and not aggregate_status_failed_backstop
     and not aggregate_status_pending_backstop
     and required_check_state["available"]
@@ -1061,7 +1068,7 @@ external_green_statuses_with_check_runs_permission_limited = (
     and not required_checks_missing_or_pending
     and not merge_state_unknown
     and not merge_state_blocking
-    and only_check_runs_permission_blocked
+    and only_external_ci_read_permission_blocked
 )
 
 if actions_primary_unavailable or head_sha_resolution_failed:
@@ -1109,7 +1116,7 @@ elif actions_decisive_green and not (
     or status_counts["other"]
 ):
     ci_status = "passed"
-elif external_green_statuses_with_check_runs_permission_limited:
+elif external_green_with_ci_read_permission_limited:
     ci_status = "passed"
 elif any(
     item.get("code") == "github_token_permission_denied"
@@ -1138,11 +1145,11 @@ elif check_counts["other"] or status_counts["other"]:
 else:
     ci_status = "passed"
 
-if external_green_statuses_with_check_runs_permission_limited:
+if external_green_with_ci_read_permission_limited:
     for item in limitations:
         if (
             item.get("code") == "github_token_permission_denied"
-            and item.get("capability") == "check_runs_read"
+            and item.get("capability") in {"check_runs_read", "commit_statuses_read"}
             and is_blocking_limitation(item)
         ):
             item["severity"] = "informational"
