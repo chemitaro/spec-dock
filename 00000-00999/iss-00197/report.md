@@ -781,6 +781,10 @@ no output
 - post-repair full verification: `uv run pytest tests/unit/infra/test_init_update.py` -> `439 passed`.
 - post-repair diff check: `git diff --check` -> pass.
 - merge refresh repair の material implementation decisions はなし。delegate note: `No material implementation decisions beyond the approved plan.`
+- PR 作成前の再 fetch で `origin/main` に PR #194 merge が追加されていたため、再度 `git merge origin/main` を実行した。Git conflict は発生しなかった。
+- second merge 後の base freshness: `git rev-list --left-right --count origin/main...HEAD` -> `0 10`。
+- second merge 後の focused regression: `uv run pytest tests/unit/infra/test_init_update.py -k "issue_197 or issue_187_s410 or issue_75_pr_observation_review_collector_explicit_trigger_body_caps_and_threads or issue_176_s03_review_collector_returns_codex_review_contract"` -> `11 passed, 428 deselected`。
+- second merge 後の full verification: `uv run pytest tests/unit/infra/test_init_update.py` -> `439 passed`。
 
 ## 省略/例外メモ (必須)
 - 該当なし
