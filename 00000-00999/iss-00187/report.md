@@ -65,6 +65,7 @@ Disposition ごとの必須証跡:
 | D-014 | resolved | implementation | S204 code-reviewer P2 / dev-coder | CI passed age を wait resume 間でどう保持するか | Option A: current snapshot `observed_at` だけで CI age を毎回 seed する; Option B: same-boundary prior `--out/result.json` の wait metadata から `ci_passed_since` / age を復元する; Option C: review/check collector 側の timestamp contract を変更する | Option B を採用する | repeated short waits が CI age を毎回 reset すると `review_completion_unknown` に到達できない。既存 wait output artifact を同一 repo/PR/head/trigger 境界で読む方式なら、collector semantics を変えず additive / non-secret に resume state を保持できる | applied | Dev-coder targeted `1 passed`; parent S204 focused `5 passed`; required selector `42 passed`; code-reviewer re-review PASS | Unobservable CI flaps between wait invocations remain residual risk |
 | D-015 | resolved | scope / design | S300+ delegated drafts / orchestrator | S200+ 後にも `fetch_pr_observation_snapshot.sh` と `wait_pr_observation.sh` に Python heredoc が残り、`fetch_pr_review_snapshot.sh` / `trigger_codex_review.sh` にも別責務の heredoc が残る。今回どこまでを直接抽出するか | Option A: snapshot/wait/review/trigger を一括抽出; Option B: snapshot/wait だけを S300+ direct target とし、review collector / trigger は follow-up; Option C: 実装へ進まず follow-up issue 化だけにする | Option B を採用する | snapshot/wait は aggregation / polling layer であり、現在のユーザー要求は `fetch_pr_observation_snapshot.sh` と `wait_pr_observation.sh` の heredoc 抽出に直接対応する。一方、review collector は lifecycle semantics、trigger は initiation semantics を持つため、一括抽出すると blast radius が大きく、PR observation 自体を final evidence として使いにくくなる | promoted_to_design / promoted_to_plan | `discussions/20260616t072719z-10-disc-snapshot-wait-python-extraction-architecture-draft.md`; `discussions/20260616t072719z-11-disc-snapshot-wait-python-extraction-implementation-plan-draft.md`; `design.md` S300+ addendum; `plan.md` S300+ addendum; EAL-030; EAL-031 | Review collector / trigger heredoc extraction remains separate follow-up unless S300+ implementation reveals a hard dependency |
 | D-016 | resolved | design / plan | PR #190 missed P2 review + delegated S400+ drafts / orchestrator | P2 `3422572159` was posted after `bb50b7a2` observation stopped, and all-fetched non-outdated unresolved review threads can remain outside current selected review inventory. Wait loop also can sleep away next-poll budget and degrade latest useful payload. | Option A: only fix P2 wait sleep; Option B: only increase review latency; Option C: add S400+ lane covering actionable review inventory, decision precedence, next-poll budget guard, 300s CI-passed age, and post-unknown fresh audit metadata | Option C を採用する | P2 wait sleep is a real bug, but the missed-review class also needs first-class actionable inventory and `review_completion_unknown` must not be treated as review absence. Design reviewer required precise carryover classifier input; final design uses GraphQL `isResolved=false` and `isOutdated=false` only, and keeps unknown-outdated artifacts audit-only. | promoted_to_design / promoted_to_plan | discussions `20260616t225521z-14`, `20260616t225521z-15`, `20260616t231000z-16`, `20260616t233000z-17`; design spec-review fail then pass; plan S400+ addendum | Fresh plan spec-review required before S410 implementation |
+| D-017 | resolved | implementation / operation | PR #190 post-push CI observation + S530 reviewers | S500 local evidence said the under-budget exception was bounded, but pushed head `bc11c60a8960d990b939f4582159fb44546bc3f4` failed Provider CI because `test_issue_187_s430_under_budget_grace_poll_is_single_attempt` observed `polls == 3` | Option A: weaken the test to allow 3 polls; Option B: treat CI as a live manual-test finding and prevent the wait loop from reusing the under-budget exception in a no-sleep loop; Option C: revert S510 under-budget exception entirely | Option B を採用する | S510 intentionally allows one final confirmation/grace poll below the budget floor, but repeated no-sleep polling after a fast snapshot violates the bounded exception contract. The live PR observation correctly classified the current head as `ci_failed`, so S530 becomes the active repair path and supersedes the stale S500 closure evidence. | applied / promoted_to_plan | PR #190 snapshot `status=failed`; GitHub Provider CI logs for runs `27664761526` and `27664760235`; plan S530; report S530; focused and full infra tests; code-reviewer PASS; QA P2 handled by narrowing the repair to bounded exception reuse | S530 commit and post-push PR observation gate remain pending until the S530 commit is pushed and observed on the new head |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -992,10 +993,57 @@ Scope:
 | S599 | SpecDock validation | `./spec-dock/scripts/spec-dock validate` | `spec-dock: ok (validate) nodes=96` | active issue docs remain valid after S500 plan/report/runtime/test diff |
 
 ### S500 review resolution status
+Note:
+- S500 local evidence for the bounded under-budget polling regression is superseded by S530 because the pushed S500 head `bc11c60a8960d990b939f4582159fb44546bc3f4` failed Provider CI on the same contract.
+- S500 remains historical evidence for the P2 review findings and the local fix attempt; S530 is the active repair path for the under-budget exception reuse defect.
+
 | review comment | concern | current status | evidence | next action |
 |---|---|---|---|---|
-| `3425177951` | under-budget pre-poll gate could skip the required confirmation poll | implemented / awaiting reviewer gate | `test_issue_187_s430_short_timeout_still_attempts_confirmation_poll`; wait/S430 selectors pass | run code/QA/spec reviewer gates, commit, push, and re-observe PR #190 |
-| `3425177952` | no-Actions + green check-runs should pass when commit statuses are unreadable | implemented / awaiting reviewer gate | `test_issue_187_u001_zero_actions_green_check_runs_passes_with_status_permission_denied`; external green/non-green selector passes | run code/QA/spec reviewer gates, commit, push, and re-observe PR #190 |
+| `3425177951` | under-budget pre-poll gate could skip the required confirmation poll | superseded for bounded-under-budget closure by S530 | S500 local selectors passed, but pushed head `bc11c60a8960d990b939f4582159fb44546bc3f4` failed Provider CI with `polls == 3` | follow S530 active repair path and re-observe PR #190 after S530 commit |
+| `3425177952` | no-Actions + green check-runs should pass when commit statuses are unreadable | implemented in S500 / still subject to post-S530 PR observation | external green/non-green selectors passed; no S530 regression found in checks collector | re-observe PR #190 after S530 commit |
+
+## S530 post-push CI/manual-test repair（2026-06-17）
+
+Scope:
+- S500 commit `bc11c60a8960d990b939f4582159fb44546bc3f4` was pushed and observed as both the PR gate and a manual test of the observation scripts.
+- The observer/cross-check correctly identified that PR #190 was not merge-ready because Provider CI failed on the current head.
+- The failure was not a missed-review or false-pass issue: the snapshot classified the PR as `status="failed"`, `summary.ci="failed"`, `summary.head="matched"`, `decision.status_reason="ci_failed"`, and `recommended_next_action="fix_ci"`.
+- The failed GitHub job was `provider-tests`; both Provider CI runs failed on `tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_187_s430_under_budget_grace_poll_is_single_attempt`.
+- The failing assertion was `payload["wait"]["polls"] == 2`; CI observed `3`.
+- Root cause: after one under-budget grace/confirmation exception, a fast snapshot could shrink `next_poll_min_budget_seconds`, return to the normal polling path without sleeping, and consume another poll in a no-sleep loop. This violated the S510 bounded exception contract.
+- Fix: after an under-budget exception has been used, the next loop now stops with `insufficient_next_snapshot_budget` instead of re-entering the normal polling path without sleep.
+
+### S530 evidence
+| step | evidence | command / source | result | notes |
+|---|---|---|---|---|
+| S530 | PR observation/manual-test failure detection | `gh pr view 190 --repo chemitaro/spec-dock --json number,state,mergeStateStatus,reviewDecision,headRefOid,headRefName,baseRefName,statusCheckRollup,url`; `fetch_pr_observation_snapshot.sh --repo chemitaro/spec-dock --pr 190 --head-sha bc11c60a8960d990b939f4582159fb44546bc3f4` | PR open / `mergeStateStatus=UNSTABLE`; snapshot `status=failed` | `provider-tests` failed twice; validate passed twice; snapshot recommended `fix_ci` and did not report merge-prepared |
+| S530 | CI failure log | `gh run view 27664761526 --repo chemitaro/spec-dock --log-failed`; `gh run view 27664760235 --repo chemitaro/spec-dock --log-failed` | both Provider CI runs failed | failing assertion: `assert payload["wait"]["polls"] == 2`, actual `3` |
+| S530 | focused regression | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_187_s430_under_budget_grace_poll_is_single_attempt -q` | `1 passed` | confirms the bounded under-budget exception no longer repeats into `polls == 3` |
+| S530 | broad wait/review selector | `uv run pytest tests/unit/infra/test_init_update.py -k "zero_check_grace or review_completion_unknown or pr_observation_wait" -q` | `27 passed, 407 deselected` | confirms zero-check grace, wait wrapper, and review-completion-unknown behavior remain green |
+| S530 | full infra unit validation | `uv run pytest tests/unit/infra/test_init_update.py -q` | `434 passed in 257.19s` | reproduces the Provider CI file locally after the runtime fix |
+| S530 | provider/mirror parity | `cmp -s src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py .agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py` | pass | provider and dogfooding mirror wait runtime remain byte-identical |
+| S530 | whitespace validation | `git diff --check` | pass | no whitespace errors |
+| S530 | generated artifact cleanup | `find src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib .agents/skills/github-pr-observation/scripts/lib -path '*/__pycache__/*' -o -name '__pycache__'` | pass / no output | no generated Python cache artifacts remain |
+| S530 | code review gate | code-reviewer `019ed3cf-bf58-7812-8f5b-db03d191897e` | `review_status: pass` | reviewer found no P0/P1 issues and confirmed S510/S530 bounded behavior is consistent |
+| S530 | QA review gate | qa-reviewer `019ed3d5-4113-7a20-98ee-096196bc1d59` | `review_status: pass` with P2 | P2 requested direct terminal-preservation coverage; the repair was narrowed to bounded exception reuse only, removing the untested terminal-preservation branch/claim |
+| S530 | spec review gate | spec-reviewer `019ed3d5-a31f-72f2-8a3f-7850917507bc` | initial `review_status: fail` | P1 findings required S500 superseded status and S530 commit/post-push observation gate status to be explicit; this report revision addresses those findings |
+| S530 | commit gate | pending | pending | S530 runtime/docs changes have not yet been committed |
+| S530 | post-push PR observation gate | pending | pending | must run after the S530 commit is pushed to a new PR #190 head |
+
+### S530 manual-test review
+| observation aspect | result | assessment |
+|---|---|---|
+| CI failure detection | `status=failed`, `recommended_next_action=fix_ci` | pass: the observation scripts did not miss the failed Provider CI state |
+| current head binding | `headRefOid=bc11c60a8960d990b939f4582159fb44546bc3f4`, snapshot head matched | pass: failure was tied to the current pushed head |
+| review inventory behavior during CI failure | carryover unresolved threads remained visible, but decision prioritized `ci_failed` | acceptable: CI failure is an immediate blocker; review inventory was not lost |
+| script defect discovered by manual test | bounded under-budget exception could repeat after fast snapshots | fixed in S530 and covered by focused/broad tests |
+
+### S530 test contract closure
+| test id | plan contract | status | evidence | notes |
+|---|---|---|---|---|
+| `tc-s530-001` | under-budget exception is not re-used in a no-sleep loop after a fast snapshot | pass | `test_issue_187_s430_under_budget_grace_poll_is_single_attempt` -> `1 passed`; broad wait/review selector -> `27 passed, 407 deselected` | focused regression covers the Provider CI failure where pushed head observed `polls == 3` |
+| `tc-s530-002` | post-exception stop emits explicit skip reason and preserves latest useful payload | pass | same focused regression asserts `final_poll_skipped_reason="insufficient_next_snapshot_budget"` and keeps `zero_checks_s03_non_success` in limitations | terminal-preservation claim was removed; S530 is narrowed to bounded exception reuse |
+| `tc-s530-003` | full infra file, provider/mirror parity, diff hygiene, generated-artifact cleanup, and fresh post-push PR observation pass | partial / pending post-push | local checks pass: full infra `434 passed`, parity pass, `git diff --check` pass, no generated artifacts, `spec-dock validate` pass | commit gate and fresh post-push PR observation remain pending until S530 is committed and pushed |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: S99 の親 focused pytest で、旧 pr_observation fake-gh fixture が Actions-primary endpoint を返さず、`actions_read` unknown で 14 件失敗した。
