@@ -189,6 +189,7 @@ class TestRuntimeNewDocS09:
             "research": ("<RESEARCH_ID>", "<RESEARCH_TITLE>"),
             "interview": ("<INTERVIEW_ID>", "<INTERVIEW_TITLE>"),
             "scratch": ("<SCRATCH_ID>", "<SCRATCH_TITLE>"),
+            "pr-repair-batch": ("<PR_REPAIR_BATCH_ID>", "<PR_REPAIR_BATCH_TITLE>"),
         }
         for doc_type, (id_placeholder, title_placeholder) in placeholders.items():
             (templates_dir / f"{doc_type}.md").write_text(
@@ -407,8 +408,9 @@ class TestRuntimeNewDocS09:
                 "research": "20260312t010203z-02-research",
                 "interview": "20260312t010203z-03-interview",
                 "scratch": "20260312t010203z-04-scratch",
+                "pr-repair-batch": "20260312t010203z-05-pr-repair-batch",
             }
-            for doc_type in ("adr", "disc", "research", "interview", "scratch"):
+            for doc_type in ("adr", "disc", "research", "interview", "scratch", "pr-repair-batch"):
                 result = app_create_node.create_discussion_doc(
                     app_contracts.CreateDiscussionDocRequest(
                         doc_type=doc_type,

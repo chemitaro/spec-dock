@@ -3,7 +3,7 @@
 ID: "iss-00188"
 タイトル: "Prevent duplicate discussion timestamp slots when creating multiple artifacts"
 関連GitHub: ["#188"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-17"
 依存: ["requirement.md"]

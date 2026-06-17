@@ -11,6 +11,7 @@ CREATABLE_DISCUSSION_DOC_TYPES = (
     "research",
     "interview",
     "scratch",
+    "pr-repair-batch",
     *DRAFT_DISCUSSION_DOC_TYPES,
 )
 RETIRED_DISCUSSION_DOC_TYPES = ("note",)
