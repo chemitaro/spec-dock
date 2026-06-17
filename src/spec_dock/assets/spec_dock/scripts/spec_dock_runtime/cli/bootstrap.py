@@ -171,6 +171,24 @@ class _DepsTopologyReader:
     def load_direct_dependency_resolutions(self, specdock_dir: Path, graph, src_id: str):
         return infra_deps_reader.load_direct_dependency_resolutions(specdock_dir, graph, src_id)
 
+    def load_node_dependency_resolutions(self, specdock_dir: Path, graph):
+        return infra_deps_reader.load_node_dependency_resolutions(specdock_dir, graph)
+
+    def build_candidate_issue_depends_on_map(
+        self,
+        graph,
+        issue_depends_on_map: dict[str, list[str]],
+        *,
+        from_node_id: str,
+        to_node_id: str,
+    ):
+        return infra_deps_reader.build_candidate_issue_depends_on_map(
+            graph,
+            issue_depends_on_map,
+            from_node_id=from_node_id,
+            to_node_id=to_node_id,
+        )
+
 
 @dataclass(frozen=True)
 class _GitGateway:

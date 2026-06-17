@@ -15,7 +15,7 @@ from ..domain.authority import (
     load_evidence_adoption_ledger_entries,
     validate_delegated_authority_artifact,
 )
-from ..domain.deps import evaluate_readiness, validate_deps_cycles
+from ..domain.deps import evaluate_readiness, validate_deps_cycles, validate_raw_node_dependency_graph
 from ..domain.ids import format_id, parse_id
 from ..domain.models import ActiveSelection, BranchDecision, NodeId, SpecGraph, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph, select_active_chain
@@ -195,6 +195,18 @@ def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> d
             normalized = value.strip()
             out[issue_id] = normalized or None
     return out
+
+
+def _validate_raw_node_dependency_preflight(ports: Ports, specdock_dir: Path, graph: SpecGraph) -> None:
+    load_node_resolutions = getattr(ports.deps_topology_reader, "load_node_dependency_resolutions", None)
+    if not callable(load_node_resolutions):
+        return
+
+    raw_node_depends_on_map = {
+        src_id: [resolution.resolved_node_id for resolution in resolutions]
+        for src_id, resolutions in load_node_resolutions(specdock_dir, graph).items()
+    }
+    validate_raw_node_dependency_graph(graph, raw_node_depends_on_map)
 
 
 def build_context_pack_text(manifest: ActiveManifest, *, repo_root: Path | None = None) -> str:
@@ -451,6 +463,7 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
     target_node = graph.nodes_by_id.get(target_id)
     if target_node is None:
         raise RuntimeError(f"Node not found: {target_id}")
+    _validate_raw_node_dependency_preflight(ports, specdock_dir, graph)
     topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
     issue_depends_on_map = dict(topology.issue_depends_on_map)
     for warning in topology.warnings:

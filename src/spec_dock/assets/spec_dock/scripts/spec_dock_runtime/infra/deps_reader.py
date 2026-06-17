@@ -303,6 +303,35 @@ def load_direct_dependency_resolutions(
     ]
 
 
+def load_node_dependency_resolutions(
+    specdock_dir: Path,
+    graph: SpecGraph,
+) -> dict[str, list[DirectDependencyResolution]]:
+    current_repo_slug = _resolve_current_repo_slug(specdock_dir)
+    dep_node_ids = sorted(
+        [node_id for node_id, node in graph.nodes_by_id.items() if node.kind in ("initiative", "epic", "issue")],
+        key=deps_node_sort_key,
+    )
+    out: dict[str, list[DirectDependencyResolution]] = {}
+    for src_id in dep_node_ids:
+        src = graph.nodes_by_id[src_id]
+        meta_path = src.path / ".meta.json"
+        depends_on = _load_meta_depends_on(meta_path)
+        out[src_id] = [
+            DirectDependencyResolution(
+                raw_ref=ref,
+                resolved_node_id=_resolve_dep_ref(
+                    graph,
+                    ref,
+                    src_path=meta_path,
+                    current_repo_slug=current_repo_slug,
+                ),
+            )
+            for ref in depends_on
+        ]
+    return out
+
+
 def _issue_ids_for_dep_node(graph: SpecGraph, node_id: str) -> list[str]:
     node = graph.nodes_by_id.get(node_id)
     if node is None:
@@ -320,6 +349,31 @@ def _issue_ids_for_dep_node(graph: SpecGraph, node_id: str) -> list[str]:
             key=deps_node_sort_key,
         )
     raise RuntimeError(f"Unsupported dependency node type: {node.kind} ({node_id})")
+
+
+def build_candidate_issue_depends_on_map(
+    graph: SpecGraph,
+    issue_depends_on_map: dict[str, list[str]],
+    *,
+    from_node_id: str,
+    to_node_id: str,
+) -> dict[str, list[str]]:
+    candidate: dict[str, set[str]] = {
+        issue_id: set(depends_on)
+        for issue_id, depends_on in issue_depends_on_map.items()
+    }
+    for issue_id in [node_id for node_id, node in graph.nodes_by_id.items() if node.kind == "issue"]:
+        candidate.setdefault(issue_id, set())
+
+    from_issue_ids = _issue_ids_for_dep_node(graph, from_node_id)
+    to_issue_ids = _issue_ids_for_dep_node(graph, to_node_id)
+    for from_issue_id in from_issue_ids:
+        candidate.setdefault(from_issue_id, set()).update(to_issue_ids)
+
+    return {
+        issue_id: sorted(depends_on, key=deps_node_sort_key)
+        for issue_id, depends_on in sorted(candidate.items(), key=lambda item: deps_node_sort_key(item[0]))
+    }
 
 
 def load_issue_depends_on_map(specdock_dir: Path, graph: SpecGraph) -> DepsTopologyLoadResult:

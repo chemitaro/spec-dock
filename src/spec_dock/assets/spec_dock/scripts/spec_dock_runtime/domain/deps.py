@@ -229,6 +229,102 @@ def validate_deps_cycles(issue_depends_on_map: dict[str, list[str]]) -> None:
                 stack.append((dep_id, 0))
 
 
+def _require_graph_node(graph: SpecGraph, node_id: str) -> None:
+    if node_id not in graph.nodes_by_id:
+        raise RuntimeError(f"Node not found: {node_id}")
+
+
+def _ancestor_node_ids(graph: SpecGraph, node_id: str) -> set[str]:
+    _require_graph_node(graph, node_id)
+    ancestors: set[str] = set()
+    current_id = graph.nodes_by_id[node_id].parent_id
+    while current_id:
+        _require_graph_node(graph, current_id)
+        if current_id in ancestors:
+            raise RuntimeError("Node hierarchy cycle detected: " + current_id)
+        ancestors.add(current_id)
+        current_id = graph.nodes_by_id[current_id].parent_id
+    return ancestors
+
+
+def _descendant_node_ids(graph: SpecGraph, node_id: str) -> set[str]:
+    _require_graph_node(graph, node_id)
+    descendants: set[str] = set()
+    stack = [
+        child_id
+        for child_id, child in graph.nodes_by_id.items()
+        if child.parent_id == node_id
+    ]
+    while stack:
+        current_id = stack.pop()
+        _require_graph_node(graph, current_id)
+        if current_id in descendants:
+            continue
+        descendants.add(current_id)
+        stack.extend(
+            child_id
+            for child_id, child in graph.nodes_by_id.items()
+            if child.parent_id == current_id
+        )
+    return descendants
+
+
+def validate_raw_node_dependency_graph(graph: SpecGraph, raw_node_depends_on_map: dict[str, list[str]]) -> None:
+    candidate_map: dict[str, list[str]] = {}
+    for node_id in _safe_sorted_node_ids(list(graph.nodes_by_id.keys())):
+        node = graph.nodes_by_id[node_id]
+        candidate_map.setdefault(node_id, [])
+        if node.parent_id:
+            _require_graph_node(graph, node.parent_id)
+            candidate_map.setdefault(node.parent_id, [])
+            candidate_map[node.parent_id].append(node_id)
+
+    for source_id in _safe_sorted_node_ids(list(raw_node_depends_on_map.keys())):
+        _require_graph_node(graph, source_id)
+        candidate_map.setdefault(source_id, [])
+        source_ancestors = _ancestor_node_ids(graph, source_id)
+
+        for target_id in _safe_sorted_node_ids(raw_node_depends_on_map.get(source_id, [])):
+            _require_graph_node(graph, target_id)
+            candidate_map.setdefault(target_id, [])
+
+            if target_id == source_id:
+                raise RuntimeError(f"Raw node dependency self edge detected: {source_id}")
+            if target_id in source_ancestors:
+                raise RuntimeError(f"Raw node dependency targets ancestor/container: {source_id} -> {target_id}")
+            if source_id in _ancestor_node_ids(graph, target_id):
+                raise RuntimeError(f"Raw node dependency targets descendant: {source_id} -> {target_id}")
+
+            candidate_map[source_id].append(target_id)
+            for descendant_id in _safe_sorted_node_ids(_descendant_node_ids(graph, source_id)):
+                candidate_map.setdefault(descendant_id, [])
+                candidate_map[descendant_id].append(target_id)
+
+    validate_deps_cycles(candidate_map)
+
+
+def ensure_node_dependency_add_would_be_valid(
+    graph: SpecGraph,
+    raw_node_depends_on_map: dict[str, list[str]],
+    *,
+    from_node_id: str,
+    to_node_id: str,
+    candidate_issue_depends_on_map: dict[str, list[str]] | None = None,
+) -> None:
+    candidate_raw_map: dict[str, list[str]] = {
+        node_id: list(depends_on)
+        for node_id, depends_on in raw_node_depends_on_map.items()
+    }
+    candidate_raw_map.setdefault(from_node_id, [])
+    candidate_raw_map.setdefault(to_node_id, [])
+    candidate_raw_map[from_node_id].append(to_node_id)
+
+    validate_raw_node_dependency_graph(graph, candidate_raw_map)
+
+    if candidate_issue_depends_on_map is not None:
+        validate_deps_cycles(candidate_issue_depends_on_map)
+
+
 def issue_dependency_exists(
     issue_depends_on_map: dict[str, list[str]],
     *,

@@ -13,7 +13,13 @@ from typing import Literal, cast
 from uuid import uuid4
 
 from ..domain.active import infer_active_node_from_branch
-from ..domain.deps import build_deps_state, build_effective_deps_map, evaluate_readiness, validate_deps_cycles
+from ..domain.deps import (
+    build_deps_state,
+    build_effective_deps_map,
+    evaluate_readiness,
+    validate_deps_cycles,
+    validate_raw_node_dependency_graph,
+)
 from ..domain.models import (
     ActiveSelection,
     DepsEvaluation,
@@ -31,7 +37,7 @@ from ..domain.validation import (
     find_github_repo_scope_pairing_error,
     validate_graph_and_deps,
 )
-from ..infra.contracts import ActiveManifest, StoredMetaRecord
+from ..infra.contracts import ActiveManifest, DirectDependencyResolution, StoredMetaRecord
 from ..presentation.contracts import ArtifactBundle
 from ..presentation.json_state import (
     render_deps_issues_artifact,
@@ -459,6 +465,16 @@ def collect_sync_state(
             for warning in topology.warnings:
                 _append_unique(warnings, warning)
             try:
+                load_node_dependency_resolutions = getattr(
+                    ports.deps_topology_reader,
+                    "load_node_dependency_resolutions",
+                    None,
+                )
+                if callable(load_node_dependency_resolutions):
+                    raw_node_depends_on_map = _raw_node_depends_on_map(
+                        load_node_dependency_resolutions(specdock_dir, graph)
+                    )
+                    validate_raw_node_dependency_graph(graph, raw_node_depends_on_map)
                 validate_deps_cycles(issue_depends_on_map)
                 validate_graph_and_deps(
                     graph,
@@ -609,6 +625,15 @@ def collect_sync_state(
         github_snapshot_by_repo_scope_and_issue_number=github_snapshot_by_repo_scope_and_issue_number,
         github_snapshot_by_issue_id=github_snapshot_by_issue_id,
     )
+
+
+def _raw_node_depends_on_map(
+    resolutions_by_node: dict[str, list[DirectDependencyResolution]],
+) -> dict[str, list[str]]:
+    return {
+        node_id: [resolution.resolved_node_id for resolution in resolutions]
+        for node_id, resolutions in resolutions_by_node.items()
+    }
 
 
 def maybe_auto_update_from_branch(
