@@ -1808,6 +1808,135 @@ class TestRuntimeDeleteS13:
         assert Path(records[0].path).exists()
         assert not Path(records[1].path).exists()
 
+    def test_recursive_delete_detects_deleted_empty_source_raw_ref_to_surviving_empty_container(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = [
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00001",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00002",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+        ]
+        ports = self._ports(
+            records=records,
+            repo_root=repo_root,
+            dep_map={},
+            node_repo=_DeletingNodeRepository(),
+        )
+        deleted_source_meta = Path(records[0].path) / ".meta.json"
+        deleted_source_meta.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "depends_on": ["init-local-00002"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        result = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="init-local-00001",
+                confirmed=True,
+                recursive=True,
+            ),
+            ports,
+        )
+
+        assert result.status == "dependency_conflict"
+        assert result.deleted_node_ids == []
+        assert result.offending_node_ids == ["init-local-00001", "init-local-00002"]
+        assert json.loads(deleted_source_meta.read_text(encoding="utf-8"))["depends_on"] == ["init-local-00002"]
+        assert Path(records[0].path).exists()
+        assert Path(records[1].path).exists()
+
+    def test_forced_recursive_delete_allows_deleted_empty_source_raw_ref_to_surviving_empty_container(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = [
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00001",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00002",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+        ]
+        ports = self._ports(
+            records=records,
+            repo_root=repo_root,
+            dep_map={},
+            node_repo=_DeletingNodeRepository(),
+        )
+        deleted_source_meta = Path(records[0].path) / ".meta.json"
+        deleted_source_meta.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "depends_on": ["init-local-00002"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        result = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="init-local-00001",
+                confirmed=True,
+                recursive=True,
+                force=True,
+            ),
+            ports,
+        )
+
+        assert result.status == "ok"
+        assert result.target_id == "init-local-00001"
+        assert result.deleted_node_ids == ["init-local-00001"]
+        assert result.dependency_scrub_failures == []
+        assert not Path(records[0].path).exists()
+        assert Path(records[1].path).exists()
+
     def test_recursive_delete_detects_empty_source_direct_raw_refs_to_deleted_subtree_nodes(self) -> None:
         app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
             _runtime_modules()

@@ -3,10 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
+from ..domain.deps import validate_raw_node_dependency_graph
 from ..domain.models import SpecGraph, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
 from ..domain.validation import validate_graph_and_deps
-from ..infra.contracts import ActiveManifestEntry, StoredMetaRecord
+from ..infra.contracts import ActiveManifestEntry, DirectDependencyResolution, StoredMetaRecord
 from . import create_node as app_create_node
 from .artifact_preflight import validate_required_artifacts_for_graph
 from .contracts import DoctorFinding, DoctorRequest, DoctorResult
@@ -43,6 +44,15 @@ def _resolve_specdock_dir(ports: Ports) -> Path:
 def _append_unique(values: list[str], value: str) -> None:
     if value not in values:
         values.append(value)
+
+
+def _raw_node_depends_on_map(
+    resolutions_by_node: dict[str, list[DirectDependencyResolution]],
+) -> dict[str, list[str]]:
+    return {
+        node_id: [resolution.resolved_node_id for resolution in resolutions]
+        for node_id, resolutions in resolutions_by_node.items()
+    }
 
 
 def _legacy_only_workspace_finding(*, legacy_dir: Path) -> DoctorFinding:
@@ -407,6 +417,20 @@ def doctor(req: DoctorRequest, ports: Ports) -> DoctorResult:
             if report.errors:
                 findings.append(_finding_from_error(str(report.errors[0])))
             else:
+                if ports.deps_topology_reader is not None:
+                    load_node_dependency_resolutions = getattr(
+                        ports.deps_topology_reader,
+                        "load_node_dependency_resolutions",
+                        None,
+                    )
+                    if callable(load_node_dependency_resolutions):
+                        try:
+                            raw_node_depends_on_map = _raw_node_depends_on_map(
+                                load_node_dependency_resolutions(specdock_dir, graph)
+                            )
+                            validate_raw_node_dependency_graph(graph, raw_node_depends_on_map)
+                        except RuntimeError as error:
+                            findings.append(_finding_from_error(str(error)))
                 try:
                     validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
                 except RuntimeError as error:
