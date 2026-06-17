@@ -153,102 +153,113 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-06-17 HH:MM - HH:MM）
+### セッションログ（2026-06-17 S01）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01 Shared catalog/parser foundation
+- AC/EC: AC-005; tc-001, tc-002
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: `実装ステップ S01 — Shared catalog/parser foundation`
+  - closure ids: tc-001, tc-002
 
 #### 実施内容
-- ...
+- Delegated S01 implementation to `dev-coder` agent `019ed359-8f2d-75a0-b31e-e69a12180be1`.
+- Added shared discussion doc catalog/parser helper and migrated create/validate timestamp filename parsing, legacy parsing, doc_id derivation, and malformed candidate detection to it.
+- Added focused unit tests for shared parser/catalog behavior and malformed fail-closed behavior.
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py tests/cli_runtime/test_validate.py tests/unit/application/test_validate.py
 
-<result>
+57 passed, 6 skipped
+
+git diff --check
+
+pass
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | Added focused parser/catalog and malformed candidate tests before helper existed. | `uv run pytest tests/unit/application/test_validate.py -k 'discussion_doc_parser_catalog_handles_hyphenated_and_existing_types or discussion_doc_malformed_candidates_remain_fail_closed'` -> 2 failed by missing `spec_dock_runtime.domain.discussion_docs` | pass | Worker-observed red evidence for tc-001/tc-002 |
+| S01 | 緑フェーズ（Green） | required focused verification | Shared helper implemented and create/validate migrated. | `uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py tests/cli_runtime/test_validate.py tests/unit/application/test_validate.py` -> 57 passed, 6 skipped | pass | Parent re-ran required verification |
+| S01 | リファクタリング（Refactor） | guardrail satisfied | Removed only obsolete duplicate parser/catalog logic inside allowed paths. | diff inspection; `git diff --check` -> pass | pass | No CLI, wait allocator, docs/skills, or migration changes |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | Shared parser/catalog and malformed fail-closed unit tests | implementation | added tests | tc-001, tc-002 | no | `tests/unit/application/test_validate.py` |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | tc-001, tc-002 | tc-001 and tc-002 pass, code-reviewer pass, step commit/no-op evidence recorded. | shared helper parser/catalog tests pass; malformed candidate tests pass; code-reviewer `019ed362-63a6-7121-b843-eb095f838247` passed findings=[] | pass | Step commit gate pending in this session log until commit recorded below |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | yes | red-required | focused parser/catalog tests failed before helper existed | `uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py tests/cli_runtime/test_validate.py tests/unit/application/test_validate.py` | pass | shared parser handles hyphenated draft types, existing types, retired `note`, and legacy exact grandfathering |
+| tc-002 | S01 | yes | red-required | malformed candidate test failed before helper existed | same required pytest command | pass | malformed timestamp/discussion intent remains fail-closed |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | `tests/unit/application/test_validate.py`; required pytest command | pass | S01 closed for shared parser/catalog foundation |
+| tc-002 | S01 | `tests/unit/application/test_validate.py`; required pytest command | pass | S01 closed for malformed fail-closed behavior |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| none | tc-001, tc-002 | `test_discussion_doc_parser_catalog_handles_hyphenated_and_existing_types`; `test_discussion_doc_malformed_candidates_remain_fail_closed` | tc-001, tc-002 | Tests are concrete aliases for planned S01 closure ids. | no | no |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00188 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction: use `spec-dock-issue-execution` workflow | current worktree | iss-00188 | current session | dev-coder, code-reviewer | S01 allowed paths only; no destructive action, publishing, credentialed access, scope expansion, or forbidden S02-S04 changes | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed with S01 gates |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | runtime/domain validation code and tests | dev-coder | Shared catalog/parser foundation only | `plan.md` S01; `requirement.md`; `design.md` | `domain/discussion_docs.py`; `application/create_node.py`; `domain/validation.py`; focused tests | CLI additions, docs/skill edits, allocator wait behavior, existing artifact migration, public `pr-repair-batch` creation enablement | required pytest command | grammar/policy change, outside allowed paths, or larger validation policy change | changed files, verification, Ledger Note or no material decisions, risks | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | dev-coder | Added shared discussion doc parser/catalog helper; migrated create/validate parsing; added focused tests; no material decisions beyond approved plan. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/discussion_docs.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py`; `tests/unit/application/test_validate.py` | required pytest -> 57 passed, 6 skipped; `git diff --check` -> pass | passed: fresh `code-reviewer` `019ed362-63a6-7121-b843-eb095f838247`, findings=[] | none for S01; S02 still must add `pr-repair-batch` public behavior | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01 | N/A: normal delegation used | N/A | N/A | N/A | revert S01 commit if needed | required pytest -> pass | code-reviewer passed | none |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to S01 commit gate | agent `019ed362-63a6-7121-b843-eb095f838247`, findings=[] |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | pending commit | S01 shared catalog/parser implementation and report evidence | pending | pending | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/discussion_docs.py` - shared discussion doc catalog/parser helper.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - use shared catalog/parser for creation-side validation and doc_id derivation.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - use shared catalog/parser for malformed and duplicate validation.
+- `tests/unit/application/test_validate.py` - S01 parser/catalog and malformed fail-closed tests.
+- `spec-dock/active/issue/report.md` - S01 observed evidence ledger.
 
 #### コミット
-- <hash> <message>
+- pending
 
 #### メモ
-- ...
+- `pr-repair-batch` public creation remains S02 scope and is intentionally not enabled in S01.
 
 ---
 
