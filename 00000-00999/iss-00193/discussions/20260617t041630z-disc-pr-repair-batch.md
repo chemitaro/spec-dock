@@ -52,6 +52,7 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 | C003 | Raw node validation must reject cycles through a target container when adding a dependency to a child node | I004 | Current containment edge model adds parent-to-child reachability but still misses child-to-container future expansion paths for target descendants | U003 | Runtime repair required |
 | C004 | `deps check` must run raw dependency preflight before readiness is computed | I005 | `deps check` still validates only the compiled issue dependency map and can ignore empty-container raw cycles | U004 | Runtime repair required |
 | C005 | Delete must block or scrub raw node dependencies that reference the deleted empty container subtree | I006 | Delete conflict/scrub logic is based on compiled issue edges, which can skip empty containers and leave dangling raw `depends_on` refs | U005 | Runtime repair required |
+| C006 | CLI regression expectations must match `deps check` raw preflight error ordering | I007 | Existing `test_deps.py` assertions expected compiled issue-map errors, but U004 intentionally makes raw structural errors fail first | U006 | Test repair required |
 
 ## Inventory
 
@@ -63,6 +64,7 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 | I004 | review_feedback | C003 | review_feedback:raw-target-container-cycle | Review comment 3425775988 on `domain/deps.py` line 258 | Adding `init-00001 -> iss-00002` can be accepted when `iss-00002` is inside a container that already depends on `init-00001`, creating a future compiled cycle when `init-00001` later gains a child issue | valid | blocking | yes | fix-now | U003 | implemented | Source-descendant future expansion edge added to raw validation and covered by focused regression | Pending PR re-observation |
 | I005 | review_feedback | C004 | review_feedback:deps-check-preflight | Review comment 3425775991 on `sync_state.py` line 477 | `deps check` can report readiness even when raw empty-container cycles would make `validate` / `sync` fail | valid | blocking | yes | fix-now | U004 | implemented | `deps check` now runs raw node validation preflight when topology reader exposes node resolutions | Pending PR re-observation |
 | I006 | review_feedback | C005 | review_feedback:delete-raw-ref-scrub | Review comment 3425775994 on `mutate_deps.py` line 238 | Deleting an empty target container after node-level dependency add can leave unresolved raw `depends_on` references in source metadata | valid | blocking | yes | fix-now | U005 | implemented | Delete now detects surviving raw refs via resolved node dependencies, blocks without force, and scrubs with force | Pending PR re-observation |
+| I007 | check_failure | C006 | check_failure:provider-tests | Provider CI run 27670570728 / job 81833757988 | `test_deps_self_dependency_fails` and `test_deps_descendant_dependency_fails` expected older compiled-graph stderr after U004 raw preflight changed fail-fast ordering | valid | blocking | yes | fix-now | U006 | implemented | Updated expectations to raw structural preflight stderr; focused and integrated local tests pass | Pending PR re-observation |
 
 ## Classification Values
 
@@ -141,6 +143,19 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 - Rationale: No dangling raw dependency refs may remain after successful delete.
 - Residual risk: Medium until implementation confirms the existing delete transaction/rollback shape.
 
+### C006
+
+- Covered inventory IDs: I007
+- Validity analysis: Valid. The CI failure came from stale test expectations, not a runtime behavior defect. U004 intentionally makes `deps check` run raw structural validation before compiled issue dependency readiness.
+- Need-to-fix decision: yes
+- Root cause: `tests/cli_runtime/test_deps.py` still asserted compiled graph error strings for raw self/descendant invalid metadata.
+- Options considered:
+  - Reorder runtime validation to preserve older stderr. Rejected because U004 is explicitly a fail-fast raw preflight repair.
+  - Update tests to assert the new raw structural stderr. Recommended.
+- Recommended disposition: fix-now
+- Rationale: Provider CI must reflect the accepted raw preflight contract.
+- Residual risk: Low after focused and integrated test bundle pass.
+
 ## Repair Queue
 
 | unit_id | source_batch | covered_ids | disposition | risk_class | repair_unit_disc | status | Implementation Plan | Re-observation Result | Residual Risk |
@@ -150,6 +165,7 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 | U003 | disc-20260617t041630z-pr-repair-batch | I004 | fix-now | blocking | `20260617t053300z-disc-pr-repair-unit-u003-target-container-cycle.md` | implemented | Extended raw validation to reject target-descendant/container future cycles and added focused domain regression | pending push / re-observation | Low; pending PR observation |
 | U004 | disc-20260617t041630z-pr-repair-batch | I005 | fix-now | blocking | `20260617t053301z-disc-pr-repair-unit-u004-deps-check-preflight.md` | implemented | Added raw node dependency preflight to `deps check`; optional-port compatibility preserved | pending push / re-observation | Low; pending PR observation |
 | U005 | disc-20260617t041630z-pr-repair-batch | I006 | fix-now | blocking | `20260617t053302z-disc-pr-repair-unit-u005-delete-raw-ref-cleanup.md` | implemented | Delete raw-ref detection now uses `load_node_dependency_resolutions` when available, scrubs exact resolver raw refs, and falls back to direct node-id conflict plus heuristic scrub | pending push / re-observation | Low; pending PR observation |
+| U006 | disc-20260617t041630z-pr-repair-batch | I007 | fix-now | blocking | N/A | implemented | Updated `tests/cli_runtime/test_deps.py` expectations for raw preflight stderr | pending push / re-observation | Low; pending PR observation |
 
 ## Unit Discussion Plan
 
