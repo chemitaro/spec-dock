@@ -11,7 +11,9 @@ from pathlib import Path
 
 
 REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS = 300
-REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS = 90
+REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS = 300
+NEXT_SNAPSHOT_BUDGET_FLOOR_SECONDS = 0.25
+NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS = 0.25
 
 
 def utc_now() -> str:
@@ -304,6 +306,74 @@ def align_decision_observation_complete(payload: dict, observation_complete: boo
     payload["decision_fingerprint"] = fingerprint
 
 
+def decision_int(decision: dict, key: str, default: int = 0) -> int:
+    value = decision.get(key)
+    return value if isinstance(value, int) else default
+
+
+def decision_list(decision: dict, key: str) -> list:
+    value = decision.get(key)
+    return value if isinstance(value, list) else []
+
+
+def actionable_unresolved_reason(payload: dict) -> str | None:
+    decision = decision_payload(payload)
+    selected_unresolved_thread_ids = decision_list(decision, "selected_unresolved_thread_ids")
+    selected_unresolved_count = decision_int(
+        decision,
+        "selected_unresolved_count",
+        len(selected_unresolved_thread_ids),
+    )
+    current_selected_unresolved_count = decision_int(
+        decision,
+        "current_selected_unresolved_count",
+        selected_unresolved_count,
+    )
+    carryover_unresolved_count = decision_int(decision, "carryover_unresolved_count")
+    actionable_unresolved_count = decision_int(decision, "actionable_unresolved_count")
+    actionable_unresolved_thread_ids = decision_list(decision, "actionable_unresolved_thread_ids")
+    decision_reason = decision.get("status_reason")
+    if (
+        decision_reason == "current_selected_unresolved_thread"
+        or selected_unresolved_count > 0
+        or current_selected_unresolved_count > 0
+    ):
+        return "current_selected_unresolved_thread"
+    if (
+        decision_reason == "carryover_non_outdated_unresolved_thread"
+        or carryover_unresolved_count > 0
+        or actionable_unresolved_count > 0
+        or bool(actionable_unresolved_thread_ids)
+    ):
+        return "carryover_non_outdated_unresolved_thread"
+    return None
+
+
+def mark_decision_actionable_unresolved(payload: dict, reason: str) -> None:
+    decision = decision_payload(payload)
+    if not decision:
+        return
+    decision["status"] = "human_gate"
+    decision["status_reason"] = reason
+    decision["recommended_next_action"] = "address_review_feedback"
+    decision["observation_complete"] = False
+    fingerprint_source = dict(decision)
+    fingerprint_source.pop("fingerprint", None)
+    fingerprint = hashlib.sha256(
+        json.dumps(fingerprint_source, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    decision["fingerprint"] = fingerprint
+    payload["decision_fingerprint"] = fingerprint
+
+
+def align_actionable_review_summary(payload: dict, reason: str | None) -> None:
+    if reason not in {"current_selected_unresolved_thread", "carryover_non_outdated_unresolved_thread"}:
+        return
+    summary = payload.get("summary")
+    if isinstance(summary, dict):
+        summary["review"] = "unresolved"
+
+
 def mark_decision_timeout(payload: dict) -> None:
     decision = decision_payload(payload)
     if not decision:
@@ -364,6 +434,8 @@ def no_completion_evidence(payload: dict) -> dict:
 
 
 def is_review_completion_unknown_candidate(payload: dict) -> bool:
+    if actionable_unresolved_reason(payload):
+        return False
     evidence = no_completion_evidence(payload)
     if evidence.get("present") is not True:
         return False
@@ -882,6 +954,9 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
                 return "unknown", "unknown", "fix_github_token_permissions", False, True
             return "unknown", "unknown", "human_gate", False, True
         return ci_status, ci_status, "wait", False, False
+    actionable_reason = actionable_unresolved_reason(payload)
+    if ci_status == "passed" and actionable_reason:
+        return "human_gate", "human_gate", "address_review_feedback", False, True
     if has_permission_limitation(payload):
         return "unknown", "unknown", "fix_github_token_permissions", False, True
     if has_blocking_limitation(payload):
@@ -1199,16 +1274,36 @@ latest_delta: dict = {}
 latest_snapshot_out_dir: Path | None = None
 final_phase = "timeout"
 ci_passed_first_monotonic: float | None = None
+recent_snapshot_elapsed_seconds = NEXT_SNAPSHOT_BUDGET_FLOOR_SECONDS
+next_poll_min_budget_seconds = (
+    recent_snapshot_elapsed_seconds + NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS
+)
+final_poll_skipped_reason: str | None = None
 
 while True:
     if latest_payload is not None and time.monotonic() >= deadline:
         final_phase = "timeout"
         mark_latest_timeout(latest_payload, latest_change_monotonic, same_count)
+        latest_payload.setdefault("wait", {})["next_poll_min_budget_seconds"] = round(
+            next_poll_min_budget_seconds,
+            3,
+        )
         break
 
-    if latest_payload is not None and (deadline - time.monotonic()) < 0.05:
+    remaining_before_poll = deadline - time.monotonic()
+    if latest_payload is not None and remaining_before_poll < next_poll_min_budget_seconds:
         final_phase = "timeout"
+        final_poll_skipped_reason = "insufficient_next_snapshot_budget"
         mark_latest_timeout(latest_payload, latest_change_monotonic, same_count)
+        latest_payload.setdefault("wait", {})["next_poll_min_budget_seconds"] = round(
+            next_poll_min_budget_seconds,
+            3,
+        )
+        latest_payload["wait"]["final_poll_skipped_reason"] = final_poll_skipped_reason
+        latest_payload["wait"]["remaining_seconds_before_final_poll"] = round(
+            max(0, remaining_before_poll),
+            3,
+        )
         break
 
     poll += 1
@@ -1224,6 +1319,11 @@ while True:
         poll_snapshot_args,
         snapshot_timeout,
     )
+    recent_snapshot_elapsed_seconds = max(0, time.monotonic() - now_before)
+    next_poll_min_budget_seconds = max(
+        NEXT_SNAPSHOT_BUDGET_FLOOR_SECONDS,
+        recent_snapshot_elapsed_seconds,
+    ) + NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS
     if snapshot_poll_timed_out and latest_payload is not None:
         payload = latest_payload
         append_snapshot_poll_timeout_limitation(
@@ -1336,6 +1436,15 @@ while True:
     else:
         final_phase = "wait"
 
+    final_actionable_reason = actionable_unresolved_reason(payload)
+    if final_phase == "terminal" and final_actionable_reason:
+        normalized_status = "human_gate"
+        overall_status = "human_gate"
+        next_action = "address_review_feedback"
+        observation_complete = False
+        mark_decision_actionable_unresolved(payload, final_actionable_reason)
+        align_actionable_review_summary(payload, final_actionable_reason)
+
     if observation_complete and review_completion_unknown_candidate:
         normalized_status = "human_gate"
         overall_status = "human_gate"
@@ -1358,6 +1467,7 @@ while True:
         "polls": poll,
         "timeout_seconds": timeout_seconds,
         "poll_interval_seconds": poll_interval_seconds,
+        "next_poll_min_budget_seconds": round(next_poll_min_budget_seconds, 3),
         "quiet_seconds_required": quiet_seconds,
         "quiet_seconds_observed": quiet_elapsed,
         "same_fingerprint_required": same_fingerprint_count,
@@ -1373,6 +1483,10 @@ while True:
         "deadline_reached": final_phase == "timeout",
         "contract_phase": "s05_stable_wait_loop",
     }
+    if observation_complete and review_completion_unknown_candidate:
+        payload["wait"]["post_unknown_fresh_audit_required"] = True
+    if final_poll_skipped_reason:
+        payload["wait"]["final_poll_skipped_reason"] = final_poll_skipped_reason
     payload.setdefault("artifacts", {})
     payload["artifacts"].update(
         {
@@ -1435,7 +1549,9 @@ while True:
     if observation_complete or terminal_now or final_phase == "timeout":
         break
 
-    sleep_seconds = min(poll_interval_seconds, max(0, deadline - time.monotonic()))
+    remaining_after_poll = max(0, deadline - time.monotonic())
+    sleep_budget = max(0, remaining_after_poll - next_poll_min_budget_seconds)
+    sleep_seconds = min(poll_interval_seconds, sleep_budget)
     if sleep_seconds <= 0:
         continue
     time.sleep(sleep_seconds)

@@ -163,6 +163,13 @@ Triage and judgment over collected evidence belong to
 - `audit_fingerprint` is a debug fingerprint for all-fetched audit context. It
   may change because historical or otherwise non-current artifacts changed, and
   must not drive final readiness or wait stability.
+- The actionable review inventory is decision-facing. It includes current
+  trigger-boundary selected unresolved review feedback plus carryover unresolved
+  review threads that are observed through GitHub thread data with
+  `isResolved=false` and `isOutdated=false`.
+- Outdated unresolved threads and threads whose outdated state is unavailable
+  or null remain audit/limitation context. They are not promoted into the
+  actionable inventory.
 
 ## Observation Semantics
 
@@ -194,16 +201,24 @@ status collection are implemented by the public scripts.
   review objects. Issue comments, reactions, or quiet windows are fallback or
   supporting evidence only.
 - `review_completion_unknown` is a non-pass terminal-like review state. It means
-  CI passed, the observed head matched, no current blocker was selected, and no
-  trusted Codex review completion signal was found after the trigger-age and
-  CI-passed-age guards are satisfied.
+  CI passed, the observed head matched, the actionable review inventory was
+  empty, and no trusted Codex review completion signal was found after the
+  trigger-age and CI-passed-age guards are satisfied.
 - Stable no-completion evidence for the current boundary must not be collapsed
   into a generic timeout. The top-level result is `human_gate`, with the decision
   reason indicating `review_completion_unknown`, so a human can review the
   no-completion condition explicitly.
 - `review_completion_unknown` remains a human gate, not `passed` or
-  merge-ready. Below the latency guards, stable no-completion evidence stays in
-  the wait/resume path instead of being promoted early.
+  merge-ready, and it is not proof that no review work exists. Below the latency
+  guards, stable no-completion evidence stays in the wait/resume path instead of
+  being promoted early.
+- When `review_completion_unknown` is emitted, wait metadata marks that a fresh
+  post-unknown audit is required before any merge-prepared or no-review-work
+  reporting. Downstream orchestration must perform that fresh audit instead of
+  reusing the unknown result as absence proof.
+- The wait loop may skip a final under-budget snapshot and preserve the latest
+  useful payload with `final_poll_skipped_reason="insufficient_next_snapshot_budget"`.
+  Treat that as budget-preservation metadata, not as a stronger review result.
 - `fallback_issue_comment` remains low-confidence evidence. It keeps the final
   status in the `human_gate` / `wait_or_resume` path and does not promote a run
   to `passed`, complete, or merge-ready.
@@ -213,10 +228,12 @@ status collection are implemented by the public scripts.
 - S102 is deferred until there is an explicit no-findings artifact contract.
   Generic issue comments, zero selected comments, or review request disappearance
   alone must not mark review completion.
-- Historical unresolved threads in `review.audit` or the legacy all-fetched
-  review fields are audit/debug context only. Only current-boundary selected
-  blockers represented through `decision` can drive final review-feedback
-  readiness decisions.
+- `selected_unresolved_count == 0` only means no current-boundary unresolved
+  feedback was selected. It does not prove that no actionable review work exists;
+  inspect `decision.actionable_unresolved_count`,
+  `decision.current_selected_unresolved_count`,
+  `decision.carryover_unresolved_count`, and the corresponding IDs before
+  reporting no review work.
 - Review bodies selected for the current trigger boundary are included in the
   final `stdout` JSON regardless of `--body-mode`.
 - When a timeout or limit occurs before CI and review complete, the final JSON

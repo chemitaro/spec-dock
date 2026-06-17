@@ -233,6 +233,50 @@ def collector_decision_payload(review_wrapper_payload: dict[str, object], review
     return {}
 
 
+def decision_int(decision: dict[str, object], key: str, default: int = 0) -> int:
+    value = decision.get(key)
+    return value if isinstance(value, int) else default
+
+
+def decision_list(decision: dict[str, object], key: str) -> list[object]:
+    value = decision.get(key)
+    return value if isinstance(value, list) else []
+
+
+def actionable_unresolved_reason(decision: dict[str, object]) -> str | None:
+    selected_unresolved_thread_ids = decision_list(decision, "selected_unresolved_thread_ids")
+    selected_unresolved_count = decision_int(
+        decision,
+        "selected_unresolved_count",
+        len(selected_unresolved_thread_ids),
+    )
+    current_selected_unresolved_count = decision_int(
+        decision,
+        "current_selected_unresolved_count",
+        selected_unresolved_count,
+    )
+    carryover_unresolved_count = decision_int(decision, "carryover_unresolved_count")
+    actionable_unresolved_count = decision_int(decision, "actionable_unresolved_count")
+    actionable_unresolved_thread_ids = decision_list(decision, "actionable_unresolved_thread_ids")
+    decision_status_reason = (
+        decision.get("status_reason") if isinstance(decision.get("status_reason"), str) else None
+    )
+    if (
+        decision_status_reason == "current_selected_unresolved_thread"
+        or selected_unresolved_count > 0
+        or current_selected_unresolved_count > 0
+    ):
+        return "current_selected_unresolved_thread"
+    if (
+        decision_status_reason == "carryover_non_outdated_unresolved_thread"
+        or carryover_unresolved_count > 0
+        or actionable_unresolved_count > 0
+        or bool(actionable_unresolved_thread_ids)
+    ):
+        return "carryover_non_outdated_unresolved_thread"
+    return None
+
+
 def has_blocking_limitation(limitations: list[object], ignored_codes: set[str] | None = None) -> bool:
     ignored_codes = ignored_codes or set()
     return any(
@@ -278,19 +322,8 @@ def classify_snapshot(
         else None
     )
     decision_observation_complete = decision.get("observation_complete")
-    selected_unresolved_thread_ids = (
-        decision.get("selected_unresolved_thread_ids")
-        if isinstance(decision.get("selected_unresolved_thread_ids"), list)
-        else []
-    )
-    selected_unresolved_count = decision.get("selected_unresolved_count")
-    if not isinstance(selected_unresolved_count, int):
-        selected_unresolved_count = len(selected_unresolved_thread_ids)
-    selected_changes_requested_evidence = (
-        decision.get("selected_changes_requested_evidence")
-        if isinstance(decision.get("selected_changes_requested_evidence"), list)
-        else []
-    )
+    actionable_reason = actionable_unresolved_reason(decision)
+    selected_changes_requested_evidence = decision_list(decision, "selected_changes_requested_evidence")
     codex_review = (
         review_wrapper_payload.get("codex_review")
         if isinstance(review_wrapper_payload.get("codex_review"), dict)
@@ -316,14 +349,14 @@ def classify_snapshot(
                 return "unknown", "fix_github_token_permissions", False, "blocking_limitation"
             return "unknown", "human_gate", False, "blocking_limitation"
         return str(ci_status), "wait", False, "ci_pending"
+    if ci_status == "passed" and actionable_reason:
+        return "human_gate", "address_review_feedback", True, actionable_reason
     if has_permission_limitation(limitations):
         return "unknown", "fix_github_token_permissions", False, "blocking_limitation"
     if has_blocking_limitation(limitations):
         return "unknown", "human_gate", False, "blocking_limitation"
     if ci_status != "passed":
         return "unknown", "human_gate", False, "blocking_limitation"
-    if decision_status_reason == "current_selected_unresolved_thread" or selected_unresolved_count > 0:
-        return "human_gate", "address_review_feedback", True, "current_selected_unresolved_thread"
     if decision_status_reason == "current_selected_changes_requested" or selected_changes_requested_evidence:
         return "human_gate", "address_review_feedback", True, "current_selected_changes_requested"
     if completion_signal == "fallback_issue_comment":
@@ -584,6 +617,8 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
         trigger_comment_id=args.trigger_comment_id,
         trigger_created_at=args.trigger_created_at,
     )
+    if status_reason in {"current_selected_unresolved_thread", "carryover_non_outdated_unresolved_thread"}:
+        summary["review"] = "unresolved"
 
     review_collector_fingerprint = review_wrapper_payload.get("fingerprint") if isinstance(review_wrapper_payload, dict) else None
     review_decision_payload = collector_decision_payload(review_wrapper_payload, review_payload)
