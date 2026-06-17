@@ -10,12 +10,21 @@ from ..application.contracts import (
     CreateNodeResult,
     UseCases,
 )
-from ..domain.discussion_docs import CREATABLE_DISCUSSION_DOC_TYPES
 from ..presentation.cli_text import render_new_doc_text, render_new_node_text
 from ..presentation.contracts import CliText
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
 
-_discussion_doc_types = CREATABLE_DISCUSSION_DOC_TYPES
+_discussion_doc_types = (
+    "adr",
+    "disc",
+    "research",
+    "interview",
+    "scratch",
+    "pr-repair-batch",
+    "draft-requirement",
+    "draft-design",
+    "draft-plan",
+)
 
 
 @dataclass(frozen=True)
