@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00188",
+  "title": "Prevent duplicate discussion timestamp slots when creating multiple artifacts",
+  "slug": "prevent-duplicate-discussion-timestamp-slots",
+  "created_at": "2026-06-17T08:59:34+09:00",
+  "updated_at": "2026-06-17T08:59:34+09:00",
+  "parent_id": "epic-00033",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00033",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 188,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}
