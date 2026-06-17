@@ -102,18 +102,24 @@ if [ -n "$out_dir" ] && [[ "$out_dir" == -* ]]; then
   fail_usage
 fi
 
-owner="${repo%%/*}"
-name="${repo#*/}"
-
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-OBS_REPO="$repo" \
-OBS_OWNER="$owner" \
-OBS_NAME="$name" \
-OBS_PR="$pr" \
-OBS_HEAD_SHA="$head_sha" \
-OBS_TRIGGER_COMMENT_ID="$trigger_comment_id" \
-OBS_TRIGGER_CREATED_AT="$trigger_created_at" \
-OBS_BODY_MODE="$body_mode" \
-OBS_OUT_DIR="$out_dir" \
-python3 "$script_dir/pr_review_snapshot.py"
+python_args=(
+  --repo "$repo"
+  --pr "$pr"
+  --body-mode "$body_mode"
+)
+if [ -n "$head_sha" ]; then
+  python_args+=(--head-sha "$head_sha")
+fi
+if [ -n "$trigger_comment_id" ]; then
+  python_args+=(--trigger-comment-id "$trigger_comment_id")
+fi
+if [ -n "$trigger_created_at" ]; then
+  python_args+=(--trigger-created-at "$trigger_created_at")
+fi
+if [ -n "$out_dir" ]; then
+  python_args+=(--out "$out_dir")
+fi
+
+python3 "$script_dir/pr_review_snapshot.py" "${python_args[@]}"

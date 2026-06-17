@@ -64,8 +64,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | ID | adoption_status | source | source_role | claim | target_artifact | target_section | rationale | evidence_strength | evidence_path | adopter | reviewer | blocking | next_action |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| EAL-001 | adopted | discussion draft | system-architect | Extract review snapshot Python to `scripts/lib/pr_review_snapshot.py`, keep `fetch_pr_review_snapshot.sh` as thin public wrapper, preserve JSON/exit/stderr semantics, and verify provider/mirror equivalence plus focused wrapper behavior | `design.md`; `report.md` | `採用方針 / トレードオフ`; `依存関係分析`; `モジュール依存図`; `インターフェース契約`; `ディレクトリ / ファイル変更計画`; `テスト戦略`; `リスク / 移行 / ロールバック`; Delegated Draft Evidence | Draft matches reviewed requirement, existing provider/mirror boundary, and existing skill-local Python entrypoint pattern. It avoids behavior/signal scope creep and gives plan-authoring-ready file and verification boundaries. | high | `discussions/20260617t065836z-disc-review-snapshot-python-extraction-design-draft.md`; post-run diff guard observed only this discussion file plus orchestrator-owned `report.md` changes | main orchestrator | spec-reviewer design gate pending | no | run fresh spec-reviewer for canonical `design.md` |
-| EAL-002 | adopted | discussion draft | implementation-planner | Plan S10/S20/S30/S90/S99 as separate reviewable steps with Spec-Locked Closure Index, delegated worker contracts, concrete test cards, final QA/code/spec gates, and final exit contract | `plan.md`; `report.md` | `この計画で満たす要件ID`; `依存関係から導く実装順序`; `ステップ一覧`; `仕様固定クロージャ索引`; `実装ステップ`; `推奨検証コマンド`; `Final Exit Contract`; Delegated Draft Evidence | Draft is based on reviewer-pass requirement/design, follows `phase_plan_issue.md` / `authoring/issue-plan.md`, keeps provider extraction before mirror parity, and prevents a single oversized implementation step. | high | `discussions/20260617t071824z-disc-review-snapshot-python-extraction-plan-draft.md`; post-run diff guard observed only this discussion file plus orchestrator-owned canonical docs changes | main orchestrator | spec-reviewer plan gate pending | no | run fresh spec-reviewer for canonical `plan.md` |
+| EAL-001 | adopted | discussion draft | system-architect | Extract review snapshot Python to `scripts/lib/pr_review_snapshot.py`, keep `fetch_pr_review_snapshot.sh` as thin public wrapper, preserve JSON/exit/stderr semantics, and verify provider/mirror equivalence plus focused wrapper behavior | `design.md`; `report.md` | `採用方針 / トレードオフ`; `依存関係分析`; `モジュール依存図`; `インターフェース契約`; `ディレクトリ / ファイル変更計画`; `テスト戦略`; `リスク / 移行 / ロールバック`; Delegated Draft Evidence | Draft matches reviewed requirement, existing provider/mirror boundary, and existing skill-local Python entrypoint pattern. It avoids behavior/signal scope creep and gives plan-authoring-ready file and verification boundaries. | high | `discussions/20260617t065836z-disc-review-snapshot-python-extraction-design-draft.md`; post-run diff guard observed only this discussion file plus orchestrator-owned `report.md` changes | main orchestrator | spec-reviewer design gate pass | no | adopted into canonical `design.md`; no further authoring action |
+| EAL-002 | adopted | discussion draft | implementation-planner | Plan S10/S20/S30/S90/S99 as separate reviewable steps with Spec-Locked Closure Index, delegated worker contracts, concrete test cards, final QA/code/spec gates, and final exit contract | `plan.md`; `report.md` | `この計画で満たす要件ID`; `依存関係から導く実装順序`; `ステップ一覧`; `仕様固定クロージャ索引`; `実装ステップ`; `推奨検証コマンド`; `Final Exit Contract`; Delegated Draft Evidence | Draft is based on reviewer-pass requirement/design, follows `phase_plan_issue.md` / `authoring/issue-plan.md`, keeps provider extraction before mirror parity, and prevents a single oversized implementation step. | high | `discussions/20260617t071824z-disc-review-snapshot-python-extraction-plan-draft.md`; post-run diff guard observed only this discussion file plus orchestrator-owned canonical docs changes | main orchestrator | spec-reviewer plan gate pass | no | adopted into canonical `plan.md`; execution completed through S90 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -73,7 +73,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | `fetch_pr_review_snapshot.sh` provider/mirror wrappers are heredoc-free and invoke sibling `pr_review_snapshot.py`; focused wrapper/scaffold tests pass | public wrapper path, usage validation, review JSON/body behavior, provider/mirror parity, and docs impact no-op evidence are recorded in S10/S20/S30/S90 logs | none | pass |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -111,8 +111,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| system-architect | iss-00197 | `discussions/20260617t065836z-disc-review-snapshot-python-extraction-design-draft.md` | `requirement.md`; `report.md`; parent epic design; provider/mirror `fetch_pr_review_snapshot.sh`; existing extracted Python entrypoints | `design.md`; `report.md` | adopted | [`design.md`, `report.md`] | passed by orchestrator diff review; only allowed discussion file was added by delegate, with pre-existing orchestrator-owned `report.md` modification | Adopted design decision for `pr_review_snapshot.py`, wrapper/Python split, interface contract, provider/mirror strategy, file plan, test strategy, and risks | None material | none | pending fresh spec-reviewer | canonical `design.md` updated; phase promotion requires fresh spec-reviewer pass |
-| implementation-planner | iss-00197 | `discussions/20260617t071824z-disc-review-snapshot-python-extraction-plan-draft.md` | reviewer-pass `requirement.md`; reviewer-pass `design.md`; `report.md`; plan authoring docs; `test_init_update.py`; current provider wrapper | `plan.md`; `report.md` | adopted | [`plan.md`, `report.md`] | passed by orchestrator diff review; only allowed plan discussion file was added by delegate, with pre-existing orchestrator-owned canonical docs modifications | Adopted S10/S20/S30/S90/S99 step decomposition, closure index, delegation contracts, concrete test cards, final gates, and exit contract | None material; wording compressed for canonical plan length | none | pending fresh spec-reviewer | canonical `plan.md` updated; execution handoff requires fresh plan spec-review pass |
+| system-architect | iss-00197 | `discussions/20260617t065836z-disc-review-snapshot-python-extraction-design-draft.md` | `requirement.md`; `report.md`; parent epic design; provider/mirror `fetch_pr_review_snapshot.sh`; existing extracted Python entrypoints | `design.md`; `report.md` | adopted | [`design.md`, `report.md`] | passed by orchestrator diff review; only allowed discussion file was added by delegate, with pre-existing orchestrator-owned `report.md` modification | Adopted design decision for `pr_review_snapshot.py`, wrapper/Python split, interface contract, provider/mirror strategy, file plan, test strategy, and risks | None material | none | spec-reviewer pass | canonical `design.md` updated and promoted to plan |
+| implementation-planner | iss-00197 | `discussions/20260617t071824z-disc-review-snapshot-python-extraction-plan-draft.md` | reviewer-pass `requirement.md`; reviewer-pass `design.md`; `report.md`; plan authoring docs; `test_init_update.py`; current provider wrapper | `plan.md`; `report.md` | adopted | [`plan.md`, `report.md`] | passed by orchestrator diff review; only allowed plan discussion file was added by delegate, with pre-existing orchestrator-owned canonical docs modifications | Adopted S10/S20/S30/S90/S99 step decomposition, closure index, delegation contracts, concrete test cards, final gates, and exit contract | None material; wording compressed for canonical plan length | none | spec-reviewer pass | canonical `plan.md` updated and execution handoff completed |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -179,7 +179,7 @@ uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_1
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S10 | `tc-001`, `tc-002` | S10 tests pass, baseline `rg` evidence recorded, `code-reviewer` pass, report closure entries complete, step commit/no-op gate closed | baseline `rg` pass; focused pytest pass; report entries recorded; `code-reviewer` pass | pass | commit gate は次に実施 |
+| S10 | `tc-001`, `tc-002` | S10 tests pass, baseline `rg` evidence recorded, `code-reviewer` pass, report closure entries complete, step commit/no-op gate closed | baseline `rg` pass; focused pytest pass; report entries recorded; `code-reviewer` pass; commit `7b6ab214`; post-commit clean | pass | closed |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -212,7 +212,7 @@ uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_1
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S10 | N/A | N/A | N/A | N/A | N/A | N/A | `code-reviewer` pending | no parent implementation exception used |
+| S10 | N/A | N/A | N/A | N/A | N/A | N/A | `code-reviewer` passed | no parent implementation exception used |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
@@ -222,14 +222,14 @@ uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_1
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S10 | pending reviewer / pending commit | `tests/unit/infra/test_init_update.py`; `report.md` | pending | pending | N/A | N/A | N/A | N/A |
+| S10 | committed | `tests/unit/infra/test_init_update.py`; `report.md` | `7b6ab214 test(pr-observation): review snapshot抽出前のwrapper挙動を固定` | `git status --short --branch --untracked-files=all` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `tests/unit/infra/test_init_update.py` - S10 characterization/static guard tests を追加。
 - `report.md` - S10 observed evidence ledger を追記。
 
 #### コミット
-- pending
+- `7b6ab214 test(pr-observation): review snapshot抽出前のwrapper挙動を固定`
 
 #### メモ
 - S10 の material implementation decisions はなし。delegate note: `No material implementation decisions beyond the approved plan.`
@@ -293,7 +293,7 @@ rg -n "pr_review_snapshot.py|python3" src/spec_dock/assets/install_root/.agents/
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S20 | `tc-002`, `tc-003`, `tc-004`, `tc-005` | provider wrapper no heredoc, provider Python exists, wrapper behavior and JSON contract preserved, `code-reviewer` pass, report closure entries complete, step commit gate closed | provider wrapper no heredoc; sibling Python exists; selected pytest pass; `py_compile` pass; report entries recorded; `code-reviewer` pass | pass | commit gate は次に実施 |
+| S20 | `tc-002`, `tc-003`, `tc-004`, `tc-005` | provider wrapper no heredoc, provider Python exists, wrapper behavior and JSON contract preserved, `code-reviewer` pass, report closure entries complete, step commit gate closed | provider wrapper no heredoc; sibling Python exists; selected pytest pass; `py_compile` pass; report entries recorded; `code-reviewer` pass; commit `ef157721`; post-commit clean | pass | closed |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -330,7 +330,7 @@ rg -n "pr_review_snapshot.py|python3" src/spec_dock/assets/install_root/.agents/
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S20 | N/A | N/A | N/A | N/A | N/A | N/A | `code-reviewer` pending | no parent implementation exception used |
+| S20 | N/A | N/A | N/A | N/A | N/A | N/A | `code-reviewer` passed | no parent implementation exception used |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
@@ -340,7 +340,7 @@ rg -n "pr_review_snapshot.py|python3" src/spec_dock/assets/install_root/.agents/
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S20 | pending reviewer / pending commit | provider wrapper; provider `pr_review_snapshot.py`; `tests/unit/infra/test_init_update.py`; `report.md` | pending | pending | N/A | N/A | N/A | N/A |
+| S20 | committed | provider wrapper; provider `pr_review_snapshot.py`; `tests/unit/infra/test_init_update.py`; `report.md` | `ef157721 refactor(pr-observation): review snapshotのprovider Pythonを分離` | `git status --short --branch --untracked-files=all` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh` - provider public wrapper を薄い shell wrapper に変更。
@@ -349,7 +349,7 @@ rg -n "pr_review_snapshot.py|python3" src/spec_dock/assets/install_root/.agents/
 - `report.md` - S20 observed evidence ledger を追記。
 
 #### コミット
-- pending
+- `ef157721 refactor(pr-observation): review snapshotのprovider Pythonを分離`
 
 #### メモ
 - S20 の material implementation decisions はなし。delegate note: `No material implementation decisions beyond the approved plan.`
@@ -426,7 +426,7 @@ pass; no output
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S30 | `tc-006`, `tc-007` | mirror wrapper and Python match provider meaning and are heredoc-free; init/update installs Python byte-for-byte; `code-reviewer` pass; report closure entries complete; step commit gate closed | mirror/provider heredoc no-match; wrapper cmp 0; Python cmp 0; issue_197 pytest pass; report entries recorded; `code-reviewer` pass | pass | commit gate は次に実施 |
+| S30 | `tc-006`, `tc-007` | mirror wrapper and Python match provider meaning and are heredoc-free; init/update installs Python byte-for-byte; `code-reviewer` pass; report closure entries complete; step commit gate closed | mirror/provider heredoc no-match; wrapper cmp 0; Python cmp 0; issue_197 pytest pass; report entries recorded; `code-reviewer` pass; commit `67f2abec`; post-commit clean | pass | closed |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -459,7 +459,7 @@ pass; no output
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S30 | N/A | N/A | N/A | N/A | N/A | N/A | `code-reviewer` pending | no parent implementation exception used |
+| S30 | N/A | N/A | N/A | N/A | N/A | N/A | `code-reviewer` passed | no parent implementation exception used |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
@@ -469,7 +469,7 @@ pass; no output
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S30 | pending reviewer / pending commit | mirror wrapper; mirror `pr_review_snapshot.py`; `tests/unit/infra/test_init_update.py`; `report.md` | pending | pending | N/A | N/A | N/A | N/A |
+| S30 | committed | mirror wrapper; mirror `pr_review_snapshot.py`; `tests/unit/infra/test_init_update.py`; `report.md` | `67f2abec refactor(pr-observation): review snapshotのmirror Pythonを分離` | `git status --short --branch --untracked-files=all` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh` - dogfooding mirror wrapper を provider と同形の薄い shell wrapper に変更。
@@ -478,7 +478,7 @@ pass; no output
 - `report.md` - S30 observed evidence ledger を追記。
 
 #### コミット
-- pending
+- `67f2abec refactor(pr-observation): review snapshotのmirror Pythonを分離`
 
 #### メモ
 - S30 の material implementation decisions はなし。delegate note: `No material implementation decisions beyond the approved plan.`
@@ -519,7 +519,7 @@ src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/l
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
 | S90 | 赤フェーズ / 代替証跡（Red / alternative） | `tc-008`: docs/skill/scaffold impact is updated or closed as no-op | stale heredoc docs were not found | `rg` docs / skills / scaffold search | approved-no-op | public wrapper path references remain valid |
-| S90 | 緑フェーズ（Green） | docs impact closed | no docs/skill text update required | inspection | approved-no-op | spec-reviewer pending |
+| S90 | 緑フェーズ（Green） | docs impact closed | no docs/skill text update required | inspection | approved-no-op | spec-reviewer pass |
 | S90 | リファクタリング（Refactor） | docs-only/no-op | no file mutation except report evidence | diff inspection | pass | `doc-writer` not needed |
 
 #### 発見されたテスト / リスク（Discovered Tests）
@@ -540,7 +540,7 @@ src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/l
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| `tc-008` | S90 | docs / skill / scaffold text search | approved-no-op pending reviewer | no stale heredoc docs found |
+| `tc-008` | S90 | docs / skill / scaffold text search | approved-no-op | no stale heredoc docs found |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -550,7 +550,7 @@ src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/l
 #### 実装委任ゲート（Implementation Delegation Gate）
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S90 | approved-local-execution | inspect-only docs impact no-op | N/A | docs / skill / scaffold text inspection | `plan.md` S90; final S30 file layout | report evidence only | docs/source mutation without stale text; implementation files; GitHub state | search evidence; spec-reviewer gate | stale docs found requiring text change | report evidence and reviewer result | docs no-op evidence recorded; spec-reviewer pending |
+| S90 | approved-local-execution | inspect-only docs impact no-op | N/A | docs / skill / scaffold text inspection | `plan.md` S90; final S30 file layout | report evidence only | docs/source mutation without stale text; implementation files; GitHub state | search evidence; spec-reviewer gate | stale docs found requiring text change | report evidence and reviewer result | docs no-op evidence recorded; spec-reviewer pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -560,7 +560,7 @@ src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/l
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S90 | N/A; no docs mutation required, so no doc-writer write delegation was needed | N/A | `report.md` | evidence recording only | revert S90 report block if reviewer rejects no-op | `rg` docs impact inspection | `spec-reviewer` pending | no waiver / denied / unavailable state used |
+| S90 | N/A; no docs mutation required, so no doc-writer write delegation was needed | N/A | `report.md` | evidence recording only | revert S90 report block if reviewer rejects no-op | `rg` docs impact inspection | `spec-reviewer` passed | no waiver / denied / unavailable state used |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
@@ -570,128 +570,163 @@ src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/l
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S90 | pending reviewer / pending no-op commit gate | `report.md` only | pending | pending | docs/skill source files unchanged because stale text was not found | docs/skills/scaffold search targets listed in command | pending after report update | `rg` inspection recorded |
+| S90 | committed / approved-no-op | `report.md` only | `a65ee902 docs(spec-dock): review snapshot分離のdocs影響を記録` | `git status --short --branch --untracked-files=all` -> clean after commit | docs/skill source files unchanged because stale text was not found | docs/skills/scaffold search targets listed in command | `git diff --check` -> pass | `rg` inspection recorded |
 
 #### 変更したファイル
 - `report.md` - S90 docs impact no-op evidence を追記。
 
 #### コミット
-- pending
+- `a65ee902 docs(spec-dock): review snapshot分離のdocs影響を記録`
 
 #### メモ
-- S90 の material implementation decisions はなし。docs / skill text update は不要と判断したが、spec-reviewer gate で確認する。
+- S90 の material implementation decisions はなし。docs / skill text update は不要と判断し、spec-reviewer gate で確認済み。
 
 ---
 
-### セッションログ（2026-06-17 HH:MM - HH:MM）
+### セッションログ（2026-06-17 20:28 - 21:33 JST）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S99 Final quality gate
+- AC/EC: all AC/EC
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: `実装ステップ S99 — Final quality gate`
+  - closure ids: `tc-009`
 
 #### 実施内容
-- ...
+- 全 step の commit gate / reviewer evidence / authoring adoption evidence を最終状態へ整理した。
+- 最終検証で `python -m py_compile` が provider / mirror asset tree に `__pycache__` を作る副作用を発見したため、生成 cache を削除し、inventory/parity tests が cache を拾わない状態へ戻した。
+- dogfooding issue `iss-00197` の `.meta.json` が checked-in dogfooding snapshot 定数に未反映だったため、`tests/unit/infra/test_init_update.py` の `.meta.json` path list と depends-on map に追加した。
+- 失敗した4件を再実行して pass を確認し、その後 `tests/unit/infra/test_init_update.py` 全体が pass することを確認した。
+- final spec-reviewer が P1「approved design requires argv-based wrapper-to-Python boundary」を指摘したため、bounded follow-up として provider/mirror wrapper から Python entrypoint へ `--repo` / `--pr` などの argv を渡す境界に修正した。
+- direct Python entrypoint が `OBS_*` 環境変数なしで argv を受け付ける focused test を追加し、P1 修正後に focused / regression / static / parity / full verification を再実行した。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+git diff --check
 
-<result>
+pass; no output
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "issue_197 or issue_187_s410 or issue_75_pr_observation_review_collector_explicit_trigger_body_caps_and_threads or issue_176_s03_review_collector_returns_codex_review_contract"
+
+11 passed, 427 deselected in 1.86s
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "issue_197"
+
+4 passed, 434 deselected in 0.45s
+```
+
+```bash
+rg -n "python3 - <<'PY'|<<PY|<<'PY'" src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh .agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh
+
+no matches; exit 1
+```
+
+```bash
+cmp -s src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh .agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh; printf 'wrapper_cmp=%s\n' $?
+cmp -s src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py .agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py; printf 'python_cmp=%s\n' $?
+
+wrapper_cmp=0
+python_cmp=0
+```
+
+```bash
+./spec-dock/scripts/spec-dock sync
+
+spec-dock: sync: active unchanged (matched id in branch: iss-00197)
+spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_69_full_install_root_inventory_is_packaged_in_wheel_sdist_and_installed_resources tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_70_build_plan_uses_install_root_recursive_inventory_including_workflow tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets
+
+4 passed in 4.32s
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py
+
+438 passed in 255.83s (0:04:15)
+```
+
+```bash
+find src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib .agents/skills/github-pr-observation/scripts/lib -type d -name __pycache__ -print
+
+no output
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S99 | 赤フェーズ / 代替証跡（Red / alternative） | `tc-009`: final gate catches premature completion | full `test_init_update.py` initially found pycache inventory drift and dogfooding `.meta.json` snapshot drift | full pytest failure analysis | pass | both were fixed before final reviewer gates |
+| S99 | 緑フェーズ（Green） | all closure IDs have evidence; focused/static/full tests pass | focused 11 pass; issue_197 4 pass; full test_init_update 438 pass; sync pass; no pycache remains | pytest / rg / cmp / sync / find | pass | final QA/code/spec reviewers passed after P1 follow-up |
+| S99 | リファクタリング（Refactor） | final report ledger and snapshot consistency | report pending/template artifacts removed; dogfooding snapshot constants updated; argv boundary restored to match approved design | diff inspection | pass | wrapper/Python boundary changed to match design; review semantics unchanged |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S99 | `py_compile` created `__pycache__` under provider/mirror asset trees, causing inventory/parity tests to fail | final pytest | removed generated cache directories; verified no `__pycache__` remains | `tc-009` | no | failed 4 tests then targeted 4 passed and full 438 passed after P1 follow-up |
+| S99 | checked-in dogfooding `.meta.json` snapshot lacked new `iss-00197` path | final pytest | added `iss-00197` `.meta.json` to path list and depends-on map | `tc-009` | no | `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` pass |
+| S99 | final spec-review P1 found env-only wrapper/Python bridge did not match approved argv-based design | `spec-reviewer` | bounded dev-coder follow-up changed provider/mirror wrappers to pass argv and Python entrypoint to parse argv without `OBS_*`; added focused direct-entrypoint test | `tc-009` | no | issue_197 4 passed; selected regression 11 passed; full 438 passed |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S99 | `tc-009` | all closure IDs have evidence; focused tests/static checks pass; final reviewers pass | all previous steps closed; P1 argv follow-up completed; focused/static/full verification pass; final QA/code/spec reviewers pass | pass | ready for commit gate |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
+| `tc-009` | S99 | yes | manual-required | S10-S90 committed and clean; final spec P1 found and fixed | focused/static/full verification listed above plus final reviewer pass | pass | final reviewer gates closed |
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| `tc-001` | S10 | S10 report + commit `7b6ab214` | pass | baseline established before extraction |
+| `tc-002` | S10/S20 | wrapper usage test in focused and final pytest | pass | invalid args / help boundary preserved |
+| `tc-003` | S20 | provider no-heredoc test/static `rg` | pass | provider wrapper invokes sibling Python |
+| `tc-004` | S20 | existing S04 review snapshot tests | pass | JSON/review semantics preserved |
+| `tc-005` | S20 | body-mode / `--out` tests | pass | artifact behavior preserved |
+| `tc-006` | S30 | provider/mirror no-heredoc and byte parity checks | pass | mirror parity closed |
+| `tc-007` | S30 | init/update scaffold asset test | pass | Python asset restored byte-for-byte |
+| `tc-008` | S90 | docs impact search + spec-reviewer pass | approved-no-op | stale docs not found |
+| `tc-009` | S99 | final focused/static/full verification after P1 argv follow-up | pass | final QA/code/spec reviewers passed |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
-
-#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
-`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
-
-| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
-|---|---|---|---|---|---|---|---|---|
-| user instruction: `[$spec-dock-issue-planning]` current-session workflow request and supplied skill body requiring fresh `spec-reviewer` gates | `/Users/iwasawayuuta/.codex/worktrees/1fe5/spec-dock` | iss-00197 | current session | `spec-reviewer` | read-only review of active issue requirement/design/plan and supporting parent/discussion/source files; no file mutation, no GitHub mutation, no publishing, no credentialed external write | issue complete / session end / active issue changes / user revocation / host policy conflict | one design reviewer attempt errored due model capacity and was retried with a fresh reviewer; no denial or waiver used | reviewer gates may proceed only on fresh `review_status: pass`; non-pass blocks promotion |
-| user instruction: `[$spec-dock-issue-planning]` current-session workflow request; scope-local discussion direct-write consent granted by orchestrator invocation contract for design draft | `/Users/iwasawayuuta/.codex/worktrees/1fe5/spec-dock` | iss-00197 | current session | `system-architect` | may create exactly one new flat Markdown discussion file at `spec-dock/active/issue/discussions/20260617t065836z-disc-review-snapshot-python-extraction-design-draft.md`; must not edit canonical docs, implementation files, tests, config, `.agents`, `.codex`, `.github`, GitHub state, or run git add/commit/push | draft produced / issue scope changes / session end / user revocation / forbidden side effect / host policy conflict | none observed; post-run diff guard saw only allowed discussion file plus orchestrator-owned canonical changes | draft adopted through EAL-001 and Delegated Draft Evidence; canonical design required and received fresh spec-reviewer pass |
-| user instruction: `[$spec-dock-issue-planning]` current-session workflow request; scope-local discussion direct-write consent granted by orchestrator invocation contract for plan draft | `/Users/iwasawayuuta/.codex/worktrees/1fe5/spec-dock` | iss-00197 | current session | `implementation-planner` | may create exactly one new flat Markdown discussion file at `spec-dock/active/issue/discussions/20260617t071824z-disc-review-snapshot-python-extraction-plan-draft.md`; must not edit canonical docs, implementation files, tests, config, `.agents`, `.codex`, `.github`, GitHub state, or run git add/commit/push | draft produced / issue scope changes / session end / user revocation / forbidden side effect / host policy conflict | none observed; post-run diff guard saw only allowed discussion file plus orchestrator-owned canonical changes | draft adopted through EAL-002 and Delegated Draft Evidence; rerun fresh plan spec-review after this consent evidence fix |
-
-#### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
-
-| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
-
-#### 委任 worker 証跡（Delegated Worker Evidence）
-| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
-|---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
-
-#### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| added | `tc-009` | dogfooding `.meta.json` snapshot assertion | `tc-009` | final full pytest found snapshot drift from new issue scaffold | no | final reviewers yes |
+| cleanup | `tc-009` | generated `__pycache__` directories | `tc-009` | final py_compile side effect created non-source files under asset inventory | no | final reviewers yes |
+| changed | `tc-009` | final spec-review P1 argv boundary follow-up | `tc-009` | implementation had used env-only bridge while approved design specified argv boundary | no | final reviewers yes |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S99 | final QA reviewer | `qa-reviewer` | fresh after P1 follow-up | passed | no | proceed to commit gate | no findings; test/evidence coverage sufficient |
+| S99 | final code reviewer | `code-reviewer` | fresh after P1 follow-up | passed | no | proceed to commit gate | no findings; argv construction, Python validation, provider/mirror parity, and behavior preservation accepted |
+| S99 | final spec reviewer | `spec-reviewer` | fresh after P1 follow-up | passed | no | proceed to commit gate | prior P1 fixed; no unresolved spec inconsistency or ledger gap |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S99 | committed | provider/mirror wrappers; provider/mirror `pr_review_snapshot.py`; `tests/unit/infra/test_init_update.py`; `report.md` | commit hash recorded in external delivery evidence because self-recording the amended commit hash would be circular | `git status --short --branch --untracked-files=all` -> clean after commit | N/A | N/A | `git diff --check` -> pass | staged diff was committed as S99 scope |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh` - provider wrapper から Python entrypoint へ argv を渡す境界へ修正。
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` - provider Python entrypoint で argv を parse / validate するよう修正。
+- `.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh` - dogfooding mirror wrapper を provider と一致させた。
+- `.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` - dogfooding mirror Python を provider と一致させた。
+- `tests/unit/infra/test_init_update.py` - checked-in dogfooding `.meta.json` snapshot に `iss-00197` を追加し、direct Python argv entrypoint test を追加。
+- `report.md` - S99 final verification、P1 follow-up、discovered failure/fix evidence を追記。
 
 #### コミット
-- <hash> <message>
+- pending
 
 #### メモ
-- ...
-
----
-
-### セッションログ（2026-06-17 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
+- S99 の material implementation decisions はなし。final verification で見つかった failures は generated cache cleanup と dogfooding snapshot update で解消し、final spec-review P1 は approved design に合わせて argv boundary を実装する bounded follow-up で解消した。
 
 ---
 
@@ -700,37 +735,41 @@ src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/l
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / README / workflow / skill / migration notes | no | N/A | S90 search found no stale heredoc docs; public wrapper path references remain valid | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | added + existing sufficient | focused/static/full verification recorded in S99 after P1 follow-up | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | no findings after P1 follow-up | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | previous P1 fixed by argv boundary follow-up; fresh re-review found no remaining inconsistency | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S99 report ledger complete through final reviewers | provider/mirror wrappers; provider/mirror `pr_review_snapshot.py`; `tests/unit/infra/test_init_update.py`; `report.md` | final response and PR body | committed; post-commit clean confirmed |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: `python -m py_compile` が asset tree に `__pycache__` を生成し、inventory/parity tests が失敗した。
+  - 解決: 生成 cache を削除し、以後の final verification では `find ... -name __pycache__` で残存なしを確認した。
+- 問題: 新しい dogfooding issue `iss-00197` の `.meta.json` が checked-in dogfooding snapshot 定数に未反映だった。
+  - 解決: `tests/unit/infra/test_init_update.py` の `.meta.json` path list と depends-on map に追加した。
+- 問題: final spec-review で、approved design が argv-based wrapper-to-Python boundary を要求している一方、実装が env-only `OBS_*` bridge になっていた。
+  - 解決: wrapper は `python_args` で sibling Python へ argv を渡し、Python entrypoint は `argparse` で同じ入力を parse / validate するよう provider/mirror を修正した。direct Python argv test で `OBS_*` なしの起動を確認した。
 
 ## 学んだこと (任意)
-- ...
+- asset tree 配下で `py_compile` を直接実行すると package inventory tests が generated cache を拾うため、検証後の cleanup 確認が必要。
 
 ## 今後の推奨事項 (任意)
-- ...
+- asset script の syntax check は `PYTHONDONTWRITEBYTECODE=1` を付ける、または `py_compile` 後に asset tree の `__pycache__` 残存を確認する。
 
 ## 省略/例外メモ (必須)
 - 該当なし
