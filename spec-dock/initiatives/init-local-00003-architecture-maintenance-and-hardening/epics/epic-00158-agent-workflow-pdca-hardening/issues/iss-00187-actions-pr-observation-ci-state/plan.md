@@ -1757,6 +1757,37 @@ S400
 - report evidence destination:
   - S499 post-observation P2 follow-up, S500/S510/S520/S590/S599 evidence, reviewer gates, step commit gate, post-push PR observation gate.
 
+### Post-push CI/manual-test repair lane S530
+- 背景:
+  - S500 commit `bc11c60a8960d990b939f4582159fb44546bc3f4` was pushed and observed as both a PR gate and a manual test of the observation scripts.
+  - The observation/follow-up cross-check correctly detected CI failure instead of timing out or falsely passing.
+  - GitHub Provider CI failed on `test_issue_187_s430_under_budget_grace_poll_is_single_attempt`: the wait loop returned `polls == 3` where the bounded-under-budget contract expected `polls == 2`.
+- 対象:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+  - `.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+  - this issue `plan.md` and `report.md`
+- 設計/実装方針:
+  - Treat the CI failure as a valid manual-test finding from the live PR observation loop.
+  - Preserve the S510 behavior that allows one under-budget confirmation/grace poll when it can classify before the actual deadline.
+  - Prevent a no-sleep loop from consuming the under-budget exception repeatedly after a fast snapshot shrinks `next_poll_min_budget_seconds`.
+  - Do not broaden public CLI flags or weaken non-green CI/review guards.
+- 委任契約:
+  - delegated role: `dev-coder` for the runtime fix.
+  - required review: `code-reviewer` before commit; QA evidence is supplied by focused/broad wait-loop selectors and full infra file validation.
+  - parent orchestrator owns report/plan integration, commit, push, and re-observation.
+- 具体テストケース一覧:
+  - `tc-s530-001` wait: under-budget exception is not re-used in a no-sleep loop after a fast snapshot.
+    - 前提: first snapshot consumes the under-budget exception, later snapshots are faster, and the process still has enough wall-clock time to spin.
+    - 期待結果: wait stops with `insufficient_next_snapshot_budget` after the single allowed exception instead of continuing to consume zero-check grace polls.
+    - 検証方法: `test_issue_187_s430_under_budget_grace_poll_is_single_attempt`.
+  - `tc-s530-002` wait: post-exception stop emits explicit skip reason and preserves latest useful payload.
+    - 前提: latest non-terminal payload consumed the single under-budget exception and the loop would otherwise spin without sleep.
+    - 期待結果: wait stops with `final_poll_skipped_reason="insufficient_next_snapshot_budget"` and keeps the latest limitations/summary visible.
+    - 検証方法: `test_issue_187_s430_under_budget_grace_poll_is_single_attempt` plus broad wait/review selector.
+  - `tc-s530-003` validation: full `tests/unit/infra/test_init_update.py`, provider/mirror parity, `git diff --check`, generated-artifact cleanup, and fresh post-push PR observation pass.
+- report evidence destination:
+  - S530 post-push CI/manual-test repair, reviewer gate, commit gate, and post-push PR observation gate.
+
 ### S400+ 未確定事項
 - Blocking:
   - なし。

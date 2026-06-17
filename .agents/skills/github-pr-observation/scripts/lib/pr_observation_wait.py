@@ -1292,6 +1292,21 @@ while True:
         break
 
     remaining_before_poll = deadline - time.monotonic()
+    if under_budget_poll_exception_used and latest_payload is not None:
+        final_phase = "timeout"
+        final_poll_skipped_reason = "insufficient_next_snapshot_budget"
+        mark_latest_timeout(latest_payload, latest_change_monotonic, same_count)
+        latest_payload.setdefault("wait", {})["next_poll_min_budget_seconds"] = round(
+            next_poll_min_budget_seconds,
+            3,
+        )
+        latest_payload["wait"]["final_poll_skipped_reason"] = final_poll_skipped_reason
+        latest_payload["wait"]["remaining_seconds_before_final_poll"] = round(
+            max(0, remaining_before_poll),
+            3,
+        )
+        break
+
     under_budget_before_poll = (
         latest_payload is not None and remaining_before_poll < next_poll_min_budget_seconds
     )
