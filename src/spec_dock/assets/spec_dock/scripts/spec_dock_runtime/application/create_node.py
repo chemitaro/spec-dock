@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import re
 import shlex
 import time
 import uuid
@@ -11,6 +10,13 @@ from pathlib import Path
 from typing import Literal
 from typing import cast
 
+from ..domain.discussion_docs import (
+    CREATABLE_DISCUSSION_DOC_TYPES as _CREATABLE_DISCUSSION_DOC_TYPES,
+    DRAFT_DISCUSSION_DOC_TYPES as _DRAFT_DISCUSSION_DOC_TYPES,
+    RETIRED_DISCUSSION_DOC_TYPES as _RETIRED_DISCUSSION_DOC_TYPES,
+    discussion_doc_id_from_path,
+    parse_timestamp_discussion_doc_filename,
+)
 from ..domain.ids import (
     find_existing_id_by_num,
     format_id,
@@ -36,14 +42,6 @@ from .repo_context import require_current_repo_slug, resolve_current_repo_slug, 
 from .sync_state import post_mutation_sync
 
 _META_FILENAME = ".meta.json"
-_DRAFT_DISCUSSION_DOC_TYPES = ("draft-requirement", "draft-design", "draft-plan")
-_CREATABLE_DISCUSSION_DOC_TYPES = ("adr", "disc", "research", "interview", "scratch", *_DRAFT_DISCUSSION_DOC_TYPES)
-_RETIRED_DISCUSSION_DOC_TYPES = ("note",)
-_DISCUSSION_DOC_FILENAME_RE = re.compile(
-    r"^(?P<ts>[0-9]{8}t[0-9]{6}z)(?:-(?P<nn>0[1-9]|[1-9][0-9]))?"
-    r"-(?P<doc_type>adr|disc|research|interview|scratch|draft-requirement|draft-design|draft-plan|note)-"
-    r"(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
-)
 _DRAFT_TARGET_BY_DOC_TYPE = {
     "draft-requirement": "requirement",
     "draft-design": "design",
@@ -1050,15 +1048,14 @@ def _scan_discussion_timestamp_sources(
     if not discussions_dir.exists():
         return refs
     for path in sorted(discussions_dir.glob("*.md"), key=lambda p: p.as_posix()):
-        matched = _DISCUSSION_DOC_FILENAME_RE.fullmatch(path.name)
-        if not matched:
+        parsed = parse_timestamp_discussion_doc_filename(path.name)
+        if parsed is None:
             continue
-        suffix_raw = matched.group("nn")
         refs.append(
             (
-                str(matched.group("ts")),
-                int(suffix_raw) if suffix_raw is not None else None,
-                str(matched.group("doc_type")),
+                parsed.timestamp,
+                parsed.suffix,
+                parsed.doc_type,
                 path,
             )
         )
@@ -1116,13 +1113,7 @@ def _resolve_specdock_root(path: Path) -> Path:
 
 
 def _doc_id_from_path(path: Path) -> str:
-    matched = _DISCUSSION_DOC_FILENAME_RE.fullmatch(path.name)
-    if matched is None:
-        raise RuntimeError(f"Invalid discussion document filename: {path.name}")
-    suffix_raw = matched.group("nn")
-    if suffix_raw is None:
-        return f"{matched.group('ts')}-{matched.group('doc_type')}"
-    return f"{matched.group('ts')}-{suffix_raw}-{matched.group('doc_type')}"
+    return discussion_doc_id_from_path(path)
 
 
 def _draft_canonical_template_path(*, specdock_dir: Path, scope_kind: SpecNodeKind, doc_type: str) -> Path | None:
