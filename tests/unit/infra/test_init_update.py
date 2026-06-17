@@ -27464,7 +27464,9 @@ esac
             assert decision["recommended_next_action"] == "merge_prepared"
             assert decision["selected_changes_requested_evidence"] == []
 
-    def test_issue_182_s01_review_collector_decision_fingerprint_ignores_historical_threads(self) -> None:
+    def test_issue_182_s01_review_collector_decision_fingerprint_ignores_historical_threads_when_audit_only_but_includes_actionable_carryover(
+        self,
+    ) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -27497,7 +27499,7 @@ JSON
     ;;
   api\\ graphql*)
     cat <<JSON
-{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"${HISTORICAL_THREAD_ID}","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_old","databaseId":300,"author":{"login":"codex"},"createdAt":"${HISTORICAL_THREAD_AT}","body":"old feedback"}]}}]}}}}}
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"${HISTORICAL_THREAD_ID}","isResolved":false,"isOutdated":${HISTORICAL_THREAD_OUTDATED},"comments":{"nodes":[{"id":"RTC_old","databaseId":300,"author":{"login":"codex"},"createdAt":"${HISTORICAL_THREAD_AT}","body":"old feedback"}]}}]}}}}}
 JSON
     ;;
   *)
@@ -27514,7 +27516,9 @@ esac
                 "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
             }
 
-            def run_with_historical_thread(thread_id: str, created_at: str) -> dict[str, object]:
+            def run_with_historical_thread(
+                thread_id: str, created_at: str, is_outdated: bool
+            ) -> dict[str, object]:
                 result = subprocess.run(
                     [
                         str(script_path),
@@ -27533,6 +27537,7 @@ esac
                         **env,
                         "HISTORICAL_THREAD_ID": thread_id,
                         "HISTORICAL_THREAD_AT": created_at,
+                        "HISTORICAL_THREAD_OUTDATED": "true" if is_outdated else "false",
                     },
                     capture_output=True,
                     text=True,
@@ -27541,11 +27546,25 @@ esac
                 assert result.returncode == 0, result.stdout + result.stderr
                 return json.loads(result.stdout)
 
-            first = run_with_historical_thread("RT_old_1", "2026-06-08T00:20:00Z")
-            second = run_with_historical_thread("RT_old_2", "2026-06-08T00:30:00Z")
-            assert first["decision"]["selected_unresolved_count"] == 0
-            assert first["decision_fingerprint"] == second["decision_fingerprint"]
-            assert first["audit_fingerprint"] != second["audit_fingerprint"]
+            first_audit_only = run_with_historical_thread(
+                "RT_old_1", "2026-06-08T00:20:00Z", True
+            )
+            second_audit_only = run_with_historical_thread(
+                "RT_old_2", "2026-06-08T00:30:00Z", True
+            )
+            first_actionable = run_with_historical_thread(
+                "RT_old_1", "2026-06-08T00:20:00Z", False
+            )
+            second_actionable = run_with_historical_thread(
+                "RT_old_2", "2026-06-08T00:30:00Z", False
+            )
+            assert first_audit_only["decision"]["selected_unresolved_count"] == 0
+            assert first_audit_only["decision"]["actionable_unresolved_count"] == 0
+            assert first_audit_only["decision_fingerprint"] == second_audit_only["decision_fingerprint"]
+            assert first_audit_only["audit_fingerprint"] != second_audit_only["audit_fingerprint"]
+            assert first_actionable["decision"]["selected_unresolved_count"] == 0
+            assert first_actionable["decision"]["actionable_unresolved_count"] == 1
+            assert first_actionable["decision_fingerprint"] != second_actionable["decision_fingerprint"]
 
     def test_issue_75_pr_observation_review_collector_compares_trigger_timestamps_by_instant(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
