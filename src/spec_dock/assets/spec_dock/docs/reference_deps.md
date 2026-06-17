@@ -24,13 +24,17 @@
 - canonical storage は node 直下 `.meta.json` の top-level `depends_on` です。
 - reader（`infra/deps_reader.py`）は `.meta.json` だけを読み、`deps.json` dual-read / auto-migration は行いません。
 - runtime mutation surface は `deps add --from <id> --to <id>` と `deps remove --from <id> --to <id>` です。
-- mutation 対象は existing issue node から existing issue node への direct edge のみです。
-- current graph validation は duplicate add / remove not-found / node kind 判定より先に走り、失敗時は `preflight_validate_failed` error で no-write です。
+- mutation 対象は existing initiative / epic / issue node から existing initiative / epic / issue node への direct edge です。
+- current graph validation は duplicate add / remove not-found / semantic validation より先に走り、失敗時は `preflight_validate_failed` error で no-write です。
 - healthy graph に対する duplicate add は success/no-op で、CLI は `result=unchanged` を返します。
+- duplicate add は source node 直下 `.meta.json.depends_on` に重複 ref を保存しません。
 - `deps remove` の edge 不在は success/no-op に丸めず `edge_not_found` error です。
+- `deps remove` は source node 直下の direct edge だけを削除します。inherited / compiled-only edge は削除対象ではなく `edge_not_found` です。
 - `depends_on` の field absence は `[]` と同義です。
 - raw value grammar は既存 shorthand に限定し、node id / GitHub issue number（int または numeric string）/ `owner/repo#123` / canonical issue URL のみを許可します。
-- shorthand は canonical な issue->issue direct edge にコンパイルされ、downstream consumer は既存 `DepsTopologyLoadResult` surface を継続利用します。
+- shorthand は canonical な node-level direct edge として解決され、downstream consumer 向けには既存の issue-level `DepsTopologyLoadResult` surface へコンパイルされます。
+- raw node-level self / ancestor-container / descendant / cycle と、candidate compiled issue-level cycle / self-edge は保存前に拒否されます。
+- empty initiative / epic dependency は raw node-level validation を通れば保存できます。issue-level expansion が空の場合は warning `deps_ref_expanded_to_empty` が出ることがあります。
 - add/remove は `.meta.json` だけを書き換え、write failure 時も partial write を残さない atomic replace を前提にします。
 - rollback は compatibility mode ではなく issue diff revert 前提です。
 
@@ -72,8 +76,11 @@
 - JSONパース不正 / top-level object 不正 / `depends_on` の型不正
 - unsupported element type / unsupported string
 - 未解決参照
-- 親->配下（descendant）依存
-- 自己依存（shorthand展開で生じる implicit self も含む）
+- raw node-level 自己依存
+- ancestor-container 依存
+- descendant 依存
+- raw node-level cycle
+- candidate compiled issue-level cycle / self-edge
 
 補足:
 - shorthand 展開結果が空でもエラーにはせず、warning `deps_ref_expanded_to_empty` を出します。
@@ -82,7 +89,7 @@
 ## 3. 読み取り契約（reader contract）
 
 - `infra/deps_reader.py` は node 直下 `.meta.json` から `depends_on` を読みます。
-- shorthand 解決、issue-level direct edge compile、dedupe、deterministic sort、descendant/self reject、warning `deps_ref_expanded_to_empty` は current contract を維持します。
+- shorthand 解決、issue-level edge compile、dedupe、deterministic sort、descendant/self reject、warning `deps_ref_expanded_to_empty` は current contract を維持します。
 - downstream consumer 向けの return shape は既存 `DepsTopologyLoadResult(issue_depends_on_map, warnings)` のままです。
 - `deps add/remove` の変更契約（mutation contract）は次節の通りで、delete scrub と `validate` / `sync` / `active set` parity の詳細はこの reference の主題に含めません。
 
@@ -96,11 +103,14 @@
 ```
 
 契約:
-- add/remove ともに current graph preflight-first です。この preflight は dependency graph consistency を対象とし、GitHub mandatory linkage は mutation preflight では強制しません（local-compat mode、`enforce_github_mandatory_linkage=False`）。graph が壊れている場合は duplicate add / remove not-found / non-issue node 判定より前に `preflight_validate_failed` error で終了します。
-- `--from` / `--to` は existing issue node id のみを受け付けます。existing initiative / epic など non-issue node は `unsupported_node_kind` error です。
+- add/remove ともに current graph preflight-first です。この preflight は dependency graph consistency を対象とし、GitHub mandatory linkage は mutation preflight では強制しません（local-compat mode、`enforce_github_mandatory_linkage=False`）。graph が壊れている場合は duplicate add / remove not-found / semantic validation より前に `preflight_validate_failed` error で終了します。
+- `--from` / `--to` は existing initiative / epic / issue node id を受け付けます。
+- add は source node 直下 `.meta.json.depends_on` に target node id を direct ref として保存します。remove は source node 直下 `.meta.json.depends_on` から matching direct ref だけを削除します。
 - duplicate add / remove not-found の存在判定は compiled dependency / inherited dependency ではなく、`from` node 直下 `.meta.json.depends_on` に保持された raw direct ref の有無を基準にします。
 - `deps add` は healthy graph に限り duplicate edge を success/no-op とし、CLI は `spec-dock: ok (deps add) ... result=unchanged` を返します。依存配列へ同一 edge を重複保存しません。
-- `deps remove` は healthy graph でも対象 edge が無ければ `edge_not_found` error です。remove not-found を no-op success にはしません。
+- `deps remove` は healthy graph でも direct edge が無ければ `edge_not_found` error です。remove not-found を no-op success にはしません。inherited / compiled-only edge は direct edge とみなしません。
+- raw node-level self / ancestor-container / descendant / cycle と、candidate compiled issue-level cycle / self-edge は保存前に拒否され、no-write で終了します。exact self は `invalid_add_self_dependency`、ancestor / descendant / raw cycle / compiled cycle は `invalid_add_cycle` です。
+- Empty initiative / epic など、source または target 配下に issue がまだ存在しない場合でも、raw node-level validation を通る direct dependency は保存できます。issue-level expansion が空の場合は warning `deps_ref_expanded_to_empty` が出ることがあります。
 - add/remove 成功時の CLI は `from=<id> to=<id> result=updated` を返します。
 - mutation write path は node 直下 `.meta.json` の `depends_on` のみです。`deps.json` fallback write や互換モードはありません。
 - write failure は `write_failed` error で返し、temp file + replace の atomic write により partial write を残しません。rollback は compatibility mode ではなく issue diff revert 前提です。

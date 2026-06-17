@@ -3,7 +3,7 @@
 ID: "iss-00193"
 タイトル: "Node Level Dependency Mutation"
 関連GitHub: ["#193"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-17"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -18,10 +18,7 @@ ID: "iss-00193"
 
 `report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
 
-Material な判断がない場合もこの section は残し、次を明示する。
-
-- No material interpretation changes.
-- No decision entries.
+Material な判断がない場合はこの section を残して `No decision entries.` を明示する。本 issue では D-001 を記録済み。
 
 Ledger entry は次の契約値を使う。
 
@@ -49,7 +46,11 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | interpretation | orchestrator + user answer | `deps add/remove` を initiative / epic / issue に広げる際、raw node-level cycle を保存前に拒否するかが未確定だった | Option A: raw node-level graph も検証; Option B: issue-level compiled graph 主体; Option C: 保存後に sync/check/validate へ委ねる | Option A を採用し、raw node-level cycle は配下 issue の有無に関係なく保存前に拒否する | 空 epic / initiative では現時点の issue-level graph が空でも、後から child issue を追加した瞬間に循環が顕在化するため | applied | `discussions/20260617t000842z-interview-node-dependency-validation-boundary.md`; `requirement.md` | design / plan authoring で validation boundary と tests へ反映する |
+| D-002 | resolved | implementation | dev-coder + orchestrator | S02 integration で node-level invalid add の public error code を新設するか、既存 code を再利用するかが実装判断として発生した | Option A: `invalid_add_self_dependency` / `invalid_add_cycle` を再利用; Option B: ancestor / descendant / raw-cycle 専用 code を追加 | Option A を採用し、exact self は `invalid_add_self_dependency`、ancestor / descendant / raw-cycle / compiled cycle は既存 `invalid_add_cycle` で返す | Requirement / design は保存前拒否と no-write を要求しており code 名は固定していない。S90 docs/help 更新前に public code surface を増やすより、既存 add error semantics へ収める方が S02 scope に合う | applied | `application/mutate_deps.py`; `tests/cli_runtime/test_deps.py` | S90 で docs/help を更新するとき、必要なら code 表現を再点検する |
+| D-003 | resolved | implementation | code-reviewer + dev-coder + orchestrator | PR #194 U005 repair で delete 側が raw dependency refs を自前解釈すると numeric / scoped / URL resolver semantics とズレるリスクが発生した | Option A: delete 側で direct / numeric / scoped / URL refs を再実装して判定; Option B: `load_node_dependency_resolutions` を authoritative に使い、fallback は direct node-id + existing heuristic に限定 | Option B を採用し、runtime path は resolver の `resolved_node_id in subtree_ids` で conflict を検出し、force scrub は resolver が返した exact `raw_ref` を削除する | dependency reader が current repo / ambiguity / scoped URL を既に解決しているため、delete use case が別解釈を持つと既存 survivor-context semantics を壊す | applied | `application/delete_node.py`; `tests/cli_runtime/test_runtime_delete_s13.py`; `discussions/20260617t053302z-disc-pr-repair-unit-u005-delete-raw-ref-cleanup.md` | fallback path は direct node-id conflict と existing heuristic scrub に限定し、将来 broadening が必要なら専用回帰を追加する |
+| D-004 | resolved | implementation | PR #194 review + orchestrator | Raw dependency validation was added to mutation/validate/sync/deps-check paths, but `active set`, `delete` outbound boundary conflict detection, and `doctor` still had entrypoint-specific gaps | Option A: patch only the exact review examples; Option B: apply the raw preflight invariant consistently to each affected entrypoint while preserving existing behavior | Option B を採用し、U007/U008/U009 として入口ごとに bounded repair を作成する | ユーザー採用済みの Option A は「後から issue を追加した瞬間の循環」を防ぐ方針であり、入口ごとに compiled issue graph だけを見ると同じ invalid state を通してしまうため | applied | `discussions/20260617t041630z-disc-pr-repair-batch.md`; `discussions/20260617t060000z-disc-pr-repair-unit-u007-active-set-raw-preflight.md`; `discussions/20260617t060001z-disc-pr-repair-unit-u008-delete-outbound-raw-conflicts.md`; `discussions/20260617t060002z-disc-pr-repair-unit-u009-doctor-raw-preflight.md` | PR re-observation after commit |
+| D-005 | resolved | implementation | PR #194 review + orchestrator | Delete raw dependency resolver failure handling could silently fall back to literal node-id scan and miss non-literal refs | Option A: keep best-effort fallback; Option B: fail closed before local delete mutation when resolver exists and fails | Option B を採用し、resolver failure は existing dependency topology load failure result に変換する | GitHub number / scoped / URL raw refs は resolver なしでは正しく判定できず、delete は destructive operation のため fail-open は不可 | applied | `discussions/20260617t041630z-disc-pr-repair-batch.md`; `discussions/20260617t080000z-disc-pr-repair-unit-u010-delete-raw-resolution-fail-closed.md`; `application/delete_node.py`; `tests/cli_runtime/test_runtime_delete_s13.py` | PR re-observation after commit |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +64,16 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | research | `requirement.md` | GitHub Issue #193、親 Epic、現行 deps reader / mutation implementation / tests の調査結果を要件の背景・スコープ・AC に採用した | `discussions/20260617t000620z-research-issue-193-node-dependency-mutation-research.md`; `requirement.md` | requirement spec-review を実施する |
+| EAL-002 | adopted | discussion/interview | `requirement.md` | ユーザーが Option A を採用し、raw node-level cycle を保存前にブロックする方針を確定したため、非交渉制約と AC/EC に採用した | `discussions/20260617t000842z-interview-node-dependency-validation-boundary.md`; `requirement.md` | design / plan authoring で validation strategy と test obligation に反映する |
+| EAL-003 | adopted | spec-reviewer finding | `requirement.md` | Requirement review failed on missing ancestor/container dependency handling and docs-impact scope. Option A の将来 invalid state 防止に整合させるため、ancestor dependency rejection と `workflow_issue.md` docs impact を要件へ採用した | `spec-reviewer` review for requirement gate; `requirement.md` | rerun fresh requirement spec-review |
+| EAL-004 | adopted | system-architect discussion draft | `design.md` | Delegated draft が raw + compiled 二段 validation、direct-vs-inherited mutation boundary、file/module change plan、test/docs impact を要件に沿って提示したため canonical design に採用した | `discussions/20260617t000000z-draft-design-node-level-dependency-mutation.md`; `design.md` | run fresh design spec-review |
+| EAL-005 | adopted | spec-reviewer finding | `design.md` | Design review passed with non-blocking P3 finding that module diagram metadata was missing. Phase design UML contract に合わせ、Title / answered question / scope / excluded details / update trigger を追加した | `spec-reviewer` design review; `design.md` | rerun fresh design spec-review after metadata fix |
+| EAL-006 | adopted | implementation-planner discussion draft | `plan.md` | Delegated draft が S01/S02/S03/S04/S90/S99、SLCI、step-local delegation contracts、concrete test seeds、docs impact、final quality gate を reviewed design に沿って提示したため canonical plan に採用した | `discussions/20260617t000001z-draft-plan-node-level-dependency-mutation.md`; `plan.md` | run fresh plan spec-review |
+| EAL-007 | adopted | spec-reviewer finding | `plan.md` | Initial plan review failed because S01 was tests-only but required Green through runtime changes, S02 helper work lacked a standalone verification path, and S01 overclaimed EC-005. The plan was revised so S01 closes raw validation foundation with unit tests, S02 closes public CLI integration, S03 closes direct-edge semantics, and closure mappings no longer overclaim EC-005. | `spec-reviewer` plan review; `plan.md` | rerun fresh plan spec-review after executable-step fixes |
+| EAL-008 | adopted | spec-reviewer finding | `plan.md`; `report.md` | Plan review passed with P2 auditability findings: stale no-decision placeholder in report and missing explicit S03/S04 regression seeds. Placeholder was qualified and S03/S04 concrete seeds were added for issue->issue regression, preflight-first, and post-sync guardrails. | `spec-reviewer` plan review; `plan.md`; `report.md` | rerun fresh plan spec-review after P2 cleanup |
+| EAL-009 | adopted | PR review findings | `report.md`; repair discussions | PR #194 review found raw dependency invariant gaps in active set, delete outbound boundary conflicts, and doctor. These are adopted as U007/U008/U009 repair units without changing requirement scope. | `discussions/20260617t041630z-disc-pr-repair-batch.md`; U007/U008/U009 repair unit discussions | run fresh code review, commit, push, and re-observe PR #194 |
+| EAL-010 | adopted | PR review finding | `report.md`; repair discussions | PR #194 review found delete raw resolver failures were fail-open. Adopted as U010 because it protects the same no-dangling-raw-ref invariant. | `discussions/20260617t041630z-disc-pr-repair-batch.md`; `discussions/20260617t080000z-disc-pr-repair-unit-u010-delete-raw-resolution-fail-closed.md` | run fresh code review, commit, push, and re-observe PR #194 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +81,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | `deps add/remove` を issue-only から initiative / epic / issue node-level mutation へ拡張する要件を `requirement.md` に具体化した | Existing issue->issue behavior、`.meta.json` SoT、preflight-first、no dual-read、raw cycle/ancestor/descendant rejection を維持する制約を明記した | low | pass: fresh requirement spec-review passed after ancestor/docs fixes |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +89,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | GitHub Issue #193; parent epic docs; `reference_deps.md`; `workflow_issue.md`; `mutate_deps.py`; `deps_reader.py`; `tests/cli_runtime/test_deps.py`; research/interview discussions; first spec-review findings | Answered: `discussions/20260617t000842z-interview-node-dependency-validation-boundary.md`; reviewer gap fixed: ancestor/container dependency rejection and workflow docs impact | adopted | pass: fresh `spec-reviewer` returned no findings after fixes | no | promote to design authoring and request `system-architect` discussion draft |
+| design | Reviewed `system-architect` discussion draft; verified scope-limited draft path; inspected current runtime/docs/tests impact; integrated selected evidence into canonical `design.md`; fixed non-blocking diagram metadata finding | none | adopted: raw + compiled validation, direct edge mutation boundary, module/file plan, test/docs strategy | pass: fresh `spec-reviewer` returned no findings after metadata fix | no | promote to plan authoring and request `implementation-planner` discussion draft |
+| plan | Reviewed `implementation-planner` discussion draft; verified scope-limited draft path; integrated S01/S02/S03/S04/S90/S99 execution contract, SLCI, delegation contracts, concrete test seeds, docs/final gates into canonical `plan.md`; fixed initial reviewer findings by making S01/S02 independently closable; fixed P2 auditability findings | none | adopted: implementation order and closure obligations | pass: final fresh `spec-reviewer` returned no findings after P2 cleanup | no | execution handoff ready |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -107,7 +119,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| system-architect | iss-00193 | `discussions/20260617t000000z-draft-design-node-level-dependency-mutation.md` | `requirement.md`; parent epic docs; workflow/authoring docs; runtime deps files; `tests/cli_runtime/test_deps.py`; prior discussions | `design.md` | adopted | `design.md` | pass: created exactly one flat discussion draft; no canonical/source/test/doc/config/GitHub edits by delegate observed | integrated into canonical design by main orchestrator | Mermaid diagram form replaced with PlantUML module diagram; helper names treated as suggestions | none | pass: fresh design spec-review returned no findings after metadata fix | design promoted |
+| implementation-planner | iss-00193 | `discussions/20260617t000001z-draft-plan-node-level-dependency-mutation.md` | `requirement.md`; `design.md`; parent epic docs; workflow/authoring docs; runtime deps files; `tests/cli_runtime/test_deps.py`; design discussion draft | `plan.md` | adopted | `plan.md` | pass: created exactly one flat discussion draft; `git diff --check -- <draft>` passed; no canonical/source/test/doc/config/GitHub edits by delegate observed | integrated into canonical plan by main orchestrator | Draft narrative compressed into executable contract; helper-level unit tests kept conditional; final plan cleanup applied after reviewer findings | none | pass: final fresh plan spec-review returned no findings | plan promoted / execution handoff ready |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -123,118 +136,467 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | 委任使用主張に対する証跡不足（missing draft evidence when delegated use is claimed） | incomplete | 証跡を追加する、または委任使用 claim を外す | この section | ineligible |
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
+## 実行ハンドオフ準備（Execution Handoff Readiness / Authoring）
+| 対象 | 状態 | 根拠 | 次アクション |
+|---|---|---|---|
+| iss-00193 issue planning | ready | `requirement.md`, `design.md`, `plan.md` all have fresh `spec-reviewer` pass; `./spec-dock/scripts/spec-dock validate` passed with `nodes=97`; `git diff --check` passed | Start S01 from `plan.md` with `dev-coder`, then follow per-step review/commit gates |
+
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- S01 では raw node-level dependency graph の domain validation helper を追加し、self / ancestor-container / descendant / cycle を unit level で拒否できる foundation を実装した。
+- S02 では public `deps add/remove` mutation path を initiative / epic / issue node に拡張し、source `.meta.json.depends_on` の direct add/remove と S01 validation を接続した。
+- Direct edge semantics の regression consolidation は S03、docs/help 更新は S90 で扱う。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-06-17 HH:MM - HH:MM）
+### セッションログ（2026-06-17 S01）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01
+- AC/EC: AC-006, AC-007, EC-001, EC-002, EC-003, EC-004
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: S01 raw node validation foundation
+  - closure ids: slci-ac-006, slci-ac-007, slci-ec-001, slci-ec-002, slci-ec-003, slci-ec-004
 
 #### 実施内容
-- ...
+- `dev-coder` に S01 のみを委任し、domain helper と unit tests を許可範囲の 2 ファイルだけに実装した。
+- 親側で diff scope、focused unit test、diff whitespace を確認した。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+uv run pytest tests/unit/domain/test_deps.py
 
-<result>
+6 passed in 0.01s
+
+git diff --check -- src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py tests/unit/domain/test_deps.py
+
+pass
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | 新規 helper 未実装状態で新規 tests が `AttributeError` により `4 failed, 2 passed` | `uv run pytest tests/unit/domain/test_deps.py` by `dev-coder` | pass | planned helper absence を Red として観測 |
+| S01 | 緑フェーズ（Green） | focused unit Green | `6 passed` | `uv run pytest tests/unit/domain/test_deps.py` by `dev-coder` and parent rerun | pass | parent rerun observed `6 passed in 0.01s` |
+| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | 許可範囲 2 ファイルのみ、追加 refactor なし、whitespace check pass | diff inspection; `git diff --check -- src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py tests/unit/domain/test_deps.py` | pass | existing issue-level functions unchanged |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | Public error code mapping is not fixed in S01 | implementation | recorded for S02 integration | slci-ac-006 / slci-ac-007 | no | domain helpers raise `RuntimeError` in existing domain style; S02 maps application/CLI errors |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | slci-ac-006, slci-ac-007, slci-ec-001, slci-ec-002, slci-ec-003, slci-ec-004 | Raw node-level self / ancestor-container / descendant / cycle are rejected before mutation integration; empty epic cycle is detected | domain helper tests in `tests/unit/domain/test_deps.py`; `uv run pytest tests/unit/domain/test_deps.py` -> `6 passed` | pass | S02 still owns public mutation path integration |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-s01-001 | S01 | yes | red-required | helper missing produced `AttributeError` before implementation | `uv run pytest tests/unit/domain/test_deps.py` | pass | raw cycle between empty epics rejected |
+| tc-s01-002 | S01 | yes | red-required | helper missing produced `AttributeError` before implementation | `uv run pytest tests/unit/domain/test_deps.py` | pass | source cannot depend on ancestor/container |
+| tc-s01-003 | S01 | yes | red-required | helper missing produced `AttributeError` before implementation | `uv run pytest tests/unit/domain/test_deps.py` | pass | source cannot depend on descendant |
+| tc-s01-004 | S01 | yes | red-required | helper missing produced `AttributeError` before implementation | `uv run pytest tests/unit/domain/test_deps.py` | pass | source cannot depend on itself |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| slci-ac-006 | S01 | `tc-s01-001`; `uv run pytest tests/unit/domain/test_deps.py` | pass | empty epic raw cycle rejected |
+| slci-ac-007 | S01 | `tc-s01-002`, `tc-s01-003`, `tc-s01-004`; `uv run pytest tests/unit/domain/test_deps.py` | pass | self / ancestor / descendant rejected |
+| slci-ec-001 | S01 | `tc-s01-001`; `uv run pytest tests/unit/domain/test_deps.py` | pass | cycle between empty epics rejected |
+| slci-ec-002 | S01 | `tc-s01-002`; `uv run pytest tests/unit/domain/test_deps.py` | pass | issue -> parent epic rejected |
+| slci-ec-003 | S01 | `tc-s01-003`; `uv run pytest tests/unit/domain/test_deps.py` | pass | epic -> child issue rejected |
+| slci-ec-004 | S01 | `tc-s01-002`; `uv run pytest tests/unit/domain/test_deps.py` | pass | epic -> parent initiative rejected |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| alias-mapped | tc-s01-001..tc-s01-004 | new unit test methods in `tests/unit/domain/test_deps.py` | slci-ac-006, slci-ac-007, slci-ec-001, slci-ec-002, slci-ec-003, slci-ec-004 | Plan listed concrete seeds but not function names; test names are implementation aliases | no | no |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00193 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/e0dd/spec-dock` | iss-00193 | current session | dev-coder, code-reviewer | same repo, active issue, session, named role; S01 bounded write scope; no destructive action / publishing / credentialed access / scope expansion / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | workflow requires implementation delegation for source/test changes | dev-coder | raw node validation foundation only | `plan.md` S01 | `domain/deps.py`; `tests/unit/domain/test_deps.py` | CLI/application/infra writer/docs/help/canonical issue docs/report/GitHub state | `uv run pytest tests/unit/domain/test_deps.py` | scope expansion, source/test outside allowed paths, failed focused tests | worker summary / changed files / verification / risks / integration decision | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | dev-coder | Added `validate_raw_node_dependency_graph` and `ensure_node_dependency_add_would_be_valid`; added tests for empty epic cycle and self / ancestor / descendant rejection | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py`; `tests/unit/domain/test_deps.py` | `uv run pytest tests/unit/domain/test_deps.py` -> `6 passed`; `git diff --check -- domain/deps.py tests/unit/domain/test_deps.py` -> pass | pass: fresh code-reviewer rerun returned no findings | Public error code mapping deferred to S02 | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01 | N/A | N/A | N/A | N/A | N/A | N/A | N/A | no parent implementation exception used |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step reviewer | code-reviewer | fresh | failed | no | follow-up required | First review found S01 code/tests in scope but report evidence placeholders blocked gate closure |
+| S01 | step reviewer rerun | code-reviewer | fresh | passed | no | proceed to commit gate | Fresh rerun returned no findings; S02 should add compiled candidate map integration tests |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | committed | S01 code/tests/report evidence plus issue planning scaffold imported before execution | `bba6e6ac` (`feat(deps): ノード依存の生グラフ検証を追加`) | `git status --short` -> clean; `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=97` | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py` - raw node dependency validation helper を追加。
+- `tests/unit/domain/test_deps.py` - S01 raw validation unit tests を追加。
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00193-node-level-deps-add-remove/report.md` - S01 observed evidence ledger を記録。
 
 #### コミット
-- <hash> <message>
+- `bba6e6ac` `feat(deps): ノード依存の生グラフ検証を追加`
 
 #### メモ
-- ...
+- S01 の first code-reviewer gate は report evidence 未記録により fail。コード差分自体の blocking finding はなし。
 
 ---
 
-### セッションログ（2026-06-17 HH:MM - HH:MM）
+### セッションログ（2026-06-17 S02）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S02
+- AC/EC: AC-001, AC-002, AC-005, AC-006, AC-007, EC-001, EC-002, EC-003, EC-004
+- 計画上の出典（Planned source）:
+  - `plan.md` section: S02 public `deps add/remove` integration
+  - closure ids: slci-ac-001, slci-ac-002, slci-ac-005, slci-ac-006, slci-ac-007, slci-ec-001, slci-ec-002, slci-ec-003, slci-ec-004
 
 #### 実施内容
-- ...
+- `dev-coder` に S02 のみを委任し、public `deps add/remove` mutation path を node-level direct dependency に接続した。
+- Existing `fs_repo.py` writer は任意 node の `.meta.json` に対して利用できるため変更不要と判断した。
+- 親側で diff scope、CLI runtime test、domain unit test、diff whitespace を確認した。
+- S02 の public error code mapping は D-002 に記録した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime/test_deps.py
+
+88 passed, 10 skipped in 104.38s
+
+uv run pytest tests/unit/domain/test_deps.py
+
+6 passed in 0.01s
+
+git diff --check
+
+pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | 追加した S02 focused CLI tests が旧 issue-only guard により `unsupported_node_kind` で `8 failed` | `uv run pytest tests/cli_runtime/test_deps.py -k <S02 focused tests>` by `dev-coder` | pass | old behavior が node-level add/remove を拒否することを観測 |
+| S02 | 緑フェーズ（Green） | public integration Green | `tests/cli_runtime/test_deps.py` 全体が `88 passed, 10 skipped`; domain S01 tests が `6 passed` | `uv run pytest tests/cli_runtime/test_deps.py`; `uv run pytest tests/unit/domain/test_deps.py` by `dev-coder` and parent rerun | pass | parent rerun observed same focused file result |
+| S02 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | S02 許可範囲内の integration files のみ変更。docs/help と S03/S04 consolidation は未実施 | diff inspection; `git diff --check` | pass | `fs_repo.py` は変更不要 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | Public error-code mapping for node-level invalid add | implementation | D-002 として記録し、既存 `invalid_add_self_dependency` / `invalid_add_cycle` を再利用 | slci-ac-006 / slci-ac-007 | no | `application/mutate_deps.py`; `tests/cli_runtime/test_deps.py` |
+| S02 | Candidate compiled issue map must be passed to S01 helper | code-reviewer S01 residual risk | S02 integration tests に candidate compiled cycle rejection を追加 | slci-ac-006 | no | `test_deps_add_candidate_compiled_cycle_returns_invalid_add_cycle_and_no_write` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | slci-ac-001, slci-ac-002, slci-ac-005, slci-ac-006, slci-ac-007, slci-ec-001, slci-ec-002, slci-ec-003, slci-ec-004 | `deps add/remove` can mutate valid node-level direct dependency and rejects S01 invalid states before write | `uv run pytest tests/cli_runtime/test_deps.py` -> `88 passed, 10 skipped`; parent rerun pass | pass | S03 still owns duplicate/direct-edge regression consolidation |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s02-001 | S02 | yes | red-required | old guard returned `unsupported_node_kind` | `uv run pytest tests/cli_runtime/test_deps.py` | pass | epic direct add writes source `.meta.json.depends_on` |
+| tc-s02-002 | S02 | yes | red-required | old guard returned `unsupported_node_kind` | `uv run pytest tests/cli_runtime/test_deps.py` | pass | epic direct remove deletes source `.meta.json.depends_on` |
+| tc-s02-003 | S02 | yes | red-required | old guard returned `unsupported_node_kind` | `uv run pytest tests/cli_runtime/test_deps.py` | pass | empty initiative dependency can be stored |
+| tc-s02-004 | S02 | yes | red-required | old guard returned `unsupported_node_kind` | `uv run pytest tests/cli_runtime/test_deps.py` | pass | self / ancestor / descendant candidates reject no-write |
+| tc-s02-005 | S02 | yes | red-required | old guard returned `unsupported_node_kind` | `uv run pytest tests/cli_runtime/test_deps.py` | pass | empty epic raw cycle rejects no-write |
+| tc-s02-006 | S02 | yes | red-required | candidate compiled map was not integrated | `uv run pytest tests/cli_runtime/test_deps.py` | pass | candidate compiled cycle rejects no-write |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| slci-ac-001 | S02 | `tc-s02-001`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | valid node-level add writes source `.meta.json.depends_on` |
+| slci-ac-002 | S02 | `tc-s02-002`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | valid node-level remove deletes direct ref |
+| slci-ac-005 | S02 | `tc-s02-003`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | empty container dependency stored with existing empty-expansion warning |
+| slci-ac-006 | S02 | `tc-s02-005`, `tc-s02-006`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | raw and candidate compiled cycles rejected before write |
+| slci-ac-007 | S02 | `tc-s02-004`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | self / ancestor-container / descendant rejected before write |
+| slci-ec-001 | S02 | `tc-s02-005`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | cycle between empty epics rejected |
+| slci-ec-002 | S02 | `tc-s02-004`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | issue -> parent epic rejected |
+| slci-ec-003 | S02 | `tc-s02-004`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | epic -> child issue rejected |
+| slci-ec-004 | S02 | `tc-s02-004`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | epic -> parent initiative rejected |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s02-001..tc-s02-006 | new CLI runtime test methods in `tests/cli_runtime/test_deps.py` | slci-ac-001, slci-ac-002, slci-ac-005, slci-ac-006, slci-ac-007, slci-ec-001, slci-ec-002, slci-ec-003, slci-ec-004 | Plan listed behaviors but not function names; test names are implementation aliases | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/e0dd/spec-dock` | iss-00193 | current session | dev-coder, code-reviewer | same repo, active issue, session, named role; S02 bounded write scope; no destructive action / publishing / credentialed access / scope expansion / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | workflow requires implementation delegation for source/test changes | dev-coder | public deps add/remove integration only | `plan.md` S02 | `infra/deps_reader.py`; `application/mutate_deps.py`; `application/ports.py`; `cli/bootstrap.py`; `tests/cli_runtime/test_deps.py` | docs/help; canonical issue docs/report; GitHub state; S03/S04 regression consolidation | `uv run pytest tests/cli_runtime/test_deps.py` | scope expansion, source/test outside allowed paths, failed CLI runtime tests | worker summary / changed files / verification / risks / integration decision | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Connected node-level add/remove to public mutation path and S01 validation; added CLI runtime tests for valid add/remove and invalid candidates | `application/mutate_deps.py`; `infra/deps_reader.py`; `application/ports.py`; `cli/bootstrap.py`; `tests/cli_runtime/test_deps.py` | `uv run pytest tests/cli_runtime/test_deps.py` -> `88 passed, 10 skipped`; `uv run pytest tests/unit/domain/test_deps.py` -> `6 passed`; `git diff --check` -> pass | pass: fresh code-reviewer returned no findings | Error-code mapping recorded as D-002; S03/S04/S90 were later closed | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | N/A | N/A | N/A | N/A | N/A | N/A | N/A | no parent implementation exception used |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | passed | no | proceed to commit gate | Fresh review returned no findings; S03/S90 remain planned residual work |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | committed | S02 integration files and report evidence | `f488293b` (`feat(deps): ノード単位の依存更新を接続`) | `git status --short` -> clean after commit; `./spec-dock/scripts/spec-dock validate` -> pass | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/mutate_deps.py` - public mutation path で node-level add/remove と S01 validation を利用。
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/deps_reader.py` - raw node dependency resolutions と candidate issue map builder を追加。
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - deps topology reader port を S02 integration 用に拡張。
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - infra deps reader の新 port 実装を接続。
+- `tests/cli_runtime/test_deps.py` - S02 public integration tests を追加 / issue-only negative tests を新 contract に更新。
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00193-node-level-deps-add-remove/report.md` - S02 observed evidence ledger を記録。
+
+#### コミット
+- `f488293b` `feat(deps): ノード単位の依存更新を接続`
+
+#### メモ
+- S02 は docs/help を意図的に変更していない。S90 で更新する。
+
+---
+
+### セッションログ（2026-06-17 S03）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-003, AC-004, AC-008, EC-005
+- 計画上の出典（Planned source）:
+  - `plan.md` section: S03 direct-edge semantics and issue regression
+  - closure ids: slci-ac-003, slci-ac-004, slci-ac-008, slci-ec-005
+
+#### 実施内容
+- `dev-coder` に S03 のみを委任し、node-level shorthand duplicate add と node-level shorthand remove の regression tests を追加した。
+- Runtime repair は不要で、S02 implementation が S03 contract を既に満たすことを characterization tests として固定した。
+- 親側で diff scope、CLI runtime test、diff whitespace、SpecDock validation を確認した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime/test_deps.py
+
+90 passed, 10 skipped in 107.71s
+
+git diff --check
+
+pass
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=97
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / characterization accepted | S03 対象 gap inspection で node-level shorthand duplicate/remove regression が未固定だった。追加 tests は S02 runtime で即 Green | diff inspection; `uv run pytest tests/cli_runtime/test_deps.py -k "duplicate_epic_shorthand or shorthand_direct_refs_by_epic_id"` by `dev-coder` | approved-no-op | production repair 不要の regression characterization |
+| S03 | 緑フェーズ（Green） | CLI runtime Green | focused `2 passed, 98 deselected`; full `90 passed, 10 skipped` | `uv run pytest tests/cli_runtime/test_deps.py` by `dev-coder` and parent rerun | pass | parent rerun observed `90 passed, 10 skipped in 107.71s` |
+| S03 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | 変更は `tests/cli_runtime/test_deps.py` のみ。runtime repair / refactor なし | diff inspection; `git diff --check` | pass | S04/S90 were later closed |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | Node-level shorthand duplicate/remove regression was not explicitly fixed by S02 tests | implementation | added S03 aliases for epic shorthand duplicate and remove | slci-ac-003 / slci-ec-005 | no | `tests/cli_runtime/test_deps.py` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | slci-ac-003, slci-ac-004, slci-ac-008, slci-ec-005 | Duplicate add, inherited-only remove, raw shorthand matching, and existing issue->issue add/remove pass | `uv run pytest tests/cli_runtime/test_deps.py` -> `90 passed, 10 skipped` | pass | S04 still owns preflight-first/no-write/post-sync consolidation |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s03-001 | S03 | yes | characterization | node-level shorthand duplicate test absent before S03 | `uv run pytest tests/cli_runtime/test_deps.py` | pass | duplicate epic shorthand direct ref returns unchanged and does not duplicate storage |
+| tc-s03-002 | S03 | yes | covered-existing | inherited-only remove test already existed | `uv run pytest tests/cli_runtime/test_deps.py` | pass | inherited-only remove returns `edge_not_found` |
+| tc-s03-003 | S03 | yes | characterization | node-level shorthand remove test absent before S03 | `uv run pytest tests/cli_runtime/test_deps.py` | pass | epic target raw refs `202`, `"202"`, `example/repo#202`, URL remove correctly |
+| tc-s03-004 | S03 | yes | covered-existing | issue->issue add/remove/duplicate/not-found tests already existed | `uv run pytest tests/cli_runtime/test_deps.py` | pass | existing issue->issue contracts remain passing |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| slci-ac-003 | S03 | `test_deps_add_duplicate_epic_shorthand_direct_ref_returns_unchanged_without_duplicate_storage`; full CLI runtime test | pass | duplicate direct add returns unchanged/no duplicate storage |
+| slci-ac-004 | S03 | existing `test_deps_remove_inherited_only_edge_returns_edge_not_found`; full CLI runtime test | pass | inherited-only edge is not direct |
+| slci-ac-008 | S03 | existing issue->issue add/remove/duplicate/not-found tests; full CLI runtime test | pass | issue-level compatibility remains passing |
+| slci-ec-005 | S03 | `test_deps_remove_removes_shorthand_direct_refs_by_issue_id`; `test_deps_remove_removes_shorthand_direct_refs_by_epic_id`; full CLI runtime test | pass | numeric/scoped/URL raw refs match direct dependency target |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s03-001..tc-s03-004 | new and existing CLI runtime test methods in `tests/cli_runtime/test_deps.py` | slci-ac-003, slci-ac-004, slci-ac-008, slci-ec-005 | Plan listed behaviors but not function names; test names are implementation aliases | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/e0dd/spec-dock` | iss-00193 | current session | dev-coder, code-reviewer | same repo, active issue, session, named role; S03 bounded write scope; no destructive action / publishing / credentialed access / scope expansion / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | workflow requires implementation delegation for tests/source changes | dev-coder | direct-edge semantics regression only | `plan.md` S03 | `tests/cli_runtime/test_deps.py`; runtime minimal repair if needed | docs/help; canonical issue docs/report; GitHub state; S04/S90 scope | `uv run pytest tests/cli_runtime/test_deps.py` | scope expansion, source/test outside allowed paths, failed CLI runtime tests | worker summary / changed files / verification / risks / integration decision | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | Added node-level shorthand duplicate add and shorthand remove regression tests; no runtime repair needed | `tests/cli_runtime/test_deps.py` | focused `2 passed, 98 deselected`; full `90 passed, 10 skipped`; `git diff --check` -> pass | failed then passed after shorthand variant follow-up | S04 preflight/no-write/post-sync and S90 docs/help remained follow-up work at this point | accepted after fresh code-reviewer rerun |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | N/A | N/A | N/A | N/A | N/A | N/A | N/A | no parent implementation exception used |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | fresh | failed | no | follow-up required | First review found `slci-ec-005` overclaimed because duplicate add covered only numeric epic shorthand |
+| S03 | step reviewer rerun | code-reviewer | fresh | passed | no | proceed to commit gate | Fresh rerun returned no findings after duplicate add shorthand variants were added |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | committed | S03 regression tests and report evidence | `84b3bc50` (`test(deps): ノード依存のdirect edge回帰を固定`) | `git status --short` -> clean after commit; `./spec-dock/scripts/spec-dock validate` -> pass | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/cli_runtime/test_deps.py` - node-level shorthand duplicate add / shorthand remove regression tests を追加。
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00193-node-level-deps-add-remove/report.md` - S03 observed evidence ledger を記録。
+
+#### コミット
+- `84b3bc50` `test(deps): ノード依存のdirect edge回帰を固定`
+
+#### メモ
+- First S03 review failed on duplicate-add shorthand variant coverage. Follow-up expanded duplicate add regression to `202`, `"202"`, `example/repo#202`, and `https://github.com/example/repo/issues/202`; fresh rerun passed.
+- S03 は runtime repair なし。S04/S90 は後続 step で扱う。
+
+---
+
+### セッションログ（2026-06-17 S04）
+
+#### 対象
+- Step: S04
+- AC/EC: AC-008, EC-006
+- 計画上の出典（Planned source）:
+  - `plan.md` section: S04 regression consolidation and no-write/post-sync guardrails
+  - closure ids: slci-ac-008, slci-ec-006
+
+#### 実施内容
+- `dev-coder` に S04 の coverage audit を委任し、既存 tests で S04 closure を満たせるため production/test changes は不要と判断した。
+- 親側で `tests/cli_runtime/test_deps.py`、`tests/cli_runtime/test_runtime_deps_s04.py`、clean status を再確認した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime/test_deps.py
+
+90 passed, 10 skipped in 107.02s
+
+uv run pytest tests/cli_runtime/test_runtime_deps_s04.py
+
+25 passed in 0.10s
+
+git status --short
+
+clean
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | 赤フェーズ / 代替証跡（Red / alternative） | covered-existing | S04 contract は既存 regression tests で coverage 済み。追加 Red 不要 | delegated coverage audit; parent inspection | approved-no-op | no production/test changes required |
+| S04 | 緑フェーズ（Green） | CLI runtime Green | `tests/cli_runtime/test_deps.py` -> `90 passed, 10 skipped`; `test_runtime_deps_s04.py` -> `25 passed` | `uv run pytest tests/cli_runtime/test_deps.py`; `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` | pass | parent rerun confirmed |
+| S04 | リファクタリング（Refactor） | no refactor needed | worktree clean; no diff | `git status --short` | approved-no-op | report-only evidence step |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | none | coverage audit | no-op | slci-ac-008 / slci-ec-006 | no | existing regression tests passed |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | slci-ac-008, slci-ec-006 | Existing issue->issue behavior, no-write, preflight-first, and post-sync guardrails remain locked | `uv run pytest tests/cli_runtime/test_deps.py` -> `90 passed, 10 skipped`; `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` -> `25 passed` | pass | approved-no-op |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s04-001 | S04 | yes | covered-existing | existing issue->issue add/duplicate/remove/not-found tests present | `uv run pytest tests/cli_runtime/test_deps.py` | pass | output and result semantics unchanged |
+| tc-s04-002 | S04 | yes | covered-existing | existing write failure no-write test present | `uv run pytest tests/cli_runtime/test_deps.py` | pass | write failure preserves before content |
+| tc-s04-003 | S04 | yes | covered-existing | existing broken graph preflight-first tests present | `uv run pytest tests/cli_runtime/test_deps.py` | pass | preflight wins before duplicate/no-op and edge_not_found |
+| tc-s04-004 | S04 | yes | covered-existing | existing post-sync update/skip tests present | `uv run pytest tests/cli_runtime/test_deps.py` | pass | updated runs post-sync; unchanged skips post-sync |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| slci-ac-008 | S04 | existing issue->issue add/remove/duplicate/not-found, write failure, post-sync tests; `test_deps.py` full pass | pass | no regression from node-level generalization |
+| slci-ec-006 | S04 | `test_deps_add_broken_current_graph_fails_preflight_before_duplicate`; `test_deps_remove_broken_current_graph_fails_preflight_before_edge_not_found`; `test_deps.py` full pass | pass | semantic branches not reached before preflight |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | slci-ac-008, slci-ec-006 | existing tests | slci-ac-008, slci-ec-006 | Existing regression coverage is sufficient | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/e0dd/spec-dock` | iss-00193 | current session | dev-coder, code-reviewer | same repo, active issue, session, named role; S04 bounded coverage audit; no destructive action / publishing / credentialed access / scope expansion / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | delegated / approved-no-op | workflow requires coverage audit for step closure | dev-coder | regression coverage audit and minimal repair if needed | `plan.md` S04 | none used; `tests/cli_runtime/test_deps.py` allowed if needed | docs/help; canonical issue docs/report; GitHub state; unrelated suites | `uv run pytest tests/cli_runtime/test_deps.py` | broad failures, public output format change needed | worker summary / verification / risks / integration decision | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 | dev-coder | Existing tests cover issue->issue behavior, write failure no-write, preflight-first, and post-sync update/skip; no changes required | none | `uv run pytest tests/cli_runtime/test_deps.py` -> `90 passed, 10 skipped`; `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` -> `25 passed`; `git diff --check` -> pass | pass: fresh code-reviewer returned no findings | S90 docs/help was later closed | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | N/A | N/A | N/A | N/A | N/A | N/A | N/A | no parent implementation exception used |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | code-reviewer | fresh | passed | no | proceed to commit gate | Fresh review returned no findings; residual risk limited to S90 docs/help alignment |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | committed | report evidence only | `3b231a5f` (`test(deps): S04回帰証跡を記録`) | `git status --short` -> clean after commit; `./spec-dock/scripts/spec-dock validate` -> pass | existing coverage sufficient | `tests/cli_runtime/test_deps.py`; `tests/cli_runtime/test_runtime_deps_s04.py` | `git status --short` -> clean before report evidence | no source/test diff |
+
+#### 変更したファイル
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00193-node-level-deps-add-remove/report.md` - S04 approved-no-op evidence ledger を記録。
+
+#### コミット
+- `3b231a5f` `test(deps): S04回帰証跡を記録`
+
+#### メモ
+- S04 は source/test no-op。S90 docs/help が後続 step。
 
 ---
 
@@ -243,37 +605,175 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| CLI help / provider docs / dogfooding docs mirror | yes | doc-writer + dev-coder | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py`; `src/spec_dock/assets/spec_dock/docs/reference_deps.md`; `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`; `spec-dock/docs/reference_deps.md`; `spec-dock/docs/workflow_issue.md`; `tests/unit/presentation/test_runtime_sync_s07.py`; `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_wrappers.py` -> `62 passed`; doc mirror `diff -u` -> no diff; `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=97`; `git diff --check` -> pass | pass: fresh spec-reviewer returned no findings |
+
+### セッションログ（2026-06-17 S90）
+
+#### 対象
+- Step: S90
+- AC/EC: AC-009
+- 計画上の出典（Planned source）:
+  - `plan.md` section: S90 docs and help alignment
+  - closure ids: slci-ac-009
+
+#### 実施内容
+- `doc-writer` に provider docs / dogfooding docs mirror を委任し、node-level mutation、direct-edge semantics、raw validation boundary、empty-container behavior、preflight / no legacy fallback / atomic write を反映した。
+- `dev-coder` に CLI help text と help assertion 更新を委任し、`deps add/remove --from/--to` が existing initiative / epic / issue node id を受け付ける表示へ変更した。
+- 親側で docs mirror 一致、help/wrapper tests、SpecDock validation、diff whitespace を確認した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_wrappers.py
+
+62 passed
+
+diff -u src/spec_dock/assets/spec_dock/docs/reference_deps.md spec-dock/docs/reference_deps.md
+
+no diff
+
+diff -u src/spec_dock/assets/spec_dock/docs/workflow_issue.md spec-dock/docs/workflow_issue.md
+
+no diff
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=97
+
+git diff --check
+
+pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S90 | 赤フェーズ / 代替証跡（Red / alternative） | docs inspect-only + help red | help assertion added before help text update failed because old wording still said `Issue node id for dependency source/target` | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k test_tc_s06_004_mutation_parser_help_exposes_no_auto_sync_opt_out` by `dev-coder` | pass | docs side was inspect-only |
+| S90 | 緑フェーズ（Green） | help/docs Green | help/wrapper tests `62 passed`; provider/dogfooding docs mirror no diff; validate pass | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_wrappers.py`; `diff -u`; `./spec-dock/scripts/spec-dock validate` | pass | parent rerun confirmed |
+| S90 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | scoped docs/help/test changes only | diff inspection; `git diff --check` | pass | no source behavior change |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S90 | CLI help still described issue-only mutation | implementation | help text and assertion updated to existing initiative / epic / issue node id wording | slci-ac-009 | no | `commands/deps.py`; `tests/unit/presentation/test_runtime_sync_s07.py` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | slci-ac-009 | CLI help / provider docs / workflow docs describe node-level mutation and direct-edge semantics | help tests `62 passed`; provider/dogfooding docs mirror no diff; validate pass | pass | fresh spec-reviewer passed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s90-001 | S90 | yes | inspect-only | docs had stale issue-only mutation contract in `reference_deps.md` / `workflow_issue.md` | `diff -u` provider vs dogfooding docs; `./spec-dock/scripts/spec-dock validate` | pass | docs now describe node-level mutation/direct-edge semantics |
+| tc-s90-002 | S90 | yes | red-required | help test failed before help wording update | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_wrappers.py` | pass | help now says existing initiative / epic / issue node id |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| slci-ac-009 | S90 | docs diff/mirror checks, help tests, validate | pass | docs/help alignment complete; fresh spec-reviewer passed |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s90-001..tc-s90-002 | docs inspection and help assertion | slci-ac-009 | Plan required docs/help evidence but not concrete function names | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/e0dd/spec-dock` | iss-00193 | current session | doc-writer, dev-coder, spec-reviewer | same repo, active issue, session, named role; S90 bounded docs/help scope; no destructive action / publishing / credentialed access / scope expansion / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S90-docs | delegated | workflow assigns persistent docs to doc-writer | doc-writer | provider/dogfooding dependency docs only | `plan.md` S90 | provider docs and dogfooding mirror docs | source code, tests, issue docs/report, GitHub state | doc diff/mirror checks | docs/source boundary violation | worker summary / verification / risks | pass |
+| S90-help | delegated | help text/test change is source/test edit | dev-coder | CLI help text and help assertions only | `plan.md` S90 | `commands/deps.py`; help-related tests | provider/dogfooding docs, issue docs/report, GitHub state | focused help/wrapper tests | runtime behavior change beyond help | worker summary / verification / risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S90 | doc-writer | Updated provider and dogfooding docs for node-level mutation/direct-edge semantics | provider and dogfooding `reference_deps.md` / `workflow_issue.md` | `git diff --check -- <changed docs>`; provider/dogfooding `diff -u` -> no diff | pass: fresh spec-reviewer returned no findings | none for docs scope | accepted |
+| S90 | dev-coder | Updated deps add/remove help wording and help assertions | `commands/deps.py`; `tests/unit/presentation/test_runtime_sync_s07.py` | focused help test pass; `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_wrappers.py` -> `62 passed`; `git diff --check` -> pass | pass: fresh spec-reviewer returned no findings | `test_init_update.py` not run because no init/update assertions changed | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | N/A | N/A | N/A | N/A | N/A | N/A | N/A | no parent implementation exception used |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | step reviewer | spec-reviewer | fresh | passed | no | proceed to commit gate | Fresh review returned no findings; separate code-reviewer not required because code/test changes are help-only |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | committed | docs/help/tests/report evidence | `c25e801d` (`docs(deps): ノード単位の依存更新契約を反映`) | `git status --short` -> clean after commit; `./spec-dock/scripts/spec-dock validate` -> pass | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py` - deps add/remove help を node-level wording に更新。
+- `tests/unit/presentation/test_runtime_sync_s07.py` - deps add/remove help assertion を更新。
+- `src/spec_dock/assets/spec_dock/docs/reference_deps.md` - provider dependency docs を node-level mutation contract に更新。
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - provider workflow docs の deps add/remove 表記を node-level に更新。
+- `spec-dock/docs/reference_deps.md` - dogfooding docs mirror を同期。
+- `spec-dock/docs/workflow_issue.md` - dogfooding docs mirror を同期。
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00193-node-level-deps-add-remove/report.md` - S90 observed evidence ledger を記録。
+
+#### コミット
+- `c25e801d` `docs(deps): ノード単位の依存更新契約を反映`
+
+#### メモ
+- Source behavior is unchanged; S90 changes docs/help/tests only.
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | focused bundle + unit suite evidence sufficient; no additional manual/integration test required | First QA review failed on missing valid mixed-kind positive mutation coverage for AC-001 / slci-ac-001. Follow-up added `issue -> unrelated epic` and `initiative -> unrelated epic` add/remove tests. Re-review found no findings and accepted `./spec-dock/scripts/spec-dock validate` -> pass; `git diff --check` -> pass; focused integrated bundle -> `189 passed, 10 skipped`; unit suite after mirror/snapshot fix -> `577 passed`. | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff and S99 follow-up diff | Initial final code review passed with only P2 report commit-evidence cleanup. Re-review after mixed-kind tests, dogfooding runtime mirror sync, snapshot updates, and commit-evidence cleanup found no findings. | 1 | pass |
+| code-reviewer | PR #194 repair diff for U001/U002 | Review passed. P2 requested refreshing this report with PR repair evidence before closeout; parent recorded U001/U002 implementation, validation, and pending re-observation in this final ledger. | 2 | pass |
+| code-reviewer | PR #194 repair diff for U003/U004/U005 | Initial U003/U004/U005 review failed on U005 raw delete ref resolution gaps. Follow-ups moved delete raw-ref detection onto `load_node_dependency_resolutions`, added exact resolver raw-ref scrub, preserved fallback heuristic scrub, and added delete regressions for direct empty target, numeric shorthand empty target, empty-source deleted subtree, non-empty-source empty target, and fallback mixed direct+URL refs. Final fresh review returned no findings. | 5 | pass |
+| code-reviewer | PR #194 repair diff for U007/U008/U009 | Fresh review found no findings. Reviewer confirmed active set and doctor raw preflight, delete surviving-source inbound plus deleted-source outbound raw boundary conflicts, and provider/dogfooding mirror consistency. | 0 | pass |
+| code-reviewer | PR #194 repair diff for U010 | Fresh review found no findings. Reviewer confirmed resolver failures now propagate into `metadata_validation_failed` before remote close, local delete, or scrub, while no-method fallback and successful resolver behavior remain covered. | 0 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | Final spec review passed. P2 finding required replacing final gate placeholders and stale pending commit evidence before closure; parent updated step commit gates with `bba6e6ac`, `f488293b`, `84b3bc50`, `3b231a5f`, and `c25e801d`, then recorded final QA/code/spec gate evidence here. | 0 | pass |
+| spec-reviewer | PR #194 repair batch / repair units / canonical reference alignment | Repair spec review passed. Repair batch has no untriaged items; U001/U002 are implemented with PR re-observation pending; renamed discussion drafts are catalog-compliant and canonical references are coherent. | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| Final gate evidence recorded; stale step commit placeholders superseded with actual hashes; S99 follow-up and PR #194 repair evidence recorded | U001 raw validation repair; U002 discussion filename repair; U003/U004/U005/U007/U008/U009/U010 PR review repairs; repair batch/unit docs; dogfooding runtime mirror sync; checked-in dogfooding snapshot update; mixed-kind positive add/remove tests; final report ledger | PR #194 push and re-observation; issue closeout after merge-prepared evidence | ready for repair commit |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: `uv run pytest tests/unit` exposed dogfooding runtime mirror divergence and checked-in dogfooding `.meta.json` snapshot drift after iss-00193 scaffold and runtime changes.
+  - 解決: S99 follow-upで dogfooding runtime mirror を provider assets に同期し、`tests/unit/infra/test_init_update.py` の path / depends_on snapshot を更新した。対象 tests は `2 passed`、unit suite は `577 passed`。
+- 問題: Final QA review found AC-001 / slci-ac-001 positive coverage was incomplete for valid mixed-kind node dependency mutation.
+  - 解決: `tests/cli_runtime/test_deps.py` に `issue -> unrelated epic` と `initiative -> unrelated epic` の add/remove positive tests を追加し、focused integrated bundle は `189 passed, 10 skipped`。QA re-review passed。
+- 問題: PR #194 Codex review found raw validation missed a future cycle through target descendants and `validate` / `sync` did not detect pre-existing raw node cycles.
+  - 解決: U001 repairで containment edge を raw cycle validation に含め、`validate_tree` / `sync_state` preflight に raw node validation を接続した。旧 test double 互換の optional-port shim と validate error priority repair も追加し、`uv run pytest` は `1185 passed, 76 skipped`。
+- 問題: PR #194 Codex review found delegated draft discussion filenames were not catalog-compliant.
+  - 解決: U002 repairで design / plan discussion drafts を `draft-design` / `draft-plan` naming に rename し、canonical docs / repair docs の参照を更新した。`spec-dock validate` は pass。
+- 問題: PR #194 follow-up Codex review found raw validation still missed target-container future cycles, `deps check` did not run raw preflight, and delete could leave dangling raw dependency refs to deleted empty containers.
+  - 解決: U003/U004/U005 repairで target-container future cycle validation、`deps check` raw preflight、delete raw-ref conflict/scrub を追加した。Delete repair は resolver authoritative path に寄せ、numeric / scoped / URL semantics を維持した。`uv run pytest tests/unit/domain/test_deps.py tests/unit/application/test_check_deps.py tests/cli_runtime/test_runtime_delete_s13.py` は `69 passed`、fresh code-reviewer は pass。
+- 問題: PR #194 Provider CI run 27670570728 failed because two `tests/cli_runtime/test_deps.py` assertions still expected compiled issue-map stderr after U004 made raw structural preflight fail first.
+  - 解決: `test_deps_self_dependency_fails` and `test_deps_descendant_dependency_fails` now assert the raw structural preflight messages. `uv run pytest tests/cli_runtime/test_deps.py tests/unit/domain/test_deps.py tests/unit/application/test_check_deps.py tests/cli_runtime/test_runtime_delete_s13.py` passed with `165 passed, 10 skipped`; `git diff --check` passed.
+- 問題: PR #194 follow-up Codex review found `active set` and `doctor` still skipped raw empty-container cycles, and delete missed raw outbound dependencies from deleted empty nodes to surviving empty containers.
+  - 解決: U007/U008/U009 repairで `active set` raw preflight、delete outbound raw boundary conflicts、`doctor` raw validation finding を追加した。Red evidence は U007 `DID NOT RAISE`, U008 no-force delete `ok`, U009 doctor `ok=True` として各 delegate が観測し、Green evidence は `uv run pytest tests/unit/application/test_set_active.py tests/cli_runtime/test_runtime_delete_s13.py tests/cli_runtime/test_runtime_doctor_s04.py` -> `102 passed`、raw deps integrated bundle -> `214 passed, 10 skipped`、`git diff --check` -> pass、`./spec-dock/scripts/spec-dock validate` -> `nodes=97`。
+- 問題: PR #194 follow-up Codex review found delete raw resolver failures were fail-open: resolver exception fell back to literal node-id scan and could miss GitHub number / scoped / URL refs.
+  - 解決: U010 repairで `load_node_dependency_resolutions` が存在して失敗した場合は existing `metadata_validation_failed` result shape で local delete / scrub 前に停止するようにした。Red evidence は new regression が `ok` で失敗、Green evidence は `uv run pytest tests/cli_runtime/test_runtime_delete_s13.py` -> `56 passed`、raw deps integrated bundle -> `215 passed, 10 skipped`、provider/dogfooding mirror一致、`git diff --check` -> pass。
 
 ## 学んだこと (任意)
-- ...
+- Node-level mutationの acceptance coverage は kind guard removal だけでは足りず、valid mixed-kind success pathを明示的に固定する必要がある。
+- Provider asset 変更時は dogfooding runtime mirror parity と checked-in dogfooding snapshot tests を final QAで広めに確認する価値がある。
+- Raw node dependency safetyは direct dependency edge だけでなく containment edge を含めて考える必要がある。空 container は現在の compiled graph では見えない将来 cycle を隠す。
 
 ## 今後の推奨事項 (任意)
-- ...
+- Similar scaffold / dogfooding issues should include `tests/unit/infra/test_init_update.py` targeted mirror/snapshot checks in the S90 or S99 verification bundle.
 
 ## 省略/例外メモ (必須)
 - 該当なし

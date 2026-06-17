@@ -122,6 +122,27 @@ class _StubDepsTopologyReader:
         del specdock_dir, graph
         return self._infra_contracts.DepsTopologyLoadResult(issue_depends_on_map=dict(self._dep_map), warnings=[])
 
+    def load_node_dependency_resolutions(self, specdock_dir, graph):
+        from spec_dock_runtime.infra import deps_reader
+
+        return deps_reader.load_node_dependency_resolutions(specdock_dir, graph)
+
+
+class _FallbackDepsTopologyReader:
+    def __init__(self, infra_contracts, dep_map):
+        self._infra_contracts = infra_contracts
+        self._dep_map = dict(dep_map)
+
+    def load_issue_depends_on_map(self, specdock_dir, graph):
+        del specdock_dir, graph
+        return self._infra_contracts.DepsTopologyLoadResult(issue_depends_on_map=dict(self._dep_map), warnings=[])
+
+
+class _RaisingNodeDependencyResolutionReader(_StubDepsTopologyReader):
+    def load_node_dependency_resolutions(self, specdock_dir, graph):
+        del specdock_dir, graph
+        raise RuntimeError("node dependency resolution unavailable")
+
 
 class _FailingDepsTopologyReader:
     def __init__(self, message: str):
@@ -377,7 +398,10 @@ class TestRuntimeDeleteS13:
             repo_root = Path("/repo")
         for record in records:
             Path(record.path).mkdir(parents=True, exist_ok=True)
-            Path(record.meta_path).write_text("{}", encoding="utf-8")
+            Path(record.meta_path).write_text(
+                json.dumps({"schema_version": 1, "depends_on": []}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
         resolved_deps_topology_reader = deps_topology_reader or _StubDepsTopologyReader(
             infra_contracts,
             dep_map or {},
@@ -514,7 +538,7 @@ class TestRuntimeDeleteS13:
         assert "epic-local-00002" in result.offending_node_ids
         assert "iss-local-00056" in result.offending_node_ids
 
-    def test_unrelated_invalid_id_record_is_ignored(self) -> None:
+    def test_unrelated_invalid_id_record_fails_closed_before_local_delete(self) -> None:
         app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
             _runtime_modules()
         )
@@ -536,9 +560,11 @@ class TestRuntimeDeleteS13:
             self._request(app_contracts, node_id="iss-local-00056", confirmed=True),
             ports,
         )
-        assert result.status == "ok"
+        assert result.status == "metadata_validation_failed"
         assert result.target_id == "iss-local-00056"
-        assert result.deleted_node_ids == ["iss-local-00056"]
+        assert result.deleted_node_ids == []
+        assert result.validation_reasons[0].code == "metadata_validation_failed"
+        assert "not-a-canonical-id" in result.validation_reasons[0].message
         assert result.remaining_node_ids == []
 
     def test_preflight_precedence_confirmation_before_recursive_active_deps(self) -> None:
@@ -645,6 +671,64 @@ class TestRuntimeDeleteS13:
         assert result.remote_close.skipped_not_attempted == []
         assert issue_gateway.close_calls == []
         assert node_repo.delete_calls == []
+        assert Path(records[2].path).exists()
+
+    def test_node_dependency_resolution_failure_fails_closed_before_local_delete_or_scrub(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = self._records(infra_contracts, repo_root, with_github_links=True)
+        issue_gateway = _StubIssueGateway(
+            domain_models=domain_models,
+            view_states={("example/repo", 56): "CLOSED"},
+        )
+        node_repo = _DeletingNodeRepository()
+        ports = self._ports(
+            records=records,
+            repo_root=repo_root,
+            dep_map={},
+            deps_topology_reader=_RaisingNodeDependencyResolutionReader(infra_contracts, {}),
+            issue_gateway=issue_gateway,
+            node_repo=node_repo,
+        )
+        survivor_meta = Path(records[3].path) / ".meta.json"
+        survivor_meta.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "depends_on": ["https://github.com/example/repo/issues/56"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        result = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="iss-local-00056",
+                confirmed=True,
+                force=True,
+            ),
+            ports,
+        )
+
+        assert result.status == "metadata_validation_failed"
+        assert result.target_id == "iss-local-00056"
+        assert result.deleted_node_ids == []
+        assert result.remaining_node_ids == []
+        assert result.offending_node_ids == []
+        assert [item.code for item in result.validation_reasons] == ["metadata_validation_failed"]
+        assert result.validation_reasons[0].node_id == "iss-local-00056"
+        assert "node dependency resolution unavailable" in result.validation_reasons[0].message
+        assert issue_gateway.close_calls == []
+        assert node_repo.delete_calls == []
+        assert json.loads(survivor_meta.read_text(encoding="utf-8"))["depends_on"] == [
+            "https://github.com/example/repo/issues/56"
+        ]
         assert Path(records[2].path).exists()
 
     def test_parent_dependency_conflict_without_force_stops_before_local_delete_mutation(self) -> None:
@@ -1644,6 +1728,636 @@ class TestRuntimeDeleteS13:
         assert Path(records[4].path).exists()
         assert Path(records[5].path).exists()
 
+    def test_forced_recursive_delete_scrubs_raw_ref_to_empty_deleted_container(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = [
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00001",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00002",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+        ]
+        ports = self._ports(
+            records=records,
+            repo_root=repo_root,
+            dep_map={},
+            node_repo=_DeletingNodeRepository(),
+        )
+        survivor_meta = Path(records[0].path) / ".meta.json"
+        survivor_meta.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "depends_on": ["init-local-00002"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        result = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="init-local-00002",
+                confirmed=True,
+                recursive=True,
+                force=True,
+            ),
+            ports,
+        )
+
+        assert result.status == "ok"
+        assert result.target_id == "init-local-00002"
+        assert result.deleted_node_ids == ["init-local-00002"]
+        assert result.dependency_scrub_failures == []
+        assert json.loads(survivor_meta.read_text(encoding="utf-8"))["depends_on"] == []
+        assert Path(records[0].path).exists()
+        assert not Path(records[1].path).exists()
+
+    def test_recursive_delete_detects_numeric_raw_ref_to_empty_deleted_container(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = [
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00001",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00002",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=102,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+        ]
+        ports = self._ports(
+            records=records,
+            repo_root=repo_root,
+            dep_map={},
+            issue_gateway=_StubIssueGateway(domain_models=domain_models),
+            node_repo=_DeletingNodeRepository(),
+        )
+        survivor_meta = Path(records[0].path) / ".meta.json"
+        survivor_meta.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "depends_on": ["102"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        blocked = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="init-local-00002",
+                confirmed=True,
+                recursive=True,
+            ),
+            ports,
+        )
+
+        assert blocked.status == "dependency_conflict"
+        assert blocked.deleted_node_ids == []
+        assert json.loads(survivor_meta.read_text(encoding="utf-8"))["depends_on"] == ["102"]
+        assert Path(records[1].path).exists()
+
+        forced = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="init-local-00002",
+                confirmed=True,
+                recursive=True,
+                force=True,
+            ),
+            ports,
+        )
+
+        assert forced.status == "ok"
+        assert forced.target_id == "init-local-00002"
+        assert forced.deleted_node_ids == ["init-local-00002"]
+        assert forced.dependency_scrub_failures == []
+        assert json.loads(survivor_meta.read_text(encoding="utf-8"))["depends_on"] == []
+        assert Path(records[0].path).exists()
+        assert not Path(records[1].path).exists()
+
+    def test_recursive_delete_detects_deleted_empty_source_raw_ref_to_surviving_empty_container(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = [
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00001",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00002",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+        ]
+        ports = self._ports(
+            records=records,
+            repo_root=repo_root,
+            dep_map={},
+            node_repo=_DeletingNodeRepository(),
+        )
+        deleted_source_meta = Path(records[0].path) / ".meta.json"
+        deleted_source_meta.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "depends_on": ["init-local-00002"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        result = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="init-local-00001",
+                confirmed=True,
+                recursive=True,
+            ),
+            ports,
+        )
+
+        assert result.status == "dependency_conflict"
+        assert result.deleted_node_ids == []
+        assert result.offending_node_ids == ["init-local-00001", "init-local-00002"]
+        assert json.loads(deleted_source_meta.read_text(encoding="utf-8"))["depends_on"] == ["init-local-00002"]
+        assert Path(records[0].path).exists()
+        assert Path(records[1].path).exists()
+
+    def test_forced_recursive_delete_allows_deleted_empty_source_raw_ref_to_surviving_empty_container(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = [
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00001",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00002",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+        ]
+        ports = self._ports(
+            records=records,
+            repo_root=repo_root,
+            dep_map={},
+            node_repo=_DeletingNodeRepository(),
+        )
+        deleted_source_meta = Path(records[0].path) / ".meta.json"
+        deleted_source_meta.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "depends_on": ["init-local-00002"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        result = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="init-local-00001",
+                confirmed=True,
+                recursive=True,
+                force=True,
+            ),
+            ports,
+        )
+
+        assert result.status == "ok"
+        assert result.target_id == "init-local-00001"
+        assert result.deleted_node_ids == ["init-local-00001"]
+        assert result.dependency_scrub_failures == []
+        assert not Path(records[0].path).exists()
+        assert Path(records[1].path).exists()
+
+    def test_recursive_delete_detects_empty_source_direct_raw_refs_to_deleted_subtree_nodes(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+
+        def build_case():
+            repo_root = self._new_repo_root()
+            records = [
+                _record(
+                    infra_contracts,
+                    repo_root=repo_root,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    repo_root=repo_root,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    repo_root=repo_root,
+                    kind="issue",
+                    node_id="iss-local-00056",
+                    parent_id="epic-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id="epic-local-00001",
+                    github_issue_number=56,
+                    github_repo_owner="example",
+                    github_repo_name="repo",
+                ),
+                _record(
+                    infra_contracts,
+                    repo_root=repo_root,
+                    kind="initiative",
+                    node_id="init-local-00002",
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            issue_gateway = _StubIssueGateway(
+                domain_models=domain_models,
+                view_states={("example/repo", 56): "CLOSED"},
+            )
+            ports = self._ports(
+                records=records,
+                repo_root=repo_root,
+                dep_map={},
+                node_repo=_DeletingNodeRepository(),
+                issue_gateway=issue_gateway,
+            )
+            survivor_meta = Path(records[3].path) / ".meta.json"
+            survivor_meta.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "depends_on": ["epic-local-00001", "iss-local-00056"],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            return records, ports, survivor_meta
+
+        blocked_records, blocked_ports, blocked_survivor_meta = build_case()
+        blocked = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="epic-local-00001",
+                confirmed=True,
+                recursive=True,
+            ),
+            blocked_ports,
+        )
+
+        assert blocked.status == "dependency_conflict"
+        assert blocked.deleted_node_ids == []
+        assert json.loads(blocked_survivor_meta.read_text(encoding="utf-8"))["depends_on"] == [
+            "epic-local-00001",
+            "iss-local-00056",
+        ]
+        assert Path(blocked_records[1].path).exists()
+        assert Path(blocked_records[2].path).exists()
+
+        forced_records, forced_ports, forced_survivor_meta = build_case()
+        forced = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="epic-local-00001",
+                confirmed=True,
+                recursive=True,
+                force=True,
+            ),
+            forced_ports,
+        )
+
+        assert forced.status == "ok"
+        assert forced.target_id == "epic-local-00001"
+        assert forced.deleted_node_ids == ["iss-local-00056", "epic-local-00001"]
+        assert forced.dependency_scrub_failures == []
+        assert json.loads(forced_survivor_meta.read_text(encoding="utf-8"))["depends_on"] == []
+        assert not Path(forced_records[1].path).exists()
+        assert not Path(forced_records[2].path).exists()
+        assert Path(forced_records[3].path).exists()
+
+    def test_forced_recursive_delete_fallback_scrubs_mixed_direct_and_url_refs_to_deleted_subtree(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = [
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00001",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="epic",
+                node_id="epic-local-00001",
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="issue",
+                node_id="iss-local-00056",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=56,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00002",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="epic",
+                node_id="epic-local-00002",
+                parent_id="init-local-00002",
+                initiative_id="init-local-00002",
+                epic_id=None,
+                github_issue_number=None,
+                initiative_node_id="init-local-00002",
+                epic_node_id="epic-local-00002",
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="issue",
+                node_id="iss-local-00070",
+                parent_id="epic-local-00002",
+                initiative_id="init-local-00002",
+                epic_id="epic-local-00002",
+                github_issue_number=70,
+                github_repo_owner="example",
+                github_repo_name="repo",
+                initiative_node_id="init-local-00002",
+                epic_node_id="epic-local-00002",
+            ),
+        ]
+        issue_gateway = _StubIssueGateway(
+            domain_models=domain_models,
+            view_states={("example/repo", 56): "CLOSED"},
+        )
+        ports = self._ports(
+            records=records,
+            repo_root=repo_root,
+            dep_map={"iss-local-00070": {"iss-local-00056"}},
+            deps_topology_reader=_FallbackDepsTopologyReader(
+                infra_contracts,
+                {"iss-local-00070": {"iss-local-00056"}},
+            ),
+            issue_gateway=issue_gateway,
+            node_repo=_DeletingNodeRepository(),
+        )
+        survivor_meta = Path(records[5].path) / ".meta.json"
+        survivor_meta.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "depends_on": [
+                        "epic-local-00001",
+                        "https://github.com/example/repo/issues/56",
+                    ],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        result = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="epic-local-00001",
+                confirmed=True,
+                recursive=True,
+                force=True,
+            ),
+            ports,
+        )
+
+        assert result.status == "ok"
+        assert result.target_id == "epic-local-00001"
+        assert result.deleted_node_ids == ["iss-local-00056", "epic-local-00001"]
+        assert result.dependency_scrub_failures == []
+        assert json.loads(survivor_meta.read_text(encoding="utf-8"))["depends_on"] == []
+        assert not Path(records[1].path).exists()
+        assert not Path(records[2].path).exists()
+        assert Path(records[5].path).exists()
+
+    def test_recursive_delete_detects_non_empty_source_direct_raw_ref_to_empty_deleted_container(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+
+        def build_case():
+            repo_root = self._new_repo_root()
+            records = [
+                _record(
+                    infra_contracts,
+                    repo_root=repo_root,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    repo_root=repo_root,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    repo_root=repo_root,
+                    kind="issue",
+                    node_id="iss-local-00056",
+                    parent_id="epic-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id="epic-local-00001",
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    repo_root=repo_root,
+                    kind="initiative",
+                    node_id="init-local-00002",
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            ports = self._ports(
+                records=records,
+                repo_root=repo_root,
+                dep_map={},
+                node_repo=_DeletingNodeRepository(),
+            )
+            survivor_meta = Path(records[2].path) / ".meta.json"
+            survivor_meta.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "depends_on": ["init-local-00002"],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            return records, ports, survivor_meta
+
+        blocked_records, blocked_ports, blocked_survivor_meta = build_case()
+        blocked = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="init-local-00002",
+                confirmed=True,
+                recursive=True,
+            ),
+            blocked_ports,
+        )
+
+        assert blocked.status == "dependency_conflict"
+        assert blocked.deleted_node_ids == []
+        assert json.loads(blocked_survivor_meta.read_text(encoding="utf-8"))["depends_on"] == ["init-local-00002"]
+        assert Path(blocked_records[3].path).exists()
+
+        forced_records, forced_ports, forced_survivor_meta = build_case()
+        forced = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="init-local-00002",
+                confirmed=True,
+                recursive=True,
+                force=True,
+            ),
+            forced_ports,
+        )
+
+        assert forced.status == "ok"
+        assert forced.target_id == "init-local-00002"
+        assert forced.deleted_node_ids == ["init-local-00002"]
+        assert forced.dependency_scrub_failures == []
+        assert json.loads(forced_survivor_meta.read_text(encoding="utf-8"))["depends_on"] == []
+        assert Path(forced_records[2].path).exists()
+        assert not Path(forced_records[3].path).exists()
+
     def test_forced_parent_delete_dependency_scrub_supports_numeric_scoped_and_url_refs_with_survivor_context_resolution(self) -> None:
         app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
             _runtime_modules()
@@ -1754,12 +2468,9 @@ class TestRuntimeDeleteS13:
                     "schema_version": 1,
                     "depends_on": [
                         "57",
-                        "56",
                         "example/repo#56",
                         "https://github.com/other/repo/issues/56",
                         "iss-local-00058",
-                        "https://github.com/missing/repo/issues/56",
-                        "example/repo#999",
                     ],
                 },
                 ensure_ascii=False,
@@ -1787,10 +2498,7 @@ class TestRuntimeDeleteS13:
         assert result.active_restore_result == "not_needed"
         assert result.dependency_scrub_failures == []
         assert json.loads(survivor_meta.read_text(encoding="utf-8"))["depends_on"] == [
-                "https://github.com/other/repo/issues/56",
                 "iss-local-00058",
-                "https://github.com/missing/repo/issues/56",
-                "example/repo#999",
             ]
         assert not Path(records[1].path).exists()
         assert not Path(records[2].path).exists()
@@ -1799,7 +2507,7 @@ class TestRuntimeDeleteS13:
         assert Path(records[5].path).exists()
         assert Path(records[6].path).exists()
 
-    def test_forced_parent_delete_dependency_scrub_keeps_ambiguous_numeric_refs_for_survivor_context(self) -> None:
+    def test_forced_parent_delete_dependency_scrub_fails_closed_on_ambiguous_numeric_ref(self) -> None:
         app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
             _runtime_modules()
         )
@@ -1932,20 +2640,23 @@ class TestRuntimeDeleteS13:
             ports,
         )
 
-        assert result.status == "ok"
+        assert result.status == "metadata_validation_failed"
         assert result.target_id == "epic-local-00001"
-        assert result.deleted_node_ids == ["iss-local-00056", "iss-local-00057", "iss-local-00059", "epic-local-00001"]
+        assert result.deleted_node_ids == []
         assert result.remaining_node_ids == []
-        assert result.active_restore_result == "not_needed"
-        assert result.dependency_scrub_failures == []
+        assert result.validation_reasons[0].code == "metadata_validation_failed"
+        assert "Ambiguous github.issue_number=56" in result.validation_reasons[0].message
+        assert issue_gateway.close_calls == []
         assert json.loads(survivor_meta.read_text(encoding="utf-8"))["depends_on"] == [
                 "56",
+                "example/repo#56",
+                "https://github.com/other/repo/issues/56",
                 "iss-local-00058",
             ]
-        assert not Path(records[1].path).exists()
-        assert not Path(records[2].path).exists()
-        assert not Path(records[3].path).exists()
-        assert not Path(records[4].path).exists()
+        assert Path(records[1].path).exists()
+        assert Path(records[2].path).exists()
+        assert Path(records[3].path).exists()
+        assert Path(records[4].path).exists()
         assert Path(records[5].path).exists()
         assert Path(records[6].path).exists()
 
@@ -2022,6 +2733,10 @@ class TestRuntimeDeleteS13:
             records=records,
             repo_root=repo_root,
             dep_map={"iss-local-00058": ["iss-local-00056"]},
+            deps_topology_reader=_FallbackDepsTopologyReader(
+                infra_contracts,
+                {"iss-local-00058": ["iss-local-00056"]},
+            ),
             node_repo=_DeletingNodeRepository(),
         )
         survivor_meta = Path(records[5].path) / ".meta.json"
