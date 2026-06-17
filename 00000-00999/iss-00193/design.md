@@ -279,7 +279,7 @@ tests/
 
 ## 委任ドラフト採用
 - 採用元:
-  - `discussions/20260617t-design-node-level-dependency-mutation.md`
+  - `discussions/20260617t000000z-draft-design-node-level-dependency-mutation.md`
 - 採用内容:
   - Raw + compiled 二段 validation。
   - Direct-vs-inherited mutation boundary。
