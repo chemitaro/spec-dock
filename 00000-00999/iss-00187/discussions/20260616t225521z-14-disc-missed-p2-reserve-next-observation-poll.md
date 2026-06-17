@@ -127,4 +127,3 @@ Add this as a new repair unit after the already implemented steps.
 - Stop if preserving latest payload would change a real failed / stale-head / unresolved-review terminal result into a softer state. The guard is only for under-budget polling, not for hiding terminal failures.
 - Stop if the test can only be made to pass by increasing global timeouts. The fix should reserve poll budget, not mask the race by making the suite slower.
 - Stop if the implementation requires changing public shell CLI options. This should be internal wait-loop hardening.
-

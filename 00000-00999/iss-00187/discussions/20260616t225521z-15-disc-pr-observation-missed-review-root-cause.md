@@ -253,4 +253,3 @@ The next repair batch should include:
 - What default latency should gate `review_completion_unknown` after CI first passes? The existing `90` seconds after CI pass was insufficient for PR #190.
 - Should `review_completion_unknown` trigger an automatic short recheck before returning, or should that remain a merge-preparer responsibility?
 - Should carryover non-outdated unresolved threads block every run, or only block merge-prepared / closeout while remaining separate from current-trigger review completion?
-
