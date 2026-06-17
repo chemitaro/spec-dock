@@ -10264,6 +10264,34 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     assert fragment in text
             assert "new doc report" not in text
 
+    def test_issue_188_pr_repair_batch_readme_catalog_assets(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            spec_dock_assets = assets_dir / "spec_dock"
+            asset_paths = {
+                "templates readme": spec_dock_assets / "templates" / "README.md",
+                "scripts readme": spec_dock_assets / "scripts" / "README.md",
+            }
+            texts = {label: path.read_text(encoding="utf-8") for label, path in asset_paths.items()}
+
+        expected_fragments = {
+            "templates readme": (
+                "discussions/{scratch,interview,research,disc,adr,pr-repair-batch}.md",
+                "`scratch` / `interview` / `research` / `disc` / `adr` / `pr-repair-batch`",
+            ),
+            "scripts readme": (
+                "`scratch` / `interview` / `research` / `disc` / `adr` / `pr-repair-batch`",
+                './spec-dock/scripts/spec-dock new doc pr-repair-batch --issue iss-00123 --title "PR Repair Batch"',
+            ),
+        }
+
+        for label, fragments in expected_fragments.items():
+            text = texts[label]
+            for fragment in fragments:
+                with _case(asset=label, fragment=fragment):
+                    assert fragment in text
+
     def test_issue_116_delegated_authoring_phase_gate_contract_assets(self) -> None:
         import spec_dock.cli as cli
 
