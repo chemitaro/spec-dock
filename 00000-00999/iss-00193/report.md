@@ -48,6 +48,7 @@ Disposition ごとの必須証跡:
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | interpretation | orchestrator + user answer | `deps add/remove` を initiative / epic / issue に広げる際、raw node-level cycle を保存前に拒否するかが未確定だった | Option A: raw node-level graph も検証; Option B: issue-level compiled graph 主体; Option C: 保存後に sync/check/validate へ委ねる | Option A を採用し、raw node-level cycle は配下 issue の有無に関係なく保存前に拒否する | 空 epic / initiative では現時点の issue-level graph が空でも、後から child issue を追加した瞬間に循環が顕在化するため | applied | `discussions/20260617t000842z-interview-node-dependency-validation-boundary.md`; `requirement.md` | design / plan authoring で validation boundary と tests へ反映する |
 | D-002 | resolved | implementation | dev-coder + orchestrator | S02 integration で node-level invalid add の public error code を新設するか、既存 code を再利用するかが実装判断として発生した | Option A: `invalid_add_self_dependency` / `invalid_add_cycle` を再利用; Option B: ancestor / descendant / raw-cycle 専用 code を追加 | Option A を採用し、exact self は `invalid_add_self_dependency`、ancestor / descendant / raw-cycle / compiled cycle は既存 `invalid_add_cycle` で返す | Requirement / design は保存前拒否と no-write を要求しており code 名は固定していない。S90 docs/help 更新前に public code surface を増やすより、既存 add error semantics へ収める方が S02 scope に合う | applied | `application/mutate_deps.py`; `tests/cli_runtime/test_deps.py` | S90 で docs/help を更新するとき、必要なら code 表現を再点検する |
+| D-003 | resolved | implementation | code-reviewer + dev-coder + orchestrator | PR #194 U005 repair で delete 側が raw dependency refs を自前解釈すると numeric / scoped / URL resolver semantics とズレるリスクが発生した | Option A: delete 側で direct / numeric / scoped / URL refs を再実装して判定; Option B: `load_node_dependency_resolutions` を authoritative に使い、fallback は direct node-id + existing heuristic に限定 | Option B を採用し、runtime path は resolver の `resolved_node_id in subtree_ids` で conflict を検出し、force scrub は resolver が返した exact `raw_ref` を削除する | dependency reader が current repo / ambiguity / scoped URL を既に解決しているため、delete use case が別解釈を持つと既存 survivor-context semantics を壊す | applied | `application/delete_node.py`; `tests/cli_runtime/test_runtime_delete_s13.py`; `discussions/20260617t053302z-disc-pr-repair-unit-u005-delete-raw-ref-cleanup.md` | fallback path は direct node-id conflict と existing heuristic scrub に限定し、将来 broadening が必要なら専用回帰を追加する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -729,6 +730,7 @@ pass
 |---|---|---|---|---|
 | code-reviewer | issue-wide integrated diff and S99 follow-up diff | Initial final code review passed with only P2 report commit-evidence cleanup. Re-review after mixed-kind tests, dogfooding runtime mirror sync, snapshot updates, and commit-evidence cleanup found no findings. | 1 | pass |
 | code-reviewer | PR #194 repair diff for U001/U002 | Review passed. P2 requested refreshing this report with PR repair evidence before closeout; parent recorded U001/U002 implementation, validation, and pending re-observation in this final ledger. | 2 | pass |
+| code-reviewer | PR #194 repair diff for U003/U004/U005 | Initial U003/U004/U005 review failed on U005 raw delete ref resolution gaps. Follow-ups moved delete raw-ref detection onto `load_node_dependency_resolutions`, added exact resolver raw-ref scrub, preserved fallback heuristic scrub, and added delete regressions for direct empty target, numeric shorthand empty target, empty-source deleted subtree, non-empty-source empty target, and fallback mixed direct+URL refs. Final fresh review returned no findings. | 5 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
@@ -739,7 +741,7 @@ pass
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| Final gate evidence recorded; stale step commit placeholders superseded with actual hashes; S99 follow-up and PR #194 repair evidence recorded | U001 raw validation repair; U002 discussion filename repair; repair batch/unit docs; dogfooding runtime mirror sync; checked-in dogfooding snapshot update; mixed-kind positive add/remove tests; final report ledger | PR #194 push and re-observation; issue closeout after merge-prepared evidence | ready for repair commit |
+| Final gate evidence recorded; stale step commit placeholders superseded with actual hashes; S99 follow-up and PR #194 repair evidence recorded | U001 raw validation repair; U002 discussion filename repair; U003/U004/U005 PR review repairs; repair batch/unit docs; dogfooding runtime mirror sync; checked-in dogfooding snapshot update; mixed-kind positive add/remove tests; final report ledger | PR #194 push and re-observation; issue closeout after merge-prepared evidence | ready for repair commit |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: `uv run pytest tests/unit` exposed dogfooding runtime mirror divergence and checked-in dogfooding `.meta.json` snapshot drift after iss-00193 scaffold and runtime changes.
@@ -750,6 +752,8 @@ pass
   - 解決: U001 repairで containment edge を raw cycle validation に含め、`validate_tree` / `sync_state` preflight に raw node validation を接続した。旧 test double 互換の optional-port shim と validate error priority repair も追加し、`uv run pytest` は `1185 passed, 76 skipped`。
 - 問題: PR #194 Codex review found delegated draft discussion filenames were not catalog-compliant.
   - 解決: U002 repairで design / plan discussion drafts を `draft-design` / `draft-plan` naming に rename し、canonical docs / repair docs の参照を更新した。`spec-dock validate` は pass。
+- 問題: PR #194 follow-up Codex review found raw validation still missed target-container future cycles, `deps check` did not run raw preflight, and delete could leave dangling raw dependency refs to deleted empty containers.
+  - 解決: U003/U004/U005 repairで target-container future cycle validation、`deps check` raw preflight、delete raw-ref conflict/scrub を追加した。Delete repair は resolver authoritative path に寄せ、numeric / scoped / URL semantics を維持した。`uv run pytest tests/unit/domain/test_deps.py tests/unit/application/test_check_deps.py tests/cli_runtime/test_runtime_delete_s13.py` は `69 passed`、fresh code-reviewer は pass。
 
 ## 学んだこと (任意)
 - Node-level mutationの acceptance coverage は kind guard removal だけでは足りず、valid mixed-kind success pathを明示的に固定する必要がある。
