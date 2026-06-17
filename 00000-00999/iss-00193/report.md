@@ -502,6 +502,111 @@ spec-dock: ok (validate) nodes=97
 
 ---
 
+### セッションログ（2026-06-17 S04）
+
+#### 対象
+- Step: S04
+- AC/EC: AC-008, EC-006
+- 計画上の出典（Planned source）:
+  - `plan.md` section: S04 regression consolidation and no-write/post-sync guardrails
+  - closure ids: slci-ac-008, slci-ec-006
+
+#### 実施内容
+- `dev-coder` に S04 の coverage audit を委任し、既存 tests で S04 closure を満たせるため production/test changes は不要と判断した。
+- 親側で `tests/cli_runtime/test_deps.py`、`tests/cli_runtime/test_runtime_deps_s04.py`、clean status を再確認した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime/test_deps.py
+
+90 passed, 10 skipped in 107.02s
+
+uv run pytest tests/cli_runtime/test_runtime_deps_s04.py
+
+25 passed in 0.10s
+
+git status --short
+
+clean
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | 赤フェーズ / 代替証跡（Red / alternative） | covered-existing | S04 contract は既存 regression tests で coverage 済み。追加 Red 不要 | delegated coverage audit; parent inspection | approved-no-op | no production/test changes required |
+| S04 | 緑フェーズ（Green） | CLI runtime Green | `tests/cli_runtime/test_deps.py` -> `90 passed, 10 skipped`; `test_runtime_deps_s04.py` -> `25 passed` | `uv run pytest tests/cli_runtime/test_deps.py`; `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` | pass | parent rerun confirmed |
+| S04 | リファクタリング（Refactor） | no refactor needed | worktree clean; no diff | `git status --short` | approved-no-op | report-only evidence step |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | none | coverage audit | no-op | slci-ac-008 / slci-ec-006 | no | existing regression tests passed |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | slci-ac-008, slci-ec-006 | Existing issue->issue behavior, no-write, preflight-first, and post-sync guardrails remain locked | `uv run pytest tests/cli_runtime/test_deps.py` -> `90 passed, 10 skipped`; `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` -> `25 passed` | pass | approved-no-op |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s04-001 | S04 | yes | covered-existing | existing issue->issue add/duplicate/remove/not-found tests present | `uv run pytest tests/cli_runtime/test_deps.py` | pass | output and result semantics unchanged |
+| tc-s04-002 | S04 | yes | covered-existing | existing write failure no-write test present | `uv run pytest tests/cli_runtime/test_deps.py` | pass | write failure preserves before content |
+| tc-s04-003 | S04 | yes | covered-existing | existing broken graph preflight-first tests present | `uv run pytest tests/cli_runtime/test_deps.py` | pass | preflight wins before duplicate/no-op and edge_not_found |
+| tc-s04-004 | S04 | yes | covered-existing | existing post-sync update/skip tests present | `uv run pytest tests/cli_runtime/test_deps.py` | pass | updated runs post-sync; unchanged skips post-sync |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| slci-ac-008 | S04 | existing issue->issue add/remove/duplicate/not-found, write failure, post-sync tests; `test_deps.py` full pass | pass | no regression from node-level generalization |
+| slci-ec-006 | S04 | `test_deps_add_broken_current_graph_fails_preflight_before_duplicate`; `test_deps_remove_broken_current_graph_fails_preflight_before_edge_not_found`; `test_deps.py` full pass | pass | semantic branches not reached before preflight |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | slci-ac-008, slci-ec-006 | existing tests | slci-ac-008, slci-ec-006 | Existing regression coverage is sufficient | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/e0dd/spec-dock` | iss-00193 | current session | dev-coder, code-reviewer | same repo, active issue, session, named role; S04 bounded coverage audit; no destructive action / publishing / credentialed access / scope expansion / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | delegated / approved-no-op | workflow requires coverage audit for step closure | dev-coder | regression coverage audit and minimal repair if needed | `plan.md` S04 | none used; `tests/cli_runtime/test_deps.py` allowed if needed | docs/help; canonical issue docs/report; GitHub state; unrelated suites | `uv run pytest tests/cli_runtime/test_deps.py` | broad failures, public output format change needed | worker summary / verification / risks / integration decision | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 | dev-coder | Existing tests cover issue->issue behavior, write failure no-write, preflight-first, and post-sync update/skip; no changes required | none | `uv run pytest tests/cli_runtime/test_deps.py` -> `90 passed, 10 skipped`; `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` -> `25 passed`; `git diff --check` -> pass | pass: fresh code-reviewer returned no findings | S90 docs/help remain pending | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | N/A | N/A | N/A | N/A | N/A | N/A | N/A | no parent implementation exception used |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | code-reviewer | fresh | passed | no | proceed to commit gate | Fresh review returned no findings; residual risk limited to S90 docs/help alignment |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | pending reviewer | report evidence only | pending | pending | existing coverage sufficient | `tests/cli_runtime/test_deps.py`; `tests/cli_runtime/test_runtime_deps_s04.py` | `git status --short` -> clean before report evidence | no source/test diff |
+
+#### 変更したファイル
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00193-node-level-deps-add-remove/report.md` - S04 approved-no-op evidence ledger を記録。
+
+#### コミット
+- pending
+
+#### メモ
+- S04 は source/test no-op。S90 docs/help が後続 step。
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
