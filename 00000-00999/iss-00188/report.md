@@ -313,7 +313,7 @@ spec-dock: ok (validate) nodes=97
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S02 | tc-003, tc-004, tc-005 | tc-003/tc-004/tc-005 pass, code-reviewer pass, spec-reviewer pass for template/spec alignment, step commit recorded. | required pytest passes; validate passes; initial reviewers failed only because S02 report evidence was missing; fresh code-reviewer `019ed375-c831-7eb2-8309-d71adf2db5fc` passed findings=[]; fresh spec-reviewer `019ed375-f15d-7542-b741-5e94c42bc948` passed findings=[] | pass | Step commit gate pending until commit recorded below |
+| S02 | tc-003, tc-004, tc-005 | tc-003/tc-004/tc-005 pass, code-reviewer pass, spec-reviewer pass for template/spec alignment, step commit recorded. | required pytest passes; validate passes; initial reviewers failed only because S02 report evidence was missing; fresh code-reviewer `019ed375-c831-7eb2-8309-d71adf2db5fc` passed findings=[]; fresh spec-reviewer `019ed375-f15d-7542-b741-5e94c42bc948` passed findings=[]; commit `9728cd57` recorded | pass | S02 step commit gate closed |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -360,7 +360,7 @@ spec-dock: ok (validate) nodes=97
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S02 | pending commit | S02 runtime-owned `pr-repair-batch` creation and report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S02 | committed | S02 runtime-owned `pr-repair-batch` creation and report evidence | `9728cd57` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/discussion_docs.py` - add `pr-repair-batch` to creatable timestamp discussion docs.
@@ -373,7 +373,7 @@ spec-dock: ok (validate) nodes=97
 - `spec-dock/active/issue/report.md` - S02 observed evidence ledger and D-013 disposition.
 
 #### コミット
-- pending
+- `9728cd57` feat(spec-dock): pr-repair-batchをnew docで生成可能にする
 
 #### メモ
 - Wait-before-suffix allocator remains S03 scope.
