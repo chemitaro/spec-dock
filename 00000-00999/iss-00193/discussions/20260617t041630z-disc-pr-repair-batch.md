@@ -93,7 +93,7 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 
 | unit_id | source_batch | covered_ids | disposition | risk_class | repair_unit_disc | status | Implementation Plan | Re-observation Result | Residual Risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| U001 | disc-20260617t041630z-pr-repair-batch | I001, I002 | fix-now | blocking | `20260617t041631z-disc-pr-repair-unit-u001-raw-validation.md` | implemented | Added containment-edge raw validation plus validate/sync raw preflight; optional-port compatibility restored; focused and unit tests pass | pending push / re-observation | Low; pending PR observation |
+| U001 | disc-20260617t041630z-pr-repair-batch | I001, I002 | fix-now | blocking | `20260617t041631z-disc-pr-repair-unit-u001-raw-validation.md` | implemented | Added containment-edge raw validation plus validate/sync raw preflight; optional-port compatibility and validate error priority restored; full pytest passes | pending push / re-observation | Low; pending PR observation |
 | U002 | disc-20260617t041630z-pr-repair-batch | I003 | fix-now | minor | `20260617t041632z-disc-pr-repair-unit-u002-discussion-filenames.md` | implemented | Renamed draft discussions and updated references; old-name grep clean | pending push / re-observation | Low; pending PR observation |
 
 ## Unit Discussion Plan

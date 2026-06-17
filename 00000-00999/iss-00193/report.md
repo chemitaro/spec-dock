@@ -747,7 +747,7 @@ pass
 - 問題: Final QA review found AC-001 / slci-ac-001 positive coverage was incomplete for valid mixed-kind node dependency mutation.
   - 解決: `tests/cli_runtime/test_deps.py` に `issue -> unrelated epic` と `initiative -> unrelated epic` の add/remove positive tests を追加し、focused integrated bundle は `189 passed, 10 skipped`。QA re-review passed。
 - 問題: PR #194 Codex review found raw validation missed a future cycle through target descendants and `validate` / `sync` did not detect pre-existing raw node cycles.
-  - 解決: U001 repairで containment edge を raw cycle validation に含め、`validate_tree` / `sync_state` preflight に raw node validation を接続した。旧 test double 互換の optional-port shim も追加し、`tests/unit` は `578 passed`。
+  - 解決: U001 repairで containment edge を raw cycle validation に含め、`validate_tree` / `sync_state` preflight に raw node validation を接続した。旧 test double 互換の optional-port shim と validate error priority repair も追加し、`uv run pytest` は `1185 passed, 76 skipped`。
 - 問題: PR #194 Codex review found delegated draft discussion filenames were not catalog-compliant.
   - 解決: U002 repairで design / plan discussion drafts を `draft-design` / `draft-plan` naming に rename し、canonical docs / repair docs の参照を更新した。`spec-dock validate` は pass。
 

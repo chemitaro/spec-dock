@@ -81,6 +81,7 @@ reflected_to: []
 - Implemented containment-edge-aware raw node dependency validation.
 - Wired raw node dependency validation into `validate_tree` and `sync_state` preflight.
 - Added optional-port compatibility for test doubles / alternate readers that implement only `load_issue_depends_on_map`; real bootstrap readers still run raw node validation via `load_node_dependency_resolutions`.
+- Restored validate error priority so structural graph errors such as `issue parent_id mismatch` are reported before raw node validation errors.
 - Synced provider runtime changes to dogfooding runtime mirror.
 - Added tests for future-cycle-through-target-descendant, `validate` rejection of existing empty-container raw cycle, and `sync` rejection of the same structural error.
 - Follow-up unit-suite failure caused by legacy `_StubDepsTopologyReader` was fixed without weakening real-runtime raw validation.
@@ -92,4 +93,4 @@ reflected_to: []
 - pending push / re-observation
 
 ## Residual Risk / Follow-up
-- Low. Local validation passed, including `uv run pytest tests/unit` -> `578 passed`; PR re-observation remains required.
+- Low. Local validation passed, including `uv run pytest` -> `1185 passed, 76 skipped`; PR re-observation remains required.
