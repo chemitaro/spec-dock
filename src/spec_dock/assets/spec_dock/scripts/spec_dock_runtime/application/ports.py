@@ -136,6 +136,23 @@ class DepsTopologyReader(Protocol):
     ) -> list[DirectDependencyResolution]:
         ...
 
+    def load_node_dependency_resolutions(
+        self,
+        specdock_dir: Path,
+        graph: SpecGraph,
+    ) -> dict[str, list[DirectDependencyResolution]]:
+        ...
+
+    def build_candidate_issue_depends_on_map(
+        self,
+        graph: SpecGraph,
+        issue_depends_on_map: dict[str, list[str]],
+        *,
+        from_node_id: str,
+        to_node_id: str,
+    ) -> dict[str, list[str]]:
+        ...
+
 
 class GitGateway(Protocol):
     def require_clean_working_tree(self, repo_root: Path) -> None:

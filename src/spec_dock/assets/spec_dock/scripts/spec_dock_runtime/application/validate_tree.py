@@ -8,10 +8,11 @@ from ..domain.authority import (
     load_evidence_adoption_ledger_entries,
     validate_delegated_authority_artifact,
 )
+from ..domain.deps import validate_raw_node_dependency_graph
 from ..domain.models import SpecNodeKind, SpecNodeSeed, ValidationReport
 from ..domain.tree import build_graph
 from ..domain.validation import validate_graph_and_deps
-from ..infra.contracts import StoredMetaRecord
+from ..infra.contracts import DirectDependencyResolution, StoredMetaRecord
 from .artifact_preflight import validate_required_artifacts_for_graph
 from .contracts import ValidateTreeRequest, ValidationResult
 from .ports import Ports
@@ -39,7 +40,15 @@ def validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult:
     del req
     records = ports.node_reader.load_node_records()
     graph = build_graph([_to_spec_node_seed(record) for record in records])
-    issue_depends_on_map: dict[str, list[str]] | None = None
+    report = validate_graph_and_deps(
+        graph,
+        issue_depends_on_map=None,
+        repo_root=ports.repo_root,
+        current_repo_slug=resolve_current_repo_slug(ports),
+    )
+    if report.errors:
+        return ValidationResult(report=report, checked_node_count=len(records))
+
     if ports.deps_topology_reader is not None:
         if ports.specdock_dir is not None:
             specdock_dir = ports.specdock_dir
@@ -48,14 +57,32 @@ def validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult:
         else:
             raise RuntimeError("specdock_dir is required when deps_topology_reader is configured")
         topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
-        issue_depends_on_map = dict(topology.issue_depends_on_map)
+        report = validate_graph_and_deps(
+            graph,
+            issue_depends_on_map=dict(topology.issue_depends_on_map),
+            repo_root=ports.repo_root,
+            current_repo_slug=resolve_current_repo_slug(ports),
+        )
+        if report.errors:
+            return ValidationResult(report=report, checked_node_count=len(records))
 
-    report = validate_graph_and_deps(
-        graph,
-        issue_depends_on_map=issue_depends_on_map,
-        repo_root=ports.repo_root,
-        current_repo_slug=resolve_current_repo_slug(ports),
-    )
+        load_node_dependency_resolutions = getattr(
+            ports.deps_topology_reader,
+            "load_node_dependency_resolutions",
+            None,
+        )
+        if callable(load_node_dependency_resolutions):
+            raw_node_depends_on_map = _raw_node_depends_on_map(
+                load_node_dependency_resolutions(specdock_dir, graph)
+            )
+            try:
+                validate_raw_node_dependency_graph(graph, raw_node_depends_on_map)
+            except RuntimeError as error:
+                return ValidationResult(
+                    report=ValidationReport(errors=[str(error)], warnings=[]),
+                    checked_node_count=len(records),
+                )
+
     if not report.errors:
         try:
             validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
@@ -70,6 +97,15 @@ def validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult:
         if ledger_errors:
             report = ValidationReport(errors=ledger_errors, warnings=list(report.warnings))
     return ValidationResult(report=report, checked_node_count=len(records))
+
+
+def _raw_node_depends_on_map(
+    resolutions_by_node: dict[str, list[DirectDependencyResolution]],
+) -> dict[str, list[str]]:
+    return {
+        node_id: [resolution.resolved_node_id for resolution in resolutions]
+        for node_id, resolutions in resolutions_by_node.items()
+    }
 
 
 def _validate_delegated_authority_artifacts(graph, *, repo_root: Path) -> list[str]:

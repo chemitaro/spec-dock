@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from ..domain.deps import inspect_target_deps, validate_deps_cycles
+from ..domain.deps import inspect_target_deps, validate_deps_cycles, validate_raw_node_dependency_graph
 from ..domain.ids import format_id, parse_id
 from ..domain.models import IssueSnapshot, NodeId, SpecGraph, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
@@ -140,6 +140,18 @@ def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> d
     return out
 
 
+def _validate_raw_node_dependency_preflight(ports: Ports, specdock_dir: Path, graph: SpecGraph) -> None:
+    load_node_resolutions = getattr(ports.deps_topology_reader, "load_node_dependency_resolutions", None)
+    if not callable(load_node_resolutions):
+        return
+
+    raw_node_depends_on_map = {
+        src_id: [resolution.resolved_node_id for resolution in resolutions]
+        for src_id, resolutions in load_node_resolutions(specdock_dir, graph).items()
+    }
+    validate_raw_node_dependency_graph(graph, raw_node_depends_on_map)
+
+
 def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
     if ports.deps_topology_reader is None:
         raise RuntimeError("deps_topology_reader is required")
@@ -150,6 +162,8 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
     graph = build_graph([_to_spec_node_seed(record) for record in records])
     current_repo_slug = resolve_current_repo_slug(ports)
     specdock_dir = _resolve_specdock_dir(ports)
+
+    _validate_raw_node_dependency_preflight(ports, specdock_dir, graph)
 
     topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
     warnings: list[str] = list(topology.warnings)

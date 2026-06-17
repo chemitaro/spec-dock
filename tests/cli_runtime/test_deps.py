@@ -242,6 +242,38 @@ class TestCliDeps(CliRuntimeHarness):
             "epic-00202": to_epic_id,
         }
 
+    def _create_mixed_node_dependency_fixture(self, target: Path) -> dict[str, str]:
+        self._create_same_repo_linked_hierarchy(
+            target,
+            owner="example",
+            repo="repo",
+            initiative_issue_number=101,
+            epic_issue_number=201,
+            issue_issue_number=301,
+            issue_title="From issue",
+        )
+        self._run_runtime(
+            target,
+            ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Sibling issue"],
+        )
+        self._run_runtime(
+            target,
+            ["new", "initiative", "--github-issue", "102", "--title", "Dependency initiative"],
+        )
+        self._run_runtime(
+            target,
+            ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "Dependency epic"],
+        )
+        self._run_runtime(
+            target,
+            ["new", "issue", "--epic", "202", "--github-issue", "303", "--title", "Dependency issue"],
+        )
+        return {
+            "init-00101": "init-00101",
+            "iss-00301": "iss-00301",
+            "epic-00202": "epic-00202",
+        }
+
     def _make_gh_issue_list_and_view_stub(
         self,
         bin_dir: Path,
@@ -2251,7 +2283,7 @@ class TestCliDeps(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             assert p.returncode == 1, p.stdout + p.stderr
             assert "iss-00301" in p.stderr
-            assert "self edge produced" in p.stderr
+            assert "Raw node dependency self edge detected: iss-00301" in p.stderr
 
     def test_deps_descendant_dependency_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2265,12 +2297,11 @@ class TestCliDeps(CliRuntimeHarness):
                 issue_title="Issue one",
             )
             init_dir = target / "spec-dock" / "initiatives" / "init-00101-auth-platform"
-            deps_path = init_dir / ".meta.json"
             self._set_meta_depends_on(init_dir, ["iss-00301"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "init-00101"])
             assert p.returncode == 1, p.stdout + p.stderr
-            assert str(deps_path) in p.stderr
+            assert "Raw node dependency targets descendant: init-00101 -> iss-00301" in p.stderr
             assert "iss-00301" in p.stderr
 
     def test_deps_cycle_detected_in_reachable_graph(self) -> None:
@@ -2359,6 +2390,46 @@ class TestCliDeps(CliRuntimeHarness):
             assert "iss-00302" in p.stderr
             assert "iss-00303" in p.stderr
             assert "->" in p.stderr
+
+    def test_validate_fails_on_existing_empty_container_raw_cycle(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._init_origin_repo(target)
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Empty a"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "202", "--title", "Empty b"])
+            init_dir = target / "spec-dock" / "initiatives" / "init-00101-auth-platform"
+            epic_a_dir = init_dir / "epics" / "epic-00201-empty-a"
+            epic_b_dir = init_dir / "epics" / "epic-00202-empty-b"
+            self._set_meta_depends_on(epic_a_dir, ["epic-00202"])
+            self._set_meta_depends_on(epic_b_dir, ["epic-00201"])
+
+            p = self._run_runtime_capture(target, ["validate"])
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert "Dependency cycle detected" in p.stderr
+            assert "epic-00201" in p.stderr
+            assert "epic-00202" in p.stderr
+
+    def test_sync_fails_on_existing_empty_container_raw_cycle_without_force(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._init_origin_repo(target)
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Empty a"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "202", "--title", "Empty b"])
+            init_dir = target / "spec-dock" / "initiatives" / "init-00101-auth-platform"
+            epic_a_dir = init_dir / "epics" / "epic-00201-empty-a"
+            epic_b_dir = init_dir / "epics" / "epic-00202-empty-b"
+            self._set_meta_depends_on(epic_a_dir, ["epic-00202"])
+            self._set_meta_depends_on(epic_b_dir, ["epic-00201"])
+
+            p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert "Dependency cycle detected" in p.stderr
+            assert "epic-00201" in p.stderr
+            assert "epic-00202" in p.stderr
 
     def test_sync_force_sets_deps_valid_false_and_emits_placeholders(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2649,6 +2720,72 @@ class TestCliDeps(CliRuntimeHarness):
             assert before == self._read_deps_projection_artifacts(target)
             assert log_path.read_text(encoding="utf-8") == ""
 
+    def test_deps_add_duplicate_epic_shorthand_direct_ref_returns_unchanged_without_duplicate_storage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(
+                target,
+                owner="example",
+                repo="repo",
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                issue_title="Issue A",
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue B"],
+            )
+            self._run_runtime(
+                target,
+                [
+                    "new",
+                    "epic",
+                    "--initiative",
+                    "101",
+                    "--github-issue",
+                    "202",
+                    "--title",
+                    "Dependency epic",
+                ],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "202", "--github-issue", "303", "--title", "Dependency issue"],
+            )
+            from_id = "epic-00201"
+            to_id = "epic-00202"
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            shorthand_refs: list[object] = [
+                202,
+                "202",
+                "example/repo#202",
+                "https://github.com/example/repo/issues/202",
+            ]
+
+            for shorthand_ref in shorthand_refs:
+                case_label = f"shorthand_ref={shorthand_ref!r}"
+                self._set_meta_depends_on(from_meta_path.parent, [shorthand_ref])
+                before = from_meta_path.read_text(encoding="utf-8")
+
+                p = self._run_runtime_capture(
+                    target,
+                    ["deps", "add", "--from", from_id, "--to", to_id],
+                )
+
+                assert p.returncode == 0, f"{case_label}: {p.stdout}{p.stderr}"
+                assert p.stderr.strip() == "", case_label
+                assert p.stdout.strip() == "\n".join(
+                    [
+                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=unchanged",
+                        "spec-dock: skipped (deps add auto-sync) reason=unchanged",
+                    ]
+                ), case_label
+                assert from_meta_path.read_text(encoding="utf-8") == before, case_label
+                after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+                assert after.get("depends_on") == [shorthand_ref], case_label
+
     def test_deps_add_inherited_only_edge_adds_direct_dependency(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -2674,6 +2811,43 @@ class TestCliDeps(CliRuntimeHarness):
                         "spec-dock: ok (deps add auto-sync)",
                     ]
                 )
+
+            after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+            assert after.get("depends_on") == [to_id]
+
+    @pytest.mark.parametrize(
+        ("from_key", "to_key"),
+        (
+            ("iss-00301", "epic-00202"),
+            ("init-00101", "epic-00202"),
+        ),
+        ids=("issue-to-unrelated-epic", "initiative-to-unrelated-epic"),
+    )
+    def test_deps_add_mixed_kind_direct_dependency_updates_meta_json_and_returns_updated(
+        self,
+        from_key: str,
+        to_key: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            local_ids = self._create_mixed_node_dependency_fixture(target)
+            from_id = local_ids[from_key]
+            to_id = local_ids[to_key]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert p.stderr.strip() == ""
+            assert p.stdout.strip() == "\n".join(
+                [
+                    f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                    "spec-dock: ok (deps add auto-sync)",
+                ]
+            )
 
             after = json.loads(from_meta_path.read_text(encoding="utf-8"))
             assert after.get("depends_on") == [to_id]
@@ -2717,6 +2891,44 @@ class TestCliDeps(CliRuntimeHarness):
             assert from_meta is not None
             assert from_meta is not None
             assert from_meta.get("depends_on") == []
+
+    @pytest.mark.parametrize(
+        ("from_key", "to_key"),
+        (
+            ("iss-00301", "epic-00202"),
+            ("init-00101", "epic-00202"),
+        ),
+        ids=("issue-to-unrelated-epic", "initiative-to-unrelated-epic"),
+    )
+    def test_deps_remove_mixed_kind_direct_dependency_updates_meta_json_and_returns_updated(
+        self,
+        from_key: str,
+        to_key: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            local_ids = self._create_mixed_node_dependency_fixture(target)
+            from_id = local_ids[from_key]
+            to_id = local_ids[to_key]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            self._set_meta_depends_on(from_meta_path.parent, [to_id])
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", to_id],
+            )
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert p.stderr.strip() == ""
+            assert p.stdout.strip() == "\n".join(
+                [
+                    f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                    "spec-dock: ok (deps remove auto-sync)",
+                ]
+            )
+
+            after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+            assert after.get("depends_on") == []
 
     def test_deps_remove_updated_path_auto_syncs_dependency_projection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2811,6 +3023,68 @@ class TestCliDeps(CliRuntimeHarness):
                             "spec-dock: ok (deps remove auto-sync)",
                         ]
                     ), case_label
+                after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+                assert after.get("depends_on") == [], case_label
+
+    def test_deps_remove_removes_shorthand_direct_refs_by_epic_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(
+                target,
+                owner="example",
+                repo="repo",
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                issue_title="Issue A",
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue B"],
+            )
+            self._run_runtime(
+                target,
+                [
+                    "new",
+                    "epic",
+                    "--initiative",
+                    "101",
+                    "--github-issue",
+                    "202",
+                    "--title",
+                    "Dependency epic",
+                ],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "202", "--github-issue", "303", "--title", "Dependency issue"],
+            )
+            from_id = "epic-00201"
+            to_id = "epic-00202"
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            shorthand_refs: list[object] = [
+                202,
+                "202",
+                "example/repo#202",
+                "https://github.com/example/repo/issues/202",
+            ]
+
+            for shorthand_ref in shorthand_refs:
+                case_label = f"shorthand_ref={shorthand_ref!r}"
+                self._set_meta_depends_on(from_meta_path.parent, [shorthand_ref])
+                p = self._run_runtime_capture(
+                    target,
+                    ["deps", "remove", "--from", from_id, "--to", to_id],
+                )
+                assert p.returncode == 0, f"{case_label}: {p.stdout}{p.stderr}"
+                assert p.stderr.strip() == "", case_label
+                assert p.stdout.strip() == "\n".join(
+                    [
+                        f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                        "spec-dock: ok (deps remove auto-sync)",
+                    ]
+                ), case_label
                 after = json.loads(from_meta_path.read_text(encoding="utf-8"))
                 assert after.get("depends_on") == [], case_label
 
@@ -2932,53 +3206,105 @@ class TestCliDeps(CliRuntimeHarness):
             after = from_meta_path.read_text(encoding="utf-8")
             assert after == before
 
-    def test_deps_remove_non_issue_from_input_returns_unsupported_node_kind(self) -> None:
+    def test_deps_remove_epic_direct_dependency_updates_meta_json_and_returns_updated(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
-            local_ids = self._create_local_compat_hierarchy(
+            self._create_same_repo_linked_hierarchy(
                 target,
-                issues=((301, "Issue A"), (302, "Issue B")),
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                issue_title="Issue A",
             )
-            from_id = local_ids["epic-00201"]
-            to_id = local_ids["iss-00301"]
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue B"],
+            )
+            from_id = "epic-00201"
+            self._run_runtime(
+                target,
+                [
+                    "new",
+                    "epic",
+                    "--initiative",
+                    "101",
+                    "--github-issue",
+                    "202",
+                    "--title",
+                    "Dependency epic",
+                ],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "202", "--github-issue", "303", "--title", "Dependency issue"],
+            )
+            to_id = "epic-00202"
             from_meta_path = self._find_meta_path_by_id(target, from_id)
-            before = from_meta_path.read_text(encoding="utf-8")
+            self._set_meta_depends_on(from_meta_path.parent, [to_id])
 
             p = self._run_runtime_capture(
                 target,
                 ["deps", "remove", "--from", from_id, "--to", to_id],
             )
-            assert p.returncode == 1, p.stdout + p.stderr
-            assert p.stdout.strip() == ""
-            assert "code=unsupported_node_kind" in p.stderr
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert p.stderr.strip() == ""
+            assert p.stdout.strip() == "\n".join(
+                    [
+                        f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                        "spec-dock: ok (deps remove auto-sync)",
+                    ]
+                )
 
-            after = from_meta_path.read_text(encoding="utf-8")
-            assert after == before
+            after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+            assert after.get("depends_on") == []
 
-    def test_deps_remove_non_issue_to_input_returns_unsupported_node_kind(self) -> None:
+    def test_deps_remove_initiative_direct_dependency_updates_meta_json_and_returns_updated(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
-            local_ids = self._create_local_compat_hierarchy(
+            self._create_same_repo_linked_hierarchy(
                 target,
-                issues=((301, "Issue A"), (302, "Issue B")),
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                issue_title="Issue A",
             )
-            from_id = local_ids["iss-00301"]
-            to_id = local_ids["epic-00201"]
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue B"],
+            )
+            from_id = "init-00101"
+            self._run_runtime(
+                target,
+                [
+                    "new",
+                    "initiative",
+                    "--github-issue",
+                    "102",
+                    "--title",
+                    "Dependency initiative",
+                ],
+            )
+            to_id = "init-00102"
             from_meta_path = self._find_meta_path_by_id(target, from_id)
-            before = from_meta_path.read_text(encoding="utf-8")
+            self._set_meta_depends_on(from_meta_path.parent, [to_id])
 
             p = self._run_runtime_capture(
                 target,
                 ["deps", "remove", "--from", from_id, "--to", to_id],
             )
-            assert p.returncode == 1, p.stdout + p.stderr
-            assert p.stdout.strip() == ""
-            assert "code=unsupported_node_kind" in p.stderr
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert p.stderr.strip() == ""
+            assert p.stdout.strip() == "\n".join(
+                    [
+                        f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                        "spec-dock: ok (deps remove auto-sync)",
+                    ]
+                )
 
-            after = from_meta_path.read_text(encoding="utf-8")
-            assert after == before
+            after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+            assert after.get("depends_on") == []
 
     def test_deps_remove_unresolved_target_returns_edge_not_found_and_no_write(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3125,53 +3451,103 @@ class TestCliDeps(CliRuntimeHarness):
             after = from_meta_path.read_text(encoding="utf-8")
             assert after == before
 
-    def test_deps_add_non_issue_node_input_returns_unsupported_node_kind(self) -> None:
+    def test_deps_add_epic_direct_dependency_updates_meta_json_and_returns_updated(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
-            local_ids = self._create_local_compat_hierarchy(
+            self._create_same_repo_linked_hierarchy(
                 target,
-                issues=((301, "Issue A"), (302, "Issue B")),
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                issue_title="Issue A",
             )
-            from_id = local_ids["epic-00201"]
-            to_id = local_ids["iss-00301"]
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue B"],
+            )
+            from_id = "epic-00201"
+            self._run_runtime(
+                target,
+                [
+                    "new",
+                    "epic",
+                    "--initiative",
+                    "101",
+                    "--github-issue",
+                    "202",
+                    "--title",
+                    "Dependency epic",
+                ],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "202", "--github-issue", "303", "--title", "Dependency issue"],
+            )
+            to_id = "epic-00202"
             from_meta_path = self._find_meta_path_by_id(target, from_id)
-            before = from_meta_path.read_text(encoding="utf-8")
 
             p = self._run_runtime_capture(
                 target,
                 ["deps", "add", "--from", from_id, "--to", to_id],
             )
-            assert p.returncode == 1, p.stdout + p.stderr
-            assert p.stdout.strip() == ""
-            assert "code=unsupported_node_kind" in p.stderr
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert p.stderr.strip() == ""
+            assert p.stdout.strip() == "\n".join(
+                    [
+                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                        "spec-dock: ok (deps add auto-sync)",
+                    ]
+                )
 
-            after = from_meta_path.read_text(encoding="utf-8")
-            assert after == before
+            after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+            assert after.get("depends_on") == [to_id]
 
-    def test_deps_add_non_issue_to_input_returns_unsupported_node_kind(self) -> None:
+    def test_deps_add_empty_initiative_direct_dependency_updates_meta_json_and_returns_updated(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
-            local_ids = self._create_local_compat_hierarchy(
+            self._create_same_repo_linked_hierarchy(
                 target,
-                issues=((301, "Issue A"), (302, "Issue B")),
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                issue_title="Issue A",
             )
-            from_id = local_ids["iss-00301"]
-            to_id = local_ids["epic-00201"]
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue B"],
+            )
+            from_id = "init-00101"
+            self._run_runtime(
+                target,
+                [
+                    "new",
+                    "initiative",
+                    "--github-issue",
+                    "102",
+                    "--title",
+                    "Dependency initiative",
+                ],
+            )
+            to_id = "init-00102"
             from_meta_path = self._find_meta_path_by_id(target, from_id)
-            before = from_meta_path.read_text(encoding="utf-8")
 
             p = self._run_runtime_capture(
                 target,
                 ["deps", "add", "--from", from_id, "--to", to_id],
             )
-            assert p.returncode == 1, p.stdout + p.stderr
-            assert p.stdout.strip() == ""
-            assert "code=unsupported_node_kind" in p.stderr
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "deps_ref_expanded_to_empty" in p.stderr
+            assert p.stdout.strip() == "\n".join(
+                    [
+                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                        "spec-dock: ok (deps add auto-sync)",
+                    ]
+                )
 
-            after = from_meta_path.read_text(encoding="utf-8")
-            assert after == before
+            after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+            assert after.get("depends_on") == [to_id]
 
     def test_deps_add_unresolved_target_returns_invalid_add_unresolved_and_no_write(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3268,6 +3644,161 @@ class TestCliDeps(CliRuntimeHarness):
             assert second.returncode == 1, second.stdout + second.stderr
             assert second.stdout.strip() == ""
             assert "code=invalid_add_cycle" in second.stderr
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            assert after == before
+
+    @pytest.mark.parametrize(
+        ("from_key", "to_key", "expected_code", "expected_detail"),
+        (
+            ("epic-00201", "epic-00201", "invalid_add_self_dependency", "Self dependency is not allowed"),
+            ("iss-00301", "epic-00201", "invalid_add_cycle", "targets ancestor/container"),
+            ("epic-00201", "iss-00301", "invalid_add_cycle", "targets descendant"),
+            ("epic-00201", "init-00101", "invalid_add_cycle", "targets ancestor/container"),
+        ),
+        ids=("self", "issue-to-parent", "parent-to-child", "epic-to-initiative"),
+    )
+    def test_deps_add_invalid_node_candidate_returns_invalid_add_cycle_and_no_write(
+        self,
+        from_key: str,
+        to_key: str,
+        expected_code: str,
+        expected_detail: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                issue_title="Issue A",
+            )
+            from_meta_path = self._find_meta_path_by_id(target, from_key)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_key, "--to", to_key],
+            )
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert p.stdout.strip() == ""
+            assert f"code={expected_code}" in p.stderr
+            assert expected_detail in p.stderr
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            assert after == before
+
+    def test_deps_add_empty_epic_raw_cycle_returns_invalid_add_cycle_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                issue_title="Issue A",
+            )
+            self._run_runtime(
+                target,
+                [
+                    "new",
+                    "epic",
+                    "--initiative",
+                    "101",
+                    "--github-issue",
+                    "202",
+                    "--title",
+                    "Empty dependency epic",
+                ],
+            )
+            self._run_runtime(
+                target,
+                [
+                    "new",
+                    "epic",
+                    "--initiative",
+                    "101",
+                    "--github-issue",
+                    "203",
+                    "--title",
+                    "Another empty dependency epic",
+                ],
+            )
+            first_id = "epic-00202"
+            second_id = "epic-00203"
+            first_meta_path = self._find_meta_path_by_id(target, first_id)
+            second_meta_path = self._find_meta_path_by_id(target, second_id)
+            self._set_meta_depends_on(second_meta_path.parent, [first_id])
+            before = first_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", first_id, "--to", second_id],
+            )
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert p.stdout.strip() == ""
+            assert "code=invalid_add_cycle" in p.stderr
+            assert "Dependency cycle detected" in p.stderr
+
+            after = first_meta_path.read_text(encoding="utf-8")
+            assert after == before
+
+    def test_deps_add_candidate_compiled_cycle_returns_invalid_add_cycle_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                issue_title="Issue A",
+            )
+            self._run_runtime(
+                target,
+                [
+                    "new",
+                    "epic",
+                    "--initiative",
+                    "101",
+                    "--github-issue",
+                    "202",
+                    "--title",
+                    "Dependency epic",
+                ],
+            )
+            self._run_runtime(
+                target,
+                [
+                    "new",
+                    "issue",
+                    "--epic",
+                    "202",
+                    "--github-issue",
+                    "302",
+                    "--title",
+                    "Issue B",
+                ],
+            )
+            from_id = "iss-00301"
+            target_epic_id = "epic-00202"
+            issue_b_id = "iss-00302"
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            issue_b_meta_path = self._find_meta_path_by_id(target, issue_b_id)
+            self._set_meta_depends_on(issue_b_meta_path.parent, [from_id])
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", target_epic_id],
+            )
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert p.stdout.strip() == ""
+            assert "code=invalid_add_cycle" in p.stderr
+            assert "Dependency cycle detected" in p.stderr
 
             after = from_meta_path.read_text(encoding="utf-8")
             assert after == before
