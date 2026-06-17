@@ -41,8 +41,8 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 ./spec-dock/scripts/spec-dock active show
 
 ./spec-dock/scripts/spec-dock deps check <target>
-./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>
-./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>
+./spec-dock/scripts/spec-dock deps add --from <node-id> --to <node-id>
+./spec-dock/scripts/spec-dock deps remove --from <node-id> --to <node-id>
 ```
 
 - `import issue` で `--epic` を省略した場合は current active から親 epic を解決する
@@ -72,7 +72,7 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 - `active set` は `<target>` の後方互換を維持しつつ、`--id` / `--github-issue` の explicit form も使える
 - 依存未解決なら `active set` は通常失敗する。確認は `./spec-dock/scripts/spec-dock deps check <target>`
 - 例外で進める場合だけ `./spec-dock/scripts/spec-dock active set <target> --force`
-- 依存 edge の追加/削除は metadata を直編集せず `./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>` / `./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>` を使う
+- 依存 edge の追加/削除は metadata を直編集せず `./spec-dock/scripts/spec-dock deps add --from <node-id> --to <node-id>` / `./spec-dock/scripts/spec-dock deps remove --from <node-id> --to <node-id>` を使う。`<node-id>` は existing initiative / epic / issue node を受け付け、source node 直下 `.meta.json.depends_on` の direct edge だけを add/remove する。inherited / compiled-only edge は remove 対象ではない
 
 ## 仕様 authoring（spec authoring）
 
