@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 
 def _runtime_modules():
     runtime_scripts_dir = (
@@ -182,3 +184,118 @@ class TestDepsDomain:
         )
 
         assert effective["iss-00003"] == ["iss-00004", "iss-00005"]
+
+    def _empty_epic_graph(self):
+        _domain_deps, domain_models, domain_tree = _runtime_modules()
+        root = Path("/repo/spec-dock/initiatives/init-00010-platform")
+        return domain_tree.build_graph(
+            [
+                domain_models.SpecNodeSeed(
+                    kind="initiative",
+                    id="init-00010",
+                    title="Platform",
+                    slug="platform",
+                    path=root,
+                    meta_path=root / ".meta.json",
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=10,
+                    github_repo_owner="example",
+                    github_repo_name="repo",
+                ),
+                domain_models.SpecNodeSeed(
+                    kind="epic",
+                    id="epic-00011",
+                    title="First",
+                    slug="first",
+                    path=root / "epics" / "epic-00011-first",
+                    meta_path=root / "epics" / "epic-00011-first" / ".meta.json",
+                    parent_id="init-00010",
+                    initiative_id="init-00010",
+                    epic_id=None,
+                    github_issue_number=11,
+                    github_repo_owner="example",
+                    github_repo_name="repo",
+                ),
+                domain_models.SpecNodeSeed(
+                    kind="epic",
+                    id="epic-00012",
+                    title="Second",
+                    slug="second",
+                    path=root / "epics" / "epic-00012-second",
+                    meta_path=root / "epics" / "epic-00012-second" / ".meta.json",
+                    parent_id="init-00010",
+                    initiative_id="init-00010",
+                    epic_id=None,
+                    github_issue_number=12,
+                    github_repo_owner="example",
+                    github_repo_name="repo",
+                ),
+            ]
+        )
+
+    def test_raw_node_dependency_cycle_between_empty_epics_is_rejected(self) -> None:
+        domain_deps, _domain_models, _domain_tree = _runtime_modules()
+        graph = self._empty_epic_graph()
+
+        with pytest.raises(RuntimeError, match="Dependency cycle detected"):
+            domain_deps.validate_raw_node_dependency_graph(
+                graph,
+                {
+                    "epic-00011": ["epic-00012"],
+                    "epic-00012": ["epic-00011"],
+                },
+            )
+
+        with pytest.raises(RuntimeError, match="Dependency cycle detected"):
+            domain_deps.ensure_node_dependency_add_would_be_valid(
+                graph,
+                {"epic-00011": ["epic-00012"]},
+                from_node_id="epic-00012",
+                to_node_id="epic-00011",
+            )
+
+    def test_raw_node_dependency_candidate_rejects_ancestor_container(self) -> None:
+        domain_deps, _domain_models, _domain_tree = _runtime_modules()
+        graph = self._graph()
+
+        with pytest.raises(RuntimeError, match="ancestor"):
+            domain_deps.ensure_node_dependency_add_would_be_valid(
+                graph,
+                {},
+                from_node_id="iss-00003",
+                to_node_id="epic-00002",
+            )
+
+        with pytest.raises(RuntimeError, match="ancestor"):
+            domain_deps.ensure_node_dependency_add_would_be_valid(
+                graph,
+                {},
+                from_node_id="epic-00002",
+                to_node_id="init-00001",
+            )
+
+    def test_raw_node_dependency_candidate_rejects_descendant(self) -> None:
+        domain_deps, _domain_models, _domain_tree = _runtime_modules()
+        graph = self._graph()
+
+        with pytest.raises(RuntimeError, match="descendant"):
+            domain_deps.ensure_node_dependency_add_would_be_valid(
+                graph,
+                {},
+                from_node_id="epic-00002",
+                to_node_id="iss-00003",
+            )
+
+    def test_raw_node_dependency_candidate_rejects_self_dependency(self) -> None:
+        domain_deps, _domain_models, _domain_tree = _runtime_modules()
+        graph = self._graph()
+
+        with pytest.raises(RuntimeError, match="self"):
+            domain_deps.ensure_node_dependency_add_would_be_valid(
+                graph,
+                {},
+                from_node_id="epic-00002",
+                to_node_id="epic-00002",
+            )
