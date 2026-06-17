@@ -771,5 +771,16 @@ no output
 ## 今後の推奨事項 (任意)
 - asset script の syntax check は `PYTHONDONTWRITEBYTECODE=1` を付ける、または `py_compile` 後に asset tree の `__pycache__` 残存を確認する。
 
+## PR delivery / merge-base refresh evidence
+- `origin/main` が branch より 19 commits 進んでいたため、PR 作成前に `git merge origin/main` を実行した。Git conflict は発生しなかった。
+- merge 後の focused regression `uv run pytest tests/unit/infra/test_init_update.py -k "issue_197 or issue_187_s410 or issue_75_pr_observation_review_collector_explicit_trigger_body_caps_and_threads or issue_176_s03_review_collector_returns_codex_review_contract"` は `11 passed, 428 deselected`。
+- merge 後の full `uv run pytest tests/unit/infra/test_init_update.py` は initially `1 failed, 438 passed`。失敗は `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` で、main 側で追加された `iss-00192` / `iss-00193` `.meta.json` が branch 側 snapshot 定数に未反映だった。
+- Bounded `dev-coder` follow-up として `tests/unit/infra/test_init_update.py` の checked-in dogfooding snapshot に `iss-00192` / `iss-00193` path と `depends_on: []` mapping を追加した。`iss-00197` は既に snapshot に含まれていた。
+- repair focused verification: `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` -> `1 passed`.
+- post-repair regression verification: `uv run pytest tests/unit/infra/test_init_update.py -k "issue_197 or issue_187_s410 or issue_75_pr_observation_review_collector_explicit_trigger_body_caps_and_threads or issue_176_s03_review_collector_returns_codex_review_contract"` -> `11 passed, 428 deselected`.
+- post-repair full verification: `uv run pytest tests/unit/infra/test_init_update.py` -> `439 passed`.
+- post-repair diff check: `git diff --check` -> pass.
+- merge refresh repair の material implementation decisions はなし。delegate note: `No material implementation decisions beyond the approved plan.`
+
 ## 省略/例外メモ (必須)
 - 該当なし
