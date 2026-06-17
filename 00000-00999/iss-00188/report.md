@@ -654,6 +654,7 @@ spec-dock: ok (validate) nodes=97
 | head branch | `iss-00188-prevent-duplicate-discussion-timestamp-slots` | pushed |
 | initial PR head SHA | `821eb10993b299e3daaa0dba8496c88e1062c034` | observed |
 | current repair head SHA before U002-U004 commit | `b04c0b1da21f23adc50859ed7c32c2d029f28765` | observed |
+| latest observed repair head SHA | `5b19b4e1a4d7650364499a2c5747b1c7b920af6e` | observed with human gate |
 | draft / ready | `isDraft=false` from `gh pr view 195 --json ...` | ready PR |
 | issue linkage | PR body includes `Closes #188` | linked |
 | PR creation decision | no existing PR was found for branch before creation; PR #195 created | complete |
@@ -665,32 +666,33 @@ spec-dock: ok (validate) nodes=97
 | 0 | `821eb10993b299e3daaa0dba8496c88e1062c034` | `/private/tmp/pr-195-observation/result.json`; trigger comment id 4725934579 | failed; `provider-tests` CI failure | repair batch created; U001 fixed forbidden command-layer domain import |
 | 1 | `b04c0b1da21f23adc50859ed7c32c2d029f28765` | `/private/tmp/pr-195-observation-b04c0b1d/result.json`; trigger comment id 4726082469 | human_gate; CI passed; Codex review returned 3 unresolved P2 threads | U002/U003/U004 repair units created and implemented |
 | 2 | `bb0b751a58b7d86f9f01feff89e5d0e2c2333bfa` | `/private/tmp/pr-195-observation-bb0b751a/result.json`; trigger comment id 4726406116 | human_gate; CI passed; Codex review returned 2 unresolved P2 threads and 1 unresolved P3 thread | U005/U006/U007 repair units created and implemented |
+| 3 | `5b19b4e1a4d7650364499a2c5747b1c7b920af6e` | `/private/tmp/pr-195-observation-5b19b4e1/result.json`; trigger comment id 4726816755; resume `/private/tmp/pr-195-observation-5b19b4e1-resume/result.json` | human_gate; CI passed; current-trigger selected unresolved review comments/threads were empty; fallback Codex issue comment said no major issues, but `status_reason=fallback_issue_comment_low_confidence` | stop at human gate; no `issue finish`; no additional review trigger approved |
 
 ### PR Repair Batch Evidence
 
 | repair unit | inventory | source | disposition | implementation status | local verification | PR re-observation |
 |---|---|---|---|---|---|---|
-| U001 | I001 `check_failure:provider-tests` | `20260617t043551z-disc-pr-repair-unit-u001-provider-tests-layer-import.md` | fix-now | implemented in commit `b04c0b1d` | structural and focused new-doc tests pass | superseded by iteration 1; CI passed on `b04c0b1d` |
-| U002 | I002 `review_feedback:body-date-after-timestamp-retry` | `20260617t050751z-disc-pr-repair-unit-u002-body-date-after-timestamp-retry.md` | fix-now | implemented; commit pending | focused red -> 3 failed; green -> 3 passed; draft hardening test -> 1 passed, 27 deselected; related suite -> 68 passed, 6 skipped; validate pass | pending |
-| U003 | I003 `review_feedback:repair-batch-template-identity` | `20260617t050753z-disc-pr-repair-unit-u003-repair-batch-template-identity.md` | fix-now | implemented; commit pending | stale-guidance `rg` no matches; parity diff no output; asset tests -> 3 passed | pending |
-| U004 | I004 `review_feedback:bare-hyphenated-doc-type-validation` | `20260617t050752z-disc-pr-repair-unit-u004-bare-hyphenated-doc-type-validation.md` | fix-now | implemented; commit pending | focused red -> 3 failed; green -> 3 passed; related suite -> 67 passed, 6 skipped; validate pass | pending |
-| U005 | I005 `review_feedback:delegated-diff-guard-pr-repair-batch` | `20260617t055224z-disc-pr-repair-unit-u005-delegated-authoring-pr-repair-batch-guard.md` | fix-now | implemented; commit pending | focused red -> `discussion_name_noncompliant`; code-review red -> `new_discussion_missing_proposed_state`; follow-up green -> 5 passed, 22 deselected; delegated authoring suites -> 45 passed, 31 skipped | pending |
-| U006 | I006 `review_feedback:shipped-readme-pr-repair-batch-catalog` | `20260617t055225z-disc-pr-repair-unit-u006-shipped-readme-pr-repair-batch-catalog.md` | fix-now | implemented; commit pending | README inspection; README pin test -> 1 passed; provider/dogfooding parity pass; asset tests -> 3 passed | pending |
-| U007 | I007 `review_feedback:suffix-fallback-original-timestamp` | `20260617t055226z-disc-pr-repair-unit-u007-suffix-fallback-original-timestamp.md` | fix-now | implemented; commit pending | focused red -> later family suffix exhaustion; green -> 1 passed; new-doc suite -> 103 passed, 11 skipped | pending |
+| U001 | I001 `check_failure:provider-tests` | `20260617t043551z-disc-pr-repair-unit-u001-provider-tests-layer-import.md` | fix-now | implemented in commit `b04c0b1d` | structural and focused new-doc tests pass | superseded by later observations; CI passed on `5b19b4e1` |
+| U002 | I002 `review_feedback:body-date-after-timestamp-retry` | `20260617t050751z-disc-pr-repair-unit-u002-body-date-after-timestamp-retry.md` | fix-now | implemented in commit `bb0b751a` | focused red -> 3 failed; green -> 3 passed; draft hardening test -> 1 passed, 27 deselected; related suite -> 68 passed, 6 skipped; validate pass | no selected current-trigger unresolved feedback on `5b19b4e1`; human gate remains due fallback low confidence |
+| U003 | I003 `review_feedback:repair-batch-template-identity` | `20260617t050753z-disc-pr-repair-unit-u003-repair-batch-template-identity.md` | fix-now | implemented in commit `bb0b751a` | stale-guidance `rg` no matches; parity diff no output; asset tests -> 3 passed | no selected current-trigger unresolved feedback on `5b19b4e1`; human gate remains due fallback low confidence |
+| U004 | I004 `review_feedback:bare-hyphenated-doc-type-validation` | `20260617t050752z-disc-pr-repair-unit-u004-bare-hyphenated-doc-type-validation.md` | fix-now | implemented in commit `bb0b751a` | focused red -> 3 failed; green -> 3 passed; related suite -> 67 passed, 6 skipped; validate pass | no selected current-trigger unresolved feedback on `5b19b4e1`; human gate remains due fallback low confidence |
+| U005 | I005 `review_feedback:delegated-diff-guard-pr-repair-batch` | `20260617t055224z-disc-pr-repair-unit-u005-delegated-authoring-pr-repair-batch-guard.md` | fix-now | implemented in commit `5b19b4e1` | focused red -> `discussion_name_noncompliant`; code-review red -> `new_discussion_missing_proposed_state`; follow-up green -> 5 passed, 22 deselected; delegated authoring suites -> 45 passed, 31 skipped | no selected current-trigger unresolved feedback on `5b19b4e1`; human gate remains due fallback low confidence |
+| U006 | I006 `review_feedback:shipped-readme-pr-repair-batch-catalog` | `20260617t055225z-disc-pr-repair-unit-u006-shipped-readme-pr-repair-batch-catalog.md` | fix-now | implemented in commit `5b19b4e1` | README inspection; README pin test -> 1 passed; provider/dogfooding parity pass; asset tests -> 3 passed | no selected current-trigger unresolved feedback on `5b19b4e1`; human gate remains due fallback low confidence |
+| U007 | I007 `review_feedback:suffix-fallback-original-timestamp` | `20260617t055226z-disc-pr-repair-unit-u007-suffix-fallback-original-timestamp.md` | fix-now | implemented in commit `5b19b4e1` | focused red -> later family suffix exhaustion; green -> 1 passed; new-doc suite -> 103 passed, 11 skipped | no selected current-trigger unresolved feedback on `5b19b4e1`; human gate remains due fallback low confidence |
 
 ### Merge Preparation Gate
 
 | 項目 | 現在の証跡 | 結果 |
 |---|---|---|
-| latest observed head matches PR head | last completed observation matched `bb0b751a58b7d86f9f01feff89e5d0e2c2333bfa`; U005-U007 commit is still pending | no |
-| required checks | CI passed on `bb0b751a58b7d86f9f01feff89e5d0e2c2333bfa` | pending recheck after repair commit |
-| non-required checks | no remaining non-required failures reported in latest observation | pending recheck after repair commit |
-| Codex review | 3 unresolved current-trigger threads in latest observation | pending repair re-observation |
-| review-thread state | available; unresolved count 3 on latest observation | pending |
-| merge conflict / visible blocker | latest observation reported `merge_state_status=CLEAN` | pending recheck after repair commit |
-| repair batch state | `20260617t043527z-pr-repair-batch-pr-repair-batch.md` updated through U005-U007 implementation | pending re-observation |
-| review-clean | no | pending |
-| merge-prepared | no | pending repair commit, push, and latest-head re-observation |
+| latest observed head matches PR head | observation and resume matched `5b19b4e1a4d7650364499a2c5747b1c7b920af6e` | yes for code-repair head; this evidence-only report update itself must not be treated as merge-prepared evidence |
+| required checks | latest observation reported CI passed; 4 rollup checks were successful (`validate` x2, `provider-tests` x2) | pass on `5b19b4e1` |
+| non-required checks | no remaining non-required failures reported in latest observation | pass on `5b19b4e1` |
+| Codex review | fallback Codex-authored issue comment id 4726895237 said no major issues for reviewed commit `5b19b4e1a4`; observation still returned `human_gate` / `fallback_issue_comment_low_confidence` | human decision required |
+| review-thread state | available; current-trigger selected unresolved review comments/threads were empty in observation and resume | no selected unresolved feedback, but not authoritative completion |
+| merge conflict / visible blocker | required-check state reported `merge_state_status=CLEAN` | pass on `5b19b4e1` |
+| repair batch state | `20260617t043527z-pr-repair-batch-pr-repair-batch.md` updated through U005-U007 implementation and latest human gate observation | human-gate-after-repair |
+| review-clean | no | cannot claim because observation completion is false and pass signal is low-confidence fallback |
+| merge-prepared | no | stop at human gate; do not run `issue finish` without user waiver, manual review decision, or approved additional trigger |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: Final spec-reviewer failed because S99 evidence rows and `tc-012` closure were still placeholders.
