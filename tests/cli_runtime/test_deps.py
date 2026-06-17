@@ -2649,6 +2649,72 @@ class TestCliDeps(CliRuntimeHarness):
             assert before == self._read_deps_projection_artifacts(target)
             assert log_path.read_text(encoding="utf-8") == ""
 
+    def test_deps_add_duplicate_epic_shorthand_direct_ref_returns_unchanged_without_duplicate_storage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(
+                target,
+                owner="example",
+                repo="repo",
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                issue_title="Issue A",
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue B"],
+            )
+            self._run_runtime(
+                target,
+                [
+                    "new",
+                    "epic",
+                    "--initiative",
+                    "101",
+                    "--github-issue",
+                    "202",
+                    "--title",
+                    "Dependency epic",
+                ],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "202", "--github-issue", "303", "--title", "Dependency issue"],
+            )
+            from_id = "epic-00201"
+            to_id = "epic-00202"
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            shorthand_refs: list[object] = [
+                202,
+                "202",
+                "example/repo#202",
+                "https://github.com/example/repo/issues/202",
+            ]
+
+            for shorthand_ref in shorthand_refs:
+                case_label = f"shorthand_ref={shorthand_ref!r}"
+                self._set_meta_depends_on(from_meta_path.parent, [shorthand_ref])
+                before = from_meta_path.read_text(encoding="utf-8")
+
+                p = self._run_runtime_capture(
+                    target,
+                    ["deps", "add", "--from", from_id, "--to", to_id],
+                )
+
+                assert p.returncode == 0, f"{case_label}: {p.stdout}{p.stderr}"
+                assert p.stderr.strip() == "", case_label
+                assert p.stdout.strip() == "\n".join(
+                    [
+                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=unchanged",
+                        "spec-dock: skipped (deps add auto-sync) reason=unchanged",
+                    ]
+                ), case_label
+                assert from_meta_path.read_text(encoding="utf-8") == before, case_label
+                after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+                assert after.get("depends_on") == [shorthand_ref], case_label
+
     def test_deps_add_inherited_only_edge_adds_direct_dependency(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -2811,6 +2877,68 @@ class TestCliDeps(CliRuntimeHarness):
                             "spec-dock: ok (deps remove auto-sync)",
                         ]
                     ), case_label
+                after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+                assert after.get("depends_on") == [], case_label
+
+    def test_deps_remove_removes_shorthand_direct_refs_by_epic_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(
+                target,
+                owner="example",
+                repo="repo",
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                issue_title="Issue A",
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue B"],
+            )
+            self._run_runtime(
+                target,
+                [
+                    "new",
+                    "epic",
+                    "--initiative",
+                    "101",
+                    "--github-issue",
+                    "202",
+                    "--title",
+                    "Dependency epic",
+                ],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "202", "--github-issue", "303", "--title", "Dependency issue"],
+            )
+            from_id = "epic-00201"
+            to_id = "epic-00202"
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            shorthand_refs: list[object] = [
+                202,
+                "202",
+                "example/repo#202",
+                "https://github.com/example/repo/issues/202",
+            ]
+
+            for shorthand_ref in shorthand_refs:
+                case_label = f"shorthand_ref={shorthand_ref!r}"
+                self._set_meta_depends_on(from_meta_path.parent, [shorthand_ref])
+                p = self._run_runtime_capture(
+                    target,
+                    ["deps", "remove", "--from", from_id, "--to", to_id],
+                )
+                assert p.returncode == 0, f"{case_label}: {p.stdout}{p.stderr}"
+                assert p.stderr.strip() == "", case_label
+                assert p.stdout.strip() == "\n".join(
+                    [
+                        f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                        "spec-dock: ok (deps remove auto-sync)",
+                    ]
+                ), case_label
                 after = json.loads(from_meta_path.read_text(encoding="utf-8"))
                 assert after.get("depends_on") == [], case_label
 
