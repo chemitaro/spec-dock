@@ -17,6 +17,7 @@
   - `research`: source-grounded read。事実、推測、未検証、用語衝突、edge case、判断への含意を分ける。
   - `disc`: synthesis / 中間レポート / reflection proposal / ADR candidate triage。採否の最終証跡は canonical docs / ADR / `report.md` Evidence Adoption Ledger に昇格する。
   - `adr`: 意思決定記録。後から戻しにくく、将来の読者に意外性があり、実質的な tradeoff がある長期判断を固定する。
+  - `pr-repair-batch`: PR repair workflow の observation、concern inventory、repair queue、merge-prepared gate を記録する。
   - `draft-requirement`: scope kind に応じた canonical requirement template を直接 source として render する discussion-local draft。
   - `draft-design`: scope kind に応じた canonical design template を直接 source として render する discussion-local draft。
   - `draft-plan`: scope kind に応じた canonical plan template を直接 source として render する discussion-local draft。
@@ -28,6 +29,7 @@
   - `./spec-dock/scripts/spec-dock new doc research --epic <id> --title "<title>"`
   - `./spec-dock/scripts/spec-dock new doc disc --epic <id> --title "<title>"`
   - `./spec-dock/scripts/spec-dock new doc adr --epic <id> --title "<title>"`
+  - `./spec-dock/scripts/spec-dock new doc pr-repair-batch --epic <id> --title "<title>"`
   - `./spec-dock/scripts/spec-dock new doc draft-requirement --epic <id> --title "<title>"`
   - `./spec-dock/scripts/spec-dock new doc draft-design --epic <id> --title "<title>"`
   - `./spec-dock/scripts/spec-dock new doc draft-plan --epic <id> --title "<title>"`
