@@ -576,7 +576,33 @@ spec-dock: ok (validate) nodes=97
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| provider discussion catalog / naming / workflow docs | yes | doc-writer | current catalog now includes `pr-repair-batch`; runtime-owned `new doc <type>` / returned `path=...` is documented as the creation procedure; `<ts>-<kind>` remains grammar / validation reference only; ADR mirror remains `adr`-only | passed: fresh spec-reviewer `019ed3c2-2683-7080-8b68-9a91bdfd600a`, findings=[] |
+| dogfooding docs mirror | yes: generated parity output | doc-writer | provider docs mechanically mirrored to `spec-dock/docs/**`; focused parity tests pass | passed: fresh spec-reviewer `019ed3c2-2683-7080-8b68-9a91bdfd600a`, findings=[] |
+| install-root guidance | no: already handled in S04 | doc-writer / N/A | S90 `rg` found no `Use filenames`; S04 updated install-root `.agents` / `.codex` guidance and dogfooding copies | passed: fresh spec-reviewer `019ed3c2-2683-7080-8b68-9a91bdfd600a`, findings=[] |
+| templates / README / migration notes | no | doc-writer / N/A | S90 `rg` found no additional directly impacted provider docs beyond updated docs set; `pr-repair-batch` provider template was S02/S04 scope | passed: fresh spec-reviewer `019ed3c2-2683-7080-8b68-9a91bdfd600a`, findings=[] |
+
+#### S90 証跡
+- Delegated provider docs update to `doc-writer` agent `019ed3b3-e8d2-75a3-97bb-c879d7288d0a`.
+- Delegated mechanical dogfooding docs mirror parity to `doc-writer` agent `019ed3bf-bd20-7722-97c1-3104d6ad8356`.
+- Updated provider docs and matching dogfooding copies:
+  - `guide.md`
+  - `phase_design.md`
+  - `phase_plan.md`
+  - `reference_naming.md`
+  - `rules/initiative/discussions.md`
+  - `rules/epic/discussions.md`
+  - `rules/issue/discussions.md`
+  - `workflow_initiative.md`
+  - `workflow_epic.md`
+  - `workflow_issue.md`
+  - `workflow_spec_authoring.md`
+- Verification:
+  - `rg -n "current catalog|pr-repair-batch|new doc <type>|<ts>-<kind>|Use filenames" src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/install_root` -> remaining matches are updated catalog, command-first procedure, or grammar/reference-only; no `Use filenames` match.
+  - `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_spec_document_templates_keep_policy_out_of_scaffold tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_mirror_docs_match_provider_assets tests/unit/infra/test_init_update.py::TestInitUpdate::test_workflow_issue_doc_matches_bundled_asset -q` -> 3 passed.
+  - `git diff --check` -> pass.
+  - `./spec-dock/scripts/spec-dock validate` -> pass, `nodes=97`.
+- Closure:
+  - `tc-011` closed by fresh `spec-reviewer` `019ed3c2-2683-7080-8b68-9a91bdfd600a`, findings=[].
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
