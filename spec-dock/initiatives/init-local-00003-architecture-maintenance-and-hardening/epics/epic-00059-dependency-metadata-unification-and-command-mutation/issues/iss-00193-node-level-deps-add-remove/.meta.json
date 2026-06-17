@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00193",
+  "title": "Node Level Dependency Mutation",
+  "slug": "node-level-deps-add-remove",
+  "created_at": "2026-06-17T07:50:23+09:00",
+  "updated_at": "2026-06-17T07:50:23+09:00",
+  "parent_id": "epic-00059",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00059",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 193,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}
