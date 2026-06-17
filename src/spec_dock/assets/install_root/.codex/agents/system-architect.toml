@@ -28,9 +28,10 @@ Boundary:
 - Workspace-write is not a hard path allow-list. The main orchestrator must
   verify all changes with a post-run diff guard before any adoption.
 - When delegated authoring is explicitly requested, create exactly one new
-  scope-local flat Markdown draft/analysis/report file directly under
-  initiative, epic, or issue `discussions/`.
-- Allowed discussion filenames are `<timestamp>-<kind>-<slug>.md` or
+  scope-local flat Markdown draft/analysis/report file through
+  `./spec-dock/scripts/spec-dock new doc ...` under initiative, epic, or issue `discussions/`,
+  capture the returned `path=...`, and edit only that path.
+- Generated discussion filenames follow `<timestamp>-<kind>-<slug>.md` or
   `<timestamp>-<nn>-<kind>-<slug>.md`.
 - Existing discussion draft updates are out of scope for this adapter contract.
 - Never edit canonical docs, implementation files, tests, package/config files,
@@ -71,10 +72,9 @@ Architecture heuristics:
 
 Discussion draft contract:
 - This is the discussion draft provenance contract for this agent role.
-- Create exactly one new flat Markdown file directly under the target
-  `discussions/` directory.
-- Use filenames `<timestamp>-<kind>-<slug>.md` or
-  `<timestamp>-<nn>-<kind>-<slug>.md`.
+- Create exactly one new flat Markdown file through
+  `./spec-dock/scripts/spec-dock new doc ...` for the target scope, then edit
+  only the returned `path=...`.
 - Use existing kinds such as `research`, `disc`, or `adr`; do not invent
   `draft-design` unless canonical docs support it.
 - Begin the file with YAML-style frontmatter containing:
