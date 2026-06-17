@@ -829,6 +829,54 @@ class TestCliNew(CliRuntimeHarness):
                 ), p.stdout)
             assert "discussion-one" not in re.search(r"id=([^\s]+)", p.stdout).group(1)
 
+    def test_new_doc_creates_pr_repair_batch_with_generated_identity_and_template(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            self._write_runtime_clock(
+                target,
+                now_iso="2026-03-12T01:02:03+00:00",
+                today="2026-03-12",
+            )
+
+            p = self._run_runtime_capture(
+                target,
+                ["new", "doc", "pr-repair-batch", "--issue", "iss-00003", "--title", "PR Repair Batch"],
+            )
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert re.search(
+                (
+                    r"spec-dock: ok \(new doc\) type=pr-repair-batch "
+                    r"id=20260312t010203z-pr-repair-batch "
+                    r"scope=iss-00003 "
+                    r"path=spec-dock/.*/discussions/"
+                    r"20260312t010203z-pr-repair-batch-pr-repair-batch\.md"
+                ),
+                p.stdout,
+            )
+
+            created = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / "discussions"
+                / "20260312t010203z-pr-repair-batch-pr-repair-batch.md"
+            )
+            assert created.is_file()
+            content = created.read_text(encoding="utf-8")
+            assert '種別: pr-repair-batch' in content
+            assert 'ID: "20260312t010203z-pr-repair-batch"' in content
+            assert 'タイトル: "PR Repair Batch"' in content
+            assert '親: ["iss-00003"]' in content
+            assert "# 20260312t010203z-pr-repair-batch PR Repair Batch" in content
+
     def test_new_doc_renders_body_date_from_same_utc_instant_as_doc_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -1067,9 +1115,32 @@ class TestCliNew(CliRuntimeHarness):
             assert "research" in p_doc.stdout
             assert "interview" in p_doc.stdout
             assert "scratch" in p_doc.stdout
+            assert "pr-repair-batch" in p_doc.stdout
             assert "note" in p_doc.stdout
+            assert "--template-file" not in p_doc.stdout
+            assert "--body-file" not in p_doc.stdout
+            assert "--basename" not in p_doc.stdout
+            assert "--doc-id" not in p_doc.stdout
             assert "--id" not in p_doc.stdout
             assert "--seq" not in p_doc.stdout
+
+            for forbidden_option in ("--template-file", "--body-file", "--basename", "--doc-id", "--id"):
+                p_forbidden = self._run_runtime_capture(
+                    target,
+                    [
+                        "new",
+                        "doc",
+                        "pr-repair-batch",
+                        "--issue",
+                        "iss-00003",
+                        "--title",
+                        "PR Repair Batch",
+                        forbidden_option,
+                        "x",
+                    ],
+                )
+                assert p_forbidden.returncode == 2, p_forbidden.stdout + p_forbidden.stderr
+                assert "unrecognized arguments" in p_forbidden.stderr
 
     def test_new_node_help_does_not_expose_local_creation_options(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

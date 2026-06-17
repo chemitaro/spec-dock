@@ -108,6 +108,130 @@ class TestDelegatedAuthoringRuntimeDomain:
             assert result.ok, result.details
             assert result.status == "pass"
 
+    def test_diff_guard_allows_new_pr_repair_batch_discussion_markdown(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            discussion = issue_dir / "discussions" / "20260525t010203z-pr-repair-batch-agent-draft.md"
+            discussion.write_text(_draft_text("# draft"), encoding="utf-8")
+
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+            )
+
+            assert result.ok, result.details
+            assert result.status == "pass"
+
+    def test_diff_guard_allows_runtime_generated_pr_repair_batch_template(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            discussion = issue_dir / "discussions" / "20260525t010203z-pr-repair-batch-pr-repair-batch.md"
+            template = (
+                Path(__file__).resolve().parents[3]
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "spec_dock"
+                / "templates"
+                / "discussions"
+                / "pr-repair-batch.md"
+            ).read_text(encoding="utf-8")
+            discussion.write_text(
+                template.replace("<PR_REPAIR_BATCH_ID>", "20260525t010203z-pr-repair-batch")
+                .replace("<PR_REPAIR_BATCH_TITLE>", "PR Repair Batch")
+                .replace("<SCOPE_ID>", "iss-00003")
+                .replace("<YOUR_NAME>", "spec-dock")
+                .replace("YYYY-MM-DD", "2026-05-25"),
+                encoding="utf-8",
+            )
+
+            result = domain.evaluate_diff_guard(
+                authorized_role="system-architect",
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+            )
+
+            assert result.ok, result.details
+            assert result.status == "pass"
+
+    def test_diff_guard_rejects_pr_repair_batch_template_with_mismatched_generated_id(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            discussion = issue_dir / "discussions" / "20260525t010203z-pr-repair-batch-pr-repair-batch.md"
+            template = (
+                Path(__file__).resolve().parents[3]
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "spec_dock"
+                / "templates"
+                / "discussions"
+                / "pr-repair-batch.md"
+            ).read_text(encoding="utf-8")
+            discussion.write_text(
+                template.replace("<PR_REPAIR_BATCH_ID>", "20260525t010204z-pr-repair-batch")
+                .replace("<PR_REPAIR_BATCH_TITLE>", "PR Repair Batch")
+                .replace("<SCOPE_ID>", "iss-00003")
+                .replace("<YOUR_NAME>", "spec-dock")
+                .replace("YYYY-MM-DD", "2026-05-25"),
+                encoding="utf-8",
+            )
+
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+            )
+
+            assert not result.ok
+            assert "reason=new_discussion_pr_repair_batch_id_mismatch" in "\n".join(result.details)
+
+    def test_diff_guard_rejects_pr_repair_batch_template_with_mismatched_scope(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            discussion = issue_dir / "discussions" / "20260525t010203z-pr-repair-batch-pr-repair-batch.md"
+            template = (
+                Path(__file__).resolve().parents[3]
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "spec_dock"
+                / "templates"
+                / "discussions"
+                / "pr-repair-batch.md"
+            ).read_text(encoding="utf-8")
+            discussion.write_text(
+                template.replace("<PR_REPAIR_BATCH_ID>", "20260525t010203z-pr-repair-batch")
+                .replace("<PR_REPAIR_BATCH_TITLE>", "PR Repair Batch")
+                .replace("<SCOPE_ID>", "iss-99999")
+                .replace("<YOUR_NAME>", "spec-dock")
+                .replace("YYYY-MM-DD", "2026-05-25"),
+                encoding="utf-8",
+            )
+
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+            )
+
+            assert not result.ok
+            assert "reason=new_discussion_scope_id_mismatch" in "\n".join(result.details)
+
     def test_diff_guard_allows_implementation_planner_discussion_markdown(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:

@@ -28,8 +28,8 @@ description: Entry/routing skill for SpecDock work; use it as the route selector
 - `spec-dock-issue-planning`: issue-level requirement/design/plan planning, review readiness, and implementation handoff readiness.
 - `spec-dock-issue-execution`: issue-level TDD execution and report updates after approved / reviewer-pass planning artifacts and an executable `plan.md` are ready.
 - `spec-dock-clarification`: first-class docs-aware clarification companion for planning, source-grounded ambiguity, one-question-at-a-time user clarification through the orchestrator, and analysis-only / authoring handoff.
-- `system-architect` agent role: delegated architecture analysis and draft design evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/system-architect.toml`, not in a skill.
-- `implementation-planner` agent role: delegated planning analysis and draft plan evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/implementation-planner.toml`, not in a skill.
+- `system-architect` agent role: delegated architecture analysis and draft design evidence created through `./spec-dock/scripts/spec-dock new doc ...` and written to the returned scope-local discussion path. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/system-architect.toml`, not in a skill.
+- `implementation-planner` agent role: delegated planning analysis and draft plan evidence created through `./spec-dock/scripts/spec-dock new doc ...` and written to the returned scope-local discussion path. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/implementation-planner.toml`, not in a skill.
 - `spec-dock-adr-facilitation`: ADR drafting/decision facilitation linked to the current workflow.
 
 ## Direct references
@@ -49,7 +49,7 @@ description: Entry/routing skill for SpecDock work; use it as the route selector
 - Do not default to create/import for initiative/epic; inspect existing nodes first.
 - Keep boundary rationale in `discussions/`; docs carry detailed rule semantics while skills expose the operational steps needed before consulting them.
 - Route clarification work to `spec-dock-clarification`; keep detailed clarification artifact semantics in `spec-dock/docs/workflow_clarification.md`.
-- Sub-agent authoring outputs may be direct-written under the target scope `discussions/` direct child, but they do not become canonical authority until the main orchestrator adopts them in canonical docs and records the adoption in `report.md`.
+- Sub-agent authoring outputs may be created through the runtime `new doc` command and then direct-written at the returned target scope `discussions/` path, but they do not become canonical authority until the main orchestrator adopts them in canonical docs and records the adoption in `report.md`.
 - Record `Spec Authoring Gate` evidence in the active node's `report.md` for each requirement / design / plan promotion.
 - For issue work, route requirement/design/plan authoring and unresolved source-grounded ambiguity to `spec-dock-issue-planning` with `spec-dock-clarification` as needed before execution.
 - If issue planning and execution are both requested, complete planning artifacts, fresh reviewer gates, and handoff readiness evidence before routing to `spec-dock-issue-execution`.

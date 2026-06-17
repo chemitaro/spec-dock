@@ -50,7 +50,7 @@ Initiative
 
 ## 議論文書カタログ（discussion docs catalog）
 
-current catalog は `scratch` / `interview` / `research` / `disc` / `adr` / `draft-requirement` / `draft-design` / `draft-plan` です。
+current catalog は `adr` / `disc` / `research` / `interview` / `scratch` / `pr-repair-batch` / `draft-requirement` / `draft-design` / `draft-plan` です。
 
 | 種別（type） | ライフサイクル（lifecycle） | 既定 authority（authority default） | 使う場面 |
 |---|---|---:|---|
@@ -59,6 +59,7 @@ current catalog は `scratch` / `interview` / `research` / `disc` / `adr` / `dra
 | `research` | research | `synthesized` | 検証可能な事実、仕様、実装、先例、外部制約を確認する |
 | `disc` | framing | `proposed` | 集まった情報から論点、評価軸、選択肢、合意点を整理する |
 | `adr` | decision | `accepted` | 長期的な判断、理由、影響、見直し条件を固定する |
+| `pr-repair-batch` | 実行証跡（execution evidence） | `proposed` | レビュー修復 workflow の observation、concern inventory、repair queue、merge-prepared gate を記録する |
 
 通常は doc type から authority を推定します。例外時だけ front matter の `authority` で override し、全 artifact で明示必須にはしません。`derived_from` / `reflected_to` は任意 metadata として、元になった discussion docs と反映先を追うために使えます。
 
