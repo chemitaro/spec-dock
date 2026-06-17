@@ -193,7 +193,7 @@ pass
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001, tc-002 | tc-001 and tc-002 pass, code-reviewer pass, step commit/no-op evidence recorded. | shared helper parser/catalog tests pass; malformed candidate tests pass; code-reviewer `019ed362-63a6-7121-b843-eb095f838247` passed findings=[] | pass | Step commit gate pending in this session log until commit recorded below |
+| S01 | tc-001, tc-002 | tc-001 and tc-002 pass, code-reviewer pass, step commit/no-op evidence recorded. | shared helper parser/catalog tests pass; malformed candidate tests pass; code-reviewer `019ed362-63a6-7121-b843-eb095f838247` passed findings=[]; commit `49f40548` recorded | pass | S01 step commit gate closed |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -246,7 +246,7 @@ pass
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | pending commit | S01 shared catalog/parser implementation and report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S01 | committed | S01 shared catalog/parser implementation and report evidence | `49f40548` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/discussion_docs.py` - shared discussion doc catalog/parser helper.
@@ -256,7 +256,7 @@ pass
 - `spec-dock/active/issue/report.md` - S01 observed evidence ledger.
 
 #### コミット
-- pending
+- `49f40548` refactor(spec-dock): discussion doc parser catalogを共有化
 
 #### メモ
 - `pr-repair-batch` public creation remains S02 scope and is intentionally not enabled in S01.
