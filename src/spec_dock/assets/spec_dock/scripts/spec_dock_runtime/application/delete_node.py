@@ -652,12 +652,16 @@ def _collect_surviving_raw_node_dependency_refs(
     subtree_ids: set[str],
     graph: SpecGraph,
     ports: Ports,
-) -> tuple[dict[str, set[str]], dict[str, list[object]]]:
+) -> tuple[dict[str, set[str]], dict[str, list[object]], dict[str, set[str]]]:
     deleted_node_ids = {node_id for node_id in subtree_ids if graph.nodes_by_id.get(node_id) is not None}
     if not deleted_node_ids:
-        return {}, {}
+        return {}, {}, {}
+    surviving_node_ids = {
+        node.id for node in _iter_managed_nodes(graph) if node.id not in subtree_ids
+    }
     surviving_node_to_deleted_node_ids: dict[str, set[str]] = {}
     surviving_node_to_deleted_raw_refs: dict[str, list[object]] = {}
+    deleted_node_to_surviving_node_ids: dict[str, set[str]] = {}
 
     load_node_dependency_resolutions = (
         getattr(ports.deps_topology_reader, "load_node_dependency_resolutions", None)
@@ -671,20 +675,28 @@ def _collect_surviving_raw_node_dependency_refs(
             resolutions_by_node = None
         if resolutions_by_node is not None:
             for survivor_id, resolutions in resolutions_by_node.items():
-                if survivor_id in subtree_ids:
-                    continue
                 for resolution in resolutions:
-                    if resolution.resolved_node_id not in deleted_node_ids:
+                    if survivor_id in subtree_ids:
+                        if resolution.resolved_node_id in surviving_node_ids:
+                            deleted_node_to_surviving_node_ids.setdefault(survivor_id, set()).add(
+                                resolution.resolved_node_id
+                            )
                         continue
-                    surviving_node_to_deleted_node_ids.setdefault(survivor_id, set()).add(resolution.resolved_node_id)
-                    surviving_node_to_deleted_raw_refs.setdefault(survivor_id, []).append(resolution.raw_ref)
-            return surviving_node_to_deleted_node_ids, surviving_node_to_deleted_raw_refs
+                    if resolution.resolved_node_id in deleted_node_ids:
+                        surviving_node_to_deleted_node_ids.setdefault(survivor_id, set()).add(
+                            resolution.resolved_node_id
+                        )
+                        surviving_node_to_deleted_raw_refs.setdefault(survivor_id, []).append(resolution.raw_ref)
+            return (
+                surviving_node_to_deleted_node_ids,
+                surviving_node_to_deleted_raw_refs,
+                deleted_node_to_surviving_node_ids,
+            )
 
     deleted_node_id_by_lower = {node_id.lower(): node_id for node_id in deleted_node_ids}
+    surviving_node_id_by_lower = {node_id.lower(): node_id for node_id in surviving_node_ids}
 
     for node in _iter_managed_nodes(graph):
-        if node.id in subtree_ids:
-            continue
         try:
             payload = _load_meta_payload(node.path / ".meta.json", ports=ports)
         except Exception:
@@ -692,12 +704,21 @@ def _collect_surviving_raw_node_dependency_refs(
         for ref in cast(list[object], payload["depends_on"]):
             if not isinstance(ref, str):
                 continue
-            deleted_node_id = deleted_node_id_by_lower.get(ref.strip().lower())
-            if deleted_node_id is None:
+            ref_lower = ref.strip().lower()
+            if node.id in subtree_ids:
+                surviving_node_id = surviving_node_id_by_lower.get(ref_lower)
+                if surviving_node_id is not None:
+                    deleted_node_to_surviving_node_ids.setdefault(node.id, set()).add(surviving_node_id)
                 continue
-            surviving_node_to_deleted_node_ids.setdefault(node.id, set()).add(deleted_node_id)
+            deleted_node_id = deleted_node_id_by_lower.get(ref_lower)
+            if deleted_node_id is not None:
+                surviving_node_to_deleted_node_ids.setdefault(node.id, set()).add(deleted_node_id)
 
-    return surviving_node_to_deleted_node_ids, surviving_node_to_deleted_raw_refs
+    return (
+        surviving_node_to_deleted_node_ids,
+        surviving_node_to_deleted_raw_refs,
+        deleted_node_to_surviving_node_ids,
+    )
 
 
 def _active_ids(manifest: ActiveManifest | None) -> set[str]:
@@ -1228,7 +1249,11 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
             subtree_issue_ids=subtree_issue_ids,
             graph=graph,
         )
-        surviving_node_to_deleted_node_ids, surviving_node_to_deleted_raw_refs = _collect_surviving_raw_node_dependency_refs(
+        (
+            surviving_node_to_deleted_node_ids,
+            surviving_node_to_deleted_raw_refs,
+            deleted_node_to_surviving_node_ids,
+        ) = _collect_surviving_raw_node_dependency_refs(
             subtree_ids=subtree_ids,
             graph=graph,
             ports=ports,
@@ -1238,6 +1263,10 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
                 dep_conflicts.add(survivor_id)
                 dep_conflicts.update(deleted_node_ids)
                 surviving_node_to_deleted_issue_ids.setdefault(survivor_id, set()).update(deleted_node_ids)
+        for deleted_source_id, surviving_node_ids in deleted_node_to_surviving_node_ids.items():
+            if surviving_node_ids:
+                dep_conflicts.add(deleted_source_id)
+                dep_conflicts.update(surviving_node_ids)
         if dep_conflicts:
             if not req.force:
                 return _result(

@@ -261,6 +261,35 @@ class _StubGitHubCapabilityGateway:
         return list(self.diagnostics)
 
 
+class _StubRawDepsTopologyReader:
+    def __init__(self, infra_contracts, raw_node_depends_on_map):
+        self._infra_contracts = infra_contracts
+        self._raw_node_depends_on_map = {
+            node_id: list(dep_ids)
+            for node_id, dep_ids in raw_node_depends_on_map.items()
+        }
+
+    def load_issue_depends_on_map(self, specdock_dir, graph):
+        del specdock_dir, graph
+        return self._infra_contracts.DepsTopologyLoadResult(
+            issue_depends_on_map={},
+            warnings=[],
+        )
+
+    def load_node_dependency_resolutions(self, specdock_dir, graph):
+        del specdock_dir, graph
+        return {
+            node_id: [
+                self._infra_contracts.DirectDependencyResolution(
+                    raw_ref=dep_id,
+                    resolved_node_id=dep_id,
+                )
+                for dep_id in dep_ids
+            ]
+            for node_id, dep_ids in self._raw_node_depends_on_map.items()
+        }
+
+
 class TestRuntimeDoctorS04:
     def test_doctor_command_surface_rejects_raw_github_api_arguments(self) -> None:
         import argparse
@@ -851,6 +880,50 @@ class TestRuntimeDoctorS04:
             assert "Duplicate id detected" in result.findings[0].message
             assert "Duplicate numeric id detected" not in result.findings[0].message
             assert result.findings[0].guidance
+
+    def test_doctor_detects_raw_empty_container_dependency_cycle(self) -> None:
+        _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            records, _issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
+            records.pop()
+            second_epic_dir = Path(records[0].path) / "epics" / "epic-local-00002-session-auth"
+            second_epic_record = _record(
+                infra_contracts,
+                kind="epic",
+                node_id="epic-local-00002",
+                title="Session Auth",
+                path=second_epic_dir,
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=104,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            )
+            _write_record_artifacts(second_epic_record)
+            records.append(second_epic_record)
+
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubRawDepsTopologyReader(
+                    infra_contracts,
+                    {
+                        "epic-local-00001": ["epic-local-00002"],
+                        "epic-local-00002": ["epic-local-00001"],
+                    },
+                ),
+            )
+
+            result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
+
+            assert not result.ok
+            assert result.findings[0].code == "validation_error"
+            assert "Dependency cycle detected" in result.findings[0].message
+            assert any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance)
 
     def test_doctor_detects_legacy_unscoped_github_linkage_when_current_repo_is_resolved(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()

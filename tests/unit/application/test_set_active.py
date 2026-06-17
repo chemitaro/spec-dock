@@ -34,6 +34,35 @@ class _StubNodeReader:
 
 
 class _StubDepsTopologyReader:
+    def __init__(self, issue_depends_on_map=None, node_depends_on_map=None):
+        self.issue_depends_on_map = dict(issue_depends_on_map or {})
+        self.node_depends_on_map = {
+            node_id: list(depends_on)
+            for node_id, depends_on in (node_depends_on_map or {}).items()
+        }
+
+    def load_issue_depends_on_map(self, specdock_dir, graph):
+        _app_contracts, _app_ports, _app_set_active, _domain_models, infra_contracts = _runtime_modules()
+        return infra_contracts.DepsTopologyLoadResult(
+            issue_depends_on_map=dict(self.issue_depends_on_map),
+            warnings=[],
+        )
+
+    def load_node_dependency_resolutions(self, specdock_dir, graph):
+        _app_contracts, _app_ports, _app_set_active, _domain_models, infra_contracts = _runtime_modules()
+        return {
+            node_id: [
+                infra_contracts.DirectDependencyResolution(
+                    raw_ref=target_id,
+                    resolved_node_id=target_id,
+                )
+                for target_id in depends_on
+            ]
+            for node_id, depends_on in self.node_depends_on_map.items()
+        }
+
+
+class _StubIssueOnlyDepsTopologyReader:
     def __init__(self, issue_depends_on_map=None):
         self.issue_depends_on_map = dict(issue_depends_on_map or {})
 
@@ -153,6 +182,8 @@ class TestSetActiveApplication:
     def _records(self, infra_contracts):
         root = Path("/repo/spec-dock/initiatives/init-00101-auth-platform")
         epic = root / "epics" / "epic-00201-jwt-auth"
+        empty_a = root / "epics" / "epic-00202-empty-a"
+        empty_b = root / "epics" / "epic-00203-empty-b"
         dep = epic / "issues" / "iss-00301-dep-issue"
         target = epic / "issues" / "iss-00302-target-issue"
         return [
@@ -181,6 +212,34 @@ class TestSetActiveApplication:
                 epic_id=None,
                 github_issue_number=201,
                 meta_path=(epic / ".meta.json").as_posix(),
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="epic",
+                id="epic-00202",
+                title="Empty A",
+                slug="empty-a",
+                path=empty_a.as_posix(),
+                parent_id="init-00101",
+                initiative_id="init-00101",
+                epic_id=None,
+                github_issue_number=202,
+                meta_path=(empty_a / ".meta.json").as_posix(),
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="epic",
+                id="epic-00203",
+                title="Empty B",
+                slug="empty-b",
+                path=empty_b.as_posix(),
+                parent_id="init-00101",
+                initiative_id="init-00101",
+                epic_id=None,
+                github_issue_number=203,
+                meta_path=(empty_b / ".meta.json").as_posix(),
                 github_repo_owner="example",
                 github_repo_name="repo",
             ),
@@ -221,16 +280,23 @@ class TestSetActiveApplication:
         *,
         active_store=None,
         deps=None,
+        node_deps=None,
+        expose_node_resolutions=True,
         derived_state_reader=None,
         issue_gateway=None,
         git_gateway=None,
     ):
+        deps_reader = (
+            _StubDepsTopologyReader(deps, node_deps)
+            if expose_node_resolutions
+            else _StubIssueOnlyDepsTopologyReader(deps)
+        )
         return app_ports.Ports(
             node_reader=_StubNodeReader(self._records(infra_contracts)),
             repo_root=Path("/repo"),
             specdock_dir=Path("/repo/spec-dock"),
             active_state_store=active_store or _StubActiveStateStore(),
-            deps_topology_reader=_StubDepsTopologyReader(deps),
+            deps_topology_reader=deps_reader,
             derived_state_reader=derived_state_reader,
             issue_gateway=issue_gateway,
             git_gateway=git_gateway,
@@ -272,7 +338,12 @@ class TestSetActiveApplication:
     def test_set_active_resolves_id_and_repo_scoped_github_target_without_cli(self) -> None:
         app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
         active_store = _StubActiveStateStore()
-        ports = self._ports(app_ports, infra_contracts, active_store=active_store)
+        ports = self._ports(
+            app_ports,
+            infra_contracts,
+            active_store=active_store,
+            expose_node_resolutions=False,
+        )
 
         by_id = app_set_active.set_active(
             self._request(app_contracts, target=self._node_id_target(app_contracts, "iss-302"), force=True),
@@ -317,6 +388,32 @@ class TestSetActiveApplication:
         assert forced.selection.issue_id == "iss-00302"
         assert "deps_blocked" in "\n".join(forced.warnings)
         assert active_store.written[-1].issue.id == "iss-00302"
+
+    def test_set_active_raw_empty_container_cycle_blocks_before_writing_without_cli(self) -> None:
+        app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
+        active_store = _StubActiveStateStore()
+        ports = self._ports(
+            app_ports,
+            infra_contracts,
+            active_store=active_store,
+            deps={},
+            node_deps={
+                "epic-00202": ["epic-00203"],
+                "epic-00203": ["epic-00202"],
+            },
+        )
+
+        with pytest.raises(RuntimeError, match="Dependency cycle detected"):
+            app_set_active.set_active(
+                self._request(
+                    app_contracts,
+                    target=self._node_id_target(app_contracts, "iss-00302"),
+                    force=True,
+                ),
+                ports,
+            )
+
+        assert active_store.written == []
 
     def test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli(self) -> None:
         app_contracts, app_ports, app_set_active, domain_models, infra_contracts = _runtime_modules()
