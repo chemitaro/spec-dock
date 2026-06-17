@@ -249,6 +249,14 @@ def _ancestor_node_ids(graph: SpecGraph, node_id: str) -> set[str]:
 
 def validate_raw_node_dependency_graph(graph: SpecGraph, raw_node_depends_on_map: dict[str, list[str]]) -> None:
     candidate_map: dict[str, list[str]] = {}
+    for node_id in _safe_sorted_node_ids(list(graph.nodes_by_id.keys())):
+        node = graph.nodes_by_id[node_id]
+        candidate_map.setdefault(node_id, [])
+        if node.parent_id:
+            _require_graph_node(graph, node.parent_id)
+            candidate_map.setdefault(node.parent_id, [])
+            candidate_map[node.parent_id].append(node_id)
+
     for source_id in _safe_sorted_node_ids(list(raw_node_depends_on_map.keys())):
         _require_graph_node(graph, source_id)
         candidate_map.setdefault(source_id, [])

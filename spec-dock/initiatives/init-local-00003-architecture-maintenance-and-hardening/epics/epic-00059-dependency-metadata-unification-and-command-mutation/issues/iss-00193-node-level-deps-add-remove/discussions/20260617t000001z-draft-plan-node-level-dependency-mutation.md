@@ -6,7 +6,7 @@ source_paths:
   - spec-dock/active/issue/requirement.md
   - spec-dock/active/issue/design.md
   - spec-dock/active/issue/report.md
-  - spec-dock/active/issue/discussions/20260617t-design-node-level-dependency-mutation.md
+  - spec-dock/active/issue/discussions/20260617t000000z-draft-design-node-level-dependency-mutation.md
   - spec-dock/active/epic/requirement.md
   - spec-dock/active/epic/design.md
   - spec-dock/active/epic/plan.md

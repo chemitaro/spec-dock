@@ -771,7 +771,7 @@ ID: "iss-00193"
 
 ## 委任ドラフト採用
 - 採用元:
-  - `discussions/20260617t-plan-node-level-dependency-mutation.md`
+  - `discussions/20260617t000001z-draft-plan-node-level-dependency-mutation.md`
 - 採用内容:
   - S01/S02/S03/S04/S90/S99 step boundaries。
   - Spec-Locked Closure Index。
