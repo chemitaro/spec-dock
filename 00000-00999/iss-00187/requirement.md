@@ -5,7 +5,7 @@ ID: "iss-00187"
 関連GitHub: ["#187"]
 状態: "draft | approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-06-16"
+最終更新: "2026-06-17"
 親: ["epic-00158", "init-local-00003"]
 ---
 
@@ -65,6 +65,8 @@ ID: "iss-00187"
   - Workflow run / job 自体の `stale` conclusion は CI failure 系として扱うが、PR head SHA mismatch / snapshot 中の head change は CI failure ではなく stale head freshness failure として再実行へ誘導する。
   - Post-observation 追加修正として、CI passed / head matched かつ current trigger boundary に unresolved feedback や pending review signal がない一方で Codex review completion signal が観測できない状態を、generic `wait_timeout` ではなく `review_completion_unknown` 系の non-pass terminal-like state として表現する。
   - `review_completion_unknown` は merge-ready / pass ではなく、人間または orchestration layer の確認を要求する状態として扱う。
+  - Post-review-inventory 追加修正として、current trigger boundary に selected されていなくても、GitHub review thread payload 上で `isResolved=false` かつ `isOutdated=false` と観測できる unresolved thread は latest head に残る actionable review work として扱い、`review_completion_unknown` / merge-prepared / issue finish の前に可視化する。
+  - `selected_unresolved_count == 0` は current trigger boundary 上の selected blocker がないことだけを示し、actionable review work がないことの証明として扱わない。
   - Downstream contract として `ci.status`、`normalized_status`、`overall_status`、`recommended_next_action`、`limitations`、`ci.failures`、`decision` の実用上の意味を維持する。
   - Fake `gh` による script-level regression tests を追加 / 更新する。
 - 禁止:
@@ -72,7 +74,7 @@ ID: "iss-00187"
   - Fine-grained PAT dashboard の UI を変更する。
   - PR merge の自動実行を追加する。
   - GitHub Actions workflow 定義そのものを再設計する。
-  - Codex review lifecycle 観測を、current-boundary completion unknown の分類とその安全な wait termination 以外へ広げる。
+  - Codex review lifecycle 観測を、current-boundary completion unknown の分類、その安全な wait termination、および latest head に残る non-outdated unresolved review thread の actionable inventory 化以外へ広げる。
   - Caller-provided endpoint、method、GraphQL query、headers、request body、`jq`、raw `gh` arguments を受け取る拡張を追加する。
   - 観測不能な CI surface を暗黙に成功扱いする。
 - 対象外:
@@ -90,7 +92,7 @@ ID: "iss-00187"
   - Workflow run / job の in-progress / queued / pending 系は `running` または `pending` とし、wait / resume 可能な状態にする。
   - Actions-only green を `passed` にする場合でも、full rollup / external provider coverage が未証明なら limitation を明示する。
   - Permission / auth / rate limit / schema / transient failure は token や stderr 本文を漏らさず、既存と同様に machine-readable limitation として返す。
-  - `review_completion_unknown` は、CI/head が完了し、current-boundary review evidence が安定して変化していないことを wait wrapper が確認した後にだけ terminal-like に扱う。
+  - `review_completion_unknown` は、CI/head が完了し、current-boundary review evidence が安定して変化しておらず、かつ actionable unresolved review inventory が空であることを wait wrapper が確認した後にだけ terminal-like に扱う。
 - 判断が必要:
   - Commit statuses / PR status rollup を supplemental signal として残す場合、permission denied を blocking とするか、Actions primary の limitation とするか。
   - External provider の存在をどこまで検出できるか。検出できない場合は「未証明の範囲」として limitation に留める。
@@ -151,7 +153,7 @@ ID: "iss-00187"
   - 観測点: `limitations`、`stderr_sha256`、stdout/stderr secret absence assertions。
 - AC-006:
   - アクター: PR observation を実行する agent。
-  - 前提: PR head SHA は期待 head と一致し、CI は `passed`。current trigger boundary では Codex-authored submitted PR review、allowlisted no-findings signal、current unresolved thread、changes-requested evidence、pending review request / pending review signal、blocking collection failure のいずれも観測されない。
+  - 前提: PR head SHA は期待 head と一致し、CI は `passed`。current trigger boundary では Codex-authored submitted PR review、allowlisted no-findings signal、current unresolved thread、changes-requested evidence、pending review request / pending review signal、blocking collection failure のいずれも観測されない。さらに all-fetched review thread inventory 上でも `isResolved=false` かつ `isOutdated=false` の actionable carryover unresolved thread が観測されない。
   - 操作: `wait_pr_observation.sh` が同じ current-boundary no-completion evidence を quiet / same-fingerprint stability 条件まで観測する。
   - 期待結果: final JSON は generic `wait_timeout` ではなく `review_completion_unknown` 系の `decision.status_reason` と `recommended_next_action="human_gate"` を返す。`passed` / `merge_prepared` にはならない。
   - 観測点: `normalized_status`、`decision.status_reason`、`decision.completion_signal`、`wait.quiet_seconds_observed`、`wait.same_fingerprint_observed`、fake `gh` wait test。
@@ -161,6 +163,12 @@ ID: "iss-00187"
   - 操作: `fetch_pr_observation_snapshot.sh` または `wait_pr_observation.sh` を実行する。
   - 期待結果: pending state は `review_completion_unknown` に昇格せず、待機 / resume の対象として扱われる。
   - 観測点: `codex_review.lifecycle.status`、`decision.status_reason`、`recommended_next_action`。
+- AC-008:
+  - アクター: 後続の repair / merge preparation workflow。
+  - 前提: current trigger boundary の selected unresolved count は `0` だが、GitHub review thread payload 上で `isResolved=false` かつ `isOutdated=false` の carryover unresolved thread が観測される。
+  - 操作: PR observation final JSON を読む。
+  - 期待結果: carryover thread は actionable review inventory として可視化され、`summary.review="unresolved"` または同等の unresolved review state になり、`review_completion_unknown` / `merge_prepared` にはならない。
+  - 観測点: `decision.actionable_unresolved_count`、`decision.carryover_unresolved_count`、`decision.carryover_unresolved_thread_ids`、`summary.review`、`recommended_next_action`。
 
 ## 例外・エッジケース
 - EC-001:

@@ -5,7 +5,7 @@ ID: "iss-00187"
 関連GitHub: ["#187"]
 状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-06-16"
+最終更新: "2026-06-17"
 依存: ["requirement.md"]
 親: ["epic-00158", "init-local-00003"]
 ---
@@ -58,6 +58,8 @@ ID: "iss-00187"
   - Snapshot / wait wrapper は `ci.status`、blocking limitation、head freshness を使って `normalized_status` と `recommended_next_action` を決める。
   - `fetch_pr_review_snapshot.sh` は current-boundary Codex PR review があれば `submitted_pull_request_review` を high-confidence completion signal とする。current Codex issue comment は `fallback_issue_comment` として low-confidence human gate に留め、信頼できる signal がない場合は `completion_signal="none"` にする。
   - PR #190 head `fc3041f86a7f9defba2d3fd8b48ff1c48126151a` の観測では、CI passed / head matched / selected blockers zero でも completion signal が `none` のまま `wait_timeout` に潰れた。これは review endpoint 未取得ではなく、completion signal contract の不足として扱う。
+  - PR #190 head `bb50b7a27144dc1a5af2f542db170ad21204ef2d` の観測では `review_completion_unknown` により false pass は避けられたが、P2 review comment `3422572159` が観測終了後に投稿された。これは late review race であり、`review_completion_unknown` が review 不在証明ではないことを示す。
+  - 同じ観測系では `review.threads.unresolved` の all-fetched audit 情報と current-boundary selected unresolved count が分離されている。非 outdated の未解決 thread が latest head に残る場合、selected count zero だけでは repair inventory / merge-prepared gate として不足する。
   - 既存 regression tests は fake `gh` script で provider-side scripts を直接実行し、permission classification、required checks、stale head、failure detail を検証している。
 - 採用するパターン:
   - Public shell command は互換 wrapper として維持し、非自明な GitHub API normalization / JSON classification は standalone Python entrypoint へ切り出す。最初の対象は P1 review が集中している `fetch_pr_checks_snapshot.sh` とする。
@@ -118,6 +120,18 @@ ID: "iss-00187"
     - B: quiet / same-fingerprint に加えて、trigger age と CI-passed age の明示的な最小猶予を満たすまで missing completion を wait/resume 側に残す。
   - 決定:
     - B を採用する。PR #190 では CI pass 後に Codex review が数分遅れて投稿されたため、payload stability だけでは review publication latency を証明できない。`review_completion_unknown` は non-pass human gate のまま、通常の Codex review 到着猶予を経た後にだけ terminal-like とする。
+- 論点 10: actionable review inventory
+  - 選択肢:
+    - A: current trigger boundary の selected unresolved だけを修正対象として扱い、all-fetched review threads は audit/debug のみに留める。
+    - B: selected unresolved と、latest head に対して non-outdated な carryover unresolved thread を分けて出力し、その union を actionable unresolved review inventory として merge-prepared / repair batch gate に使う。
+  - 決定:
+    - B を採用する。current-boundary selection は stale review false positive を避けるために維持するが、non-outdated carryover unresolved thread は latest head に残る review work なので、audit field に隠さず first-class decision inventory に昇格する。`selected_unresolved_count == 0` は必要条件の一部であり、全 review work がないことの証明ではない。
+- 論点 11: wait loop next poll budget
+  - 選択肢:
+    - A: deadline まで sleep し、次 loop の `run_snapshot` に残り時間をそのまま渡す。
+    - B: sleep 前と poll 開始前に next snapshot 用の最小 budget を予約し、budget 不足時は latest useful payload を保持して under-budget final poll を開始しない。
+  - 決定:
+    - B を採用する。quiet / same-fingerprint stability を待つだけの非終端 payload で残り時間を sleep が食い切ると、次 poll が timeout して有用な payload を all-unknown timeout に劣化させる。wait loop は deadline だけでなく次回 snapshot 実行可能性を守る。
 
 ## 依存関係分析
 - module / file 依存:
@@ -262,6 +276,26 @@ Skill --> Collector : documents required permission
     - Wait / combined snapshot may promote to `decision.status_reason="review_completion_unknown"` only after CI passed, head matched, no current blocker/pending evidence, quiet/same-fingerprint stability, and explicit review-latency guards are observed.
     - Promoted state uses `decision.status="unknown"` or top-level-normalized `human_gate`, `decision.recommended_next_action="human_gate"`, and `decision.observation_complete=true`.
     - This state means: current trigger boundary no-completion evidence has stabilized enough to stop blind waiting, CI/head are already satisfactory at the combined snapshot layer, no current selected blocker exists, and no trusted completion signal was observed.
+  - Add actionable review inventory:
+    - `decision.actionable_unresolved_count`
+    - `decision.current_selected_unresolved_count`
+    - `decision.carryover_unresolved_count`
+    - `decision.actionable_unresolved_thread_ids`
+    - `decision.carryover_unresolved_thread_ids`
+    - `review_threads.current_selected.unresolved[]`
+    - `review_threads.carryover_non_outdated_unresolved[]`
+    - `review_threads.all_fetched.non_outdated_unresolved[]`
+  - Compatibility:
+    - Existing `decision.selected_unresolved_count`, `decision.selected_review_thread_ids`, `codex_review.collection_summary.review_threads.selected_ids`, and `review.threads.*` audit fields remain additive-compatible.
+    - `summary.review` must reflect actionable unresolved inventory. If current-selected or carryover non-outdated unresolved review exists, `summary.review="unresolved"` even when current completion signal is absent.
+    - `review_completion_unknown` requires actionable unresolved inventory to be empty; it is not a synonym for review absence.
+  - Add wait budget metadata:
+    - `wait.next_poll_min_budget_seconds`
+    - `wait.next_poll_budget_reserved`
+    - `wait.last_snapshot_elapsed_seconds`
+    - `wait.final_poll_skipped_reason`
+    - `wait.post_unknown_fresh_audit_required`
+    - `wait.latest_review_activity_at` and `wait.latest_review_activity_age_seconds` when reliably available.
   - Preserve existing primary / fallback signals:
     - `submitted_pull_request_review` remains high-confidence primary completion.
     - `fallback_issue_comment` remains low-confidence and non-promoting.
@@ -289,6 +323,7 @@ Skill --> Collector : documents required permission
   - `completion_signal="none"` is not pass.
   - `review_completion_unknown` is terminal-like but non-pass: it stops wasteful wait/resume only after wait stability and asks for human/orchestrator inspection.
   - Current selected unresolved threads and current selected changes-requested evidence override no-findings or unknown completion states.
+  - Carryover non-outdated unresolved threads also block `review_completion_unknown` and merge-prepared reporting until resolved, outdated, or explicitly dispositioned.
   - Pending review requests or pending current review signals remain pending and must not become `review_completion_unknown`.
 
 ## シーケンス差分
@@ -301,8 +336,10 @@ Skill --> Collector : documents required permission
   6. CI collector emits stdout JSON with Actions-derived status and coverage limitations.
   7. Review collector classifies current-boundary review lifecycle from reviews/comments/threads.
   8. If no trusted completion signal is present and no current blocker/pending signal remains, the review collector keeps machine-readable no-completion evidence; it does not by itself prove stability.
-  9. `wait_pr_observation.sh` promotes that evidence to `review_completion_unknown` only when CI is `passed`, head is matched, the semantic fingerprint is stable for the configured same-count, the quiet window has elapsed, and explicit review-latency guards are satisfied.
-  10. Snapshot / wait wrappers classify top-level observation from the same `ci.status` and review `decision.status_reason` contracts, and use limitation blocking/severity/capability rather than any presence of supplemental permission-denied text.
+  9. Snapshot / wait classification first builds actionable review inventory. current-selected unresolved threads take precedence, then carryover non-outdated unresolved threads, then blocking collection limitations, then pending review signals, then trusted completion signal, and only after those are absent may stable no-completion evidence become `review_completion_unknown`.
+  10. `wait_pr_observation.sh` promotes that evidence to `review_completion_unknown` only when CI is `passed`, head is matched, actionable unresolved inventory is empty, the semantic fingerprint is stable for the configured same-count, the quiet window has elapsed, and explicit review-latency guards are satisfied.
+  11. Before sleeping or launching another snapshot, `wait_pr_observation.sh` reserves a minimum next-poll budget. If the remaining budget is insufficient and a useful latest payload exists, the loop keeps that payload and records an insufficient-budget reason instead of starting a final poll that cannot complete.
+  12. Snapshot / wait wrappers classify top-level observation from the same `ci.status` and review `decision.status_reason` contracts, and use limitation blocking/severity/capability rather than any presence of supplemental permission-denied text.
 - Retry / external API:
   - No new retry loop in collector. Existing wait loop continues to poll wrapper output.
   - Rate/transient failures are surfaced as limitations and existing wait/resume behavior decides the next action.
@@ -315,6 +352,8 @@ Skill --> Collector : documents required permission
   - CI detail policy separates high-level classification from bounded diagnostic expansion. Green Actions workflow runs do not require unbounded jobs API expansion before a snapshot can complete.
   - Zero Actions runs is not by itself CI success, but it also does not suppress readable green external check/status evidence.
   - Review lifecycle policy adds a non-pass terminal-like `review_completion_unknown` state so CI/head completed observations do not degrade to generic timeout when Codex does not submit a PR review, while timing guards prevent the state from racing ahead of normal Codex review publication latency.
+  - Review inventory policy separates `current_selected_unresolved`, `carryover_non_outdated_unresolved`, all-fetched audit data, and `actionable_unresolved`. Merge-prepared / repair batch decisions use actionable inventory, not selected count alone.
+  - Wait-loop policy preserves the latest useful payload when the remaining deadline is insufficient for a meaningful next snapshot poll.
 - Invariants:
   - No arbitrary endpoint input.
   - No secret/raw stderr leak.
@@ -599,12 +638,124 @@ lib/pr_observation_wait.py
   - `pr_observation_snapshot.py` and `pr_observation_wait.py` are installed by init/update.
   - provider/mirror changed files match.
 
+## 追加設計修正（S400+ / Review Inventory and Wait Budget Guard）
+
+### 追加設計の目的
+- PR #190 の P2 review `3422572159` と review 見逃し分析を、既存の Actions-primary / `review_completion_unknown` / snapshot-wait Python extraction 設計に統合する。
+- `review_completion_unknown` を維持しつつ、それが review 不在証明ではなく non-pass human gate であることをより強くする。
+- current trigger boundary の selected unresolved だけでなく、latest head に残る non-outdated carryover unresolved review thread を first-class actionable inventory として扱う。
+- wait loop が next snapshot の実行 budget を残さず sleep し、latest useful payload を timeout snapshot で劣化させることを防ぐ。
+
+### 追加現状分析
+- P2 `Reserve time for the next observation poll`:
+  - `pr_observation_wait.py` の sleep は `deadline - time.monotonic()` をそのまま sleep 可能時間として扱う。
+  - quiet / same-fingerprint stability が未達なだけの meaningful payload でも、sleep が残り時間を食い切ると次 poll が under-budget timeout し、previous payload を all-unknown timeout に劣化させ得る。
+- Late review race:
+  - `bb50b7a2` 観測は `2026-06-16T16:54:26Z` に終了し、P2 review comment `3422572159` は `2026-06-16T16:57:38Z` に投稿された。
+  - この P2 自体は当該観測で GitHub API が取得し損ねたものではなく、観測終了後に review が到着した race である。
+  - 既存の `review_completion_unknown_min_ci_passed_age_seconds=90` はこのケースでは late review を完全には待てなかった。
+  - S400+ では `review_completion_unknown_min_ci_passed_age_seconds` を `300` へ引き上げ、post-unknown fresh audit requirement と併用する。これは late review を完全証明する値ではなく、90 秒が短すぎた実測に対する conservative default である。
+- Review inventory gap:
+  - all-fetched `review.threads.unresolved` と current-boundary selected unresolved は別概念として出ているが、merge-prepared / repair workflow が読む actionable inventory へ統合されていない。
+  - `selected_unresolved_count=0` は current trigger boundary に selected blocker がないことだけを示し、latest head に unresolved review work がないことは示さない。
+
+### Review inventory domain model
+- `current_selected_unresolved`:
+  - current trigger / review boundary に属する unresolved review thread。
+  - 既存の selected blocker semantics を維持し、最優先で `address_review_feedback` へ進める。
+- `carryover_non_outdated_unresolved`:
+  - current trigger boundary には selected されないが、GitHub 上で unresolved かつ non-outdated と観測され、latest head に残る review thread。
+  - stale / outdated thread との混同を避けるため、outdated-only unresolved は audit data に留める。
+  - Classifier input contract:
+    - GraphQL review thread payload の `isResolved=false` と `isOutdated=false` が両方取得できる thread だけを carryover actionable candidate にする。
+    - REST PR review comment だけで GraphQL thread outdated state を確認できない場合、その comment は `review_comments.unclassified_unresolved[]` などの audit / limitation evidence に留め、carryover actionable blocker へ昇格しない。
+    - current-selected unresolved thread IDs / comment IDs に含まれるものは `current_selected_unresolved` 側を正とし、carryover から dedupe する。
+    - head SHA / diff relevance を別フィールドで証明できない場合は、GitHub の `isOutdated=false` を latest diff applicability の source of truth とする。`isOutdated` が unavailable / null / unknown の場合は false positive を避けるため carryover へ昇格せず、collection limitation または audit uncertainty として出す。
+    - `isResolved=true` は outdated state に関わらず actionable inventory から除外する。
+- `all_fetched_unresolved`:
+  - GitHub から取得した raw/audit set。debug / evidence 用であり、分類なしに blocker へ昇格しない。
+- `actionable_unresolved`:
+  - `current_selected_unresolved` と `carryover_non_outdated_unresolved` の union。
+  - merge-prepared / repair batch / issue finish gate はこれが zero であることを要求する。
+
+### Decision precedence
+1. current-selected changes requested / unresolved thread。
+2. carryover non-outdated unresolved thread。
+3. blocking collection limitation。
+4. pending review request または current pending review signal。
+5. trusted explicit completion signal。
+6. stable no-completion evidence -> `review_completion_unknown`。
+
+If actionable unresolved inventory is non-empty:
+
+- `summary.review="unresolved"`。
+- `recommended_next_action="address_review_feedback"`。
+- `decision.status_reason` は `current_selected_unresolved_thread` または `carryover_non_outdated_unresolved_thread`。
+- `review_completion_unknown` へ昇格しない。
+
+### Wait budget guard
+- `pr_observation_wait.py` は snapshot 成功時の elapsed を記録し、次 poll の最小 budget を floor + recent elapsed + slack で計算する。
+- sleep 前に `remaining - next_poll_min_budget_seconds` を上限として sleep する。
+- poll 開始前に remaining budget が不足しており、かつ latest useful payload がある場合、under-budget snapshot を開始せず、latest payload を保持して `wait.final_poll_skipped_reason="insufficient_next_snapshot_budget"` を出す。
+- timeout / deadline metadata は残すが、snapshot を開始できないことに由来する all-unknown timeout payload で previous useful payload を上書きしない。
+
+### Post-unknown fresh audit
+- `review_completion_unknown` は blind wait を止める signal であり、review absence を証明しない。
+- Ownership:
+  - `wait_pr_observation.sh` / `pr_observation_wait.py` は、返却する final payload 自体に直近 poll の actionable review inventory と `wait.post_unknown_fresh_audit_required=true` を含める責務を持つ。
+  - `github-pr-merge-preparer` / orchestrator は、`review_completion_unknown` を受け取った後、merge-prepared / no-review-work を報告する前に fresh observation または fresh review inventory audit を再実行・再取得する責務を持つ。
+  - この issue の S400+ 直接 scope は observation payload 側の machine-readable requirement と tests までとし、merge-preparer 自体の workflow 実装変更は follow-up または別スキル側の修正対象にする。ただし PR #190 final evidence では parent orchestrator が手動で fresh inventory を確認する。
+- JSON には `wait.post_unknown_fresh_audit_required=true` を追加し、`review_completion_unknown` が review absence proof ではないことを downstream に伝える。
+
+### Review latency default after PR #190
+- S200+ の `review_completion_unknown_min_ci_passed_age_seconds=90` は当時の initial constant として残るが、PR #190 head `bb50b7a2` では CI pass 後 124 秒で observation が止まり、その約 3 分後に P2 review が投稿された。
+- S400+ の追加実装では CI-passed age guard を `300` 秒へ引き上げる。
+- `300` 秒でも review 不在は証明できないため、`wait.post_unknown_fresh_audit_required=true` と fresh review inventory recheck が final merge-prepared / no-review-work 報告の安全機構である。
+- 実装時に `300` 秒が過剰または不足と判明した場合は、plan/report に observed evidence を記録し、design amendment と spec re-review を通して調整する。
+
+### 追加ファイル変更計画
+- Provider source:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh` または後続の Python extraction module: review thread inventory / carryover classification。
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py`: combined decision precedence and `summary.review` alignment。
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`: next poll budget guard and post-unknown metadata。
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md`: operator-facing wording if output semantics change.
+- Dogfooding mirror:
+  - `.agents/skills/github-pr-observation/...` corresponding files are synchronized after provider changes.
+- Tests:
+  - `tests/unit/infra/test_init_update.py` remains the fake-`gh` regression home.
+
+### 追加テスト戦略
+- selected IDs が空でも all-fetched に non-outdated unresolved thread がある場合:
+  - `decision.actionable_unresolved_count > 0`
+  - `decision.carryover_unresolved_count > 0`
+  - `summary.review="unresolved"`
+  - `recommended_next_action="address_review_feedback"`
+  - no `review_completion_unknown`
+- all-fetched unresolved が outdated のみの場合:
+  - audit data は残る。
+  - actionable count は `0`。
+  - outdated-only data だけでは `address_review_feedback` にしない。
+- current-selected と carryover が両方ある場合:
+  - current-selected reason が優先される。
+  - carryover IDs は inventory に残る。
+- stable no-completion かつ actionable inventory empty:
+  - 既存 latency / quiet / same-fingerprint guards 後に `review_completion_unknown` は引き続き可能。
+- late review activity:
+  - 最新 review activity が stop window に近い場合、unknown promotion または post-unknown audit metadata が安全側に働く。
+- insufficient next-poll budget:
+  - latest useful payload が保持される。
+  - under-budget final snapshot が開始されない。
+  - `wait.final_poll_skipped_reason="insufficient_next_snapshot_budget"` が出る。
+
 ## リスク / 移行 / ロールバック
 - リスク:
   - Actions runs API query shape or pagination behavior differs from fake expectations.
   - Existing downstream code treats any `github_token_permission_denied` limitation as blocking regardless of severity/source.
   - Required checks from branch protection may be incompletely represented when supplemental rollup is unavailable.
   - Review completion unknown may be classified too early if pending review requests or current in-progress signals are not recognized.
+  - Late Codex review publication can occur after `review_completion_unknown` is emitted, so unknown must not be reported as no-review completion.
+  - Carryover review classification can over-block if stale/outdated threads are promoted too broadly, or under-block if non-outdated unresolved threads remain audit-only.
+  - Under-budget final polling can overwrite a useful latest payload with a less informative timeout payload unless the wait loop reserves next-poll budget.
   - Explicit no-findings issue-comment support could false-pass if body matching, actor identity, trigger boundary, or selected blocker precedence is too broad.
   - Extracted Python asset may be omitted from scaffold/update output if installer asset coverage is incomplete.
   - Bounded green-run job expansion may remove diagnostic detail that consumers had begun to inspect, even though high-level CI state remains correct.
@@ -613,6 +764,9 @@ lib/pr_observation_wait.py
   - Supplemental permission limitations must be non-blocking or coverage-only when Actions is decisive.
   - Coverage limitation remains visible on Actions-only green.
   - `review_completion_unknown` is non-pass and terminal-like; it stops blind wait without marking merge-ready.
+  - Actionable review inventory is separated from raw audit fields, and outdated-only unresolved threads remain audit data.
+  - `review_completion_unknown` requires actionable unresolved inventory to be empty and should request or imply a fresh post-unknown review audit before merge-prepared reporting.
+  - Wait budget guard preserves the latest useful payload when a final snapshot cannot be given enough time to complete.
   - Optional no-findings support must use a distinct signal and strict fake `gh` tests instead of changing `fallback_issue_comment` semantics.
 - Rollback:
   - Revert provider script / skill doc / mirror / tests in this issue diff. Public CLI surface is unchanged, so rollback does not require consumer migration.
@@ -625,3 +779,4 @@ lib/pr_observation_wait.py
   - Whether `wait_pr_observation.sh` requires code changes depends on whether collector output can make supplemental permission limitation non-blocking without wrapper edits.
   - Whether `review_completion_unknown` top-level status should be `unknown` or `human_gate`; current recommendation is `human_gate` because it is the safe inspect-before-merge state.
   - Whether an allowlisted no-findings issue comment exists for the observed no-review completion form. If it is not observable, implement only `review_completion_unknown` and defer explicit secondary signal support.
+  - Exact `next_poll_min_budget_seconds` calculation can be tuned during implementation, as long as tests prove the loop does not sleep away all time needed for the next meaningful snapshot.
