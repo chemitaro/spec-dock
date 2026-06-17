@@ -23383,6 +23383,311 @@ esac
         assert decision["actionable_unresolved_thread_ids"] == ["RT_selected"]
         assert decision["actionable_unresolved_count"] == 1
 
+    def _issue_187_s420_run_observation_snapshot(
+        self,
+        *,
+        review_wrapper_payload: dict[str, object],
+    ) -> dict[str, object]:
+        repo_root = Path(__file__).resolve().parents[3]
+        source_script = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            script_dir = tmp_path / "scripts"
+            lib_dir = script_dir / "lib"
+            fake_bin = tmp_path / "bin"
+            script_dir.mkdir()
+            lib_dir.mkdir()
+            fake_bin.mkdir()
+            snapshot_script = script_dir / "fetch_pr_observation_snapshot.sh"
+            shutil.copy2(source_script, snapshot_script)
+            snapshot_script.chmod(0o755)
+            shutil.copy2(source_script.parent / "lib" / "pr_observation_snapshot.py", lib_dir)
+            checks_script = lib_dir / "fetch_pr_checks_snapshot.sh"
+            checks_script.write_text(
+                """#!/usr/bin/env bash
+cat <<'JSON'
+{"ci":{"status":"passed","progress_status":"passed","checks":[],"failures":[],"check_runs":{"total":1,"success":1}},"limitations":[]}
+JSON
+""",
+                encoding="utf-8",
+            )
+            checks_script.chmod(0o755)
+            review_script = lib_dir / "fetch_pr_review_snapshot.sh"
+            review_script.write_text(
+                f"""#!/usr/bin/env bash
+cat <<'JSON'
+{json.dumps(review_wrapper_payload, sort_keys=True, separators=(",", ":"))}
+JSON
+""",
+                encoding="utf-8",
+            )
+            review_script.chmod(0o755)
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
+    cat <<'JSON'
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [str(snapshot_script), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            return json.loads(result.stdout)
+
+    def test_issue_187_s420_snapshot_carryover_unresolved_blocks_unknown(self) -> None:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        payload = self._issue_187_s420_run_observation_snapshot(
+            review_wrapper_payload={
+                "review": {"status": "approved", "signals": []},
+                "decision": {
+                    "status": "pending",
+                    "status_reason": "missing_current_completion_signal",
+                    "recommended_next_action": "wait_or_resume",
+                    "observation_complete": False,
+                    "selected_unresolved_count": 0,
+                    "current_selected_unresolved_count": 0,
+                    "carryover_unresolved_count": 1,
+                    "actionable_unresolved_count": 1,
+                    "current_selected_unresolved_thread_ids": [],
+                    "carryover_unresolved_thread_ids": ["RT_carryover"],
+                    "actionable_unresolved_thread_ids": ["RT_carryover"],
+                    "completion_signal": "none",
+                    "no_completion_evidence": evidence,
+                },
+                "codex_review": {
+                    "lifecycle": {
+                        "status": "none",
+                        "completion_signal": "none",
+                        "no_completion_evidence": evidence,
+                    }
+                },
+            }
+        )
+
+        assert payload["summary"]["review"] == "unresolved"
+        assert payload["recommended_next_action"] == "address_review_feedback"
+        assert payload["decision"]["status_reason"] == "carryover_non_outdated_unresolved_thread"
+        assert payload["decision"]["carryover_unresolved_thread_ids"] == ["RT_carryover"]
+        assert payload["decision"]["status_reason"] != "review_completion_unknown"
+
+    def test_issue_187_s420_snapshot_current_selected_reason_wins_over_carryover(self) -> None:
+        payload = self._issue_187_s420_run_observation_snapshot(
+            review_wrapper_payload={
+                "review": {"status": "approved", "signals": []},
+                "decision": {
+                    "status": "pending",
+                    "status_reason": "missing_current_completion_signal",
+                    "recommended_next_action": "wait_or_resume",
+                    "observation_complete": False,
+                    "selected_unresolved_count": 1,
+                    "current_selected_unresolved_count": 1,
+                    "carryover_unresolved_count": 1,
+                    "actionable_unresolved_count": 2,
+                    "selected_unresolved_thread_ids": ["RT_current"],
+                    "current_selected_unresolved_thread_ids": ["RT_current"],
+                    "carryover_unresolved_thread_ids": ["RT_carryover"],
+                    "actionable_unresolved_thread_ids": ["RT_current", "RT_carryover"],
+                    "completion_signal": "none",
+                },
+            }
+        )
+
+        assert payload["summary"]["review"] == "unresolved"
+        assert payload["decision"]["status_reason"] == "current_selected_unresolved_thread"
+        assert payload["decision"]["carryover_unresolved_thread_ids"] == ["RT_carryover"]
+        assert payload["decision"]["actionable_unresolved_thread_ids"] == ["RT_current", "RT_carryover"]
+
+    def test_issue_187_s420_wait_pending_review_beats_unknown(self) -> None:
+        evidence = {
+            "present": False,
+            "category": "pending_review",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": True,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "carryover_unresolved_count": 0,
+            "actionable_unresolved_count": 0,
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": "pending-review-s420",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "pending-review-s420",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "pending",
+                                "completion_signal": "none",
+                                "no_completion_evidence": evidence,
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status_reason"] != "review_completion_unknown"
+            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["observation_complete"] is False
+
+    def test_issue_187_s420_snapshot_trusted_completion_still_passes_with_empty_inventory(self) -> None:
+        payload = self._issue_187_s420_run_observation_snapshot(
+            review_wrapper_payload={
+                "review": {"status": "approved", "signals": []},
+                "decision": {
+                    "status": "passed",
+                    "status_reason": "passed",
+                    "recommended_next_action": "merge_prepared",
+                    "observation_complete": True,
+                    "selected_unresolved_count": 0,
+                    "current_selected_unresolved_count": 0,
+                    "carryover_unresolved_count": 0,
+                    "actionable_unresolved_count": 0,
+                    "completion_signal": "submitted_pull_request_review",
+                },
+                "codex_review": {
+                    "lifecycle": {
+                        "status": "submitted",
+                        "completion_signal": "submitted_pull_request_review",
+                    }
+                },
+            }
+        )
+
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+
+    def test_issue_187_s420_wait_stable_no_completion_remains_possible_with_empty_inventory(self) -> None:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "carryover_unresolved_count": 0,
+            "actionable_unresolved_count": 0,
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": "no-completion-s420",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "no-completion-s420",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "no_completion_evidence": evidence,
+                            }
+                        },
+                        "observed_at": "2000-01-01T00:00:00Z",
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=3,
+                quiet_seconds=1,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "human_gate"
+            assert payload["decision"]["status_reason"] == "review_completion_unknown"
+            assert payload["decision"]["recommended_next_action"] == "human_gate"
+            assert payload["decision"]["recommended_next_action"] != "merge_prepared"
+
     def test_issue_75_pr_observation_review_collector_explicit_trigger_body_caps_and_threads(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
