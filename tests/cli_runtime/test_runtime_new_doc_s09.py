@@ -669,6 +669,49 @@ class TestRuntimeNewDocS09:
             assert result.path.name == "20260312t010203z-01-scratch-frozen-slot.md"
             assert sleep_calls == [0.05, 0.05]
 
+    def test_later_occupied_timestamp_exhaustion_falls_back_to_original_family(self, monkeypatch) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            clock = _SequenceClock(
+                "2026-03-12T01:02:03+00:00",
+                "2026-03-12T01:02:04+00:00",
+                "2026-03-12T01:02:04+00:00",
+            )
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], clock=clock)
+            sleep_calls: list[float] = []
+
+            discussions_dir = Path(issue_record.path) / "discussions"
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260312t010203z-adr-first.md").write_text("first\n", encoding="utf-8")
+            (discussions_dir / "20260312t010204z-adr-later.md").write_text("later\n", encoding="utf-8")
+            for nn in range(1, 100):
+                (discussions_dir / f"20260312t010204z-{nn:02d}-disc-later-{nn:02d}.md").write_text(
+                    "later suffix\n",
+                    encoding="utf-8",
+                )
+
+            monkeypatch.setenv("SPEC_DOCK_DISCUSSION_TIMESTAMP_WAIT_SECONDS", "0.1")
+            monkeypatch.setenv("SPEC_DOCK_DISCUSSION_TIMESTAMP_POLL_SECONDS", "0.05")
+            monkeypatch.setattr(app_create_node, "_sleep_discussion_timestamp_poll", sleep_calls.append)
+
+            result = app_create_node.create_discussion_doc(
+                app_contracts.CreateDiscussionDocRequest(
+                    doc_type="scratch",
+                    scope_node_id="iss-local-00001",
+                    title="Original family fallback",
+                    slug=None,
+                ),
+                ports,
+            )
+
+            assert result.doc_id == "20260312t010203z-01-scratch"
+            assert result.path.name == "20260312t010203z-01-scratch-original-family-fallback.md"
+            assert sleep_calls == [0.05, 0.05]
+
     @pytest.mark.parametrize(
         ("env_name", "value"),
         (

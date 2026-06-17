@@ -1180,7 +1180,6 @@ def _allocate_discussion_doc_filename(
     wait_seconds, poll_seconds = wait_config
     effective_sleep_fn = sleep_fn if sleep_fn is not None else _sleep_discussion_timestamp_poll
     remaining_seconds = wait_seconds
-    last_observed_timestamp = timestamp
     while remaining_seconds > 0:
         sleep_seconds = min(poll_seconds, remaining_seconds)
         if sleep_seconds <= 0:
@@ -1189,7 +1188,6 @@ def _allocate_discussion_doc_filename(
         remaining_seconds -= sleep_seconds
         next_timestamp = _format_discussion_timestamp(now_iso_provider())
         if next_timestamp > timestamp:
-            last_observed_timestamp = next_timestamp
             if _discussion_standard_slot_is_free(discussions_dir, next_timestamp):
                 return _allocate_discussion_doc_filename_for_timestamp(
                     discussions_dir,
@@ -1200,7 +1198,7 @@ def _allocate_discussion_doc_filename(
 
     return _allocate_discussion_doc_filename_for_timestamp(
         discussions_dir,
-        timestamp=last_observed_timestamp,
+        timestamp=timestamp,
         doc_type=doc_type,
         slug=slug,
     )
