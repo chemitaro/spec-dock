@@ -927,6 +927,35 @@ Scope:
 - `tests/unit/infra/test_init_update.py`
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00187-actions-pr-observation-ci-state/report.md`
 
+## S499 post-observation manual test follow-up（2026-06-17）
+
+Scope:
+- PR #190 head `33dde3c4096cb36ec0f671373e583378c3de2164` was observed with the shipped `wait_pr_observation.sh` as both the external PR gate and a manual test of the PR observation scripts.
+- The observer correctly reached a terminal non-pass `human_gate` instead of timing out or falsely passing: CI was `passed`, head was `matched`, and the review state was `unresolved`.
+- The `human_gate` reason was `carryover_non_outdated_unresolved_thread`; the observer found three actionable carryover unresolved review threads: `PRRT_kwDOQ99OK86Jzt03`, `PRRT_kwDOQ99OK86Jzt09`, and `PRRT_kwDOQ99OK86J9d0v`.
+- The current-selected unresolved inventory was empty: `current_selected_unresolved_count=0` and `current_selected_unresolved_thread_ids=[]`.
+- PR review comments `3418873984` and `3418873991` were confirmed already covered by existing U001 implementation and regression tests.
+- PR review comment `3422327149` remained actionable as a test-stability hardening item. A bounded DevCoder follow-up increased the affected fake-`gh` wait test deadlines from 3 seconds to 6 seconds without changing production scripts.
+
+### S499 post-observation manual test evidence
+| step | evidence | command / source | result | notes |
+|---|---|---|---|---|
+| S499 post-observation | latest-head PR observation / manual script test | `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 190 --head-sha 33dde3c4096cb36ec0f671373e583378c3de2164 --timeout-seconds 900 --poll-interval-seconds 15 --quiet-seconds 30 --same-fingerprint-count 2 --progress stderr-summary` | `human_gate` | `summary.ci=passed`; `summary.head=matched`; `summary.review=unresolved`; `decision.status_reason=carryover_non_outdated_unresolved_thread`; `actionable_unresolved_count=3`; no timeout and no false pass |
+| S499 post-observation | manual test review of observer behavior | observation payload inspection | pass / conservative gate | The script detected non-outdated carryover unresolved threads and did not count the already outdated P2 thread `3422572159` as actionable |
+| S499 post-observation | PR state cross-check | `gh pr view 190 --repo chemitaro/spec-dock --json headRefOid,mergeable,mergeStateStatus,statusCheckRollup,reviewDecision,isDraft,state,url` | PR open / clean / checks passed | `headRefOid=33dde3c4096cb36ec0f671373e583378c3de2164`; `mergeable=MERGEABLE`; `mergeStateStatus=CLEAN`; validate x2 and provider-tests x2 were `SUCCESS`; review threads still blocked readiness |
+| S499 post-observation | already-fixed P1 regressions | `uv run pytest tests/unit/infra/test_init_update.py -k "multiple_running_runs_do_not_expand_every_job or non_terminal_job_failures_are_bounded_by_attempts or propagates_actions_pass_with_informational_supplemental_permission" -q` | `3 passed, 425 deselected` | Confirms P1 comments `3418873984` and `3418873991` are covered by current code and tests |
+| S499 post-observation P1 follow-up | wait fake-`gh` deadline hardening | `uv run pytest tests/unit/infra/test_init_update.py -k "wait_completes_after_stable_fingerprint_and_quiet or wait_out_only_preserves_raw_review_bodies or wait_head_change_is_stale_non_success or wait_applies_zero_check_grace_before_human_gate" -q` | `4 passed, 424 deselected` | DevCoder changed only `tests/unit/infra/test_init_update.py`; affected wait tests now use `--timeout-seconds 6`; zero-check grace was already at 4 seconds and remained unchanged |
+| S499 post-observation P1 follow-up | full unit validation | `uv run pytest tests/unit/infra/test_init_update.py -q` | `428 passed in 246.19s` | Confirms the P1 follow-up does not regress the infra unit lane |
+| S499 post-observation P1 follow-up | whitespace validation | `git diff --check` | pass | no whitespace errors |
+| S499 post-observation P1 follow-up | SpecDock validation | `./spec-dock/scripts/spec-dock validate` | `spec-dock: ok (validate) nodes=96` | active issue docs remain valid after the post-observation report/test diff |
+
+### S499 post-observation review resolution status
+| review comment | concern | current status | evidence | next action |
+|---|---|---|---|---|
+| `3418873984` | Non-terminal Actions job expansion was unbounded | implemented / awaiting GitHub thread resolution | `NON_TERMINAL_JOB_EXPANSION_CAP = 1`; focused U001 tests pass | resolve review thread after reviewer gate |
+| `3418873991` | Green legacy commit statuses should pass when only check-runs read is permission-denied | implemented / awaiting GitHub thread resolution | `external_green_statuses_with_check_runs_permission_limited`; focused U001 tests pass | resolve review thread after reviewer gate |
+| `3422327149` | wait fake-`gh` tests had too little timeout budget after shell/Python extraction | implemented in post-observation follow-up / awaiting reviewer gate | affected timeout values changed from `3` to `6`; focused and full unit tests pass | run code-reviewer gate, commit, push, and re-observe PR #190 |
+
 ## 遭遇した問題と解決 (任意)
 - 問題: S99 の親 focused pytest で、旧 pr_observation fake-gh fixture が Actions-primary endpoint を返さず、`actions_read` unknown で 14 件失敗した。
   - 解決: dev-coder に `tests/unit/infra/test_init_update.py` のみを委任し、旧 fixture に Actions runs/jobs 応答を追加した。親セッションで正しい S99 lane を再実行し `81 passed, 287 deselected` を確認した。
