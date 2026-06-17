@@ -242,6 +242,38 @@ class TestCliDeps(CliRuntimeHarness):
             "epic-00202": to_epic_id,
         }
 
+    def _create_mixed_node_dependency_fixture(self, target: Path) -> dict[str, str]:
+        self._create_same_repo_linked_hierarchy(
+            target,
+            owner="example",
+            repo="repo",
+            initiative_issue_number=101,
+            epic_issue_number=201,
+            issue_issue_number=301,
+            issue_title="From issue",
+        )
+        self._run_runtime(
+            target,
+            ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Sibling issue"],
+        )
+        self._run_runtime(
+            target,
+            ["new", "initiative", "--github-issue", "102", "--title", "Dependency initiative"],
+        )
+        self._run_runtime(
+            target,
+            ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "Dependency epic"],
+        )
+        self._run_runtime(
+            target,
+            ["new", "issue", "--epic", "202", "--github-issue", "303", "--title", "Dependency issue"],
+        )
+        return {
+            "init-00101": "init-00101",
+            "iss-00301": "iss-00301",
+            "epic-00202": "epic-00202",
+        }
+
     def _make_gh_issue_list_and_view_stub(
         self,
         bin_dir: Path,
@@ -2744,6 +2776,43 @@ class TestCliDeps(CliRuntimeHarness):
             after = json.loads(from_meta_path.read_text(encoding="utf-8"))
             assert after.get("depends_on") == [to_id]
 
+    @pytest.mark.parametrize(
+        ("from_key", "to_key"),
+        (
+            ("iss-00301", "epic-00202"),
+            ("init-00101", "epic-00202"),
+        ),
+        ids=("issue-to-unrelated-epic", "initiative-to-unrelated-epic"),
+    )
+    def test_deps_add_mixed_kind_direct_dependency_updates_meta_json_and_returns_updated(
+        self,
+        from_key: str,
+        to_key: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            local_ids = self._create_mixed_node_dependency_fixture(target)
+            from_id = local_ids[from_key]
+            to_id = local_ids[to_key]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert p.stderr.strip() == ""
+            assert p.stdout.strip() == "\n".join(
+                [
+                    f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                    "spec-dock: ok (deps add auto-sync)",
+                ]
+            )
+
+            after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+            assert after.get("depends_on") == [to_id]
+
     def test_deps_remove_updates_meta_json_and_returns_updated(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -2783,6 +2852,44 @@ class TestCliDeps(CliRuntimeHarness):
             assert from_meta is not None
             assert from_meta is not None
             assert from_meta.get("depends_on") == []
+
+    @pytest.mark.parametrize(
+        ("from_key", "to_key"),
+        (
+            ("iss-00301", "epic-00202"),
+            ("init-00101", "epic-00202"),
+        ),
+        ids=("issue-to-unrelated-epic", "initiative-to-unrelated-epic"),
+    )
+    def test_deps_remove_mixed_kind_direct_dependency_updates_meta_json_and_returns_updated(
+        self,
+        from_key: str,
+        to_key: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            local_ids = self._create_mixed_node_dependency_fixture(target)
+            from_id = local_ids[from_key]
+            to_id = local_ids[to_key]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            self._set_meta_depends_on(from_meta_path.parent, [to_id])
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", to_id],
+            )
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert p.stderr.strip() == ""
+            assert p.stdout.strip() == "\n".join(
+                [
+                    f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                    "spec-dock: ok (deps remove auto-sync)",
+                ]
+            )
+
+            after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+            assert after.get("depends_on") == []
 
     def test_deps_remove_updated_path_auto_syncs_dependency_projection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
