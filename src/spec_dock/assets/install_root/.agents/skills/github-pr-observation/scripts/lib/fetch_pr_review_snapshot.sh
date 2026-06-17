@@ -812,9 +812,18 @@ for thread in thread_nodes:
         for comment in comments
         for timestamp in (comment.get("createdAt"), comment.get("updatedAt"))
     )
-    resolved = bool(thread.get("isResolved"))
-    outdated = bool(thread.get("isOutdated"))
-    state = "resolved" if resolved else "outdated" if outdated else "unresolved"
+    resolved = thread.get("isResolved")
+    outdated = thread.get("isOutdated")
+    if resolved is True:
+        state = "resolved"
+    elif resolved is False and outdated is True:
+        state = "outdated"
+    elif resolved is False and outdated is False:
+        state = "unresolved"
+    elif resolved is False:
+        state = "unknown_outdated"
+    else:
+        state = "unknown"
     thread_id = thread.get("id")
     if thread_id is not None:
         thread_states_by_thread_id[str(thread_id)] = {
@@ -994,6 +1003,23 @@ selected_unresolved_thread_ids = [
     for thread_id in selected_thread_ids
     if str(thread_id) in unresolved_thread_id_set
 ]
+selected_unresolved_thread_id_set = {
+    str(thread_id) for thread_id in selected_unresolved_thread_ids
+}
+carryover_non_outdated_unresolved_threads = [
+    item
+    for item in threads
+    if item.get("state") == "unresolved"
+    and item.get("id") is not None
+    and str(item.get("id")) not in selected_unresolved_thread_id_set
+]
+carryover_unresolved_thread_ids = [
+    item.get("id") for item in carryover_non_outdated_unresolved_threads
+]
+actionable_unresolved_thread_ids = list(selected_unresolved_thread_ids)
+for thread_id in carryover_unresolved_thread_ids:
+    if thread_id not in actionable_unresolved_thread_ids:
+        actionable_unresolved_thread_ids.append(thread_id)
 
 def selected_review_item(item):
     raw_body = str(item.get("_selected_full_body", "") or "")
@@ -1049,6 +1075,14 @@ review_collection_summary = {
         current_unresolved_thread_ids,
     ),
 }
+review_collection_summary["review_threads"]["non_outdated_unresolved_ids"] = [
+    item.get("id")
+    for item in threads
+    if item.get("state") == "unresolved" and item.get("id") is not None
+]
+review_collection_summary["review_threads"]["carryover_non_outdated_unresolved_ids"] = (
+    carryover_unresolved_thread_ids
+)
 if selected_review_signals:
     lifecycle_status = "unresolved" if selected_thread_ids else "completed"
     completion_signal = "submitted_pull_request_review"
@@ -1084,6 +1118,76 @@ else:
     lifecycle_status = "none"
     completion_signal = "none"
     lifecycle_confidence = "medium"
+selected_changes_requested_reviews = [
+    item for item in selected_review_signals if item.get("state") == "changes_requested"
+]
+selected_changes_requested_review_ids = [
+    item.get("id") for item in selected_changes_requested_reviews if item.get("id") is not None
+]
+selected_changes_requested_review_id_set = {
+    str(value) for value in selected_changes_requested_review_ids
+}
+selected_changes_requested_comments = [
+    item
+    for item in status_signals
+    if item.get("review_id") is not None
+    and str(item.get("review_id")) in selected_changes_requested_review_id_set
+    and item.get("kind") == "pull_review_comment"
+]
+selected_changes_requested_comment_ids = [
+    item.get("id") for item in selected_changes_requested_comments if item.get("id") is not None
+]
+selected_changes_requested_evidence = [
+    {
+        "kind": "pull_review",
+        "id": item.get("id"),
+        "state": item.get("state"),
+    }
+    for item in selected_changes_requested_reviews
+]
+selected_changes_requested_evidence.extend(
+    {
+        "kind": "pull_review_comment",
+        "id": item.get("id"),
+        "review_id": item.get("review_id"),
+        "thread_id": item.get("thread_id"),
+    }
+    for item in selected_changes_requested_comments
+)
+pending_review_present = lifecycle_status == "pending"
+blocking_limitation_present = bool(blocking_collection_failure)
+selected_blocker_present = bool(selected_unresolved_thread_ids or selected_changes_requested_evidence)
+explicit_completion_present = completion_signal == "submitted_pull_request_review"
+fallback_issue_comment_present = completion_signal == "fallback_issue_comment"
+if selected_blocker_present:
+    no_completion_category = "selected_blocker"
+elif explicit_completion_present:
+    no_completion_category = "explicit_completion"
+elif fallback_issue_comment_present:
+    no_completion_category = "fallback_issue_comment"
+elif pending_review_present:
+    no_completion_category = "pending_review"
+elif blocking_limitation_present:
+    no_completion_category = "blocking_limitation"
+else:
+    no_completion_category = "missing_current_completion_signal"
+no_completion_present = no_completion_category == "missing_current_completion_signal"
+no_completion_evidence = {
+    "present": no_completion_present,
+    "category": no_completion_category,
+    "reason": (
+        "current_boundary_has_no_completion_or_blocking_signal"
+        if no_completion_present
+        else None
+    ),
+    "requires_wait_stability": no_completion_present,
+    "promotes_top_level_status": False,
+    "pending_review_present": pending_review_present,
+    "blocking_limitation_present": blocking_limitation_present,
+    "selected_blocker_present": selected_blocker_present,
+    "explicit_completion_present": explicit_completion_present,
+    "fallback_issue_comment_present": fallback_issue_comment_present,
+}
 codex_review_payload = {
     "lifecycle": {
         "status": lifecycle_status,
@@ -1093,6 +1197,7 @@ codex_review_payload = {
         "selected_review_comment_ids": selected_review_comment_ids,
         "selected_review_thread_ids": selected_thread_ids,
         "trigger_source": trigger_source,
+        "no_completion_evidence": no_completion_evidence,
     },
     "selected_reviews": [selected_review_item(item) for item in selected_review_signals],
     "selected_review_comments": [
@@ -1211,42 +1316,6 @@ fallback_pass_candidate = {
     "reason": "current_boundary_no_major_issues_comment" if fallback_pass_source_ids else None,
     "promotes_top_level_status": False,
 }
-selected_changes_requested_reviews = [
-    item for item in selected_review_signals if item.get("state") == "changes_requested"
-]
-selected_changes_requested_review_ids = [
-    item.get("id") for item in selected_changes_requested_reviews if item.get("id") is not None
-]
-selected_changes_requested_review_id_set = {
-    str(value) for value in selected_changes_requested_review_ids
-}
-selected_changes_requested_comments = [
-    item
-    for item in status_signals
-    if item.get("review_id") is not None
-    and str(item.get("review_id")) in selected_changes_requested_review_id_set
-    and item.get("kind") == "pull_review_comment"
-]
-selected_changes_requested_comment_ids = [
-    item.get("id") for item in selected_changes_requested_comments if item.get("id") is not None
-]
-selected_changes_requested_evidence = [
-    {
-        "kind": "pull_review",
-        "id": item.get("id"),
-        "state": item.get("state"),
-    }
-    for item in selected_changes_requested_reviews
-]
-selected_changes_requested_evidence.extend(
-    {
-        "kind": "pull_review_comment",
-        "id": item.get("id"),
-        "review_id": item.get("review_id"),
-        "thread_id": item.get("thread_id"),
-    }
-    for item in selected_changes_requested_comments
-)
 if selected_unresolved_thread_ids:
     decision_status_reason = "current_selected_unresolved_thread"
     decision_status = "human_gate"
@@ -1295,6 +1364,12 @@ decision_source = {
     "selected_review_comment_ids": selected_review_comment_ids,
     "selected_review_thread_ids": selected_thread_ids,
     "selected_unresolved_thread_ids": selected_unresolved_thread_ids,
+    "current_selected_unresolved_thread_ids": selected_unresolved_thread_ids,
+    "current_selected_unresolved_count": len(selected_unresolved_thread_ids),
+    "carryover_unresolved_thread_ids": carryover_unresolved_thread_ids,
+    "carryover_unresolved_count": len(carryover_unresolved_thread_ids),
+    "actionable_unresolved_thread_ids": actionable_unresolved_thread_ids,
+    "actionable_unresolved_count": len(actionable_unresolved_thread_ids),
     "selected_unresolved_count": len(selected_unresolved_thread_ids),
     "selected_changes_requested_review_ids": selected_changes_requested_review_ids,
     "selected_changes_requested_review_comment_ids": selected_changes_requested_comment_ids,
@@ -1302,6 +1377,7 @@ decision_source = {
     "completion_signal": completion_signal,
     "confidence": lifecycle_confidence,
     "fallback_pass_candidate": fallback_pass_candidate,
+    "no_completion_evidence": no_completion_evidence,
     "blocking_limitations": [
         item.get("code")
         for item in limitations
@@ -1356,6 +1432,12 @@ review_current_payload = {
     "selected_review_comment_ids": selected_review_comment_ids,
     "selected_thread_ids": selected_thread_ids,
     "selected_unresolved_thread_ids": selected_unresolved_thread_ids,
+    "current_selected_unresolved_thread_ids": selected_unresolved_thread_ids,
+    "current_selected_unresolved_count": len(selected_unresolved_thread_ids),
+    "carryover_non_outdated_unresolved_thread_ids": carryover_unresolved_thread_ids,
+    "carryover_non_outdated_unresolved_count": len(carryover_unresolved_thread_ids),
+    "actionable_unresolved_thread_ids": actionable_unresolved_thread_ids,
+    "actionable_unresolved_count": len(actionable_unresolved_thread_ids),
     "selected_changes_requested_evidence": selected_changes_requested_evidence,
 }
 review_audit_payload = {
@@ -1366,6 +1448,14 @@ review_audit_payload = {
         item for item in signals + review_request_signals if item.get("codex_authored")
     ],
     "threads": thread_counts,
+    "non_outdated_unresolved_thread_ids": review_collection_summary["review_threads"][
+        "non_outdated_unresolved_ids"
+    ],
+    "unknown_outdated_unresolved_thread_ids": [
+        item.get("id")
+        for item in threads
+        if item.get("state") == "unknown_outdated" and item.get("id") is not None
+    ],
     "fingerprint": audit_fingerprint,
 }
 
