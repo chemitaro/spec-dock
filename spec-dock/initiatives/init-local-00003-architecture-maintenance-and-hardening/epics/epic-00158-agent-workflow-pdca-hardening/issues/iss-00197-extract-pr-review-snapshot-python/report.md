@@ -236,6 +236,126 @@ uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_1
 
 ---
 
+### セッションログ（2026-06-17 20:09 - 20:16 JST）
+
+#### 対象
+- Step: S20 Provider extraction to `pr_review_snapshot.py`
+- AC/EC: AC-001, AC-002, EC-001, EC-002
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S20 — Provider extraction to pr_review_snapshot.py`
+  - closure ids: `tc-002`, `tc-003`, `tc-004`, `tc-005`
+
+#### 実施内容
+- `dev-coder` に S20 を委任し、許可範囲を provider wrapper、provider `pr_review_snapshot.py`、focused tests のみに制限した。
+- provider-side `fetch_pr_review_snapshot.sh` から Python heredoc を削除し、同じ `scripts/lib/` 配下の `pr_review_snapshot.py` へ機械抽出した。
+- shell wrapper は既存の usage / validation を維持し、`script_dir` から sibling Python を `python3 "$script_dir/pr_review_snapshot.py"` で実行する薄い wrapper にした。
+- S20 の範囲では dogfooding mirror は意図的に未変更のままとし、S30 で mirror parity を閉じる。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "issue_197 or issue_187_s410 or issue_75_pr_observation_review_collector_explicit_trigger_body_caps_and_threads or issue_176_s03_review_collector_returns_codex_review_contract"
+
+9 passed, 427 deselected in 1.47s
+```
+
+```bash
+python -m py_compile src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py
+
+exit 0
+```
+
+```bash
+rg -n "python3 - <<'PY'|<<PY|<<'PY'|def parse_gh_paginated_stdout" src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh
+
+no matches; exit 1
+```
+
+```bash
+rg -n "pr_review_snapshot.py|python3" src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh
+
+119:python3 "$script_dir/pr_review_snapshot.py"
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S20 | 赤フェーズ / 代替証跡（Red / alternative） | `tc-003`: provider static no-heredoc test は抽出前 fail / 抽出後 pass | S10 baseline が provider wrapper heredoc presence を固定していたため、S20 で provider no-heredoc expectation へ更新 | S10 report evidence + S20 test diff inspection | pass | mirror heredoc presence は S30 まで許容 |
+| S20 | 緑フェーズ（Green） | `tc-002` - `tc-005`: provider extraction and behavior preservation | selected pytest 9 件 pass; `py_compile` pass; provider static no-match | `uv run pytest ... -k ...`; `python -m py_compile`; `rg` | pass | public wrapper invocation 経由の existing review snapshot tests が pass |
+| S20 | リファクタリング（Refactor） | mechanical extraction only | wrapper は validation + sibling Python invocation のみ、Python logic は sibling file へ移動 | 差分点検（diff inspection） | pass | completion policy / review semantics は変更していない |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S20 | S10 baseline test needed provider-only transition after extraction | implementation | `test_issue_197_pr_review_snapshot_provider_wrapper_invokes_python_entrypoint` に更新し、provider no-heredoc / mirror heredoc allowance を明示 | `tc-003` | no | focused pytest pass |
+| S20 | provider Python syntax risk after extraction | implementation | `py_compile` を実行 | `tc-004` | no | `python -m py_compile ...` exit 0 |
+| S20 | mirror remains stale until S30 | plan scope | S20 report に non-blocking risk として記録 | `tc-006` future | no | S30 planned to close mirror parity |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S20 | `tc-002`, `tc-003`, `tc-004`, `tc-005` | provider wrapper no heredoc, provider Python exists, wrapper behavior and JSON contract preserved, `code-reviewer` pass, report closure entries complete, step commit gate closed | provider wrapper no heredoc; sibling Python exists; selected pytest pass; `py_compile` pass; report entries recorded; `code-reviewer` pass | pass | commit gate は次に実施 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-002` | S20 | yes | covered-existing / characterization | S10 wrapper usage behavior test pass | `uv run pytest ... -k "issue_197 ..."` | pass | invalid args `64` / `--help` `0` は S20 後も pass |
+| `tc-003` | S20 | yes | red-required / static acceptance | S10 baseline provider heredoc presence | `rg -n "python3 - <<'PY'|<<PY|<<'PY'|def parse_gh_paginated_stdout" provider wrapper` | pass | no matches; wrapper invokes `pr_review_snapshot.py` |
+| `tc-004` | S20 | yes | covered-existing plus focused regression | existing S04 JSON behavior tests | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_197 or issue_187_s410 or issue_75_pr_observation_review_collector_explicit_trigger_body_caps_and_threads or issue_176_s03_review_collector_returns_codex_review_contract"` | pass | 9 passed, 427 deselected |
+| `tc-005` | S20 | yes | covered-existing | existing body-mode / `--out` assertions | same selected pytest | pass | selected `issue_176` / body cap tests cover body-mode and raw body artifact behavior |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| `tc-002` | S20 | focused issue_197 pytest | pass | public wrapper usage contract preserved |
+| `tc-003` | S20 | static no-heredoc `rg`; wrapper invocation inspection | pass | provider-only extraction complete |
+| `tc-004` | S20 | selected existing review snapshot pytest | pass | S04 JSON contract preserved through wrapper |
+| `tc-005` | S20 | selected body-mode / out pytest | pass | `--out` / body-mode behavior preserved |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| changed | `tc-001` / `tc-003` | `test_issue_197_pr_review_snapshot_provider_wrapper_invokes_python_entrypoint` | `tc-003` | S10 baseline test を S20 provider no-heredoc acceptance に移行し、mirror heredoc は S30 まで残す | no | no |
+| none | `tc-002` | `test_issue_197_pr_review_snapshot_wrapper_usage_exits_before_gh` | `tc-002` | wrapper usage behavior を S20 後も維持 | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S20 | delegated | runtime / shipped scaffold provider extraction | `dev-coder` | provider extraction only | `plan.md` S20; provider wrapper | provider wrapper, provider `pr_review_snapshot.py`, focused tests | mirror assets, docs, unrelated observation scripts, completion policy, CI/check collector behavior, GitHub state | selected pytest; `py_compile`; static heredoc search | extraction requires review decision policy changes, failure path leaks traceback/stderr, or mirror changes are needed before provider behavior passes | changed files, commands/results, Ledger Note or no-material-decision statement | pass; delegate changed only allowed provider/test files and reported no material implementation decisions beyond approved plan |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S20 | `dev-coder` | provider wrapper から heredoc を削除し、Python logic を sibling `pr_review_snapshot.py` へ抽出。S20 static test を provider no-heredoc expectation へ更新 | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py`; `tests/unit/infra/test_init_update.py` | `uv run pytest ... -k ...` -> delegate observed 9 passed; parent rerun 9 passed. `python -m py_compile ...` -> exit 0 | `code-reviewer` pass | mirror remains intentionally stale until S30 | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S20 | N/A | N/A | N/A | N/A | N/A | N/A | `code-reviewer` pending | no parent implementation exception used |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S20 | step reviewer | `code-reviewer` | fresh | passed | no | proceed to commit gate | no findings; S20 may proceed to commit gate |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S20 | pending reviewer / pending commit | provider wrapper; provider `pr_review_snapshot.py`; `tests/unit/infra/test_init_update.py`; `report.md` | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh` - provider public wrapper を薄い shell wrapper に変更。
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` - provider review snapshot Python entrypoint を追加。
+- `tests/unit/infra/test_init_update.py` - S20 provider no-heredoc / sibling invocation expectation へ更新。
+- `report.md` - S20 observed evidence ledger を追記。
+
+#### コミット
+- pending
+
+#### メモ
+- S20 の material implementation decisions はなし。delegate note: `No material implementation decisions beyond the approved plan.`
+
+---
+
 ### セッションログ（2026-06-17 HH:MM - HH:MM）
 
 #### 対象
