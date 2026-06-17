@@ -381,6 +381,93 @@ spec-dock: ok (validate) nodes=97
 
 ---
 
+### セッションログ（2026-06-17 S03）
+
+#### 実行コンテキスト
+- Step: S03 Wait-before-suffix allocator
+- Active issue: `iss-00188-prevent-duplicate-discussion-timestamp-slots`
+- Plan source: `spec-dock/active/issue/plan.md`
+- Plan section: `実装ステップ S03 — Wait-before-suffix allocator`
+- Required target tests: `uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py`
+- Required reviewer: `code-reviewer`
+
+#### 実行内容
+- Delegated S03 implementation to `dev-coder` agent `019ed379-ee1d-7c20-828f-2a0682ea46b6`.
+- Added bounded wait-before-suffix allocation for discussion docs when the initial timestamp slot is already occupied.
+- Kept suffix allocation as the fail-safe fallback after the wait budget expires or the clock does not advance.
+- Added environment overrides for wait budget and poll interval, with fail-fast validation before writing when the occupied-slot wait path is used.
+- Kept `PlanDiscussionDocResult.path` as the only generated path source; no public `new doc` interface expansion was introduced.
+
+#### TDD / 検証証跡
+| ステップ（step） | フェーズ | 種別 | 観測 | コマンド / 証跡 | 結果 | 備考 |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only / focused test design | Existing allocator immediately appended suffixes on occupied timestamp slots; no wait-before-suffix behavior or fake clock coverage existed before S03. | pre-change diff inspection against `application/create_node.py`; planned new tests in `tests/cli_runtime/test_runtime_new_doc_s09.py` | pass | Covers tc-006/tc-007/tc-008 as behavior gaps |
+| S03 | 緑フェーズ（Green） | required focused verification | Advancing clock uses a later suffix-less timestamp; frozen clock falls back to suffix after bounded wait; suffix exhaustion remains fail-closed; invalid wait/poll env fails before writing. | `uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py` -> 26 passed | pass | Parent re-ran required verification after worker completion |
+| S03 | リファクタリング（Refactor） | guardrail satisfied | Wait logic stays inside `application/create_node.py`; no Ports expansion, no public interface expansion, no broad CLI/doc changes. | `git diff --check` -> pass; `./spec-dock/scripts/spec-dock validate` -> pass | pass | S04 remains the docs/skill guidance step |
+
+#### 要件クロージャ証跡（Requirements Closure Evidence）
+| クロージャID（closure id） | ステップ（step） | 状態（state） | 証跡（evidence） | 備考 |
+|---|---|---|---|---|
+| tc-006 | S03 | pass | `test_occupied_timestamp_with_advancing_clock_uses_later_unsuffixed_doc`; required pytest -> 26 passed | Occupied timestamp waits for a later slot and avoids first-choice suffix. |
+| tc-007 | S03 | pass | `test_frozen_clock_uses_suffix_after_bounded_wait`; required pytest -> 26 passed | Frozen / non-advancing clock preserves suffix fallback. |
+| tc-008 | S03 | pass | `test_suffix_exhaustion_fail_fast_no_write`; required pytest -> 26 passed | Suffix exhaustion remains fail-closed after the bounded wait path. |
+| tc-s03-004 | S03 | pass | `test_invalid_discussion_timestamp_wait_env_fails_fast`; required pytest -> 26 passed | Planned negative coverage: invalid wait/poll override fails before writing. |
+
+#### 受入条件クロージャ（Acceptance Criteria Closure）
+| 受入条件（acceptance criteria） | 対応テスト / 証跡 | 結果 | 備考 |
+|---|---|---|---|
+| `new doc` generated path is still source of truth | `PlanDiscussionDocResult.path` remains the write target; no hand-built discussion path interface added | pass | S03 preserves S01/S02 contract |
+| Occupied timestamp avoids suffix when clock advances within wait budget | `test_occupied_timestamp_with_advancing_clock_uses_later_unsuffixed_doc` | pass | Later suffix-less timestamp is selected |
+| Suffix fallback remains available as safety net | `test_frozen_clock_uses_suffix_after_bounded_wait` | pass | Existing `01..99` suffix allocation remains fail-safe |
+| Suffix exhaustion remains fail-closed | `test_suffix_exhaustion_fail_fast_no_write` | pass | Existing suffix exhaustion behavior is preserved after wait fallback |
+| Invalid wait configuration fails before partial artifact creation | `test_invalid_discussion_timestamp_wait_env_fails_fast` | pass | No output artifact is written for invalid env overrides |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-006, tc-007, tc-008 | advancing clock / frozen clock / suffix exhaustion tests | tc-006, tc-007, tc-008 | Tests are concrete aliases for planned S03 closure ids. | no | yes: fresh re-review after report evidence update |
+| additional negative coverage | tc-s03-004 | invalid env tests | planned S03 negative case | Plan includes invalid env value coverage but does not assign it a primary tc-006..tc-008 closure id. | no | yes: fresh re-review after report evidence update |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | runtime/test behavior | dev-coder | Wait-before-suffix allocator only | `plan.md` S03; `requirement.md`; `design.md` | allocator wait config, fake clock/no-op sleep tests | public `new doc` interface expansion, template/body/id options, docs/skill guidance, provider template changes | required pytest command | outside allowed paths, suffix removal, unbounded wait, public interface change | changed files, verification, behavior summary, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | Added bounded wait-before-suffix allocation, env validation, advancing/frozen clock tests, suffix exhaustion preservation, and invalid env fail-fast tests. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py`; `tests/cli_runtime/test_runtime_new_doc_s09.py` | required pytest -> 26 passed; `git diff --check` -> pass; `./spec-dock/scripts/spec-dock validate` -> pass | passed: fresh code-reviewer `019ed388-1711-7e72-bd58-f95784b0650f`, findings=[] | no implementation risk identified by reviewers; S04 remains future docs/skill guidance scope | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | N/A: normal delegation used; parent only updated issue-level evidence ledger | N/A | `spec-dock/active/issue/report.md` | record observed S03 evidence and reviewer gate state | revert this report hunk if needed | required pytest -> pass; validate -> pass | fresh code-reviewer re-review pending | none |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | first step reviewer | code-reviewer | fresh before report evidence update | failed | no | fixed by this report evidence update; re-review required | agent `019ed381-0081-7333-b4a4-924a972023de`, P1 missing S03 report evidence; no code-level bug found |
+| S03 | first re-review | code-reviewer | fresh after report evidence update | failed | no | fixed by tc-008 evidence correction; re-review required | agent `019ed385-5881-7081-94c4-68f9a0dd73dc`, P1 tc-008 should cite suffix exhaustion evidence |
+| S03 | step reviewer | code-reviewer | fresh after tc-008 evidence correction | passed | N/A | proceed to S03 commit gate | agent `019ed388-1711-7e72-bd58-f95784b0650f`, findings=[] |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | pending commit | S03 wait-before-suffix allocator and report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - add bounded wait-before-suffix allocator and env validation.
+- `tests/cli_runtime/test_runtime_new_doc_s09.py` - add advancing-clock, frozen-clock fallback, and invalid env tests.
+- `spec-dock/active/issue/report.md` - S03 observed evidence ledger.
+
+#### コミット
+- pending S03 reviewer pass and step commit gate
+
+#### メモ
+- Shipped guidance / dogfooding parity remains S04 scope.
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
