@@ -176,6 +176,23 @@ class _StubClock:
         return "2026-03-12"
 
 
+class _SequenceClock:
+    def __init__(self, *values: str):
+        self._values = list(values)
+        self.calls: list[str] = []
+
+    def now_iso(self):
+        if len(self.calls) < len(self._values):
+            value = self._values[len(self.calls)]
+        else:
+            value = self._values[-1]
+        self.calls.append(value)
+        return value
+
+    def today(self):
+        return "2026-03-12"
+
+
 class TestRuntimeNewDocS09:
     def _create_lock_path(self, specdock_dir: Path) -> Path:
         return specdock_dir / "system" / ".runtime" / "create.lock"
@@ -189,6 +206,7 @@ class TestRuntimeNewDocS09:
             "research": ("<RESEARCH_ID>", "<RESEARCH_TITLE>"),
             "interview": ("<INTERVIEW_ID>", "<INTERVIEW_TITLE>"),
             "scratch": ("<SCRATCH_ID>", "<SCRATCH_TITLE>"),
+            "pr-repair-batch": ("<PR_REPAIR_BATCH_ID>", "<PR_REPAIR_BATCH_TITLE>"),
         }
         for doc_type, (id_placeholder, title_placeholder) in placeholders.items():
             (templates_dir / f"{doc_type}.md").write_text(
@@ -231,14 +249,14 @@ class TestRuntimeNewDocS09:
         rules_path.parent.mkdir(parents=True, exist_ok=True)
         rules_path.write_text("issue discussions rules\n", encoding="utf-8")
 
-    def _ports(self, app_ports, *, specdock_dir: Path, records, events=None):
+    def _ports(self, app_ports, *, specdock_dir: Path, records, events=None, clock=None):
         return app_ports.Ports(
             node_reader=_DummyNodeReader(),
             node_repo=_StubNodeRepo(records),
             template_scaffolder=_StubTemplateScaffolder(events=events),
             issue_gateway=_StubIssueGateway(),
             git_gateway=_StubGitGateway(),
-            clock=_StubClock(),
+            clock=clock if clock is not None else _StubClock(),
             repo_root=specdock_dir.parent,
             specdock_dir=specdock_dir,
         )
@@ -392,7 +410,7 @@ class TestRuntimeNewDocS09:
             assert "scope=iss-local-00001" in content
             assert "date=2026-03-12" in content
 
-    def test_doc_type_parity_template_selection_regression(self) -> None:
+    def test_doc_type_parity_template_selection_regression(self, monkeypatch) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -400,6 +418,7 @@ class TestRuntimeNewDocS09:
             self._prepare_discussion_templates(specdock_dir)
             issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
             ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+            monkeypatch.setattr(app_create_node, "_sleep_discussion_timestamp_poll", lambda _seconds: None)
 
             expected_ids = {
                 "adr": "20260312t010203z-adr",
@@ -407,8 +426,9 @@ class TestRuntimeNewDocS09:
                 "research": "20260312t010203z-02-research",
                 "interview": "20260312t010203z-03-interview",
                 "scratch": "20260312t010203z-04-scratch",
+                "pr-repair-batch": "20260312t010203z-05-pr-repair-batch",
             }
-            for doc_type in ("adr", "disc", "research", "interview", "scratch"):
+            for doc_type in ("adr", "disc", "research", "interview", "scratch", "pr-repair-batch"):
                 result = app_create_node.create_discussion_doc(
                     app_contracts.CreateDiscussionDocRequest(
                         doc_type=doc_type,
@@ -445,7 +465,7 @@ class TestRuntimeNewDocS09:
                         ports,
                     )
 
-    def test_draft_doc_types_render_scope_specific_template_bodies(self) -> None:
+    def test_draft_doc_types_render_scope_specific_template_bodies(self, monkeypatch) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -456,9 +476,10 @@ class TestRuntimeNewDocS09:
                 (discussions_template_dir / f"{doc_type}.md").write_text(
                     f"type={doc_type}\nenvelope=discussion-draft-template\n",
                     encoding="utf-8",
-                )
+            )
             records = self._scope_records(infra_contracts, specdock_dir=specdock_dir)
             ports = self._ports(app_ports, specdock_dir=specdock_dir, records=records)
+            monkeypatch.setattr(app_create_node, "_sleep_discussion_timestamp_poll", lambda _seconds: None)
 
             scope_ids = {
                 "initiative": "init-local-00001",
@@ -511,7 +532,228 @@ class TestRuntimeNewDocS09:
                     "20260312t010203z-05-draft-plan",
                 ]
 
-    def test_suffix_exhaustion_fail_fast_no_write(self) -> None:
+    def test_occupied_timestamp_with_advancing_clock_uses_later_unsuffixed_doc(self, monkeypatch) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            clock = _SequenceClock("2026-03-12T01:02:03+00:00", "2026-03-12T01:02:04+00:00")
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], clock=clock)
+            sleep_calls: list[float] = []
+
+            discussions_dir = Path(issue_record.path) / "discussions"
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260312t010203z-adr-first.md").write_text("first\n", encoding="utf-8")
+
+            monkeypatch.setattr(app_create_node, "_sleep_discussion_timestamp_poll", sleep_calls.append)
+
+            result = app_create_node.create_discussion_doc(
+                app_contracts.CreateDiscussionDocRequest(
+                    doc_type="scratch",
+                    scope_node_id="iss-local-00001",
+                    title="Later slot",
+                    slug=None,
+                ),
+                ports,
+            )
+
+            assert result.doc_id == "20260312t010204z-scratch"
+            assert result.path.name == "20260312t010204z-scratch-later-slot.md"
+            assert sleep_calls == [0.05]
+            assert clock.calls == ["2026-03-12T01:02:03+00:00", "2026-03-12T01:02:04+00:00"]
+
+    def test_retry_day_rollover_renders_date_from_allocated_timestamp(self, monkeypatch) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            clock = _SequenceClock("2026-03-12T23:59:59+00:00", "2026-03-13T00:00:00+00:00")
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], clock=clock)
+
+            discussions_dir = Path(issue_record.path) / "discussions"
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260312t235959z-adr-first.md").write_text("first\n", encoding="utf-8")
+
+            monkeypatch.setattr(app_create_node, "_sleep_discussion_timestamp_poll", lambda _seconds: None)
+
+            result = app_create_node.create_discussion_doc(
+                app_contracts.CreateDiscussionDocRequest(
+                    doc_type="pr-repair-batch",
+                    scope_node_id="iss-local-00001",
+                    title="PR Repair Batch",
+                    slug=None,
+                ),
+                ports,
+            )
+
+            assert result.doc_id == "20260313t000000z-pr-repair-batch"
+            assert result.path.name == "20260313t000000z-pr-repair-batch-pr-repair-batch.md"
+            content = result.path.read_text(encoding="utf-8")
+            assert "date=2026-03-13" in content
+            assert "id=20260313t000000z-pr-repair-batch" in content
+
+    def test_draft_retry_day_rollover_renders_date_from_allocated_timestamp(self, monkeypatch) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            (specdock_dir / "templates" / "issue" / "plan.md").write_text(
+                'ID: "<ISS_ID>"\n最終更新: "YYYY-MM-DD"\n',
+                encoding="utf-8",
+            )
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            clock = _SequenceClock("2026-03-12T23:59:59+00:00", "2026-03-13T00:00:00+00:00")
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], clock=clock)
+
+            discussions_dir = Path(issue_record.path) / "discussions"
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260312t235959z-adr-first.md").write_text("first\n", encoding="utf-8")
+
+            monkeypatch.setattr(app_create_node, "_sleep_discussion_timestamp_poll", lambda _seconds: None)
+
+            result = app_create_node.create_discussion_doc(
+                app_contracts.CreateDiscussionDocRequest(
+                    doc_type="draft-plan",
+                    scope_node_id="iss-local-00001",
+                    title="Draft Plan",
+                    slug=None,
+                ),
+                ports,
+            )
+
+            assert result.doc_id == "20260313t000000z-draft-plan"
+            assert result.path.name == "20260313t000000z-draft-plan-draft-plan.md"
+            content = result.path.read_text(encoding="utf-8")
+            assert 'ID: "iss-local-00001"' in content
+            assert '最終更新: "2026-03-13"' in content
+
+    def test_frozen_clock_uses_suffix_after_bounded_wait(self, monkeypatch) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            clock = _SequenceClock(
+                "2026-03-12T01:02:03+00:00",
+                "2026-03-12T01:02:03+00:00",
+                "2026-03-12T01:02:03+00:00",
+            )
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], clock=clock)
+            sleep_calls: list[float] = []
+
+            discussions_dir = Path(issue_record.path) / "discussions"
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260312t010203z-adr-first.md").write_text("first\n", encoding="utf-8")
+
+            monkeypatch.setenv("SPEC_DOCK_DISCUSSION_TIMESTAMP_WAIT_SECONDS", "0.1")
+            monkeypatch.setenv("SPEC_DOCK_DISCUSSION_TIMESTAMP_POLL_SECONDS", "0.05")
+            monkeypatch.setattr(app_create_node, "_sleep_discussion_timestamp_poll", sleep_calls.append)
+
+            result = app_create_node.create_discussion_doc(
+                app_contracts.CreateDiscussionDocRequest(
+                    doc_type="scratch",
+                    scope_node_id="iss-local-00001",
+                    title="Frozen slot",
+                    slug=None,
+                ),
+                ports,
+            )
+
+            assert result.doc_id == "20260312t010203z-01-scratch"
+            assert result.path.name == "20260312t010203z-01-scratch-frozen-slot.md"
+            assert sleep_calls == [0.05, 0.05]
+
+    def test_later_occupied_timestamp_exhaustion_falls_back_to_original_family(self, monkeypatch) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            clock = _SequenceClock(
+                "2026-03-12T01:02:03+00:00",
+                "2026-03-12T01:02:04+00:00",
+                "2026-03-12T01:02:04+00:00",
+            )
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], clock=clock)
+            sleep_calls: list[float] = []
+
+            discussions_dir = Path(issue_record.path) / "discussions"
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260312t010203z-adr-first.md").write_text("first\n", encoding="utf-8")
+            (discussions_dir / "20260312t010204z-adr-later.md").write_text("later\n", encoding="utf-8")
+            for nn in range(1, 100):
+                (discussions_dir / f"20260312t010204z-{nn:02d}-disc-later-{nn:02d}.md").write_text(
+                    "later suffix\n",
+                    encoding="utf-8",
+                )
+
+            monkeypatch.setenv("SPEC_DOCK_DISCUSSION_TIMESTAMP_WAIT_SECONDS", "0.1")
+            monkeypatch.setenv("SPEC_DOCK_DISCUSSION_TIMESTAMP_POLL_SECONDS", "0.05")
+            monkeypatch.setattr(app_create_node, "_sleep_discussion_timestamp_poll", sleep_calls.append)
+
+            result = app_create_node.create_discussion_doc(
+                app_contracts.CreateDiscussionDocRequest(
+                    doc_type="scratch",
+                    scope_node_id="iss-local-00001",
+                    title="Original family fallback",
+                    slug=None,
+                ),
+                ports,
+            )
+
+            assert result.doc_id == "20260312t010203z-01-scratch"
+            assert result.path.name == "20260312t010203z-01-scratch-original-family-fallback.md"
+            assert sleep_calls == [0.05, 0.05]
+
+    @pytest.mark.parametrize(
+        ("env_name", "value"),
+        (
+            ("SPEC_DOCK_DISCUSSION_TIMESTAMP_WAIT_SECONDS", "0"),
+            ("SPEC_DOCK_DISCUSSION_TIMESTAMP_WAIT_SECONDS", "-0.1"),
+            ("SPEC_DOCK_DISCUSSION_TIMESTAMP_WAIT_SECONDS", "not-a-number"),
+            ("SPEC_DOCK_DISCUSSION_TIMESTAMP_POLL_SECONDS", "0"),
+            ("SPEC_DOCK_DISCUSSION_TIMESTAMP_POLL_SECONDS", "-0.1"),
+            ("SPEC_DOCK_DISCUSSION_TIMESTAMP_POLL_SECONDS", "0.0005"),
+            ("SPEC_DOCK_DISCUSSION_TIMESTAMP_POLL_SECONDS", "not-a-number"),
+        ),
+    )
+    def test_invalid_discussion_timestamp_wait_env_fails_fast(self, monkeypatch, env_name, value) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+
+            discussions_dir = Path(issue_record.path) / "discussions"
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260312t010203z-adr-first.md").write_text("first\n", encoding="utf-8")
+
+            monkeypatch.setenv(env_name, value)
+            monkeypatch.setattr(app_create_node, "_sleep_discussion_timestamp_poll", lambda _seconds: None)
+
+            with pytest.raises(RuntimeError, match=f"Invalid {env_name}"):
+                app_create_node.create_discussion_doc(
+                    app_contracts.CreateDiscussionDocRequest(
+                        doc_type="scratch",
+                        scope_node_id="iss-local-00001",
+                        title="Invalid env",
+                        slug=None,
+                    ),
+                    ports,
+                )
+
+            assert list(discussions_dir.glob("*scratch-invalid-env.md")) == []
+
+    def test_suffix_exhaustion_fail_fast_no_write(self, monkeypatch) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -529,6 +771,10 @@ class TestRuntimeNewDocS09:
                     "second\n",
                     encoding="utf-8",
                 )
+
+            monkeypatch.setenv("SPEC_DOCK_DISCUSSION_TIMESTAMP_WAIT_SECONDS", "0.01")
+            monkeypatch.setenv("SPEC_DOCK_DISCUSSION_TIMESTAMP_POLL_SECONDS", "0.005")
+            monkeypatch.setattr(app_create_node, "_sleep_discussion_timestamp_poll", lambda _seconds: None)
 
             with pytest.raises(RuntimeError, match="Discussion timestamp suffix exhaustion"):
                 app_create_node.create_discussion_doc(
@@ -804,7 +1050,7 @@ class TestRuntimeNewDocS09:
                 assert not lock_path.exists()
                 assert sorted(path.name for path in discussions_dir.glob("*.md")) == [malformed_name]
 
-    def test_parallel_new_doc_allocates_unique_suffixes(self) -> None:
+    def test_parallel_new_doc_allocates_unique_suffixes(self, monkeypatch) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -812,17 +1058,19 @@ class TestRuntimeNewDocS09:
             self._prepare_discussion_templates(specdock_dir)
             issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
             ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+            monkeypatch.setattr(app_create_node, "_sleep_discussion_timestamp_poll", lambda _seconds: None)
 
             original_allocate = app_create_node._allocate_discussion_doc_filename
             first_call_pending = {"value": True}
             first_call_lock = threading.Lock()
 
-            def _slow_allocate(discussions_dir, *, timestamp, doc_type, slug):
+            def _slow_allocate(discussions_dir, *, timestamp, doc_type, slug, **kwargs):
                 allocated = original_allocate(
                     discussions_dir,
                     timestamp=timestamp,
                     doc_type=doc_type,
                     slug=slug,
+                    **kwargs,
                 )
                 with first_call_lock:
                     if first_call_pending["value"]:

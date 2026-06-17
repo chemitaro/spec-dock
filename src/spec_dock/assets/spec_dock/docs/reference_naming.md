@@ -14,10 +14,11 @@
 
 - `new {initiative,epic,issue}`
 - `import {initiative,epic,issue}`
-- `new doc <type>`（current catalog: `scratch` / `interview` / `research` / `disc` / `adr` / `draft-requirement` / `draft-design` / `draft-plan`）
+- `new doc <type>`（current catalog: `adr` / `disc` / `research` / `interview` / `scratch` / `pr-repair-batch` / `draft-requirement` / `draft-design` / `draft-plan`）
 
 補足:
 - `new doc <type>` は explicit basename / `doc_id` override（`--id` / `--seq` など）を提供しません。
+- 新規 discussion doc の filename / `doc_id` / path は runtime が生成します。caller / agent は `new doc <type>` の stdout で返る `path=...` を正本として本文更新に使います。
 
 ### 1.2 ブランチ命名（checkout 後の正規化）
 
@@ -87,10 +88,11 @@
 
 ### 4.1 文書種別と保存先（doc family）
 
-- new creation の discussion doc family は `scratch` / `interview` / `research` / `disc` / `adr` です。
+- new creation の discussion doc family は `adr` / `disc` / `research` / `interview` / `scratch` / `pr-repair-batch` / `draft-requirement` / `draft-design` / `draft-plan` です。
 - `note` は retired です。既存 `note` artifact は grandfathered として validation 対象に残りますが、新規作成 catalog ではありません。
 - original/source file は、対象 Initiative / Epic / Issue ノード配下の `discussions/` に作成されます。
-- ADR も original は常に `discussions/` 配下です。mirror / sync があっても original location は変わりません。
+- ADR も original は常に `discussions/` 配下です。generated ADR mirror / sync 対象は `adr` のみで、`pr-repair-batch` や他の discussion type へ広げません。
+- この節の basename 形式は validation / allocation contract の参照です。新規作成時に手で `<ts>-...` filename を組み立てず、`new doc <type>` が返す generated path を使います。
 
 ### 4.2 ベース名契約（basename contract）
 
@@ -105,18 +107,20 @@ same-second collision 形:
   - UTC 固定
   - `t` / `z` は lowercase 固定
 - `nn = 01..99`
-  - 同一 `discussions/` directory 内で同じ秒を共有した discussion doc family collision を解消する suffix です
-  - suffix が必要ないときは付けません
-- `kind = scratch|interview|research|disc|adr`
+  - 同一 `discussions/` directory 内で同じ秒を共有した discussion doc family collision の safety fallback suffix です
+  - runtime は同じ timestamp slot が使われている場合、短い wait / retry で次の timestamp slot を優先し、bounded wait で解消できないときだけ suffix を使います
+- `kind = adr|disc|research|interview|scratch|pr-repair-batch|draft-requirement|draft-design|draft-plan`
 - grandfathered existing `note` filenames may also appear in validation.
 - `slug` は kebab-case です
 
 例:
 - `20260329t123456z-adr-token-rotation.md`
 - `20260329t123456z-disc-api-options.md`
+- `20260329t123456z-pr-repair-batch-review-fixes.md`
 - `20260329t123456z-01-research-benchmark-summary.md`
 - `20260329t123456z-02-interview-rollout-policy.md`
 - `20260329t123456z-scratch-kickoff-memo.md`
+- `20260329t123457z-draft-plan-step-slicing.md`
 
 ### 4.3 `doc_id` と filename stem の境界
 
@@ -138,6 +142,8 @@ collision 形の `doc_id`:
   - `doc_id`: `20260329t123456z-adr`
 - filename: `20260329t123456z-01-disc-api-options.md`
   - `doc_id`: `20260329t123456z-01-disc`
+- filename: `20260329t123456z-pr-repair-batch-review-fixes.md`
+  - `doc_id`: `20260329t123456z-pr-repair-batch`
 
 ### 4.4 旧形式ファイルと検証境界（legacy files / validation boundary）
 

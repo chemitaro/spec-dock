@@ -4,10 +4,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-DISCUSSION_DOC_FILENAME_RE = re.compile(
-    r"^[0-9]{8}t[0-9]{6}z(?:-(?:0[1-9]|[1-9][0-9]))?"
-    r"-(?:adr|disc|research|interview|scratch|draft-requirement|draft-design|draft-plan)-"
-    r"[a-z0-9]+(?:-[a-z0-9]+)*\.md$"
+from .discussion_docs import (
+    is_creatable_discussion_doc_type,
+    parse_timestamp_discussion_doc_filename,
 )
 CANONICAL_DOC_NAMES: tuple[str, ...] = ("requirement.md", "design.md", "plan.md", "report.md")
 FORBIDDEN_ROOT_NAMES: tuple[str, ...] = (".agents", ".codex", ".github", "src", "tests")
@@ -282,6 +281,11 @@ def _validate_new_discussion_create(path: Path, *, scope_id: str, authorized_rol
     metadata = _discussion_frontmatter_metadata(text)
     if NON_EDITABLE_DISCUSSION_STATE_RE.search(metadata):
         return "new_discussion_claims_non_editable_state"
+    runtime_pr_repair_batch_error = _validate_runtime_pr_repair_batch_create(path, metadata, scope_id=scope_id)
+    if runtime_pr_repair_batch_error is None:
+        return None
+    if runtime_pr_repair_batch_error != "not_runtime_pr_repair_batch":
+        return runtime_pr_repair_batch_error
     if not EDITABLE_DISCUSSION_STATE_RE.search(metadata):
         return "new_discussion_missing_proposed_state"
     provenance_error = _validate_required_discussion_frontmatter(
@@ -289,6 +293,21 @@ def _validate_new_discussion_create(path: Path, *, scope_id: str, authorized_rol
     )
     if provenance_error is not None:
         return provenance_error
+    return None
+
+
+def _validate_runtime_pr_repair_batch_create(path: Path, metadata: str, *, scope_id: str) -> str | None:
+    parsed = parse_timestamp_discussion_doc_filename(path.name)
+    if parsed is None or parsed.doc_type != "pr-repair-batch":
+        return "not_runtime_pr_repair_batch"
+    if _frontmatter_scalar_value(metadata, "authority") != "proposed":
+        return "not_runtime_pr_repair_batch"
+    if _frontmatter_scalar_value(metadata, "種別") != "pr-repair-batch":
+        return "new_discussion_pr_repair_batch_type_mismatch"
+    if _frontmatter_scalar_value(metadata, "ID") != parsed.doc_id:
+        return "new_discussion_pr_repair_batch_id_mismatch"
+    if not _frontmatter_inline_list_has_value(metadata, "親", scope_id):
+        return "new_discussion_scope_id_mismatch"
     return None
 
 
@@ -344,6 +363,17 @@ def _frontmatter_list_has_value(metadata: str, key: str) -> bool:
             if re.match(r"^\s*-\s+\S+", child):
                 return True
         return False
+    return False
+
+
+def _frontmatter_inline_list_has_value(metadata: str, key: str, value: str) -> bool:
+    key_re = re.compile(rf"^\s*{re.escape(key)}\s*:\s*\[(.*?)\]\s*$")
+    for line in metadata.splitlines():
+        match = key_re.match(line)
+        if match is None:
+            continue
+        items = (item.strip().strip("'\"") for item in match.group(1).split(","))
+        return value in items
     return False
 
 
@@ -406,7 +436,8 @@ def _is_direct_child_of(path: Path, parent: Path) -> bool:
 
 
 def _is_valid_discussion_markdown_name(path: Path) -> bool:
-    return DISCUSSION_DOC_FILENAME_RE.fullmatch(path.name) is not None
+    parsed = parse_timestamp_discussion_doc_filename(path.name)
+    return parsed is not None and is_creatable_discussion_doc_type(parsed.doc_type)
 
 
 def _is_draft_artifact_name(path: Path) -> bool:

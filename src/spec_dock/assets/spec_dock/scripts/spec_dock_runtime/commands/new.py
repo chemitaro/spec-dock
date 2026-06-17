@@ -20,6 +20,7 @@ _discussion_doc_types = (
     "research",
     "interview",
     "scratch",
+    "pr-repair-batch",
     "draft-requirement",
     "draft-design",
     "draft-plan",
