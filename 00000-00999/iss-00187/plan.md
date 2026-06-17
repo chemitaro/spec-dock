@@ -1580,7 +1580,8 @@ S400
   - `tc-s430-002` regression: under-budget final poll preserves latest useful payload
     - 前提: latest payload has useful CI/head/review evidence and remaining time is below next-poll minimum.
     - 操作: run wait path to deadline.
-    - 期待結果: no under-budget snapshot starts; result keeps latest payload and records insufficient budget.
+    - 期待結果: no under-budget snapshot starts when the next snapshot cannot satisfy stability/grace; result keeps latest payload and records insufficient budget.
+    - 例外: a final confirmation poll or zero-check grace poll may start under the budget floor when it can satisfy the requested stability / human-gate classification before the actual deadline.
     - 失敗検出: final result becomes all-unknown timeout.
     - 検証方法: pytest fake snapshot call-log and final JSON assertions.
   - `tc-s430-003` negative: budget guard does not hide terminal failures
@@ -1709,6 +1710,52 @@ S400
     - 検証方法: command evidence in `report.md`.
 - report evidence destination:
   - Final QA Gate, Final Code Review Gate, Final Spec Review Gate, PR Observation Gate, Closure Coverage, Step Commit Gate, Final Commit.
+
+### Post-observation bounded repair lane S500
+- 背景:
+  - S499 PR observation is both a live PR gate and a manual test of the observation scripts.
+  - When S499 observation exposes fresh review findings, runtime/test fixes must not be hidden inside S499 final evidence.
+  - This lane records bounded reassignment created by PR #190 observation on head `40fe4dc7d98bd3cc0587aebdbeadadc1deba22b8`.
+- 対象 review findings:
+  - `3425177951`: under-budget pre-poll gate must not skip a required confirmation poll or zero-check grace poll when that poll can still classify the latest payload before the actual deadline.
+  - `3425177952`: no-Actions + readable green check-runs may pass when commit statuses are unreadable due only to `commit_statuses_read` permission denial; non-green / merge-blocking / required-missing states remain non-pass.
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+  - `.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py`
+  - `.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py`
+  - `tests/unit/infra/test_init_update.py`
+  - this issue `report.md`
+- 委任契約:
+  - delegated role: `dev-coder` for runtime/tests; parent orchestrator integrates report evidence and reviewer gates.
+  - allowed paths: only the listed runtime provider/mirror files, focused tests, and report evidence.
+  - forbidden changes: unrelated PR observation semantics, public CLI flag changes, global timeout increases as primary fix, unbounded job expansion, merge-ready claim while actionable inventory remains.
+  - required reviewers: code-reviewer, qa-reviewer, spec-reviewer before commit.
+  - stop conditions: fix requires broader design changes; tests pass only by weakening non-green guards; latest observation cannot be tied to the current head.
+- 具体テストケース一覧:
+  - `tc-s510-001` wait: short timeout still attempts required confirmation poll
+    - 前提: latest payload can become `review_completion_unknown` after one more stable confirmation poll and remaining time is below the budget floor.
+    - 期待結果: wait attempts the confirmation poll instead of returning `insufficient_next_snapshot_budget` after one poll.
+    - 検証方法: focused fake wait-loop pytest.
+  - `tc-s510-002` wait: under-budget zero-check grace can still be evaluated
+    - 前提: latest payload has zero-check limitation, `poll < zero_check_grace_polls`, and remaining time is below the budget floor.
+    - 期待結果: wait attempts the grace poll instead of returning `insufficient_next_snapshot_budget` early.
+    - 検証方法: focused fake wait-loop pytest.
+  - `tc-s520-001` checks: readable green check-runs tolerate unreadable commit statuses
+    - 前提: Actions has zero runs, check-runs are all green, commit statuses endpoint returns `commit_statuses_read` permission denial, merge state is clean.
+    - 期待結果: `ci.status="passed"` and the commit-status permission limitation is informational.
+    - 検証方法: focused fake `gh` pytest.
+  - `tc-s520-002` checks: non-green external evidence remains non-pass
+    - 前提: no-Actions external evidence includes failed/pending/non-green checks or statuses, missing required checks, or blocking merge state.
+    - 期待結果: status remains non-pass and blocking limitation is not downgraded.
+    - 検証方法: existing external green/non-green selector.
+  - `tc-s590-001` parity: provider and dogfooding mirror stay byte-identical for changed runtime files.
+  - `tc-s599-001` quality: focused selectors, broad PR observation selector, full infra unit file, diff hygiene, SpecDock validation, and generated-artifact cleanup pass.
+- PR observation / manual-test evidence:
+  - latest observation must record head SHA, CI/head/review summary, current-selected IDs, carryover IDs, actionable count, and outdated status for comment `3422572159`.
+  - post-fix PR observation must be rerun on the latest pushed head before final merge-ready claim.
+- report evidence destination:
+  - S499 post-observation P2 follow-up, S500/S510/S520/S590/S599 evidence, reviewer gates, step commit gate, post-push PR observation gate.
 
 ### S400+ 未確定事項
 - Blocking:
