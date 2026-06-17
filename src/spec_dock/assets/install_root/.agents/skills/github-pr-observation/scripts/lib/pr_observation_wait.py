@@ -304,6 +304,74 @@ def align_decision_observation_complete(payload: dict, observation_complete: boo
     payload["decision_fingerprint"] = fingerprint
 
 
+def decision_int(decision: dict, key: str, default: int = 0) -> int:
+    value = decision.get(key)
+    return value if isinstance(value, int) else default
+
+
+def decision_list(decision: dict, key: str) -> list:
+    value = decision.get(key)
+    return value if isinstance(value, list) else []
+
+
+def actionable_unresolved_reason(payload: dict) -> str | None:
+    decision = decision_payload(payload)
+    selected_unresolved_thread_ids = decision_list(decision, "selected_unresolved_thread_ids")
+    selected_unresolved_count = decision_int(
+        decision,
+        "selected_unresolved_count",
+        len(selected_unresolved_thread_ids),
+    )
+    current_selected_unresolved_count = decision_int(
+        decision,
+        "current_selected_unresolved_count",
+        selected_unresolved_count,
+    )
+    carryover_unresolved_count = decision_int(decision, "carryover_unresolved_count")
+    actionable_unresolved_count = decision_int(decision, "actionable_unresolved_count")
+    actionable_unresolved_thread_ids = decision_list(decision, "actionable_unresolved_thread_ids")
+    decision_reason = decision.get("status_reason")
+    if (
+        decision_reason == "current_selected_unresolved_thread"
+        or selected_unresolved_count > 0
+        or current_selected_unresolved_count > 0
+    ):
+        return "current_selected_unresolved_thread"
+    if (
+        decision_reason == "carryover_non_outdated_unresolved_thread"
+        or carryover_unresolved_count > 0
+        or actionable_unresolved_count > 0
+        or bool(actionable_unresolved_thread_ids)
+    ):
+        return "carryover_non_outdated_unresolved_thread"
+    return None
+
+
+def mark_decision_actionable_unresolved(payload: dict, reason: str) -> None:
+    decision = decision_payload(payload)
+    if not decision:
+        return
+    decision["status"] = "human_gate"
+    decision["status_reason"] = reason
+    decision["recommended_next_action"] = "address_review_feedback"
+    decision["observation_complete"] = False
+    fingerprint_source = dict(decision)
+    fingerprint_source.pop("fingerprint", None)
+    fingerprint = hashlib.sha256(
+        json.dumps(fingerprint_source, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    decision["fingerprint"] = fingerprint
+    payload["decision_fingerprint"] = fingerprint
+
+
+def align_actionable_review_summary(payload: dict, reason: str | None) -> None:
+    if reason not in {"current_selected_unresolved_thread", "carryover_non_outdated_unresolved_thread"}:
+        return
+    summary = payload.get("summary")
+    if isinstance(summary, dict):
+        summary["review"] = "unresolved"
+
+
 def mark_decision_timeout(payload: dict) -> None:
     decision = decision_payload(payload)
     if not decision:
@@ -364,6 +432,8 @@ def no_completion_evidence(payload: dict) -> dict:
 
 
 def is_review_completion_unknown_candidate(payload: dict) -> bool:
+    if actionable_unresolved_reason(payload):
+        return False
     evidence = no_completion_evidence(payload)
     if evidence.get("present") is not True:
         return False
@@ -882,6 +952,9 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
                 return "unknown", "unknown", "fix_github_token_permissions", False, True
             return "unknown", "unknown", "human_gate", False, True
         return ci_status, ci_status, "wait", False, False
+    actionable_reason = actionable_unresolved_reason(payload)
+    if ci_status == "passed" and actionable_reason:
+        return "human_gate", "human_gate", "address_review_feedback", False, True
     if has_permission_limitation(payload):
         return "unknown", "unknown", "fix_github_token_permissions", False, True
     if has_blocking_limitation(payload):
@@ -1335,6 +1408,15 @@ while True:
         mark_decision_timeout(payload)
     else:
         final_phase = "wait"
+
+    final_actionable_reason = actionable_unresolved_reason(payload)
+    if final_phase == "terminal" and final_actionable_reason:
+        normalized_status = "human_gate"
+        overall_status = "human_gate"
+        next_action = "address_review_feedback"
+        observation_complete = False
+        mark_decision_actionable_unresolved(payload, final_actionable_reason)
+        align_actionable_review_summary(payload, final_actionable_reason)
 
     if observation_complete and review_completion_unknown_candidate:
         normalized_status = "human_gate"
