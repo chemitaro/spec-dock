@@ -1280,6 +1280,7 @@ next_poll_min_budget_seconds = (
 )
 final_poll_skipped_reason: str | None = None
 under_budget_poll_exception_used = False
+under_budget_poll_exception_kind: str | None = None
 
 while True:
     if latest_payload is not None and time.monotonic() >= deadline:
@@ -1292,21 +1293,6 @@ while True:
         break
 
     remaining_before_poll = deadline - time.monotonic()
-    if under_budget_poll_exception_used and latest_payload is not None:
-        final_phase = "timeout"
-        final_poll_skipped_reason = "insufficient_next_snapshot_budget"
-        mark_latest_timeout(latest_payload, latest_change_monotonic, same_count)
-        latest_payload.setdefault("wait", {})["next_poll_min_budget_seconds"] = round(
-            next_poll_min_budget_seconds,
-            3,
-        )
-        latest_payload["wait"]["final_poll_skipped_reason"] = final_poll_skipped_reason
-        latest_payload["wait"]["remaining_seconds_before_final_poll"] = round(
-            max(0, remaining_before_poll),
-            3,
-        )
-        break
-
     under_budget_before_poll = (
         latest_payload is not None and remaining_before_poll < next_poll_min_budget_seconds
     )
@@ -1333,22 +1319,32 @@ while True:
             final_phase = "terminal"
             break
         zero_check_grace_can_be_evaluated = (
+            not (
+                under_budget_poll_exception_used
+                and under_budget_poll_exception_kind == "zero_check_grace"
+            )
+            and
             has_zero_check_limitation(latest_payload) and poll < zero_check_grace_polls
             and not has_blocking_limitation(
                 latest_payload,
                 ignored_codes={"zero_checks_s03_non_success"},
             )
         )
+        under_budget_poll_exception_candidate_kind = None
+        if (
+            can_complete_when_stable_before_poll
+            and quiet_can_be_evaluated
+            and stability_can_be_evaluated
+        ):
+            under_budget_poll_exception_candidate_kind = "stable_completion"
+        elif zero_check_grace_can_be_evaluated:
+            under_budget_poll_exception_candidate_kind = "zero_check_grace"
         under_budget_poll_allowed = (
-            not under_budget_poll_exception_used
-            and (
-                (
-                    can_complete_when_stable_before_poll
-                    and quiet_can_be_evaluated
-                    and stability_can_be_evaluated
-                )
-                or zero_check_grace_can_be_evaluated
+            not (
+                under_budget_poll_exception_used
+                and under_budget_poll_exception_candidate_kind == "zero_check_grace"
             )
+            and under_budget_poll_exception_candidate_kind is not None
         )
         if not under_budget_poll_allowed:
             final_phase = "timeout"
@@ -1365,8 +1361,10 @@ while True:
             )
             break
         under_budget_poll_exception_used = True
+        under_budget_poll_exception_kind = under_budget_poll_exception_candidate_kind
     else:
         under_budget_poll_exception_used = False
+        under_budget_poll_exception_kind = None
 
     poll += 1
     now_before = time.monotonic()
@@ -1616,7 +1614,9 @@ while True:
     sleep_seconds = min(poll_interval_seconds, sleep_budget)
     if sleep_seconds <= 0:
         continue
-    under_budget_poll_exception_used = False
+    if under_budget_poll_exception_kind != "zero_check_grace":
+        under_budget_poll_exception_used = False
+        under_budget_poll_exception_kind = None
     time.sleep(sleep_seconds)
 
 assert latest_payload is not None

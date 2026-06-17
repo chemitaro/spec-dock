@@ -1769,15 +1769,15 @@ S400
 - 設計/実装方針:
   - Treat the CI failure as a valid manual-test finding from the live PR observation loop.
   - Preserve the S510 behavior that allows one under-budget confirmation/grace poll when it can classify before the actual deadline.
-  - Prevent a no-sleep loop from consuming the under-budget exception repeatedly after a fast snapshot shrinks `next_poll_min_budget_seconds`.
+  - Prevent the wait loop from consuming the under-budget exception more than once in a single wait invocation, even if a fast snapshot shrinks `next_poll_min_budget_seconds` and leaves room for a short sleep.
   - Do not broaden public CLI flags or weaken non-green CI/review guards.
 - 委任契約:
   - delegated role: `dev-coder` for the runtime fix.
   - required review: `code-reviewer` before commit; QA evidence is supplied by focused/broad wait-loop selectors and full infra file validation.
   - parent orchestrator owns report/plan integration, commit, push, and re-observation.
 - 具体テストケース一覧:
-  - `tc-s530-001` wait: under-budget exception is not re-used in a no-sleep loop after a fast snapshot.
-    - 前提: first snapshot consumes the under-budget exception, later snapshots are faster, and the process still has enough wall-clock time to spin.
+  - `tc-s530-001` wait: under-budget exception is not re-used after a fast snapshot.
+    - 前提: first snapshot consumes the under-budget exception, later snapshots are faster, and the process still has enough wall-clock time for another poll with or without a short sleep.
     - 期待結果: wait stops with `insufficient_next_snapshot_budget` after the single allowed exception instead of continuing to consume zero-check grace polls.
     - 検証方法: `test_issue_187_s430_under_budget_grace_poll_is_single_attempt`.
   - `tc-s530-002` wait: post-exception stop emits explicit skip reason and preserves latest useful payload.
