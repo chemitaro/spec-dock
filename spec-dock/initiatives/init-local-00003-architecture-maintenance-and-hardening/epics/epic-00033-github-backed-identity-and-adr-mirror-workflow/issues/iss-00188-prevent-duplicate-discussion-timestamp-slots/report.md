@@ -453,7 +453,7 @@ spec-dock: ok (validate) nodes=97
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S03 | pending commit | S03 wait-before-suffix allocator and report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S03 | committed | S03 wait-before-suffix allocator and report evidence | `e3f3bc33` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - add bounded wait-before-suffix allocator and env validation.
@@ -461,7 +461,7 @@ spec-dock: ok (validate) nodes=97
 - `spec-dock/active/issue/report.md` - S03 observed evidence ledger.
 
 #### コミット
-- pending S03 reviewer pass and step commit gate
+- `e3f3bc33` feat(spec-dock): discussion timestamp衝突時に待機する
 
 #### メモ
 - Shipped guidance / dogfooding parity remains S04 scope.
