@@ -3,268 +3,513 @@
 ID: "iss-00188"
 タイトル: "Prevent duplicate discussion timestamp slots when creating multiple artifacts"
 関連GitHub: ["#188"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-17"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00033", "init-local-00003"]
 ---
 
-# iss-00188 Prevent duplicate discussion timestamp slots when creating multiple artifacts — 実装計画（実行契約 / Execution Contract）
-
-> このテンプレートは executable scaffold です。`plan.md` は計画済み契約（planned contract）と、実装者が step を上から順に実行できる command queue を書く場所です。実行結果、逸脱、発見された tests、reviewer verdict、commit/no-op evidence は `report.md` の観測証跡台帳（observed evidence ledger）に記録する。workflow authority は skills / `workflow_issue.md` が持ち、Issue 計画の field semantics と詳しい書き方は `phase_plan_issue.md` と `docs/authoring/issue-plan.md` を detail-reference として参照する。
+# iss-00188 Prevent duplicate discussion timestamp slots when creating multiple artifacts — 実装計画
 
 ## この計画で満たす要件ID
 - AC:
-  - ...
+  - AC-001 runtime-owned PR repair batch creation
+  - AC-002 existing `new doc` interface shape preserved
+  - AC-003 manual filename guidance removed from shipped generation workflows
+  - AC-004 wait before suffix fallback
+  - AC-005 hyphenated doc type validation
 - EC:
-  - ...
+  - EC-001 frozen / non-advancing clock
+  - EC-002 suffix exhaustion
+  - EC-003 generated path body update
+  - EC-004 repair unit creation
 - 制約:
-  - ...
+  - Existing timestamp grammar `yyyymmddthhmmssz` is preserved.
+  - Suffix fallback `01..99` is preserved.
+  - `note` remains retired for new creation.
+  - No body/template input option, explicit basename, explicit doc_id override, existing artifact rename/repair, or `pr-repair-unit` type is introduced.
 
 ## 依存関係から導く実装順序
-- 依存関係の参照元:
-  - `design.md` の依存関係、図、ファイル変更計画
-- 順序ルール:
-  - prerequisite / lower-dependency slice から先に閉じる
-  - downstream slice は前提が固定されてから置く
-- step 依存サマリー:
-  - S01:
-    - 依存:
-    - unblock:
-    - 対象ファイル:
+- Design source:
+  - `design.md` module dependency diagram and directory/file change plan.
+- 順序:
+  - S01 shared catalog/parser foundation.
+  - S02 runtime-owned `pr-repair-batch` creation.
+  - S03 wait-before-suffix allocator.
+  - S04 shipped guidance and dogfooding parity.
+  - S90 docs impact resolution.
+  - S99 final quality gate.
+- 根拠:
+  - S02 and S03 both depend on shared parsing/catalog semantics from S01.
+  - S04 depends on S02 because shipped guidance must point to a real `new doc pr-repair-batch` command.
+  - S90 closes docs impact after behavior and guidance surfaces are known.
 
 ## ステップ一覧
-- S01:
-  - 観測可能な振る舞い:
-  - 依存:
-  - unblock:
+- S01 Shared catalog/parser foundation:
+  - 依存: requirement/design reviewer pass.
+  - unblock: S02, S03, S04.
   - 対象ファイル:
-  - 閉じる要件:
-  - レビューゲート:
-- S02:
-  - ...
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/discussion_docs.py`
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py`
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py`
+    - focused tests.
+- S02 Runtime-owned `pr-repair-batch` creation:
+  - 依存: S01 committed.
+  - unblock: S04.
+  - 対象ファイル:
+    - `commands/new.py`
+    - `application/create_node.py`
+    - `templates/discussions/pr-repair-batch.md`
+    - focused CLI/runtime/validation tests.
+- S03 Wait-before-suffix allocator:
+  - 依存: S01 committed.
+  - unblock: S99.
+  - 対象ファイル:
+    - `application/create_node.py`
+    - deterministic runtime tests.
+- S04 Shipped guidance and dogfooding parity:
+  - 依存: S02 committed.
+  - unblock: S90/S99.
+  - 対象ファイル:
+    - `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`
+    - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md`
+    - `src/spec_dock/assets/install_root/.codex/AGENTS.md`
+    - `src/spec_dock/assets/install_root/.codex/agents/system-architect.toml`
+    - `src/spec_dock/assets/install_root/.codex/agents/implementation-planner.toml`
+    - dogfooding copies under `.agents/` and `.codex/` by sync/update or parity inspection.
+- S90 Docs impact resolution:
+  - 依存: S01-S04 committed.
+  - 対象ファイル:
+    - `src/spec_dock/assets/spec_dock/docs/**` impacted catalog/guidance references.
+- S99 Final quality gate:
+  - 依存: S90 closed.
+  - 対象:
+    - integrated diff, report closure, final reviews.
 
 ## 要件 ↔ ステップ対応
-- AC-001 -> S01
-- EC-001 -> S02
+- AC-001 -> S02, S03, S99
+- AC-002 -> S02, S99
+- AC-003 -> S04, S90, S99
+- AC-004 -> S03, S99
+- AC-005 -> S01, S02, S99
+- EC-001 -> S03
+- EC-002 -> S03
+- EC-003 -> S04
+- EC-004 -> S04
 
 ## 仕様固定クロージャ索引（Spec-Locked Closure Index）
-
-> これは Issue 全体のテスト一覧ではなく、仕様を縮小解釈・後付けテスト・過剰実装しないための coverage ledger です。実際の step-local obligation と concrete seeds は各 implementation step の `具体テストケース一覧` に置く。
-
-| 識別子（ID） | ステップ（step） | スライス（slice） | 種別（type） | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル（evidence level） | クロージャ証跡（closure evidence） |
-|---|---|---|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | <behavior> | 受け入れ（acceptance） | AC-001 | ... | ... | 仕様 drift（spec drift） | yes | red-required | ステップ完了証跡（report step closure） |
-| tc-002 | S01 | <behavior> | 否定系（negative） | EC-001 | ... | ... | 沈黙失敗（silent failure） | yes | inspect-only | ステップ完了証跡（report step closure） |
-
-- 証跡レベル（evidence level）:
-  - red-required: 実装前に失敗する新規 test / characterization を固定する。
-  - covered-existing: 既存 test が対象 behavior を検出できる根拠を固定する。
-  - inspect-only: docs / template / config などを inspection、structural assertion、review evidence で閉じる。
-  - manual-required: 自動化できない確認手順、期待結果、記録先を固定する。
-- 詳細化方針:
-  - 件数ではなく、AC、changed contract、failure mode、regression risk、invariant、manual / integration risk から必要な obligation を決める。
-  - private method、実装アルゴリズム、mock 構造、assert 細部は原則固定しない。
+| ID | ステップ | 種別 | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル | クロージャ証跡 |
+|---|---|---|---|---|---|---|---|---|---|
+| tc-001 | S01 | invariant | AC-005 | shared parser/catalog handles hyphenated and existing doc types consistently | timestamp filenames for current doc types and `pr-repair-batch` | catalog/regex drift | yes | red-required | report Step/Test Contract Closure |
+| tc-002 | S01 | regression | AC-005 | malformed timestamp/discussion intent stays fail-closed | malformed basename candidates | silent acceptance | yes | red-required | report Step/Test Contract Closure |
+| tc-003 | S02 | acceptance | AC-001 | `new doc pr-repair-batch` returns generated path/id/template/stdout | CLI command | missing first-class doc type | yes | red-required | report Step/Test Contract Closure |
+| tc-004 | S02 | negative | AC-002 | body/template and explicit id/basename options are absent | CLI help/parser | interface creep | yes | inspect-only | report Test Contract Closure |
+| tc-005 | S02 | validation | AC-005 | valid `pr-repair-batch` passes and malformed intent fails | validate command | hyphenated type regression | yes | red-required | report Step/Test Contract Closure |
+| tc-006 | S03 | acceptance | AC-004 | occupied timestamp with advancing clock creates later suffix-less timestamp | fake clock sequence | suffix-first regression | yes | red-required | report Step/Test Contract Closure |
+| tc-007 | S03 | edge | EC-001 | frozen clock uses suffix fallback after bounded wait | fake frozen clock | hang / nondeterministic wait | yes | red-required | report Step/Test Contract Closure |
+| tc-008 | S03 | edge | EC-002 | suffix exhaustion remains fail-closed | occupied suffixes 01..99 | silent overwrite | yes | covered-existing | report Test Contract Closure |
+| tc-009 | S04 | acceptance | AC-003 | in-scope shipped surfaces are command-first / returned-path-first | provider and dogfooding guidance text | manual filename recurrence | yes | inspect-only | report Test Contract Closure |
+| tc-010 | S04 | edge | EC-003/EC-004 | batch body update uses generated path; repair unit remains `disc`/future follow-up | guidance text | scope creep / identity corruption | yes | inspect-only | report Test Contract Closure |
+| tc-011 | S90 | docs | AC-003 | grammar reference and generation procedure are separated | docs text | reference-as-instruction ambiguity | yes | inspect-only | report Docs Impact Closure |
+| tc-012 | S99 | final | all | focused tests, validate/sync, reviewer gates, report closure are complete | full issue diff | incomplete handoff | yes | manual-required | final quality gate evidence |
 
 ## レビュー / QA ゲート方針
-- RG1 step review:
-  - 実施タイミング: 各 implementation step の commit 前
-  - reviewer: code-reviewer（code / runtime / tests / scaffold behavior）; spec-reviewer（docs-only / template-only / skill-text-only）
-  - pass 条件: review_status: pass
-- QG1 final QA:
-  - reviewer: qa-reviewer
-  - 範囲: Issue 全体の obligation coverage、missing high-value tests、manual / integration test 要否
-- SG1 final spec review:
-  - reviewer: spec-reviewer
-  - 範囲: requirement / design / plan / report / docs 整合
-
-## 実行ルール（全ステップ共通）
-- 各 implementation step は 1 behavior slice / 1 review scope / 1 commit boundary とする。例外が必要な場合は実装前に plan amendment と fresh re-review を通し、final review / final commit で per-step review / commit を代替しない。
-- `plan.md` には planned requirements、evidence destination、closure 条件だけを書く。observed result は `report.md` に書く。
-- docs-only / inspect-only / manual-required step は code test 前提にせず、代替 evidence path と rationale を implementation 前に固定する。
-- implementation 中に新しい仕様、bug class、外部 contract risk、未計画の closure が見つかった場合は、report 記録だけで足りるか、plan amendment と re-review が必要かを判断する。
+- Step reviewer:
+  - S01, S02, S03: `code-reviewer` after dev-coder work.
+  - S04, S90: `spec-reviewer` after doc-writer work.
+- Commit gate:
+  - Each implementation step is one review scope and one commit.
+  - No later step starts until previous step has review pass, commit/no-op evidence, and clean status evidence.
+- Final gate:
+  - S99 requires `qa-reviewer`, issue-wide `code-reviewer`, final `spec-reviewer`, focused tests, `validate`, sync evidence, and report closure.
 
 ## 実装ステップ
 
-### 実装ステップ S01 — <観測可能な振る舞い>
-- 振る舞いの目標（behavior goal）:
-  - ...
+### 実装ステップ S01 — Shared catalog/parser foundation
+- 振る舞いの目標:
+  - Discussion doc type catalog, timestamp filename regex, legacy filename regex, doc_id derivation, and malformed candidate detection share one source of truth that supports hyphenated doc types.
 - design 参照:
-  - ...
+  - `design.md` "ドメインモデル差分" and "ディレクトリ / ファイル変更計画".
 - 依存:
-  - ...
+  - Requirement/design reviewer pass.
 - unblock:
-  - ...
-- 対象ファイル:
-  - ...
-- 計画済み契約（planned contract）:
+  - S02, S03, S04.
+- 計画済み契約:
   - scope:
-    - 実装・文書化する範囲:
-  - テスト義務（test obligation）:
-    - closure id:
-      - tc-001
-    - coverage rationale:
-      - AC / changed contract / failure mode / regression risk / invariant / manual risk から必要性を書く:
-  - Red / 代替証跡の要件:
-    - red-required / covered-existing:
-      - 実装前に確認する failing test、characterization、または既存 test sensitivity:
-    - docs-only / inspect-only / manual-required:
-      - code test を置かない理由:
-      - 代替 evidence path:
-      - manual 手順と期待結果:
-  - 実装範囲（implementation scope）:
-    - allowed paths:
-      - ...
-    - forbidden changes:
-      - ...
+    - Add shared helper module and migrate create/validate parsing to it without enabling `pr-repair-batch` CLI behavior yet unless needed for helper tests.
+  - テスト義務:
+    - closure ids: tc-001, tc-002.
+    - coverage rationale: hyphenated doc type support is unsafe without central parser coverage.
+  - Red / 代替証跡:
+    - Add or update tests that fail before shared helper handles current types and malformed candidates consistently.
   - Green 検証:
-    - command / inspection / manual evidence:
-      - ...
-  - Refactor / cleanup ガードレール:
-    - 目的:
-    - 禁止する広がり:
-  - closure 証跡要件:
-    - Step Contract Closure:
-    - Test Contract Closure:
-    - Closure Coverage:
-  - report 証跡の記録先:
-    - `report.md` の対象 section / ledger:
-  - amendment trigger（plan amendment が必要になる契機）:
-    - plan amendment と re-review が必要になる発見:
+    - `uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py tests/cli_runtime/test_validate.py tests/unit/application/test_validate.py`
+  - refactor guardrail:
+    - Allowed cleanup is limited to removing duplication made obsolete by the new shared parser/catalog inside the allowed paths.
+    - Renaming public concepts, moving command boundaries, or changing filename grammar requires plan amendment and re-review.
+  - amendment trigger:
+    - Any need to change public filename grammar, legacy grandfathering, or retired `note` semantics.
 
-#### 委任契約（delegation contract）
-- 委任ロール（delegated role）:
-  - dev-coder / doc-writer / other named worker / N/A
-  - N/A は read-only / approved-no-op step、または `workflow_issue.md` に従う事前承認済み Parent Implementation Exception だけに使う。file mutation を伴う通常の implementation success path として使わない。
-- 入力 docs:
-  - `requirement.md`
-  - `design.md`
-  - `plan.md`
-  - workflow / authoring docs:
-  - current target files:
-- 許可 paths:
-  - ...
-- 禁止 changes:
-  - ...
-- 受け入れ条件:
-  - closure id / step close condition:
-- 必須 tests または docs-only verification:
-  - targeted command / inspection / docs diff / manual evidence:
+#### 委任契約
+- delegated role:
+  - `dev-coder`
+- input docs:
+  - `requirement.md`, `design.md`, `plan.md`, `workflow_issue.md`, `authoring/issue-plan.md`
+- allowed paths:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/discussion_docs.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py`
+  - focused tests under `tests/cli_runtime/` and `tests/unit/application/`
+- forbidden changes:
+  - CLI interface additions, docs/skill edits, allocator wait behavior, existing artifact migration.
+- acceptance criteria:
+  - tc-001 and tc-002 close.
+- required verification:
+  - pytest command listed above.
 - reviewer focus:
-  - code-reviewer（code / runtime / tests / scaffold behavior）; spec-reviewer（docs-only / template-only / skill-text-only docs/spec alignment）
-- 必須出力（output required）:
-  - changed files:
-  - verification result:
-  - report evidence to update:
-  - unresolved risks:
-- 停止条件（stop conditions）:
-  - input docs conflict / path outside allowed scope / verification cannot run / acceptance cannot be met:
+  - `code-reviewer`: shared parser boundaries, compatibility, regression coverage.
+- output required:
+  - changed files, verification result, no material decision or Ledger Note, unresolved risks.
+- stop conditions:
+  - shared helper requires grammar change or larger validation policy change.
 
 #### 具体テストケース一覧
-
-> この欄は full test inventory ではありません。step-local obligation と concrete red / characterization / inspect / manual seeds を、実装前に固定するための欄です。
-
-- `tc-s01-001` acceptance: <短い説明>
-  - 前提: ...
-  - 操作: ...
-  - 期待結果: ...
-  - 失敗検出: ...
-  - 検証方法: ...
+- `tc-s01-001` acceptance: shared helper parses supported timestamp filenames.
+  - 前提: Existing fixtures include `adr`, `disc`, `research`, `interview`, `scratch`, draft types, and grandfathered `note`.
+  - 操作: Run focused parser/validation tests.
+  - 期待結果: Supported timestamp filenames produce expected doc_type/doc_id and validation still passes.
+  - 失敗検出: create/validate catalog drift or hyphenated-type-incompatible parsing.
+  - 検証方法: `tests/cli_runtime/test_validate.py` / unit helper tests.
   - 関連 closure id: tc-001
-
-- `tc-s01-002` inspect-only / manual-required: <短い説明>
-  - テスト不要理由: <自動テスト不要の理由>
-  - 代替検証方法: <確認手順>
-  - 期待結果: <期待される状態>
-  - 記録先: <証跡の保存先>
+- `tc-s01-002` negative: malformed discussion candidates remain fail-closed.
+  - 前提: Existing malformed candidate cases plus doc-type-prefixed stems.
+  - 操作: Run validation tests.
+  - 期待結果: Malformed candidates fail with explicit malformed filename error.
+  - 失敗検出: refactor accidentally ignores malformed discussion intent.
+  - 検証方法: `tests/cli_runtime/test_validate.py`
   - 関連 closure id: tc-002
 
-#### ステップ完了契約（step closure contract）
-- closure id:
-  - tc-001
+#### ステップ完了契約
 - close 条件:
-  - ...
-- 検証 evidence:
-  - targeted command / inspection / manual evidence:
+  - tc-001 and tc-002 pass, code-reviewer pass, step commit/no-op evidence recorded.
 - report evidence:
-  - Step Contract Closure:
-  - Test Contract Closure:
-  - Closure Coverage:
-  - Closure Delta:
-- 残リスク:
-  - ...
+  - Implementation Delegation Gate, TDD evidence, Step Contract Closure, Test Contract Closure, Closure Coverage, Reviewer Gate Status, Step Commit Gate.
 
-#### ステップゲート（step gate）
-- step reviewer gate:
-  - reviewer:
-  - review 範囲:
-  - pass 条件: review_status: pass
-  - re-review rule: 指摘を修正し pass まで再実行
-- commit / no-op gate:
-  - closure 状態: committed / approved-no-op
-  - commit 範囲:
-  - no-op の場合の確認対象、差分なし確認コマンド、read-only evidence:
+### 実装ステップ S02 — Runtime-owned `pr-repair-batch` creation
+- 振る舞いの目標:
+  - `new doc pr-repair-batch` creates a valid runtime-generated discussion artifact and preserves existing `new doc` interface shape.
+- 依存:
+  - S01 committed.
+- unblock:
+  - S04.
+- 計画済み契約:
+  - scope:
+    - Add `pr-repair-batch` to creatable catalog, provider template, CLI help output, stdout/doc_id/path behavior, and validation.
+  - テスト義務:
+    - closure ids: tc-003, tc-004, tc-005.
+  - Green 検証:
+    - `uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_runtime_new_doc_s09.py tests/cli_runtime/test_validate.py tests/unit/commands/test_runtime_new_s08.py`
+  - refactor guardrail:
+    - Allowed cleanup is limited to wiring `pr-repair-batch` through the shared catalog/template/create surfaces touched by this step.
+    - Broader CLI parser restructuring, command output redesign, or template framework changes require plan amendment and re-review.
+  - amendment trigger:
+    - Need for body/template option, command output shape change, or `pr-repair-unit`.
 
-### 実装ステップ Sxx — <次に観測可能な振る舞い>
-- S01 の subsections を複製して記入する。
-- `planned contract`、`delegation contract`、`具体テストケース一覧`、`step closure contract`、`step gate` がない implementation step は implementation-ready ではない。
+#### 委任契約
+- delegated role:
+  - `dev-coder`
+- allowed paths:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/discussion_docs.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py`
+  - `src/spec_dock/assets/spec_dock/templates/discussions/pr-repair-batch.md`
+  - focused CLI/runtime/validation tests.
+- forbidden changes:
+  - `--template-file`, `--body-file`, explicit basename/doc_id, `pr-repair-unit`, existing artifact migration, docs/skill guidance edits.
+- input docs:
+  - `requirement.md`, `design.md`, `plan.md`, `workflow_issue.md`, `authoring/issue-plan.md`
+- acceptance criteria:
+  - tc-003, tc-004, and tc-005 close without changing the existing `new doc` interface shape.
+- required tests or docs-only verification:
+  - pytest command listed above, plus CLI help/parser inspection for absence of new body/template/id/basename options.
+- reviewer focus:
+  - `code-reviewer`: public CLI behavior, runtime catalog/create flow, tests, validation, and backward compatibility.
+  - `spec-reviewer`: provider discussion template identity, template/front matter alignment, and no interface creep into docs/template semantics.
+- stop conditions:
+  - template cannot preserve generated identity fields or `pr-repair-batch` requires public grammar change.
+- output required:
+  - changed files, verification result, CLI/output behavior summary, template impact summary, no material decision or Ledger Note, unresolved risks.
 
-### ドキュメント影響の解消ステップ S90（docs impact resolution / docs refresh）
+#### 具体テストケース一覧
+- `tc-s02-001` acceptance: create PR repair batch artifact.
+  - 前提: Temp repo has valid issue scope.
+  - 操作: `new doc pr-repair-batch --issue iss-00003 --title "PR Repair Batch"`.
+  - 期待結果: File `*-pr-repair-batch-pr-repair-batch.md` exists, stdout includes `type=pr-repair-batch`, slugless id, scope, path.
+  - 失敗検出: doc type is not first-class or path/id are wrong.
+  - 検証方法: `tests/cli_runtime/test_new.py`.
+  - 関連 closure id: tc-003
+- `tc-s02-002` negative: interface shape remains unchanged.
+  - 前提: CLI help available after implementation.
+  - 操作: inspect `new doc --help` and invalid options.
+  - 期待結果: no body/template/basename/doc_id options are exposed or accepted.
+  - 失敗検出: interface creep.
+  - 検証方法: `tests/cli_runtime/test_new.py`.
+  - 関連 closure id: tc-004
+- `tc-s02-003` validation: hyphenated doc type validates.
+  - 前提: Valid and malformed `pr-repair-batch` filenames exist in discussions.
+  - 操作: run `validate`.
+  - 期待結果: valid files pass; missing slug / malformed candidates fail.
+  - 失敗検出: hyphenated type breaks validation or malformed detection.
+  - 検証方法: `tests/cli_runtime/test_validate.py`.
+  - 関連 closure id: tc-005
+
+#### ステップ完了契約
+- close 条件:
+  - tc-003/tc-004/tc-005 pass, code-reviewer pass, spec-reviewer pass for template/spec alignment, step commit recorded.
+- report evidence:
+  - Implementation Delegation Gate, TDD evidence, Step/Test Contract Closure, Closure Coverage, Reviewer Gate Status for both reviewers, Step Commit Gate.
+
+### 実装ステップ S03 — Wait-before-suffix allocator
+- 振る舞いの目標:
+  - Occupied timestamp slots wait/retry before suffix fallback with deterministic tests and bounded latency.
+- 依存:
+  - S01 committed.
+- unblock:
+  - S99.
+- 計画済み契約:
+  - scope:
+    - Add allocation helper with wait budget default 1.1s, poll default 0.05s, env validation, injected fake clock/sleep test seam, suffix fallback.
+  - テスト義務:
+    - closure ids: tc-006, tc-007, tc-008.
+  - Green 検証:
+    - `uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py`
+  - refactor guardrail:
+    - Allowed cleanup is limited to allocation helper extraction and test injection seams inside the allowed runtime/test files.
+    - Real sleeps in tests, public `Ports` expansion beyond design, timestamp grammar changes, or suffix policy changes require plan amendment and re-review.
+  - amendment trigger:
+    - Need to change timestamp grammar, suffix fallback, or public `Ports` contract beyond design.
+
+#### 委任契約
+- delegated role:
+  - `dev-coder`
+- allowed paths:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py`
+  - deterministic tests under `tests/cli_runtime/test_runtime_new_doc_s09.py`
+- forbidden changes:
+  - sub-second timestamp, removing suffix fallback, real one-second sleeps in tests, docs/skill edits.
+- input docs:
+  - `requirement.md`, `design.md`, `plan.md`, `workflow_issue.md`, `authoring/issue-plan.md`
+- acceptance criteria:
+  - tc-006, tc-007, and tc-008 close while preserving timestamp grammar and suffix fallback.
+- required tests or docs-only verification:
+  - pytest command listed above, including fake advancing clock, fake frozen clock, suffix exhaustion, and invalid env value coverage.
+- reviewer focus:
+  - `code-reviewer`: lock interaction, deterministic tests, no hangs, compatibility.
+- stop conditions:
+  - deterministic testing requires changing design wait contract.
+- output required:
+  - changed files, verification result, allocator timing/fallback behavior summary, no material decision or Ledger Note, unresolved risks.
+
+#### 具体テストケース一覧
+- `tc-s03-001` acceptance: advancing fake clock avoids suffix.
+  - 前提: Existing standard timestamp slot is occupied and fake clock advances within budget.
+  - 操作: create another doc through runtime allocator.
+  - 期待結果: new file uses later suffix-less timestamp.
+  - 失敗検出: suffix-first regression.
+  - 検証方法: `tests/cli_runtime/test_runtime_new_doc_s09.py`.
+  - 関連 closure id: tc-006
+- `tc-s03-002` edge: frozen clock falls back to suffix.
+  - 前提: Clock does not advance and wait budget is exhausted through fake sleep.
+  - 操作: create another doc.
+  - 期待結果: first available suffix is used; command does not hang.
+  - 失敗検出: infinite loop or failure instead of fallback.
+  - 検証方法: `tests/cli_runtime/test_runtime_new_doc_s09.py`.
+  - 関連 closure id: tc-007
+- `tc-s03-003` edge: suffix exhaustion remains fail-closed.
+  - 前提: Standard slot and suffixes 01..99 are occupied.
+  - 操作: create another doc after fallback path.
+  - 期待結果: suffix exhaustion error; no file written.
+  - 失敗検出: overwrite or silent success.
+  - 検証方法: existing suffix exhaustion test updated if needed.
+  - 関連 closure id: tc-008
+- `tc-s03-004` negative: invalid env values fail fast.
+  - 前提: wait/poll env values are zero, negative, or non-numeric.
+  - 操作: create doc in occupied timestamp condition or resolve config.
+  - 期待結果: invalid configuration error before ambiguous allocation.
+  - 失敗検出: undefined zero wait semantics.
+  - 検証方法: focused runtime test.
+  - 関連 closure id: tc-007
+
+#### ステップ完了契約
+- close 条件:
+  - tc-006/tc-007/tc-008 pass or covered-existing evidence recorded, code-reviewer pass, step commit recorded.
+- report evidence:
+  - TDD evidence, Step/Test Contract Closure, Closure Coverage, Closure Delta, Reviewer Gate Status, Step Commit Gate.
+
+### 実装ステップ S04 — Shipped guidance and dogfooding parity
+- 振る舞いの目標:
+  - Shipped agent guidance uses command-first / returned-path-first artifact generation and dogfooding copies are not stale.
+- 依存:
+  - S02 committed.
+- unblock:
+  - S90/S99.
+- 計画済み契約:
+  - scope:
+    - Update provider install-root skill / role / AGENTS guidance and dogfooding parity evidence.
+  - テスト義務:
+    - closure ids: tc-009, tc-010.
+  - Green 検証:
+    - targeted `rg` inspection.
+    - focused `uv run pytest tests/unit/infra/test_init_update.py` tests for shipped assets.
+  - refactor guardrail:
+    - Allowed cleanup is limited to replacing manual filename instructions with command-first / returned-path-first wording in the in-scope surfaces.
+    - Rewriting broader agent policy, delegated authoring workflow, or unrelated skill prose requires plan amendment or follow-up.
+  - amendment trigger:
+    - Guidance needs command support not implemented in S02 or broader delegated authoring policy change.
+
+#### 委任契約
+- delegated role:
+  - `doc-writer`
+- allowed paths:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md`
+  - `src/spec_dock/assets/install_root/.codex/AGENTS.md`
+  - `src/spec_dock/assets/install_root/.codex/agents/system-architect.toml`
+  - `src/spec_dock/assets/install_root/.codex/agents/implementation-planner.toml`
+  - `.agents/skills/github-pr-merge-preparer/SKILL.md`
+  - `.agents/skills/spec-dock-hub/SKILL.md`
+  - `.codex/AGENTS.md`
+  - `.codex/agents/system-architect.toml`
+  - `.codex/agents/implementation-planner.toml`
+  - update/sync side effects outside these enumerated dogfooding copies must be reported, reviewed, and either justified as generated parity output or reverted before step closure.
+  - focused asset tests.
+- forbidden changes:
+  - runtime implementation, canonical active issue docs, existing artifact rename/repair.
+- input docs:
+  - `requirement.md`, `design.md`, `plan.md`, accepted ADRs, and the in-scope provider/dogfooding guidance files listed in AC-003.
+- acceptance criteria:
+  - tc-009 and tc-010 close with provider and dogfooding guidance aligned to command-first / returned-path-first artifact generation.
+- required tests or docs-only verification:
+  - targeted `rg` inspection for manual filename guidance recurrence, parity inspection or sync/update evidence for root copies, and focused asset tests when assertions are added or changed.
+- reviewer focus:
+  - `spec-reviewer`: docs/spec alignment, no manual filename guidance recurrence, dogfooding parity evidence.
+  - `code-reviewer`: focused asset tests, scaffold propagation behavior, and any provider-to-dogfooding update/sync mechanics touched by the step.
+- output required:
+  - changed files, inspection commands, parity evidence, focused asset test results when touched, no material decision or Ledger Note.
+- stop conditions:
+  - Need to change runtime behavior or define new doc type beyond `pr-repair-batch`.
+
+#### 具体テストケース一覧
+- `tc-s04-001` inspect-only: PR merge preparer uses generated path.
+  - 前提: Provider skill guidance is updated.
+  - 操作: inspect skill text.
+  - 期待結果: Skill calls `new doc pr-repair-batch`, captures returned path, updates only that path.
+  - 失敗検出: remaining `<ts>-disc-pr-repair-batch.md` target filename instruction.
+  - 検証方法: `rg` and focused asset tests.
+  - 関連 closure id: tc-009
+- `tc-s04-002` inspect-only: role configs do not handcraft filenames.
+  - 前提: Provider `.codex` role configs and AGENTS are updated.
+  - 操作: inspect provider and dogfooding copies.
+  - 期待結果: no "Use filenames <timestamp>" generation instruction remains; grammar references are reference-only.
+  - 失敗検出: known AC-003 surface remains stale.
+  - 検証方法: `rg` plus parity evidence.
+  - 関連 closure id: tc-009
+- `tc-s04-003` inspect-only: repair unit remains out of scope.
+  - 前提: PR repair guidance describes unit creation.
+  - 操作: inspect unit guidance.
+  - 期待結果: units remain `disc` or future follow-up; no `pr-repair-unit` type is required.
+  - 失敗検出: scope creep into unapproved doc type.
+  - 検証方法: guidance inspection.
+  - 関連 closure id: tc-010
+
+#### ステップ完了契約
+- close 条件:
+  - tc-009/tc-010 pass by inspection/tests, spec-reviewer pass, code-reviewer pass when tests/scaffold propagation are touched, dogfooding parity evidence recorded, step commit recorded.
+- report evidence:
+  - Delegated Worker Evidence, Test Contract Closure, Closure Coverage, Reviewer Gate Status for required reviewers, Step Commit Gate.
+
+### ドキュメント影響の解消ステップ S90
 - 対象:
-  - docs / templates / README / workflow / skill / migration notes / none
+  - `src/spec_dock/assets/spec_dock/docs/reference_naming.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
+  - `src/spec_dock/assets/spec_dock/docs/rules/{initiative,epic,issue}/discussions.md`
+  - other docs surfaced by `rg` that list current catalog or describe generation procedure.
 - 対応:
-  - ...
+  - Update current catalog where listed.
+  - Preserve ADR mirror as `adr`-only.
+  - Separate grammar reference from generation procedure.
 - doc update owner:
-  - doc-writer when updates are required
+  - `doc-writer` when edits are required; approved-no-op only if inspection proves no docs need updates.
+- verification:
+  - `rg -n "current catalog|pr-repair-batch|new doc <type>|<ts>-<kind>|Use filenames" src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/install_root`
+  - focused docs/asset tests.
 - spec/doc review:
-  - reviewer: spec-reviewer
-  - pass 条件: docs が requirement / design / plan と整合し、未解決の必須 docs 影響が残っていない
+  - `spec-reviewer` pass required.
+- closure:
+  - tc-011 closed and report docs impact ledger updated.
+- delegation contract:
+  - delegated role:
+    - `doc-writer`
+  - input docs:
+    - `requirement.md`, `design.md`, `plan.md`, accepted ADRs, and docs discovered by the S90 `rg` command.
+  - allowed paths:
+    - `src/spec_dock/assets/spec_dock/docs/reference_naming.md`
+    - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+    - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
+    - `src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md`
+    - `src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md`
+    - `src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md`
+    - additional provider docs under `src/spec_dock/assets/spec_dock/docs/` only when discovered by the S90 inspection command and directly tied to tc-011.
+  - forbidden changes:
+    - runtime code, tests, templates, install-root skill/role assets, canonical issue docs except report evidence updates, and any ADR mirror broadening beyond `adr`-only.
+  - acceptance criteria:
+    - tc-011 closes by updating or explicitly no-oping catalog/generation-procedure docs with evidence.
+  - required tests or docs-only verification:
+    - S90 `rg` command, focused docs/asset tests when docs are covered by tests, and direct inspection of any approved-no-op target.
+  - reviewer focus:
+    - `spec-reviewer`: docs impact completeness, grammar-reference vs generation-procedure separation, no conflict with AC-003.
+  - stop conditions:
+    - docs need behavior not implemented by S01-S04, or docs reveal a new required public contract outside AC/EC.
+  - output required:
+    - changed files or approved-no-op rationale per target, inspection output summary, report Docs Impact Resolution row, no material decision or Ledger Note, unresolved risks.
+- step gate:
+  - `doc-writer` output is accepted only after spec-reviewer pass.
+  - Commit or approved-no-op evidence is recorded before S99 starts.
 
-### 最終品質ゲートステップ S99（final quality gate）
+### 最終品質ゲートステップ S99
 - branch diff 範囲:
-  - ...
+  - Runtime, templates, provider docs/assets, dogfooding parity copies, and tests touched by S01-S90.
 - 必須 validation:
-  - ...
+  - `uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py tests/cli_runtime/test_new.py tests/cli_runtime/test_validate.py tests/unit/infra/test_init_update.py`
+  - `uv run pytest tests/unit/application/test_validate.py tests/unit/commands/test_runtime_new_s08.py`
+  - `./spec-dock/scripts/spec-dock validate`
+  - `./spec-dock/scripts/spec-dock sync --no-github` or normal `sync` according to available command support.
 - final QA gate:
-  - reviewer: qa-reviewer
-  - 範囲: Issue 全体の obligation coverage と integration test 要否
-  - pass 条件: reviewer pass
-- final code review ゲート:
-  - reviewer: code-reviewer
-  - 範囲: issue-wide integrated diff、構造、責務境界、回帰リスク、保守性
-  - pass 条件: review_status: pass
-- final spec review ゲート:
-  - reviewer: spec-reviewer
-  - 範囲: requirement / design / plan / report / implementation / tests / docs 整合
-  - pass 条件: reviewer pass
+  - `qa-reviewer` verifies closure coverage and integration test sufficiency.
+- final code review gate:
+  - issue-wide `code-reviewer` reviews integrated runtime/scaffold diff.
+- final spec review gate:
+  - `spec-reviewer` verifies requirement/design/plan/report/docs/test alignment.
 - final commit gate:
-  - commit 範囲:
-  - final report ledger:
-  - post-commit external evidence destination:
+  - Every implementation step is committed or valid approved-no-op before final commit.
+  - Final response / PR / issue comment records post-commit clean evidence.
+
+## Rollback / Compatibility
+- Rollback:
+  - Remove `pr-repair-batch` from creatable catalog/template/docs/guidance.
+  - Revert allocator to suffix-first.
+  - Do not rename or repair existing generated artifacts.
+- Compatibility:
+  - Existing timestamp grammar, suffix family, legacy sequential docs, and retired `note` grandfathering remain valid.
 
 ## 未確定事項
-- Q-001:
-  - 質問:
-  - 推奨案:
-  - 影響範囲:
+- なし。
 
 ## 最終完了条件
-- AC/EC 達成:
-  - ...
-- docs 影響解決:
-  - ...
-- 全 implementation step 完了:
-  - committed / approved-no-op:
-- final quality gate pass:
-  - qa-reviewer:
-  - issue-wide code-reviewer:
-  - spec-reviewer:
-- final commit 完了:
-  - ...
-- 必須 closure id 完了:
-  - Step Contract Closure:
-  - Test Contract Closure:
-  - Closure Coverage:
-- final clean state:
-  - no unintended staged / unstaged changes:
+- All AC/EC closure ids tc-001 through tc-012 are closed in `report.md`.
+- S01-S04 and S90 are committed or valid approved-no-op.
+- S99 final QA/code/spec gates pass.
+- `validate`, focused tests, and sync evidence are recorded.
+- No unresolved Evidence Adoption Ledger, Delegated Draft Evidence, or Spec Interpretation entries remain.
