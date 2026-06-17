@@ -62,6 +62,7 @@ Disposition ごとの必須証跡:
 | D-011 | resolved | test-strategy | spec-reviewer | Plan pass review left P2 findings: plan gate row still reflected pre-pass pending state, and S04 dogfooding allowed paths were broader than AC-003/design enumerated surfaces. | Treat P2 as follow-up; apply immediately and re-review | S04 now enumerates exact dogfooding copies and requires reporting/reviewing any update/sync side effect outside those files. | Keeps the executable plan narrow and prevents `.agents` / `.codex` scope creep. | applied | plan pass review by fresh `spec-reviewer` `019ed350-7d19-74c2-9f82-b2d8811504f9`; `plan.md` S04 allowed path fix; final fresh `spec-reviewer` `019ed353-84a8-71e3-8d27-b246905e8807`, findings=[] | Closed by final plan reviewer pass |
 | D-012 | resolved | operation | orchestrator | Requirement, design, and plan authoring gates must be closed before issue execution handoff. | Start execution with provisional/self-checked plan; wait for fresh reviewer pass | Issue execution handoff is ready because requirement, design, and plan each have fresh `spec-reviewer` pass evidence; `plan.md` is executable under issue-plan workflow. | Satisfies `spec-dock-issue-planning` mandatory workflow step 7 for authoring handoff readiness. | applied | `spec-reviewer` passes: requirement `019ed333-714b-7581-a46e-9d7ab5a91fc4`; design `019ed33e-40be-7f91-9d3a-0b722f7e337c`; plan `019ed353-84a8-71e3-8d27-b246905e8807`; `./spec-dock/scripts/spec-dock validate` pass | Proceed to issue execution |
 | D-013 | resolved | operation | dev-coder / orchestrator | S02 worker reported requirement/design/plan front matter still said `状態: "draft"` despite fresh reviewer pass and execution handoff readiness. | Stop execution and return to planning; treat report evidence as sufficient; align front matter to approved | Requirement, design, and plan front matter now use `状態: "approved"`; execution continues because fresh reviewer pass evidence and D-012 already proved handoff readiness. | Removes metadata ambiguity without changing S02 behavior scope. | applied | S02 worker Ledger Note from `dev-coder` `019ed367-5cff-7f33-b7cc-76b54badf829`; `requirement.md`; `design.md`; `plan.md`; `report.md` D-012 | Continue S02 review gates |
+| D-014 | resolved | dogfooding-parity | dev-coder / orchestrator | S04 focused asset tests exposed dogfooding mirror drift outside the initially named S04 guidance files: provider S02/S03 added `pr-repair-batch` template and runtime dependencies not yet mirrored under `spec-dock/`. | Revert extra mirror files; relax validation; treat as generated parity output required by S04 | Treat `spec-dock/templates/discussions/pr-repair-batch.md` and `spec-dock/scripts/spec_dock_runtime/{application/create_node.py,commands/new.py,domain/validation.py,domain/discussion_docs.py}` as generated dogfooding parity output needed to satisfy S04 verification. | `plan.md` S04 requires reporting/reviewing update/sync side effects outside enumerated dogfooding copies; required `validate` and runtime mirror tests cannot pass with only `create_node.py` mirrored because provider runtime imports the shared catalog. | applied | Red `test_init_update.py` -> 5 failed, 350 passed; green `test_init_update.py` -> 355 passed; `./spec-dock/scripts/spec-dock validate` pass | Review as S04 parity side effect; no provider runtime implementation changed |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -465,6 +466,108 @@ spec-dock: ok (validate) nodes=97
 
 #### メモ
 - Shipped guidance / dogfooding parity remains S04 scope.
+
+---
+
+### セッションログ（2026-06-17 S04）
+
+#### 実行コンテキスト
+- Step: S04 Shipped guidance and dogfooding parity
+- Active issue: `iss-00188-prevent-duplicate-discussion-timestamp-slots`
+- Plan source: `spec-dock/active/issue/plan.md`
+- Plan section: `実装ステップ S04 — Shipped guidance and dogfooding parity`
+- Required verification: targeted `rg` inspection, provider/dogfooding parity inspection, focused `uv run pytest tests/unit/infra/test_init_update.py`, `git diff --check`, `./spec-dock/scripts/spec-dock validate`
+- Required reviewers: `spec-reviewer` and `code-reviewer`
+
+#### 実行内容
+- Delegated S04 guidance update to `doc-writer` agent `019ed38b-7d89-7210-9823-19aa28b46991`.
+- Updated shipped install-root guidance and dogfooding copies so new discussion artifacts are created through `./spec-dock/scripts/spec-dock new doc ...` and agents edit only the returned `path=...`.
+- Replaced PR repair batch guidance so writable SpecDock scopes use `new doc pr-repair-batch`; inline batch remains the fallback when no writable scope exists.
+- Kept repair units as ordinary `disc` artifacts and explicitly avoided inventing a `pr-repair-unit` doc type.
+- Delegated focused asset-test repair to `dev-coder` agent `019ed392-6ef3-7571-85fc-7749b11ffd21` after parent observed `test_init_update.py` failures.
+- Applied D-014: additional dogfooding runtime/template mirror outputs are treated as generated parity output required by S04 validation, not provider runtime implementation changes.
+
+#### TDD / 検証証跡
+| ステップ（step） | フェーズ | 種別 | 観測 | コマンド / 証跡 | 結果 | 備考 |
+|---|---|---|---|---|---|---|
+| S04 | 赤フェーズ / characterization | required focused verification | Focused asset suite exposed stale dogfooding template/runtime mirrors, stale dogfooding `.meta.json` snapshot, and stale shipped guidance assertions. | `uv run pytest tests/unit/infra/test_init_update.py` -> 5 failed, 350 passed | pass | Failures matched S04 parity/assertion scope |
+| S04 | 緑フェーズ（Green） | required focused verification | Guidance assertions, dogfooding template/runtime mirrors, `.meta.json` snapshot, and mirror map were aligned. | `uv run pytest tests/unit/infra/test_init_update.py` -> 355 passed | pass | Parent re-ran after dev-coder completion |
+| S04 | inspection | required inspect-only | No stale manual filename instruction remains in S04 guidance surfaces. | `rg -n '<ts>-disc-pr-repair-batch|disc-pr-repair-batch|create or update a timestamped target|timestamped issue-local|Use filenames' ...` -> no matches, exit 1 | pass | Exit 1 is expected for no matches |
+| S04 | parity | required inspect-only | Provider and dogfooding guidance copies match for all five S04 guidance surfaces; added dogfooding template/runtime mirrors match provider assets. | `diff -u` on provider/dogfooding pairs -> no output for checked pairs | pass | Includes `pr-repair-batch.md` and `discussion_docs.py` spot checks |
+| S04 | refactor / hygiene | guardrail satisfied | No runtime provider implementation was changed in S04; added test assertions and generated dogfooding parity outputs only. | `git diff --check` -> pass; `./spec-dock/scripts/spec-dock validate` -> pass | pass | D-014 records parity side-effect disposition |
+
+#### 要件クロージャ証跡（Requirements Closure Evidence）
+| クロージャID（closure id） | ステップ（step） | 状態（state） | 証跡（evidence） | 備考 |
+|---|---|---|---|---|
+| tc-009 | S04 | pass | command-first / returned-path-first guidance in provider and dogfooding copies; stale manual filename `rg` -> no matches; `test_init_update.py` -> 355 passed | Known manual filename guidance surfaces are aligned. |
+| tc-010 | S04 | pass | `github-pr-merge-preparer` guidance says repair units remain ordinary `disc` artifacts and must not invent `pr-repair-unit`; `rg -n 'pr-repair-unit'` shows only out-of-scope statement and `disc` slug example | No new `pr-repair-unit` doc type is introduced. |
+
+#### 受入条件クロージャ（Acceptance Criteria Closure）
+| 受入条件（acceptance criteria） | 対応テスト / 証跡 | 結果 | 備考 |
+|---|---|---|---|
+| Shipped guidance forbids hand-built timestamped discussion filenames for new artifacts | targeted `rg` no-match inspection across S04 surfaces | pass | Grammar references remain reference-only. |
+| PR repair batch guidance uses runtime-owned creation | provider and dogfooding `github-pr-merge-preparer/SKILL.md` now use `new doc pr-repair-batch` and returned `path=...` | pass | Template file remains template source, not target filename. |
+| Dogfooding guidance is not stale | provider/dogfooding `diff -u` pairs and `test_init_update.py` | pass | S04 guidance files match provider copies. |
+| Repair unit scope remains bounded | `pr-repair-unit` appears only as a forbidden doc type / slug example for ordinary `disc` creation | pass | `pr-repair-unit` doc type remains out of scope. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-009, tc-010 | guidance `rg`, parity `diff`, `test_init_update.py` | tc-009, tc-010 | Tests/inspection are concrete aliases for planned S04 closure ids. | no | yes: required S04 reviewers pending |
+| generated parity side effect | D-014 | dogfooding runtime/template mirror tests | tc-009 | S04 plan allowed update/sync side effects outside enumerated dogfooding copies if reported/reviewed as generated parity output. | no | yes: code-reviewer and spec-reviewer must review D-014 disposition |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 guidance | delegated | shipped docs/skill guidance | doc-writer | command-first / returned-path-first guidance and dogfooding copies | `plan.md` S04; `requirement.md`; `design.md` | S04 allowed guidance paths | runtime provider implementation, active issue docs/report, `pr-repair-unit` support | targeted `rg`, parity inspection, `git diff --check` | need runtime support beyond S02/S03 | changed files, verification, parity evidence, risks | pass |
+| S04 asset-test repair | delegated | focused asset tests/scaffold parity | dev-coder | fix `test_init_update.py` failures caused by S04/S02/S03 mirror drift and assertion drift | `plan.md` S04; failing `test_init_update.py` output | focused test assertions and generated dogfooding parity outputs | provider runtime implementation changes, active issue docs/report | `test_init_update.py`, `git diff --check`, `validate` | broader runtime behavior change | changed files, verification, Ledger Note | pass with D-014 |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 guidance | doc-writer | Updated PR repair batch and delegated authoring guidance to use runtime `new doc` and returned `path=...`; kept repair units as ordinary `disc`; reported parity/no-stale-guidance inspections. | install-root `.agents` / `.codex` S04 guidance files and matching dogfooding copies | targeted `rg`; provider/dogfooding `diff -u`; `git diff --check` | passed: fresh code-reviewer `019ed3ad-aa03-7873-ba68-0bc25ad8f7af`, findings=[]; fresh spec-reviewer `019ed3ad-e14d-7dd3-a06e-b1c15293e5c3`, findings=[] | none | accepted |
+| S04 asset-test repair | dev-coder | Mirrored provider `pr-repair-batch` template and runtime files into dogfooding workspace, updated runtime mirror map, `.meta.json` snapshot, and guidance assertions. | `tests/unit/infra/test_init_update.py`; `spec-dock/templates/discussions/pr-repair-batch.md`; `spec-dock/scripts/spec_dock_runtime/application/create_node.py`; `spec-dock/scripts/spec_dock_runtime/commands/new.py`; `spec-dock/scripts/spec_dock_runtime/domain/validation.py`; `spec-dock/scripts/spec_dock_runtime/domain/discussion_docs.py`; role config wording | `uv run pytest tests/unit/infra/test_init_update.py` -> 355 passed; `git diff --check` -> pass; `./spec-dock/scripts/spec-dock validate` -> pass | passed: fresh code-reviewer `019ed3ad-aa03-7873-ba68-0bc25ad8f7af`, findings=[]; fresh spec-reviewer `019ed3ad-e14d-7dd3-a06e-b1c15293e5c3`, findings=[] | none after D-014 reviewer pass | accepted as generated parity output |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | N/A: normal delegation used; parent only updated issue-level evidence ledger | N/A | `spec-dock/active/issue/report.md` | record S04 evidence and D-014 disposition | revert this report hunk if needed | `test_init_update.py` -> pass; `validate` -> pass | fresh code-reviewer and spec-reviewer pending | none |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step code/scaffold reviewer | code-reviewer | fresh after report evidence update | passed | N/A | proceed to S04 commit gate | agent `019ed3ad-aa03-7873-ba68-0bc25ad8f7af`, findings=[] |
+| S04 | step spec/guidance reviewer | spec-reviewer | fresh after report evidence update | passed | N/A | proceed to S04 commit gate | agent `019ed3ad-e14d-7dd3-a06e-b1c15293e5c3`, findings=[] |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | pending commit | S04 guidance, focused asset tests, generated dogfooding parity output, and report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md`
+- `src/spec_dock/assets/install_root/.codex/AGENTS.md`
+- `src/spec_dock/assets/install_root/.codex/agents/system-architect.toml`
+- `src/spec_dock/assets/install_root/.codex/agents/implementation-planner.toml`
+- `.agents/skills/github-pr-merge-preparer/SKILL.md`
+- `.agents/skills/spec-dock-hub/SKILL.md`
+- `.codex/AGENTS.md`
+- `.codex/agents/system-architect.toml`
+- `.codex/agents/implementation-planner.toml`
+- `tests/unit/infra/test_init_update.py`
+- `spec-dock/templates/discussions/pr-repair-batch.md`
+- `spec-dock/scripts/spec_dock_runtime/application/create_node.py`
+- `spec-dock/scripts/spec_dock_runtime/commands/new.py`
+- `spec-dock/scripts/spec_dock_runtime/domain/validation.py`
+- `spec-dock/scripts/spec_dock_runtime/domain/discussion_docs.py`
+- `spec-dock/active/issue/report.md`
+
+#### コミット
+- pending S04 reviewer pass and step commit gate
+
+#### メモ
+- S90 remains the final docs impact resolution gate for issue-wide docs surface confirmation.
 
 ---
 
