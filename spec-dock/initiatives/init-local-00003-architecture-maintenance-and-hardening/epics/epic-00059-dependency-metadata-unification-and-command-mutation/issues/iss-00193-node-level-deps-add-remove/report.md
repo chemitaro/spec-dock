@@ -47,6 +47,7 @@ Disposition ごとの必須証跡:
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | interpretation | orchestrator + user answer | `deps add/remove` を initiative / epic / issue に広げる際、raw node-level cycle を保存前に拒否するかが未確定だった | Option A: raw node-level graph も検証; Option B: issue-level compiled graph 主体; Option C: 保存後に sync/check/validate へ委ねる | Option A を採用し、raw node-level cycle は配下 issue の有無に関係なく保存前に拒否する | 空 epic / initiative では現時点の issue-level graph が空でも、後から child issue を追加した瞬間に循環が顕在化するため | applied | `discussions/20260617t000842z-interview-node-dependency-validation-boundary.md`; `requirement.md` | design / plan authoring で validation boundary と tests へ反映する |
+| D-002 | resolved | implementation | dev-coder + orchestrator | S02 integration で node-level invalid add の public error code を新設するか、既存 code を再利用するかが実装判断として発生した | Option A: `invalid_add_self_dependency` / `invalid_add_cycle` を再利用; Option B: ancestor / descendant / raw-cycle 専用 code を追加 | Option A を採用し、exact self は `invalid_add_self_dependency`、ancestor / descendant / raw-cycle / compiled cycle は既存 `invalid_add_cycle` で返す | Requirement / design は保存前拒否と no-write を要求しており code 名は固定していない。S90 docs/help 更新前に public code surface を増やすより、既存 add error semantics へ収める方が S02 scope に合う | applied | `application/mutate_deps.py`; `tests/cli_runtime/test_deps.py` | S90 で docs/help を更新するとき、必要なら code 表現を再点検する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -137,7 +138,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装サマリー (任意)
 - S01 では raw node-level dependency graph の domain validation helper を追加し、self / ancestor-container / descendant / cycle を unit level で拒否できる foundation を実装した。
-- Public `deps add/remove` mutation path への統合、direct edge add/remove semantics、docs/help 更新は S02 以降で扱う。
+- S02 では public `deps add/remove` mutation path を initiative / epic / issue node に拡張し、source `.meta.json.depends_on` の direct add/remove と S01 validation を接続した。
+- Direct edge semantics の regression consolidation は S03、docs/help 更新は S90 で扱う。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -252,6 +254,128 @@ pass
 
 #### メモ
 - S01 の first code-reviewer gate は report evidence 未記録により fail。コード差分自体の blocking finding はなし。
+
+---
+
+### セッションログ（2026-06-17 S02）
+
+#### 対象
+- Step: S02
+- AC/EC: AC-001, AC-002, AC-005, AC-006, AC-007, EC-001, EC-002, EC-003, EC-004
+- 計画上の出典（Planned source）:
+  - `plan.md` section: S02 public `deps add/remove` integration
+  - closure ids: slci-ac-001, slci-ac-002, slci-ac-005, slci-ac-006, slci-ac-007, slci-ec-001, slci-ec-002, slci-ec-003, slci-ec-004
+
+#### 実施内容
+- `dev-coder` に S02 のみを委任し、public `deps add/remove` mutation path を node-level direct dependency に接続した。
+- Existing `fs_repo.py` writer は任意 node の `.meta.json` に対して利用できるため変更不要と判断した。
+- 親側で diff scope、CLI runtime test、domain unit test、diff whitespace を確認した。
+- S02 の public error code mapping は D-002 に記録した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime/test_deps.py
+
+88 passed, 10 skipped in 104.38s
+
+uv run pytest tests/unit/domain/test_deps.py
+
+6 passed in 0.01s
+
+git diff --check
+
+pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | 追加した S02 focused CLI tests が旧 issue-only guard により `unsupported_node_kind` で `8 failed` | `uv run pytest tests/cli_runtime/test_deps.py -k <S02 focused tests>` by `dev-coder` | pass | old behavior が node-level add/remove を拒否することを観測 |
+| S02 | 緑フェーズ（Green） | public integration Green | `tests/cli_runtime/test_deps.py` 全体が `88 passed, 10 skipped`; domain S01 tests が `6 passed` | `uv run pytest tests/cli_runtime/test_deps.py`; `uv run pytest tests/unit/domain/test_deps.py` by `dev-coder` and parent rerun | pass | parent rerun observed same focused file result |
+| S02 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | S02 許可範囲内の integration files のみ変更。docs/help と S03/S04 consolidation は未実施 | diff inspection; `git diff --check` | pass | `fs_repo.py` は変更不要 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | Public error-code mapping for node-level invalid add | implementation | D-002 として記録し、既存 `invalid_add_self_dependency` / `invalid_add_cycle` を再利用 | slci-ac-006 / slci-ac-007 | no | `application/mutate_deps.py`; `tests/cli_runtime/test_deps.py` |
+| S02 | Candidate compiled issue map must be passed to S01 helper | code-reviewer S01 residual risk | S02 integration tests に candidate compiled cycle rejection を追加 | slci-ac-006 | no | `test_deps_add_candidate_compiled_cycle_returns_invalid_add_cycle_and_no_write` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | slci-ac-001, slci-ac-002, slci-ac-005, slci-ac-006, slci-ac-007, slci-ec-001, slci-ec-002, slci-ec-003, slci-ec-004 | `deps add/remove` can mutate valid node-level direct dependency and rejects S01 invalid states before write | `uv run pytest tests/cli_runtime/test_deps.py` -> `88 passed, 10 skipped`; parent rerun pass | pass | S03 still owns duplicate/direct-edge regression consolidation |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s02-001 | S02 | yes | red-required | old guard returned `unsupported_node_kind` | `uv run pytest tests/cli_runtime/test_deps.py` | pass | epic direct add writes source `.meta.json.depends_on` |
+| tc-s02-002 | S02 | yes | red-required | old guard returned `unsupported_node_kind` | `uv run pytest tests/cli_runtime/test_deps.py` | pass | epic direct remove deletes source `.meta.json.depends_on` |
+| tc-s02-003 | S02 | yes | red-required | old guard returned `unsupported_node_kind` | `uv run pytest tests/cli_runtime/test_deps.py` | pass | empty initiative dependency can be stored |
+| tc-s02-004 | S02 | yes | red-required | old guard returned `unsupported_node_kind` | `uv run pytest tests/cli_runtime/test_deps.py` | pass | self / ancestor / descendant candidates reject no-write |
+| tc-s02-005 | S02 | yes | red-required | old guard returned `unsupported_node_kind` | `uv run pytest tests/cli_runtime/test_deps.py` | pass | empty epic raw cycle rejects no-write |
+| tc-s02-006 | S02 | yes | red-required | candidate compiled map was not integrated | `uv run pytest tests/cli_runtime/test_deps.py` | pass | candidate compiled cycle rejects no-write |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| slci-ac-001 | S02 | `tc-s02-001`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | valid node-level add writes source `.meta.json.depends_on` |
+| slci-ac-002 | S02 | `tc-s02-002`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | valid node-level remove deletes direct ref |
+| slci-ac-005 | S02 | `tc-s02-003`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | empty container dependency stored with existing empty-expansion warning |
+| slci-ac-006 | S02 | `tc-s02-005`, `tc-s02-006`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | raw and candidate compiled cycles rejected before write |
+| slci-ac-007 | S02 | `tc-s02-004`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | self / ancestor-container / descendant rejected before write |
+| slci-ec-001 | S02 | `tc-s02-005`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | cycle between empty epics rejected |
+| slci-ec-002 | S02 | `tc-s02-004`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | issue -> parent epic rejected |
+| slci-ec-003 | S02 | `tc-s02-004`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | epic -> child issue rejected |
+| slci-ec-004 | S02 | `tc-s02-004`; `uv run pytest tests/cli_runtime/test_deps.py` | pass | epic -> parent initiative rejected |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s02-001..tc-s02-006 | new CLI runtime test methods in `tests/cli_runtime/test_deps.py` | slci-ac-001, slci-ac-002, slci-ac-005, slci-ac-006, slci-ac-007, slci-ec-001, slci-ec-002, slci-ec-003, slci-ec-004 | Plan listed behaviors but not function names; test names are implementation aliases | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/e0dd/spec-dock` | iss-00193 | current session | dev-coder, code-reviewer | same repo, active issue, session, named role; S02 bounded write scope; no destructive action / publishing / credentialed access / scope expansion / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | workflow requires implementation delegation for source/test changes | dev-coder | public deps add/remove integration only | `plan.md` S02 | `infra/deps_reader.py`; `application/mutate_deps.py`; `application/ports.py`; `cli/bootstrap.py`; `tests/cli_runtime/test_deps.py` | docs/help; canonical issue docs/report; GitHub state; S03/S04 regression consolidation | `uv run pytest tests/cli_runtime/test_deps.py` | scope expansion, source/test outside allowed paths, failed CLI runtime tests | worker summary / changed files / verification / risks / integration decision | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Connected node-level add/remove to public mutation path and S01 validation; added CLI runtime tests for valid add/remove and invalid candidates | `application/mutate_deps.py`; `infra/deps_reader.py`; `application/ports.py`; `cli/bootstrap.py`; `tests/cli_runtime/test_deps.py` | `uv run pytest tests/cli_runtime/test_deps.py` -> `88 passed, 10 skipped`; `uv run pytest tests/unit/domain/test_deps.py` -> `6 passed`; `git diff --check` -> pass | pass: fresh code-reviewer returned no findings | Error-code mapping recorded as D-002; S03/S04/S90 remain pending | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | N/A | N/A | N/A | N/A | N/A | N/A | N/A | no parent implementation exception used |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | passed | no | proceed to commit gate | Fresh review returned no findings; S03/S90 remain planned residual work |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | pending reviewer | S02 integration files and report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/mutate_deps.py` - public mutation path で node-level add/remove と S01 validation を利用。
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/deps_reader.py` - raw node dependency resolutions と candidate issue map builder を追加。
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - deps topology reader port を S02 integration 用に拡張。
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - infra deps reader の新 port 実装を接続。
+- `tests/cli_runtime/test_deps.py` - S02 public integration tests を追加 / issue-only negative tests を新 contract に更新。
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00193-node-level-deps-add-remove/report.md` - S02 observed evidence ledger を記録。
+
+#### コミット
+- pending
+
+#### メモ
+- S02 は docs/help を意図的に変更していない。S90 で更新する。
 
 ---
 
