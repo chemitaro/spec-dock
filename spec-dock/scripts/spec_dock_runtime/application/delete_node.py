@@ -669,29 +669,25 @@ def _collect_surviving_raw_node_dependency_refs(
         else None
     )
     if callable(load_node_dependency_resolutions):
-        try:
-            resolutions_by_node = load_node_dependency_resolutions(_resolve_specdock_dir(ports), graph)
-        except Exception:
-            resolutions_by_node = None
-        if resolutions_by_node is not None:
-            for survivor_id, resolutions in resolutions_by_node.items():
-                for resolution in resolutions:
-                    if survivor_id in subtree_ids:
-                        if resolution.resolved_node_id in surviving_node_ids:
-                            deleted_node_to_surviving_node_ids.setdefault(survivor_id, set()).add(
-                                resolution.resolved_node_id
-                            )
-                        continue
-                    if resolution.resolved_node_id in deleted_node_ids:
-                        surviving_node_to_deleted_node_ids.setdefault(survivor_id, set()).add(
+        resolutions_by_node = load_node_dependency_resolutions(_resolve_specdock_dir(ports), graph)
+        for survivor_id, resolutions in resolutions_by_node.items():
+            for resolution in resolutions:
+                if survivor_id in subtree_ids:
+                    if resolution.resolved_node_id in surviving_node_ids:
+                        deleted_node_to_surviving_node_ids.setdefault(survivor_id, set()).add(
                             resolution.resolved_node_id
                         )
-                        surviving_node_to_deleted_raw_refs.setdefault(survivor_id, []).append(resolution.raw_ref)
-            return (
-                surviving_node_to_deleted_node_ids,
-                surviving_node_to_deleted_raw_refs,
-                deleted_node_to_surviving_node_ids,
-            )
+                    continue
+                if resolution.resolved_node_id in deleted_node_ids:
+                    surviving_node_to_deleted_node_ids.setdefault(survivor_id, set()).add(
+                        resolution.resolved_node_id
+                    )
+                    surviving_node_to_deleted_raw_refs.setdefault(survivor_id, []).append(resolution.raw_ref)
+        return (
+            surviving_node_to_deleted_node_ids,
+            surviving_node_to_deleted_raw_refs,
+            deleted_node_to_surviving_node_ids,
+        )
 
     deleted_node_id_by_lower = {node_id.lower(): node_id for node_id in deleted_node_ids}
     surviving_node_id_by_lower = {node_id.lower(): node_id for node_id in surviving_node_ids}
@@ -1249,15 +1245,22 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
             subtree_issue_ids=subtree_issue_ids,
             graph=graph,
         )
-        (
-            surviving_node_to_deleted_node_ids,
-            surviving_node_to_deleted_raw_refs,
-            deleted_node_to_surviving_node_ids,
-        ) = _collect_surviving_raw_node_dependency_refs(
-            subtree_ids=subtree_ids,
-            graph=graph,
-            ports=ports,
-        )
+        try:
+            (
+                surviving_node_to_deleted_node_ids,
+                surviving_node_to_deleted_raw_refs,
+                deleted_node_to_surviving_node_ids,
+            ) = _collect_surviving_raw_node_dependency_refs(
+                subtree_ids=subtree_ids,
+                graph=graph,
+                ports=ports,
+            )
+        except Exception as exc:
+            message = str(exc).strip() or "failed to load dependency topology"
+            return _dependency_topology_load_failure_result(
+                target_id=target.id,
+                message=message,
+            )
         for survivor_id, deleted_node_ids in surviving_node_to_deleted_node_ids.items():
             if deleted_node_ids:
                 dep_conflicts.add(survivor_id)
