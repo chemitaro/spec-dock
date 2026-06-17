@@ -356,6 +356,135 @@ rg -n "pr_review_snapshot.py|python3" src/spec_dock/assets/install_root/.agents/
 
 ---
 
+### セッションログ（2026-06-17 20:17 - 20:24 JST）
+
+#### 対象
+- Step: S30 Dogfooding mirror and scaffold parity
+- AC/EC: AC-001, AC-003
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S30 — Dogfooding mirror and scaffold parity`
+  - closure ids: `tc-006`, `tc-007`
+
+#### 実施内容
+- `dev-coder` に S30 を委任し、許可範囲を dogfooding mirror wrapper、mirror `pr_review_snapshot.py`、focused tests のみに制限した。
+- provider は S20 commit 済みの正本として未変更のまま、dogfooding mirror を provider と byte-for-byte parity に揃えた。
+- `tests/unit/infra/test_init_update.py` に `pr_review_snapshot.py` の install_root inventory / classification / observation scaffold / init-update byte parity assertion を追加した。
+- provider / mirror wrapper の heredoc-free parity と provider / mirror Python entrypoint byte parity を focused issue-197 test に反映した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "issue_197"
+
+3 passed, 434 deselected in 0.19s
+```
+
+```bash
+rg -n "python3 - <<'PY'|<<PY|<<'PY'" src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh .agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh
+
+no matches; exit 1
+```
+
+```bash
+cmp -s src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh .agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh; printf 'wrapper_cmp=%s\n' $?
+
+wrapper_cmp=0
+```
+
+```bash
+cmp -s src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py .agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py; printf 'python_cmp=%s\n' $?
+
+python_cmp=0
+```
+
+```bash
+test -f src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py; printf 'provider_py_exists=%s\n' $?
+test -f .agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py; printf 'mirror_py_exists=%s\n' $?
+
+provider_py_exists=0
+mirror_py_exists=0
+```
+
+```bash
+git diff --check
+
+pass; no output
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S30 | 赤フェーズ / 代替証跡（Red / alternative） | `tc-006`: provider/mirror drift を検出する parity check | delegate pre-check で wrapper `cmp=1`、mirror Python absent を確認 | worker report + S20 report evidence | pass | S20 では mirror stale が意図的に残っていた |
+| S30 | 緑フェーズ（Green） | `tc-006`, `tc-007`: mirror parity and init/update scaffold | focused issue_197 pytest 3 件 pass; heredoc no-match; wrapper/python cmp 0; provider/mirror Python exists | `uv run pytest ... -k "issue_197"`; `rg`; `cmp`; `test -f` | pass | scaffold init/update restores Python asset byte-for-byte from provider |
+| S30 | リファクタリング（Refactor） | no behavior policy change | mirror を provider と同形に揃え、tests のみ parity assertion を追加 | 差分点検（diff inspection） | pass | provider implementation / completion semantics は変更なし |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S30 | `test_issue_197_pr_review_snapshot_python_asset_installed_by_init_and_update` | implementation | added test | `tc-007` | no | focused pytest pass |
+| S30 | provider/mirror wrapper and Python byte parity should remain fixed | implementation | issue_197 static parity test updated | `tc-006` | no | focused pytest pass; `cmp=0` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S30 | `tc-006`, `tc-007` | mirror wrapper and Python match provider meaning and are heredoc-free; init/update installs Python byte-for-byte; `code-reviewer` pass; report closure entries complete; step commit gate closed | mirror/provider heredoc no-match; wrapper cmp 0; Python cmp 0; issue_197 pytest pass; report entries recorded; `code-reviewer` pass | pass | commit gate は次に実施 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-006` | S30 | yes | red-required / static parity | S20 report: mirror intentionally stale | `rg`; `cmp`; focused issue_197 pytest | pass | provider/mirror wrappers heredoc-free and byte-equivalent; Python files byte-equivalent |
+| `tc-007` | S30 | yes | red-required / scaffold acceptance | S20 provider Python existed but mirror/scaffold assertion not complete | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_197"` | pass | init and update install/restore `pr_review_snapshot.py` byte-for-byte from provider |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| `tc-006` | S30 | static heredoc no-match; wrapper/python byte parity; focused pytest | pass | dogfooding mirror parity closed |
+| `tc-007` | S30 | init/update scaffold asset test | pass | installed asset restoration covered |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| changed | `tc-006` | `test_issue_197_pr_review_snapshot_provider_wrapper_invokes_python_entrypoint` | `tc-006` | S20 provider-only expectation を S30 provider/mirror parity expectation へ移行 | no | no |
+| added | `tc-007` | `test_issue_197_pr_review_snapshot_python_asset_installed_by_init_and_update` | `tc-007` | plan の init/update scaffold byte parity を具体化 | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S30 | delegated | dogfooding mirror / scaffold parity | `dev-coder` | mirror parity and scaffold assertions only | `plan.md` S30; provider files from S20 commit | mirror wrapper, mirror `pr_review_snapshot.py`, focused tests | provider files, docs/report/design/plan, docs/skills/workflow/package/config, GitHub state | focused issue_197 pytest; static heredoc search; provider/mirror cmp | provider objectively broken, behavior semantics change required, or allowed paths insufficient | changed files, commands/results, Ledger Note or no-material-decision statement | pass; delegate changed only allowed mirror/test files and reported no material implementation decisions beyond approved plan |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S30 | `dev-coder` | dogfooding mirror wrapper and `pr_review_snapshot.py` を provider と byte-for-byte parity に揃え、init/update scaffold assertion を追加 | `.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh`; `.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py`; `tests/unit/infra/test_init_update.py` | `uv run pytest ... -k "issue_197"` -> delegate observed 3 passed; parent rerun 3 passed. Static `rg` no-match; wrapper/python `cmp=0` | `code-reviewer` pass | none known | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S30 | N/A | N/A | N/A | N/A | N/A | N/A | `code-reviewer` pending | no parent implementation exception used |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S30 | step reviewer | `code-reviewer` | fresh | passed | no | proceed to commit gate | no findings; S30 may proceed to commit gate |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S30 | pending reviewer / pending commit | mirror wrapper; mirror `pr_review_snapshot.py`; `tests/unit/infra/test_init_update.py`; `report.md` | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh` - dogfooding mirror wrapper を provider と同形の薄い shell wrapper に変更。
+- `.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` - dogfooding mirror Python entrypoint を追加。
+- `tests/unit/infra/test_init_update.py` - provider/mirror parity と init/update scaffold assertion を追加。
+- `report.md` - S30 observed evidence ledger を追記。
+
+#### コミット
+- pending
+
+#### メモ
+- S30 の material implementation decisions はなし。delegate note: `No material implementation decisions beyond the approved plan.`
+
+---
+
 ### セッションログ（2026-06-17 HH:MM - HH:MM）
 
 #### 対象
