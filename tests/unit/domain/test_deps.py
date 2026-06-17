@@ -235,6 +235,75 @@ class TestDepsDomain:
             ]
         )
 
+    def _future_cycle_graph(self):
+        _domain_deps, domain_models, domain_tree = _runtime_modules()
+        root = Path("/repo/spec-dock/initiatives/init-00020-platform")
+        return domain_tree.build_graph(
+            [
+                domain_models.SpecNodeSeed(
+                    kind="initiative",
+                    id="init-00020",
+                    title="Platform",
+                    slug="platform",
+                    path=root,
+                    meta_path=root / ".meta.json",
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=20,
+                    github_repo_owner="example",
+                    github_repo_name="repo",
+                ),
+                domain_models.SpecNodeSeed(
+                    kind="epic",
+                    id="epic-00021",
+                    title="Empty source",
+                    slug="empty-source",
+                    path=root / "epics" / "epic-00021-empty-source",
+                    meta_path=root / "epics" / "epic-00021-empty-source" / ".meta.json",
+                    parent_id="init-00020",
+                    initiative_id="init-00020",
+                    epic_id=None,
+                    github_issue_number=21,
+                    github_repo_owner="example",
+                    github_repo_name="repo",
+                ),
+                domain_models.SpecNodeSeed(
+                    kind="epic",
+                    id="epic-00022",
+                    title="Target parent",
+                    slug="target-parent",
+                    path=root / "epics" / "epic-00022-target-parent",
+                    meta_path=root / "epics" / "epic-00022-target-parent" / ".meta.json",
+                    parent_id="init-00020",
+                    initiative_id="init-00020",
+                    epic_id=None,
+                    github_issue_number=22,
+                    github_repo_owner="example",
+                    github_repo_name="repo",
+                ),
+                domain_models.SpecNodeSeed(
+                    kind="issue",
+                    id="iss-00023",
+                    title="Target child",
+                    slug="target-child",
+                    path=root / "epics" / "epic-00022-target-parent" / "issues" / "iss-00023-target-child",
+                    meta_path=root
+                    / "epics"
+                    / "epic-00022-target-parent"
+                    / "issues"
+                    / "iss-00023-target-child"
+                    / ".meta.json",
+                    parent_id="epic-00022",
+                    initiative_id="init-00020",
+                    epic_id="epic-00022",
+                    github_issue_number=23,
+                    github_repo_owner="example",
+                    github_repo_name="repo",
+                ),
+            ]
+        )
+
     def test_raw_node_dependency_cycle_between_empty_epics_is_rejected(self) -> None:
         domain_deps, _domain_models, _domain_tree = _runtime_modules()
         graph = self._empty_epic_graph()
@@ -254,6 +323,27 @@ class TestDepsDomain:
                 {"epic-00011": ["epic-00012"]},
                 from_node_id="epic-00012",
                 to_node_id="epic-00011",
+            )
+
+    def test_raw_node_dependency_future_cycle_through_target_descendant_is_rejected(self) -> None:
+        domain_deps, _domain_models, _domain_tree = _runtime_modules()
+        graph = self._future_cycle_graph()
+
+        with pytest.raises(RuntimeError, match="Dependency cycle detected"):
+            domain_deps.validate_raw_node_dependency_graph(
+                graph,
+                {
+                    "epic-00021": ["epic-00022"],
+                    "iss-00023": ["epic-00021"],
+                },
+            )
+
+        with pytest.raises(RuntimeError, match="Dependency cycle detected"):
+            domain_deps.ensure_node_dependency_add_would_be_valid(
+                graph,
+                {"iss-00023": ["epic-00021"]},
+                from_node_id="epic-00021",
+                to_node_id="epic-00022",
             )
 
     def test_raw_node_dependency_candidate_rejects_ancestor_container(self) -> None:

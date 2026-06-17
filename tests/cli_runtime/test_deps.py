@@ -2392,6 +2392,46 @@ class TestCliDeps(CliRuntimeHarness):
             assert "iss-00303" in p.stderr
             assert "->" in p.stderr
 
+    def test_validate_fails_on_existing_empty_container_raw_cycle(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._init_origin_repo(target)
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Empty a"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "202", "--title", "Empty b"])
+            init_dir = target / "spec-dock" / "initiatives" / "init-00101-auth-platform"
+            epic_a_dir = init_dir / "epics" / "epic-00201-empty-a"
+            epic_b_dir = init_dir / "epics" / "epic-00202-empty-b"
+            self._set_meta_depends_on(epic_a_dir, ["epic-00202"])
+            self._set_meta_depends_on(epic_b_dir, ["epic-00201"])
+
+            p = self._run_runtime_capture(target, ["validate"])
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert "Dependency cycle detected" in p.stderr
+            assert "epic-00201" in p.stderr
+            assert "epic-00202" in p.stderr
+
+    def test_sync_fails_on_existing_empty_container_raw_cycle_without_force(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._init_origin_repo(target)
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Empty a"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "202", "--title", "Empty b"])
+            init_dir = target / "spec-dock" / "initiatives" / "init-00101-auth-platform"
+            epic_a_dir = init_dir / "epics" / "epic-00201-empty-a"
+            epic_b_dir = init_dir / "epics" / "epic-00202-empty-b"
+            self._set_meta_depends_on(epic_a_dir, ["epic-00202"])
+            self._set_meta_depends_on(epic_b_dir, ["epic-00201"])
+
+            p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert "Dependency cycle detected" in p.stderr
+            assert "epic-00201" in p.stderr
+            assert "epic-00202" in p.stderr
+
     def test_sync_force_sets_deps_valid_false_and_emits_placeholders(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
