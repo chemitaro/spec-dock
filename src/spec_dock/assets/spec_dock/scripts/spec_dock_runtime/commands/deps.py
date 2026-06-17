@@ -71,13 +71,19 @@ def _add_deps_add_arguments(parser: argparse.ArgumentParser) -> None:
         "--from",
         dest="from_id",
         required=True,
-        help="Issue node id for dependency source (e.g. iss-00123 or iss-local-00001)",
+        help=(
+            "Existing initiative, epic, or issue node id for dependency source "
+            "(e.g. init-00123 / epic-00123 / iss-00123)"
+        ),
     )
     parser.add_argument(
         "--to",
         dest="to_id",
         required=True,
-        help="Issue node id for dependency target (e.g. iss-00124 or iss-local-00002)",
+        help=(
+            "Existing initiative, epic, or issue node id for dependency target "
+            "(e.g. init-00124 / epic-00124 / iss-00124)"
+        ),
     )
 
 
