@@ -104,6 +104,7 @@ class TestValidateApplication:
             "20260329t123456z-draft-design.md",
             "001-scratch-legacy-capture.md",
             "20260329x-draft-requirement-kickoff.md",
+            "pr-repair-batch.md",
         ):
             assert discussion_docs.is_malformed_discussion_doc_candidate(Path(name)), name
 

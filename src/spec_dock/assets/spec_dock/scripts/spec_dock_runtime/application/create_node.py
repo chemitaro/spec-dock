@@ -1059,6 +1059,11 @@ def _format_discussion_date(now_iso: str | None = None) -> str:
     return _resolve_discussion_instant_utc(now_iso).date().isoformat()
 
 
+def _format_discussion_date_from_doc_id(doc_id: str) -> str:
+    timestamp = doc_id.split("-", 1)[0]
+    return datetime.strptime(timestamp, "%Y%m%dt%H%M%Sz").date().isoformat()
+
+
 def _scan_discussion_timestamp_sources(
     discussions_dir: Path,
 ) -> list[tuple[str, int | None, str, Path]]:
@@ -1255,6 +1260,7 @@ def plan_discussion_doc(
     if dest_path.exists():
         raise RuntimeError(f"Discussion doc already exists: {dest_path}")
 
+    rendered_date = _format_discussion_date_from_doc_id(doc_id)
     if doc_type in _DRAFT_DISCUSSION_DOC_TYPES:
         replacements = _replacements(
             kind=scope.kind,
@@ -1263,7 +1269,7 @@ def plan_discussion_doc(
             parent_id=scope.parent_id,
             initiative_id=scope.initiative_id,
             github_issue_number=scope.github_issue_number,
-            today=today if today is not None else date.today().isoformat(),
+            today=rendered_date,
         )
         replacements["<SCOPE_ID>"] = scope.id
     else:
@@ -1284,7 +1290,7 @@ def plan_discussion_doc(
             "<NOTE_TITLE>": title,
             "<SCOPE_ID>": scope.id,
             "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
-            "YYYY-MM-DD": today if today is not None else date.today().isoformat(),
+            "YYYY-MM-DD": rendered_date,
         }
     return template_path, dest_path, replacements
 

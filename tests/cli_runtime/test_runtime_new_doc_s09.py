@@ -564,6 +564,74 @@ class TestRuntimeNewDocS09:
             assert sleep_calls == [0.05]
             assert clock.calls == ["2026-03-12T01:02:03+00:00", "2026-03-12T01:02:04+00:00"]
 
+    def test_retry_day_rollover_renders_date_from_allocated_timestamp(self, monkeypatch) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            clock = _SequenceClock("2026-03-12T23:59:59+00:00", "2026-03-13T00:00:00+00:00")
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], clock=clock)
+
+            discussions_dir = Path(issue_record.path) / "discussions"
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260312t235959z-adr-first.md").write_text("first\n", encoding="utf-8")
+
+            monkeypatch.setattr(app_create_node, "_sleep_discussion_timestamp_poll", lambda _seconds: None)
+
+            result = app_create_node.create_discussion_doc(
+                app_contracts.CreateDiscussionDocRequest(
+                    doc_type="pr-repair-batch",
+                    scope_node_id="iss-local-00001",
+                    title="PR Repair Batch",
+                    slug=None,
+                ),
+                ports,
+            )
+
+            assert result.doc_id == "20260313t000000z-pr-repair-batch"
+            assert result.path.name == "20260313t000000z-pr-repair-batch-pr-repair-batch.md"
+            content = result.path.read_text(encoding="utf-8")
+            assert "date=2026-03-13" in content
+            assert "id=20260313t000000z-pr-repair-batch" in content
+
+    def test_draft_retry_day_rollover_renders_date_from_allocated_timestamp(self, monkeypatch) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            (specdock_dir / "templates" / "issue" / "plan.md").write_text(
+                'ID: "<ISS_ID>"\n最終更新: "YYYY-MM-DD"\n',
+                encoding="utf-8",
+            )
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            clock = _SequenceClock("2026-03-12T23:59:59+00:00", "2026-03-13T00:00:00+00:00")
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], clock=clock)
+
+            discussions_dir = Path(issue_record.path) / "discussions"
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260312t235959z-adr-first.md").write_text("first\n", encoding="utf-8")
+
+            monkeypatch.setattr(app_create_node, "_sleep_discussion_timestamp_poll", lambda _seconds: None)
+
+            result = app_create_node.create_discussion_doc(
+                app_contracts.CreateDiscussionDocRequest(
+                    doc_type="draft-plan",
+                    scope_node_id="iss-local-00001",
+                    title="Draft Plan",
+                    slug=None,
+                ),
+                ports,
+            )
+
+            assert result.doc_id == "20260313t000000z-draft-plan"
+            assert result.path.name == "20260313t000000z-draft-plan-draft-plan.md"
+            content = result.path.read_text(encoding="utf-8")
+            assert 'ID: "iss-local-00001"' in content
+            assert '最終更新: "2026-03-13"' in content
+
     def test_frozen_clock_uses_suffix_after_bounded_wait(self, monkeypatch) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:

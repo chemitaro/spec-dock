@@ -133,6 +133,9 @@ def is_malformed_discussion_doc_candidate(path: Path) -> bool:
         return False
     first = parts[0]
     doc_type_slot = _find_discussion_doc_type_slot(parts)
+    lowered = stem.lower()
+    if _is_discussion_doc_type_candidate(lowered):
+        return True
     if _is_discussion_doc_type_candidate(first):
         return True
     if doc_type_slot is not None and not first.isdigit():
@@ -142,7 +145,6 @@ def is_malformed_discussion_doc_candidate(path: Path) -> bool:
     if _DISCUSSION_DOC_LEGACY_SEQUENCE_INTENT_PREFIX_RE.fullmatch(stem) is not None:
         return True
     for doc_type in TIMESTAMP_DISCUSSION_DOC_TYPES:
-        lowered = stem.lower()
         if lowered.startswith(f"{doc_type}-") or lowered.startswith(f"{doc_type}_"):
             return True
     if _DISCUSSION_DOC_TIMESTAMP_INTENT_TOKEN_RE.fullmatch(first) is not None:

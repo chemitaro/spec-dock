@@ -442,6 +442,7 @@ class TestCliValidate(CliRuntimeHarness):
             "draft-requirement-kickoff.md",
             "draft-design-kickoff.md",
             "draft-plan-kickoff.md",
+            "pr-repair-batch.md",
             "pr-repair-batch-kickoff.md",
             "20260329t123456z-pr-repair-batch.md",
             "20260329t123456z-PR-repair-batch-kickoff.md",
