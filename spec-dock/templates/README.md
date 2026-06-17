@@ -6,13 +6,13 @@
 - `initiative/` → `initiatives/init-xxxx-<slug>/`
 - `epic/` → `.../epics/epic-xxxx-<slug>/`
 - `issue/` → `.../issues/iss-xxxx-<slug>/`
-- `discussions/{scratch,interview,research,disc,adr}.md` → `<scope>/discussions/<ts>-<kind>-<slug>.md`
+- `discussions/{scratch,interview,research,disc,adr,pr-repair-batch}.md` → `<scope>/discussions/<ts>-<kind>-<slug>.md`
 - `draft-requirement` / `draft-design` / `draft-plan` は draft 専用 template file を持たず、scope kind に応じた canonical `templates/{initiative,epic,issue}/{requirement,design,plan}.md` を直接 source として render します。
 - same-second collision 時は `<scope>/discussions/<ts>-<nn>-<kind>-<slug>.md`
 
 注意:
 - discussion docs の公開 CLI は `new doc <type>` のみです。
-- current catalog は `scratch` / `interview` / `research` / `disc` / `adr` / `draft-requirement` / `draft-design` / `draft-plan` です。
+- current catalog は `scratch` / `interview` / `research` / `disc` / `adr` / `pr-repair-batch` / `draft-requirement` / `draft-design` / `draft-plan` です。
 - `interview` は docs-aware clarification workflow の正式質問シートです。重要判断は一問一答で扱い、回答前に unanswered artifact を作成し、回答後に同じ artifact へ回答、採用判断、反映先を追記します。既存の複数質問 interview artifact は grandfathered で、自動分割や rename はしません。
 - `research` は source-grounded read、事実、推測、未検証事項、判断への含意を分離します。`disc` は複数質問や research の synthesis、reflection proposal、ADR candidate triage を扱います。採否の最終証跡は canonical docs / ADR / `report.md` へ昇格して記録します。
 - `report.md` は initiative / epic / issue の canonical observed evidence ledger であり、`new doc report` として作成する discussion catalog には含めません。
