@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00155",
+  "title": "Skill Docs Runtime Contract Realignment",
+  "slug": "skill-docs-runtime-contract-realignment",
+  "created_at": "2026-06-18T00:11:44+09:00",
+  "updated_at": "2026-06-18T00:11:44+09:00",
+  "parent_id": "epic-00158",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00158",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 155,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}

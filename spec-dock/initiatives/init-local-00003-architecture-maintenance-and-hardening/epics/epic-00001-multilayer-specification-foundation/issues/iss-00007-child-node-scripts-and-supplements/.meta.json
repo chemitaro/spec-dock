@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00007",
+  "title": "Generate Child Node Scripts And Supplements",
+  "slug": "child-node-scripts-and-supplements",
+  "created_at": "2026-06-18T00:11:32+09:00",
+  "updated_at": "2026-06-18T00:11:32+09:00",
+  "parent_id": "epic-00001",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00001",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 7,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}
