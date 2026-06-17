@@ -607,32 +607,45 @@ spec-dock: ok (validate) nodes=97
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer `019ed3ca-33f3-7992-b99c-2fd81773cc7f` | whole issue obligation coverage | already sufficient | Final validation: `uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py tests/cli_runtime/test_new.py tests/cli_runtime/test_validate.py tests/unit/infra/test_init_update.py` -> 455 passed, 11 skipped; `uv run pytest tests/unit/application/test_validate.py tests/unit/commands/test_runtime_new_s08.py` -> 52 passed; `validate` pass; `sync --no-github` pass with no resulting git diff; `git diff --check` pass | pass, findings=[] |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer `019ed3ca-6dc9-7d23-b9dc-c71ab2f9e21f` | issue-wide integrated diff | no actionable runtime correctness, public-interface, scaffold parity, or process-risk findings | 0 | pass, findings=[] |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer `019ed3ca-9c2c-7a83-aedf-f987baf295a1` | requirement / design / plan / report / implementation / tests / docs alignment | failed before S99 evidence rows were filled: P1 missing tc-012 closure and final gate rows | 0 | fail, fixed by this S99 report evidence update |
+| spec-reviewer `019ed3ce-9739-7403-b6cc-5697d8a184cf` | requirement / design / plan / report / implementation / tests / docs alignment after S99 report evidence update | prior P1 fixed; no new actionable spec/report inconsistency | 1 | pass, findings=[] |
+
+### S99 クロージャ証跡
+  - `tc-012` closed by final validation evidence and fresh final `spec-reviewer` re-review:
+  - Runtime / CLI / validation / scaffold bundle: `uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py tests/cli_runtime/test_new.py tests/cli_runtime/test_validate.py tests/unit/infra/test_init_update.py` -> 455 passed, 11 skipped.
+  - Unit bundle: `uv run pytest tests/unit/application/test_validate.py tests/unit/commands/test_runtime_new_s08.py` -> 52 passed.
+  - `./spec-dock/scripts/spec-dock validate` -> pass, `nodes=97`.
+  - `./spec-dock/scripts/spec-dock sync --no-github` -> pass, active unchanged, wrote generated artifacts; `git status --short` after sync -> clean.
+  - `git diff --check` -> pass.
+  - final QA reviewer `019ed3ca-33f3-7992-b99c-2fd81773cc7f` -> pass, findings=[].
+  - final code-reviewer `019ed3ca-6dc9-7d23-b9dc-c71ab2f9e21f` -> pass, findings=[].
+  - first final spec-reviewer `019ed3ca-9c2c-7a83-aedf-f987baf295a1` -> fail only because S99 evidence rows were placeholders; corrected by this report update.
+  - fresh final spec-reviewer `019ed3ce-9739-7403-b6cc-5697d8a184cf` -> pass, findings=[].
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| complete through final spec-review pass; commit pending | final S99 report evidence only | final response | ready for final report commit |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: Final spec-reviewer failed because S99 evidence rows and `tc-012` closure were still placeholders.
+  - 解決: final validation commands, QA/code reviewer pass evidence, first spec-reviewer finding, and `tc-012` closure evidence were recorded before fresh final spec re-review.
 
 ## 学んだこと (任意)
-- ...
+- Final reviewer should see concrete S99 ledger rows, not only command evidence in conversation.
 
 ## 今後の推奨事項 (任意)
-- ...
+- Keep final gate rows populated before launching final issue-wide spec review in future executions.
 
 ## 省略/例外メモ (必須)
 - 該当なし
