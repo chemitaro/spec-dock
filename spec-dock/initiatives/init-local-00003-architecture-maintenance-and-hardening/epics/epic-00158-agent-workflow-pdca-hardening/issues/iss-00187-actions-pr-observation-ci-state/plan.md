@@ -5,7 +5,7 @@ ID: "iss-00187"
 関連GitHub: ["#187"]
 状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-06-16"
+最終更新: "2026-06-17"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00158", "init-local-00003"]
 ---
@@ -14,7 +14,7 @@ ID: "iss-00187"
 
 ## この計画で満たす要件ID
 - AC:
-  - AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007
+  - AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008
 - EC:
   - EC-001, EC-002, EC-003, EC-004
 - 制約:
@@ -115,6 +115,7 @@ ID: "iss-00187"
 - AC-005 -> S01, S02
 - AC-006 -> S100, S101
 - AC-007 -> S100, S101
+- AC-008 -> S410, S420
 - EC-001 -> S02
 - EC-002 -> S01
 - EC-003 -> S03
@@ -520,7 +521,7 @@ ID: "iss-00187"
 
 ## 最終完了条件
 - AC/EC 達成:
-  - AC-001..AC-007 and EC-001..EC-004 mapped closure IDs pass.
+  - AC-001..AC-008 and EC-001..EC-004 mapped closure IDs pass.
 - docs 影響解決:
   - S90 and S190 complete; provider and mirror are aligned or intentional differences are recorded.
 - 全 implementation step 完了:
@@ -1331,3 +1332,388 @@ S300
   - Whether `pr_observation_common.py` is needed should be decided after S310/S320 expose concrete duplication.
   - Metadata `gh pr view` execution should move into `pr_observation_snapshot.py` if focused tests lock current JSON and exit behavior tightly; otherwise split into a narrower follow-up inside S310.
   - `fetch_pr_review_snapshot.sh` / `trigger_codex_review.sh` heredoc extraction should remain a separate follow-up unless S310/S320 reveals a hard dependency.
+
+## 追加実装計画 S400+ — Review Inventory and Wait Budget Guard
+
+### 追加計画の位置づけ
+- この追加計画は、既存 S01-S399 の実施済み計画を修正・再番号付けしない。
+- `discussions/20260616t225521z-14-disc-missed-p2-reserve-next-observation-poll.md`、`discussions/20260616t225521z-15-disc-pr-observation-missed-review-root-cause.md`、`discussions/20260616t231000z-16-disc-system-architect-review-inventory-and-wait-budget-design-draft.md`、`discussions/20260616t233000z-17-disc-implementation-planner-s400-review-inventory-and-wait-budget-plan-draft.md` を S400+ evidence として扱う。
+- 目的は、PR #190 の P2 review と review 見逃し分析を受けて、actionable review inventory、decision precedence、wait next-poll budget guard、post-unknown fresh audit metadata を実装できる状態にすること。
+- `review_completion_unknown` は引き続き non-pass human gate であり、merge-ready / no-review-work の証明ではない。
+
+### S400+ 依存順序
+```text
+S400
+  -> S410
+      -> S420
+          -> S430
+              -> S490
+                  -> S499
+```
+
+### 追加クロージャ索引 S400+
+
+| 識別子（ID） | ステップ | スライス | 種別 | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 |
+|---|---|---|---|---|---|---|---|
+| `tc-s400-001` | S400 | authoring-adoption | authoring | S400+ delegated evidence is adopted or rejected in report before canonical use | discussions `14`..`17`, canonical plan/report diff | delegated draft treated as authority | yes |
+| `tc-s400-002` | S400 | plan-review | authoring | fresh `spec-reviewer` pass gates S410 implementation | canonical S400+ plan candidate | implementation starts from unreviewed plan | yes |
+| `tc-s410-001` | S410 | current-selected-actionable | acceptance | current-selected unresolved review is actionable | current-boundary unresolved thread | current review blocker hidden | yes |
+| `tc-s410-002` | S410 | carryover-actionable | acceptance | carryover `isResolved=false` and `isOutdated=false` thread is actionable | selected IDs empty; GraphQL thread non-outdated unresolved | non-outdated review work remains audit-only | yes |
+| `tc-s410-003` | S410 | outdated-audit-only | negative | outdated-only unresolved threads remain audit-only | all unresolved threads `isOutdated=true` | stale review over-blocks PR | yes |
+| `tc-s410-004` | S410 | unknown-outdated-audit-only | negative | unavailable/null outdated evidence is not promoted | REST comment exists but GraphQL outdated state unavailable/null | uncertain review artifact becomes false blocker | yes |
+| `tc-s410-005` | S410 | inventory-dedupe | regression | current-selected and carryover inventory dedupe by thread/comment identity | same thread appears in both data sets | duplicate repair inventory | yes |
+| `tc-s420-001` | S420 | carryover-blocks-unknown | integration | carryover unresolved blocks `review_completion_unknown` | CI passed, head matched, selected unresolved zero, carryover count > 0 | stable unknown hides review work | yes |
+| `tc-s420-002` | S420 | precedence-current-selected | integration | current-selected reason wins while carryover IDs remain listed | current-selected and carryover both exist | lower-priority reason obscures current feedback | yes |
+| `tc-s420-003` | S420 | pending-beats-unknown | negative | pending review signal remains pending and not unknown | pending review request/signal exists | in-progress review becomes terminal-like human gate | yes |
+| `tc-s420-004` | S420 | trusted-completion-empty-inventory | regression | trusted completion path remains intact when actionable inventory is empty | submitted PR review, CI passed, head matched | inventory addition breaks existing pass path | yes |
+| `tc-s420-005` | S420 | unknown-empty-inventory | regression | stable no-completion remains possible when actionable inventory is empty | no completion, no pending/blocker, stability satisfied | useful unknown escape hatch removed | yes |
+| `tc-s430-001` | S430 | reserve-next-poll-budget | regression | wait sleep leaves budget for next meaningful snapshot | non-terminal payload requires another stability poll | sleep consumes deadline | yes |
+| `tc-s430-002` | S430 | preserve-latest-under-budget | regression | under-budget final poll is skipped and latest useful payload is kept | remaining time below next-poll budget | useful payload overwritten by timeout | yes |
+| `tc-s430-003` | S430 | terminal-failures-visible | negative | budget guard does not hide failed/stale/actionable terminal states | terminal blocker near deadline | budget guard masks real blocker | yes |
+| `tc-s430-004` | S430 | ci-age-300 | negative | CI-passed age below 300 seconds does not promote unknown | PR #190-like 124 second CI-passed age | late review race remains reproducible | yes |
+| `tc-s430-005` | S430 | post-unknown-fresh-audit | acceptance | `review_completion_unknown` emits fresh-audit-required metadata | all stability and latency gates satisfied | unknown misread as review absence | yes |
+| `tc-s490-001` | S490 | operator-docs | docs | docs describe actionable inventory and unknown/fresh-audit semantics | provider/mirror `SKILL.md` inspection | operator treats unknown as merge-ready | yes |
+| `tc-s490-002` | S490 | mirror-sync | scaffold | provider/mirror changed files match where intended | provider and `.agents` file comparison | dogfooding mirror stale | yes |
+| `tc-s490-003` | S490 | asset-completeness | scaffold | installed asset set remains complete | init/update asset coverage or inspection | consumer wrapper cannot find required files | yes |
+| `tc-s499-001` | S499 | focused-validation | quality | focused S400+ fake-`gh` tests pass | final diff | untested observation behavior | yes |
+| `tc-s499-002` | S499 | reviewer-triad | quality | qa-reviewer, code-reviewer, spec-reviewer all pass | final issue-wide diff | worker output replaces final gates | yes |
+| `tc-s499-003` | S499 | live-pr-observation | live | latest PR #190 observation reports actionable inventory and P2 status | latest PR #190 head after push | stale observation hides review | yes |
+| `tc-s499-004` | S499 | diff-and-specdock-validation | validation | diff hygiene and SpecDock validation pass | final diff | invalid handoff artifact | yes |
+
+### S400+ 共通実行契約
+- Parent orchestrator executes exactly one step at a time.
+- Runtime/test/scaffold changes are delegated to `dev-coder`.
+- Shipped docs / skill text changes are delegated to `doc-writer`.
+- Each behavior step closes with focused evidence, fresh reviewer pass, step commit, and post-commit clean check before the next step starts.
+- Forbidden across S400+:
+  - no public shell flag change without design amendment.
+  - no arbitrary GitHub API proxy.
+  - no raw token / raw auth stderr output.
+  - no `review_completion_unknown` promotion to `passed` / `merge_prepared`.
+  - no selected-count-only review completion inference.
+  - no carryover promotion when `isOutdated` is unavailable/null.
+  - no merge-ready/no-review-work claim from stale PR observation.
+
+### 実装ステップ S400 — Canonical adoption / S400+ authoring gate
+- 振る舞いの目標:
+  - S400+ delegated evidence is ledgered, canonical `plan.md` receives this S400+ lane, and fresh `spec-reviewer` pass is obtained before implementation.
+- 対象ファイル:
+  - `spec-dock/active/issue/plan.md`
+  - `spec-dock/active/issue/report.md`
+- 計画済み契約:
+  - Existing S01-S399 content remains intact.
+  - Discussions `14`..`17` are recorded in Evidence Adoption Ledger with adopted/rejected scope.
+  - No implementation source/test/config/GitHub mutation happens in S400.
+- 委任契約:
+  - delegated role: `spec-reviewer` for canonical plan review; main orchestrator owns canonical edits.
+  - input docs: active requirement/design/plan/report, discussions `14`..`17`.
+  - allowed paths: `spec-dock/active/issue/plan.md` and `spec-dock/active/issue/report.md` only, edited by the main orchestrator.
+  - forbidden changes: implementation files, tests, configs, `.agents`, GitHub state, phase promotion without reviewer pass.
+  - acceptance criteria: Evidence Adoption Ledger records S400+ adoption; fresh `spec-reviewer` returns `review_status: pass`.
+  - required verification: `git diff --check` and reviewer evidence.
+  - reviewer focus: append-only S400+ placement, executable step schema, no S01-S399 rewrite, design/plan traceability.
+  - stop conditions: requirement amendment becomes necessary; design evidence becomes stale/contradictory; reviewer fails.
+  - output required: spec-review findings, final `review_status`, adoption decision, unresolved blockers, and implementation handoff readiness or block reason recorded in `report.md`.
+- 具体テストケース一覧:
+  - `tc-s400-001` authoring: S400+ evidence adoption is ledgered
+    - 前提: discussions `14`..`17` and S400+ design exist.
+    - 操作: orchestrator records adopted/rejected evidence in `report.md`.
+    - 期待結果: source paths, target artifacts, adoption decision, and next action are visible.
+    - 失敗検出: delegated draft is used as authority without adoption ledger.
+    - 検証方法: `report.md` inspection and `git diff --check`.
+  - `tc-s400-002` authoring: fresh plan review gates implementation
+    - 前提: canonical S400+ plan has been edited.
+    - 操作: run fresh `spec-reviewer` on canonical plan.
+    - 期待結果: `review_status: pass` before S410 starts.
+    - 失敗検出: implementation begins from unreviewed delegated draft.
+    - 検証方法: reviewer evidence in `report.md`.
+- report evidence destination:
+  - Evidence Adoption Ledger, Spec Authoring Gate, Reviewer Gate Status, Step Commit Gate.
+
+### 実装ステップ S410 — Actionable review inventory classification
+- 振る舞いの目標:
+  - Review collection exposes actionable unresolved inventory as current-selected unresolved plus carryover non-outdated unresolved, while outdated-only or unknown-outdated artifacts remain audit-only.
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh` or its extraction successor if current implementation has moved ownership.
+  - `tests/unit/infra/test_init_update.py`
+- 計画済み契約:
+  - Carryover actionable requires GraphQL thread `isResolved=false` and `isOutdated=false`.
+  - REST-only or null/unknown outdated state is audit/limitation, not actionable.
+  - current-selected is authoritative and dedupes carryover.
+  - Existing selected fields remain additive-compatible.
+- 委任契約:
+  - delegated role: `dev-coder`.
+  - input docs: AC-006/AC-007/AC-008, design S400+ review inventory model, this plan.
+  - allowed paths: provider review collector/extraction module and focused fake-`gh` tests.
+  - forbidden changes: wait budget, snapshot/wait precedence beyond plumbing, docs/mirror sync, generic issue comment promotion.
+  - acceptance criteria: `decision.actionable_unresolved_count`, current/carryover counts, actionable/carryover IDs, and compatible selected fields are emitted.
+  - required tests: `tc-s410-001`..`tc-s410-005`.
+  - reviewer focus: false-positive carryover blocking, outdated handling, dedupe, compatibility, secret-safe limitations.
+  - stop conditions: GitHub payload cannot distinguish non-outdated carryover; implementation would promote REST-only comments; design amendment needed.
+  - output required: changed files, worker summary, Red/Green verification results, unresolved risks, closure IDs covered, reviewer handoff notes, and `No material implementation decisions beyond the approved plan.` or a Ledger Note.
+- 具体テストケース一覧:
+  - `tc-s410-001` acceptance: current-selected unresolved is actionable
+    - 前提: fake `gh` returns a current-boundary unresolved thread.
+    - 操作: run provider review collector.
+    - 期待結果: actionable count and current-selected count are greater than zero, with IDs listed.
+    - 失敗検出: current review blockers remain selected-only or audit-only.
+    - 検証方法: pytest fake-`gh` collector test.
+  - `tc-s410-002` acceptance: carryover non-outdated unresolved is actionable
+    - 前提: selected IDs are empty, GraphQL thread has `isResolved=false` and `isOutdated=false`.
+    - 操作: run provider review collector.
+    - 期待結果: carryover and actionable counts are greater than zero, with carryover IDs listed.
+    - 失敗検出: non-outdated review work remains hidden in audit data.
+    - 検証方法: pytest fake-`gh` collector test.
+  - `tc-s410-003` negative: outdated-only unresolved remains audit-only
+    - 前提: all fetched unresolved threads have `isOutdated=true`.
+    - 操作: run provider review collector.
+    - 期待結果: audit data remains visible; actionable and carryover counts are zero.
+    - 失敗検出: stale/outdated review thread over-blocks current PR.
+    - 検証方法: pytest fake-`gh` collector test.
+  - `tc-s410-004` negative: unknown outdated state is not promoted
+    - 前提: REST comment exists but GraphQL `isOutdated` is unavailable/null.
+    - 操作: run provider review collector.
+    - 期待結果: artifact is audit/limitation only, not carryover actionable.
+    - 失敗検出: uncertain review artifact becomes false blocker.
+    - 検証方法: pytest fake-`gh` collector test.
+  - `tc-s410-005` regression: selected and carryover sets dedupe
+    - 前提: same thread appears in current-selected and all-fetched non-outdated data.
+    - 操作: run provider review collector.
+    - 期待結果: current-selected is authoritative and actionable IDs are unique.
+    - 失敗検出: duplicate repair inventory.
+    - 検証方法: pytest fake-`gh` collector test.
+- Green 検証:
+  - `uv run pytest tests/unit/infra/test_init_update.py -k "review_inventory or actionable_unresolved or carryover_unresolved or issue_187"`
+- reviewer:
+  - code-reviewer pass.
+- report evidence destination:
+  - TDD Evidence, Test Contract Closure, Closure Coverage, Reviewer Gate Status, Step Commit Gate, Delegated Worker Evidence.
+
+### 実装ステップ S420 — Snapshot / wait decision precedence and summary alignment
+- 振る舞いの目標:
+  - Snapshot/wait decisions evaluate actionable review inventory before blocking limitations, pending review, trusted completion, and stable no-completion unknown; `summary.review` and `recommended_next_action` align with actionable inventory.
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py` if final wait classification owns precedence after S320.
+  - `tests/unit/infra/test_init_update.py`
+- 計画済み契約:
+  - Actionable unresolved inventory forces `summary.review="unresolved"` and `recommended_next_action="address_review_feedback"`.
+  - `review_completion_unknown` is impossible while actionable inventory is non-empty.
+  - trusted completion and stable unknown paths remain available when inventory is empty and other gates allow them.
+- 委任契約:
+  - delegated role: `dev-coder`.
+  - input docs: design S400+ decision precedence, S410 output contract.
+  - allowed paths: provider snapshot/wait decision modules and focused tests.
+  - forbidden changes: collector inventory classification beyond integration plumbing, wait sleep/budget logic, docs/mirror sync, merge-preparer implementation.
+  - acceptance criteria: actionable inventory precedes unknown/completion decisions; `summary.review` and `recommended_next_action` align with actionable inventory; existing trusted completion and stable unknown paths still work when inventory is empty.
+  - required tests: `tc-s420-001`..`tc-s420-005`.
+  - reviewer focus: precedence ordering, compatibility of selected fields, non-pass safety, snapshot/wait consistency.
+  - stop conditions: S410 output is insufficient; summary alignment would break public contract without design amendment.
+  - output required: changed files, worker summary, Red/Green verification results, unresolved risks, closure IDs covered, reviewer handoff notes, and `No material implementation decisions beyond the approved plan.` or a Ledger Note.
+- 具体テストケース一覧:
+  - `tc-s420-001` integration: carryover unresolved blocks unknown
+    - 前提: CI passed, head matched, selected unresolved zero, carryover count > 0.
+    - 操作: run snapshot/wait fake-`gh` path.
+    - 期待結果: no `review_completion_unknown`; `summary.review="unresolved"`; action `address_review_feedback`; reason `carryover_non_outdated_unresolved_thread`.
+    - 失敗検出: stable unknown hides carryover review work.
+    - 検証方法: pytest fake-`gh` snapshot/wait test.
+  - `tc-s420-002` integration: current-selected reason wins over carryover
+    - 前提: current-selected and carryover unresolved both exist.
+    - 操作: run provider snapshot.
+    - 期待結果: current-selected reason wins; carryover IDs remain listed.
+    - 失敗検出: lower-priority carryover obscures current feedback.
+    - 検証方法: pytest fake-`gh` snapshot test.
+  - `tc-s420-003` negative: pending review beats unknown
+    - 前提: no actionable inventory, no trusted completion, pending review signal exists.
+    - 操作: run wait path.
+    - 期待結果: pending/wait state remains; no `review_completion_unknown`.
+    - 失敗検出: in-progress review becomes terminal-like human gate.
+    - 検証方法: pytest fake-`gh` wait test.
+  - `tc-s420-004` regression: trusted completion still passes when inventory is empty
+    - 前提: CI passed, head matched, trusted submitted PR review exists, actionable inventory zero.
+    - 操作: run provider snapshot.
+    - 期待結果: existing trusted completion pass-compatible path remains intact.
+    - 失敗検出: inventory additions break existing completion behavior.
+    - 検証方法: existing trusted completion test plus focused assertion.
+  - `tc-s420-005` regression: stable no-completion remains possible with empty inventory
+    - 前提: no completion/pending/blocker and actionable inventory zero after stability gates.
+    - 操作: run wait path.
+    - 期待結果: `review_completion_unknown` remains possible and non-pass.
+    - 失敗検出: S400+ removes useful no-completion escape hatch.
+    - 検証方法: pytest fake-`gh` wait test.
+- Green 検証:
+  - `uv run pytest tests/unit/infra/test_init_update.py -k "review_inventory or review_completion_unknown or pr_observation_snapshot or pr_observation_wait or issue_187"`
+- reviewer:
+  - code-reviewer pass.
+- report evidence destination:
+  - TDD Evidence, Test Contract Closure, Closure Coverage, Reviewer Gate Status, Step Commit Gate, Delegated Worker Evidence.
+
+### 実装ステップ S430 — Wait next-poll budget guard and post-unknown metadata
+- 振る舞いの目標:
+  - Wait loop reserves enough budget for a meaningful next snapshot, preserves latest useful payload when final poll would be under-budget, raises CI-passed unknown latency default to `300` seconds, and marks post-unknown fresh audit as required.
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+  - `tests/unit/infra/test_init_update.py`
+- 計画済み契約:
+  - No public shell CLI changes.
+  - `review_completion_unknown_min_ci_passed_age_seconds=300`.
+  - `wait.post_unknown_fresh_audit_required=true` when unknown is emitted.
+  - `wait.final_poll_skipped_reason="insufficient_next_snapshot_budget"` when applicable.
+  - Terminal failed/stale/actionable states are not softened by budget guard.
+- 委任契約:
+  - delegated role: `dev-coder`.
+  - input docs: discussions `14`/`15`, design S400+ wait budget guard, S420 decision output.
+  - allowed paths: provider wait module and focused tests.
+  - forbidden changes: review inventory classifier, snapshot precedence, public flags, global timeout increase as primary fix, docs/mirror sync.
+  - acceptance criteria: next-poll budget is reserved; under-budget final poll preserves latest useful payload; CI-passed unknown latency default is `300`; post-unknown fresh audit metadata is emitted; terminal blockers remain visible.
+  - required tests: `tc-s430-001`..`tc-s430-005`.
+  - reviewer focus: deadline math, timeout preservation, terminal failure precedence, stdout/stderr/out artifact compatibility, no pass weakening.
+  - stop conditions: latest payload preservation would hide real blocker; implementation requires new public flags; test can pass only by raising total timeout.
+  - output required: changed files, worker summary, timing constant evidence, Red/Green verification results, unresolved risks, closure IDs covered, reviewer handoff notes, and `No material implementation decisions beyond the approved plan.` or a Ledger Note.
+- 具体テストケース一覧:
+  - `tc-s430-001` regression: sleep reserves next-poll budget
+    - 前提: meaningful non-terminal payload needs one more stability poll before deadline.
+    - 操作: run wait test with fake snapshot timing.
+    - 期待結果: sleep leaves `wait.next_poll_min_budget_seconds` available.
+    - 失敗検出: loop sleeps until deadline and leaves fractional snapshot time.
+    - 検証方法: pytest fake wait-loop timing test.
+  - `tc-s430-002` regression: under-budget final poll preserves latest useful payload
+    - 前提: latest payload has useful CI/head/review evidence and remaining time is below next-poll minimum.
+    - 操作: run wait path to deadline.
+    - 期待結果: no under-budget snapshot starts; result keeps latest payload and records insufficient budget.
+    - 失敗検出: final result becomes all-unknown timeout.
+    - 検証方法: pytest fake snapshot call-log and final JSON assertions.
+  - `tc-s430-003` negative: budget guard does not hide terminal failures
+    - 前提: failed CI, stale head, or actionable unresolved review appears near deadline.
+    - 操作: run wait path.
+    - 期待結果: terminal/actionable state remains visible.
+    - 失敗検出: budget guard masks a real blocker.
+    - 検証方法: pytest parametrized wait test.
+  - `tc-s430-004` negative: CI-passed age below 300 seconds does not promote unknown
+    - 前提: CI passed 124 seconds ago, trigger age sufficient, no actionable inventory, no completion.
+    - 操作: run wait path beyond quiet/same-fingerprint stability.
+    - 期待結果: `review_completion_unknown` is not emitted before 300 seconds.
+    - 失敗検出: PR #190 late-review window remains reproducible.
+    - 検証方法: pytest fake wait test.
+  - `tc-s430-005` acceptance: post-unknown fresh audit metadata is emitted
+    - 前提: CI/head passed, actionable inventory empty, no pending/blocking state, all gates satisfied.
+    - 操作: run wait path to `review_completion_unknown`.
+    - 期待結果: final JSON has `wait.post_unknown_fresh_audit_required=true` and latest inventory fields.
+    - 失敗検出: downstream can misread unknown as review absence proof.
+    - 検証方法: pytest fake wait test.
+- Green 検証:
+  - `uv run pytest tests/unit/infra/test_init_update.py -k "next_poll_budget or insufficient_next_snapshot_budget or post_unknown_fresh_audit or review_completion_unknown or pr_observation_wait"`
+- reviewer:
+  - code-reviewer pass.
+- report evidence destination:
+  - TDD Evidence, Test Contract Closure, Closure Coverage, Reviewer Gate Status, Step Commit Gate, Delegated Worker Evidence.
+
+### ドキュメント / ミラー追加ステップ S490
+- 振る舞いの目標:
+  - Provider docs and dogfooding mirror reflect S410-S430 behavior, and changed provider assets match mirror files where intended.
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md` if operator-facing semantics changed.
+  - `.agents/skills/github-pr-observation/SKILL.md` if provider docs changed.
+  - `.agents/skills/github-pr-observation/scripts/**` corresponding to changed provider files.
+  - focused asset tests if new/moved files are involved.
+- 計画済み契約:
+  - Docs state `review_completion_unknown` is non-pass and not review absence proof.
+  - Docs identify actionable review inventory as merge-prepared / repair-batch input.
+  - Docs mention post-unknown fresh audit if operator-facing.
+  - Provider/mirror changed files are byte-identical where intended.
+- 委任契約:
+  - delegated roles: `doc-writer` for skill text; `dev-coder` or `utility-worker` for mechanical mirror sync.
+  - input docs: requirement/design/plan S400+ sections, S410-S430 report evidence, changed provider files.
+  - allowed paths: provider/mirror `SKILL.md`, mirror files corresponding to changed provider scripts/modules, and focused asset tests only if needed.
+  - forbidden changes: provider behavior changes, unrelated tests, PR #190 merge-ready claim.
+  - acceptance criteria: docs explain actionable inventory and unknown/fresh-audit semantics if operator-visible; provider/mirror changed files match where intended; installed asset surface remains complete.
+  - required verification: `tc-s490-001`..`tc-s490-003`, provider/mirror `cmp -s`, `git diff --check`.
+  - reviewer focus: docs/spec alignment, mirror equality, no behavior drift during sync.
+  - stop conditions: docs contradict requirement/design; provider and mirror cannot align; behavior change becomes necessary.
+  - output required: changed files, docs inspection summary, mirror comparison results, asset coverage result if applicable, unresolved risks, reviewer handoff notes, and `No material implementation decisions beyond the approved plan.` or a Ledger Note.
+- 具体テストケース一覧:
+  - `tc-s490-001` docs: operator-facing semantics are documented
+    - 前提: S410-S430 behavior is implemented.
+    - 操作: inspect provider and mirror `SKILL.md`.
+    - 期待結果: docs state actionable inventory and post-unknown fresh audit semantics without claiming unknown means no review work.
+    - 失敗検出: operators treat `review_completion_unknown` as merge-ready/no-review evidence.
+    - 検証方法: docs inspection recorded in `report.md`.
+  - `tc-s490-002` scaffold: provider and mirror changed files match
+    - 前提: provider files changed and corresponding mirror paths exist.
+    - 操作: compare provider and mirror files.
+    - 期待結果: changed mirror files are identical where intended.
+    - 失敗検出: dogfooding observation runs stale logic.
+    - 検証方法: `cmp -s` or checksum comparison.
+  - `tc-s490-003` scaffold: installed asset set remains complete
+    - 前提: S410-S430 touch shipped assets.
+    - 操作: run existing init/update asset coverage or focused inspection.
+    - 期待結果: required files are present in installed asset surface.
+    - 失敗検出: consumer repo cannot run updated observation scripts.
+    - 検証方法: focused pytest or asset tree inspection.
+- reviewer:
+  - spec-reviewer for docs wording; code-reviewer for mirror/scaffold sync.
+- report evidence destination:
+  - Docs Impact Resolution, Test Contract Closure, Closure Coverage, Reviewer Gate Status, Step Commit Gate.
+
+### 追加最終品質ゲート S499
+- branch diff 範囲:
+  - S400 authoring adoption, S410 review inventory, S420 decision precedence, S430 wait budget/metadata, S490 docs/mirror, final `report.md` evidence.
+- 必須 validation:
+  - `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187 or pr_observation or review_inventory or actionable_unresolved or next_poll_budget or review_completion_unknown"`
+  - `uv run pytest tests/unit/infra/test_init_update.py -q`
+  - `git diff --check`
+  - `./spec-dock/scripts/spec-dock validate`
+  - provider/mirror `cmp -s` for touched files
+- PR observation gate:
+  - Re-run PR observation on latest PR #190 head after push.
+  - Report latest head SHA, CI/head status, `decision.actionable_unresolved_count`, current-selected IDs, carryover IDs, and comment `3422572159` status if still unresolved and non-outdated.
+  - Do not report merge-prepared while actionable unresolved review inventory is non-empty or observation is stale.
+- 委任契約:
+  - delegated roles: `qa-reviewer`, issue-wide `code-reviewer`, final `spec-reviewer`.
+  - input docs: final requirement/design/plan/report, S410-S490 diffs/evidence, latest PR #190 observation output.
+  - allowed paths: final report evidence only, unless a reviewer finding creates a bounded follow-up assigned back to S410/S420/S430/S490.
+  - parent-owned work: final report evidence integration, PR observation orchestration, commit gate, PR delivery handoff.
+  - acceptance criteria: focused and broad validation pass or blockers are recorded; provider/mirror comparisons pass; live PR #190 observation is fresh; final reviewer triad passes.
+  - required verification: `tc-s499-001`..`tc-s499-004`, final pytest selectors, `git diff --check`, `spec-dock validate`, provider/mirror comparisons, fresh PR observation.
+  - forbidden changes: behavior changes in S499 unless bounded follow-up returns to S410/S420/S430/S490; final commit before reviewers pass; stale PR observation reuse.
+  - reviewer focus:
+    - qa-reviewer: fake-`gh` coverage, late-review and budget race coverage.
+    - code-reviewer: integrated provider/mirror/runtime/test diff and false-pass safety.
+    - spec-reviewer: requirement/design/plan/report alignment.
+  - stop conditions: any reviewer fails; PR observation is stale/head-mismatched; actionable unresolved review remains and workflow attempts merge-prepared reporting.
+  - output required: final validation summary, reviewer verdicts, latest PR #190 head SHA, actionable inventory fields, unresolved blockers or `none`, final next action, and commit/PR handoff evidence.
+- 具体テストケース一覧:
+  - `tc-s499-001` quality: focused S400+ fake-`gh` regression suite passes
+    - 前提: S410-S490 are complete.
+    - 操作: run focused pytest selector.
+    - 期待結果: focused tests pass or unrelated failures are explained.
+    - 失敗検出: S400+ closure relies on untested script behavior.
+    - 検証方法: pytest command output in report.
+  - `tc-s499-002` quality: final reviewer triad passes
+    - 前提: final issue-wide diff and report evidence are ready.
+    - 操作: run `qa-reviewer`, issue-wide `code-reviewer`, and `spec-reviewer`.
+    - 期待結果: all return `review_status: pass`.
+    - 失敗検出: final gate is replaced by worker output.
+    - 検証方法: reviewer evidence in `report.md`.
+  - `tc-s499-003` live gate: PR #190 final re-observation uses latest head
+    - 前提: S400+ changes are pushed or available for dogfooding observation.
+    - 操作: run PR observation against latest PR #190 head.
+    - 期待結果: report records latest head, CI/head status, actionable inventory, current-selected IDs, carryover IDs, and P2 `3422572159` status if applicable.
+    - 失敗検出: stale pre-fix observation is reused or P2 remains hidden.
+    - 検証方法: live observation JSON summary in `report.md`.
+  - `tc-s499-004` validation: SpecDock and diff hygiene pass
+    - 前提: final diff is ready.
+    - 操作: run `git diff --check` and `./spec-dock/scripts/spec-dock validate`.
+    - 期待結果: both pass or blockers are reported.
+    - 失敗検出: final handoff includes whitespace/schema/spec-dock validation defects.
+    - 検証方法: command evidence in `report.md`.
+- report evidence destination:
+  - Final QA Gate, Final Code Review Gate, Final Spec Review Gate, PR Observation Gate, Closure Coverage, Step Commit Gate, Final Commit.
+
+### S400+ 未確定事項
+- Blocking:
+  - なし。
+- Non-blocking:
+  - S400+ carryover actionable inventory is now reflected as AC-008; future refinements should keep AC-006 review-unknown and AC-008 actionable-inventory semantics separate.
+  - Whether `review_completion_unknown_min_ci_passed_age_seconds=300` should remain hard-coded internal constant or named module constant only.
+  - Whether merge-preparer workflow changes should become a separate follow-up after observation payload exposes actionable inventory.
