@@ -26257,19 +26257,28 @@ esac
             assert payload["review"]["status"] == "none"
             assert all("body" not in item for item in payload["review"]["signals"])
 
-    def test_issue_197_pr_review_snapshot_wrapper_baseline_heredoc_markers_are_present(self) -> None:
+    def test_issue_197_pr_review_snapshot_provider_wrapper_invokes_python_entrypoint(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
-        script_paths = [
+        provider_script = (
             repo_root
-            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh",
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+        provider_python = provider_script.with_name("pr_review_snapshot.py")
+        mirror_script = (
             repo_root
-            / ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh",
-        ]
+            / ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
 
-        for script_path in script_paths:
-            with _case(path=script_path.relative_to(repo_root).as_posix()):
-                text = script_path.read_text(encoding="utf-8")
-                assert "python3 - <<'PY'" in text
+        provider_text = provider_script.read_text(encoding="utf-8")
+        assert provider_python.is_file()
+        assert "python3 - <<'PY'" not in provider_text
+        assert "<<PY" not in provider_text
+        assert "<<'PY'" not in provider_text
+        assert "def parse_gh_paginated_stdout" not in provider_text
+        assert 'python3 "$script_dir/pr_review_snapshot.py"' in provider_text
+
+        mirror_text = mirror_script.read_text(encoding="utf-8")
+        assert "python3 - <<'PY'" in mirror_text
 
     def test_issue_197_pr_review_snapshot_wrapper_usage_exits_before_gh(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
