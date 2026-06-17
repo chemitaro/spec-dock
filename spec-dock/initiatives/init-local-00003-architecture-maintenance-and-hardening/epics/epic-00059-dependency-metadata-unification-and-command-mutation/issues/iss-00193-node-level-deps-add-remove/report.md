@@ -754,6 +754,8 @@ pass
   - 解決: U002 repairで design / plan discussion drafts を `draft-design` / `draft-plan` naming に rename し、canonical docs / repair docs の参照を更新した。`spec-dock validate` は pass。
 - 問題: PR #194 follow-up Codex review found raw validation still missed target-container future cycles, `deps check` did not run raw preflight, and delete could leave dangling raw dependency refs to deleted empty containers.
   - 解決: U003/U004/U005 repairで target-container future cycle validation、`deps check` raw preflight、delete raw-ref conflict/scrub を追加した。Delete repair は resolver authoritative path に寄せ、numeric / scoped / URL semantics を維持した。`uv run pytest tests/unit/domain/test_deps.py tests/unit/application/test_check_deps.py tests/cli_runtime/test_runtime_delete_s13.py` は `69 passed`、fresh code-reviewer は pass。
+- 問題: PR #194 Provider CI run 27670570728 failed because two `tests/cli_runtime/test_deps.py` assertions still expected compiled issue-map stderr after U004 made raw structural preflight fail first.
+  - 解決: `test_deps_self_dependency_fails` and `test_deps_descendant_dependency_fails` now assert the raw structural preflight messages. `uv run pytest tests/cli_runtime/test_deps.py tests/unit/domain/test_deps.py tests/unit/application/test_check_deps.py tests/cli_runtime/test_runtime_delete_s13.py` passed with `165 passed, 10 skipped`; `git diff --check` passed.
 
 ## 学んだこと (任意)
 - Node-level mutationの acceptance coverage は kind guard removal だけでは足りず、valid mixed-kind success pathを明示的に固定する必要がある。

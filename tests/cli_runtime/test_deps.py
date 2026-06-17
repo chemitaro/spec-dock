@@ -2283,7 +2283,7 @@ class TestCliDeps(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             assert p.returncode == 1, p.stdout + p.stderr
             assert "iss-00301" in p.stderr
-            assert "self edge produced" in p.stderr
+            assert "Raw node dependency self edge detected: iss-00301" in p.stderr
 
     def test_deps_descendant_dependency_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2297,12 +2297,11 @@ class TestCliDeps(CliRuntimeHarness):
                 issue_title="Issue one",
             )
             init_dir = target / "spec-dock" / "initiatives" / "init-00101-auth-platform"
-            deps_path = init_dir / ".meta.json"
             self._set_meta_depends_on(init_dir, ["iss-00301"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "init-00101"])
             assert p.returncode == 1, p.stdout + p.stderr
-            assert str(deps_path) in p.stderr
+            assert "Raw node dependency targets descendant: init-00101 -> iss-00301" in p.stderr
             assert "iss-00301" in p.stderr
 
     def test_deps_cycle_detected_in_reachable_graph(self) -> None:
