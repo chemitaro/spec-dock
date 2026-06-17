@@ -485,6 +485,104 @@ pass; no output
 
 ---
 
+### セッションログ（2026-06-17 20:25 - 20:27 JST）
+
+#### 対象
+- Step: S90 Docs / scaffold / mirror impact resolution
+- AC/EC: non-negotiable constraints, docs impact
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S90 — Docs / scaffold / mirror impact resolution`
+  - closure ids: `tc-008`
+
+#### 実施内容
+- S20/S30 後の最終 file layout に対して docs / skill / scaffold text の stale reference を検索した。
+- 検索対象では `fetch_pr_review_snapshot.sh` の実行経路参照と、新規 `pr_review_snapshot.py` の実体参照のみが見つかり、Python heredoc を前提にした文書説明や更新必須の stale text は見つからなかった。
+- よって S90 は docs no-op として閉じ、`doc-writer` 変更は不要と判断した。spec-reviewer gate は次に実施する。
+
+#### 実行コマンド / 結果
+```bash
+rg -n "fetch_pr_review_snapshot\\.sh|pr_review_snapshot\\.py|review snapshot|Python heredoc|heredoc" src/spec_dock/assets/install_root/.agents/skills .agents/skills spec-dock/docs README.md src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/spec_dock/templates
+
+src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py:402:    review_script = script_dir / "lib" / "fetch_pr_review_snapshot.sh"
+src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py:601:                    "source": "fetch_pr_review_snapshot.sh",
+src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py:1346:    "script": "fetch_pr_review_snapshot.sh",
+src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh:6:usage: fetch_pr_review_snapshot.sh --repo OWNER/REPO --pr NUMBER [options]
+src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh:119:python3 "$script_dir/pr_review_snapshot.py"
+.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh:6:usage: fetch_pr_review_snapshot.sh --repo OWNER/REPO --pr NUMBER [options]
+.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh:119:python3 "$script_dir/pr_review_snapshot.py"
+.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py:1346:    "script": "fetch_pr_review_snapshot.sh",
+.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py:402:    review_script = script_dir / "lib" / "fetch_pr_review_snapshot.sh"
+.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py:601:                    "source": "fetch_pr_review_snapshot.sh",
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S90 | 赤フェーズ / 代替証跡（Red / alternative） | `tc-008`: docs/skill/scaffold impact is updated or closed as no-op | stale heredoc docs were not found | `rg` docs / skills / scaffold search | approved-no-op | public wrapper path references remain valid |
+| S90 | 緑フェーズ（Green） | docs impact closed | no docs/skill text update required | inspection | approved-no-op | spec-reviewer pending |
+| S90 | リファクタリング（Refactor） | docs-only/no-op | no file mutation except report evidence | diff inspection | pass | `doc-writer` not needed |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S90 | none | inspection | no-op recorded | `tc-008` | no | `rg` output showed no stale heredoc docs |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | `tc-008` | docs/skill/scaffold impact is updated or explicitly closed as no-op; `spec-reviewer` pass; report evidence complete; step commit/no-op gate closed | stale docs not found; no-op evidence recorded; `spec-reviewer` pass | approved-no-op | no-op commit gate は次に実施 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-008` | S90 | yes | inspect-only / docs-only | S30 final file layout fixed | `rg -n "fetch_pr_review_snapshot\\.sh|pr_review_snapshot\\.py|review snapshot|Python heredoc|heredoc" ...` | approved-no-op | docs/skill text update not required |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| `tc-008` | S90 | docs / skill / scaffold text search | approved-no-op pending reviewer | no stale heredoc docs found |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | `tc-008` | docs impact inspection | `tc-008` | no stale docs found | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S90 | approved-local-execution | inspect-only docs impact no-op | N/A | docs / skill / scaffold text inspection | `plan.md` S90; final S30 file layout | report evidence only | docs/source mutation without stale text; implementation files; GitHub state | search evidence; spec-reviewer gate | stale docs found requiring text change | report evidence and reviewer result | docs no-op evidence recorded; spec-reviewer pending |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S90 | N/A | docs impact no-op inspection performed by orchestrator because no docs/skill text changes were needed | `report.md` only | `rg` docs/skills/scaffold search -> no stale heredoc docs | `spec-reviewer` pass | none known | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | N/A; no docs mutation required, so no doc-writer write delegation was needed | N/A | `report.md` | evidence recording only | revert S90 report block if reviewer rejects no-op | `rg` docs impact inspection | `spec-reviewer` pending | no waiver / denied / unavailable state used |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | step reviewer | `spec-reviewer` | fresh | passed | no | proceed to no-op/commit gate | no findings; S90 may proceed to no-op/commit gate |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | pending reviewer / pending no-op commit gate | `report.md` only | pending | pending | docs/skill source files unchanged because stale text was not found | docs/skills/scaffold search targets listed in command | pending after report update | `rg` inspection recorded |
+
+#### 変更したファイル
+- `report.md` - S90 docs impact no-op evidence を追記。
+
+#### コミット
+- pending
+
+#### メモ
+- S90 の material implementation decisions はなし。docs / skill text update は不要と判断したが、spec-reviewer gate で確認する。
+
+---
+
 ### セッションログ（2026-06-17 HH:MM - HH:MM）
 
 #### 対象
