@@ -329,6 +329,39 @@ class TestDepsDomain:
         assert result.node_blockers == []
         assert result.satisfied_dependencies == [dependency_context]
 
+    def test_evaluate_readiness_does_not_apply_node_blockers_to_done_source_issue(self) -> None:
+        domain_deps, domain_models, _domain_tree = _runtime_modules()
+        graph = self._graph()
+        statuses = {"iss-00003": _issue_status(domain_models, "iss-00003", "done")}
+        dependency_context = domain_models.DepsDependencyContext(
+            source_node_id="iss-00003",
+            source_issue_id="iss-00003",
+            target_node_id="epic-00002",
+            target_node_kind="epic",
+            target_issue_ids=(),
+            expansion="empty",
+        )
+
+        result = domain_deps.evaluate_readiness(
+            graph,
+            issue_depends_on_map={"iss-00003": []},
+            target_id=domain_models.NodeId("iss-00003"),
+            issue_statuses=statuses,
+            dependency_contexts_by_issue_id={"iss-00003": [dependency_context]},
+            high_level_statuses_by_node_id={
+                "epic-00002": domain_models.DepsHighLevelStatus(
+                    node_id="epic-00002",
+                    state="open",
+                    source="github",
+                )
+            },
+        )
+
+        assert result.ready
+        assert result.guard_reason == "ready"
+        assert result.blockers == []
+        assert result.node_blockers == []
+
     def _empty_epic_graph(self):
         _domain_deps, domain_models, domain_tree = _runtime_modules()
         root = Path("/repo/spec-dock/initiatives/init-00010-platform")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import cast
 
@@ -148,6 +149,40 @@ def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> d
     return out
 
 
+def _load_cached_high_level_github_state_by_id(specdock_dir: Path) -> dict[str, str]:
+    agent_dir = specdock_dir / ".agent"
+    for state_index_path in (agent_dir / "index-all.json", agent_dir / "index.json"):
+        if not state_index_path.is_file():
+            continue
+        try:
+            loaded = json.loads(state_index_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(loaded, dict):
+            continue
+        raw_nodes = loaded.get("nodes")
+        if not isinstance(raw_nodes, dict):
+            continue
+        out: dict[str, str] = {}
+        for node_id, item in raw_nodes.items():
+            if not isinstance(node_id, str) or not isinstance(item, dict):
+                continue
+            kind = item.get("kind")
+            if kind not in {"initiative", "epic"}:
+                continue
+            github = item.get("github")
+            if not isinstance(github, dict):
+                continue
+            raw_state = github.get("state")
+            if not isinstance(raw_state, str):
+                continue
+            normalized = raw_state.strip().lower()
+            if normalized in {"open", "closed"}:
+                out[node_id] = normalized
+        return out
+    return {}
+
+
 def _normalize_issue_status(value: str | None) -> str:
     normalized = str(value or "").strip().lower()
     if normalized in {"done", "open", "unknown"}:
@@ -213,8 +248,10 @@ def resolve_high_level_status_context(
     graph: SpecGraph,
     *,
     issue_statuses: dict[str, IssueStatusSnapshot],
+    cached_high_level_github_state_by_id: dict[str, str] | None = None,
 ) -> dict[str, DepsHighLevelStatus]:
     statuses: dict[str, DepsHighLevelStatus] = {}
+    cached_high_level_states = cached_high_level_github_state_by_id or {}
     for node_id, node in graph.nodes_by_id.items():
         if node.kind not in {"initiative", "epic"}:
             continue
@@ -222,6 +259,10 @@ def resolve_high_level_status_context(
         status = issue_statuses.get(node_id)
         if status is not None:
             resolved = _status_state_from_snapshot(status)
+        if resolved is None:
+            cached_state = cached_high_level_states.get(node_id)
+            if cached_state in {"open", "closed"}:
+                resolved = (cached_state, "cache")
         if resolved is None:
             resolved = _descendant_aggregate_state(
                 graph,
@@ -314,9 +355,12 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
 
     cached_issue_status_by_id: dict[str, str] = {}
     cached_issue_last_sync_at_by_id: dict[str, str | None] = {}
+    cached_high_level_github_state_by_id: dict[str, str] = {}
     if ports.derived_state_reader is not None:
         cached_issue_status_by_id = ports.derived_state_reader.load_cached_issue_status_by_id(specdock_dir)
         cached_issue_last_sync_at_by_id = _load_cached_issue_last_sync_at_by_id(ports, specdock_dir)
+        if not req.use_github:
+            cached_high_level_github_state_by_id = _load_cached_high_level_github_state_by_id(specdock_dir)
 
     status_context = resolve_issue_status_context(
         graph,
@@ -343,6 +387,7 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
         high_level_statuses_by_node_id=resolve_high_level_status_context(
             graph,
             issue_statuses=status_context.issue_statuses,
+            cached_high_level_github_state_by_id=cached_high_level_github_state_by_id,
         ),
         active_issue_id=active_issue_id,
     )

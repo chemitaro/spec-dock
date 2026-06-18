@@ -179,6 +179,7 @@ def _build_evaluation(
 
     node_blockers, satisfied_dependencies = _evaluate_dependency_contexts(
         target_issue_ids=target_issue_ids,
+        issue_statuses=issue_statuses,
         dependency_contexts_by_issue_id=dependency_contexts_by_issue_id,
         high_level_statuses_by_node_id=high_level_statuses_by_node_id,
     )
@@ -242,6 +243,7 @@ def _dependency_context_from_input(context: DependencyContextInput) -> DepsDepen
 def _evaluate_dependency_contexts(
     *,
     target_issue_ids: list[str],
+    issue_statuses: dict[str, IssueStatusSnapshot],
     dependency_contexts_by_issue_id: dict[str, list[DependencyContextInput]] | None,
     high_level_statuses_by_node_id: dict[str, DepsHighLevelStatus] | None,
 ) -> tuple[list[DepsNodeBlocker], list[DepsDependencyContext]]:
@@ -253,6 +255,8 @@ def _evaluate_dependency_contexts(
     satisfied_by_key: dict[tuple[str, str, str], DepsDependencyContext] = {}
 
     for issue_id in target_issue_ids:
+        if _issue_status(issue_id, issue_statuses) == "done":
+            continue
         for raw_context in dependency_contexts_by_issue_id.get(issue_id, []):
             context = _dependency_context_from_input(raw_context)
             if context.target_node_kind == "issue":
