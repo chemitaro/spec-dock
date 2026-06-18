@@ -131,81 +131,94 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- S01 では provider-side workflow docs に decision routing の入口を追加し、具体例と good / bad pattern の置き場として `docs/authoring/decision-routing.md` を新設した。
+- Skills / templates / runtime / tests / GitHub state は S01 の許可範囲外として変更していない。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-06-18 HH:MM - HH:MM）
+### セッションログ（2026-06-18 S01）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01
+- AC/EC: AC-001, AC-003, EC-001, EC-002, EC-003, EC-004
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: `実装ステップ S01 — Provider docs decision-routing guidance`
+  - closure ids: tc-001, tc-002
 
 #### 実施内容
-- ...
+- `doc-writer` に S01 provider docs 変更を委任し、許可パス外変更がないことを親 orchestrator が確認した。
+- Provider workflow docs に `authoring/decision-routing.md` への参照と decision responsibility の入口 rule を追加した。
+- `src/spec_dock/assets/spec_dock/docs/authoring/decision-routing.md` を追加し、routing matrix、generic examples、good / bad patterns、handoff checklist を置いた。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+rg -n "decision-routing|Decision-only|Issue-local|Epic|Initiative" src/spec_dock/assets/spec_dock/docs
 
-<result>
+pass: provider docs and new authoring guide contain the expected routing terms.
+
+rg -n "good|bad|example|例" src/spec_dock/assets/spec_dock/docs/authoring/decision-routing.md
+
+pass: new authoring guide contains generic examples and good / bad pattern sections.
+
+git diff --check
+
+pass: no whitespace errors.
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | 代替証跡（Red / alternative） | inspect-only | Existing docs did not have a single `decision-routing.md` target or explicit Decision-only routing matrix before S01 | docs inspection / pre-step plan evidence | pass | Failing-first code test is not applicable for docs-only step |
+| S01 | 緑フェーズ（Green） | inspect-only | Workflow docs now link decision routing; `decision-routing.md` owns examples and patterns | `rg` / docs inspection | pass | Skills/templates/runtime/tests unchanged |
+| S01 | リファクタリング（Refactor） | guardrail satisfied | Workflow docs stay concise; examples are centralized in `decision-routing.md` | diff inspection / `git diff --check` | pass | no extra cleanup needed |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | none | implementation | recorded | tc-001, tc-002 | no | worker returned `No material implementation decisions beyond the approved plan.` |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | tc-001, tc-002 | docs contain routing rule and `decision-routing.md` owns examples | Provider workflow docs link `authoring/decision-routing.md`; new authoring guide contains routing matrix, examples, good/bad patterns | pass | reviewer gate pending |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | yes | inspect-only | Existing docs lacked a single decision-routing authoring guide and explicit routing matrix | `rg -n "decision-routing|Decision-only|Issue-local|Epic|Initiative" src/spec_dock/assets/spec_dock/docs` | pass | workflow docs and guide expose routing terms |
+| tc-002 | S01 | yes | inspect-only | Examples were not centralized in a dedicated decision-routing authoring doc | `rg -n "good|bad|example|例" src/spec_dock/assets/spec_dock/docs/authoring/decision-routing.md` | pass | examples/good/bad patterns live in docs authoring guide |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | provider docs routing inspection | pass | step reviewer gate pending |
+| tc-002 | S01 | `decision-routing.md` examples/patterns inspection | pass | step reviewer gate pending |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| none | tc-001, tc-002 | N/A | tc-001, tc-002 | S01 で追加 closure / 削除 closure / alias 変更は発生していない | no | no |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00196 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/7e5f/spec-dock` | iss-00196 | current session | doc-writer, spec-reviewer, code-reviewer, qa-reviewer | same repo, active issue, current session, named roles; no destructive action / publishing / credentialed access / scope expansion / private external system use | issue complete / session end / scope change / user revocation | none | proceed with plan-scoped delegated steps |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | shipped docs / workflow text | doc-writer | provider docs decision-routing guidance | `plan.md` S01 and provider docs | `workflow_issue.md`, `workflow_epic.md`, `workflow_initiative.md`, `workflow_spec_authoring.md`, `docs/authoring/decision-routing.md` | skills, templates, runtime code, tests, package/config, `.github`, GitHub state, dogfooding mirror, canonical issue docs/report | targeted `rg`; `git diff --check`; parent diff guard | need runtime enforcement; unclear routing responsibility; examples cannot be generic | changed files; verification results; unresolved risks; Ledger Note | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | doc-writer | Added decision-routing references to workflow docs and created `docs/authoring/decision-routing.md`; no material implementation decisions beyond approved plan | `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`; `src/spec_dock/assets/spec_dock/docs/workflow_epic.md`; `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md`; `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`; `src/spec_dock/assets/spec_dock/docs/authoring/decision-routing.md` | targeted `rg` -> pass; `git diff --check` -> pass | pending spec-reviewer | none | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -215,22 +228,25 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step reviewer | spec-reviewer | fresh | passed | no | proceed to commit | pass by `spec-reviewer` `019ed84a-c36a-7e83-a59a-fdf0c6ed9508`; P2 Closure Delta cleanup applied before commit |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | pending commit | provider docs S01 diff and report evidence | pending | pending | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - decision-only Issue routing入口を追加
+- `src/spec_dock/assets/spec_dock/docs/workflow_epic.md` - Epic-owned durable decision routing を追加
+- `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md` - Initiative-owned operating decision routing を追加
+- `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` - authoring 中の decision-only finding routing を追加
+- `src/spec_dock/assets/spec_dock/docs/authoring/decision-routing.md` - 具体例と good / bad pattern の docs surface を追加
 
 #### コミット
-- <hash> <message>
+- pending
 
 #### メモ
-- ...
+- S01 は docs-only step。Skills / templates / runtime / tests / GitHub state は変更していない。
 
 ---
 
