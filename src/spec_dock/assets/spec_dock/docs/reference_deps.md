@@ -118,6 +118,7 @@
 ## 5. 下流境界メモ（downstream boundary note）
 
 - `deps check`、`active set`、`validate`、`sync`、`delete` は compiled dependency result を消費する downstream consumer です。
+- `sync` が生成する `deps-raw.puml` は `.meta.json.depends_on` の raw direct dependency を可視化する確認用 artifact です。readiness / blocker 判定の authority は compiled issue-level result と `deps-issues.*` 側にあります。
 - 運用では `deps add/remove` の後に `./spec-dock/scripts/spec-dock deps check <target>`、`./spec-dock/scripts/spec-dock validate`、`./spec-dock/scripts/spec-dock sync` を順に実行して、標準の GitHub live state で整合を確認します。GitHub を呼ばない cache/local 確認が必要な場合だけ `--no-github` を指定します。
 - この文書は `.meta.json` schema / reader / `deps check` / `deps add/remove` の command contract を固定するもので、downstream parity や hard cutover 完了を意味しません。
 - provider-side のこのファイルが dependency reference の正本であり、dogfooding 側 copy は secondary verification です。

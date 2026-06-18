@@ -13,6 +13,74 @@ ID: "iss-00192"
 ### セッションログ（2026-06-18 11:18 JST）
 
 #### 対象
+- Step: S90 Docs Impact Resolution
+- AC/EC:
+  - docs impact closure
+  - cl-006 docs distinction
+- 計画上の出典（Planned source）:
+  - `plan.md` S90
+  - `reference_sync.md`
+  - `reference_deps.md`
+  - `guide.md`
+
+#### 実施内容
+- `reference_sync.md` の generated artifact list / `sync --force` placeholder list / arrow direction section に `deps-raw.puml` を追加した。
+- `reference_sync.md` と `reference_deps.md` に、`deps-raw.puml` は raw direct dependency の確認用であり、readiness / blocker authority ではないことを明記した。
+- `guide.md` の主な生成物一覧に `deps-raw` を追加した。
+- Provider asset docs と dogfooding mirror docs の両方を更新した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_reference_sync_doc_matches_bundled_asset tests/unit/infra/test_init_update.py::TestInitUpdate::test_reference_deps_doc_matches_bundled_asset -q
+# 2 passed
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=129
+
+git diff --check
+# pass
+```
+
+#### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
+| 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
+|---|---|---|---|---|
+| `src/spec_dock/assets/spec_dock/docs/reference_sync.md` / `spec-dock/docs/reference_sync.md` | yes | parent | generated artifact list, force placeholder list, arrow/raw view distinction updated | pass |
+| `src/spec_dock/assets/spec_dock/docs/reference_deps.md` / `spec-dock/docs/reference_deps.md` | yes | parent | downstream boundary note distinguishes raw direct view from readiness authority | pass |
+| `src/spec_dock/assets/spec_dock/docs/guide.md` / `spec-dock/docs/guide.md` | yes | parent | generated artifact inventory includes `deps-raw` | pass |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| docs impact / tc-s90-001 | S90 | yes | docs diff inspection + asset mirror test | docs lacked `deps-raw.puml` artifact inventory | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_reference_sync_doc_matches_bundled_asset tests/unit/infra/test_init_update.py::TestInitUpdate::test_reference_deps_doc_matches_bundled_asset -q` | pass | provider and dogfooding docs match |
+| cl-006 / tc-s90-002 | S90 | yes | docs diff inspection | raw direct view was not documented | docs inspection | pass | `deps-raw.puml` is not described as readiness authority |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | docs/spec alignment reviewer | spec-reviewer | fresh | passed | no | proceed to Step Commit Gate | Agent `019ed8bc-008e-75d0-86ab-af5624cbbde9`; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | pending commit | docs and report evidence only | commit hash recorded as post-commit external evidence | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/reference_sync.md`
+- `src/spec_dock/assets/spec_dock/docs/reference_deps.md`
+- `src/spec_dock/assets/spec_dock/docs/guide.md`
+- `spec-dock/docs/reference_sync.md`
+- `spec-dock/docs/reference_deps.md`
+- `spec-dock/docs/guide.md`
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00192-generate-deps-raw-puml/report.md`
+
+#### コミット
+- pending
+
+---
+
+### セッションログ（2026-06-18 11:18 JST）
+
+#### 対象
 - Step: S05 Existing Dependency Artifact and Readiness Regression Preservation
 - AC/EC:
   - cl-006
