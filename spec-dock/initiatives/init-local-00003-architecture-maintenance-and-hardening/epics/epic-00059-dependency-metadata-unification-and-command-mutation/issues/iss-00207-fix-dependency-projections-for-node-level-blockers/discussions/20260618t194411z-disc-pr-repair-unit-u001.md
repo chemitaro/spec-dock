@@ -108,7 +108,7 @@ Fix both findings before the PR is merge-prepared. They are within the issue sco
 
 ## Commit Evidence
 
-- pending commit after parent integration.
+- Commit: `b506e0abcc8749bc679d28c78f71efcfa170fb9b`
 - Parent verification before commit:
   - `uv run pytest tests/unit/domain/test_deps.py::TestDepsDomain::test_evaluate_readiness_does_not_apply_node_blockers_to_done_source_issue tests/unit/application/test_check_deps.py::TestCheckDepsApplication::test_no_github_uses_cached_high_level_github_state_from_sync_artifact` -> 2 passed
   - `git diff --check` -> pass
@@ -117,8 +117,10 @@ Fix both findings before the PR is merge-prepared. They are within the issue sco
 
 ## Re-observation Result
 
-- pending
+- Latest observed head `36acb9c56156f266a7e46417fc71c077a0d63ab0`: CI passed and the current observation trigger boundary had no selected review comments or review threads for this unit.
+- The observation script still reported `human_gate` because historical non-outdated GitHub review threads `PRRT_kwDOQ99OK86KqG36` and `PRRT_kwDOQ99OK86KqG3_` remain unresolved as carryover.
 
 ## Residual Risk / Follow-up
 
-- pending re-observation
+- No product blocker remains for U001 after committed repair and latest-boundary clean observation.
+- Residual workflow risk: GitHub review threads remain unresolved as carryover and require human/GitHub-side resolution if strict thread resolution is required before merge.
