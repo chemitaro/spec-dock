@@ -233,7 +233,7 @@ pass: no whitespace errors.
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | pending commit | provider docs S01 diff and report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S01 | committed | provider docs S01 diff and report evidence | `57e61118` | `git status --short` -> clean after S01 commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - decision-only Issue routing入口を追加
@@ -253,11 +253,93 @@ pass: no whitespace errors.
 ### セッションログ（2026-06-18 HH:MM - HH:MM）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S02
+- AC/EC: AC-002, AC-006
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S02 — Thin skill decision-only gates`
+  - closure ids: tc-003, tc-004
 
 #### 実施内容
-- ...
+- `doc-writer` に S02 provider skill 変更を委任し、許可パス外変更がないことを親 orchestrator が確認した。
+- Issue planning / Epic planning / Initiative planning / Clarification の各 skill に、decision-only / cross-scope finding の thin stop/routing gate と `decision-routing.md` 参照を追加した。
+- 具体例や routing matrix は skill に複製せず、docs への参照に留めた。
+
+#### 実行コマンド / 結果
+```bash
+rg -n "decision-only|decision routing|decision-routing|Epic|Initiative|stop" src/spec_dock/assets/install_root/.agents/skills/spec-dock-*
+
+pass: target provider skills expose decision-only routing terms and docs links.
+
+git diff --check
+
+pass: no whitespace errors.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 代替証跡（Red / alternative） | inspect-only | Existing provider skills did not all expose the new decision-only routing gate and docs link | docs inspection / pre-step plan evidence | pass | docs-only skill text step |
+| S02 | 緑フェーズ（Green） | inspect-only | Target provider skills now contain thin routing gate / reminder and link to `decision-routing.md` | `rg` / skill inspection | pass | examples are not copied into skill bodies |
+| S02 | リファクタリング（Refactor） | guardrail satisfied | Skill additions remain short routing guidance | diff inspection / `git diff --check` | pass | no extra cleanup needed |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | none | implementation | recorded | tc-003, tc-004 | no | worker returned `No material implementation decisions beyond the approved plan.` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | tc-003, tc-004 | Skill files contain thin decision routing and no long examples | Provider planning/clarification skills link `decision-routing.md` and contain short stop/routing text | pass | reviewer gate pending |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-003 | S02 | yes | inspect-only | Target skills lacked a complete first-read decision-only gate aligned to S01 docs | `rg -n "decision-only|decision routing|decision-routing|Epic|Initiative|stop" src/spec_dock/assets/install_root/.agents/skills/spec-dock-*` | pass | routing terms and docs links present |
+| tc-004 | S02 | yes | inspect-only | Examples are owned by docs and should not be duplicated in skills | manual skill inspection / `git diff --check` | pass | skill additions are short routing guidance |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-003 | S02 | provider skill routing inspection | pass | step reviewer gate pending |
+| tc-004 | S02 | skill thinness inspection | pass | step reviewer gate pending |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-003, tc-004 | N/A | tc-003, tc-004 | S02 で追加 closure / 削除 closure / alias 変更は発生していない | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | shipped skill text | doc-writer | provider planning / clarification skill routing gates | `plan.md` S02, S01 docs, provider skills | four listed provider skill files | provider docs, templates, runtime code, tests, package/config, `.github`, GitHub state, dogfooding mirror, canonical issue docs/report | targeted `rg`; `git diff --check`; parent diff guard | broad rewrite needed; docs route target missing; examples required in skill | changed files; verification results; unresolved risks; Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | doc-writer | Added thin decision-only stop/routing gates and `decision-routing.md` links to planning/clarification skills; no examples copied into skills | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md`; `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md`; `src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md`; `src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md` | targeted `rg` -> pass; `git diff --check` -> pass | pending spec-reviewer | none | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | spec-reviewer | fresh | passed | no | proceed to commit | pass by `spec-reviewer` `019ed850-a084-7c10-83d1-9dd43557b62d`; P2 S01 commit evidence cleanup applied before S02 commit |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | pending commit | provider skill S02 diff and report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` - Issue planning の decision-only gate を追加
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md` - Epic planning の cross-scope routing reminder を追加
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md` - Initiative planning の routing reminder を追加
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md` - clarification の decision-only routing gap 分類を追加
+
+#### コミット
+- pending
+
+#### メモ
+- S02 は skill-text-only step。Provider docs / templates / runtime / tests / GitHub state は変更していない。
 
 ---
 
