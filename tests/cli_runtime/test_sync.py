@@ -456,6 +456,107 @@ class TestCliSync(CliRuntimeHarness):
                 for edge in cached_deps_issues["edges"]
             ] == [("iss-00301", "epic-00202", "satisfied", "raw_direct")]
 
+            p_cached_again = self._run_runtime_capture(
+                target,
+                ["sync", "--no-github", "--no-update-active"],
+                env=test_env,
+            )
+            assert p_cached_again.returncode == 0, p_cached_again.stdout + p_cached_again.stderr
+            cached_again_deps_issues = json.loads(
+                (target / "spec-dock" / ".agent" / "deps-issues.json").read_text(encoding="utf-8")
+            )
+            assert cached_again_deps_issues["nodes"]["iss-00301"]["ready"] is True
+            assert cached_again_deps_issues["nodes"]["iss-00301"]["node_blockers"] == []
+            assert cached_again_deps_issues["nodes"]["epic-00202"]["state"] == "closed"
+            assert [
+                (edge["from"], edge["to"], edge["state"], edge["relation"])
+                for edge in cached_again_deps_issues["edges"]
+            ] == [("iss-00301", "epic-00202", "satisfied", "raw_direct")]
+
+            p_deps_check = self._run_runtime_capture(
+                target,
+                ["deps", "check", "--id", "iss-00301", "--no-github", "--json"],
+                env=test_env,
+            )
+            assert p_deps_check.returncode == 0, p_deps_check.stdout + p_deps_check.stderr
+            deps_check = json.loads(p_deps_check.stdout)
+            assert deps_check["ready"] is True
+            assert deps_check["node_blockers"] == []
+            assert deps_check["satisfied_dependencies"] == [
+                {
+                    "source_node_id": "iss-00301",
+                    "source_issue_id": "iss-00301",
+                    "target_node_id": "epic-00202",
+                    "target_node_kind": "epic",
+                    "target_issue_ids": [],
+                    "expansion": "empty",
+                }
+            ]
+
+    def test_sync_deps_issues_records_all_done_expanded_high_level_dependency_as_satisfied(self) -> None:
+        if os.name == "nt":
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            self._init_origin_repo(target)
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Main init"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"])
+            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target issue"])
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "102", "--title", "Dependency init"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "Dependency epic"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "202", "--github-issue", "401", "--title", "Done child"],
+            )
+
+            target_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-main-init"
+                / "epics"
+                / "epic-00201-main-epic"
+                / "issues"
+                / "iss-00301-target-issue"
+            )
+            self._set_meta_depends_on(target_issue_dir, ["epic-00202"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Main init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Main epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "OPEN", "title": "Target issue", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 102, "state": "OPEN", "title": "Dependency init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 202, "state": "OPEN", "title": "Dependency epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 401, "state": "CLOSED", "title": "Done child", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            assert p.returncode == 0, p.stdout + p.stderr
+
+            deps_issues = json.loads(
+                (target / "spec-dock" / ".agent" / "deps-issues.json").read_text(encoding="utf-8")
+            )
+            assert deps_issues["nodes"]["iss-00301"]["ready"] is True
+            assert deps_issues["nodes"]["iss-00301"]["node_blockers"] == []
+            assert deps_issues["nodes"]["epic-00202"]["type"] == "epic"
+            assert [
+                (edge["from"], edge["to"], edge["state"], edge["relation"])
+                for edge in deps_issues["edges"]
+                if edge["from"] == "iss-00301"
+            ] == [("iss-00301", "epic-00202", "satisfied", "raw_direct")]
+
     def test_sync_fails_on_unresolved_ref(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

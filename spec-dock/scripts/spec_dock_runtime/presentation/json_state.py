@@ -416,6 +416,15 @@ def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], d
                         "labels": list(snapshot.labels),
                     }
                 )
+            elif node.kind in {"initiative", "epic"}:
+                visual_state = _high_level_visual_state(result, node.id)
+                if visual_state is not None and visual_state["state_source"] in {"github", "cache"}:
+                    github_item.update(
+                        {
+                            "state": visual_state["state"].upper(),
+                            "updated_at": result.generated_at,
+                        }
+                    )
             item["github"] = github_item
 
         if node.kind in ("initiative", "epic"):
