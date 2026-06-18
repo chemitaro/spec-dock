@@ -2463,6 +2463,11 @@ class TestCliDeps(CliRuntimeHarness):
 
             (agent_dir / "index.json").unlink(missing_ok=True)
             (agent_dir / "tree.json").unlink(missing_ok=True)
+            deps_raw_puml_path = target / "spec-dock" / "deps-raw.puml"
+            deps_raw_puml_path.write_text(
+                "@startuml\nrectangle \"stale edge\" as STALE\n@enduml\n",
+                encoding="utf-8",
+            )
 
             p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active", "--force"])
             assert p.returncode == 0, p.stdout + p.stderr
@@ -2527,11 +2532,14 @@ class TestCliDeps(CliRuntimeHarness):
             tree_all_puml = (target / "spec-dock" / "tree-all.puml").read_text(encoding="utf-8")
             tree_todo_puml = (target / "spec-dock" / "tree.puml").read_text(encoding="utf-8")
             deps_issues_puml = (target / "spec-dock" / "deps-issues.puml").read_text(encoding="utf-8")
+            deps_raw_puml = deps_raw_puml_path.read_text(encoding="utf-8")
             dashboard = (target / "spec-dock" / "dashboard.md").read_text(encoding="utf-8")
-            for text in (tree_all_puml, tree_todo_puml, deps_issues_puml, dashboard):
+            for text in (tree_all_puml, tree_todo_puml, deps_issues_puml, deps_raw_puml, dashboard):
                 assert "deps_preflight_failed" in text
                 assert "deps.valid=false" in text
                 assert "--force" in text
+            assert "title deps-raw - DEPS_DISABLED" in deps_raw_puml
+            assert "stale edge" not in deps_raw_puml
 
             assert not (agent_dir / "deps.json").exists()
             assert not (agent_dir / "deps.puml").exists()
