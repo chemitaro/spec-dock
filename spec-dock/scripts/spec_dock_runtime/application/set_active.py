@@ -33,6 +33,7 @@ from .contracts import (
 from .github_issue_targets import collect_repo_scoped_issue_view_targets, normalize_repo_slug
 from .ports import Ports
 from .repo_context import resolve_current_repo_slug
+from .check_deps import resolve_high_level_status_context
 from .status_context import resolve_issue_status_context
 
 
@@ -524,11 +525,16 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
         issue_depends_on_map=issue_depends_on_map,
         target_id=NodeId(target_id),
         issue_statuses=status_context.issue_statuses,
+        dependency_contexts_by_issue_id=topology.dependency_contexts_by_issue_id,
+        high_level_statuses_by_node_id=resolve_high_level_status_context(
+            graph,
+            issue_statuses=status_context.issue_statuses,
+        ),
     )
     blockers = list(deps.blockers)
     guard_ready = deps.ready
     if not guard_ready:
-        if not req.force:
+        if deps.node_blockers or not req.force:
             lines = [
                 (
                     "active set blocked: "
@@ -537,6 +543,12 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
             ]
             for blocker in blockers:
                 lines.append(f"- {blocker}")
+            for blocker in deps.node_blockers:
+                lines.append(
+                    "- node_blocker: "
+                    f"{blocker.node_id} reason={blocker.reason} "
+                    f"state={blocker.state} source={blocker.state_source}"
+                )
             raise RuntimeError("\n".join(lines))
         _append_unique(
             warnings,
