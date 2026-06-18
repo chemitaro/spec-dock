@@ -799,6 +799,21 @@ uv run pytest tests/unit tests/cli_runtime
 |---|---|---|---|
 | S99 report evidence updated through QA/code/spec follow-up | S99 dogfooding mirror parity, checked-in snapshot, deps check JSON presentation renderer, sync satisfied high-level regression, and final report evidence | final response and PR body after final commit; final commit hash and clean check are external delivery evidence | ready for final commit |
 
+## PR repair follow-up U003（追加レビュー指摘対応）
+
+| 項目 | 証跡 |
+|---|---|
+| 対象 thread | `PRRT_kwDOQ99OK86Krei6` / comment `3438957583` |
+| 指摘 | GitHub 未連携の empty initiative / epic dependency が local `open` として解決されているのに、high-level status resolver が GitHub/cache/descendant aggregate だけを採用し、`empty_unknown/source=none` へ落ちる |
+| 判断 | valid / fix-now。local high-level open は既知の open blocker として扱い、GitHub-linked unresolved empty high-level は unknown のまま維持する |
+| 委任 | dev-coder `Pauli` が bounded repair を実装 |
+| 変更 | `resolve_high_level_status_context()` で GitHub/cache/descendant aggregate が解決できない場合に限り local high-level `open` / `done` を採用。provider runtime と dogfooding mirror を同期 |
+| Red evidence | dev-coder reported added regression failed before implementation: local empty high-level dependency preserved neither local open nor blocked reason |
+| Green evidence | `uv run pytest tests/unit/application/test_check_deps.py -k "local_empty_high_level_dependency_preserves_open_status or github_linked_empty_high_level_dependency_without_cache_fails_unknown or local_high_level_default_open_does_not_mask_done_descendant_aggregate"` -> 3 passed |
+| Additional verification | `uv run pytest tests/unit/application/test_check_deps.py` -> 14 passed; `uv run pytest tests/cli_runtime/test_deps.py -k "deps_check or node or empty_high_level or closed_epic_context"` -> 31 passed, 8 skipped, 69 deselected; `./spec-dock/scripts/spec-dock validate` -> ok; `git diff --check` -> pass; provider/mirror `diff -u` -> no diff |
+| Step reviewer | code-reviewer `review_status=pass`; no findings |
+| Re-observation | pending after U003 commit and push |
+
 ## PR 送達ゲート（PR Delivery Gate / 必須）
 
 | 項目 | 証跡 |
@@ -829,6 +844,10 @@ uv run pytest tests/unit tests/cli_runtime
 | unresolved review-thread limitation status | known carryover non-outdated unresolved threads: `PRRT_kwDOQ99OK86KqG36`, `PRRT_kwDOQ99OK86KqG3_`, `PRRT_kwDOQ99OK86Kqu-M`, `PRRT_kwDOQ99OK86Kqu-P`; `PRRT_kwDOQ99OK86Kqu-H` became outdated |
 | unresolved blockers | none untriaged; no unresolved needs-human repair item remains |
 | final merge-prepared decision | merge-prepared for GitHub mergeability and current-trigger review state, with residual known limitation that historical GitHub review threads remain unresolved and need human/GitHub-side resolution if strict thread resolution is required |
+
+### Merge Preparation Superseding Note
+
+After this gate was first recorded, observation at head `473a50910aed8d2fc419a52ca157ca12dc4ac57b` showed CI success and GitHub `mergeable=MERGEABLE` / `mergeStateStatus=CLEAN`, but also surfaced carryover unresolved thread `PRRT_kwDOQ99OK86Krei6`. U003 fixes that valid P3 finding. The final merge-prepared decision must be based on the post-U003 head observation, recorded as post-commit external delivery evidence.
 
 ## 遭遇した問題と解決 (任意)
 - 問題: final broad regression initially failed on dogfooding metadata snapshot and runtime mirror parity.
