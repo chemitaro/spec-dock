@@ -35,6 +35,7 @@ agent-facing の読取契約:
 - `spec-dock/tree-all.puml`（Readyボード, all）
 - `spec-dock/tree.puml`（Readyボード, todo）
 - `spec-dock/deps-issues.puml`（todo issue-only 依存図）
+- `spec-dock/deps-raw.puml`（raw direct dependency 可視化）
 - `spec-dock/dashboard.md`（todo要約）
 
 legacy v1 生成物（廃止）:
@@ -78,7 +79,7 @@ deps 構造エラー（未解決参照 / self / cycle / descendant依存 / schem
 - `index-*.json` / `tree-*.json`: `deps.valid=false`, `deps.issue_edges=[]`, `deps.error` を設定
 - issueノードの `deps` は `null`（未計算扱い）
 - `spec-dock/.agent/deps-issues.json` は placeholder（`deps.valid=false`, `nodes={}`, `edges=[]`）で上書き
-- `spec-dock/deps-issues.puml`, `spec-dock/tree*.puml`, `spec-dock/dashboard.md` も placeholder内容で上書き
+- `spec-dock/deps-issues.puml`, `spec-dock/deps-raw.puml`, `spec-dock/tree*.puml`, `spec-dock/dashboard.md` も placeholder内容で上書き
 - `--force` はデバッグ/リカバリ用途のため、depsの成否に関わらず active auto-update を無効化（`--no-update-active` 相当）
 
 削除ではなく上書きにすることで、stale 参照を防ぎます。
@@ -111,7 +112,10 @@ deps 構造エラー（未解決参照 / self / cycle / descendant依存 / schem
 
 - JSON（`deps.issue_edges`）: `depends_on` 方向（`dependent -> prerequisite`）
 - `deps-issues.puml`: blocks 表示（`prerequisite -> dependent`）
+- `deps-raw.puml`: `.meta.json.depends_on` の raw direct edge を node/package endpoint で表示（`prerequisite -> dependent`）
 
+`deps-issues.*` は readiness / blocker 判定に使う todo issue-only の effective graph です。
+`deps-raw.puml` は initiative / epic / issue を含む raw direct dependency の確認用であり、readiness authority ではありません。
 同じ依存を、機械向けと可視化向けで向きを分けて表現しています。
 
 ## 8. 処理フロー（PlantUML）

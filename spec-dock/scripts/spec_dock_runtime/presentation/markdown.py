@@ -72,6 +72,7 @@ def _render_dashboard_md(
     lines.append("- index: `spec-dock/.agent/index.json`")
     lines.append("- ready board: `spec-dock/tree.puml`")
     lines.append("- deps graph: `spec-dock/deps-issues.puml`")
+    lines.append("- raw deps graph: `spec-dock/deps-raw.puml`")
     lines.append("")
     lines.append("## Summary")
     lines.append(f"- todo_total: {len(entries)}")
@@ -122,6 +123,7 @@ def _render_deps_disabled_dashboard_md(*, error: str | None) -> str:
     lines.append("- index: `spec-dock/.agent/index.json`")
     lines.append("- ready board: `spec-dock/tree.puml`")
     lines.append("- deps graph: `spec-dock/deps-issues.puml`")
+    lines.append("- raw deps graph: `spec-dock/deps-raw.puml`")
     lines.append("")
     return "\n".join(lines)
 

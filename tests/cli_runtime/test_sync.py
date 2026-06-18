@@ -972,6 +972,7 @@ class TestCliSync(CliRuntimeHarness):
             assert "spec-dock/.agent/index.json" in dashboard
             assert "spec-dock/tree.puml" in dashboard
             assert "spec-dock/deps-issues.puml" in dashboard
+            assert "spec-dock/deps-raw.puml" in dashboard
             assert "## Ready" in dashboard
             assert "## Blocked" in dashboard
             assert "## Unknown" in dashboard
@@ -980,6 +981,14 @@ class TestCliSync(CliRuntimeHarness):
             assert "blockers: iss-00303" in dashboard
             assert "`iss-00304`" in dashboard
             assert "`iss-00301`" not in dashboard
+            assert "spec-dock/deps-raw.puml" in p.stdout
+
+            deps_raw_path = target / "spec-dock" / "deps-raw.puml"
+            assert deps_raw_path.is_file()
+            deps_raw = deps_raw_path.read_text(encoding="utf-8")
+            assert "@startuml" in deps_raw
+            assert "iss-00303" in deps_raw
+            assert "iss-00302" in deps_raw
 
     def test_spec_dock_gitignore_ignores_human_facing_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -990,6 +999,7 @@ class TestCliSync(CliRuntimeHarness):
             assert "tree-all.puml" in gitignore
             assert "tree.puml" in gitignore
             assert "deps-issues.puml" in gitignore
+            assert "deps-raw.puml" in gitignore
             assert "dashboard.md" in gitignore
             assert "/adrs/" in gitignore
 
@@ -1003,6 +1013,7 @@ class TestCliSync(CliRuntimeHarness):
             self._run_git(target, ["init"])
 
             (target / "spec-dock" / "dashboard.md").write_text("dashboard\n", encoding="utf-8")
+            (target / "spec-dock" / "deps-raw.puml").write_text("@startuml\n@enduml\n", encoding="utf-8")
             adrs_doc = target / "spec-dock" / "adrs" / "example.md"
             adrs_doc.parent.mkdir(parents=True, exist_ok=True)
             adrs_doc.write_text("adr\n", encoding="utf-8")
@@ -1045,6 +1056,10 @@ class TestCliSync(CliRuntimeHarness):
             ignored_dashboard = _run_check_ignore("spec-dock/dashboard.md")
             assert ignored_dashboard.returncode == 0, ignored_dashboard.stdout + ignored_dashboard.stderr
             assert "spec-dock/dashboard.md" in ignored_dashboard.stdout
+
+            ignored_deps_raw = _run_check_ignore("spec-dock/deps-raw.puml")
+            assert ignored_deps_raw.returncode == 0, ignored_deps_raw.stdout + ignored_deps_raw.stderr
+            assert "spec-dock/deps-raw.puml" in ignored_deps_raw.stdout
 
             ignored_adr = _run_check_ignore("spec-dock/adrs/example.md")
             assert ignored_adr.returncode == 0, ignored_adr.stdout + ignored_adr.stderr

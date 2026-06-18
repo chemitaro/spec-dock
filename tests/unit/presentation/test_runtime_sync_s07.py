@@ -112,6 +112,19 @@ class _StubDepsTopologyReader:
             warnings=list(self._warnings),
         )
 
+    def load_node_dependency_resolutions(self, specdock_dir, graph):
+        del specdock_dir, graph
+        return {
+            node_id: [
+                self._infra_contracts.DirectDependencyResolution(
+                    raw_ref=depends_on_id,
+                    resolved_node_id=depends_on_id,
+                )
+                for depends_on_id in depends_on
+            ]
+            for node_id, depends_on in self._issue_depends_on_map.items()
+        }
+
 
 class _StubDerivedStateReader:
     def __init__(self, statuses):
@@ -1506,11 +1519,13 @@ class TestRuntimeSyncS07:
             assert result.state.generated_at == "2026-03-12T00:00:00Z"
             assert result.write_result.index_all_path == "spec-dock/.agent/index-all.json"
             assert result.write_result.dashboard_md_path == "spec-dock/dashboard.md"
+            assert result.write_result.deps_raw_puml_path == "spec-dock/deps-raw.puml"
 
             index_todo = json.loads((specdock_dir / ".agent" / "index.json").read_text(encoding="utf-8"))
             index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             tree_todo = json.loads((specdock_dir / ".agent" / "tree.json").read_text(encoding="utf-8"))
             tree_all = json.loads((specdock_dir / ".agent" / "tree-all.json").read_text(encoding="utf-8"))
+            deps_raw_puml = (specdock_dir / "deps-raw.puml").read_text(encoding="utf-8")
             assert index_todo["projection"] == "current-future"
             assert "source" not in index_todo
             assert index_all["projection"] == "full-history"
@@ -1520,6 +1535,9 @@ class TestRuntimeSyncS07:
             assert "iss-local-00001" in index_todo["nodes"]
             assert "iss-local-00002" not in index_todo["nodes"]
             assert "iss-local-00002" in index_all["nodes"]
+            assert "@startuml" in deps_raw_puml
+            assert "iss-local-00001" in deps_raw_puml
+            assert "iss-local-00002" in deps_raw_puml
 
             def _index_paths(payload: dict[str, object]) -> list[str]:
                 nodes = payload.get("nodes")
@@ -1675,10 +1693,13 @@ class TestRuntimeSyncS07:
 
             tree_puml = (specdock_dir / "tree.puml").read_text(encoding="utf-8")
             deps_puml = (specdock_dir / "deps-issues.puml").read_text(encoding="utf-8")
+            deps_raw_puml = (specdock_dir / "deps-raw.puml").read_text(encoding="utf-8")
             dashboard = (specdock_dir / "dashboard.md").read_text(encoding="utf-8")
-            for text in (tree_puml, deps_puml, dashboard):
+            for text in (tree_puml, deps_puml, deps_raw_puml, dashboard):
                 assert "DEPS_DISABLED" in text
                 assert "sync --force" in text
+            assert '\\"' not in dashboard
+            assert "\\\\" not in dashboard
 
     def test_sync_force_placeholder_and_deps_error_regression(self) -> None:
         self._assert_sync_force_placeholder_and_deps_error_regression()
@@ -3073,6 +3094,7 @@ class TestRuntimeSyncS07:
                     tree_todo_puml_path="spec-dock/tree.puml",
                     deps_issues_json_path="spec-dock/.agent/deps-issues.json",
                     deps_issues_puml_path="spec-dock/deps-issues.puml",
+                    deps_raw_puml_path="spec-dock/deps-raw.puml",
                     dashboard_md_path="spec-dock/dashboard.md",
                 ),
                 active_update=app_contracts.ActiveUpdateOutcome(applied=False, reason="no match"),
@@ -3316,6 +3338,7 @@ class TestRuntimeSyncS07:
                 tree_todo_puml_path="spec-dock/tree.puml",
                 deps_issues_json_path="spec-dock/.agent/deps-issues.json",
                 deps_issues_puml_path="spec-dock/deps-issues.puml",
+                deps_raw_puml_path="spec-dock/deps-raw.puml",
                 dashboard_md_path="spec-dock/dashboard.md",
             ),
             active_update=None,

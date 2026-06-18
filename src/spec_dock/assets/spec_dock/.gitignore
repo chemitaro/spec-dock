@@ -8,4 +8,5 @@ active/
 tree-all.puml
 tree.puml
 deps-issues.puml
+deps-raw.puml
 dashboard.md

@@ -733,6 +733,7 @@ def render_sync_text(result: SyncCommandResult) -> CliText:
         f"{result.write_result.tree_todo_puml_path},"
         f"{result.write_result.deps_issues_json_path},"
         f"{result.write_result.deps_issues_puml_path},"
+        f"{result.write_result.deps_raw_puml_path},"
         f"{result.write_result.dashboard_md_path}"
         if result.write_result is not None
         else "spec-dock: ok (sync)"

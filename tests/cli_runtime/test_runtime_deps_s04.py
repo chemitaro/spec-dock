@@ -203,10 +203,15 @@ class _StubNodeReader:
 
 
 class _StubDepsTopologyReader:
-    def __init__(self, issue_depends_on_map, warnings=None):
+    def __init__(self, issue_depends_on_map, warnings=None, raw_node_depends_on_map=None):
         self.issue_depends_on_map = dict(issue_depends_on_map)
         self.warnings = list(warnings or [])
+        self.raw_node_depends_on_map = {
+            node_id: list(depends_on)
+            for node_id, depends_on in dict(raw_node_depends_on_map or {}).items()
+        }
         self.calls = 0
+        self.raw_calls = 0
 
     def load_issue_depends_on_map(self, specdock_dir, graph):
         del specdock_dir, graph
@@ -216,6 +221,21 @@ class _StubDepsTopologyReader:
             issue_depends_on_map=dict(self.issue_depends_on_map),
             warnings=list(self.warnings),
         )
+
+    def load_node_dependency_resolutions(self, specdock_dir, graph):
+        del specdock_dir, graph
+        self.raw_calls += 1
+        _, _, _, _, _, _, _, infra_contracts, _, _ = _runtime_modules()
+        return {
+            node_id: [
+                infra_contracts.DirectDependencyResolution(
+                    raw_ref=dep_id,
+                    resolved_node_id=dep_id,
+                )
+                for dep_id in depends_on
+            ]
+            for node_id, depends_on in self.raw_node_depends_on_map.items()
+        }
 
 
 class _StubDerivedStateReader:
@@ -342,6 +362,206 @@ class TestRuntimeDepsS04:
                 for node in state.deps_state.nodes
             )
         assert state.deps_preflight_error is None
+
+    def test_collect_sync_state_carries_raw_direct_dependencies(self) -> None:
+        (
+            _runtime_app,
+            _app_check_deps,
+            app_contracts,
+            app_ports,
+            _app_status_context,
+            _app_validate_tree,
+            _domain_models,
+            infra_contracts,
+            _presentation_cli_text,
+            _presentation_json_state,
+        ) = _runtime_modules()
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.application import sync_state as app_sync_state
+        finally:
+            sys.path.pop(0)
+
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            records = _sample_records(infra_contracts, repo_root=repo_root)
+            _materialize_required_artifacts(records)
+            deps_reader = _StubDepsTopologyReader(
+                {
+                    "iss-local-00001": [],
+                    "iss-local-00002": ["iss-local-00001"],
+                },
+                raw_node_depends_on_map={
+                    "iss-local-00001": [],
+                    "iss-local-00002": ["iss-local-00001"],
+                },
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=repo_root / "spec-dock",
+                derived_state_reader=_StubDerivedStateReader(
+                    {"iss-local-00001": "open", "iss-local-00002": "open"}
+                ),
+                issue_gateway=_StubIssueGateway([]),
+                deps_topology_reader=deps_reader,
+            )
+
+            state = app_sync_state.collect_sync_state(
+                app_contracts.SyncRequest(
+                    force=False,
+                    github_enabled=False,
+                    issue_limit=10000,
+                    update_active_from_branch=False,
+                ),
+                ports,
+            )
+
+        assert deps_reader.raw_calls == 1
+        assert state.raw_node_depends_on_map == {
+            "iss-local-00002": ["iss-local-00001"],
+        }
+
+    def test_artifact_bundle_requires_explicit_deps_raw_artifact(self) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.presentation import contracts as presentation_contracts
+        finally:
+            sys.path.pop(0)
+
+        with pytest.raises(TypeError):
+            presentation_contracts.ArtifactBundle(
+                index=presentation_contracts.IndexArtifact(
+                    all_json_text="{}",
+                    todo_json_text="{}",
+                ),
+                tree=presentation_contracts.TreeArtifact(
+                    all_json_text="{}",
+                    todo_json_text="{}",
+                    all_puml_text="@startuml\n@enduml\n",
+                    todo_puml_text="@startuml\n@enduml\n",
+                ),
+                deps_issues=presentation_contracts.DepsIssuesArtifact(
+                    json_text="{}",
+                    puml_text="@startuml\n@enduml\n",
+                ),
+                dashboard=presentation_contracts.DashboardArtifact(markdown_text=""),
+            )
+
+    def test_collect_sync_state_keeps_raw_parent_dependencies_out_of_readiness_map(self) -> None:
+        (
+            _runtime_app,
+            _app_check_deps,
+            app_contracts,
+            app_ports,
+            _app_status_context,
+            _app_validate_tree,
+            _domain_models,
+            infra_contracts,
+            _presentation_cli_text,
+            _presentation_json_state,
+        ) = _runtime_modules()
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.application import sync_state as app_sync_state
+        finally:
+            sys.path.pop(0)
+
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            records = _sample_records(infra_contracts, repo_root=repo_root)
+            records.append(
+                infra_contracts.StoredMetaRecord(
+                    kind="epic",
+                    id="epic-local-00002",
+                    title="Password Auth",
+                    slug="password-auth",
+                    path=(
+                        repo_root
+                        / "spec-dock"
+                        / "initiatives"
+                        / "init-local-00001-auth-platform"
+                        / "epics"
+                        / "epic-local-00002-password-auth"
+                    ).as_posix(),
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=202,
+                    meta_path=(
+                        repo_root
+                        / "spec-dock"
+                        / "initiatives"
+                        / "init-local-00001-auth-platform"
+                        / "epics"
+                        / "epic-local-00002-password-auth"
+                        / ".meta.json"
+                    ).as_posix(),
+                )
+            )
+            _materialize_required_artifacts(records)
+            deps_reader = _StubDepsTopologyReader(
+                {
+                    "iss-local-00001": [],
+                    "iss-local-00002": [],
+                },
+                raw_node_depends_on_map={
+                    "epic-local-00002": ["epic-local-00001"],
+                },
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=repo_root / "spec-dock",
+                derived_state_reader=_StubDerivedStateReader(
+                    {"iss-local-00001": "open", "iss-local-00002": "open"}
+                ),
+                issue_gateway=_StubIssueGateway([]),
+                deps_topology_reader=deps_reader,
+            )
+
+            state = app_sync_state.collect_sync_state(
+                app_contracts.SyncRequest(
+                    force=False,
+                    github_enabled=False,
+                    issue_limit=10000,
+                    update_active_from_branch=False,
+                ),
+                ports,
+            )
+
+        assert state.raw_node_depends_on_map == {
+            "epic-local-00002": ["epic-local-00001"],
+        }
+        assert state.issue_depends_on_map == {
+            "iss-local-00001": [],
+            "iss-local-00002": [],
+        }
+        assert all(node.effective_depends_on == [] for node in state.deps_state.nodes)
 
     def test_status_context_source_selection(self) -> None:
         (
