@@ -243,7 +243,7 @@ pass: no whitespace errors.
 - `src/spec_dock/assets/spec_dock/docs/authoring/decision-routing.md` - 具体例と good / bad pattern の docs surface を追加
 
 #### コミット
-- pending
+- `57e61118` (`docs(workflow): decision routing guidanceを追加`)
 
 #### メモ
 - S01 は docs-only step。Skills / templates / runtime / tests / GitHub state は変更していない。
@@ -327,7 +327,7 @@ pass: no whitespace errors.
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S02 | pending commit | provider skill S02 diff and report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S02 | committed | provider skill S02 diff and report evidence | `50584a63` | `git status --short` -> clean after S02 commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` - Issue planning の decision-only gate を追加
@@ -336,10 +336,105 @@ pass: no whitespace errors.
 - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md` - clarification の decision-only routing gap 分類を追加
 
 #### コミット
-- pending
+- `50584a63` (`docs(skills): decision-only routing gateを追加`)
 
 #### メモ
 - S02 は skill-text-only step。Provider docs / templates / runtime / tests / GitHub state は変更していない。
+
+---
+
+### セッションログ（2026-06-18 HH:MM - HH:MM）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-004, AC-006, EC-004
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S03 — Thin templates / no embedded examples`
+  - closure ids: tc-005, tc-006
+
+#### 実施内容
+- `doc-writer` に S03 provider template 変更を委任し、許可パス外変更がないことを親 orchestrator が確認した。
+- Template README から具体例 ownership / example surface 表現と不要な例示を削り、thin scaffold / evidence slot の責務に寄せた。
+- Epic design template から `good example surface` 表現を削り、`evidence slot` としての位置づけに変更した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n "例:|サンプル|good example|bad example|management_core|shared kernel" src/spec_dock/assets/spec_dock/templates
+
+pass: no matches. The command returned exit 1 because no forbidden concrete example markers were found.
+
+rg -n "good example surface|scaffold / examples|scaffolds/examples|example surface|scaffold/example" src/spec_dock/assets/spec_dock/templates
+
+pass: no matches. The command returned exit 1 because stale template/example ownership phrases were absent.
+
+git diff --check
+
+pass: no whitespace errors.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 代替証跡（Red / alternative） | inspect-only | Provider templates still contained `good example surface` / concrete example phrasing | diff inspection / pre-step plan evidence | pass | docs-only template text step |
+| S03 | 緑フェーズ（Green） | inspect-only | Target provider templates now describe thin scaffold / evidence slot only | targeted `rg` / template inspection | pass | no concrete examples added to templates |
+| S03 | リファクタリング（Refactor） | guardrail satisfied | Template changes remain narrow wording cleanup | diff inspection / `git diff --check` | pass | no extra cleanup needed |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | none | implementation | recorded | tc-005, tc-006 | no | worker returned `No material implementation decisions beyond the approved plan.` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | tc-005, tc-006 | Templates remain thin and do not embed concrete examples | Provider template README and epic design template no longer contain example-surface ownership terms or concrete example markers | pass | reviewer gate pending |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-005 | S03 | yes | inspect-only | Template README and epic design template contained stale example-surface phrasing | `rg -n "good example surface|scaffold / examples|scaffolds/examples|example surface|scaffold/example" src/spec_dock/assets/spec_dock/templates` | pass | no stale ownership phrases found |
+| tc-006 | S03 | yes | inspect-only | Templates risked carrying concrete examples that should live in docs | `rg -n "例:|サンプル|good example|bad example|management_core|shared kernel" src/spec_dock/assets/spec_dock/templates` | pass | no concrete example markers found |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-005 | S03 | provider template ownership phrase inspection | pass | step reviewer gate pending |
+| tc-006 | S03 | provider template concrete example marker inspection | pass | step reviewer gate pending |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-005, tc-006 | N/A | tc-005, tc-006 | S03 で追加 closure / 削除 closure / alias 変更は発生していない | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | shipped template text | doc-writer | provider template thinness cleanup | `plan.md` S03, S01 docs, provider templates | `src/spec_dock/assets/spec_dock/templates/README.md`; `src/spec_dock/assets/spec_dock/templates/epic/design.md` | provider docs, skills, runtime code, tests, package/config, `.github`, GitHub state, dogfooding mirror, canonical issue docs/report | targeted `rg`; `git diff --check`; parent diff guard | template schema rewrite needed; examples required in templates; runtime behavior needed | changed files; verification results; unresolved risks; Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | doc-writer | Removed example ownership phrasing from provider template README and epic design template; kept templates as thin scaffold / evidence slots | `src/spec_dock/assets/spec_dock/templates/README.md`; `src/spec_dock/assets/spec_dock/templates/epic/design.md` | targeted `rg` -> pass; `git diff --check` -> pass | pending spec-reviewer | none | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | spec-reviewer | fresh | passed | no | proceed to commit | pass by `spec-reviewer` `019ed858-d3ba-7843-af05-1852f95aadcb`; P2 AC/EC traceability cleanup applied before commit |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | pending review | provider template S03 diff and report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/templates/README.md` - template責務をthin scaffold / evidence slotへ整合
+- `src/spec_dock/assets/spec_dock/templates/epic/design.md` - `good example surface`表現を削除
+
+#### コミット
+- pending
+
+#### メモ
+- S03 は template-text-only step。Provider docs / skills / runtime / tests / GitHub state は変更していない。
 
 ---
 
