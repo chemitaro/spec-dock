@@ -38,7 +38,7 @@ ID: "epic-00158"
   - Issue 内の実装 step / TDD cadence / commit rhythm は Issue `plan.md` に任せる。
   - 各 issue は少なくとも一つの E-RQ / E-AC と design decision に trace する。
   - Shipped asset 変更では provider-side source を authority とし、dogfooding mirror を validation target とする。
-  - Templates は scaffold / evidence slot / example surface として扱い、compliance authority にしない。
+  - Templates は薄い scaffold / evidence slot として扱い、example surface や compliance authority にしない。具体例は docs に置く。
   - Runtime guard / harness / regression checks は first-wave blocker にしない。
 - 例外:
   - `Align Skill Docs Template Context Surfaces` が広すぎる場合は、skill family / docs / templates family へ分割する。
@@ -84,7 +84,7 @@ ID: "epic-00158"
   - 成果物:
     - Provider-side `spec-dock-clarification/SKILL.md` rewrite。
     - `workflow_clarification.md` bridge/reference conversion。
-    - `interview` / `research` / `disc` templates の scaffold/example alignment。
+    - `interview` / `research` / `disc` templates の thin scaffold alignment と、必要な具体例の docs 側配置。
   - tranche:
     - T2 exception lane
   - closes:
@@ -127,13 +127,14 @@ ID: "epic-00158"
     - `Clarify Hub And Leaf Skill Routing Surface`
   - GitHub:
     - To be created with ASCII title `Align Workflow Docs With Skill Spine Boundary`.
-- `Align Templates As Scaffolds And Examples`:
+- `Align Templates As Thin Scaffolds`:
   - 目的:
-    - Templates を scaffold / evidence slot / good example として揃え、compliance authority と誤読されないようにする。
+    - Templates を薄い scaffold / evidence slot として揃え、examples や compliance authority と誤読されないようにする。
   - 成果物:
     - Epic / Issue report evidence slots。
     - Discussion templates, especially `interview`, `research`, `disc`。
     - Template README / scaffold wording alignment。
+    - Concrete examples moved or kept in docs / authoring guidance, not template bodies。
   - tranche:
     - T4 templates
   - closes:
@@ -237,7 +238,7 @@ ID: "epic-00158"
 - D-003:
   - Hub routing は leaf skill surface が安定してから更新する。
 - D-004:
-  - Templates は skill/docs boundary が見えてから scaffold/example を整える。
+  - Templates は skill/docs boundary が見えてから thin scaffold / evidence slot を整え、具体例は docs 側へ寄せる。
 - D-005:
   - Regression / harness / runtime gate は first-wave cleaned surfaces が stable expected behavior を持つまで開始しない。
 
