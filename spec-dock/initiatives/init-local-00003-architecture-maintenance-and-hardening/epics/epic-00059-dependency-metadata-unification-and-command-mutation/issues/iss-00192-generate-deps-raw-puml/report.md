@@ -13,6 +13,118 @@ ID: "iss-00192"
 ### セッションログ（2026-06-18 11:18 JST）
 
 #### 対象
+- Step: S04 Forced Deps Failure Disabled Artifact Behavior
+- AC/EC:
+  - cl-007
+- 計画上の出典（Planned source）:
+  - `plan.md` S04
+  - `design.md` disabled output contract
+
+#### 実施内容
+- `deps_preflight_error` がある場合、`render_deps_raw_artifact()` が通常 raw dependency view ではなく disabled `deps-raw.puml` を返すようにした。
+- disabled `deps-raw.puml` は既存 `tree.puml` / `deps-issues.puml` の disabled 表示に合わせ、`title deps-raw - DEPS_DISABLED`、`deps_preflight_failed`、`deps.valid=false`、`mode=sync --force`、sanitized error を含める。
+- `sync --force` の dependency preflight failure 時に、既存の stale `deps-raw.puml` が disabled content で上書きされることを CLI runtime test で固定した。
+- validation rule、`deps check` semantics、forced sync warning semantics は変更していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/presentation/test_deps_raw_puml.py::test_tc_s04_001_disabled_raw_dependency_view_includes_failure_note -q
+# 1 passed
+
+uv run pytest tests/unit/presentation/test_runtime_sync_s07.py::TestRuntimeSyncS07::test_sync_force_placeholder_and_deps_error_regression tests/unit/presentation/test_runtime_sync_s07.py::TestRuntimeSyncS07::test_issue_71_runtime_bundle_sync_force_degraded_path -q
+# 2 passed
+
+uv run pytest tests/cli_runtime/test_deps.py::TestCliDeps::test_sync_force_sets_deps_valid_false_and_emits_placeholders -q
+# 1 passed
+
+uv run pytest tests/unit/presentation/test_deps_raw_puml.py tests/unit/presentation/test_runtime_sync_s07.py -q
+# 65 passed
+
+uv run pytest tests/cli_runtime/test_deps.py::TestCliDeps::test_sync_force_sets_deps_valid_false_and_emits_placeholders tests/cli_runtime/test_deps.py::TestCliDeps::test_sync_fails_on_existing_empty_container_raw_cycle_without_force -q
+# 2 passed
+
+git diff --check
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | 赤フェーズ（Red） | red-required: disabled raw renderer / stale overwrite | S04 実装前は `render_deps_raw_artifact()` が `deps_preflight_error` を見ず、raw dependency payload を描画していた | source inspection + focused test expectation | pass | S03 writer would write stale-valid style output on force failure |
+| S04 | 緑フェーズ（Green） | disabled renderer includes failure note | `test_tc_s04_001_disabled_raw_dependency_view_includes_failure_note` -> pass | command | pass | sanitized newline error asserted |
+| S04 | 緑フェーズ（Green） | forced sync overwrites stale raw graph | `test_sync_force_sets_deps_valid_false_and_emits_placeholders` -> pass | command | pass | stale edge text removed |
+| S04 | リファクタリング（Refactor） | match existing disabled style / no semantics change | `git diff --check` -> pass; diff inspection confirms presentation disabled path and tests only | command + diff inspection | pass | no validation or deps mutation changes |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | `_state()` helper for raw renderer tests could not construct `deps_preflight_error` state | focused test failure | Added optional `deps_preflight_error` argument to the test helper | cl-007 | no | S04 focused renderer test passed after helper update |
+| S04 | CLI test needed stale raw artifact setup to prove overwrite, not only file presence | plan close condition | Seeded stale `deps-raw.puml` text before `sync --force` and asserted it is gone afterward | cl-007 | no | CLI forced sync test passed |
+| S04 | Disabled raw error text with quotes/backslashes can break PlantUML quoted notes | code-reviewer P2 | Escaped `\\` and `"` in `_deps_disabled_error_text()` and added focused assertion | cl-007 | no | focused renderer test passed after follow-up |
+| S04 | Shared PlantUML escaping should not leak into dashboard diagnostics | code-reviewer P3 | Split PlantUML note escaping into `_deps_disabled_puml_note_error_text()` and kept dashboard error text newline-only sanitized | cl-007 | no | force-path unit tests passed after follow-up |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | cl-007 | forced failure output is disabled PlantUML and not stale valid graph | disabled renderer unit test plus CLI force test with stale file overwrite | pass | `title deps-raw - DEPS_DISABLED` asserted |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-007 / tc-s04-001 | S04 | yes | red-required | S04 実装前は raw artifact renderer disabled branch がなかった | `uv run pytest tests/unit/presentation/test_deps_raw_puml.py::test_tc_s04_001_disabled_raw_dependency_view_includes_failure_note -q` | pass | failure note and sanitized error |
+| cl-007 / tc-s04-002 | S04 | yes | red-required | S04 実装前は stale `deps-raw.puml` overwrite behavior未固定 | `uv run pytest tests/cli_runtime/test_deps.py::TestCliDeps::test_sync_force_sets_deps_valid_false_and_emits_placeholders -q` | pass | stale edge removed |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-007 | S04 | renderer unit, forced sync unit, CLI runtime stale overwrite | pass | disabled path only |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | cl-007 | stale `deps-raw.puml` seed assertion | cl-007 | stale prevention evidence を明示するため | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | parent implementation | small disabled renderer branch matching existing style | N/A | S04 only | `plan.md` S04 | `presentation/puml.py`, `presentation/json_state.py`, focused CLI/runtime tests, report evidence | validation rules, `deps check` semantics, error swallowing, forced warning semantics | focused renderer and forced sync tests, diff check, code-reviewer | broader error handling required | report evidence, reviewer status, commit evidence | implemented; pending reviewer |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 | N/A | Parent added disabled deps-raw renderer branch and stale overwrite tests | `presentation/puml.py`, `presentation/json_state.py`, `tests/unit/presentation/test_deps_raw_puml.py`, `tests/unit/presentation/test_runtime_sync_s07.py`, `tests/cli_runtime/test_deps.py` | focused commands listed above | pending | none known | pending fresh review |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | code-reviewer | stale after P2 follow-up | passed with finding | no | follow-up completed; fresh re-review required | Agent `019ed8aa-9d70-7563-a0c9-ecadd63719ef`; P2 quote/backslash escaping |
+| S04 | step reviewer | code-reviewer | stale after P3 follow-up | passed with finding | no | follow-up completed; fresh re-review required | Agent `019ed8ae-65a9-7421-8546-b999eed44a0f`; P3 dashboard escape leakage |
+| S04 | step reviewer | code-reviewer | fresh | passed | no | proceed to Step Commit Gate | Agent `019ed8b1-a414-7af3-b3c8-06a63cbfab69`; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | pending commit | S04 disabled renderer/tests/report evidence only | commit hash recorded as post-commit external evidence | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/puml.py` - disabled `deps-raw.puml` renderer
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py` - preflight error branch for raw artifact
+- `tests/unit/presentation/test_deps_raw_puml.py` - disabled renderer test
+- `tests/unit/presentation/test_runtime_sync_s07.py` - forced sync disabled raw artifact regression
+- `tests/cli_runtime/test_deps.py` - stale raw artifact overwrite regression
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00192-generate-deps-raw-puml/report.md` - S04 evidence ledger
+
+#### コミット
+- pending
+
+#### メモ
+- S04 intentionally reuses existing disabled output style and does not introduce a new failure framework.
+
+---
+
+### セッションログ（2026-06-18 11:18 JST）
+
+#### 対象
 - Step: S03 Normal Sync Artifact Write, Discovery, and Ignore Integration
 - AC/EC:
   - cl-001 sync artifact write / discovery side

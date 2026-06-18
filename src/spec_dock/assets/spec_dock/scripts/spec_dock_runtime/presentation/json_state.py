@@ -9,6 +9,7 @@ from ..domain.models import ActiveSelection, DepsNodeState, SpecNode
 from .contracts import DepsIssuesArtifact, DepsRawArtifact, IndexArtifact, TreeArtifact
 from .puml import (
     render_deps_disabled_deps_issues_puml,
+    render_deps_disabled_deps_raw_puml,
     render_deps_disabled_tree_puml,
     render_deps_issues_puml,
     render_deps_raw_puml,
@@ -638,6 +639,10 @@ def render_deps_issues_artifact(result: SyncStateResult) -> DepsIssuesArtifact:
 
 
 def render_deps_raw_artifact(result: SyncStateResult) -> DepsRawArtifact:
+    if result.deps_preflight_error is not None:
+        return DepsRawArtifact(
+            puml_text=render_deps_disabled_deps_raw_puml(error=result.deps_preflight_error)
+        )
     payload = _build_deps_raw_payload(result)
     return DepsRawArtifact(puml_text=render_deps_raw_puml(payload))
 
