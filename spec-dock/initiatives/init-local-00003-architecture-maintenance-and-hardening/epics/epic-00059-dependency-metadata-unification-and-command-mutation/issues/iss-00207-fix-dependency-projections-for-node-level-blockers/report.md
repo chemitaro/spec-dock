@@ -357,6 +357,115 @@ rg -n "github|cache|gh\b|subprocess|requests|urllib|http" src/spec_dock/assets/s
 
 ---
 
+### セッションログ（2026-06-19 S03）
+
+#### 対象
+- Step: S03 Command Guards And CLI Output
+- AC/EC: AC-001, AC-002, EC-001, EC-002
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `S03 — Command Guards And CLI Output`
+  - closure ids:
+    - `cl-ac-001`
+    - `cl-ac-002`
+    - `cl-ec-001`
+    - `cl-ec-002`
+
+#### 実施内容
+- `deps check` と `active set` が S01/S02 の topology context / high-level status context を domain evaluation へ渡すようにした。
+- command-time high-level status context builder を追加し、GitHub snapshot、cache、descendant aggregate、unknown の順で high-level node state を解決する。
+- `deps check --json` を schema v2 にし、`issue_blockers`、`node_blockers`、`satisfied_dependencies` を出力するようにした。
+- `active set --force` は既存 issue-level blocker の警告継続互換を維持しつつ、node-level blocker がある場合は force でも拒否するようにした。
+- `issue start --force` は `set_active(... force=False ...)` 経由の dependency guard を維持し、node-blocked issue を開始しないことを CLI test で固定した。
+- reviewer follow-up として、high-level node の default local open が empty unknown / descendant aggregate を隠さないように補正した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/application/test_check_deps.py -k "local_empty_high_level_dependency_without_cache_fails_unknown or local_high_level_default_open_does_not_mask_done_descendant_aggregate"
+# 2 passed, 10 deselected
+
+uv run pytest tests/cli_runtime/test_deps.py tests/cli_runtime/test_issue_lifecycle.py tests/unit/application/test_check_deps.py tests/unit/application/test_set_active.py -k "deps_check or active or issue_start or node"
+# 61 passed, 8 skipped, 85 deselected
+
+git diff --check
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | Red | red-required | required command が実装前に 7 failures。empty open epic が ready/exit 0、`issue start --force` が node-blocked issue を開始、JSON が schema v1 / typed fields なし | dev-coder reported red run | pass | command guard level の未実装を検出 |
+| S03 | Red follow-up | reviewer finding | local empty high-level / done descendant aggregate tests が実装修正前に 2 failed | dev-coder reported follow-up red run | pass | default local open が unknown / descendant aggregate を隠すことを検出 |
+| S03 | Green | red-required | required S03 slice -> 61 passed, 8 skipped, 85 deselected | command | pass | 親 orchestrator でも同じ Green を再実行済み |
+| S03 | Refactor | guardrail satisfied | 差分は S03 allowed paths plus this report のみ。GitHub mutation、storage format、sync artifact behavior には未着手 | diff inspection / `git diff --check` | pass | JSON v2 command rendering は S04 で presentation artifact と整合確認する |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | `deps check --json` v2 serialization は S03 では command output に限定 | dev-coder / orchestrator | S04 で presentation artifact contract と再確認するリスクとして記録 | S04 | no | `commands/deps.py` |
+| S03 | high-level default local open が unknown / descendant aggregate を隠す | code-reviewer | follow-up fix and tests added | `cl-ec-001`, `cl-ec-002` | no | `tests/unit/application/test_check_deps.py` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | `tc-s03-001`, `tc-s03-002`, `tc-s03-003`, `tc-s03-004`, `cl-ac-001`, `cl-ac-002`, `cl-ec-001`, `cl-ec-002` | S03 command tests pass, node-blocked issues fail consistently across `deps check`, `active set`, and `issue start`, reviewer pass recorded | tests pass; first `code-reviewer` failed on missing report evidence and local high-level status edge; follow-up fix applied; fresh `code-reviewer` pass; S03 commit confirmed by post-commit `git log --oneline -4` | pass | post-commit clean check passed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-s03-001` | S03 | yes | red-required | command tests failed before implementation | required S03 pytest slice | pass | `deps check --json` exits non-zero and returns schema v2 node blocker fields |
+| `tc-s03-002` | S03 | yes | red-required | application/CLI guard failed before implementation | required S03 pytest slice | pass | `active set` rejects node-blocked issue and keeps active pointer unchanged |
+| `tc-s03-003` | S03 | yes | red-required | `issue start --force` started node-blocked issue before implementation | required S03 pytest slice | pass | force does not bypass dependency guard |
+| `tc-s03-004` | S03 | yes | red-required | schema v1 / missing satisfied context before implementation | required S03 pytest slice | pass | satisfied high-level context exits zero and remains visible |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| `cl-ac-001` | S03 | CLI/application node blocker tests for `deps check`, `active set`, `issue start --force` | pass | command guard level closed pending fresh review |
+| `cl-ac-002` | S03 | `deps check --json` satisfied closed high-level context test | pass | satisfied-only context exits zero |
+| `cl-ec-001` | S03 | local empty high-level unknown follow-up test | pass | no default local open mask |
+| `cl-ec-002` | S03 | done descendant aggregate follow-up test | pass | descendant aggregate remains satisfied |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| reviewer follow-up | `cl-ec-001`, `cl-ec-002` | local high-level status tests | same | reviewer P2 が EC-001/EC-002 の説明性不足を指摘したため | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | runtime/test mutation under issue execution workflow | dev-coder | Command Guards And CLI Output | `plan.md` S03 | S03 application/command/tests allowed paths | dependency guard bypass via force, GitHub mutation, storage/presentation artifact behavior outside command output | S03 required pytest slice and `git diff --check` | lifecycle redesign or JSON schema strategy beyond design | changed files, command examples, status source path evidence, tests, risks, ledger note | pass after reviewer follow-up |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | Added high-level status context wiring for deps check / active set and JSON schema v2 command output. | `application/check_deps.py`; `application/set_active.py`; `commands/deps.py`; S03 tests | required S03 slice passed; `git diff --check` pass | first code-reviewer fail | S04 may consolidate command JSON and presentation ownership | accepted after follow-up |
+| S03 follow-up | dev-coder | Prevented default local-open high-level status from masking unknown/descendant aggregate behavior. | `application/check_deps.py`; `tests/unit/application/test_check_deps.py` | focused 2-test run passed; required S03 slice passed; `git diff --check` pass | pending fresh review | none beyond S04 presentation alignment | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | fresh after follow-up | passed | N/A | proceed to commit gate | First review failed on P1/P2; follow-up fixed local high-level status edge and report evidence; fresh re-review returned no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | closed | S03 allowed paths plus this report evidence | current S03 commit confirmed by `git log --oneline -4` after commit | `git status --short` clean after commit | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/check_deps.py` - high-level status context builder and deps check wiring
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py` - active set readiness wiring and node blocker force guard
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py` - deps check JSON schema v2 command output
+- `tests/cli_runtime/test_deps.py` - CLI deps check node blocker / satisfied context tests
+- `tests/cli_runtime/test_issue_lifecycle.py` - issue start force dependency guard test
+- `tests/unit/application/test_check_deps.py` - application status context and follow-up edge tests
+- `tests/unit/application/test_set_active.py` - active set node blocker force guard test
+- `spec-dock/active/issue/report.md` - S03 observed evidence ledger
+
+#### コミット
+- `feat(deps): node依存をcommand guardに反映` committed; final hash confirmed by post-commit `git log --oneline -4`
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）

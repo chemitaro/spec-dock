@@ -34,7 +34,7 @@ class _StubNodeReader:
 
 
 class _StubDepsTopologyReader:
-    def __init__(self, issue_depends_on_map, warnings=None, node_depends_on_map=None):
+    def __init__(self, issue_depends_on_map, warnings=None, node_depends_on_map=None, dependency_contexts=None):
         self.issue_depends_on_map = {
             issue_id: list(depends_on)
             for issue_id, depends_on in issue_depends_on_map.items()
@@ -44,12 +44,17 @@ class _StubDepsTopologyReader:
             node_id: list(depends_on)
             for node_id, depends_on in (node_depends_on_map or {}).items()
         }
+        self.dependency_contexts = {
+            issue_id: list(contexts)
+            for issue_id, contexts in (dependency_contexts or {}).items()
+        }
 
     def load_issue_depends_on_map(self, specdock_dir, graph):
         _app_check_deps, _app_contracts, _app_ports, _domain_models, infra_contracts = _runtime_modules()
         return infra_contracts.DepsTopologyLoadResult(
             issue_depends_on_map=dict(self.issue_depends_on_map),
             warnings=list(self.warnings),
+            dependency_contexts_by_issue_id=dict(self.dependency_contexts),
         )
 
     def load_node_dependency_resolutions(self, specdock_dir, graph):
@@ -269,6 +274,7 @@ class TestCheckDepsApplication:
         issue_gateway=None,
         deps=None,
         records=None,
+        dependency_contexts=None,
     ):
         if records is None:
             records = self._records(infra_contracts)
@@ -278,7 +284,10 @@ class TestCheckDepsApplication:
             specdock_dir=Path("/repo/spec-dock"),
             derived_state_reader=derived_state_reader,
             issue_gateway=issue_gateway,
-            deps_topology_reader=_StubDepsTopologyReader(deps or {"iss-00302": ["iss-00301"]}),
+            deps_topology_reader=_StubDepsTopologyReader(
+                deps or {"iss-00302": ["iss-00301"]},
+                dependency_contexts=dependency_contexts,
+            ),
         )
 
     def _snapshot(self, domain_models, issue_number, state, *, updated_at="2026-06-05T00:00:00Z"):
@@ -484,3 +493,189 @@ class TestCheckDepsApplication:
         assert blocked.inspection.evaluation.guard_reason == "blocked"
         assert blocked.inspection.evaluation.blockers == ["iss-00301"]
         assert blocked.inspection.node_states["iss-00301"].status == "ready"
+
+    def test_deps_check_passes_empty_open_high_level_context_to_readiness(self) -> None:
+        app_check_deps, app_contracts, app_ports, domain_models, infra_contracts = _runtime_modules()
+        records = self._records(infra_contracts) + self._empty_epic_records(infra_contracts)
+        context = infra_contracts.DepsDependencyContext(
+            source_node_id="iss-00302",
+            source_issue_id="iss-00302",
+            target_node_id="epic-00203",
+            target_node_kind="epic",
+            target_issue_ids=(),
+            expansion="empty",
+        )
+        ports = self._ports(
+            app_ports,
+            infra_contracts,
+            records=records,
+            deps={"iss-00302": []},
+            dependency_contexts={"iss-00302": [context]},
+            issue_gateway=_StubIssueGateway(
+                [
+                    self._snapshot(domain_models, 103, "OPEN"),
+                    self._snapshot(domain_models, 203, "OPEN"),
+                    self._snapshot(domain_models, 302, "OPEN"),
+                ]
+            ),
+        )
+
+        result = app_check_deps.check_deps(self._request(app_contracts, use_github=True), ports)
+
+        assert not result.inspection.evaluation.ready
+        assert result.inspection.evaluation.guard_reason == "blocked"
+        assert result.inspection.evaluation.blockers == ["epic-00203"]
+        assert result.inspection.evaluation.issue_blockers == []
+        assert [(b.node_id, b.reason, b.state, b.state_source) for b in result.inspection.evaluation.node_blockers] == [
+            ("epic-00203", "empty_open", "open", "github")
+        ]
+
+    def test_deps_check_exposes_satisfied_closed_high_level_context(self) -> None:
+        app_check_deps, app_contracts, app_ports, domain_models, infra_contracts = _runtime_modules()
+        records = self._records(infra_contracts) + self._empty_epic_records(infra_contracts)
+        context = infra_contracts.DepsDependencyContext(
+            source_node_id="iss-00302",
+            source_issue_id="iss-00302",
+            target_node_id="epic-00203",
+            target_node_kind="epic",
+            target_issue_ids=(),
+            expansion="empty",
+        )
+        ports = self._ports(
+            app_ports,
+            infra_contracts,
+            records=records,
+            deps={"iss-00302": []},
+            dependency_contexts={"iss-00302": [context]},
+            issue_gateway=_StubIssueGateway(
+                [
+                    self._snapshot(domain_models, 103, "OPEN"),
+                    self._snapshot(domain_models, 203, "CLOSED"),
+                    self._snapshot(domain_models, 302, "OPEN"),
+                ]
+            ),
+        )
+
+        result = app_check_deps.check_deps(self._request(app_contracts, use_github=True), ports)
+
+        assert result.inspection.evaluation.ready
+        assert result.inspection.evaluation.blockers == []
+        assert result.inspection.evaluation.node_blockers == []
+        assert [(c.target_node_id, c.expansion) for c in result.inspection.evaluation.satisfied_dependencies] == [
+            ("epic-00203", "empty")
+        ]
+
+    def test_local_empty_high_level_dependency_without_cache_fails_unknown(self) -> None:
+        app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
+        records = self._records(infra_contracts) + [
+            infra_contracts.StoredMetaRecord(
+                kind="epic",
+                id="epic-local-00203",
+                title="Local empty epic",
+                slug="local-empty-epic",
+                path="/repo/spec-dock/initiatives/init-00101-auth-platform/epics/epic-local-00203-local-empty-epic",
+                parent_id="init-00101",
+                initiative_id="init-00101",
+                epic_id=None,
+                github_issue_number=None,
+                meta_path="/repo/spec-dock/initiatives/init-00101-auth-platform/epics/epic-local-00203-local-empty-epic/.meta.json",
+            )
+        ]
+        context = infra_contracts.DepsDependencyContext(
+            source_node_id="iss-00302",
+            source_issue_id="iss-00302",
+            target_node_id="epic-local-00203",
+            target_node_kind="epic",
+            target_issue_ids=(),
+            expansion="empty",
+        )
+        ports = self._ports(
+            app_ports,
+            infra_contracts,
+            records=records,
+            deps={"iss-00302": []},
+            dependency_contexts={"iss-00302": [context]},
+            issue_gateway=_StubIssueGateway(fail_index=True),
+        )
+
+        result = app_check_deps.check_deps(self._request(app_contracts, use_github=False), ports)
+
+        assert not result.inspection.evaluation.ready
+        assert result.inspection.evaluation.guard_reason == "unknown"
+        assert [(b.node_id, b.reason, b.state, b.state_source) for b in result.inspection.evaluation.node_blockers] == [
+            ("epic-local-00203", "empty_unknown", "unknown", "none")
+        ]
+
+    def test_local_high_level_default_open_does_not_mask_done_descendant_aggregate(self) -> None:
+        app_check_deps, app_contracts, app_ports, domain_models, infra_contracts = _runtime_modules()
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[3]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.domain.tree import build_graph
+        finally:
+            sys.path.pop(0)
+        records = self._records(infra_contracts) + [
+            infra_contracts.StoredMetaRecord(
+                kind="epic",
+                id="epic-local-00203",
+                title="Local epic",
+                slug="local-epic",
+                path="/repo/spec-dock/initiatives/init-00101-auth-platform/epics/epic-local-00203-local-epic",
+                parent_id="init-00101",
+                initiative_id="init-00101",
+                epic_id=None,
+                github_issue_number=None,
+                meta_path="/repo/spec-dock/initiatives/init-00101-auth-platform/epics/epic-local-00203-local-epic/.meta.json",
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="issue",
+                id="iss-local-00401",
+                title="Local child",
+                slug="local-child",
+                path="/repo/spec-dock/initiatives/init-00101-auth-platform/epics/epic-local-00203-local-epic/issues/iss-local-00401-local-child",
+                parent_id="epic-local-00203",
+                initiative_id="init-00101",
+                epic_id="epic-local-00203",
+                github_issue_number=401,
+                meta_path="/repo/spec-dock/initiatives/init-00101-auth-platform/epics/epic-local-00203-local-epic/issues/iss-local-00401-local-child/.meta.json",
+            ),
+        ]
+        context = infra_contracts.DepsDependencyContext(
+            source_node_id="iss-00302",
+            source_issue_id="iss-00302",
+            target_node_id="epic-local-00203",
+            target_node_kind="epic",
+            target_issue_ids=("iss-local-00401",),
+            expansion="expanded",
+        )
+        ports = self._ports(
+            app_ports,
+            infra_contracts,
+            records=records,
+            deps={"iss-00302": ["iss-local-00401"]},
+            dependency_contexts={"iss-00302": [context]},
+            derived_state_reader=_StubDerivedStateReader({"iss-local-00401": "done"}),
+            issue_gateway=_StubIssueGateway(fail_index=True),
+        )
+
+        result = app_check_deps.check_deps(self._request(app_contracts, use_github=False), ports)
+
+        assert result.inspection.evaluation.node_blockers == []
+        assert [(c.target_node_id, c.expansion) for c in result.inspection.evaluation.satisfied_dependencies] == [
+            ("epic-local-00203", "expanded")
+        ]
+
+        graph = build_graph([app_check_deps._to_spec_node_seed(record) for record in records])
+        high_level_statuses = app_check_deps.resolve_high_level_status_context(
+            graph,
+            issue_statuses=result.inspection.issue_statuses,
+        )
+        assert high_level_statuses["epic-local-00203"].state == "done"
+        assert high_level_statuses["epic-local-00203"].source == "descendant_aggregate"

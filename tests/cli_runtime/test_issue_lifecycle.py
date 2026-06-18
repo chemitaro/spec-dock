@@ -1036,6 +1036,50 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert current == "iss-00101-first-issue"
 
+    def test_issue_start_force_does_not_bypass_node_level_dependency_guard(self) -> None:
+        if os.name == "nt":
+            pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as bin_tmp:
+            target = Path(tmp)
+            self._prepare_clean_repo_with_two_issues(target)
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "1", "--title", "Empty blocker", "--github-issue", "202"],
+            )
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00102-second-issue"
+                / ".meta.json"
+            )
+            meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+            meta["depends_on"] = ["epic-00202"]
+            self._write_json_force(issue_meta, meta)
+            self._commit_all(target, "add node dependency")
+
+            bin_dir = Path(bin_tmp)
+            self._make_gh_stub(bin_dir, states={101: "OPEN", 102: "OPEN", 202: "OPEN"})
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            self._run_runtime(target, ["issue", "start", "101"], env=test_env)
+            self._commit_all(target, "active first issue")
+
+            p = self._run_runtime_capture(target, ["issue", "start", "102", "--force"], env=test_env)
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "active set blocked" in p.stderr
+            assert "epic-00202" in p.stderr
+            assert "spec-dock: ok (issue start)" not in p.stdout
+            assert self._active_issue_id(target) == "iss-00101"
+            current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+            assert current == "iss-00101-first-issue"
+
     def test_issue_start_rejects_legacy_force_short_options(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
