@@ -144,7 +144,7 @@ class TestCliDeps(CliRuntimeHarness):
         assert deps_json_path.is_file(), f"missing artifact: {deps_json_path}"
         assert deps_puml_path.is_file(), f"missing artifact: {deps_puml_path}"
         deps_issues = json.loads(deps_json_path.read_text(encoding="utf-8"))
-        assert {"from": from_id, "to": to_id} in deps_issues["edges"]
+        assert any(edge.get("from") == from_id and edge.get("to") == to_id for edge in deps_issues["edges"])
         deps_puml = deps_puml_path.read_text(encoding="utf-8")
         assert from_id in deps_puml
         assert to_id in deps_puml
@@ -156,7 +156,7 @@ class TestCliDeps(CliRuntimeHarness):
         assert deps_json_path.is_file(), f"missing artifact: {deps_json_path}"
         assert deps_puml_path.is_file(), f"missing artifact: {deps_puml_path}"
         deps_issues = json.loads(deps_json_path.read_text(encoding="utf-8"))
-        assert {"from": from_id, "to": to_id} not in deps_issues["edges"]
+        assert not any(edge.get("from") == from_id and edge.get("to") == to_id for edge in deps_issues["edges"])
         deps_puml = deps_puml_path.read_text(encoding="utf-8")
         assert ": blocks" not in deps_puml
 
@@ -380,7 +380,7 @@ class TestCliDeps(CliRuntimeHarness):
             assert nodes["iss-00302"]["status"] == "open"
             assert nodes["iss-00303"]["status"] == "open"
 
-    def test_sync_deps_empty_epic_and_initiative_are_done_and_non_blocking(self) -> None:
+    def test_sync_deps_empty_open_epic_blocks_with_node_context(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
@@ -437,9 +437,9 @@ class TestCliDeps(CliRuntimeHarness):
             nodes = index["nodes"]
             assert nodes["epic-00201"]["progress"] == {"total": 0, "done": 0, "open": 0, "unknown": 0}
             assert nodes["init-00101"]["progress"] == {"total": 0, "done": 0, "open": 0, "unknown": 0}
-            assert nodes["iss-00301"]["deps"]["ready"]
-            assert nodes["iss-00301"]["deps"]["depends_on"] == []
-            assert nodes["iss-00301"]["deps"]["blockers_top"] == []
+            assert not nodes["iss-00301"]["deps"]["ready"]
+            assert nodes["iss-00301"]["deps"]["depends_on"] == ["epic-00201"]
+            assert nodes["iss-00301"]["deps"]["blockers_top"] == ["epic-00201"]
 
     def test_sync_deps_ignores_parent_github_closed_for_done(self) -> None:
         if os.name == "nt":
@@ -2658,8 +2658,8 @@ class TestCliDeps(CliRuntimeHarness):
             assert tree_all_issue_deps["iss-00303"] is None
 
             deps_issues = json.loads((agent_dir / "deps-issues.json").read_text(encoding="utf-8"))
-            assert deps_issues["projection"] == "open-issues-dependency-view"
-            assert deps_issues["source"] == {"index": "spec-dock/.agent/index.json", "schema_version": 2}
+            assert deps_issues["projection"] == "issue-readiness-with-dependency-context"
+            assert deps_issues["source"] == {"sync_state": "readiness_evaluation", "schema_version": 2}
             assert not deps_issues["deps"]["valid"]
             assert "Dependency cycle detected" in str(deps_issues["deps"]["error"])
             assert deps_issues["nodes"] == {}

@@ -344,6 +344,36 @@ class TestCliSync(CliRuntimeHarness):
             index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
             assert index["deps"]["issue_edges"] == []
 
+            deps_issues = json.loads((target / "spec-dock" / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
+            assert deps_issues["schema_version"] == 2
+            assert deps_issues["projection"] == "issue-readiness-with-dependency-context"
+            assert deps_issues["nodes"]["iss-00301"]["ready"] is False
+            assert deps_issues["nodes"]["iss-00301"]["node_blockers"] == [
+                {
+                    "node_id": "init-00102",
+                    "reason": "empty_unknown",
+                    "state": "unknown",
+                    "state_source": "none",
+                    "source_issue_id": "iss-00301",
+                },
+                {
+                    "node_id": "epic-00202",
+                    "reason": "empty_unknown",
+                    "state": "unknown",
+                    "state_source": "none",
+                    "source_issue_id": "iss-00301",
+                },
+            ]
+            assert deps_issues["nodes"]["init-00102"]["type"] == "initiative"
+            assert deps_issues["nodes"]["epic-00202"]["type"] == "epic"
+            assert [
+                (edge["from"], edge["to"], edge["state"], edge["relation"])
+                for edge in deps_issues["edges"]
+            ] == [
+                ("iss-00301", "init-00102", "blocking", "raw_direct"),
+                ("iss-00301", "epic-00202", "blocking", "raw_direct"),
+            ]
+
     def test_sync_fails_on_unresolved_ref(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -672,10 +702,16 @@ class TestCliSync(CliRuntimeHarness):
             assert deps_issues_puml_path.is_file()
 
             deps_issues = json.loads(deps_issues_path.read_text(encoding="utf-8"))
-            assert deps_issues["schema_version"] == 1
-            assert deps_issues["projection"] == "open-issues-dependency-view"
-            assert deps_issues["source"] == {"index": "spec-dock/.agent/index.json", "schema_version": 2}
-            assert set(deps_issues["nodes"].keys()) == {"iss-00302", "iss-00303", "iss-00304", "iss-00305"}
+            assert deps_issues["schema_version"] == 2
+            assert deps_issues["projection"] == "issue-readiness-with-dependency-context"
+            assert deps_issues["source"] == {"sync_state": "readiness_evaluation", "schema_version": 2}
+            assert set(deps_issues["nodes"].keys()) == {
+                "iss-00301",
+                "iss-00302",
+                "iss-00303",
+                "iss-00304",
+                "iss-00305",
+            }
 
             node_302 = deps_issues["nodes"]["iss-00302"]
             node_304 = deps_issues["nodes"]["iss-00304"]
@@ -690,14 +726,18 @@ class TestCliSync(CliRuntimeHarness):
             assert node_305["depends_on"] == []
             assert node_305["state"] == "ready"
 
-            edge_pairs = [(edge["from"], edge["to"]) for edge in deps_issues["edges"]]
-            assert edge_pairs == [("iss-00302", "iss-00303")]
+            edge_pairs = [(edge["from"], edge["to"], edge["state"], edge["relation"]) for edge in deps_issues["edges"]]
+            assert edge_pairs == [
+                ("iss-00302", "iss-00303", "blocking", "compiled_issue"),
+                ("iss-00304", "iss-00301", "satisfied", "raw_direct"),
+            ]
 
             puml = deps_issues_puml_path.read_text(encoding="utf-8")
             assert "iss-00302" in puml
             assert "iss-00303" in puml
+            assert "iss-00301" in puml
             assert "iss-00305" in puml
-            assert "iss-00301" not in puml
+            assert "satisfied" in puml
             assert "Niss_00303 --> Niss_00302 : blocks" in puml
 
     def test_sync_todo_projection_excludes_done_and_empty_branches(self) -> None:
@@ -806,13 +846,13 @@ class TestCliSync(CliRuntimeHarness):
 
             assert collect_tree_ids(tree_todo["tree"]) == todo_nodes
 
-            # deps-issues nodes should match todo issue set from index.json.
+            # deps-issues is readiness context, not a todo-only issue set.
             todo_issue_ids = {
                 node_id
                 for node_id, item in index_todo["nodes"].items()
                 if isinstance(item, dict) and item.get("type") == "issue"
             }
-            assert set(deps_issues["nodes"].keys()) == todo_issue_ids
+            assert set(deps_issues["nodes"].keys()).issuperset(todo_issue_ids)
 
     def test_sync_emits_tree_puml_ready_board_at_spec_dock_root(self) -> None:
         if os.name == "nt":
@@ -1326,18 +1366,18 @@ class TestCliSync(CliRuntimeHarness):
             assert deps_issues_path.is_file()
             assert deps_issues_puml_path.is_file()
             deps_issues = json.loads(deps_issues_path.read_text(encoding="utf-8"))
-            assert deps_issues["projection"] == "open-issues-dependency-view"
-            assert deps_issues["source"] == {"index": "spec-dock/.agent/index.json", "schema_version": 2}
+            assert deps_issues["projection"] == "issue-readiness-with-dependency-context"
+            assert deps_issues["source"] == {"sync_state": "readiness_evaluation", "schema_version": 2}
             assert deps_issues["deps"]["valid"]
             assert deps_issues["deps"]["error"] is None
-            assert "iss-00301" not in deps_issues["nodes"]  # done issue is filtered from todo projection
+            assert "iss-00301" in deps_issues["nodes"]  # satisfied context remains visible
             assert "iss-00302" in deps_issues["nodes"]
             assert "iss-00303" in deps_issues["nodes"]
 
             deps_issues_puml = deps_issues_puml_path.read_text(encoding="utf-8")
             assert "iss-00302" in deps_issues_puml
             assert "iss-00303" in deps_issues_puml
-            assert "iss-00301" not in deps_issues_puml
+            assert "iss-00301" in deps_issues_puml
 
             # Legacy v1 deps artifacts are no longer generated.
             assert not (target / "spec-dock" / ".agent" / "deps.json").exists()
