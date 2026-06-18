@@ -9,7 +9,7 @@ description: Entry/routing skill for SpecDock work; use it as the route selector
 - Keep this hub focused on route selection and cross-workflow invariants; leaf skills own task-specific workflow spines.
 - Use skills for the first-read workflow spine: mandatory next actions, stop conditions, reviewer gates, and handoff boundaries an agent must know before following links.
 - Use `spec-dock/docs/` for detailed semantics, field meanings, lifecycle policy, hard cases, and reference material.
-- Use templates as minimum authoring scaffolds, evidence slots, and examples. Templates are not compliance authorities.
+- Use templates as minimum authoring scaffolds and evidence slots only. Examples and detailed guidance belong in docs, not templates. Templates are not compliance authorities.
 - Route to docs for detailed explanations instead of copying schema or policy into skills.
 - Use `spec-dock/docs/workflow_spec_authoring.md` for detailed requirement / design / plan phase promotion semantics across Initiative, Epic, and Issue.
 - Use `spec-dock-clarification` for skill-owned, source-grounded clarification when the request is to clarify ambiguous requirements, sharpen domain language, prepare one-question-at-a-time interviews, or work in analysis-only / draft-only mode before canonical authoring; use `spec-dock/docs/workflow_clarification.md` for artifact semantics and reference details.

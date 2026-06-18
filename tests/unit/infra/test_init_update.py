@@ -422,6 +422,9 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/authoring/issue-plan.md": (
             "src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md"
         ),
+        "spec-dock/docs/authoring/decision-routing.md": (
+            "src/spec_dock/assets/spec_dock/docs/authoring/decision-routing.md"
+        ),
         "spec-dock/docs/workflow_initiative.md": (
             "src/spec_dock/assets/spec_dock/docs/workflow_initiative.md"
         ),

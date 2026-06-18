@@ -628,11 +628,6 @@ class CliRuntimeHarness:
                     text,
                     f"rules.md ignore example missing from {rel_path}",
                 )
-                _assert_in(
-                    "foo-adr-kickoff.md",
-                    text,
-                    f"malformed filename example missing from {rel_path}",
-                )
                 _assert_not_in(
                     "3-digit filename",
                     text,
