@@ -589,12 +589,106 @@ git diff --check
 
 ---
 
+### セッションログ（2026-06-19 S90）
+
+#### 対象
+- Step: S90 Docs Impact Resolution And Dogfooding Mirror
+- AC/EC: AC-006, EC-004
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `S90 — Docs Impact Resolution And Dogfooding Mirror`
+  - closure ids:
+    - `cl-ac-006`
+    - `cl-ec-004`
+
+#### 実施内容
+- provider docs `src/spec_dock/assets/spec_dock/docs/reference_deps.md` / `reference_sync.md` に node blocker、satisfied dependency、schema v2 `deps-issues`、raw/debug `deps-raw` の authority 境界を反映した。
+- dogfooding mirror docs `spec-dock/docs/reference_deps.md` / `reference_sync.md` を provider docs と同一内容に揃えた。
+- `.meta.json.depends_on` が raw storage であり storage format は変更しないことを明記した。
+- empty high-level dependency は保存可能だが open/unknown では node blocker、done/closed/all-descendant-done では satisfied dependency として扱うことを明記した。
+- disabled/cycle path は fail-closed placeholder であり partial readiness authority として読まないことを明記した。
+
+#### 実行コマンド / 結果
+```bash
+git diff --name-only
+# S90 allowed docs 4 files only
+
+diff -u src/spec_dock/assets/spec_dock/docs/reference_deps.md spec-dock/docs/reference_deps.md
+# no diff
+
+diff -u src/spec_dock/assets/spec_dock/docs/reference_sync.md spec-dock/docs/reference_sync.md
+# no diff
+
+git diff --check
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S90 | Red / Inspect | inspect-only | docs previously described `deps-issues` as todo issue-only and `deps_ref_expanded_to_empty` as warning-only context | `rg` inspection | pass | S04 contract was not reflected in docs |
+| S90 | Green | inspect-only + reviewer | provider/mirror docs aligned; spec-reviewer pass with no findings | `diff -u`; `git diff --check`; spec-reviewer | pass | docs-only step, runtime tests not run |
+| S90 | Refactor | guardrail satisfied | diff limited to provider docs and dogfooding mirror docs | `git diff --name-only` | pass | no workflow/source/test changes |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | `tc-s90-001`, `tc-s90-002`, `cl-ac-006`, `cl-ec-004` | provider docs explain node blockers/satisfied dependencies/authority boundary, mirror status recorded, spec-reviewer pass recorded | provider/mirror docs aligned; spec-reviewer pass; S90 commit confirmed by post-commit `git log --oneline -6` | pass | post-commit clean check passed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-s90-001` | S90 | yes | inspect-only | stale docs wording before S90 | docs diff inspection and spec-reviewer | pass | provider docs define readiness authority |
+| `tc-s90-002` | S90 | yes | inspect-only | mirror docs stale before S90 | provider/mirror `diff -u` | pass | dogfooding mirror intentionally aligned |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| `cl-ac-006` | S90 | provider/mirror docs diff and spec-reviewer | pass | docs and tests fix the new contract |
+| `cl-ec-004` | S90 | docs wording for `deps-raw` raw/debug authority | pass | `deps-raw` is not readiness authority |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | S90 | N/A | N/A | plan の S90 closure ids で対応 | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S90 | delegated | docs mutation under issue execution workflow | doc-writer | Docs Impact Resolution And Dogfooding Mirror | `plan.md` S90 | provider docs and generated mirror docs | workflow/source/test changes, broad unrelated docs rewrite | docs diff inspection and `git diff --check` | docs require workflow semantics or broad scaffold refresh | changed files, provider/mirror alignment, verification, risks, ledger note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S90 | doc-writer | Updated dependency and sync reference docs for node blockers, satisfied dependencies, deps-issues v2, deps-raw raw/debug boundary, and mirror alignment. | `src/.../reference_deps.md`; `src/.../reference_sync.md`; `spec-dock/docs/reference_deps.md`; `spec-dock/docs/reference_sync.md` | `git diff --check` pass; provider/mirror `diff -u` no diff | spec-reviewer pass | runtime tests not run for docs-only step | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed to commit gate | No findings; reviewer confirmed storage/readiness/raw authority wording and mirror alignment |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | closed | S90 docs plus this report evidence | current S90 commit confirmed by `git log --oneline -6` after commit | `git status --short` clean after commit | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/reference_deps.md` - provider dependency semantics
+- `src/spec_dock/assets/spec_dock/docs/reference_sync.md` - provider sync artifact contract
+- `spec-dock/docs/reference_deps.md` - dogfooding mirror dependency semantics
+- `spec-dock/docs/reference_sync.md` - dogfooding mirror sync artifact contract
+- `spec-dock/active/issue/report.md` - S90 observed evidence ledger
+
+#### コミット
+- `docs(deps): 依存ビューのauthority境界を更新` committed; final hash confirmed by post-commit `git log --oneline -6`
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| provider docs and dogfooding mirror docs | yes | doc-writer | `reference_deps.md` / `reference_sync.md` provider and mirror aligned; `git diff --check` pass | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
