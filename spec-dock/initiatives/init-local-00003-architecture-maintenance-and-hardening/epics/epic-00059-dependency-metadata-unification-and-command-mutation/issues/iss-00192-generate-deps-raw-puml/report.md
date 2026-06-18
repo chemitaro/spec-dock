@@ -1,4 +1,128 @@
 ---
+
+### セッションログ（2026-06-18 11:18 JST）
+
+#### 対象
+- Step: S02 Valid `deps-raw.puml` Renderer and Dependency-Focused Subset
+- AC/EC:
+  - cl-002, cl-003, cl-004, cl-005, cl-009, cl-010, cl-011, cl-012 renderer side
+- 計画上の出典（Planned source）:
+  - `plan.md` S02
+  - `design.md` `deps-raw.puml` payload / rendering contract
+
+#### 実施内容
+- `dev-coder` に S02 のみを委任し、`render_deps_raw_artifact()` と `render_deps_raw_puml()` を追加した。
+- Raw direct dependency map から participant と ancestor package を抽出し、dependency-focused subset を作る presentation payload builder を追加した。
+- initiative / epic は package endpoint、issue は state-colored rectangle、edge は `prerequisite --> dependent : blocks` として描画する。
+- S03 範囲の writer / dashboard / CLI / `.gitignore` integration は実装していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/presentation/test_deps_raw_puml.py
+# 8 passed
+
+uv run python -m compileall src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/puml.py tests/unit/presentation/test_deps_raw_puml.py
+# pass
+
+java -jar /private/tmp/plantuml-1.2026.6.jar -tsvg /private/tmp/deps-raw-s02-check.puml
+# pass
+
+uv run pytest tests/unit/presentation
+# 64 passed
+
+git diff --check
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ（Red） | red-required: deps-raw renderer cases | `uv run pytest tests/unit/presentation/test_deps_raw_puml.py` が実装前に `render_deps_raw_artifact` 未実装で 8 failed | delegated worker reported Red command | pass | tc-s02-001..tc-s02-008 |
+| S02 | 緑フェーズ（Green） | focused renderer verification | `uv run pytest tests/unit/presentation/test_deps_raw_puml.py` -> 8 passed | command | pass | all S02 closure cases |
+| S02 | 緑フェーズ（Green） | presentation regression | `uv run pytest tests/unit/presentation` -> 64 passed | command | pass | existing presentation tests preserved |
+| S02 | PlantUML 構文確認 | manual-required / source contract rendering | `java -jar /private/tmp/plantuml-1.2026.6.jar -tsvg /private/tmp/deps-raw-s02-check.puml` -> pass | command | pass | representative package endpoint sample |
+| S02 | リファクタリング（Refactor） | guardrail satisfied / no unrelated refactor | `git diff --check` -> pass; diff inspection confirms no S03 writer/dashboard/CLI/gitignore work | command + diff inspection | pass | existing `deps-issues` path preserved |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | PlantUML rendered layout may vary by version | plan risk | Source text contract tests and one PlantUML syntax render check recorded | cl-002..cl-012 | no | PlantUML 1.2026.6 SVG generation pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | cl-002 | issue->issue edge with ancestors | `test_tc_s02_001_issue_to_issue_edge_with_ancestors` | pass | edge direction and packages asserted |
+| S02 | cl-003 | parent-level package endpoint edge | `test_tc_s02_002_parent_level_package_endpoint_edge` | pass | issue-only expansion absent |
+| S02 | cl-004 | epic/issue mixed endpoint edge | `test_tc_s02_003_epic_issue_mixed_edge` | pass | package endpoint + rectangle endpoint |
+| S02 | cl-005 | initiative-involved mixed edge | `test_tc_s02_004_initiative_issue_mixed_edge` | pass | design reviewer P2 coverage |
+| S02 | cl-009 | parent participant without descendant issue expansion | `test_tc_s02_006_parent_participant_without_descendant_issue_expansion` | pass | package endpoint preserved |
+| S02 | cl-010 | nonparticipants omitted and ancestors retained | `test_tc_s02_005_nonparticipants_omitted_and_ancestors_retained` | pass | dependency-focused subset |
+| S02 | cl-011 | done/closed participant included | `test_tc_s02_007_done_closed_participant_included` | pass | done issue rendered gray |
+| S02 | cl-012 renderer side | zero dependency note | `test_tc_s02_008_zero_raw_direct_dependencies_valid_note` | pass | file write remains S03 scope |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-002 / tc-s02-001 | S02 | yes | red-required | Initial Red: renderer missing | `uv run pytest tests/unit/presentation/test_deps_raw_puml.py` | pass | 8 passed |
+| cl-003 / tc-s02-002 | S02 | yes | red-required | Initial Red: renderer missing | `uv run pytest tests/unit/presentation/test_deps_raw_puml.py` | pass | 8 passed |
+| cl-004 / tc-s02-003 | S02 | yes | red-required | Initial Red: renderer missing | `uv run pytest tests/unit/presentation/test_deps_raw_puml.py` | pass | 8 passed |
+| cl-005 / tc-s02-004 | S02 | yes | red-required | Initial Red: renderer missing | `uv run pytest tests/unit/presentation/test_deps_raw_puml.py` | pass | 8 passed |
+| cl-009 / tc-s02-006 | S02 | yes | red-required | Initial Red: renderer missing | `uv run pytest tests/unit/presentation/test_deps_raw_puml.py` | pass | 8 passed |
+| cl-010 / tc-s02-005 | S02 | yes | red-required | Initial Red: renderer missing | `uv run pytest tests/unit/presentation/test_deps_raw_puml.py` | pass | 8 passed |
+| cl-011 / tc-s02-007 | S02 | yes | red-required | Initial Red: renderer missing | `uv run pytest tests/unit/presentation/test_deps_raw_puml.py` | pass | 8 passed |
+| cl-012 / tc-s02-008 | S02 | yes | red-required | Initial Red: renderer missing | `uv run pytest tests/unit/presentation/test_deps_raw_puml.py` | pass | 8 passed |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-002 | S02 | focused renderer test | pass | issue->issue |
+| cl-003 | S02 | focused renderer test | pass | parent package endpoint |
+| cl-004 | S02 | focused renderer test | pass | epic/issue mixed |
+| cl-005 | S02 | focused renderer test | pass | initiative/issue mixed |
+| cl-009 | S02 | focused renderer test | pass | empty parent participant |
+| cl-010 | S02 | focused renderer test | pass | subset omission |
+| cl-011 | S02 | focused renderer test | pass | done participant |
+| cl-012 | S02 | focused renderer test | pass | renderer side only; sync file write remains S03 |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | S02 | N/A | N/A | plan-defined S02 closures implemented as planned | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | presentation renderer and tests | dev-coder | S02 only | `plan.md` S02 | `presentation/json_state.py`, `presentation/puml.py`, focused presentation tests | writer / dashboard / CLI / `.gitignore`, application/infra contract changes, raw JSON output, `deps-issues` semantics | focused renderer tests, compile, PlantUML syntax check, presentation regression | path outside S02, hidden anchor need, renderer cannot express accepted design | changed files, tests, risks, ledger note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Added raw dependency payload builder, valid PlantUML renderer, and eight focused renderer tests | `presentation/json_state.py`, `presentation/puml.py`, `tests/unit/presentation/test_deps_raw_puml.py` | `uv run pytest tests/unit/presentation/test_deps_raw_puml.py` -> 8 passed; compileall -> pass | code-reviewer passed | bitmap layout variance only | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | passed | no | proceed to Step Commit Gate | Re-review not needed; agent `019ed891-70da-7dc3-bd39-55a755b32342` |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | pending commit | S02 presentation renderer/tests/report evidence only | commit hash recorded as post-commit external evidence | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py` - raw dependency payload builder and artifact renderer
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/puml.py` - valid deps-raw PlantUML renderer
+- `tests/unit/presentation/test_deps_raw_puml.py` - S02 focused renderer tests
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00192-generate-deps-raw-puml/report.md` - S02 evidence ledger
+
+#### コミット
+- pending
+
+#### メモ
+- Worker stated: No material implementation decisions beyond the approved plan.
+- `deps-raw.puml` writer integration and discovery remain S03 scope.
+
+---
 種別: 実装報告書（Issue）
 ID: "iss-00192"
 タイトル: "Generate Raw Dependency View"
