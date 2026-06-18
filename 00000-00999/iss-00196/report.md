@@ -452,7 +452,7 @@ pass: no whitespace errors.
   - closure id: tc-007
 
 #### 実施内容
-- Provider assets の S01-S03 変更を、現在 checkout から `uvx --from . spec-dock update .` で dogfooding workspace へ投影した。
+- Provider assets の S01-S03 変更を、現在 source から `uv run python -m spec_dock.cli update .` で dogfooding workspace へ投影した。先行して実行した `uvx --from . spec-dock update .` は cached build を使ったため、最終投影証跡としては採用しない。
 - 投影後の変更範囲が `.agents/skills/**`, `spec-dock/docs/**`, `spec-dock/templates/**` の該当 mirror に収まることを確認した。
 - 投影前後で `./spec-dock/scripts/spec-dock validate` が通ることを確認した。
 
@@ -463,6 +463,10 @@ pass: no whitespace errors.
 pass: spec-dock: ok (validate) nodes=129
 
 uvx --from . spec-dock update .
+
+superseded: command returned ok, but later provider repair showed this path could use a cached build and was not authoritative final projection evidence.
+
+uv run python -m spec_dock.cli update .
 
 pass: spec-dock: ok (update) -> /Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/7e5f/spec-dock
 
@@ -486,12 +490,12 @@ pass: no whitespace errors.
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S90 | tc-007 | Provider edits validate and dogfooding mirror is inspected or explicitly marked not refreshed with reason | `uvx --from . spec-dock update .` projected provider docs/skills/templates into mirror; validate passed before and after update | pass | reviewer gate pending |
+| S90 | tc-007 | Provider edits validate and dogfooding mirror is inspected or explicitly marked not refreshed with reason | `uv run python -m spec_dock.cli update .` projected provider docs/skills/templates into mirror; validate passed before and after update | pass | reviewer gate pending |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-007 | S90 | yes | manual-required | Provider assets had changed in S01-S03 and mirror needed validation / projection | `./spec-dock/scripts/spec-dock validate`; `uvx --from . spec-dock update .`; targeted mirror `rg`; `git diff --check`; `git diff --cached --check` | pass | mirror diff is generated projection of provider asset changes; cached check covers the new mirror guide |
+| tc-007 | S90 | yes | manual-required | Provider assets had changed in S01-S03 and mirror needed validation / projection | `./spec-dock/scripts/spec-dock validate`; `uv run python -m spec_dock.cli update .`; targeted mirror `rg`; `git diff --check`; `git diff --cached --check` | pass | mirror diff is generated projection of provider asset changes; cached check covers the new mirror guide |
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
@@ -527,7 +531,7 @@ pass: no whitespace errors.
 - `spec-dock/templates/epic/design.md` - provider template change の dogfooding mirror
 
 #### コミット
-- pending
+- `a78abeef` (`docs(dogfooding): provider asset変更をmirrorへ投影`)
 
 #### メモ
 - S90 は command-generated mirror projection step。Provider source of truth は S01-S03 の各 commit で更新済み。
@@ -539,37 +543,43 @@ pass: no whitespace errors.
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / README / workflow / skill / migration notes | yes | doc-writer / parent orchestrator projection | S01-S03 provider assets updated; S90 projected mirror by `uv run python -m spec_dock.cli update .`; `./spec-dock/scripts/spec-dock validate` -> pass | S90 step reviewer pass by `019ed85c-7f8a-70b2-82a5-4e7b2769e3fe`; final spec reviewer pending |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | existing update/runtime regression suite sufficient after adding decision-routing mirror parity coverage | `uv run pytest tests/unit/infra/test_init_update.py tests/cli_runtime` -> 1065 passed, 76 skipped; `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_mirror_docs_match_provider_assets tests/unit/infra/test_init_update.py::TestInitUpdate::test_spec_document_templates_keep_policy_out_of_scaffold` -> 2 passed; `./spec-dock/scripts/spec-dock validate` -> pass | pass by `qa-reviewer` `019ed87d-a058-7da0-b9bc-b6e424c1736c`; P2 decision-routing mirror parity coverage added |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | P2 S90 projection evidence contradiction fixed by marking `uvx --from .` superseded and recording `uv run python -m spec_dock.cli update .` as authoritative projection evidence | 0 | pass by `code-reviewer` `019ed87d-cd5d-7a81-81fe-589043791bb2` |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | P1 hub skill template/example contradiction fixed in provider and mirror; P1 final gate pending fixed by recording QA/code results; P2 S90 projection evidence contradiction fixed | 1 | pass by `spec-reviewer` `019ed87d-fa18-7403-be0a-31486676ebf1` |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| final reviewer pass recorded | provider docs/templates/skills repair, dogfooding mirror repair, test contract realignment, final report evidence | PR and final response | ready for final commit |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: `uvx --from . spec-dock update .` が cached build を使い、provider repair 後の mirror 更新が差分に出なかった。
+  - 解決: `uv run python -m spec_dock.cli update .` で current source から dogfooding mirror を再投影した。
+- 問題: final reviewer で hub skill が templates を examples surface と呼んでおり、clean-template decision と矛盾していた。
+  - 解決: provider / dogfooding mirror の `spec-dock-hub` skill を thin scaffold / evidence slot only に修正した。
+- 問題: 新規 `decision-routing.md` の dogfooding mirror parity が explicit test map に含まれていなかった。
+  - 解決: `_DOGFOODING_MIRROR_PROVIDER_ASSET_MAP` に `spec-dock/docs/authoring/decision-routing.md` を追加し、focused parity test を通した。
+- 問題: `tests/unit/infra/test_init_update.py tests/cli_runtime` の初回実行で 5 failed / 1060 passed / 76 skipped。
+  - 解決: `decision-routing.md` を日本語 primary docs contract に合わせ、template README の旧 example 必須 test を thin-template 方針へ更新し、checked-in dogfooding `.meta.json` snapshot を現行 tree に機械更新した。Focused 5 tests -> pass、wide suite -> 1065 passed / 76 skipped。
 
 ## 学んだこと (任意)
-- ...
+- Provider asset repair 後の dogfooding mirror 検証では、cached installer 経由ではなく current source 直実行の update 経路を優先する。
 
 ## 今後の推奨事項 (任意)
-- ...
+- `uvx --from .` の cached build 挙動を避けるため、provider asset dogfooding projection の標準コマンドを docs / workflow に明示する follow-up を検討する。
 
 ## 省略/例外メモ (必須)
 - 該当なし
