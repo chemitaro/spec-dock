@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 import argparse
+import json
 from dataclasses import dataclass
 
-from ..application.contracts import CheckDepsRequest, MutateDepsError, MutateDepsRequest, TargetRef, UseCases
+from ..application.contracts import (
+    CheckDepsRequest,
+    DepsCheckResult,
+    MutateDepsError,
+    MutateDepsRequest,
+    TargetRef,
+    UseCases,
+)
 from ..presentation.cli_text import (
     render_deps_check_text,
     render_deps_mutation_error_text,
     render_deps_mutation_text,
 )
 from ..presentation.contracts import CliText
-from ..presentation.json_state import render_deps_check_json
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
 from .node_id_normalizer import normalize_node_id
 from .targets import parse_explicit_target_flags
@@ -120,7 +127,7 @@ def _run_deps_check(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     )
     if typed.json_output:
         text = CliText(
-            stdout_lines=[render_deps_check_json(result)],
+            stdout_lines=[_render_deps_check_json(result)],
             stderr_lines=[],
             warnings=[],
         )
@@ -128,6 +135,83 @@ def _run_deps_check(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
         text = render_deps_check_text(result)
     exit_code = 0 if result.inspection.evaluation.ready else 3
     return CommandOutcome(exit_code=exit_code, text=text)
+
+
+def _render_deps_check_json(result: DepsCheckResult) -> str:
+    inspection = result.inspection
+    target_id = inspection.target_id.value
+    target_status = inspection.issue_statuses.get(target_id)
+    target_status_payload = {
+        "authority": target_status.authority if target_status is not None else "unknown",
+        "effective_status": target_status.effective_status if target_status is not None else "unknown",
+        "source": target_status.source if target_status is not None else "unknown",
+        "stale": bool(target_status.stale) if target_status is not None else True,
+        "last_sync_at": target_status.last_sync_at if target_status is not None else None,
+    }
+    payload = {
+        "schema_version": 2,
+        "target": target_id,
+        "target_status": target_status_payload,
+        "ready": bool(inspection.evaluation.ready),
+        "effective_depends_on": list(inspection.effective_depends_on),
+        "blockers": list(inspection.evaluation.blockers),
+        "issue_blockers": list(inspection.evaluation.issue_blockers),
+        "node_blockers": [
+            {
+                "node_id": blocker.node_id,
+                "reason": blocker.reason,
+                "state": blocker.state,
+                "state_source": blocker.state_source,
+                "source_issue_id": blocker.source_issue_id,
+            }
+            for blocker in inspection.evaluation.node_blockers
+        ],
+        "satisfied_dependencies": [
+            {
+                "source_node_id": context.source_node_id,
+                "source_issue_id": context.source_issue_id,
+                "target_node_id": context.target_node_id,
+                "target_node_kind": context.target_node_kind,
+                "target_issue_ids": list(context.target_issue_ids),
+                "expansion": context.expansion,
+            }
+            for context in inspection.evaluation.satisfied_dependencies
+        ],
+        "nodes": {
+            node_id: {
+                "state": node_state.status,
+                "ready": bool(node_state.ready),
+                "authority": (
+                    inspection.issue_statuses[node_id].authority
+                    if node_id in inspection.issue_statuses
+                    else "unknown"
+                ),
+                "effective_status": (
+                    inspection.issue_statuses[node_id].effective_status
+                    if node_id in inspection.issue_statuses
+                    else "unknown"
+                ),
+                "source": (
+                    inspection.issue_statuses[node_id].source
+                    if node_id in inspection.issue_statuses
+                    else "unknown"
+                ),
+                "stale": (
+                    bool(inspection.issue_statuses[node_id].stale)
+                    if node_id in inspection.issue_statuses
+                    else True
+                ),
+                "last_sync_at": (
+                    inspection.issue_statuses[node_id].last_sync_at
+                    if node_id in inspection.issue_statuses
+                    else None
+                ),
+            }
+            for node_id, node_state in inspection.node_states.items()
+        },
+        "warnings": list(result.warnings),
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
 def _run_deps_add(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
