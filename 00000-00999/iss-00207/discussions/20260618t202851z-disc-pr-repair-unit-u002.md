@@ -98,7 +98,7 @@ The first cached-state repair was local to `deps check --no-github`, did not mat
 
 ## Commit Evidence
 
-- pending commit after parent integration.
+- Commit: `36acb9c56156f266a7e46417fc71c077a0d63ab0`
 - Parent verification before commit:
   - `uv run pytest tests/unit/application/test_check_deps.py::TestCheckDepsApplication::test_no_github_uses_cached_high_level_github_state_from_sync_artifact tests/unit/application/test_set_active.py::TestSetActiveApplication::test_set_active_no_github_uses_cached_high_level_github_state tests/cli_runtime/test_sync.py::TestCliSync::test_sync_deps_issues_marks_empty_closed_epic_dependency_satisfied` -> 3 passed
   - `git diff --check` -> pass
@@ -107,8 +107,11 @@ The first cached-state repair was local to `deps check --no-github`, did not mat
 
 ## Re-observation Result
 
-- pending
+- Latest observed head `36acb9c56156f266a7e46417fc71c077a0d63ab0`: CI passed and the current observation trigger boundary had no selected review comments or review threads for this unit.
+- Thread `PRRT_kwDOQ99OK86Kqu-H` became outdated.
+- The observation script still reported `human_gate` because historical non-outdated GitHub review threads `PRRT_kwDOQ99OK86Kqu-M` and `PRRT_kwDOQ99OK86Kqu-P` remain unresolved as carryover.
 
 ## Residual Risk / Follow-up
 
-- pending re-observation
+- No product blocker remains for U002 after committed repair and latest-boundary clean observation.
+- Residual workflow risk: GitHub review threads remain unresolved as carryover and require human/GitHub-side resolution if strict thread resolution is required before merge.

@@ -21,17 +21,17 @@ reflected_to: []
 - Repository: chemitaro/spec-dock
 - Base branch: main
 - Head branch: iss-00207-fix-dependency-projections-for-node-level-blockers
-- Latest head SHA: b506e0abcc8749bc679d28c78f71efcfa170fb9b
+- Latest observed head SHA: 36acb9c56156f266a7e46417fc71c077a0d63ab0
 - Observation command: `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh --repo chemitaro/spec-dock --pr 208 --head-sha 8ca6cd6e1c7a9899b20b69445c61343e2b455633`
 - Observation final JSON / evidence: stdout JSON from observation at 2026-06-18T19:43:11Z
-- Observation status: human_gate; CI passed; review unresolved after U001 re-observation
+- Observation status: human_gate due carryover non-outdated unresolved threads; CI passed; current trigger boundary had no selected review comments or review threads after U002 re-observation
 - Trigger comment id: 4745456367
 - Trigger created_at: 2026-06-18T19:29:48Z
 - Trigger boundary: current trigger boundary for head SHA 8ca6cd6e1c7a9899b20b69445c61343e2b455633
 - Resume metadata: N/A; initial observation reached terminal human_gate
 - New trigger approved: no
 - Observation limitation: none; unresolved review thread state known
-- Batch status: U002 implemented; re-observation pending
+- Batch status: implemented and re-observed; GitHub PR state is open, ready, mergeable, and clean at observed head
 
 ## Batch Purpose
 
@@ -48,11 +48,11 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 
 | ID | source_type | concern | failure_class | evidence | summary | validity | risk_class | need_to_fix | disposition | repair_unit | status | rationale | residual_risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| I001 | codex_review_comment | C001 | review_feedback:completed-source-node-blocker | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py:190`, thread `PRRT_kwDOQ99OK86KqG36` | Completed source issues can become blocked again when they still have an open/unknown empty high-level dependency context. | valid | blocking | yes | fix-now | U001 | implemented | Done issues should remain ready even if raw high-level dependency context is incomplete; dependency blocker evaluation must not flip completed source readiness. | pending re-observation |
-| I002 | codex_review_comment | C001 | review_feedback:cached-high-level-state | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/check_deps.py:168`, thread `PRRT_kwDOQ99OK86KqG3_` | `--no-github` cached high-level state reads issue-only `status` while sync stores high-level GitHub state under `github.state`. | valid | blocking | yes | fix-now | U001 | implemented | Cached closed epic/initiative dependencies must remain satisfied without live GitHub. | pending re-observation |
-| I003 | codex_review_comment | C002 | review_feedback:cached-node-kind-schema | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/check_deps.py:171`, thread `PRRT_kwDOQ99OK86Kqu-H` | Cached high-level reader expects `kind`, but generated `index*.json` node schema uses `type`. | valid | blocking | yes | fix-now | U002 | implemented | Cached artifact reader must match generated schema and tests must use generated field shape. | pending re-observation |
-| I004 | codex_review_comment | C002 | review_feedback:offline-sync-cache | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py:598`, thread `PRRT_kwDOQ99OK86Kqu-M` | `sync --no-github` does not pass cached high-level `github.state`, so offline sync rewrites closed high-level dependency as unknown blocker. | valid | blocking | yes | fix-now | U002 | implemented | Offline sync must preserve cached satisfied high-level dependencies. | pending re-observation |
-| I005 | codex_review_comment | C002 | review_feedback:offline-active-set-cache | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py:532`, thread `PRRT_kwDOQ99OK86Kqu-P` | `active set --no-github` does not include cached high-level GitHub state, so offline activation is blocked by `empty_unknown`. | valid | blocking | yes | fix-now | U002 | implemented | Offline activation guard must use cached high-level state consistently. | pending re-observation |
+| I001 | codex_review_comment | C001 | review_feedback:completed-source-node-blocker | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py:190`, thread `PRRT_kwDOQ99OK86KqG36` | Completed source issues can become blocked again when they still have an open/unknown empty high-level dependency context. | valid | blocking | yes | fix-now | U001 | reobserved-pass | Done issues should remain ready even if raw high-level dependency context is incomplete; dependency blocker evaluation must not flip completed source readiness. | GitHub review thread remains unresolved as carryover, but latest trigger boundary had no selected current finding after repair |
+| I002 | codex_review_comment | C001 | review_feedback:cached-high-level-state | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/check_deps.py:168`, thread `PRRT_kwDOQ99OK86KqG3_` | `--no-github` cached high-level state reads issue-only `status` while sync stores high-level GitHub state under `github.state`. | valid | blocking | yes | fix-now | U001 | reobserved-pass | Cached closed epic/initiative dependencies must remain satisfied without live GitHub. | GitHub review thread remains unresolved as carryover, but latest trigger boundary had no selected current finding after repair |
+| I003 | codex_review_comment | C002 | review_feedback:cached-node-kind-schema | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/check_deps.py:171`, thread `PRRT_kwDOQ99OK86Kqu-H` | Cached high-level reader expects `kind`, but generated `index*.json` node schema uses `type`. | valid | blocking | yes | fix-now | U002 | reobserved-pass | Cached artifact reader must match generated schema and tests must use generated field shape. | Thread became outdated after repair observation |
+| I004 | codex_review_comment | C002 | review_feedback:offline-sync-cache | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py:598`, thread `PRRT_kwDOQ99OK86Kqu-M` | `sync --no-github` does not pass cached high-level `github.state`, so offline sync rewrites closed high-level dependency as unknown blocker. | valid | blocking | yes | fix-now | U002 | reobserved-pass | Offline sync must preserve cached satisfied high-level dependencies. | GitHub review thread remains unresolved as carryover, but latest trigger boundary had no selected current finding after repair |
+| I005 | codex_review_comment | C002 | review_feedback:offline-active-set-cache | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py:532`, thread `PRRT_kwDOQ99OK86Kqu-P` | `active set --no-github` does not include cached high-level GitHub state, so offline activation is blocked by `empty_unknown`. | valid | blocking | yes | fix-now | U002 | reobserved-pass | Offline activation guard must use cached high-level state consistently. | GitHub review thread remains unresolved as carryover, but latest trigger boundary had no selected current finding after repair |
 
 ## Classification Values
 
@@ -91,8 +91,8 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 
 | unit_id | source_batch | covered_ids | disposition | risk_class | repair_unit_disc | status | Implementation Plan | Re-observation Result | Residual Risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| U001 | 20260618t194321z-pr-repair-batch | I001, I002 | fix-now | blocking | `20260618t194411z-disc-pr-repair-unit-u001.md` | implemented | Added regressions for completed source issue with high-level blocker context and cached closed high-level dependency; updated domain/application logic; mirrored provider runtime; focused tests, validate, diff check, and broad unit / CLI runtime passed. | pending | pending re-observation |
-| U002 | 20260618t194321z-pr-repair-batch | I003, I004, I005 | fix-now | blocking | `20260618t202851z-disc-pr-repair-unit-u002.md` | implemented | Read cached high-level state from generated `type` field and propagate it through offline check/sync/active-set paths; focused tests, validate, diff check, and broad unit / CLI runtime passed. | pending | pending re-observation |
+| U001 | 20260618t194321z-pr-repair-batch | I001, I002 | fix-now | blocking | `20260618t194411z-disc-pr-repair-unit-u001.md` | reobserved-pass | Added regressions for completed source issue with high-level blocker context and cached closed high-level dependency; updated domain/application logic; mirrored provider runtime; focused tests, validate, diff check, and broad unit / CLI runtime passed. | Latest observed head `36acb9c56156f266a7e46417fc71c077a0d63ab0`: CI passed; no selected current-trigger review finding remained for U001. | Carryover GitHub review threads I001/I002 remain unresolved but are triaged as addressed by committed repair and latest-boundary clean observation. |
+| U002 | 20260618t194321z-pr-repair-batch | I003, I004, I005 | fix-now | blocking | `20260618t202851z-disc-pr-repair-unit-u002.md` | reobserved-pass | Read cached high-level state from generated `type` field and propagate it through offline check/sync/active-set paths; focused tests, validate, diff check, and broad unit / CLI runtime passed. | Latest observed head `36acb9c56156f266a7e46417fc71c077a0d63ab0`: CI passed; no selected current-trigger review finding remained for U002; I003 thread became outdated. | Carryover GitHub review threads I004/I005 remain unresolved but are triaged as addressed by committed repair and latest-boundary clean observation. |
 
 ## Unit Discussion Plan
 
@@ -150,3 +150,15 @@ Report `merge-prepared: yes` only when all conditions are true:
 - Observation limitation handling, resume metadata, trigger boundary, and new trigger approval status are recorded.
 - Review-thread unresolved state is known, or any unresolved-thread limitation is explicitly waived and recorded as residual risk.
 - `review-clean` is reported separately from `merge-prepared`; `review-clean: no` may still be `merge-prepared: yes` when all remaining items are triaged and non-blocking.
+
+### Merge-Prepared Result
+
+- PR open: yes.
+- Latest observed head SHA: `36acb9c56156f266a7e46417fc71c077a0d63ab0`.
+- Required checks: pass (`validate`, `provider-tests`).
+- Non-required checks: none observed.
+- GitHub mergeability: `mergeable=MERGEABLE`, `mergeStateStatus=CLEAN`.
+- Review-clean: yes for the latest observation trigger boundary; no selected current-trigger review comments or review threads remained.
+- Carryover unresolved review threads: known. `PRRT_kwDOQ99OK86KqG36`, `PRRT_kwDOQ99OK86KqG3_`, `PRRT_kwDOQ99OK86Kqu-M`, and `PRRT_kwDOQ99OK86Kqu-P` remain unresolved in GitHub as carryover non-outdated threads, while `PRRT_kwDOQ99OK86Kqu-H` became outdated.
+- Unresolved blockers: none untriaged; no unresolved needs-human item remains.
+- Final merge-prepared decision: yes for GitHub mergeability and current-trigger review state, with residual known limitation that historical GitHub review threads remain unresolved and cannot be resolved by the local workflow.

@@ -799,6 +799,37 @@ uv run pytest tests/unit tests/cli_runtime
 |---|---|---|---|
 | S99 report evidence updated through QA/code/spec follow-up | S99 dogfooding mirror parity, checked-in snapshot, deps check JSON presentation renderer, sync satisfied high-level regression, and final report evidence | final response and PR body after final commit; final commit hash and clean check are external delivery evidence | ready for final commit |
 
+## PR 送達ゲート（PR Delivery Gate / 必須）
+
+| 項目 | 証跡 |
+|---|---|
+| PR URL | https://github.com/chemitaro/spec-dock/pull/208 |
+| selected base | `main` |
+| base-resolution source | repository default branch / PR creation context |
+| base-resolution conflict / handling | none observed |
+| draft / ready decision | ready PR (`isDraft=false`) |
+| head branch | `iss-00207-fix-dependency-projections-for-node-level-blockers` |
+| head SHA at latest completed observation before this report evidence commit | `36acb9c56156f266a7e46417fc71c077a0d63ab0` |
+| issue linkage | GitHub issue `#207`, active SpecDock issue `iss-00207` |
+| existing PR reuse / new PR creation decision | new PR created for this issue branch |
+| post-report evidence boundary | this report evidence commit may advance PR head; final head SHA, push state, and clean check are recorded as external delivery evidence after commit/push |
+
+## マージ準備ゲート（Merge Preparation Gate / 必須）
+
+| 項目 | 証跡 |
+|---|---|
+| PR open state | open |
+| monitor status | latest observation reached terminal `human_gate` only because carryover non-outdated unresolved review threads remain; CI and current-trigger review boundary were clean |
+| latest monitored head SHA | `36acb9c56156f266a7e46417fc71c077a0d63ab0` |
+| fix loop count / history | U001 and U002 repair units completed after PR observation findings; commits `b506e0abcc8749bc679d28c78f71efcfa170fb9b` and `36acb9c56156f266a7e46417fc71c077a0d63ab0` |
+| required check status | pass: `validate` and `provider-tests` all `SUCCESS` at monitored head |
+| non-required check status and waiver evidence | no non-required failing checks observed; no waiver used |
+| blocking review status | no selected current-trigger review comments or review threads remained at monitored head |
+| merge conflict / visible merge blocker status | GitHub reports `mergeable=MERGEABLE`, `mergeStateStatus=CLEAN` |
+| unresolved review-thread limitation status | known carryover non-outdated unresolved threads: `PRRT_kwDOQ99OK86KqG36`, `PRRT_kwDOQ99OK86KqG3_`, `PRRT_kwDOQ99OK86Kqu-M`, `PRRT_kwDOQ99OK86Kqu-P`; `PRRT_kwDOQ99OK86Kqu-H` became outdated |
+| unresolved blockers | none untriaged; no unresolved needs-human repair item remains |
+| final merge-prepared decision | merge-prepared for GitHub mergeability and current-trigger review state, with residual known limitation that historical GitHub review threads remain unresolved and need human/GitHub-side resolution if strict thread resolution is required |
+
 ## 遭遇した問題と解決 (任意)
 - 問題: final broad regression initially failed on dogfooding metadata snapshot and runtime mirror parity.
   - 解決: S99 follow-up synchronized dogfooding runtime mirror files and updated checked-in snapshot expectations, then focused and broad tests passed.
