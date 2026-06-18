@@ -3,7 +3,7 @@
 ID: "iss-00207"
 タイトル: "Fix dependency projections for node level blockers"
 関連GitHub: ["#207"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-18"
 依存: ["requirement.md"]
@@ -12,177 +12,238 @@ ID: "iss-00207"
 
 # iss-00207 Fix dependency projections for node level blockers — 設計（どう実現するか）
 
-> このテンプレートは最小 scaffold です。プロジェクトの目的、作業内容、人間の理解しやすさ、エージェントの実行可能性に合わせて、項目は追加・削除・統合・並べ替えてよい。
+## 設計目的
+- `.meta.json.depends_on` に保存される initiative / epic / issue の raw direct dependency を保持したまま、readiness 判定では issue-level blocker と high-level node blocker を同じ安全性で扱う。
+- `deps check`、`active set`、`issue start`、`sync`、`deps-issues.*`、`deps-raw.puml` が同じ dependency interpretation を参照する構造にする。
+- `deps-issues` は readiness / blocker authority、`deps-raw` は raw visual/debug artifact という境界を維持する。
 
-## 親図（Diagram）参照
-- Epic 図:
-  - ...
-- Initiative 図:
-  - ...
-- 再利用する決定:
-  - ...
+## 採用するモデル
+- raw direct dependency:
+  - `.meta.json.depends_on` から解決した node-to-node edge。initiative / epic / issue endpoint をそのまま保持する。
+- compiled issue dependency:
+  - non-empty initiative / epic dependency を child issue に展開した issue-to-issue edge。既存の `effective_depends_on` はこの issue-level graph を表す。
+- node-level blocker:
+  - high-level dependency が issue に展開できない、または展開結果だけでは安全に ready と言えない場合に readiness を塞ぐ high-level node。
+- satisfied dependency:
+  - done / closed / all-descendant-done などにより readiness を塞がないが、debug context と visual context には残す dependency。
 
-## 目的・制約
-- 目的:
-  - ...
-- 必須 / 禁止:
-  - ...
-- 非交渉制約:
-  - ...
-- 前提:
-  - ...
+## 主要決定
+- D-001: storage format は変えない。
+  - `.meta.json.depends_on` の保存形式は維持し、empty initiative / epic dependency の保存も許可する。
+- D-002: warning ではなく evaluation contract に node blocker を持たせる。
+  - `deps_ref_expanded_to_empty` は debug warning として残してよいが、readiness source of truth にはしない。
+- D-003: `DepsEvaluation.blockers` は互換性のため文字列 list を維持し、issue blocker と node blocker の両方の node id を含める。
+  - 新規 consumer は `issue_blockers` と `node_blockers` を優先して型を判別する。
+- D-004: `deps-issues.json` は schema v2 の readiness context artifact にする。
+  - `index.json` の todo issue projection を再パースして作る方式をやめ、`SyncStateResult` の dependency state から生成する。
+- D-005: high-level node status は presentation ではなく domain / application boundary までに解決する。
+  - renderer は渡された state / state_source を表示し、独自に readiness を推論しない。
 
-## 既存実装 / 規約の理解
-- 参照した実装 / docs:
-  - ...
-- 現状理解:
-  - ...
-- 採用するパターン:
-  - ...
-- 採用しないもの:
-  - ...
-- 影響範囲:
-  - ...
+## high-level node status
+- 解決優先順位:
+  1. GitHub-linked node で GitHub state / snapshot enrichment が取得できる場合はそれを使う。
+  2. GitHub enrichment が使えない場合は local SpecDock metadata と descendant issue state から算出する。
+  3. open / done / closed に確定できない場合は `unknown` とする。
+- descendant aggregate:
+  - descendant issue が 1 件以上あり、全件 done / closed 相当なら high-level node は `done` 相当。
+  - descendant issue に open / blocked / ready / doing 相当が 1 件以上あれば `open` 相当。
+  - descendant issue が 0 件で authoritative state がなければ `unknown`。
+- readiness:
+  - empty open high-level dependency は `node_blockers.reason=empty_open`。
+  - empty unknown high-level dependency は `node_blockers.reason=empty_unknown` かつ `guard_reason=unknown`。
+  - empty done / closed high-level dependency は `satisfied_dependencies` に残し、readiness blocker にはしない。
 
-## 採用方針 / トレードオフ
-- 論点:
-  - ...
-- 選択肢:
-  - ...
-- 決定:
-  - ...
+## データ / インターフェース契約
+- `DepsTopologyLoadResult`:
+  - 既存の `issue_depends_on_map` と `warnings` を維持する。
+  - 追加候補:
+    - `raw_node_depends_on_map: dict[str, list[str]]`
+    - `dependency_contexts_by_issue_id: dict[str, list[DepsDependencyContext]]`
+    - `node_status_by_id: dict[str, HighLevelNodeStatus]`
+- `DepsEvaluation`:
+  - 既存:
+    - `ready`
+    - `guard_reason`
+    - `blockers`
+    - `blockers_top`
+    - `closure`
+  - 追加:
+    - `issue_blockers: list[str]`
+    - `node_blockers: list[DepsNodeBlocker]`
+    - `satisfied_dependencies: list[DepsDependencyContext]`
+    - `debug_context: dict[str, object]`
+- `deps check --json`:
+  - `schema_version: 2` を返す。
+  - `blockers` は issue / high-level を含む all blocker node id list。
+  - `issue_blockers` と `node_blockers` で typed consumer 向けの内訳を返す。
+  - satisfied dependency や warning-only debug context があっても、blocker がなければ exit code は 0。
+  - node blocker があれば `ready=false` かつ exit code は非 0。
 
-## 依存関係分析
-- module 依存:
-  - ...
-- class 依存（必要時）:
-  - ...
-- function 依存（必要時）:
-  - ...
-- file 依存:
-  - ...
-- 上流 / 前提:
-  - ...
-- 下流 / 依存先:
-  - ...
-- 実装起点:
-  - 依存の少ないもの / 先に固定すべき interface / 先に通すべき test を書く
-- 順序への影響:
-  - plan では upstream / prerequisite から順に step を組む
+## レイヤー別責務
+- `infra/deps_reader.py`:
+  - raw ref resolution と compiled issue dependency の topology facts を返す。
+  - readiness 判定は行わない。
+  - empty expansion を warning だけで捨てず、domain が評価できる context として残す。
+- `domain/deps.py`:
+  - issue-level blockers、node-level blockers、satisfied dependencies、guard_reason を算出する。
+  - high-level node status の判定規則を集約する。
+- `application/check_deps.py`:
+  - topology / status context を domain evaluation へ渡し、JSON / text output に typed blocker context を渡す。
+- `application/set_active.py`:
+  - `DepsEvaluation.ready` と all blockers に基づいて active selection を止める。
+  - error message に high-level node blocker id と reason を含める。
+- `application/issue start` path:
+  - `active set` と同じ readiness interpretation を使い、node-blocked issue の start を止める。
+- `application/sync_state.py`:
+  - sync 中の dependency evaluation を `SyncStateResult` に保持し、presentation へ lossless に渡す。
+- `presentation/json_state.py`:
+  - `deps-issues.json` を `SyncStateResult` から作り、todo-only `index.json` 再パースに依存しない。
+  - `deps-raw` payload に high-level participant state / state_source を含める。
+- `presentation/puml.py`:
+  - payload の state と edge state を描画する。
+  - readiness rule や high-level status を renderer 内で再計算しない。
 
-## モジュール依存図（Module Dependency Diagram）
-- タイトル:
-  - ...
-- 答える問い:
-  - どの module / class / file / function の依存方向を固定し、どこから実装を始めるか
-- 範囲:
-  - ...
-- 含めない詳細:
-  - 網羅的な call graph / 全 method / 全 import は描かない
-- 更新条件:
-  - 依存方向、責務境界、実装起点、変更対象 module が変わるとき
-- 図:
-  - 下の `plantuml` block を更新する
-
-### 図表（UML / 原則: モジュール依存 / パッケージ依存差分）
+## モジュール依存図
 ```plantuml
 @startuml
 top to bottom direction
-' show module / class / file / function dependencies that affect implementation order
-' do not copy Initiative/Epic diagrams
+skinparam monochrome true
 
-rectangle "対象module-a" as A
-rectangle "対象module-b" as B
-A --> B : depends_on
+rectangle "infra/deps_reader.py\nraw + compiled topology facts" as Reader
+rectangle "domain/deps.py\nreadiness evaluation" as Domain
+rectangle "application/check_deps.py\napplication/set_active.py\nissue start path\napplication/sync_state.py" as App
+rectangle "presentation/json_state.py\nmachine payloads" as Json
+rectangle "presentation/puml.py\nPlantUML rendering" as Puml
+rectangle "docs + tests" as DocsTests
+
+Reader --> Domain
+Domain --> App
+App --> Json
+Json --> Puml
+App --> DocsTests
+Json --> DocsTests
+Puml --> DocsTests
 @enduml
 ```
 
-## ローカル図の差分（Local Diagram Delta / 必要時）
-- 変更する境界 / 責務 / 相互作用:
-  - N/A: 理由
+## 生成 artifact 設計
+- `.agent/deps-issues.json`:
+  - `schema_version: 2`
+  - `projection: "issue-readiness-with-dependency-context"`
+  - nodes:
+    - current open / unknown issue nodes
+    - readiness を説明する issue blocker nodes
+    - node-level blocker の initiative / epic nodes
+    - displayed issue に直接関係する satisfied dependency nodes
+  - edges:
+    - JSON direction は existing convention に合わせて dependent -> prerequisite を維持する。
+    - `state: "blocking" | "satisfied"`
+    - `relation: "compiled_issue" | "raw_direct"`
+    - `source: "readiness" | "debug"` など、authority/debug の区別を可能にする field を持たせる。
+- `deps-issues.puml`:
+  - blocking edge と satisfied edge を label / color / line style で区別する。
+  - node-level blocker は high-level package / node として表示する。
+  - ready / blocked / done / unknown の色は JSON payload に基づく。
+- `deps-raw.puml`:
+  - raw direct edge を表示する。
+  - initiative / epic package に `state` と `state_source` 由来の色または note を表示する。
+  - readiness authority ではないことを legend または docs で明示する。
 
-## インターフェース契約
-- API / function / protocol / data boundary:
-  - ...
-
-## シーケンス差分（Sequence Delta / 必要時）
-- 変更する相互作用:
-  - N/A: 理由
-- retry / transaction / external API / queue:
-  - ...
-- UML:
-  - N/A: 理由
-
-## ドメインモデル差分（Domain Model Delta / 必要時）
-- 親 model 参照:
-  - ...
-- aggregate / entity / value object 変更:
-  - N/A: 理由
-- domain event / policy / specification 変更:
-  - ...
-- 不変条件の変更:
-  - ...
-- UML:
-  - N/A: 理由
-
-## クラス / インターフェース詳細設計（必要時）
-- Class / Interface:
-  - ...
-- 責務:
-  - ...
-- 連携:
-  - ...
-- UML:
-  - N/A: 理由
-
-## ディレクトリ / ファイル変更計画
+## ファイル変更計画
 ```text
-.
-|-- src/
-|   |-- package/
-|   |   |-- new_module.py        # 追加: 目的; 依存: ...
-|   |   |-- existing_module.py   # 変更: 目的; 依存: ...
-|   |   `-- renamed_module.py    # 移動/rename 元: src/package/old_module.py; 目的
-|   `-- tests/
-|       `-- test_new_module.py   # 追加/変更: 目的; 依存: src/package/new_module.py
-|-- docs/
-|   `-- reference.md             # 読取のみ: 目的
-`-- legacy/
-    `-- obsolete_file.py         # 削除: 目的; 依存: 代替準備完了
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/
+|-- infra/
+|   |-- contracts.py        # DepsTopologyLoadResult の互換 field 追加
+|   `-- deps_reader.py      # raw map / dependency context seed を保持
+|-- domain/
+|   |-- models.py           # 必要に応じて node blocker / context / status model を追加
+|   `-- deps.py             # issue + node blocker readiness evaluation
+|-- application/
+|   |-- check_deps.py       # deps check JSON/text と exit code
+|   |-- set_active.py       # active guard の blocker 表示
+|   `-- sync_state.py       # SyncStateResult に enriched dependency context を通す
+|-- presentation/
+|   |-- json_state.py       # deps-issues v2 と deps-raw payload state
+|   `-- puml.py             # blocker/satisfied/high-level state rendering
+
+src/spec_dock/assets/spec_dock/docs/
+|-- reference_deps.md       # dependency semantics
+`-- reference_sync.md       # generated artifact authority
+
+tests/
+|-- cli_runtime/test_deps.py
+|-- cli_runtime/test_sync.py
+|-- unit/domain/
+|-- unit/infra/
+`-- unit/presentation/
 ```
 
 ## 要件 → 設計マッピング
-- AC-001 -> ...
-- EC-001 -> ...
-- constraint -> ...
+- AC-001:
+  - `node_blockers` と `DepsEvaluation.ready=false` により empty open high-level dependency を guard 対象にする。
+  - `deps check`、`active set`、`issue start` は同じ evaluation を参照する。
+- AC-002:
+  - empty done / closed high-level dependency は `satisfied_dependencies` と raw/debug view に残す。
+- AC-003:
+  - non-empty high-level dependency の child issue expansion は `issue_depends_on_map` / `effective_depends_on` として維持する。
+- AC-004:
+  - `deps-issues` は `SyncStateResult` 由来の readiness context artifact に変更し、todo-only filtering で blocker context を落とさない。
+- AC-005:
+  - `deps-raw` payload に high-level node state / state_source を含め、renderer はそれを package state として描画する。
+- AC-006:
+  - docs と tests で storage / readiness / raw visual の authority 境界、schema v2、node blocker semantics を固定する。
+- EC-001:
+  - unknown high-level node は fail-closed blocker とし、`guard_reason=unknown` を返す。
+- EC-002:
+  - done child-only dependency は ready のまま satisfied context に残す。
+- EC-003:
+  - raw graph cycle validation は existing fail-closed path を維持し、readiness projection 前に止める。
+- EC-004:
+  - docs と renderer label で `deps-raw` を raw visual/debug artifact と明記する。
 
 ## テスト戦略
-- 単体:
-  - ...
-- 統合:
-  - ...
-- E2E / manual:
-  - ...
-- migration / rollback / feature flag if needed:
-  - ...
+- domain / infra:
+  - issue -> empty open epic: node blocker、`ready=false`。
+  - issue -> empty closed epic: satisfied dependency、blocker なし。
+  - issue -> empty unknown epic: node blocker、`guard_reason=unknown`。
+  - issue -> non-empty epic with open child: child issue blocker を維持。
+  - issue -> non-empty epic with done children: blocker なし、satisfied context。
+  - raw node-level cycle: projection 前に fail-closed。
+- CLI:
+  - `deps check --json`: node blocker fields と exit code 非 0。
+  - warning-only / satisfied-only: ready なら exit code 0。
+  - `active set`: node-blocked issue を拒否。
+  - `issue start`: node-blocked issue を拒否。
+- sync / presentation:
+  - `.agent/deps-issues.json` v2 に high-level blocker と satisfied context が出る。
+  - `deps-issues.puml` が blocking / satisfied edge を区別する。
+  - `deps-raw.puml` が initiative / epic package state を payload 由来で表示する。
+- docs:
+  - `reference_deps.md` と `reference_sync.md` が新 contract と authority 境界を説明する。
 
-## 要件 / 例外 -> 検証マッピング
-- AC-001 -> ...
-- EC-001 -> ...
-- constraint -> ...
+## リスク / トレードオフ / ロールバック
+- 既存 consumer が `blockers` を issue-only と仮定している可能性:
+  - typed fields を追加し、docs で `blockers` は all blocker node ids と明記する。
+- `deps-issues` v2 で表示 node が増える:
+  - readiness 説明に必要な context node へ限定し、全履歴 graph にはしない。
+- unknown fail-closed による過剰 block:
+  - reason / status_source を表示し、operator が不足情報を追跡できるようにする。
+- rollback:
+  - storage migration はないため issue diff revert で戻す。
+  - feature flag、dual-read、legacy `deps.json` fallback は導入しない。
 
-## リスク / 移行 / ロールバック（必要時）
-- ...
+## 設計ドラフト採用
+- 採用元:
+  - `discussions/20260618t151109z-draft-design-node-level-dependency-projection.md`
+- 採用内容:
+  - raw / compiled / node blocker / satisfied dependency の分離。
+  - typed blocker fields と `blockers` compatibility 方針。
+  - high-level node status source と unknown fail-closed。
+  - `deps-issues` v2 と `deps-raw` rendering boundary。
+- 採用しない内容:
+  - ADR candidate は本 issue では即時 ADR 化せず、実装中に durable decision 化が必要になった場合だけ report から ADR / follow-up へ昇格する。
 
 ## 未確定事項
-- Q-001:
-  - 質問:
-  - 選択肢:
-    - A:
-      - ...
-    - B:
-      - ...
-  - 推奨案:
-    - ...
-  - 影響範囲:
-    - ...
+- 人間への blocking question はない。
+- 実装中に `DepsTopologyLoadResult` の既存所在や `DepsEvaluation` dataclass の所在が異なる場合は、同じ契約を保ったまま local structure に合わせる。
+- `deps-issues.json` の field 名は plan の closure と tests で固定し、実装中に変更が必要なら plan amendment と fresh review に戻す。
