@@ -149,7 +149,7 @@ def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> d
     return out
 
 
-def _load_cached_high_level_github_state_by_id(specdock_dir: Path) -> dict[str, str]:
+def load_cached_high_level_github_state_by_id(specdock_dir: Path) -> dict[str, str]:
     agent_dir = specdock_dir / ".agent"
     for state_index_path in (agent_dir / "index-all.json", agent_dir / "index.json"):
         if not state_index_path.is_file():
@@ -167,11 +167,14 @@ def _load_cached_high_level_github_state_by_id(specdock_dir: Path) -> dict[str, 
         for node_id, item in raw_nodes.items():
             if not isinstance(node_id, str) or not isinstance(item, dict):
                 continue
-            kind = item.get("kind")
+            kind = item.get("type") or item.get("kind")
             if kind not in {"initiative", "epic"}:
                 continue
             github = item.get("github")
             if not isinstance(github, dict):
+                continue
+            raw_updated_at = github.get("updated_at")
+            if not isinstance(raw_updated_at, str) or not raw_updated_at.strip():
                 continue
             raw_state = github.get("state")
             if not isinstance(raw_state, str):
@@ -257,7 +260,7 @@ def resolve_high_level_status_context(
             continue
         resolved = None
         status = issue_statuses.get(node_id)
-        if status is not None:
+        if status is not None and status.source == "github":
             resolved = _status_state_from_snapshot(status)
         if resolved is None:
             cached_state = cached_high_level_states.get(node_id)
@@ -360,7 +363,7 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
         cached_issue_status_by_id = ports.derived_state_reader.load_cached_issue_status_by_id(specdock_dir)
         cached_issue_last_sync_at_by_id = _load_cached_issue_last_sync_at_by_id(ports, specdock_dir)
         if not req.use_github:
-            cached_high_level_github_state_by_id = _load_cached_high_level_github_state_by_id(specdock_dir)
+            cached_high_level_github_state_by_id = load_cached_high_level_github_state_by_id(specdock_dir)
 
     status_context = resolve_issue_status_context(
         graph,

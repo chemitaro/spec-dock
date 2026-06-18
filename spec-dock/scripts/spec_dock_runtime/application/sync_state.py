@@ -63,7 +63,7 @@ from .github_issue_targets import (
     normalize_repo_slug,
     snapshot_repo_issue_key,
 )
-from .check_deps import resolve_high_level_status_context
+from .check_deps import load_cached_high_level_github_state_by_id, resolve_high_level_status_context
 from .ports import Ports
 from .repo_context import (
     resolve_current_repo_slug,
@@ -566,9 +566,12 @@ def collect_sync_state(
 
     cached_issue_status_by_id: dict[str, str] = {}
     cached_issue_last_sync_at_by_id: dict[str, str | None] = {}
+    cached_high_level_github_state_by_id: dict[str, str] = {}
     if ports.derived_state_reader is not None:
         cached_issue_status_by_id = ports.derived_state_reader.load_cached_issue_status_by_id(specdock_dir)
         cached_issue_last_sync_at_by_id = _load_cached_issue_last_sync_at_by_id(ports, specdock_dir)
+        if not req.github_enabled:
+            cached_high_level_github_state_by_id = load_cached_high_level_github_state_by_id(specdock_dir)
     status_context = resolve_issue_status_context(
         graph,
         github_enabled=req.github_enabled,
@@ -595,6 +598,7 @@ def collect_sync_state(
     high_level_statuses_by_node_id = resolve_high_level_status_context(
         graph,
         issue_statuses=status_context.issue_statuses,
+        cached_high_level_github_state_by_id=cached_high_level_github_state_by_id,
     )
     if deps_preflight_error is None:
         effective_deps_map = build_effective_deps_map(graph, issue_depends_on_map)

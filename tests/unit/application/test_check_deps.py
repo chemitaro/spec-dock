@@ -577,8 +577,8 @@ class TestCheckDepsApplication:
                 {
                     "nodes": {
                         "epic-00203": {
-                            "kind": "epic",
-                            "github": {"issue_number": 203, "state": "CLOSED"},
+                            "type": "epic",
+                            "github": {"issue_number": 203, "state": "CLOSED", "updated_at": "2026-06-05T00:00:00Z"},
                         }
                     }
                 }

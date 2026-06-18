@@ -291,6 +291,7 @@ class TestSetActiveApplication:
         issue_gateway=None,
         git_gateway=None,
         dependency_contexts=None,
+        specdock_dir=Path("/repo/spec-dock"),
     ):
         deps_reader = (
             _StubDepsTopologyReader(deps, node_deps, dependency_contexts)
@@ -300,7 +301,7 @@ class TestSetActiveApplication:
         return app_ports.Ports(
             node_reader=_StubNodeReader(self._records(infra_contracts)),
             repo_root=Path("/repo"),
-            specdock_dir=Path("/repo/spec-dock"),
+            specdock_dir=specdock_dir,
             active_state_store=active_store or _StubActiveStateStore(),
             deps_topology_reader=deps_reader,
             derived_state_reader=derived_state_reader,
@@ -503,6 +504,47 @@ class TestSetActiveApplication:
         )
         assert cache_only.selection.issue_id == "iss-00302"
         assert cache_only_ports.issue_gateway.issue_index_calls == []
+
+    def test_set_active_no_github_uses_cached_high_level_github_state(self, tmp_path) -> None:
+        app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
+        specdock_dir = tmp_path / "spec-dock"
+        agent_dir = specdock_dir / ".agent"
+        agent_dir.mkdir(parents=True)
+        (agent_dir / "index-all.json").write_text(
+            (
+                '{"nodes":{"epic-00202":{"type":"epic",'
+                '"github":{"issue_number":202,"state":"CLOSED","updated_at":"2026-06-05T00:00:00Z"}}}}\n'
+            ),
+            encoding="utf-8",
+        )
+        active_store = _StubActiveStateStore()
+        context = infra_contracts.DepsDependencyContext(
+            source_node_id="iss-00302",
+            source_issue_id="iss-00302",
+            target_node_id="epic-00202",
+            target_node_kind="epic",
+            target_issue_ids=(),
+            expansion="empty",
+        )
+        ports = self._ports(
+            app_ports,
+            infra_contracts,
+            active_store=active_store,
+            deps={"iss-00302": []},
+            dependency_contexts={"iss-00302": [context]},
+            derived_state_reader=_StubDerivedStateReader({"iss-00302": "open"}),
+            issue_gateway=_StubIssueGateway([]),
+            specdock_dir=specdock_dir,
+        )
+
+        result = app_set_active.set_active(
+            self._request(app_contracts, target=self._node_id_target(app_contracts, "iss-00302")),
+            ports,
+        )
+
+        assert result.selection.issue_id == "iss-00302"
+        assert active_store.written[-1].issue.id == "iss-00302"
+        assert ports.issue_gateway.issue_index_calls == []
 
     def test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git(self) -> None:
         app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()

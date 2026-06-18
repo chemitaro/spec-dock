@@ -33,7 +33,7 @@ from .contracts import (
 from .github_issue_targets import collect_repo_scoped_issue_view_targets, normalize_repo_slug
 from .ports import Ports
 from .repo_context import resolve_current_repo_slug
-from .check_deps import resolve_high_level_status_context
+from .check_deps import load_cached_high_level_github_state_by_id, resolve_high_level_status_context
 from .status_context import resolve_issue_status_context
 
 
@@ -505,9 +505,12 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
 
     cached_issue_status_by_id: dict[str, str] = {}
     cached_issue_last_sync_at_by_id: dict[str, str | None] = {}
+    cached_high_level_github_state_by_id: dict[str, str] = {}
     if ports.derived_state_reader is not None:
         cached_issue_status_by_id = ports.derived_state_reader.load_cached_issue_status_by_id(specdock_dir)
         cached_issue_last_sync_at_by_id = _load_cached_issue_last_sync_at_by_id(ports, specdock_dir)
+        if not req.use_github:
+            cached_high_level_github_state_by_id = load_cached_high_level_github_state_by_id(specdock_dir)
 
     status_context = resolve_issue_status_context(
         graph,
@@ -529,6 +532,7 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
         high_level_statuses_by_node_id=resolve_high_level_status_context(
             graph,
             issue_statuses=status_context.issue_statuses,
+            cached_high_level_github_state_by_id=cached_high_level_github_state_by_id,
         ),
     )
     blockers = list(deps.blockers)
