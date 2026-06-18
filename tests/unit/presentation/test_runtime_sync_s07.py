@@ -1693,10 +1693,13 @@ class TestRuntimeSyncS07:
 
             tree_puml = (specdock_dir / "tree.puml").read_text(encoding="utf-8")
             deps_puml = (specdock_dir / "deps-issues.puml").read_text(encoding="utf-8")
+            deps_raw_puml = (specdock_dir / "deps-raw.puml").read_text(encoding="utf-8")
             dashboard = (specdock_dir / "dashboard.md").read_text(encoding="utf-8")
-            for text in (tree_puml, deps_puml, dashboard):
+            for text in (tree_puml, deps_puml, deps_raw_puml, dashboard):
                 assert "DEPS_DISABLED" in text
                 assert "sync --force" in text
+            assert '\\"' not in dashboard
+            assert "\\\\" not in dashboard
 
     def test_sync_force_placeholder_and_deps_error_regression(self) -> None:
         self._assert_sync_force_placeholder_and_deps_error_regression()

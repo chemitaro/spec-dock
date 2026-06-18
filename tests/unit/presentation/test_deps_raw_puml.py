@@ -66,6 +66,7 @@ def _state(
     issue_statuses=None,
     deps_eval_by_id=None,
     active_issue_id=None,
+    deps_preflight_error=None,
 ):
     app_contracts, domain_models, presentation_json_state = _runtime_modules()
     nodes = {
@@ -122,7 +123,7 @@ def _state(
             deps_eval_by_id=evals,
             generated_at="2026-06-18T00:00:00Z",
             warnings=[],
-            deps_preflight_error=None,
+            deps_preflight_error=deps_preflight_error,
             repo_root=Path("/repo"),
             raw_node_depends_on_map=raw_node_depends_on_map,
         ),
@@ -251,4 +252,22 @@ def test_tc_s02_008_zero_raw_direct_dependencies_valid_note():
     assert "skinparam linetype ortho" in puml
     assert "skinparam packageStyle rectangle" in puml
     assert 'note "No raw direct dependencies to render" as Empty' in puml
+    assert puml.endswith("@enduml\n")
+
+
+def test_tc_s04_001_disabled_raw_dependency_view_includes_failure_note():
+    _unused_app_contracts, _unused_domain_models, presentation_json_state = _runtime_modules()
+    state, _unused, _unused_domain = _state(
+        raw_node_depends_on_map={"iss-b": ["iss-a"]},
+        deps_preflight_error='Dependency cycle detected\niss-a -> "iss-b" \\ path',
+    )
+
+    puml = presentation_json_state.render_deps_raw_artifact(state).puml_text
+
+    assert "title deps-raw - DEPS_DISABLED" in puml
+    assert "deps_preflight_failed" in puml
+    assert "deps.valid=false" in puml
+    assert "mode=sync --force" in puml
+    assert 'Dependency cycle detected iss-a -> \\"iss-b\\" \\\\ path' in puml
+    assert "Niss_a --> Niss_b" not in puml
     assert puml.endswith("@enduml\n")
