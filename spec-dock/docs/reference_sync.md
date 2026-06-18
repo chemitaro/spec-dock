@@ -23,7 +23,7 @@
 - `spec-dock/.agent/tree-all.json`（全ノードのツリー）
 - `spec-dock/.agent/index.json`（todo projection）
 - `spec-dock/.agent/tree.json`（todo projection のツリー）
-- `spec-dock/.agent/deps-issues.json`（todo issue-only 依存グラフ）
+- `spec-dock/.agent/deps-issues.json`（schema v2 readiness / blocker context）
 
 agent-facing の読取契約:
 - entry: `spec-dock/.agent/active.json`
@@ -34,8 +34,8 @@ agent-facing の読取契約:
 `spec-dock/` 直下（人間向け）:
 - `spec-dock/tree-all.puml`（Readyボード, all）
 - `spec-dock/tree.puml`（Readyボード, todo）
-- `spec-dock/deps-issues.puml`（todo issue-only 依存図）
-- `spec-dock/deps-raw.puml`（raw direct dependency 可視化）
+- `spec-dock/deps-issues.puml`（readiness / blocker context 依存図）
+- `spec-dock/deps-raw.puml`（raw direct dependency visual/debug 可視化）
 - `spec-dock/dashboard.md`（todo要約）
 
 legacy v1 生成物（廃止）:
@@ -69,6 +69,17 @@ uninstall との関係:
 
 issueノードには `deps`（`ready`, `depends_on`, `blockers_top`）を統合します。
 
+`spec-dock/.agent/deps-issues.json` は `index.json` の todo issue-only graph を再パースした派生物ではありません。`sync_state` の readiness evaluation から生成する schema v2 artifact です。
+
+主な契約:
+- `schema_version: 2`
+- `projection: "issue-readiness-with-dependency-context"`
+- `source.sync_state: "readiness_evaluation"`
+- issue-level blocker、node-level blocker、satisfied dependency を区別できる typed context を含む
+- open / unknown issue nodes、readiness を説明する issue blocker nodes、node-level blocker の initiative / epic nodes、表示対象 issue に直接関係する satisfied dependency nodes を含める
+
+`.meta.json.depends_on` は raw storage のままです。empty initiative / epic dependency は raw validation を通れば保存できますが、readiness evaluation では open / unknown の empty high-level target が node blocker になり、done / closed / all-descendant-done の context は satisfied dependency として扱われます。
+
 ## 4. `sync --force`（deps preflight失敗時）
 
 deps 構造エラー（未解決参照 / self / cycle / descendant依存 / schema不正など）がある場合:
@@ -83,6 +94,7 @@ deps 構造エラー（未解決参照 / self / cycle / descendant依存 / schem
 - `--force` はデバッグ/リカバリ用途のため、depsの成否に関わらず active auto-update を無効化（`--no-update-active` 相当）
 
 削除ではなく上書きにすることで、stale 参照を防ぎます。
+raw node-level cycle などで deps preflight が失敗した場合、この placeholder path は fail-closed です。placeholder を partial readiness authority として読まず、構造エラーを解消してから通常の `sync` を再実行してください。
 `--force` 実行後に active を更新したい場合は、`./spec-dock/scripts/spec-dock active set <target>` を使って明示更新してください。
 
 ## 5. GitHub の既定動作（GitHub default）と `--no-github`
@@ -114,8 +126,8 @@ deps 構造エラー（未解決参照 / self / cycle / descendant依存 / schem
 - `deps-issues.puml`: blocks 表示（`prerequisite -> dependent`）
 - `deps-raw.puml`: `.meta.json.depends_on` の raw direct edge を node/package endpoint で表示（`prerequisite -> dependent`）
 
-`deps-issues.*` は readiness / blocker 判定に使う todo issue-only の effective graph です。
-`deps-raw.puml` は initiative / epic / issue を含む raw direct dependency の確認用であり、readiness authority ではありません。
+`deps-issues.*` は readiness / blocker 判定に使う authority です。schema v2 の `deps-issues` は typed issue blockers、typed node blockers、satisfied dependencies を含み、todo-only `index.json` から消える context も保持します。
+`deps-raw.puml` は initiative / epic / issue を含む raw direct dependency の visual/debug artifact です。high-level participant の state / source を表示できますが、readiness authority ではありません。
 同じ依存を、機械向けと可視化向けで向きを分けて表現しています。
 
 ## 8. 処理フロー（PlantUML）
