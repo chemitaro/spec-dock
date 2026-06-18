@@ -21,17 +21,17 @@ reflected_to: []
 - Repository: chemitaro/spec-dock
 - Base branch: main
 - Head branch: iss-00207-fix-dependency-projections-for-node-level-blockers
-- Latest head SHA: 8ca6cd6e1c7a9899b20b69445c61343e2b455633
+- Latest head SHA: b506e0abcc8749bc679d28c78f71efcfa170fb9b
 - Observation command: `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh --repo chemitaro/spec-dock --pr 208 --head-sha 8ca6cd6e1c7a9899b20b69445c61343e2b455633`
 - Observation final JSON / evidence: stdout JSON from observation at 2026-06-18T19:43:11Z
-- Observation status: human_gate; CI passed; review unresolved
+- Observation status: human_gate; CI passed; review unresolved after U001 re-observation
 - Trigger comment id: 4745456367
 - Trigger created_at: 2026-06-18T19:29:48Z
 - Trigger boundary: current trigger boundary for head SHA 8ca6cd6e1c7a9899b20b69445c61343e2b455633
 - Resume metadata: N/A; initial observation reached terminal human_gate
 - New trigger approved: no
 - Observation limitation: none; unresolved review thread state known
-- Batch status: repair implemented; re-observation pending
+- Batch status: U002 implemented; re-observation pending
 
 ## Batch Purpose
 
@@ -42,6 +42,7 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 | concern_id | concern | related_inventory_ids | suspected_root_cause | repair_unit | notes |
 | --- | --- | --- | --- | --- | --- |
 | C001 | high-level readiness evaluation must respect completed source issues and cached high-level state | I001, I002 | node blocker evaluation applies to done source issues; cached status context reads issue-only `status` instead of high-level `github.state` | U001 | Both findings affect high-level dependency readiness context |
+| C002 | offline cached high-level state must use generated artifact schema across check/sync/active paths | I003, I004, I005 | cached high-level state reader checks `kind` instead of generated `type`; sync and active-set paths do not receive cached high-level state | U002 | Same cached state propagation problem across offline workflows |
 
 ## Inventory
 
@@ -49,6 +50,9 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | I001 | codex_review_comment | C001 | review_feedback:completed-source-node-blocker | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py:190`, thread `PRRT_kwDOQ99OK86KqG36` | Completed source issues can become blocked again when they still have an open/unknown empty high-level dependency context. | valid | blocking | yes | fix-now | U001 | implemented | Done issues should remain ready even if raw high-level dependency context is incomplete; dependency blocker evaluation must not flip completed source readiness. | pending re-observation |
 | I002 | codex_review_comment | C001 | review_feedback:cached-high-level-state | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/check_deps.py:168`, thread `PRRT_kwDOQ99OK86KqG3_` | `--no-github` cached high-level state reads issue-only `status` while sync stores high-level GitHub state under `github.state`. | valid | blocking | yes | fix-now | U001 | implemented | Cached closed epic/initiative dependencies must remain satisfied without live GitHub. | pending re-observation |
+| I003 | codex_review_comment | C002 | review_feedback:cached-node-kind-schema | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/check_deps.py:171`, thread `PRRT_kwDOQ99OK86Kqu-H` | Cached high-level reader expects `kind`, but generated `index*.json` node schema uses `type`. | valid | blocking | yes | fix-now | U002 | implemented | Cached artifact reader must match generated schema and tests must use generated field shape. | pending re-observation |
+| I004 | codex_review_comment | C002 | review_feedback:offline-sync-cache | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py:598`, thread `PRRT_kwDOQ99OK86Kqu-M` | `sync --no-github` does not pass cached high-level `github.state`, so offline sync rewrites closed high-level dependency as unknown blocker. | valid | blocking | yes | fix-now | U002 | implemented | Offline sync must preserve cached satisfied high-level dependencies. | pending re-observation |
+| I005 | codex_review_comment | C002 | review_feedback:offline-active-set-cache | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py:532`, thread `PRRT_kwDOQ99OK86Kqu-P` | `active set --no-github` does not include cached high-level GitHub state, so offline activation is blocked by `empty_unknown`. | valid | blocking | yes | fix-now | U002 | implemented | Offline activation guard must use cached high-level state consistently. | pending re-observation |
 
 ## Classification Values
 
@@ -72,11 +76,23 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 - Rationale: The issue scope is dependency readiness projection correctness; both findings are within scope and have small, testable fixes.
 - Residual risk: none expected after focused tests, full local suite, and re-observation.
 
+### C002
+
+- Covered inventory IDs: I003, I004, I005
+- Validity analysis: All three findings are valid. I003 identifies an artifact schema mismatch in the cache reader. I004 and I005 identify missing propagation of cached high-level state into offline sync and active-set readiness evaluation.
+- Need-to-fix decision: yes.
+- Root cause: U001 introduced a local cache reader for `deps check --no-github`, but it did not match the generated `index*.json` schema and was not shared by the other offline readiness paths.
+- Options considered: fix only the field name; fix check/sync/active consistently with shared cache helper and regressions. The latter is required because the same readiness contract applies across offline workflows.
+- Recommended disposition: fix-now via U002.
+- Rationale: These are in-scope correctness issues for high-level dependency readiness projection and command guards.
+- Residual risk: none expected after focused tests, full local suite, and re-observation.
+
 ## Repair Queue
 
 | unit_id | source_batch | covered_ids | disposition | risk_class | repair_unit_disc | status | Implementation Plan | Re-observation Result | Residual Risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | U001 | 20260618t194321z-pr-repair-batch | I001, I002 | fix-now | blocking | `20260618t194411z-disc-pr-repair-unit-u001.md` | implemented | Added regressions for completed source issue with high-level blocker context and cached closed high-level dependency; updated domain/application logic; mirrored provider runtime; focused tests, validate, diff check, and broad unit / CLI runtime passed. | pending | pending re-observation |
+| U002 | 20260618t194321z-pr-repair-batch | I003, I004, I005 | fix-now | blocking | `20260618t202851z-disc-pr-repair-unit-u002.md` | implemented | Read cached high-level state from generated `type` field and propagate it through offline check/sync/active-set paths; focused tests, validate, diff check, and broad unit / CLI runtime passed. | pending | pending re-observation |
 
 ## Unit Discussion Plan
 
