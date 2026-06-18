@@ -1,4 +1,144 @@
 ---
+種別: 実装報告書（Issue）
+ID: "iss-00192"
+タイトル: "Generate Raw Dependency View"
+関連GitHub: ["#192"]
+状態: "draft | approved"
+作成者: "iwasawayuuta"
+最終更新: "2026-06-17"
+依存: ["requirement.md", "design.md", "plan.md"]
+親: ["epic-00059", "init-local-00003"]
+---
+
+### セッションログ（2026-06-18 11:18 JST）
+
+#### 対象
+- Step: S03 Normal Sync Artifact Write, Discovery, and Ignore Integration
+- AC/EC:
+  - cl-001 sync artifact write / discovery side
+  - cl-008 generated ignore
+  - cl-012 sync file write side
+- 計画上の出典（Planned source）:
+  - `plan.md` S03
+  - `design.md` artifact pipeline / discovery / generated artifact contract
+
+#### 実施内容
+- `write_sync_artifacts()` の S01 temporary bridge `DepsRawArtifact(puml_text="")` を `render_deps_raw_artifact()` に差し替えた。
+- `FileArtifactWriter` が `spec-dock/deps-raw.puml` を通常 sync artifact として書き、`ArtifactWriteResult.deps_raw_puml_path` を返すようにした。
+- dashboard Observability と `render_sync_text()` の wrote list に `spec-dock/deps-raw.puml` を追加した。
+- shipped `spec-dock/.gitignore` に `deps-raw.puml` を追加し、init/update 後の generated artifact ignore 契約を固定した。
+- 既存 `deps-issues.puml` / `.agent/deps-issues.json` の semantics は変更していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime/test_sync.py::TestCliSync::test_sync_emits_dashboard_md_at_spec_dock_root tests/cli_runtime/test_sync.py::TestCliSync::test_spec_dock_gitignore_ignores_human_facing_artifacts tests/cli_runtime/test_sync.py::TestCliSync::test_spec_dock_gitignore_behavior_matches_git_check_ignore -q
+# 3 passed
+
+uv run pytest tests/unit/presentation/test_runtime_sync_s07.py::TestRuntimeSyncS07::test_sync_use_case_writes_artifacts_and_paths tests/unit/presentation/test_runtime_sync_s07.py::TestRuntimeSyncS07::test_render_sync_text_regression -q
+# 2 passed
+
+uv run pytest tests/cli_runtime/test_post_mutation_sync_s01.py -q
+# 8 passed
+
+uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/unit/presentation/test_deps_raw_puml.py -q
+# 64 passed
+
+uv run pytest tests/cli_runtime/test_sync.py -q
+# 24 passed, 2 skipped
+
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_init_creates_expected_structure tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_refreshes_discussion_guidance_without_legacy_examples_across_asset_set -q
+# 2 passed
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=129
+
+git diff --check
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ（Red） | red-required: normal sync writes and reports `deps-raw.puml` | S03 実装前は `write_sync_artifacts()` が `DepsRawArtifact(puml_text="")` を渡し、`artifact_writer.py` に `deps-raw.puml` path/write がなく、CLI/dashboard/gitignore に path が存在しなかった | source inspection + S01/S02 committed state | pass | S03 の接続欠落を確認 |
+| S03 | 緑フェーズ（Green） | normal sync artifact / dashboard / sync output / gitignore | focused CLI sync / unit sync / gitignore tests passed | command | pass | cl-001 / cl-008 / cl-012 sync side |
+| S03 | 緑フェーズ（Green） | affected runtime and presentation regression | `tests/cli_runtime/test_sync.py`, `tests/unit/presentation/test_runtime_sync_s07.py`, `tests/unit/presentation/test_deps_raw_puml.py` passed | command | pass | existing `deps-issues` lane preserved |
+| S03 | リファクタリング（Refactor） | guardrail satisfied / no unrelated redesign | `git diff --check` -> pass; diff inspection shows writer/dashboard/CLI/.gitignore integration only | command + diff inspection | pass | no raw JSON artifact added |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | `test_runtime_sync_s07` stub lacked `load_node_dependency_resolutions()` and therefore rendered the zero-dependency note in unit sync coverage | Green verification failure | Added raw resolver to the existing stub so sync unit test observes the real raw artifact path/content | cl-001 / cl-012 | no | focused unit sync test failed once, then passed after stub update |
+| S03 | Code-reviewer requires S03 report evidence before step closure | code-reviewer P1 | Added this S03 evidence ledger and recorded the failed reviewer gate | cl-001 / cl-008 / cl-012 | no | reviewer agent `019ed89a-4f10-72d2-8eb2-2e870871af7c` failed before this report update |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | cl-001 | `sync` writes `spec-dock/deps-raw.puml` and exposes it from dashboard / sync output | `test_sync_emits_dashboard_md_at_spec_dock_root` asserts file exists, dashboard path, stdout path, and expected issue ids | pass | `ArtifactWriteResult.deps_raw_puml_path` added |
+| S03 | cl-008 | shipped `.gitignore` ignores generated `deps-raw.puml` | `test_spec_dock_gitignore_ignores_human_facing_artifacts`, `test_spec_dock_gitignore_behavior_matches_git_check_ignore`, and init/update tests pass | pass | `git check-ignore --no-index spec-dock/deps-raw.puml` covered |
+| S03 | cl-012 sync side | zero-dependency view still writes a valid file instead of omitting the artifact | `render_deps_raw_artifact()` is now passed to writer; zero-dependency renderer test remains green | pass | S02 renderer side plus S03 writer side together close cl-012 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-001 / tc-s03-001 | S03 | yes | red-required | S03 実装前は writer path absent / empty bridge | `uv run pytest tests/cli_runtime/test_sync.py::TestCliSync::test_sync_emits_dashboard_md_at_spec_dock_root -q` | pass | file/dashboard/stdout/content covered |
+| cl-001 / tc-s03-002 | S03 | yes | red-required | dashboard / sync stdout lacked raw path | focused CLI sync test and `render_sync_text` regression | pass | `spec-dock/deps-raw.puml` in both discovery surfaces |
+| cl-008 / tc-s03-003 | S03 | yes | inspect + git behavior | shipped `.gitignore` lacked `deps-raw.puml` | CLI gitignore tests and init/update asset tests | pass | static and `git check-ignore` behavior covered |
+| cl-012 / tc-s03-004 | S03 | yes | red-required | S01 bridge wrote empty deps_raw content nowhere | unit sync artifact path/content test + S02 zero-dependency renderer test | pass | writer-side file creation covered |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-001 | S03 | CLI sync, unit sync, sync text regression | pass | raw artifact is written and discoverable |
+| cl-008 | S03 | `.gitignore` static, `git check-ignore`, init/update tests | pass | generated artifact ignored |
+| cl-012 | S03 | S02 renderer zero-dependency + S03 writer integration | pass | artifact is not skipped |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | cl-001 / cl-012 | `test_sync_use_case_writes_artifacts_and_paths` raw resolver stub update | cl-001 / cl-012 | unit sync coverage needed to observe raw resolver input instead of zero-dependency fallback | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | parent implementation | small connector-only diff after S01/S02 contracts were committed | N/A | S03 only | `plan.md` S03 | `application/contracts.py`, `application/sync_state.py`, `infra/artifact_writer.py`, `presentation/markdown.py`, `presentation/cli_text.py`, shipped `.gitignore`, focused tests | renderer redesign, raw JSON artifact, dogfooding generated artifact direct edit, unrelated dashboard redesign | focused sync / gitignore / presentation tests, validate, diff check, code-reviewer | failed verification, code reviewer finding, path outside S03 | report evidence, reviewer status, commit evidence | implemented; reviewer fail due missing report evidence is addressed here |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | N/A | Parent made connector-only artifact pipeline changes after S01/S02 contracts | `application/contracts.py`, `application/sync_state.py`, `infra/artifact_writer.py`, `presentation/markdown.py`, `presentation/cli_text.py`, `src/spec_dock/assets/spec_dock/.gitignore`, focused tests | focused commands listed above | first code-reviewer failed on report evidence only | none known after report update | pending fresh re-review |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | stale after report update | failed | no | report follow-up required | Agent `019ed89a-4f10-72d2-8eb2-2e870871af7c`; finding: S03 report evidence missing |
+| S03 | step reviewer | code-reviewer | stale after frontmatter fix | failed | no | report structure follow-up required | Agent `019ed89e-991a-7e40-8e5d-67818af349f5`; finding: S03 evidence inserted inside frontmatter |
+| S03 | step reviewer | code-reviewer | fresh | passed | no | proceed to Step Commit Gate | Agent `019ed8a2-953c-7a03-9612-6dd860e18337`; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | pending commit | S03 artifact writer/dashboard/CLI/gitignore/tests/report evidence only | commit hash recorded as post-commit external evidence | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `ArtifactWriteResult.deps_raw_puml_path`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` - real `render_deps_raw_artifact()` integration
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/artifact_writer.py` - `deps-raw.puml` write and returned path
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/markdown.py` - dashboard Observability link
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - sync wrote output path
+- `src/spec_dock/assets/spec_dock/.gitignore` - generated artifact ignore
+- `tests/cli_runtime/test_sync.py`, `tests/cli_runtime/test_post_mutation_sync_s01.py`, `tests/unit/infra/test_init_update.py`, `tests/unit/presentation/test_runtime_sync_s07.py` - S03 tests and contract updates
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00192-generate-deps-raw-puml/report.md` - S03 evidence ledger
+
+#### コミット
+- pending
+
+#### メモ
+- S03 does not change `deps-issues.puml` / `.agent/deps-issues.json` semantics.
+- S04 still owns provider/consumer dogfooding refresh and checked-in dogfooding artifact policy.
+
+---
+
+---
 
 ### セッションログ（2026-06-18 11:18 JST）
 
@@ -107,7 +247,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S02 | pending commit | S02 presentation renderer/tests/report evidence only | commit hash recorded as post-commit external evidence | pending | N/A | N/A | N/A | N/A |
+| S02 | committed | S02 presentation renderer/tests/report evidence only | `7e82e0db feat(presentation): raw依存ビューのPlantUML描画を追加` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py` - raw dependency payload builder and artifact renderer
@@ -116,24 +256,11 @@ git diff --check
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00192-generate-deps-raw-puml/report.md` - S02 evidence ledger
 
 #### コミット
-- pending
+- `7e82e0db feat(presentation): raw依存ビューのPlantUML描画を追加`
 
 #### メモ
 - Worker stated: No material implementation decisions beyond the approved plan.
 - `deps-raw.puml` writer integration and discovery remain S03 scope.
-
----
-種別: 実装報告書（Issue）
-ID: "iss-00192"
-タイトル: "Generate Raw Dependency View"
-関連GitHub: ["#192"]
-状態: "draft | approved"
-作成者: "iwasawayuuta"
-最終更新: "2026-06-17"
-依存: ["requirement.md", "design.md", "plan.md"]
-親: ["epic-00059", "init-local-00003"]
----
-
 # iss-00192 Generate Raw Dependency View — 実装報告（観測証跡台帳 / Observed Evidence Ledger）
 
 > `report.md` は観測証跡台帳（observed evidence ledger）の scaffold です。planned requirements、evidence destination、closure 条件は `plan.md` が持ち、この文書は実際の Red / Green / Refactor evidence、発見された tests、closure delta、reviewer status、commit/no-op evidence を記録する evidence slot です。workflow / compliance authority は skills、docs、accepted ADRs、reviewer gates に置きます。

@@ -39,9 +39,10 @@ from ..domain.validation import (
     validate_graph_and_deps,
 )
 from ..infra.contracts import ActiveManifest, DirectDependencyResolution, StoredMetaRecord
-from ..presentation.contracts import ArtifactBundle, DepsRawArtifact
+from ..presentation.contracts import ArtifactBundle
 from ..presentation.json_state import (
     render_deps_issues_artifact,
+    render_deps_raw_artifact,
     render_index_artifact,
     render_tree_artifact,
 )
@@ -725,7 +726,7 @@ def write_sync_artifacts(
         tree=render_tree_artifact(persisted_result),
         deps_issues=render_deps_issues_artifact(persisted_result),
         dashboard=render_dashboard(persisted_result),
-        deps_raw=DepsRawArtifact(puml_text=""),
+        deps_raw=render_deps_raw_artifact(persisted_result),
     )
     try:
         write_result = ports.artifact_writer.write(specdock_dir, bundle)

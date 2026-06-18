@@ -625,6 +625,7 @@ class ArtifactWriteResult:
     tree_todo_puml_path: str
     deps_issues_json_path: str
     deps_issues_puml_path: str
+    deps_raw_puml_path: str
     dashboard_md_path: str
 
 
