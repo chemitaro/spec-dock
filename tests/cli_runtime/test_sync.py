@@ -351,16 +351,16 @@ class TestCliSync(CliRuntimeHarness):
             assert deps_issues["nodes"]["iss-00301"]["node_blockers"] == [
                 {
                     "node_id": "init-00102",
-                    "reason": "empty_unknown",
-                    "state": "unknown",
-                    "state_source": "none",
+                    "reason": "empty_open",
+                    "state": "open",
+                    "state_source": "cache",
                     "source_issue_id": "iss-00301",
                 },
                 {
                     "node_id": "epic-00202",
-                    "reason": "empty_unknown",
-                    "state": "unknown",
-                    "state_source": "none",
+                    "reason": "empty_open",
+                    "state": "open",
+                    "state_source": "cache",
                     "source_issue_id": "iss-00301",
                 },
             ]
@@ -435,6 +435,26 @@ class TestCliSync(CliRuntimeHarness):
             deps_puml = (target / "spec-dock" / "deps-issues.puml").read_text(encoding="utf-8")
             assert "Nepic_00202 ..> Niss_00301 : satisfied (raw_direct)" in deps_puml
             assert "Nepic_00202 --> Niss_00301 : blocks" not in deps_puml
+
+            guard_log = bin_dir / "gh-guard-sync-no-github.log"
+            self._make_gh_issue_list_stub(bin_dir, issues=[], fail=True, log_path=guard_log)
+            p_cached = self._run_runtime_capture(
+                target,
+                ["sync", "--no-github", "--no-update-active"],
+                env=test_env,
+            )
+            assert p_cached.returncode == 0, p_cached.stdout + p_cached.stderr
+            assert not guard_log.exists(), "gh must not be invoked with sync --no-github"
+            cached_deps_issues = json.loads(
+                (target / "spec-dock" / ".agent" / "deps-issues.json").read_text(encoding="utf-8")
+            )
+            assert cached_deps_issues["nodes"]["iss-00301"]["ready"] is True
+            assert cached_deps_issues["nodes"]["iss-00301"]["node_blockers"] == []
+            assert cached_deps_issues["nodes"]["epic-00202"]["state"] == "closed"
+            assert [
+                (edge["from"], edge["to"], edge["state"], edge["relation"])
+                for edge in cached_deps_issues["edges"]
+            ] == [("iss-00301", "epic-00202", "satisfied", "raw_direct")]
 
     def test_sync_fails_on_unresolved_ref(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
