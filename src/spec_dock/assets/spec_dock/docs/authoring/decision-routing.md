@@ -1,48 +1,48 @@
-# Decision Routing Authoring Guide
+# 判断配置ガイド（Decision Routing Authoring Guide）
 
-This guide helps authoring agents decide where a finding belongs before execution handoff. Workflow docs own the entry rules; this file owns reusable examples and good / bad routing patterns. Keep templates and skills thin: link here instead of copying these examples into generated artifacts.
+このガイドは、authoring agent が execution handoff 前に発見事項の配置先を判断するための参照です。Workflow docs は入口ルールを持ち、この文書は再利用できる例と good / bad routing pattern を持ちます。Templates と skills は薄く保ち、生成 artifact へ例を複製せず、この文書へ link します。
 
-## Routing Rule
+## 配置ルール（Routing rule）
 
-Route by the smallest durable scope that can own the decision without hiding future work.
+未来の作業を隠さずに判断を所有できる、最小の durable scope へ配置します。
 
-| Finding type | Destination | Use when | Handoff result |
+| 発見種別（finding type） | 配置先（destination） | 使う条件（use when） | 引き渡し結果（handoff result） |
 |---|---|---|---|
-| Issue-local implementation tradeoff | Issue | The decision affects only one implementation slice and is reversible or local to the issue. | Record in issue design / plan / report and continue only if the issue remains executable. |
-| Cross-issue design backbone | Epic | The decision affects issue decomposition, ownership boundaries, dependency direction, shared component behavior, or workflow policy across multiple issues. | Update the Epic artifact or create Epic-scope follow-up before Issue execution. |
-| Cross-epic operating decision | Initiative | The decision affects multiple epics, investment scope, success metrics, product direction, or operating model. | Update the Initiative artifact or create Initiative-scope follow-up before Epic / Issue decomposition depends on it. |
-| Long-lived architecture decision | ADR | The decision should be durable, independently discoverable, and reusable beyond one scope tree. | Create or update an ADR candidate, then link the accepted outcome from affected artifacts. |
-| Missing source of truth | Clarification | The agent cannot decide scope, acceptance, non-scope, owner intent, or priority from available sources. | Return to clarification and ask one essential question after source-grounded research. |
+| 単一 Issue の実装判断（Issue-local implementation tradeoff） | 単一 Issue | 1つの implementation slice だけに影響し、可逆または issue-local な判断である。 | 記録先は Issue design / plan / report とし、Issue が executable のままなら継続する。 |
+| 複数 Issue の設計背骨（Cross-issue design backbone） | 上位 Epic | 対象は Issue 分割、ownership boundary、dependency direction、shared component behavior、workflow policy へ複数 Issue にまたがって影響する。 | 実行前に Epic artifact を更新する、または Epic-scope follow-up を作成する。 |
+| 複数 Epic の運用判断（Cross-epic operating decision） | 上位 Initiative | 複数 Epic、investment scope、success metric、product direction、operating model に影響する。 | その判断に依存する Epic / Issue decomposition 前に Initiative artifact を更新する、または Initiative-scope follow-up を作成する。 |
+| 長期 architecture 判断（Long-lived architecture decision） | ADR | 1つの scope tree を超えて再利用され、独立して発見できる durable decision として残すべきである。 | 記録先として ADR candidate を作成または更新し、accepted outcome を影響 artifact から link する。 |
+| 判断根拠不足（Missing source of truth） | 確認質問（Clarification） | 利用可能な source から scope、acceptance、non-scope、owner intent、priority を判断できない。 | 調査後は clarification へ戻して essential question を1つ聞く。 |
 
-## Generic Examples
+## 汎用例（Generic examples）
 
-| Finding | Route | Why |
+| 発見（finding） | 配置（route） | 理由（why） |
 |---|---|---|
-| A single issue can choose between two equivalent helper names while preserving public behavior. | Issue-local | The tradeoff is local and does not change decomposition or durable policy. |
-| Several issues need the same ownership boundary before any one issue can implement safely. | Epic | The boundary is a cross-issue design backbone. |
-| A proposed change alters which teams or product areas are in scope for multiple epics. | Initiative | The decision changes investment scope and operating model. |
-| A storage or integration style should become the default for future unrelated work. | ADR | The decision is long-lived and should be discoverable outside the current tree. |
-| The issue title asks for implementation, but the sources disagree about the required behavior. | Clarification | Execution would require inventing acceptance criteria. |
+| 1つの Issue が公開挙動を保ったまま同等の helper 名を選ぶ。 | 単一 Issue | 判断は局所的で、分解や durable policy を変えない。 |
+| 複数 Issue が安全に実装へ進む前に、同じ ownership boundary を固定する必要がある。 | 上位 Epic | 境界は cross-issue design backbone である。 |
+| 提案された変更が複数 Epic の対象 team や product area を変える。 | 上位 Initiative | これは investment scope と operating model を変える判断である。 |
+| 保存方式または integration style を、将来の unrelated work の default にしたい。 | ADR | 長期に残り、現在の tree 外からも発見できる必要がある。 |
+| 表題上は実装を求めているが、source 間で必要な挙動が矛盾している。 | 確認質問（Clarification） | 実行すると agent が acceptance criteria を作り出す必要が出てしまう。 |
 
-## Good Patterns
+## 良いパターン（Good patterns）
 
-- good: Keep a reversible local implementation choice in the Issue, with report evidence explaining why no promotion is needed.
-- good: Promote a cross-issue dependency direction to Epic before writing issue plans that assume that direction.
-- good: Promote a cross-epic success metric or responsibility boundary to Initiative before splitting new epics.
-- good: Use ADR for a decision that future initiatives should find without reading this issue's report.
-- good: Use clarification when the agent can name the missing decision but cannot infer the owner's intent from source-grounded research.
+- good: 可逆な local implementation choice は Issue に残し、promotion 不要の理由を report evidence に記録する。
+- good: Cross-issue dependency direction は、それを前提に issue plan を書く前に Epic へ昇格する。
+- good: Cross-epic success metric や responsibility boundary は、新しい Epic 分割の前に Initiative へ昇格する。
+- good: 将来の Initiative が Issue report を読まずに見つけるべき判断は ADR にする。
+- good: 欠けている判断を agent が特定できるが、source-grounded research から owner intent を推測できない場合は clarification を使う。
 
-## Bad Patterns
+## 悪いパターン（Bad patterns）
 
-- bad: Treat a Decision-only Issue as execution-ready because it has a title and a branch.
-- bad: Hide a cross-issue ownership decision inside one issue's plan and let sibling issues discover it later.
-- bad: Put reusable examples or routing tutorials into templates that will remain in completed artifacts.
-- bad: Store a durable decision only in `report.md` when future agents must rely on it.
-- bad: Ask the user a broad question before checking existing docs, code, ADRs, discussions, and workflow rules.
+- bad: Decision-only Issue に title と branch があるだけで execution-ready と扱う。
+- bad: Cross-issue ownership decision を1つの Issue plan に隠し、sibling Issue が後から発見する状態にする。
+- bad: 完了後 artifact に残る template へ reusable example や routing tutorial を入れる。
+- bad: Future agent が依存する durable decision を `report.md` だけに保存する。
+- bad: 既存 docs、code、ADR、discussions、workflow rules を確認する前に、広すぎる質問を user に投げる。
 
-## Handoff Checklist
+## 引き渡しチェック（Handoff checklist）
 
-- The finding has one destination: Issue-local, Epic, Initiative, ADR, or clarification.
-- The chosen destination is the smallest scope that can safely own the decision.
-- Execution handoff does not depend on an unstated durable decision.
-- Examples and instructional guidance stay in docs; completed requirement / design / plan artifacts contain only adopted scope-specific facts.
+- Finding の配置先は Issue-local、Epic、Initiative、ADR、clarification のいずれか1つである。
+- 選んだ配置先は、その判断を安全に所有できる最小 scope である。
+- Execution handoff が、未記録の durable decision に依存していない。
+- 例と instructional guidance は docs に置き、完了後の requirement / design / plan artifact には採用済みの scope-specific facts だけを残す。
