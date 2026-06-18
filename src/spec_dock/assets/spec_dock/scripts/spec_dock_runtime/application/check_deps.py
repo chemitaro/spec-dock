@@ -273,6 +273,10 @@ def resolve_high_level_status_context(
                 kind=node.kind,
                 issue_statuses=issue_statuses,
             )
+        if resolved is None and status is not None and status.source == "local":
+            effective_status = _normalize_issue_status(status.effective_status)
+            if effective_status in {"done", "open"}:
+                resolved = (effective_status, "local")
         state, source = resolved if resolved is not None else ("unknown", "none")
         statuses[node_id] = DepsHighLevelStatus(
             node_id=node_id,

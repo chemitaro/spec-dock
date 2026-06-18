@@ -616,7 +616,49 @@ class TestCheckDepsApplication:
             ("epic-00203", "empty")
         ]
 
-    def test_local_empty_high_level_dependency_without_cache_fails_unknown(self) -> None:
+    def test_github_linked_empty_high_level_dependency_without_cache_fails_unknown(self) -> None:
+        app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
+        records = self._records(infra_contracts) + [
+            infra_contracts.StoredMetaRecord(
+                kind="epic",
+                id="epic-00203",
+                title="Linked empty epic",
+                slug="linked-empty-epic",
+                path="/repo/spec-dock/initiatives/init-00101-auth-platform/epics/epic-00203-linked-empty-epic",
+                parent_id="init-00101",
+                initiative_id="init-00101",
+                epic_id=None,
+                github_issue_number=203,
+                meta_path="/repo/spec-dock/initiatives/init-00101-auth-platform/epics/epic-00203-linked-empty-epic/.meta.json",
+            )
+        ]
+        context = infra_contracts.DepsDependencyContext(
+            source_node_id="iss-00302",
+            source_issue_id="iss-00302",
+            target_node_id="epic-00203",
+            target_node_kind="epic",
+            target_issue_ids=(),
+            expansion="empty",
+        )
+        ports = self._ports(
+            app_ports,
+            infra_contracts,
+            records=records,
+            deps={"iss-00302": []},
+            dependency_contexts={"iss-00302": [context]},
+            derived_state_reader=_StubDerivedStateReader(statuses={"iss-00302": "open"}),
+            issue_gateway=_StubIssueGateway(fail_index=True),
+        )
+
+        result = app_check_deps.check_deps(self._request(app_contracts, use_github=False), ports)
+
+        assert not result.inspection.evaluation.ready
+        assert result.inspection.evaluation.guard_reason == "unknown"
+        assert [(b.node_id, b.reason, b.state, b.state_source) for b in result.inspection.evaluation.node_blockers] == [
+            ("epic-00203", "empty_unknown", "unknown", "none")
+        ]
+
+    def test_local_empty_high_level_dependency_preserves_open_status(self) -> None:
         app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
         records = self._records(infra_contracts) + [
             infra_contracts.StoredMetaRecord(
@@ -646,15 +688,16 @@ class TestCheckDepsApplication:
             records=records,
             deps={"iss-00302": []},
             dependency_contexts={"iss-00302": [context]},
+            derived_state_reader=_StubDerivedStateReader(statuses={"iss-00302": "open"}),
             issue_gateway=_StubIssueGateway(fail_index=True),
         )
 
         result = app_check_deps.check_deps(self._request(app_contracts, use_github=False), ports)
 
         assert not result.inspection.evaluation.ready
-        assert result.inspection.evaluation.guard_reason == "unknown"
+        assert result.inspection.evaluation.guard_reason == "blocked"
         assert [(b.node_id, b.reason, b.state, b.state_source) for b in result.inspection.evaluation.node_blockers] == [
-            ("epic-local-00203", "empty_unknown", "unknown", "none")
+            ("epic-local-00203", "empty_open", "open", "local")
         ]
 
     def test_local_high_level_default_open_does_not_mask_done_descendant_aggregate(self) -> None:
