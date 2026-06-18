@@ -1124,8 +1124,11 @@ class TestInitUpdate(CliRuntimeHarness):
     _CHECKED_IN_DOGFOODING_META_JSON_PATHS = (
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json",
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/.meta.json",
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00028-manual-regression-runtime-github-bugs/.meta.json",
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00082-fail-fast-on-malformed-node-metadata/.meta.json",
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00084-manual-fail-fast-initiative/.meta.json",
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00149-issue-finish-synthetic-approval-closeout-bug/.meta.json",
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00157-reduce-test-suite-runtime/.meta.json",
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00160-reduce-test-runtime-followup/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json",
@@ -1142,6 +1145,8 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/issues/iss-00075-multi-host-agent-and-config-asset-install/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00003-prevent-japanese-branch-name-gh-issue-develop/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00005-prevent-japanese-branch-name-id-slug/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00108-worktree-create-cli-and-output/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00109-worktree-docs-dogfooding-and-final-verification/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00110-worktree-create-core-use-case/.meta.json",
@@ -1150,7 +1155,14 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00143-manage-external-git-worktrees/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00153-worktree-remove-default-full-delete/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00001-multilayer-specification-foundation/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00001-multilayer-specification-foundation/issues/iss-00007-child-node-scripts-and-supplements/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00023-runtime-cli-modularization/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00023-runtime-cli-modularization/issues/iss-00024-split-runtime-cli-modules/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00023-runtime-cli-modularization/issues/iss-00025-split-app-py-reorganize-tests/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00014-unify-discussion-artifact-storage/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00019-chronological-discussion-naming/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00034-github-mandatory-node-creation-contract/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00035-sync-adr-symlink-mirror/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00036-timestamp-based-discussion-and-adr-naming/.meta.json",
@@ -1160,13 +1172,24 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00141-remove-local-only-node-creation-option-surface/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00188-prevent-duplicate-discussion-timestamp-slots/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00009-issue-epic-initiative-dependency-management/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00010-dependency-shorthand-ready-board/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00012-protect-metadata-guardrails/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00058-command-managed-dependency-registration/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00060-meta-json-dependency-schema-and-reader-alignment/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00061-dependency-mutation-command-contract/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00062-downstream-parity-and-cutover-readiness/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00063-final-regression-parity-and-cutover-closure/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00064-update-user-facing-docs-help/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00065-align-user-docs-help/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00192-generate-deps-raw-puml/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00193-node-level-deps-add-remove/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00198-manual-node-deps-a/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00199-manual-node-deps-b/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00200-manual-epic-a/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00201-manual-epic-b/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00202-manual-issue-a/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00203-manual-issue-b/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00068-install-root-tree-and-asset-classification/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00069-package-data-and-installed-artifact-parity/.meta.json",
@@ -1210,6 +1233,10 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00131-debug-codex-subagent-permission-profile-callability/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00138-split-issue-planning-execution-skills/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00016-reorganize-codex-skills-hub-leaf/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00021-rebuild-templates-playbook-responsibilities/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00155-skill-docs-runtime-contract-realignment/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00156-add-runtime-contracts-to-skills/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00159-make-issue-planning-skill-expose-mandatory-authoring-gates/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00162-align-skill-docs-template-context-surfaces/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00163-revise-spec-dock-clarification-as-skill-owned-grill-workflow/.meta.json",
@@ -1221,19 +1248,24 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00184-rename-spec-dock-hub-skill/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00186-harden-issue-execution-step-gates/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00187-actions-pr-observation-ci-state/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00191-split-pr-observation-shell-python/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00196-decision-implementation-workflow-responsibility/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00197-extract-pr-review-snapshot-python/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/.meta.json": [],
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00028-manual-regression-runtime-github-bugs/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00082-fail-fast-on-malformed-node-metadata/.meta.json": [],
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00084-manual-fail-fast-initiative/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00149-issue-finish-synthetic-approval-closeout-bug/.meta.json": [],
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00157-reduce-test-suite-runtime/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00160-reduce-test-runtime-followup/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00050-host-adapter-scaffold-and-final-parity/.meta.json": [
-            "iss-00049"
+            "iss-00049",
         ],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00051-host-native-shim-deployment-and-validation-closure/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00052-reject-non-canonical-git-issue-targets/.meta.json": [],
@@ -1246,6 +1278,8 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/issues/iss-00075-multi-host-agent-and-config-asset-install/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00003-prevent-japanese-branch-name-gh-issue-develop/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00005-prevent-japanese-branch-name-id-slug/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00108-worktree-create-cli-and-output/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00109-worktree-docs-dogfooding-and-final-verification/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00110-worktree-create-core-use-case/.meta.json": [],
@@ -1254,13 +1288,20 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00143-manage-external-git-worktrees/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00153-worktree-remove-default-full-delete/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00001-multilayer-specification-foundation/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00001-multilayer-specification-foundation/issues/iss-00007-child-node-scripts-and-supplements/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00023-runtime-cli-modularization/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00023-runtime-cli-modularization/issues/iss-00024-split-runtime-cli-modules/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00023-runtime-cli-modularization/issues/iss-00025-split-app-py-reorganize-tests/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00014-unify-discussion-artifact-storage/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00019-chronological-discussion-naming/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00034-github-mandatory-node-creation-contract/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00035-sync-adr-symlink-mirror/.meta.json": [
-            "iss-00036"
+            "iss-00036",
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00036-timestamp-based-discussion-and-adr-naming/.meta.json": [
-            "iss-00034"
+            "iss-00034",
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00037-migration-guardrails-and-validation-hardening/.meta.json": [
             "iss-00034",
@@ -1278,17 +1319,28 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00141-remove-local-only-node-creation-option-surface/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00188-prevent-duplicate-discussion-timestamp-slots/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00009-issue-epic-initiative-dependency-management/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00010-dependency-shorthand-ready-board/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00012-protect-metadata-guardrails/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00058-command-managed-dependency-registration/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00060-meta-json-dependency-schema-and-reader-alignment/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00061-dependency-mutation-command-contract/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00062-downstream-parity-and-cutover-readiness/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00063-final-regression-parity-and-cutover-closure/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00064-update-user-facing-docs-help/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00065-align-user-docs-help/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00192-generate-deps-raw-puml/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00193-node-level-deps-add-remove/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00198-manual-node-deps-a/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00199-manual-node-deps-b/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00200-manual-epic-a/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00201-manual-epic-b/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00202-manual-issue-a/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00203-manual-issue-b/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00068-install-root-tree-and-asset-classification/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00069-package-data-and-installed-artifact-parity/.meta.json": [
-            "iss-00068"
+            "iss-00068",
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00070-installer-source-discovery-and-managed-ownership/.meta.json": [
             "iss-00068",
@@ -1299,7 +1351,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "iss-00070",
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/.meta.json": [
-            "iss-00071"
+            "iss-00071",
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00098-delegated-implementation-orchestration-contract/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00100-discussion-template-hearing-sheet-and-flexible-note-expansion/.meta.json": [],
@@ -1323,7 +1375,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00113-delegated-authoring-policy-foundation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00114-delegated-draft-evidence-schema/.meta.json": [
-            "iss-00113"
+            "iss-00113",
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00115-delegated-author-role-skills/.meta.json": [
             "iss-00113",
@@ -1347,10 +1399,10 @@ class TestInitUpdate(CliRuntimeHarness):
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00120-authority-metadata-and-promotion-record-schema/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00121-authority-aware-context-pack-lifecycle-gates/.meta.json": [
-            "iss-00120"
+            "iss-00120",
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00122-evidence-adoption-ledger-depth2-delegation/.meta.json": [
-            "iss-00120"
+            "iss-00120",
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00123-role-scoped-permission-profiles-task-manifest/.meta.json": [
             "iss-00120",
@@ -1373,12 +1425,16 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00131-debug-codex-subagent-permission-profile-callability/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00138-split-issue-planning-execution-skills/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00016-reorganize-codex-skills-hub-leaf/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00021-rebuild-templates-playbook-responsibilities/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00155-skill-docs-runtime-contract-realignment/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00156-add-runtime-contracts-to-skills/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00159-make-issue-planning-skill-expose-mandatory-authoring-gates/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00162-align-skill-docs-template-context-surfaces/.meta.json": [
-            "iss-00159"
+            "iss-00159",
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00163-revise-spec-dock-clarification-as-skill-owned-grill-workflow/.meta.json": [
-            "iss-00162"
+            "iss-00162",
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00164-clarify-hub-and-leaf-skill-routing-surface/.meta.json": [
             "iss-00159",
@@ -1399,6 +1455,8 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00184-rename-spec-dock-hub-skill/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00186-harden-issue-execution-step-gates/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00187-actions-pr-observation-ci-state/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00191-split-pr-observation-shell-python/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00196-decision-implementation-workflow-responsibility/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00197-extract-pr-review-snapshot-python/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {

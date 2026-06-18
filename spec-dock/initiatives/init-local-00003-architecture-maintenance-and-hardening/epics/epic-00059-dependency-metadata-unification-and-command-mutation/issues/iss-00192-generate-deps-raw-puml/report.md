@@ -809,15 +809,28 @@ git diff --check
 |---|---|---|---|
 | ready | dogfooding mirror sync + final report ledger | final response / PR / issue comment as appropriate | ready |
 
+### PR merge-preparation 追跡（PR Merge Preparation Tracking）
+| 項目 | 証跡 | 結果 | メモ |
+|---|---|---|---|
+| PR 作成 | https://github.com/chemitaro/spec-dock/pull/206 | open / ready | base=`main`, head=`iss-00192-generate-deps-raw-puml`, initial head=`03b6953ffdfa24835a71cd925f1fc7ec9357be20` |
+| 初回 PR 観測 | `/private/tmp/spec-dock-pr-206-observation/result.json` | failed | `provider-tests` failed twice; `validate` passed twice; Codex review reported no major issues for `03b6953ffd` |
+| PR repair batch | `discussions/20260618t035621z-pr-repair-batch-pr-repair-batch.md` | implemented locally | I001 valid blocking `check_failure:provider-tests`; I002 duplicate covered by U001 |
+| Repair unit U001 | `discussions/20260618t035702z-disc-pr-repair-unit-u001-check-failure-provider-tests.md` | implemented locally | Updated checked-in dogfooding `.meta.json` path and `depends_on` snapshot baselines in `tests/unit/infra/test_init_update.py` |
+| U001 focused verification | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -q` | pass | `1 passed in 1.21s` |
+| U001 file-level verification | `uv run pytest tests/unit/infra/test_init_update.py -q` | pass | `439 passed in 259.88s` |
+| U001 broad unit verification | `uv run pytest tests/unit -q` | pass | `680 passed in 233.40s` |
+| U001 smoke validation | `./spec-dock/scripts/spec-dock validate`; `git diff --check` | pass | `spec-dock: ok (validate) nodes=129`; whitespace check passed |
+| 再観測 | pending after commit and push | pending | New head SHA will be observed after repair commit is pushed |
+
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: PR #206 の初回 observation で required `provider-tests` が失敗した。
+  - 解決: `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` の checked-in dogfooding snapshot baseline を現物の `spec-dock/initiatives` tree に同期し、focused / file-level / unit-wide verification を通した。PR 再観測は repair commit push 後に実施する。
 
 ## 学んだこと (任意)
-- ...
+- `deps-raw.puml` の runtime 実装自体は reviewer / focused tests / broad unit tests で通っていたが、PR merge-preparation では required CI 全体の dogfooding snapshot drift も blocking として扱う必要がある。
 
 ## 今後の推奨事項 (任意)
-- ...
+- checked-in dogfooding metadata snapshot guard は、dogfooding tree 変更を含む PR で自動更新 helper を持つと PR repair が短くなる。
 
 ## 省略/例外メモ (必須)
 - Spec authoring workflow:
