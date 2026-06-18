@@ -683,6 +683,95 @@ git diff --check
 
 ---
 
+### セッションログ（2026-06-19 S99）
+
+#### 対象
+- Step: S99 Final Quality Gate
+- AC/EC: all issue closures, final QA / code / spec gates, delivery readiness
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `S99 — Final Quality Gate`
+
+#### 実施内容
+- S90 後の final gate として `validate`、`git diff --check`、`tests/unit tests/cli_runtime` を実行した。
+- 初回の広範囲テストで dogfooding checked-in snapshot と runtime mirror parity の 2 failure を観測した。
+- S99 follow-up として、provider runtime assets で変更済みの runtime 11 files を dogfooding mirror `spec-dock/scripts/spec_dock_runtime/...` に同期した。
+- checked-in dogfooding `.meta.json` snapshot に active issue `iss-00207` の `.meta.json` path と legacy deps expectation empty entry を追加した。
+- 失敗していた focused tests を再実行し、その後に広範囲 unit / CLI runtime suite を再実行した。
+
+#### 実行コマンド / 結果
+```bash
+git diff --check
+# pass
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=130
+
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_runtime_mirror_match_provider_assets -q
+# 2 passed in 0.07s
+
+uv run pytest tests/unit tests/cli_runtime
+# 1325 passed, 76 skipped in 695.72s (0:11:35)
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S99 | Red / Final regression | final regression required | broad suite initially failed on checked-in dogfooding `.meta.json` snapshot and provider/runtime mirror parity | `uv run pytest tests/unit tests/cli_runtime` | pass | failure identified dogfooding parity gaps, not readiness logic regression |
+| S99 | Green | final regression required | focused failing tests passed after mirror/snapshot follow-up | focused pytest command | pass | 2 passed |
+| S99 | Green | final regression required | broad unit / CLI runtime suite passed | `uv run pytest tests/unit tests/cli_runtime` | pass | 1325 passed, 76 skipped |
+| S99 | Refactor | guardrail satisfied | diff limited to dogfooding runtime mirror parity, checked-in snapshot expectation, and report evidence | `git diff --name-only`; `git diff --check` | pass | no provider runtime logic changed in S99 follow-up |
+| S99 reviewer follow-up | Red / QA finding | final QA reviewer required additional sync artifact coverage | final QA reviewer failed with P1: empty closed high-level satisfied edge was not directly covered in sync-generated `.agent/deps-issues.json` / PUML | qa-reviewer output | pass | bounded follow-up added CLI sync regression |
+| S99 reviewer follow-up | Red / code review finding | issue-wide code reviewer found non-blocking presentation responsibility drift | code-reviewer passed with P2: `deps check --json` v2 renderer lived in command while presentation renderer stayed schema v1 | code-reviewer output | pass | bounded follow-up moved v2 renderer to presentation |
+| S99 reviewer follow-up | Green | reviewer findings resolved | focused new/changed tests passed | `uv run pytest tests/cli_runtime/test_sync.py::TestCliSync::test_sync_deps_issues_marks_empty_closed_epic_dependency_satisfied tests/cli_runtime/test_deps.py::TestCliDeps::test_deps_check_json_exits_zero_for_empty_closed_epic_context` | pass | 2 passed in 2.98s |
+| S99 reviewer follow-up | Green | final regression required after follow-up | broad unit / CLI runtime suite passed | `uv run pytest tests/unit tests/cli_runtime` | pass | 1326 passed, 76 skipped in 707.72s |
+| S99 reviewer follow-up | Refactor | guardrail satisfied | `deps check --json` rendering responsibility restored to presentation layer; provider/dogfooding mirror files match | `diff -u`; `git diff --check`; `validate` | pass | `validate` nodes=130 |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S99 | all issue closures | final regression pass, final reviewer gates ready for execution, report evidence updated | `validate` pass; `git diff --check` pass; broad pytest pass; QA P1 / code P2 follow-up implemented and verified; final QA re-review pass; issue-wide code re-review pass; final spec re-review pass | pass | final commit remains open until this report evidence and S99 follow-up diff are committed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| final-regression | S99 | yes | full-suite | final gate initially had 2 dogfooding parity failures | `uv run pytest tests/unit tests/cli_runtime` | pass | 1325 passed, 76 skipped |
+| dogfooding-parity-follow-up | S99 | yes | focused-regression | snapshot / mirror parity failures | focused `test_init_update.py` tests | pass | 2 passed |
+| qa-p1-sync-satisfied-high-level | S99 reviewer follow-up | yes | focused-regression | final QA reviewer identified missing sync artifact coverage | focused `test_sync.py` / `test_deps.py` tests | pass | 2 passed in parent verification |
+| final-regression-after-reviewer-follow-up | S99 reviewer follow-up | yes | full-suite | QA P1 and code P2 follow-up changed runtime/test surface | `uv run pytest tests/unit tests/cli_runtime` | pass | 1326 passed, 76 skipped |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| all AC/EC closures | S99 | final broad pytest, validate, diff check | pass | final reviewer gates pending |
+| dogfooding parity | S99 | mirror parity and checked-in snapshot focused tests | pass | S99 follow-up closes final regression failure |
+| reviewer follow-up coverage | S99 | sync-generated satisfied high-level dependency test, deps check JSON focused test, broad pytest | pass | QA P1 and code P2 addressed |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| final-gate follow-up | dogfooding parity | checked-in dogfooding snapshot / runtime mirror parity | final-regression | final broad suite exposed dogfooding parity gaps after provider runtime changes | no | yes |
+| reviewer follow-up | `cl-ac-002`, `cl-ac-004` | empty closed epic satisfied sync artifact | same | QA reviewer required direct sync-generated artifact coverage for satisfied high-level dependency | no | yes |
+| reviewer follow-up | deps check json v2 presentation responsibility | deps check JSON renderer | same | issue-wide code reviewer found non-blocking presentation responsibility drift | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S99 follow-up | delegated + orchestrator integration | final gate parity correction under issue execution workflow | dev-coder / parent integration | dogfooding runtime mirror and checked-in snapshot parity | `plan.md` S99 and failing tests | dogfooding mirror files, `test_init_update.py` snapshot, report evidence | provider runtime behavior changes, unrelated docs/workflow edits | focused parity tests, broad unit / CLI runtime, `validate`, `git diff --check` | parity fix requires new provider behavior changes | changed files, verification result, unresolved risks | pass |
+| S99 reviewer follow-up | delegated | final reviewer findings under issue execution workflow | dev-coder | sync satisfied high-level coverage and deps check JSON renderer responsibility | final QA / code-reviewer findings | provider runtime presentation/command files, dogfooding mirror, focused CLI tests | unrelated docs/workflow/report edits by worker | focused tests, broad unit / CLI runtime, `validate`, `git diff --check` | follow-up requires behavior outside reviewer findings | changed files, verification result, unresolved risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S99 follow-up | dev-coder / parent integration | Synchronized changed provider runtime assets into dogfooding mirror and updated checked-in dogfooding snapshot expectations for `iss-00207`. | `spec-dock/scripts/spec_dock_runtime/...`; `tests/unit/infra/test_init_update.py` | focused parity tests 2 passed; broad unit / CLI runtime 1325 passed, 76 skipped; `validate` pass; `git diff --check` pass | final reviewers pass after follow-up chain | none known | accepted |
+| S99 reviewer follow-up | dev-coder | Added sync artifact regression for empty closed epic satisfied dependency and moved `deps check --json` v2 rendering into presentation. | `src/.../commands/deps.py`; `src/.../presentation/json_state.py`; dogfooding mirrors; `tests/cli_runtime/test_sync.py` | focused tests 2 passed; broad unit / CLI runtime 1326 passed, 76 skipped; `validate` pass; `git diff --check` pass | QA/code/spec re-review pass | none known | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S99 | final QA reviewer | qa-reviewer | fresh after follow-up | passed | N/A | proceed to final spec review | First review P1 fixed; re-review found no remaining P0/P1 QA gaps |
+| S99 | issue-wide code reviewer | code-reviewer | fresh after follow-up | passed | N/A | proceed to final spec review | First review pass with P2 fixed; re-review found no actionable findings |
+| S99 | final spec reviewer | spec-reviewer | fresh after final gate evidence update | passed | N/A | proceed to final commit | first failure was placeholder/pending final gate evidence; re-review found no blockers |
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
@@ -693,32 +782,37 @@ git diff --check
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | additional sync-generated artifact regression added for empty closed high-level satisfied dependency; broader integration suite sufficient after follow-up | focused tests 2 passed; `uv run pytest tests/unit tests/cli_runtime` 1326 passed, 76 skipped; QA re-review found no remaining P0/P1 gaps | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | first review passed with P2; `deps check --json` v2 rendering moved into `presentation/json_state.py`; re-review found no actionable findings | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | first review failed because final gate placeholders were still pending; re-review found no P0/P1 spec, implementation, test, docs, or final-gate traceability blockers | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S99 report evidence updated through QA/code/spec follow-up | S99 dogfooding mirror parity, checked-in snapshot, deps check JSON presentation renderer, sync satisfied high-level regression, and final report evidence | final response and PR body after final commit; final commit hash and clean check are external delivery evidence | ready for final commit |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: final broad regression initially failed on dogfooding metadata snapshot and runtime mirror parity.
+  - 解決: S99 follow-up synchronized dogfooding runtime mirror files and updated checked-in snapshot expectations, then focused and broad tests passed.
+- 問題: final QA reviewer found missing sync-generated artifact coverage for an empty closed high-level satisfied dependency.
+  - 解決: Added CLI sync regression covering `.agent/deps-issues.json` and `deps-issues.puml`, then focused and broad tests passed.
+- 問題: issue-wide code reviewer found `deps check --json` v2 rendering drift between command and presentation layers.
+  - 解決: Moved v2 JSON rendering to `presentation/json_state.py::render_deps_check_json` and routed the command through it.
 
 ## 学んだこと (任意)
-- ...
+- `deps-issues` の readiness authority は sync 時の評価結果にあるため、command-level JSON と sync artifact の双方で同じ node blocker / satisfied dependency contract を固定する必要がある。
+- dogfooding mirror parity は provider runtime 変更後の final gate で明示的に確認する必要がある。
 
 ## 今後の推奨事項 (任意)
-- ...
+- PR 作成後、GitHub checks と mergeability を PR delivery / merge preparation evidence として確認する。
 
 ## 省略/例外メモ (必須)
 - 該当なし

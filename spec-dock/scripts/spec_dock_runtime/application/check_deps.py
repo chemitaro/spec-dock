@@ -5,7 +5,15 @@ from typing import cast
 
 from ..domain.deps import inspect_target_deps, validate_deps_cycles, validate_raw_node_dependency_graph
 from ..domain.ids import format_id, parse_id
-from ..domain.models import IssueSnapshot, NodeId, SpecGraph, SpecNodeKind, SpecNodeSeed
+from ..domain.models import (
+    DepsHighLevelStatus,
+    IssueSnapshot,
+    IssueStatusSnapshot,
+    NodeId,
+    SpecGraph,
+    SpecNodeKind,
+    SpecNodeSeed,
+)
 from ..domain.tree import build_graph
 from ..infra.contracts import StoredMetaRecord
 from .contracts import CheckDepsRequest, DepsCheckResult, TargetRef
@@ -140,6 +148,96 @@ def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> d
     return out
 
 
+def _normalize_issue_status(value: str | None) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"done", "open", "unknown"}:
+        return normalized
+    return "unknown"
+
+
+def _status_state_from_snapshot(status: IssueStatusSnapshot) -> tuple[str, str] | None:
+    effective_status = _normalize_issue_status(status.effective_status)
+    if status.source == "github":
+        if effective_status == "done":
+            return ("closed", "github")
+        if effective_status == "open":
+            return ("open", "github")
+        return None
+    if status.source == "cache":
+        if effective_status in {"done", "open"}:
+            return (effective_status, status.source)
+    return None
+
+
+def _descendant_issue_ids(graph: SpecGraph, node_id: str, kind: str) -> list[str]:
+    if kind == "initiative":
+        return [
+            issue_id
+            for issue_id, issue_node in graph.nodes_by_id.items()
+            if issue_node.kind == "issue" and issue_node.initiative_id == node_id
+        ]
+    if kind == "epic":
+        return [
+            issue_id
+            for issue_id, issue_node in graph.nodes_by_id.items()
+            if issue_node.kind == "issue" and issue_node.epic_id == node_id
+        ]
+    return []
+
+
+def _descendant_aggregate_state(
+    graph: SpecGraph,
+    *,
+    node_id: str,
+    kind: str,
+    issue_statuses: dict[str, IssueStatusSnapshot],
+) -> tuple[str, str] | None:
+    descendant_issue_ids = _descendant_issue_ids(graph, node_id, kind)
+    if not descendant_issue_ids:
+        return None
+    descendant_statuses = [
+        _normalize_issue_status(issue_statuses[issue_id].effective_status)
+        for issue_id in descendant_issue_ids
+        if issue_id in issue_statuses
+    ]
+    if len(descendant_statuses) != len(descendant_issue_ids):
+        return ("unknown", "descendant_aggregate")
+    if descendant_statuses and all(status == "done" for status in descendant_statuses):
+        return ("done", "descendant_aggregate")
+    if any(status == "open" for status in descendant_statuses):
+        return ("open", "descendant_aggregate")
+    return ("unknown", "descendant_aggregate")
+
+
+def resolve_high_level_status_context(
+    graph: SpecGraph,
+    *,
+    issue_statuses: dict[str, IssueStatusSnapshot],
+) -> dict[str, DepsHighLevelStatus]:
+    statuses: dict[str, DepsHighLevelStatus] = {}
+    for node_id, node in graph.nodes_by_id.items():
+        if node.kind not in {"initiative", "epic"}:
+            continue
+        resolved = None
+        status = issue_statuses.get(node_id)
+        if status is not None:
+            resolved = _status_state_from_snapshot(status)
+        if resolved is None:
+            resolved = _descendant_aggregate_state(
+                graph,
+                node_id=node_id,
+                kind=node.kind,
+                issue_statuses=issue_statuses,
+            )
+        state, source = resolved if resolved is not None else ("unknown", "none")
+        statuses[node_id] = DepsHighLevelStatus(
+            node_id=node_id,
+            state=state,  # type: ignore[arg-type]
+            source=source,
+        )
+    return statuses
+
+
 def _validate_raw_node_dependency_preflight(ports: Ports, specdock_dir: Path, graph: SpecGraph) -> None:
     load_node_resolutions = getattr(ports.deps_topology_reader, "load_node_dependency_resolutions", None)
     if not callable(load_node_resolutions):
@@ -241,6 +339,11 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
         issue_depends_on_map=issue_depends_on_map,
         target_id=NodeId(target_node_id),
         issue_statuses=status_context.issue_statuses,
+        dependency_contexts_by_issue_id=topology.dependency_contexts_by_issue_id,
+        high_level_statuses_by_node_id=resolve_high_level_status_context(
+            graph,
+            issue_statuses=status_context.issue_statuses,
+        ),
         active_issue_id=active_issue_id,
     )
     return DepsCheckResult(target=req.target, inspection=inspection, warnings=warnings)

@@ -36,12 +36,34 @@ def render_deps_check_json(result: DepsCheckResult) -> str:
     }
 
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "target": target_id,
         "target_status": target_status_payload,
         "ready": bool(inspection.evaluation.ready),
         "effective_depends_on": list(inspection.effective_depends_on),
         "blockers": list(inspection.evaluation.blockers),
+        "issue_blockers": list(inspection.evaluation.issue_blockers),
+        "node_blockers": [
+            {
+                "node_id": blocker.node_id,
+                "reason": blocker.reason,
+                "state": blocker.state,
+                "state_source": blocker.state_source,
+                "source_issue_id": blocker.source_issue_id,
+            }
+            for blocker in inspection.evaluation.node_blockers
+        ],
+        "satisfied_dependencies": [
+            {
+                "source_node_id": context.source_node_id,
+                "source_issue_id": context.source_issue_id,
+                "target_node_id": context.target_node_id,
+                "target_node_kind": context.target_node_kind,
+                "target_issue_ids": list(context.target_issue_ids),
+                "expansion": context.expansion,
+            }
+            for context in inspection.evaluation.satisfied_dependencies
+        ],
         "nodes": {
             node_id: {
                 "state": node_state.status,
