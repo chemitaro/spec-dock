@@ -466,6 +466,129 @@ git diff --check
 
 ---
 
+### セッションログ（2026-06-19 S04）
+
+#### 対象
+- Step: S04 Sync State And Presentation Artifacts
+- AC/EC: AC-002, AC-004, AC-005, EC-001, EC-002, EC-003
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `S04 — Sync State And Presentation Artifacts`
+  - closure ids:
+    - `cl-ac-004`
+    - `cl-ac-005`
+    - sync/presentation portions of `cl-ac-002`, `cl-ec-001`, `cl-ec-002`, `cl-ec-003`
+
+#### 実施内容
+- `SyncStateResult` が `dependency_contexts_by_issue_id` と `high_level_statuses_by_node_id` を保持するようにした。
+- `sync_state.py` が S03 の high-level status context builder を再利用し、sync 中の `evaluate_readiness()` に topology context / high-level status context を渡すようにした。
+- `.agent/deps-issues.json` を schema v2 / `issue-readiness-with-dependency-context` projection に変更し、`SyncStateResult` の readiness evaluation から生成するようにした。
+- `deps-issues` の edge に `state: blocking | satisfied` と `relation: compiled_issue | raw_direct` を持たせた。
+- `deps-raw.puml` が payload の high-level `state` / `state_source` を package label / color に反映し、raw/debug artifact であることを legend に表示するようにした。
+- raw dependency preflight failure 時は deps disabled payload / PUML を維持し、stale partial graph を描画しないことを確認した。
+- reviewer follow-up として、historical done issue の unrelated satisfied high-level context が `deps-issues` に混入しないよう include 境界を絞った。
+- broader CLI regression follow-up として、S04 v2 contract に追随して `test_new.py` / `test_deps.py` の stale source/projection expectations を更新した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k historical_satisfied_high_level_context -q
+# 1 passed, 56 deselected
+
+uv run pytest tests/cli_runtime/test_new.py::TestCliNew::test_new_issue_auto_syncs_index_and_dashboard tests/cli_runtime/test_deps.py::TestCliDeps::test_sync_force_sets_deps_valid_false_and_emits_placeholders tests/cli_runtime/test_deps.py::TestCliDeps::test_sync_deps_empty_open_epic_blocks_with_node_context tests/cli_runtime/test_deps.py::TestCliDeps::test_deps_add_updated_path_auto_syncs_dependency_projection tests/cli_runtime/test_deps.py::TestCliDeps::test_deps_remove_updated_path_auto_syncs_dependency_projection -q
+# 5 passed
+
+uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_deps.py -k "deps_issues or force or cycle or sync or new"
+# 63 passed, 6 skipped, 83 deselected
+
+uv run pytest tests/cli_runtime/test_sync.py tests/unit/presentation/test_runtime_sync_s07.py tests/unit/presentation/test_deps_raw_puml.py
+# 91 passed, 2 skipped
+
+git diff --check
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | Red | red-required | focused tests failed on missing `SyncStateResult.high_level_statuses_by_node_id` and deps-issues schema v1 | dev-coder reported red run | pass | carrier field and old todo-only projection path were missing |
+| S04 | Red follow-up | reviewer finding | historical satisfied high-level regression failed because done issue / closed high-level node were pulled into deps-issues | dev-coder reported focused red run | pass | all-history dump boundary risk reproduced |
+| S04 | Red follow-up | reviewer finding | focused CLI tests failed on old `index.json` source / `open-issues-dependency-view` projection expectations | dev-coder reported focused red run | pass | stale tests outside required S04 subset detected |
+| S04 | Green | red-required | required S04 lane -> 91 passed, 2 skipped | command | pass | 親 orchestrator でも同じ Green を再実行済み |
+| S04 | Refactor | guardrail satisfied | runtime/presentation diff stays in S04 source paths; test expectation updates include S04 contract consumers outside original required subset | diff inspection / `git diff --check` | pass | no storage format or docs changes |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | satisfied high-level context from historical done issue could become all-history dump | code-reviewer | bounded follow-up fix and regression test | `cl-ac-004`, `cl-ac-002`, `cl-ec-002` | no | `tests/unit/presentation/test_runtime_sync_s07.py` |
+| S04 | stale deps-issues v1 source/projection expectations remained in broader CLI tests | code-reviewer | bounded test expectation update | `cl-ac-004`, `cl-ec-003` | no | `tests/cli_runtime/test_new.py`; `tests/cli_runtime/test_deps.py` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | `tc-s04-001`, `tc-s04-002`, `tc-s04-003`, `tc-s04-004`, `cl-ac-004`, `cl-ac-005`, `cl-ac-002`, `cl-ec-001`, `cl-ec-002`, `cl-ec-003` | S04 sync/presentation tests pass, `deps-issues` no longer derives from todo-only `index.json`, `deps-raw` renders supplied high-level state, reviewer pass recorded | tests pass; first review pass with P2; P2 boundary fixed; second review failed on stale CLI expectations and missing report; P1 test expectations fixed; fresh `code-reviewer` pass; S04 commit confirmed by post-commit `git log --oneline -5` | pass | post-commit clean check passed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| `tc-s04-001` | S04 | yes | red-required | deps-issues was schema v1 / todo-index source | required S04 pytest lane | pass | v2 blocker context includes high-level nodes |
+| `tc-s04-002` | S04 | yes | red-required | satisfied context absent or over-inclusive before follow-up | required S04 pytest lane plus historical regression | pass | satisfied context visible only from displayed readiness context |
+| `tc-s04-003` | S04 | yes | red-required | deps-raw high-level packages lacked payload state/source | required S04 pytest lane | pass | high-level package state/source rendered from payload |
+| `tc-s04-004` | S04 | yes | covered-existing + updated expectation | stale v1 disabled deps-issues expectation remained | CLI focused and required lanes | pass | disabled path emits v2 invalid payload and DEPS_DISABLED PUML |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| `cl-ac-004` | S04 | deps-issues v2 tests and stale expectation follow-up | pass | source is sync_state readiness evaluation, not todo-only index |
+| `cl-ac-005` | S04 | deps-raw high-level state rendering test | pass | renderer uses supplied payload state/source |
+| `cl-ac-002` | S04 | satisfied context tests and historical boundary regression | pass | satisfied dependencies remain visible but scoped |
+| `cl-ec-001` | S04 | unknown high-level blocker context in sync artifact | pass | unknown node blocker visible in deps-issues |
+| `cl-ec-002` | S04 | done/satisfied context visibility tests | pass | done dependency does not block but remains visible when connected to displayed context |
+| `cl-ec-003` | S04 | forced cycle disabled artifact tests | pass | invalid deps payload / DEPS_DISABLED remain fail-closed |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| reviewer follow-up | `cl-ac-004`, `cl-ac-002`, `cl-ec-002` | historical satisfied high-level context | same | reviewer P2 が all-history dump boundary risk を指摘したため | no | yes |
+| reviewer follow-up | `cl-ac-004`, `cl-ec-003` | stale CLI deps-issues expectations | same | reviewer P1 が broader CLI suite の stale contract を指摘したため | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | delegated | runtime/test mutation under issue execution workflow | dev-coder | Sync State And Presentation Artifacts | `plan.md` S04 | S04 application/contracts/presentation/tests | renderer-side readiness inference, todo-only index source, all-history graph dump, storage/docs changes | required S04 pytest lane and `git diff --check` | SyncStateResult cannot carry typed contexts without duplicating readiness rules | changed files, deps-issues v2 snippet, deps-raw rendering evidence, tests, risks, ledger note | pass after follow-ups |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 | dev-coder | Added sync/presentation carriers and deps-issues v2 / deps-raw state rendering. | S04 application/contracts/presentation/tests | required S04 lane 90 passed, 2 skipped; `git diff --check` pass | first code-reviewer pass with P2 | satisfied context could over-include historical done issue | accepted after follow-up |
+| S04 follow-up P2 | dev-coder | Limited satisfied high-level context to displayed include set and added regression. | `presentation/json_state.py`; `tests/unit/presentation/test_runtime_sync_s07.py` | focused 1 passed; required S04 lane 91 passed, 2 skipped; `git diff --check` pass | second code-reviewer failed on P1/P1 | broader CLI stale expectations; report missing | accepted |
+| S04 follow-up P1 | dev-coder | Updated stale CLI expectations to S04 deps-issues v2 contract. | `tests/cli_runtime/test_new.py`; `tests/cli_runtime/test_deps.py` | focused 5 passed; CLI subset 63 passed, 6 skipped, 83 deselected; `git diff --check` pass | fresh code-reviewer pass | none | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | code-reviewer | fresh after follow-ups | passed | N/A | proceed to commit gate | First review P2 fixed; second review P1 stale tests and missing report fixed; fresh re-review returned no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | closed | S04 allowed paths plus broader stale CLI expectation tests and this report evidence | current S04 commit confirmed by `git log --oneline -5` after commit | `git status --short` clean after commit | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - sync dependency context carrier fields
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` - sync readiness context wiring
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py` - deps-issues v2 payload and deps-raw high-level state payload
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/puml.py` - blocker/satisfied/raw state rendering
+- `tests/cli_runtime/test_sync.py` - sync artifact v2 regression tests
+- `tests/cli_runtime/test_new.py` - auto-sync deps-issues v2 expectation
+- `tests/cli_runtime/test_deps.py` - deps auto-sync / disabled artifact v2 expectations
+- `tests/unit/presentation/test_runtime_sync_s07.py` - sync presentation regression tests
+- `tests/unit/presentation/test_deps_raw_puml.py` - raw PUML high-level state tests
+- `spec-dock/active/issue/report.md` - S04 observed evidence ledger
+
+#### コミット
+- `feat(deps): sync依存ビューをreadiness文脈で生成` committed; final hash confirmed by post-commit `git log --oneline -5`
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
