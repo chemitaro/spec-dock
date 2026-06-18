@@ -62,7 +62,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S90 | pending commit | docs and report evidence only | commit hash recorded as post-commit external evidence | pending | N/A | N/A | N/A | N/A |
+| S90 | committed | docs and report evidence only | `db98bc27 docs(sync): deps-raw.pumlの生成物説明を追加` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/docs/reference_sync.md`
@@ -74,7 +74,7 @@ git diff --check
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00192-generate-deps-raw-puml/report.md`
 
 #### コミット
-- pending
+- `db98bc27 docs(sync): deps-raw.pumlの生成物説明を追加`
 
 ---
 
@@ -157,13 +157,13 @@ git status --short
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S05 | pending commit | report evidence only | commit hash recorded as post-commit external evidence | pending | compatibility tests passed without implementation changes | `deps-issues` artifacts, readiness, mutation semantics | `git status --short` -> clean before report update | no code changes required |
+| S05 | committed | report evidence only | `c2d8cdbc docs(report): S05の互換性検証を記録` | `git status --short` -> clean after commit | compatibility tests passed without implementation changes | `deps-issues` artifacts, readiness, mutation semantics | `git status --short` -> clean before report update | no code changes required |
 
 #### 変更したファイル
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00192-generate-deps-raw-puml/report.md` - S05 no-op compatibility evidence
 
 #### コミット
-- pending
+- `c2d8cdbc docs(report): S05の互換性検証を記録`
 
 #### メモ
 - S05 found no compatibility regression requiring code changes.
@@ -264,7 +264,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S04 | pending commit | S04 disabled renderer/tests/report evidence only | commit hash recorded as post-commit external evidence | pending | N/A | N/A | N/A | N/A |
+| S04 | committed | S04 disabled renderer/tests/report evidence only | `09a8a49a fix(sync): force時のraw依存ビューをdisabled表示にする` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/puml.py` - disabled `deps-raw.puml` renderer
@@ -275,7 +275,7 @@ git diff --check
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00192-generate-deps-raw-puml/report.md` - S04 evidence ledger
 
 #### コミット
-- pending
+- `09a8a49a fix(sync): force時のraw依存ビューをdisabled表示にする`
 
 #### メモ
 - S04 intentionally reuses existing disabled output style and does not introduce a new failure framework.
@@ -764,7 +764,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | pending commit | S01 code/tests/report evidence only | commit hash recorded as post-commit external evidence | pending | N/A | N/A | N/A | N/A |
+| S01 | committed | S01 code/tests/report evidence only | `7a21f493 feat(sync): raw依存マップを同期状態へ保持` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `SyncStateResult.raw_node_depends_on_map`
@@ -774,7 +774,7 @@ git diff --check
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00192-generate-deps-raw-puml/report.md` - S01 evidence ledger
 
 #### コミット
-- pending
+- `7a21f493 feat(sync): raw依存マップを同期状態へ保持`
 
 #### メモ
 - Worker stated: No material implementation decisions beyond the approved plan.
@@ -787,27 +787,27 @@ git diff --check
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| sync/deps/guide docs | yes | parent | `db98bc27`; provider docs and dogfooding mirror docs updated | pass (`019ed8bc-008e-75d0-86ab-af5624cbbde9`) |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | sufficient with recorded residual risk | `uv run pytest tests/cli_runtime -q` -> 629 passed, 76 skipped; `./spec-dock/scripts/spec-dock validate` -> ok; `uv run pytest tests/unit -q` -> 677 passed, 3 failed before mirror sync, mirror tests pass after S99 sync, remaining non-mirror failure is checked-in dogfooding metadata snapshot drift outside this issue diff | pass (`019ed8cb-fac8-74b3-908f-618240288e3d`) |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | no findings; dogfooding mirror matches provider assets for touched files | 0 | pass (`019ed8c8-a6df-79b0-bc7e-0c59c11b03dd`) |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | first final review found pending S99 reviewer gates and missing residual-risk disposition; report updated with QA/code verdicts and residual risk disposition; fresh re-review passed | 1 | pass (`019ed8cd-ec92-7041-b9e2-4ccfaa6495cd`) |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| ready | dogfooding mirror sync + final report ledger | final response / PR / issue comment as appropriate | ready |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
