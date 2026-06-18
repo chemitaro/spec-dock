@@ -14,6 +14,10 @@ description: Leaf skill for epic planning tasks in spec-dock.
   - `spec-dock/docs/phase_requirement.md`
   - `spec-dock/docs/phase_design.md`
   - `spec-dock/docs/phase_plan.md`
+- Decision routing examples and detailed placement guidance: `spec-dock/docs/authoring/decision-routing.md`.
+- First-read gate: keep cross-issue design backbone decisions in Epic planning, but stop and route cross-epic operating decisions to Initiative, ADR-worthy decisions to ADR, and missing source-of-truth gaps to clarification.
+- When decomposing work into Issues, do not create a decision-only Issue as execution-ready; create only executable Issue slices or record the remaining Epic-level decision/follow-up.
+- Keep this skill as routing guidance only; use `spec-dock/docs/authoring/decision-routing.md` for examples and detailed routing.
 - Keep scope-specific constraints and decisions in `workflow_epic.md`.
 - In spec authoring mode, do not move from requirement to design, design to plan, or plan to Issue decomposition until a fresh `spec-reviewer` returns `review_status: pass`; fix findings and re-run a fresh reviewer until pass.
 - Record each `Spec Authoring Gate` in the epic `report.md`, including investigation, user questions/answers, reviewer verdict, fixes, and promotion decision.

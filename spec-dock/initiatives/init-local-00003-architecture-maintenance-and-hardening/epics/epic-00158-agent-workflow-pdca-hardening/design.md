@@ -47,7 +47,7 @@ ID: "epic-00158"
 |---|---|---|
 | Skill `SKILL.md` | Mandatory task order, stop conditions, first-read gates, evidence obligations, next-doc routing | Full field semantics, long policy explanation, exhaustive examples |
 | Workflow / phase docs | Lifecycle details, field meanings, hard cases, shared policy, phase-specific review criteria | Hidden mandatory first action that the skill omits |
-| Templates | Starting shape, evidence slots, good examples, discussion/canonical scaffold | Compliance authority, phase promotion authority |
+| Templates | Thin final-artifact starting shape, evidence slots, discussion/canonical scaffold fields | Compliance authority, phase promotion authority, examples, long field semantics |
 | Discussion drafts / research | Evidence, proposal, synthesis, ADR candidates | Canonical authority, reviewer pass, phase promotion |
 | Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` | Main orchestrator-owned source of truth and adoption ledger | Sub-agent direct ownership |
 | Accepted ADR | Durable architecture decision evidence | Implementation readiness by itself |
@@ -81,7 +81,7 @@ database "Canonical epic docs\nrequirement/design/plan/report" as Canonical
 
 Skills --> Docs : routes to detail
 Skills --> Templates : routes to scaffold
-Docs --> Templates : explains fields/examples
+Docs --> Templates : explains fields and example-free scaffold use
 Evidence --> Canonical : adopted by main orchestrator
 ADR --> Canonical : durable decision evidence
 Provider --> Mirror : installed/updated for dogfooding
@@ -115,7 +115,7 @@ Canonical --> Templates : issue-level changes update provider source later
   - `Context surface`: agent が作業前または作業中に読む file / generated view。
   - `Workflow spine`: skill の first-read surface に置く、必須順序、停止条件、evidence obligation、reviewer gate。
   - `Detail surface`: docs が所有する概念、field semantics、hard cases、policy detail。
-  - `Scaffold surface`: templates が所有する artifact shape、evidence slots、good examples。
+  - `Scaffold surface`: templates が所有する artifact shape と evidence slots。具体例や詳細な field semantics は docs が所有する。
   - `Evidence`: canonical へ反映する前の research / discussion / draft / external analysis。
   - `Adoption`: main orchestrator が `report.md` に採否を記録し、必要なら canonical docs へ再記述する行為。
   - `Dogfooding mirror`: provider-side shipped asset が install/update 後にどう見えるかを検証する local consumer surface。
@@ -124,7 +124,7 @@ Canonical --> Templates : issue-level changes update provider source later
 - エンティティ / 値オブジェクト:
   - N/A: runtime domain model は変更しない。
 - ドメインイベント / ポリシー / 仕様:
-  - Policy: Skills own operational workflow spine; docs own detailed semantics; templates own scaffolds/examples.
+  - Policy: Skills own operational workflow spine; docs own detailed semantics and examples; templates own thin scaffolds and evidence slots.
   - Policy: `spec-dock-clarification` owns its own source-grounded grill workflow in the skill.
   - Policy: Delegated / external output remains evidence until main orchestrator adoption and report ledger recording.
 - 不変条件:
@@ -287,7 +287,7 @@ AgentState --> Orchestrator: verification evidence
 - 単体:
   - Content-level inspection: skills が mandatory first-read gates を持ち、ownership ADR と矛盾しないことを確認する。
   - Docs inspection: docs が detail semantics / hard cases を持ち、skill-owned workflow と矛盾する authority claim を残さないことを確認する。
-  - Templates inspection: scaffold / evidence slot / good example に徹し、compliance authority wording を避けることを確認する。
+  - Templates inspection: thin scaffold / evidence slot に徹し、examples や compliance authority wording を避けることを確認する。
 - 統合:
   - Shipped asset 変更時は installer/init/update coverage に必要な assertion を追加または更新する。
   - Provider-side assets が `.agents/` / `spec-dock/` mirror に反映されることを dogfooding で確認する。

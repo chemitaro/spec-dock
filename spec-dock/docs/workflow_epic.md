@@ -15,6 +15,7 @@ Epic は設計の背骨です。
 - GitHub 連携: [reference_github.md](reference_github.md)
 - 共通 phase playbook: [phase_requirement.md](phase_requirement.md), [phase_design.md](phase_design.md), [phase_plan.md](phase_plan.md)
 - Epic plan playbook: [phase_plan_epic.md](phase_plan_epic.md)
+- Decision routing: [authoring/decision-routing.md](authoring/decision-routing.md)
 
 ## 再利用判定
 
@@ -43,6 +44,7 @@ Epic は設計の背骨です。
 - `requirement.md`: 期待する価値、受け入れ条件、非機能、スコープ
 - `design.md`: 契約、移行、観測性、リスク
 - `plan.md`: Issue 分割、依存順、品質ゲート。shared axiom は `phase_plan.md`、Epic 固有の書き方は `phase_plan_epic.md`
+- Epic は複数 Issue の設計の背骨を所有する。Issue 分割、責務境界、依存方向、shared component / workflow policy、rollout 順に影響する durable decision は Epic requirement / design / plan に反映してから Issue へ落とす。Epic をまたいで product / operating model / 投資判断へ広がる場合は Initiative へ戻し、長期 architecture decision として独立に記録すべき場合は ADR 候補にする。routing 例は [authoring/decision-routing.md](authoring/decision-routing.md) を参照する
 - Requirement / design / plan の phase promotion は `workflow_spec_authoring.md` を正本にし、各 artifact ごとに fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
 - `discussions/`: `new doc <type> --epic <epic-id> --title "..."` で、この epic の `discussions/` 配下に timestamp-prefixed original を作成する。current catalog は `adr` / `disc` / `research` / `interview` / `scratch` / `pr-repair-batch` / `draft-requirement` / `draft-design` / `draft-plan`。runtime が filename / path を生成し、caller は stdout の `path=...` を正本として扱う。標準形は `<ts>-<kind>-<slug>.md`、same-second collision fallback は `<ts>-<nn>-<kind>-<slug>.md`。詳細 contract は [reference_naming.md](reference_naming.md) を参照する
 - `note` は新規作成 catalog から retired。既存 `note` artifact は grandfathered として壊さない。

@@ -12,6 +12,14 @@ description: Actor-based issue requirement, design, and plan authoring workflow 
 - Clarification workflow for unresolved ambiguity, interview evidence, and source-grounded questions: `spec-dock/docs/workflow_clarification.md`.
 - Issue plan phase playbook: `spec-dock/docs/phase_plan_issue.md`.
 - Issue plan field semantics and executable step schema: `spec-dock/docs/authoring/issue-plan.md`.
+- Decision routing examples and detailed placement guidance: `spec-dock/docs/authoring/decision-routing.md`.
+
+## First-Read Decision Routing Gate
+
+- Before issue-local planning, check whether the target is a decision-only Issue rather than an executable implementation slice.
+- If the finding is cross-issue, cross-epic, ADR-worthy, or missing a source of truth, stop issue planning and route it to the smallest owning scope: Epic, Initiative, ADR, or clarification.
+- Keep only Issue-local, reversible implementation tradeoffs inside issue planning, and record the adopted decision in the canonical issue artifacts or `report.md`.
+- Use `spec-dock/docs/authoring/decision-routing.md` for examples and detailed routing. Do not copy those examples into this skill.
 
 ## Mandatory Issue Authoring Workflow
 
