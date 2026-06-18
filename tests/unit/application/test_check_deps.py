@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 
@@ -275,13 +276,14 @@ class TestCheckDepsApplication:
         deps=None,
         records=None,
         dependency_contexts=None,
+        specdock_dir=Path("/repo/spec-dock"),
     ):
         if records is None:
             records = self._records(infra_contracts)
         return app_ports.Ports(
             node_reader=_StubNodeReader(records),
             repo_root=Path("/repo"),
-            specdock_dir=Path("/repo/spec-dock"),
+            specdock_dir=specdock_dir,
             derived_state_reader=derived_state_reader,
             issue_gateway=issue_gateway,
             deps_topology_reader=_StubDepsTopologyReader(
@@ -560,6 +562,55 @@ class TestCheckDepsApplication:
 
         assert result.inspection.evaluation.ready
         assert result.inspection.evaluation.blockers == []
+        assert result.inspection.evaluation.node_blockers == []
+        assert [(c.target_node_id, c.expansion) for c in result.inspection.evaluation.satisfied_dependencies] == [
+            ("epic-00203", "empty")
+        ]
+
+    def test_no_github_uses_cached_high_level_github_state_from_sync_artifact(self, tmp_path) -> None:
+        app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
+        specdock_dir = tmp_path / "spec-dock"
+        agent_dir = specdock_dir / ".agent"
+        agent_dir.mkdir(parents=True)
+        (agent_dir / "index-all.json").write_text(
+            json.dumps(
+                {
+                    "nodes": {
+                        "epic-00203": {
+                            "kind": "epic",
+                            "github": {"issue_number": 203, "state": "CLOSED"},
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        records = self._records(infra_contracts) + self._empty_epic_records(infra_contracts)
+        context = infra_contracts.DepsDependencyContext(
+            source_node_id="iss-00302",
+            source_issue_id="iss-00302",
+            target_node_id="epic-00203",
+            target_node_kind="epic",
+            target_issue_ids=(),
+            expansion="empty",
+        )
+        ports = self._ports(
+            app_ports,
+            infra_contracts,
+            records=records,
+            deps={"iss-00302": []},
+            dependency_contexts={"iss-00302": [context]},
+            derived_state_reader=_StubDerivedStateReader(
+                statuses={"iss-00302": "open"},
+                last_sync_at={"iss-00302": "2026-06-05T02:00:00Z"},
+            ),
+            issue_gateway=_StubIssueGateway(fail_index=True),
+            specdock_dir=specdock_dir,
+        )
+
+        result = app_check_deps.check_deps(self._request(app_contracts, use_github=False), ports)
+
+        assert result.inspection.evaluation.ready
         assert result.inspection.evaluation.node_blockers == []
         assert [(c.target_node_id, c.expansion) for c in result.inspection.evaluation.satisfied_dependencies] == [
             ("epic-00203", "empty")
