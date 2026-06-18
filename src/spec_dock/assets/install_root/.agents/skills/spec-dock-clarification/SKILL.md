@@ -9,6 +9,8 @@ Use this skill when the user asks to clarify requirements, sharpen wording, reso
 
 This skill owns the source-grounded grill loop. Use `spec-dock/docs/workflow_clarification.md` only for detailed artifact semantics, formal question lifecycle, and adoption evidence guidance.
 
+Decision routing examples and detailed placement guidance live in `spec-dock/docs/authoring/decision-routing.md`. Use that doc when clarification finds a decision-only Issue, cross-issue Epic decision, cross-epic Initiative decision, ADR candidate, or missing source-of-truth gap; keep this skill limited to the stop/routing loop.
+
 ## Source-Grounded Grill Loop
 
 1. Read sources before asking: active docs, parent docs, `discussions/`, related code/tests/templates, ADRs, and the current request.
@@ -16,6 +18,7 @@ This skill owns the source-grounded grill loop. Use `spec-dock/docs/workflow_cla
 3. Do gap classification:
    - source-grounded answer available: answer or proceed without asking the user.
    - low-impact uncertainty: mention the assumption and continue if safe.
+   - decision-only routing gap: stop implementation/planning handoff and route to Issue-local, Epic, Initiative, ADR, or clarification using `spec-dock/docs/authoring/decision-routing.md`.
    - user-intent blocker: stop and ask the user directly.
    - durable tradeoff: prepare `disc` or ADR triage, then route adoption through canonical docs.
 4. Pick one pressure-test question only when it would change scope, requirement, design, plan, ADR, template, workflow, or adoption evidence.
