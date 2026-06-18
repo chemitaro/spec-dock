@@ -117,7 +117,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S03 | pending commit | S03 artifact writer/dashboard/CLI/gitignore/tests/report evidence only | commit hash recorded as post-commit external evidence | pending | N/A | N/A | N/A | N/A |
+| S03 | committed | S03 artifact writer/dashboard/CLI/gitignore/tests/report evidence only | `c02ad797 feat(sync): deps-raw.pumlを通常同期で生成` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `ArtifactWriteResult.deps_raw_puml_path`
@@ -130,7 +130,7 @@ git diff --check
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00192-generate-deps-raw-puml/report.md` - S03 evidence ledger
 
 #### コミット
-- pending
+- `c02ad797 feat(sync): deps-raw.pumlを通常同期で生成`
 
 #### メモ
 - S03 does not change `deps-issues.puml` / `.agent/deps-issues.json` semantics.
