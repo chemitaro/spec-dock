@@ -43,6 +43,7 @@ def _sync_result(app_contracts, domain_models, *, warnings=None, artifact_failur
         tree_todo_puml_path="spec-dock/tree.puml",
         deps_issues_json_path="spec-dock/.agent/deps-issues.json",
         deps_issues_puml_path="spec-dock/deps-issues.puml",
+        deps_raw_puml_path="spec-dock/deps-raw.puml",
         dashboard_md_path="spec-dock/dashboard.md",
     )
     return app_contracts.SyncCommandResult(

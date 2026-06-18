@@ -2935,6 +2935,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert ".agent/" in gitignore
             assert "active/" in gitignore
             assert "/adrs/" in gitignore
+            assert "deps-raw.puml" in gitignore
 
             docs_dir = target / "spec-dock" / "docs"
             assert (docs_dir / "README.md").is_file()
@@ -3538,6 +3539,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert main(["update", str(target)]) == 0
             gitignore = (target / "spec-dock" / ".gitignore").read_text(encoding="utf-8")
             assert "/adrs/" in gitignore
+            assert "deps-raw.puml" in gitignore
             self._assert_canonical_rules_files_match_provider_assets(target)
             self._assert_installed_templates_match_provider_assets(target)
             self._assert_workflow_tree_docs_contract(
