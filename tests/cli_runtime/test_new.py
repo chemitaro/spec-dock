@@ -82,8 +82,9 @@ class TestCliNew(CliRuntimeHarness):
         deps_issues = json.loads(deps_issues_path.read_text(encoding="utf-8"))
         assert node_id in index_all["nodes"]
         assert node_id in self._collect_tree_node_ids(tree_all)
+        assert deps_issues["projection"] == "issue-readiness-with-dependency-context"
         assert deps_issues["deps"]["valid"]
-        assert deps_issues["source"] == {"index": "spec-dock/.agent/index.json", "schema_version": 2}
+        assert deps_issues["source"] == {"sync_state": "readiness_evaluation", "schema_version": 2}
         for text_path in (tree_all_puml_path, tree_puml_path, deps_issues_puml_path):
             assert "@startuml" in text_path.read_text(encoding="utf-8")
         if node_id.startswith("iss-"):
