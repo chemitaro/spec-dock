@@ -22,9 +22,21 @@ class StoredMetaRecord:
 
 
 @dataclass(frozen=True)
+class DepsDependencyContext:
+    source_node_id: str
+    source_issue_id: str
+    target_node_id: str
+    target_node_kind: Literal["initiative", "epic", "issue"]
+    target_issue_ids: tuple[str, ...]
+    expansion: Literal["issue", "expanded", "empty"]
+
+
+@dataclass(frozen=True)
 class DepsTopologyLoadResult:
     issue_depends_on_map: dict[str, list[str]]
     warnings: list[str]
+    raw_node_depends_on_map: dict[str, list[str]] = field(default_factory=dict)
+    dependency_contexts_by_issue_id: dict[str, list[DepsDependencyContext]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
