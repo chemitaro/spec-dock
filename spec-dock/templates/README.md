@@ -21,7 +21,7 @@
 - discussion docs の filename contract は timestamp-prefix です（標準: `<ts>-<kind>-<slug>.md` / same-second collision: `<ts>-<nn>-<kind>-<slug>.md`）。
 - `ts = yyyymmddthhmmssz`（UTC, lowercase `t` / `z`）、`nn = 01..99` です。
 - `doc_id` は slugless identity（`<ts>-<kind>` / `<ts>-<nn>-<kind>`）で、filename stem は `<doc_id>-<slug>` です。
-- `discussions/` 配下の allocation は valid timestamp-contract files を対象にし、unrelated navigation files は無視されます。
+- `discussions/` 配下の allocation は valid timestamp-contract files を対象にし、unrelated files / navigation files は無視されます。
 - legacy sequential discussion docs（`<nnn>-<kind>-<slug>.md`）は grandfathered artifact として許容されますが、自動 rename や basename 再利用はしません。
 - ただし discussion-doc intent を持つ malformed basename は explicit failure です。
 - same-second collision suffix が `99` まで埋まった場合は失敗します。follow-up issue で archive または contract 拡張を判断してください。
