@@ -43,7 +43,7 @@ ID: "epic-00158"
 
 - 正常系:
   - Agent が SpecDock の issue / epic / clarification / execution 関連 skill を読んだ時点で、次に守るべき operational workflow spine、停止条件、reviewer gate、evidence obligation を把握できる。
-  - Agent は詳細な field semantics、schema、hard-case criteria、artifact の意味を docs / templates へ読みに行き、skill に全文コピーされた長い説明へ依存しない。
+  - Agent は詳細な field semantics、schema、hard-case criteria、artifact の意味を docs へ読みに行き、skill や templates に全文コピーされた長い説明へ依存しない。
   - Maintainer は first wave の issue を順番に dogfooding し、各修正の結果から次の PDCA issue を選べる。
 - 例外 / 運用シナリオ:
   - Requirement / design / plan に未解決 gap が見つかった場合、execution assumption として吸収せず、clarification または該当 phase へ戻す。
@@ -56,10 +56,10 @@ ID: "epic-00158"
 - E-RQ-001: Context surface ownership を固定する。
   - Skills は、agent が最初に守る operational workflow spine を所有する。
   - Docs は、concept、field meanings、policy details、references、hard-case decision criteria を所有する。
-  - Templates は、scaffolds、evidence slots、good examples を所有し、compliance authority にはしない。
+  - Templates は、薄い final-artifact scaffolds と evidence slots を所有し、good examples や compliance authority は所有しない。具体例や判断基準は docs が所有する。
 - E-RQ-002: First-read executable な skill surface を作る。
   - 主要 skill は、linked docs を読む前でも、作業順序、停止条件、reviewer gate、evidence obligation、次に読む docs を判断できる状態にする。
-  - 詳細 schema や長い policy は skill に複製せず、docs / templates へ誘導する。
+  - 詳細 schema や長い policy は skill に複製せず、docs へ誘導する。Templates は完成 artifact に残る最小 scaffold に留める。
 - E-RQ-003: `spec-dock-clarification` を skill-owned source-grounded grill workflow として扱う。
   - `spec-dock-clarification/SKILL.md` は、sources を読む、provisional understanding を作る、一つの essential pressure-test question を選ぶ、artifact に回答を捕捉する、iterate / handoff を判断する workflow を所有する。
   - `workflow_clarification.md` は残す場合も thin bridge / reference とし、必須 clarification runbook の authority にしない。
@@ -82,7 +82,7 @@ ID: "epic-00158"
 - E-AC-001: Context surface ownership が矛盾なく見える。
   - 前提: first wave の対象 skill / docs / templates を読む。
   - 操作: skill / docs / templates の責務分担を確認する。
-  - 期待結果: Skills は workflow spine、docs は詳細意味、templates は scaffold / examples という境界が矛盾なく読める。
+  - 期待結果: Skills は workflow spine、docs は詳細意味と具体例、templates は薄い scaffold / evidence slots という境界が矛盾なく読める。
   - 観測点: provider-side skill / docs / templates の diff と dogfooding mirror inspection。
 - E-AC-002: First wave issue が scope 通りに分割されている。
   - 前提: `20260605t080509z-02-adr` が accepted である。
@@ -142,7 +142,7 @@ ID: "epic-00158"
   - ユーザーに聞く前に、active docs、parent docs、discussions、ADR、関連 source を確認する。
   - Shipped asset は provider-side source を authority とし、dogfooding mirror は検証対象として扱う。
   - Agent が必ず守る作業順序、停止条件、evidence obligation は skill の first-read surface に置く。
-  - Artifact の意味、field semantics、schema、hard-case criteria は docs / templates に置く。
+  - Artifact の意味、field semantics、schema、hard-case criteria、具体例は docs に置く。Templates には完成 artifact に残る最小 scaffold だけを置く。
   - Evidence を canonical artifact へ採用する場合は `report.md` に採用証跡を残す。
 - 判断が必要:
   - `workflow_clarification.md` を bridge として残すか、後段で retire するか。
