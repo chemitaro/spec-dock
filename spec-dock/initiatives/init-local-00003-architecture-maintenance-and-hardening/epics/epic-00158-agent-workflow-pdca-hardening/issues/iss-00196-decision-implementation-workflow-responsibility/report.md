@@ -3,7 +3,7 @@
 ID: "iss-00196"
 タイトル: "Document Decision Implementation Layer Responsibilities"
 関連GitHub: ["#196"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-18"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -18,10 +18,7 @@ ID: "iss-00196"
 
 `report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
 
-Material な判断がない場合もこの section は残し、次を明示する。
-
-- No material interpretation changes.
-- No decision entries.
+Material な判断がない場合はこの section を残したうえで `No material interpretation changes.` / `No decision entries.` を明示する。この Issue では material decisions があるため、下表の D-001 以降を canonical decision entries として扱う。
 
 Ledger entry は次の契約値を使う。
 
@@ -49,7 +46,9 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | user + deep consultant | `iss-00196` の scope が docs/skills だけか、templates も含むかが未確定だった | A: docs/skills only; B: docs+skills+template checklist; D: B-lite contract-first | Option D / B-lite contract-first を採用し、workflow docs、planning skills、minimal template readiness prompts を対象にする | Harness / prompt / context engineering 上、docs/skills だけでは authoring failure を防ぎにくい。一方、templates は policy authority ではなく thin scaffold に留める必要がある | applied | `discussions/20260617t154625z-interview-decision-boundary-primary-intent.md`; `discussions/20260618t000451z-disc-deep-consultant-decision-scope-synthesis.md`; `requirement.md` | design/plan で具体的な変更対象へ分解する |
+| D-002 | resolved | interpretation | user + deep consultant | templates に具体例を置くべきか、docs に置くべきかが未確定だった | C+: generic examples in docs/templates; clean-template revision: examples only in docs | Clean-template policy を採用する。Templates は薄く、skills も薄く、詳細説明と具体例は docs に置く | Templates は完成 artifact の初期形であり、例や authoring-only instruction が残ると downstream implementation agent のノイズになる | applied | `discussions/20260618t000833z-interview-decision-boundary-example-policy.md`; `discussions/20260618t003437z-disc-deep-consultant-clean-template-revision.md`; `requirement.md` | design/plan で docs examples と template absence checks を定義する |
+| D-003 | resolved | compatibility | spec-reviewer | Parent Epic が `templates = examples` を所有する古い文言を保持し、Issue requirement の clean-template policy と衝突していた | A: Issue requirement だけで supersede; B: parent Epic wording を最小修正 | Parent Epic の context surface ownership wording を clean-template policy に合わせ、templates は thin scaffold / evidence slots、docs は examples / detailed semantics と明示する | Design / plan は parent Epic に trace するため、親の矛盾を残すと reviewer が相反する実装対象を読む | applied | `spec-reviewer` finding `019ed82f-1e31-7b32-b7b0-b75e9a40f63f`; `spec-dock/active/epic/requirement.md`; `spec-dock/active/epic/design.md`; `spec-dock/active/epic/plan.md` | requirement gate の fresh re-review を実施する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +62,12 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | `adopted` | research | `requirement.md` 背景・現状 / スコープ | GitHub #196、parent epic、workflow docs、planning skills の source-grounding として採用した | `discussions/20260617t154620z-research-decision-implementation-layer-source-grounding.md` | design phase で具体的な docs/skills/templates 差分へ展開する |
+| EAL-002 | `adopted` | discussion + deep consultant | `requirement.md` スコープ / 受け入れ条件 | User-approved Option D と deep consultant の B-lite contract-first 推奨が一致したため採用した | `discussions/20260617t154625z-interview-decision-boundary-primary-intent.md`; `discussions/20260618t000451z-disc-deep-consultant-decision-scope-synthesis.md` | design phase で template readiness prompt の最小形を定義する |
+| EAL-003 | `adopted` | discussion + deep consultant | `requirement.md` 非交渉制約 / 受け入れ条件 / エッジケース | ユーザー回答と再分析により、examples out of templates、thin skills、docs detailed guidance が採用方針として確定した | `discussions/20260618t000833z-interview-decision-boundary-example-policy.md`; `discussions/20260618t003437z-disc-deep-consultant-clean-template-revision.md` | design phase で docs examples と template noise checks を定義する |
+| EAL-004 | `adopted` | reviewer | Parent Epic requirement/design/plan alignment | Requirement review の P1 finding を採用し、親 Epic の古い `templates = examples` 表現を clean-template 方針へ揃えた | `spec-reviewer` finding `019ed82f-1e31-7b32-b7b0-b75e9a40f63f`; `spec-dock/active/epic/requirement.md`; `spec-dock/active/epic/design.md`; `spec-dock/active/epic/plan.md` | fresh requirement re-review |
+| EAL-005 | `adopted` | reviewer | `design.md` / `report.md` design gate fixes | Design review の P1/P2 finding を採用し、example ownership を `decision-routing.md` に一本化し、no-decision placeholder を material decision entries と矛盾しない説明へ修正した | `spec-reviewer` finding `019ed835-b27c-7531-8711-3fbd34da811c`; `design.md`; `report.md` | fresh design re-review completed: `019ed838-6ee0-7663-8fa6-24a409b84cf2` |
+| EAL-006 | `adopted` | reviewer | `plan.md` constraint closure coverage | Plan review の P2 finding を採用し、non-scope constraints を closure index の `tc-009` と S99 closure に追加した | `spec-reviewer` finding `019ed83c-a029-7dd2-9cb1-bee6a676ac08`; `plan.md` | fresh plan re-review completed: `019ed83f-4cda-7901-bb8c-208f2e2f965e` |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +75,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | `requirement.md` は decision responsibility と implementation responsibility の境界明文化を主目的にしている | Templates / skills の thinness、docs examples、dogfooding evidence は主目的を支える context-surface 要件として扱う | low | passed through requirement/design/plan fresh spec-reviewer gates |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +83,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | GitHub #196; parent epic requirement/design/plan; workflow docs; planning skills; issue discussions | Option D / B-lite contract-first adopted; clean-template policy adopted; no remaining blocking interview question | adopted into `requirement.md` and this `report.md` ledger; reviewer P1 parent-Epic contradiction fixed | passed: fresh `spec-reviewer` re-review `019ed831-fee1-7ed2-8cc2-bfd6c9f0fdbb` | no | promote to design authoring |
+| design | passed requirement; parent epic requirement/design/plan; workflow docs; phase design playbook; provider docs/skills/templates inventory | system-architect direct-write skipped because target discussions subtree was already dirty; manual design fallback recorded; no blocking design question | adopted into `design.md`; reviewer P1/P2 findings fixed | passed: fresh `spec-reviewer` re-review `019ed838-6ee0-7663-8fa6-24a409b84cf2` | no | promote to plan authoring |
+| plan | passed requirement and design; phase plan issue playbook; authoring issue-plan schema; workflow issue completion policy | implementation-planner direct-write skipped because target discussions subtree was already dirty; manual plan fallback recorded; P2 constraint coverage finding fixed | adopted into `plan.md`; `tc-009` added for non-scope constraints | passed: fresh `spec-reviewer` re-review `019ed83f-4cda-7901-bb8c-208f2e2f965e` | no | ready for issue execution handoff, subject to normal execution workflow gates |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -107,7 +113,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| system-architect | iss-00196 | 該当なし | `requirement.md`; parent epic docs; workflow docs; issue discussions | `design.md`; `report.md` | blocked（direct-write draft skipped） | なし（[]） | not_run: target `discussions/` subtree already has untracked current-authoring artifacts, making static direct-write adoption-ineligible | manual design authoring fallback | delegated design draft itself | なし（manual path available） | fresh requirement reviewer pass: `019ed831-fee1-7ed2-8cc2-bfd6c9f0fdbb` | manual fallback; fresh `spec-reviewer` required for canonical `design.md` |
+| implementation-planner | iss-00196 | 該当なし | `requirement.md`; `design.md`; parent epic docs; workflow docs | `plan.md`; `report.md` | blocked（direct-write draft skipped） | なし（[]） | not_run: target `discussions/` subtree already has untracked current-authoring artifacts, making static direct-write adoption-ineligible | manual plan authoring fallback | delegated plan draft itself | なし（manual path available） | fresh design reviewer pass: `019ed838-6ee0-7663-8fa6-24a409b84cf2` | manual fallback; fresh `spec-reviewer` required for canonical `plan.md` |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
