@@ -6,11 +6,13 @@ from pathlib import Path
 from ..application.contracts import DepsCheckResult, SyncStateResult
 from ..domain.ids import deps_node_sort_key
 from ..domain.models import ActiveSelection, DepsNodeState, SpecNode
-from .contracts import DepsIssuesArtifact, IndexArtifact, TreeArtifact
+from .contracts import DepsIssuesArtifact, DepsRawArtifact, IndexArtifact, TreeArtifact
 from .puml import (
     render_deps_disabled_deps_issues_puml,
+    render_deps_disabled_deps_raw_puml,
     render_deps_disabled_tree_puml,
     render_deps_issues_puml,
+    render_deps_raw_puml,
     render_tree_ready_board_puml,
 )
 
@@ -164,6 +166,130 @@ def _build_issue_edges_from_deps_state(
             edges.append({"from": issue_id, "to": dep_id, "kind": "depends_on"})
     edges.sort(key=lambda item: (_sort_key(item["from"]), _sort_key(item["to"])))
     return edges
+
+
+def _issue_raw_state(result: SyncStateResult, issue_id: str) -> str:
+    status_snapshot = result.issue_statuses.get(issue_id)
+    status = status_snapshot.effective_status.lower() if status_snapshot is not None else "unknown"
+    if status in ("done", "closed"):
+        return "done"
+    if result.active is not None and result.active.issue_id == issue_id:
+        return "doing"
+    if status == "unknown":
+        return "unknown"
+    evaluation = result.deps_eval_by_id.get(issue_id)
+    if evaluation is not None and evaluation.ready:
+        return "ready"
+    return "blocked"
+
+
+def _raw_dependency_participant_ids(result: SyncStateResult) -> tuple[set[str], list[dict[str, str]]]:
+    graph_nodes = result.graph.nodes_by_id
+    participant_ids: set[str] = set()
+    edges: list[dict[str, str]] = []
+    seen_edges: set[tuple[str, str]] = set()
+
+    for dependent_id in _sort_ids(list(result.raw_node_depends_on_map.keys())):
+        if dependent_id not in graph_nodes:
+            continue
+        dep_ids = result.raw_node_depends_on_map.get(dependent_id, [])
+        for prerequisite_id in _sort_ids([dep_id for dep_id in dep_ids if isinstance(dep_id, str)]):
+            if prerequisite_id not in graph_nodes:
+                continue
+            edge_key = (dependent_id, prerequisite_id)
+            if edge_key in seen_edges:
+                continue
+            seen_edges.add(edge_key)
+            participant_ids.add(dependent_id)
+            participant_ids.add(prerequisite_id)
+            edges.append({"from": dependent_id, "to": prerequisite_id})
+
+    edges.sort(key=lambda edge: (_sort_key(edge["from"]), _sort_key(edge["to"])))
+    return participant_ids, edges
+
+
+def _include_raw_ancestors(result: SyncStateResult, participant_ids: set[str]) -> set[str]:
+    graph_nodes = result.graph.nodes_by_id
+    include_ids = set(participant_ids)
+    pending = list(participant_ids)
+    while pending:
+        node_id = pending.pop()
+        node = graph_nodes.get(node_id)
+        if node is None or not node.parent_id or node.parent_id in include_ids:
+            continue
+        include_ids.add(node.parent_id)
+        pending.append(node.parent_id)
+    return include_ids
+
+
+def _build_deps_raw_payload(result: SyncStateResult) -> dict[str, object]:
+    graph_nodes = result.graph.nodes_by_id
+    participant_ids, edges = _raw_dependency_participant_ids(result)
+    include_ids = _include_raw_ancestors(result, participant_ids)
+
+    tree: list[dict[str, object]] = []
+    initiative_ids = _sort_ids(
+        [
+            node_id
+            for node_id, node in graph_nodes.items()
+            if node.kind == "initiative" and node_id in include_ids
+        ]
+    )
+    for initiative_id in initiative_ids:
+        init_node = graph_nodes[initiative_id]
+        init_item: dict[str, object] = {
+            "id": init_node.id,
+            "title": init_node.title,
+            "participant": init_node.id in participant_ids,
+            "epics": [],
+        }
+        epic_items: list[dict[str, object]] = []
+        epic_ids = _sort_ids(
+            [
+                node_id
+                for node_id, node in graph_nodes.items()
+                if node.kind == "epic" and node.parent_id == initiative_id and node_id in include_ids
+            ]
+        )
+        for epic_id in epic_ids:
+            epic_node = graph_nodes[epic_id]
+            epic_item: dict[str, object] = {
+                "id": epic_node.id,
+                "title": epic_node.title,
+                "participant": epic_node.id in participant_ids,
+                "issues": [],
+            }
+            issue_items: list[dict[str, object]] = []
+            issue_ids = _sort_ids(
+                [
+                    node_id
+                    for node_id, node in graph_nodes.items()
+                    if node.kind == "issue" and node.parent_id == epic_id and node_id in include_ids
+                ]
+            )
+            for issue_id in issue_ids:
+                issue_node = graph_nodes[issue_id]
+                issue_items.append(
+                    {
+                        "id": issue_node.id,
+                        "title": issue_node.title,
+                        "state": _issue_raw_state(result, issue_node.id),
+                    }
+                )
+            epic_item["issues"] = issue_items
+            epic_items.append(epic_item)
+        init_item["epics"] = epic_items
+        tree.append(init_item)
+
+    return {
+        "schema_version": 1,
+        "generated_at": result.generated_at,
+        "projection": "raw-direct-dependency-view",
+        "deps": {"valid": True, "error": None},
+        "tree": tree,
+        "edges": edges,
+        "edge_direction": "depends_on (dependent -> prerequisite)",
+    }
 
 
 def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], dict[str, object]]:
@@ -510,6 +636,15 @@ def render_deps_issues_artifact(result: SyncStateResult) -> DepsIssuesArtifact:
         json_text=json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         puml_text=puml,
     )
+
+
+def render_deps_raw_artifact(result: SyncStateResult) -> DepsRawArtifact:
+    if result.deps_preflight_error is not None:
+        return DepsRawArtifact(
+            puml_text=render_deps_disabled_deps_raw_puml(error=result.deps_preflight_error)
+        )
+    payload = _build_deps_raw_payload(result)
+    return DepsRawArtifact(puml_text=render_deps_raw_puml(payload))
 
 
 def render_context_pack(active_selection: ActiveSelection | None) -> str:
