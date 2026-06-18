@@ -7,6 +7,7 @@ from typing import Any
 from ..domain.ids import deps_node_sort_key, find_existing_id_by_num, format_id, parse_id
 from ..domain.models import SpecGraph
 from .contracts import DirectDependencyResolution
+from .contracts import DepsDependencyContext
 from .contracts import DepsTopologyLoadResult
 from .git_cli import origin_github_repo_slug
 from .json_store import load_json
@@ -387,14 +388,14 @@ def load_issue_depends_on_map(specdock_dir: Path, graph: SpecGraph) -> DepsTopol
         key=deps_node_sort_key,
     )
     issue_depends_on: dict[str, set[str]] = {issue_id: set() for issue_id in issue_ids}
+    raw_node_depends_on: dict[str, list[str]] = {}
+    dependency_contexts: dict[str, list[DepsDependencyContext]] = {issue_id: [] for issue_id in issue_ids}
 
     warning_codes: list[str] = []
     warned_empty_refs: set[tuple[str, str]] = set()
 
     for src_id in dep_node_ids:
         src_issue_ids = _issue_ids_for_dep_node(graph, src_id)
-        if not src_issue_ids:
-            continue
         src_node = graph.nodes_by_id[src_id]
         meta_path = src_node.path / ".meta.json"
         direct_dep_node_ids = _resolved_direct_depends_on(
@@ -402,9 +403,32 @@ def load_issue_depends_on_map(specdock_dir: Path, graph: SpecGraph) -> DepsTopol
             src_id,
             current_repo_slug=current_repo_slug,
         )
+        raw_node_depends_on[src_id] = direct_dep_node_ids
+        if not src_issue_ids:
+            continue
 
         for dep_node_id in direct_dep_node_ids:
+            dep_node = graph.nodes_by_id[dep_node_id]
             dep_issue_ids = _issue_ids_for_dep_node(graph, dep_node_id)
+            expansion = (
+                "empty"
+                if not dep_issue_ids
+                else "issue"
+                if dep_node.kind == "issue"
+                else "expanded"
+            )
+            target_issue_ids = tuple(dep_issue_ids)
+            for src_issue_id in src_issue_ids:
+                dependency_contexts[src_issue_id].append(
+                    DepsDependencyContext(
+                        source_node_id=src_id,
+                        source_issue_id=src_issue_id,
+                        target_node_id=dep_node_id,
+                        target_node_kind=dep_node.kind,
+                        target_issue_ids=target_issue_ids,
+                        expansion=expansion,
+                    )
+                )
             if not dep_issue_ids:
                 key = (src_id, dep_node_id)
                 if key not in warned_empty_refs:
@@ -426,4 +450,9 @@ def load_issue_depends_on_map(specdock_dir: Path, graph: SpecGraph) -> DepsTopol
         issue_id: sorted(list(issue_depends_on.get(issue_id, set())), key=deps_node_sort_key)
         for issue_id in issue_ids
     }
-    return DepsTopologyLoadResult(issue_depends_on_map=compiled, warnings=warning_codes)
+    return DepsTopologyLoadResult(
+        issue_depends_on_map=compiled,
+        warnings=warning_codes,
+        raw_node_depends_on_map=raw_node_depends_on,
+        dependency_contexts_by_issue_id=dependency_contexts,
+    )
