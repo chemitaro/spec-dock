@@ -1,0 +1,91 @@
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam linetype ortho
+
+title deps-raw visual mock - nested package simulation
+
+skinparam packageStyle rectangle
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #9CA3AF
+  FontColor #111827
+}
+skinparam rectangle {
+  RoundCorner 6
+}
+
+legend right
+|= Kind / State |= Color |
+| issue ready |<#D5E8D4> |
+| issue blocked |<#F8CECC> |
+| issue unknown |<#EEEEEE> |
+endlegend
+
+package "init-a\nWorkflow Governance" as INIT_A <<initiative>> {
+  package "epic-a1\nIssue Planning Workflow" as EPIC_A1 <<epic>> {
+    rectangle "iss-a1-1\nDefine issue readiness gate\nReady" as ISS_A11 #D5E8D4
+    rectangle "iss-a1-2\nAdd decision-layer checklist\nBlocked" as ISS_A12 #F8CECC
+    rectangle "iss-a1-3\nUpdate issue planning skill\nBlocked" as ISS_A13 #F8CECC
+  }
+
+  package "epic-a2\nEpic Planning Workflow" as EPIC_A2 <<epic>> {
+    rectangle "iss-a2-1\nDefine epic decision gate\nReady" as ISS_A21 #D5E8D4
+    rectangle "iss-a2-2\nAdd epic-to-issue handoff checklist\nBlocked" as ISS_A22 #F8CECC
+  }
+
+  package "epic-a3\nSpec Review Workflow" as EPIC_A3 <<epic>> {
+    rectangle "iss-a3-1\nAlign reviewer verdict wording\nReady" as ISS_A31 #D5E8D4
+    rectangle "iss-a3-2\nAdd non-pass state examples\nBlocked" as ISS_A32 #F8CECC
+  }
+}
+
+package "init-b\nDependency Graph Operations" as INIT_B <<initiative>> {
+  package "epic-b1\nDependency Mutation" as EPIC_B1 <<epic>> {
+    rectangle "iss-b1-1\nAdd dependency command\nReady" as ISS_B11 #D5E8D4
+    rectangle "iss-b1-2\nValidate raw dependency graph\nBlocked" as ISS_B12 #F8CECC
+    rectangle "iss-b1-3\nScrub deleted node dependencies\nBlocked" as ISS_B13 #F8CECC
+  }
+
+  package "epic-b2\nDependency Visualization" as EPIC_B2 <<epic>> {
+    rectangle "iss-b2-1\nGenerate raw dependency view\nBlocked" as ISS_B21 #F8CECC
+    rectangle "iss-b2-2\nDocument sync artifacts\nBlocked" as ISS_B22 #F8CECC
+    rectangle "iss-b2-3\nAdd dashboard discovery\nBlocked" as ISS_B23 #F8CECC
+  }
+}
+
+package "init-c\nWorktree Operations" as INIT_C <<initiative>> {
+  package "epic-c1\nWorktree Provisioning" as EPIC_C1 <<epic>> {
+    rectangle "iss-c1-1\nCreate managed worktree\nReady" as ISS_C11 #D5E8D4
+    rectangle "iss-c1-2\nList managed worktrees\nBlocked" as ISS_C12 #F8CECC
+  }
+
+  package "epic-c2\nWorktree Cleanup" as EPIC_C2 <<epic>> {
+    rectangle "iss-c2-1\nRemove managed worktree\nBlocked" as ISS_C21 #F8CECC
+    rectangle "iss-c2-2\nClean stale worktree metadata\nBlocked" as ISS_C22 #F8CECC
+  }
+}
+
+INIT_A --> INIT_B : blocks
+
+EPIC_A1 --> EPIC_A2 : blocks
+EPIC_B1 --> EPIC_B2 : blocks
+EPIC_C1 --> EPIC_C2 : blocks
+
+ISS_A11 --> ISS_A12 : blocks
+ISS_A12 --> ISS_A13 : blocks
+ISS_A21 --> ISS_A22 : blocks
+ISS_A31 --> ISS_A32 : blocks
+ISS_B11 --> ISS_B12 : blocks
+ISS_B12 --> ISS_B13 : blocks
+ISS_B21 --> ISS_B22 : blocks
+ISS_B22 --> ISS_B23 : blocks
+ISS_C11 --> ISS_C12 : blocks
+ISS_C21 --> ISS_C22 : blocks
+
+ISS_B12 --> ISS_B21 : blocks
+
+ISS_A32 --> EPIC_B2 : blocks
+EPIC_B2 --> ISS_C21 : blocks
+ISS_B13 --> ISS_C22 : blocks
+@enduml
