@@ -20,6 +20,7 @@ from ..domain.deps import (
     validate_deps_cycles,
     validate_raw_node_dependency_graph,
 )
+from ..domain.ids import deps_node_sort_key
 from ..domain.models import (
     ActiveSelection,
     DepsEvaluation,
@@ -38,7 +39,7 @@ from ..domain.validation import (
     validate_graph_and_deps,
 )
 from ..infra.contracts import ActiveManifest, DirectDependencyResolution, StoredMetaRecord
-from ..presentation.contracts import ArtifactBundle
+from ..presentation.contracts import ArtifactBundle, DepsRawArtifact
 from ..presentation.json_state import (
     render_deps_issues_artifact,
     render_index_artifact,
@@ -433,6 +434,7 @@ def collect_sync_state(
     warnings: list[str] = []
     deps_preflight_error: str | None = None
     issue_depends_on_map: dict[str, list[str]] = {}
+    raw_node_depends_on_map: dict[str, list[str]] = {}
     validation = validate_graph_and_deps(
         graph,
         issue_depends_on_map=None,
@@ -621,6 +623,7 @@ def collect_sync_state(
         deps_preflight_error=deps_preflight_error,
         repo_root=ports.repo_root,
         issue_depends_on_map=issue_depends_on_map,
+        raw_node_depends_on_map=raw_node_depends_on_map,
         github_snapshot_by_repo_and_issue_number=github_snapshot_by_repo_and_issue_number,
         github_snapshot_by_repo_scope_and_issue_number=github_snapshot_by_repo_scope_and_issue_number,
         github_snapshot_by_issue_id=github_snapshot_by_issue_id,
@@ -631,8 +634,15 @@ def _raw_node_depends_on_map(
     resolutions_by_node: dict[str, list[DirectDependencyResolution]],
 ) -> dict[str, list[str]]:
     return {
-        node_id: [resolution.resolved_node_id for resolution in resolutions]
-        for node_id, resolutions in resolutions_by_node.items()
+        node_id: sorted(
+            [resolution.resolved_node_id for resolution in resolutions],
+            key=deps_node_sort_key,
+        )
+        for node_id, resolutions in sorted(
+            resolutions_by_node.items(),
+            key=lambda item: deps_node_sort_key(item[0]),
+        )
+        if resolutions
     }
 
 
@@ -715,6 +725,7 @@ def write_sync_artifacts(
         tree=render_tree_artifact(persisted_result),
         deps_issues=render_deps_issues_artifact(persisted_result),
         dashboard=render_dashboard(persisted_result),
+        deps_raw=DepsRawArtifact(puml_text=""),
     )
     try:
         write_result = ports.artifact_writer.write(specdock_dir, bundle)

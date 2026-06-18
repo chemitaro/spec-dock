@@ -139,113 +139,123 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-06-17 HH:MM - HH:MM）
+### セッションログ（2026-06-18 11:18 JST）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01 Raw Direct Dependency Contract Propagation
+- AC/EC:
+  - cl-001 support
+  - cl-006 guard
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` S01
+  - closure ids: cl-001, cl-006
 
 #### 実施内容
-- ...
+- `dev-coder` に S01 のみを委任し、`SyncStateResult.raw_node_depends_on_map`、`DepsRawArtifact`、`ArtifactBundle.deps_raw` の contract surface を追加した。
+- `collect_sync_state()` が `load_node_dependency_resolutions()` 由来の raw direct dependency を保持するようにした。
+- raw direct dependency map は空の prerequisite entry を含めず、dependent node id と prerequisite id list を deterministic sort する。
+- `ArtifactBundle.deps_raw` は default なしの required field とし、S01 の temporary contract bridge として `write_sync_artifacts()` では明示的に `DepsRawArtifact(puml_text="")` を渡す。
+- S02 以降の renderer / writer / dashboard / CLI / `.gitignore` integration は実装していない。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+uv run pytest tests/cli_runtime/test_runtime_deps_s04.py -q
+# 28 passed in 0.12s
 
-<result>
+uv run pytest tests/cli_runtime/test_runtime_deps_s04.py tests/unit/presentation/test_runtime_sync_s07.py
+# 84 passed in 0.36s
+
+git diff --check
+# pass
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | 赤フェーズ（Red） | red-required: raw map population | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py -k "raw_direct_dependencies or raw_parent_dependencies"` が実装前に `SyncStateResult` に `raw_node_depends_on_map` がないため 2 failed | delegated worker reported Red command | pass | tc-s01-001 / tc-s01-002 の initial Red |
+| S01 | 赤フェーズ（review follow-up） | red-required: empty raw entry omission / explicit `deps_raw` constructor | review finding 対応 test 追加直後、修正前に `test_collect_sync_state_carries_raw_direct_dependencies` と `test_artifact_bundle_requires_explicit_deps_raw_artifact` が fail | delegated worker reported Red command | pass | code-reviewer P2 を test で固定 |
+| S01 | 緑フェーズ（Green） | focused S01 verification | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py -q` -> 28 passed | command | pass | raw map propagation / empty entry omission / required deps_raw field |
+| S01 | 緑フェーズ（Green） | affected sync/presentation regression | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py tests/unit/presentation/test_runtime_sync_s07.py` -> 84 passed | command | pass | broader S01 affected lane |
+| S01 | リファクタリング（Refactor） | guardrail satisfied / no unrelated refactor | `git diff --check` -> pass; diff inspection confirms no S02 renderer/writer/dashboard/CLI/gitignore work | command + diff inspection | pass | temporary `DepsRawArtifact(puml_text="")` bridge remains explicit for S03 replacement |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | Empty raw dependency entries must be filtered out of `raw_node_depends_on_map` | code-reviewer P2 | Added focused assertion in `test_collect_sync_state_carries_raw_direct_dependencies` | cl-001 | no | code-reviewer finding and `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py -q` -> pass |
+| S01 | `ArtifactBundle.deps_raw` must be explicitly supplied | code-reviewer P2 | Removed default field and added `test_artifact_bundle_requires_explicit_deps_raw_artifact` | cl-001 | no | code-reviewer finding and focused test pass |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | cl-001 support | Raw direct dependency contract is present in sync state | `SyncStateResult.raw_node_depends_on_map` added; `test_collect_sync_state_carries_raw_direct_dependencies` passes | pass | Empty entries are omitted |
+| S01 | cl-006 guard | Raw map does not replace effective readiness path | `test_collect_sync_state_keeps_raw_parent_dependencies_out_of_readiness_map` passes | pass | `issue_depends_on_map` and `deps_state.nodes[*].effective_depends_on` stay separate |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
+| cl-001 / tc-s01-001 | S01 | yes | red-required | Initial Red: focused tests failed because `SyncStateResult.raw_node_depends_on_map` was absent | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py -q` | pass | 28 passed |
+| cl-006 / tc-s01-002 | S01 | yes | covered-existing + focused regression | Initial Red: focused raw parent dependency test failed before S01 contract existed | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py tests/unit/presentation/test_runtime_sync_s07.py` | pass | 84 passed |
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| cl-001 | S01 | `test_collect_sync_state_carries_raw_direct_dependencies`; `test_artifact_bundle_requires_explicit_deps_raw_artifact` | pass | S03 still owns actual artifact writing |
+| cl-006 | S01 | `test_collect_sync_state_keeps_raw_parent_dependencies_out_of_readiness_map`; affected regression lane | pass | S05 still owns full compatibility gate |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| added | cl-001 | `test_artifact_bundle_requires_explicit_deps_raw_artifact` | cl-001 | code-reviewer P2 により future S03 renderer omission を constructor level で検出する必要があった | no | no |
+| changed | cl-001 | `test_collect_sync_state_carries_raw_direct_dependencies` | cl-001 | code-reviewer P2 により empty raw entries omission を固定した | no | no |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction | `/Users/iwasawayuuta/.codex/worktrees/58bb/spec-dock` | iss-00192 | current session | spec-reviewer / system-architect / implementation-planner | same repo, active issue, session, named role; canonical docs remain orchestrator-owned; delegated agents may produce only scope-local discussion draft or review verdict; no destructive action / publishing / credentialed external access / scope expansion | issue planning complete / session end / scope change / host policy conflict / user revocation | none | proceed with issue-planning workflow gates |
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/58bb/spec-dock` | iss-00192 | current session | spec-reviewer / system-architect / implementation-planner / dev-coder / code-reviewer | same repo, active issue, session, named role; canonical docs remain orchestrator-owned; delegated agents may edit only allowed step paths; no destructive action / publishing / credentialed external access / scope expansion | issue execution complete / session end / scope change / host policy conflict / user revocation | none | proceed with S01 reviewer gate |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | runtime contract / tests / scaffold behavior | dev-coder | S01 only | `plan.md` S01 | `application/contracts.py`, `application/sync_state.py`, `presentation/contracts.py`, focused tests | renderer / writer / dashboard / CLI / `.gitignore`, dependency semantics, raw JSON artifact, unrelated refactor | focused raw map tests, affected sync regression, `git diff --check` | path outside S01, presentation filesystem read, raw JSON need, verification failure | changed files, tests, risks, ledger note | pass after bounded follow-up |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | dev-coder | Added raw map propagation and contract surface; follow-up filtered empty raw entries and made `deps_raw` explicit | `application/contracts.py`, `application/sync_state.py`, `presentation/contracts.py`, `tests/cli_runtime/test_runtime_deps_s04.py` | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py -q` -> 28 passed; `git diff --check` -> pass | first code-reviewer failed; re-review passed | temporary explicit `DepsRawArtifact(puml_text="")` bridge until S03 | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01 | not used | N/A | N/A | N/A | revert S01 commit if needed | N/A | code-reviewer required | N/A |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step reviewer | code-reviewer | stale after follow-up | failed | no | follow-up required | Findings: report evidence missing, empty raw entries, explicit `deps_raw` requirement |
+| S01 | step reviewer | code-reviewer | fresh | passed | no | proceed to Step Commit Gate | Re-review agent `019ed888-3579-7df0-b060-9d92acf9131c`; no findings |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | pending commit | S01 code/tests/report evidence only | commit hash recorded as post-commit external evidence | pending | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `SyncStateResult.raw_node_depends_on_map`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` - raw map population and explicit temporary `DepsRawArtifact`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/contracts.py` - `DepsRawArtifact` and required `ArtifactBundle.deps_raw`
+- `tests/cli_runtime/test_runtime_deps_s04.py` - S01 focused tests
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00192-generate-deps-raw-puml/report.md` - S01 evidence ledger
 
 #### コミット
-- <hash> <message>
+- pending
 
 #### メモ
-- ...
-
----
-
-### セッションログ（2026-06-17 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
+- Worker stated: No material implementation decisions beyond the approved plan.
+- `DepsRawArtifact(puml_text="")` in `write_sync_artifacts()` is an explicit temporary S01 bridge; S03 owns replacement with real rendered artifact.
 
 ---
 
