@@ -223,6 +223,15 @@ def _normalize_high_level_state(value: str | None) -> str:
     return "unknown"
 
 
+def _all_target_issues_satisfied(
+    target_issue_ids: tuple[str, ...],
+    issue_statuses: dict[str, IssueStatusSnapshot],
+) -> bool:
+    if not target_issue_ids:
+        return False
+    return all(_issue_status(issue_id, issue_statuses) == "done" for issue_id in target_issue_ids)
+
+
 def _dependency_context_from_input(context: DependencyContextInput) -> DepsDependencyContext:
     target_issue_ids = _context_value(context, "target_issue_ids", ())
     if isinstance(target_issue_ids, list):
@@ -266,7 +275,10 @@ def _evaluate_dependency_contexts(
             state = _normalize_high_level_state(status.state if status is not None else None)
             state_source = status.source if status is not None else "none"
 
-            if state in _SATISFIED_HIGH_LEVEL_STATES:
+            if state in _SATISFIED_HIGH_LEVEL_STATES or _all_target_issues_satisfied(
+                context.target_issue_ids,
+                issue_statuses,
+            ):
                 satisfied_by_key[(context.source_issue_id, context.target_node_id, context.expansion)] = context
                 continue
 

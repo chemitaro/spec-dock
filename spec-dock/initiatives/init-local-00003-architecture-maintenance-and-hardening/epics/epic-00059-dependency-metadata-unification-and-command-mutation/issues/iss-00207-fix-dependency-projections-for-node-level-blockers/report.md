@@ -814,6 +814,23 @@ uv run pytest tests/unit tests/cli_runtime
 | Step reviewer | code-reviewer `review_status=pass`; no findings |
 | Re-observation | pending after U003 commit and push |
 
+## PR repair follow-up U004（追加レビュー指摘対応）
+
+| 項目 | 証跡 |
+|---|---|
+| 対象 thread | `PRRT_kwDOQ99OK86KrvkL` / comment `3439052488`; `PRRT_kwDOQ99OK86KrvkQ` / comment `3439052493` |
+| 指摘 I007 | `sync --no-github` が cached high-level GitHub state を現在 run で利用しても、生成 index へ再出力しないため、次回 offline sync / deps check で high-level state を失う |
+| 指摘 I008 | expanded high-level dependency の child issues が all done でも、parent high-level node が open の場合に satisfied dependency として記録されず、`deps-issues` から raw edge が消える |
+| 判断 | valid / fix-now。どちらも deps projection の説明可能性と offline readiness cache の安定性に関わる |
+| 委任 | dev-coder `Lorentz` が bounded repair を実装 |
+| 変更 | `presentation/json_state.py` が high-level `github` / `cache` state を index payload に保持。`domain/deps.py` が `target_issue_ids` all done の expanded context を satisfied として記録 |
+| Red evidence | dev-coder reported pre-fix failures for the all-done expanded domain regression and repeated `sync --no-github` regression |
+| Green evidence | `uv run pytest tests/unit/domain/test_deps.py::TestDepsDomain::test_evaluate_readiness_records_expanded_all_done_high_level_dependency_as_satisfied -q` -> 1 passed; `uv run pytest tests/cli_runtime/test_sync.py::TestCliSync::test_sync_deps_issues_marks_empty_closed_epic_dependency_satisfied tests/cli_runtime/test_sync.py::TestCliSync::test_sync_deps_issues_records_all_done_expanded_high_level_dependency_as_satisfied -q` -> 2 passed |
+| Additional verification | `uv run pytest tests/unit/domain/test_deps.py tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_sync.py` -> 97 passed, 2 skipped; `uv run pytest tests/unit tests/cli_runtime` -> 1332 passed, 76 skipped; `./spec-dock/scripts/spec-dock validate` -> ok; `git diff --check` -> pass; provider/mirror `diff -u` -> no diff |
+| Step reviewer | code-reviewer `review_status=pass`; no findings |
+| Risk note | offline-preserved high-level cache uses sync `generated_at` as a cache freshness marker, not as evidence that GitHub was fetched |
+| Re-observation | pending after U004 commit and push |
+
 ## PR 送達ゲート（PR Delivery Gate / 必須）
 
 | 項目 | 証跡 |
@@ -848,6 +865,8 @@ uv run pytest tests/unit tests/cli_runtime
 ### Merge Preparation Superseding Note
 
 After this gate was first recorded, observation at head `473a50910aed8d2fc419a52ca157ca12dc4ac57b` showed CI success and GitHub `mergeable=MERGEABLE` / `mergeStateStatus=CLEAN`, but also surfaced carryover unresolved thread `PRRT_kwDOQ99OK86Krei6`. U003 fixes that valid P3 finding. The final merge-prepared decision must be based on the post-U003 head observation, recorded as post-commit external delivery evidence.
+
+Observation at head `9be1681c3d05b3434255ef87cfcba64d6b28bfa0` then showed CI success and GitHub `mergeable=MERGEABLE` / `mergeStateStatus=CLEAN`, but surfaced carryover unresolved threads `PRRT_kwDOQ99OK86KrvkL` and `PRRT_kwDOQ99OK86KrvkQ`. U004 fixes those valid P2 findings. The final merge-prepared decision must be based on the post-U004 head observation, recorded as post-commit external delivery evidence.
 
 ## 遭遇した問題と解決 (任意)
 - 問題: final broad regression initially failed on dogfooding metadata snapshot and runtime mirror parity.
