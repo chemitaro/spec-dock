@@ -18,6 +18,7 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 - 共通 phase playbook: [phase_requirement.md](phase_requirement.md), [phase_design.md](phase_design.md), [phase_plan.md](phase_plan.md)
 - Issue plan playbook: [phase_plan_issue.md](phase_plan_issue.md)
 - Issue plan authoring contract: [authoring/issue-plan.md](authoring/issue-plan.md)
+- Decision routing: [authoring/decision-routing.md](authoring/decision-routing.md)
 - Hard cutover reference: [reference_hard_cutover.md](reference_hard_cutover.md)
 
 ## 作成と issue start
@@ -77,6 +78,7 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 ## 仕様 authoring（spec authoring）
 
 - Issue planning は `.agents/skills/spec-dock-issue-planning/SKILL.md` を operational entrypoint にし、仕様作成の phase promotion detail は `workflow_spec_authoring.md`、未解決の曖昧さは `spec-dock-clarification` skill と `workflow_clarification.md` の bridge/reference に route する
+- Decision-only Issue は execution-ready ではない。Issue-local な軽量判断なら issue requirement / design / plan / report に閉じてよいが、複数 Issue の責務境界、分解、依存方向、shared workflow policy に影響する判断は Epic へ戻し、複数 Epic または投資判断に影響する判断は Initiative へ戻す。長期 architecture decision は ADR 候補にし、判断に必要な情報が足りない場合は clarification へ戻す。具体例と good / bad routing pattern は [authoring/decision-routing.md](authoring/decision-routing.md) を参照する
 - Issue execution は `.agents/skills/spec-dock-issue-execution/SKILL.md` を operational entrypoint にし、承認済み / reviewer-pass 済みの `requirement.md` / `design.md` / `plan.md` と executable `plan.md` を前提に、この workflow の execution gate / report gate / completion gate detail に route する
 - active issue 配下の `requirement.md` / `design.md` / `plan.md` を埋める
 - Requirement / design / plan の phase promotion は `workflow_spec_authoring.md` の detail / reference semantics に従い、各 artifact ごとに fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない

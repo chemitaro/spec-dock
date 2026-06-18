@@ -163,6 +163,10 @@ pass: new authoring guide contains generic examples and good / bad pattern secti
 git diff --check
 
 pass: no whitespace errors.
+
+git diff --cached --check
+
+pass: no whitespace errors after staging the new mirror guide, so the untracked `spec-dock/docs/authoring/decision-routing.md` projection is included in whitespace verification.
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
@@ -424,17 +428,109 @@ pass: no whitespace errors.
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S03 | pending review | provider template S03 diff and report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S03 | committed | provider template S03 diff and report evidence | `1ac571ea` | `git status --short` -> clean after S03 commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/templates/README.md` - template責務をthin scaffold / evidence slotへ整合
 - `src/spec_dock/assets/spec_dock/templates/epic/design.md` - `good example surface`表現を削除
 
 #### コミット
-- pending
+- `1ac571ea` (`docs(templates): テンプレートのexample ownership表現を削除`)
 
 #### メモ
 - S03 は template-text-only step。Provider docs / skills / runtime / tests / GitHub state は変更していない。
+
+---
+
+### セッションログ（2026-06-18 HH:MM - HH:MM）
+
+#### 対象
+- Step: S90
+- AC/EC: AC-005, AC-006
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S90 — Validation / docs impact resolution`
+  - closure id: tc-007
+
+#### 実施内容
+- Provider assets の S01-S03 変更を、現在 checkout から `uvx --from . spec-dock update .` で dogfooding workspace へ投影した。
+- 投影後の変更範囲が `.agents/skills/**`, `spec-dock/docs/**`, `spec-dock/templates/**` の該当 mirror に収まることを確認した。
+- 投影前後で `./spec-dock/scripts/spec-dock validate` が通ることを確認した。
+
+#### 実行コマンド / 結果
+```bash
+./spec-dock/scripts/spec-dock validate
+
+pass: spec-dock: ok (validate) nodes=129
+
+uvx --from . spec-dock update .
+
+pass: spec-dock: ok (update) -> /Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/7e5f/spec-dock
+
+./spec-dock/scripts/spec-dock validate
+
+pass: spec-dock: ok (validate) nodes=129
+
+rg -n "decision-routing|Decision-only|Issue-local|Epic|Initiative" spec-dock/docs .agents/skills/spec-dock-*
+
+pass: mirror docs and skills expose decision-routing guidance and links.
+
+rg -n "例:|サンプル|good example|bad example|management_core|shared kernel" spec-dock/templates
+
+pass: no matches. The command returned exit 1 because no forbidden concrete example markers were found in mirror templates.
+
+git diff --check
+
+pass: no whitespace errors.
+```
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | tc-007 | Provider edits validate and dogfooding mirror is inspected or explicitly marked not refreshed with reason | `uvx --from . spec-dock update .` projected provider docs/skills/templates into mirror; validate passed before and after update | pass | reviewer gate pending |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-007 | S90 | yes | manual-required | Provider assets had changed in S01-S03 and mirror needed validation / projection | `./spec-dock/scripts/spec-dock validate`; `uvx --from . spec-dock update .`; targeted mirror `rg`; `git diff --check`; `git diff --cached --check` | pass | mirror diff is generated projection of provider asset changes; cached check covers the new mirror guide |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-007 | S90 | validate/update/validate + mirror inspection + cached whitespace check | pass | step reviewer gate pending |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-007 | N/A | tc-007 | S90 で追加 closure / 削除 closure / alias 変更は発生していない | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S90 | command-generated mirror projection | dogfooding workspace must reflect shipped provider assets | parent orchestrator command execution | `spec-dock update .` projection and validation | provider assets from S01-S03, `plan.md` S90 | generated mirror docs/skills/templates and report evidence | runtime/source code, tests, package/config, `.github`, GitHub state, non-mirror dogfooding data | validate before/after update; targeted mirror `rg`; `git diff --check`; `git diff --cached --check` | update changes unrelated files; validate fails; mirror missing provider changes | command output; changed files; validation evidence | pass |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | docs impact reviewer | spec-reviewer | fresh | passed | no | proceed to commit | pass by `spec-reviewer` `019ed85c-7f8a-70b2-82a5-4e7b2769e3fe`; P2 cached whitespace evidence cleanup applied before commit |
+
+#### 変更したファイル
+- `.agents/skills/spec-dock-issue-planning/SKILL.md` - provider skill change の dogfooding mirror
+- `.agents/skills/spec-dock-epic-planning/SKILL.md` - provider skill change の dogfooding mirror
+- `.agents/skills/spec-dock-initiative-planning/SKILL.md` - provider skill change の dogfooding mirror
+- `.agents/skills/spec-dock-clarification/SKILL.md` - provider skill change の dogfooding mirror
+- `spec-dock/docs/workflow_issue.md` - provider docs change の dogfooding mirror
+- `spec-dock/docs/workflow_epic.md` - provider docs change の dogfooding mirror
+- `spec-dock/docs/workflow_initiative.md` - provider docs change の dogfooding mirror
+- `spec-dock/docs/workflow_spec_authoring.md` - provider docs change の dogfooding mirror
+- `spec-dock/docs/authoring/decision-routing.md` - provider docs change の dogfooding mirror
+- `spec-dock/templates/README.md` - provider template change の dogfooding mirror
+- `spec-dock/templates/epic/design.md` - provider template change の dogfooding mirror
+
+#### コミット
+- pending
+
+#### メモ
+- S90 は command-generated mirror projection step。Provider source of truth は S01-S03 の各 commit で更新済み。
 
 ---
 

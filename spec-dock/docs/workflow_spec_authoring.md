@@ -8,6 +8,7 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - 総合: [guide.md](guide.md)
 - Scope workflow: [workflow_initiative.md](workflow_initiative.md), [workflow_epic.md](workflow_epic.md), [workflow_issue.md](workflow_issue.md)
 - Phase playbook: [phase_requirement.md](phase_requirement.md), [phase_design.md](phase_design.md), [phase_plan.md](phase_plan.md)
+- Decision routing: [authoring/decision-routing.md](authoring/decision-routing.md)
 - Clarification workflow: [workflow_clarification.md](workflow_clarification.md)
 
 ## 基本契約
@@ -22,6 +23,7 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - 調査で解消できる不明点をユーザー質問で代替しない。先に docs / code / ADR / discussions / 外部一次情報を確認する。
 - 調査後もユーザー意図、受け入れ条件、スコープ、非スコープ、優先順位に影響する未確定事項が残る場合は、[workflow_clarification.md](workflow_clarification.md) に従い、次 phase へ進む前に orchestrator が一問ずつヒアリングする。
 - scope / non-scope に影響する未確認事項が残る場合は `blocked` または `incomplete` として扱い、次 phase へ進めない。
+- authoring 中に Decision-only finding を見つけた場合は、execution handoff 前に [authoring/decision-routing.md](authoring/decision-routing.md) で placement を確認する。Issue-local なら対象 Issue に閉じ、cross-issue なら Epic、cross-epic / investment なら Initiative、long-lived architecture decision なら ADR 候補、判断材料不足なら clarification へ戻す。routing 判断は canonical artifact または `report.md` の evidence に残し、template や skill に長い例を複製しない。
 
 ## 権限境界（Authority boundary / Promotion Record）
 
