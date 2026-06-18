@@ -14,6 +14,10 @@ description: Leaf skill for initiative planning tasks in spec-dock.
   - `spec-dock/docs/phase_requirement.md`
   - `spec-dock/docs/phase_design.md`
   - `spec-dock/docs/phase_plan.md`
+- Decision routing examples and detailed placement guidance: `spec-dock/docs/authoring/decision-routing.md`.
+- First-read gate: keep cross-epic product, investment, success-metric, or operating-model decisions in Initiative planning, but route ADR-worthy decisions to ADR and missing source-of-truth gaps to clarification.
+- When decomposing work into Epics, do not pass down a decision-only container as execution-ready; pass down only bounded Epic scope or record the remaining Initiative-level decision/follow-up.
+- Keep this skill as routing guidance only; use `spec-dock/docs/authoring/decision-routing.md` for examples and detailed routing.
 - Keep scope-specific constraints and decisions in `workflow_initiative.md`.
 - In spec authoring mode, do not move from requirement to design, design to plan, or plan to Epic decomposition until a fresh `spec-reviewer` returns `review_status: pass`; fix findings and re-run a fresh reviewer until pass.
 - Record each `Spec Authoring Gate` in the initiative `report.md`, including investigation, user questions/answers, reviewer verdict, fixes, and promotion decision.
