@@ -459,6 +459,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-epic-planning/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md"
         ),
+        ".agents/skills/spec-dock-epic-execution/SKILL.md": (
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md"
+        ),
         ".agents/skills/spec-dock-issue-planning/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md"
         ),
@@ -792,6 +795,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-hub/SKILL.md",
         ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
         ".agents/skills/spec-dock-epic-planning/SKILL.md",
+        ".agents/skills/spec-dock-epic-execution/SKILL.md",
         ".agents/skills/spec-dock-initiative-planning/SKILL.md",
         ".agents/skills/spec-dock-issue-planning/SKILL.md",
         ".agents/skills/spec-dock-issue-execution/SKILL.md",
@@ -857,6 +861,7 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/spec-dock-hub/SKILL.md",
             ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
             ".agents/skills/spec-dock-epic-planning/SKILL.md",
+            ".agents/skills/spec-dock-epic-execution/SKILL.md",
             ".agents/skills/spec-dock-initiative-planning/SKILL.md",
             ".agents/skills/spec-dock-issue-planning/SKILL.md",
             ".agents/skills/spec-dock-issue-execution/SKILL.md",
@@ -941,6 +946,14 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md",
+            ),
+        },
+        "spec-dock-epic-execution skill": {
+            "search_globs": (
+                "**/spec-dock-epic-execution/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md",
             ),
         },
         "spec-dock-initiative-planning skill": {
@@ -3030,6 +3043,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "spec-dock-clarification" in docs_readme
             assert "spec-dock-initiative-planning" in docs_readme
             assert "spec-dock-epic-planning" in docs_readme
+            assert "spec-dock-epic-execution" in docs_readme
             assert "spec-dock-issue-planning" in docs_readme
             assert "spec-dock-issue-execution" in docs_readme
             assert "spec-dock-adr-facilitation" in docs_readme
@@ -11891,10 +11905,155 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         for phrase in issue_execution_phrases:
             assert phrase in issue_execution
 
+    def test_issue_211_epic_execution_skill_content_regression_contract(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        provider_skill_path = (
+            repo_root
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "install_root"
+            / ".agents"
+            / "skills"
+            / "spec-dock-epic-execution"
+            / "SKILL.md"
+        )
+        mirror_skill_path = repo_root / ".agents/skills/spec-dock-epic-execution/SKILL.md"
+        epic_execution = provider_skill_path.read_text(encoding="utf-8")
+
+        assert mirror_skill_path.read_bytes() == provider_skill_path.read_bytes()
+        for phrase in (
+            "active Epic",
+            "requested-Epic resolution",
+            "active Issue",
+            "GitHub freshness",
+            "deps check",
+            "no Issue is ready",
+            "no executable Issue work",
+            "multiple Issues are ready",
+            "issue start",
+            "spec-dock-issue-planning",
+            "spec-dock-issue-execution",
+            "github-pr-merge-preparer",
+            "workflow_issue.md",
+            "issue finish",
+            "only after merge-prepared evidence",
+            "do not run `issue finish`",
+            "no-op Epic",
+            "Do not merge PRs",
+            "Do not claim reviewer pass",
+            "issue-finish self-claim",
+        ):
+            assert phrase in epic_execution
+
+    def test_issue_211_epic_execution_route_content_regression_contract(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        route_asset_pairs = {
+            "spec-dock/docs/workflow_epic.md": (
+                "src/spec_dock/assets/spec_dock/docs/workflow_epic.md"
+            ),
+            ".agents/skills/spec-dock-hub/SKILL.md": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md"
+            ),
+            ".codex/prompts/execute-epic.md": (
+                "src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md"
+            ),
+            ".codex/prompts/execute-initiative.md": (
+                "src/spec_dock/assets/install_root/.codex/prompts/execute-initiative.md"
+            ),
+        }
+        route_texts: dict[str, str] = {}
+
+        for mirror_rel_path, provider_rel_path in route_asset_pairs.items():
+            with _case(mirror=mirror_rel_path, provider=provider_rel_path):
+                assert self._DOGFOODING_MIRROR_PROVIDER_ASSET_MAP[mirror_rel_path] == \
+                    provider_rel_path
+                mirror_path = repo_root / mirror_rel_path
+                provider_path = repo_root / provider_rel_path
+                assert mirror_path.is_file(), f"missing dogfooding route mirror: {mirror_path}"
+                assert provider_path.is_file(), f"missing provider route asset: {provider_path}"
+                assert mirror_path.read_bytes() == provider_path.read_bytes()
+                route_texts[mirror_rel_path] = mirror_path.read_text(encoding="utf-8")
+                route_texts[provider_rel_path] = provider_path.read_text(encoding="utf-8")
+
+        workflow_epic = route_texts["src/spec_dock/assets/spec_dock/docs/workflow_epic.md"]
+        for phrase in (
+            "spec-dock-epic-execution",
+            "first-read coordinator",
+            "ready Issue",
+            "github-pr-merge-preparer",
+            "workflow_issue.md",
+            "issue finish",
+        ):
+            assert phrase in workflow_epic
+
+        hub_skill = route_texts[
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md"
+        ]
+        for phrase in (
+            "spec-dock-epic-planning",
+            "spec-dock-epic-execution",
+            "spec-dock-issue-execution",
+            "routes to Issue planning/execution",
+            "merge-preparer",
+            "without replacing issue execution",
+        ):
+            assert phrase in hub_skill
+
+        execute_epic_prompt = route_texts[
+            "src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md"
+        ]
+        for phrase in (
+            "$spec-dock-epic-execution",
+            "Epic execution",
+            "$spec-dock-epic-planning",
+            "initiative-driven decomposition",
+            "/execute-issue",
+            "$spec-dock-issue-execution",
+            "selects one ready Issue at a time",
+        ):
+            assert phrase in execute_epic_prompt
+
+        stale_execute_epic_prompt_phrases = (
+            "before creating or importing a new epic",
+            "creating or importing a new epic",
+            "Do not create a new skill for this workflow",
+            "Decompose the epic plan",
+            "Create or update issues",
+        )
+        for prompt_rel_path in (
+            "src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md",
+            ".codex/prompts/execute-epic.md",
+        ):
+            with _case(prompt=prompt_rel_path):
+                for phrase in stale_execute_epic_prompt_phrases:
+                    assert phrase not in route_texts[prompt_rel_path]
+
+        execute_initiative_prompt = route_texts[
+            "src/spec_dock/assets/install_root/.codex/prompts/execute-initiative.md"
+        ]
+        for phrase in (
+            "$spec-dock-epic-planning",
+            "$spec-dock-epic-execution",
+            "planning or issue decomposition",
+            "reviewed planning outputs and ready Issue work",
+            "/execute-epic",
+            "sole owner of Epic execution coordination",
+            "Do not start or execute Issues directly",
+        ):
+            assert phrase in execute_initiative_prompt
+        assert "issue decomposition using the\n  `/execute-epic` contract" not in \
+            execute_initiative_prompt
+        assert "For each issue produced by those epics, run" not in \
+            execute_initiative_prompt
+        assert "`./spec-dock/scripts/spec-dock issue start <issue-id>` before implementation" not in \
+            execute_initiative_prompt
+
     def test_issue_93_execute_prompts_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         prompt_contracts = {
             "execute-epic.md": (
+                "$spec-dock-epic-execution",
                 "$spec-dock-epic-planning",
                 "$spec-dock-issue-execution",
                 "/execute-issue",
@@ -11915,7 +12074,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "spec-dock/docs/workflow_initiative.md",
                 "spec-dock/docs/phase_plan_initiative.md",
                 "spec-dock/docs/rules/initiative/epics.md",
-                "issue start <issue-id>",
+                "$spec-dock-epic-execution",
                 "active initiative `report.md`",
                 "report the initiative as blocked or",
                 "initiative and affected epic plans are amended",
