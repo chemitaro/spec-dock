@@ -247,3 +247,92 @@ git diff --check
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
 | S02 | committed | application readiness consumers and S02 report evidence | `HEAD` (S02 commit) | clean | N/A | N/A | N/A | N/A |
+
+### S03 — Presentation JSON Contract（2026-06-19）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-003, AC-004, AC-006, EC-004
+- Closure IDs: `cl-009`, `cl-010`, `cl-011`
+
+#### 実施内容
+- `dev-coder` に S03 allowed paths のみを委任した。
+- `deps check --json` の `node_blockers` / `satisfied_dependencies` に `lifecycle_state`, `lifecycle_source`, `dependency_disposition`, `disposition_basis` を additive に追加した。
+- `.agent/deps-issues.json` に top-level `dependency_contexts` を追加し、active `nodes` / `edges` と evaluated dependency context を分離した。
+- satisfied-only high-level context は active graph noise として `nodes` / `edges` に出さず、`dependency_contexts` に保持するようにした。
+- inherited high-level blocker の raw 宣言元を失わないよう、`dependency_contexts_by_issue_id` の `source_node_id` を合成 blocker context より優先した。
+- `schema_version: 2` と既存 JSON keys は維持した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k deps_issues_does_not_include_historical_satisfied_high_level_context
+# red evidence from worker: failed with KeyError: 'dependency_contexts'
+
+uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k 'deps_issues or deps_check_json'
+# green verification after S03 implementation and follow-up: 2 passed, 56 deselected
+
+uv run python -m py_compile src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py
+# pass
+
+git diff --check
+# pass
+```
+
+#### 未完了 / 代替検証
+- `uv run pytest tests/cli_runtime/test_deps.py::TestCliDeps::test_deps_check_json_reports_empty_open_epic_as_node_blocker tests/cli_runtime/test_deps.py::TestCliDeps::test_deps_check_json_exits_zero_for_empty_closed_epic_context`
+  - selected 2 tests but no tests completed after about 4m47s; interrupted.
+- `uv run pytest tests/cli_runtime/test_sync.py -k 'sync_deps_issues_marks_empty_closed_epic_dependency_satisfied or records_all_done_expanded_high_level_dependency_as_satisfied'`
+  - selected 2 tests but did not complete after about 4m48s; interrupted.
+- CLI JSON expectations were updated in allowed test files, but local CLI runtime slowness prevented green confirmation. `render_deps_check_json()` and `render_deps_issues_artifact()` are covered directly by presentation unit tests instead.
+
+#### TDD / Red / Green / Refactor Evidence
+| step | phase | planned evidence | observed evidence | method | result | notes |
+|---|---|---|---|---|---|---|
+| S03 | Red | red-required for `cl-010` top-level `dependency_contexts` | worker reported `KeyError: 'dependency_contexts'` before implementation | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k deps_issues_does_not_include_historical_satisfied_high_level_context` | pass | `.agent/deps-issues.json` lacked separated context list |
+| S03 | Alternative Red | `cl-009` was missing after S02 | S02 worker observed `deps check --json` dropped disposition/basis fields in presentation serializer | focused CLI JSON assertion during S02/S03 handoff | pass | S03 owns presentation serializer |
+| S03 | Green | JSON projection exposes lifecycle/disposition and separates active graph/context | `2 passed, 56 deselected` | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k 'deps_issues or deps_check_json'` | pass | direct serializer coverage for `render_deps_check_json()` and `render_deps_issues_artifact()` |
+| S03 | Green | serializer syntax remains valid | no output | `uv run python -m py_compile src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py` | pass | syntax check |
+| S03 | Refactor guard | additive fields only / schema v2 unchanged | whitespace clean and changed files limited to S03 allowed paths plus report evidence | `git diff --check`; `git diff --stat` | pass | no domain/application changes |
+
+#### Implementation Delegation Gate
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | runtime/presentation JSON contract step | dev-coder | JSON projection and JSON tests | `requirement.md`, `design.md`, `plan.md` S03 | `presentation/json_state.py`, presentation/CLI JSON tests | PUML renderer, schema version bump, existing key removal, domain/application behavior | S03 JSON commands and `git diff --check` | schema bump or existing key removal needed | changed files, JSON before/after, verification, risks | pass with parent follow-up for stable unit coverage and reviewer P2 fix |
+
+#### Delegated Worker Evidence
+| step | delegated role | worker summary | changed files | tests run | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | Added additive lifecycle/disposition JSON fields and top-level `dependency_contexts`; moved satisfied-only high-level context out of active graph. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py`; `tests/unit/presentation/test_runtime_sync_s07.py`; `tests/cli_runtime/test_sync.py`; `tests/cli_runtime/test_deps.py` | unit `-k deps_issues` -> 1 passed; py_compile -> pass; `git diff --check` -> pass; CLI focused tests did not complete | initial code-reviewer failed with P1 report evidence and P2 provenance issue | CLI runtime focused tests too slow locally | accepted with parent follow-up |
+| S03 | dev-coder follow-up | Added direct `render_deps_check_json()` unit coverage for lifecycle/disposition fields. | `tests/unit/presentation/test_runtime_sync_s07.py` | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k 'deps_issues or deps_check_json'` -> 2 passed; py_compile -> pass; `git diff --check` -> pass | pending re-review | CLI runtime still not green-confirmed locally | accepted |
+| S03 | parent follow-up | Fixed reviewer P2 by preserving original `dependency_contexts_by_issue_id` provenance before synthetic node blocker context fallback. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py`; `tests/unit/presentation/test_runtime_sync_s07.py` | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k 'deps_issues or deps_check_json'` -> 2 passed; py_compile -> pass; `git diff --check` -> pass | stale after follow-up | none beyond CLI runtime slowness | accepted for re-review |
+| S03 | parent follow-up | Fixed reviewer P1 by deduplicating raw and evaluated dependency contexts on source issue / target node / expansion and merging evaluated lifecycle/disposition into the raw-provenance entry. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py`; `tests/unit/presentation/test_runtime_sync_s07.py` | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k 'deps_issues or deps_check_json'` -> 2 passed; py_compile -> pass; `git diff --check` -> pass | pending re-review | none beyond CLI runtime slowness | accepted for re-review |
+| S03 | parent follow-up | Fixed reviewer P1 by removing satisfied direct issue dependency edges from the active graph while keeping the evaluated direct issue context in top-level `dependency_contexts`. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py`; `tests/unit/presentation/test_runtime_sync_s07.py`; `tests/cli_runtime/test_sync.py` | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k 'deps_issues or deps_check_json'` -> 2 passed; py_compile -> pass; `git diff --check` -> pass | pending re-review | CLI runtime focused test still not green-confirmed locally | accepted for re-review |
+| S03 | parent follow-up | Fixed reviewer P1 by enriching raw direct issue satisfied contexts with lifecycle/disposition fields before serializing top-level `dependency_contexts`. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py`; `tests/unit/presentation/test_runtime_sync_s07.py` | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k 'deps_issues or deps_check_json'` -> 2 passed; py_compile -> pass; `git diff --check` -> pass | pending re-review | CLI runtime focused test still not green-confirmed locally | accepted for re-review |
+
+#### Step Contract Closure
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S03 | `cl-009` | `deps check --json` includes lifecycle and disposition context | direct `render_deps_check_json()` unit test asserts lifecycle/disposition fields for node blockers and satisfied dependencies | pass | CLI runtime test updated but not green-confirmed due local hang |
+| S03 | `cl-010` | active graph and dependency contexts are separated | `render_deps_issues_artifact()` unit test asserts active graph omits satisfied-only context while top-level `dependency_contexts` preserves it | pass | blocker context provenance also covered |
+| S03 | `cl-011` | schema v2 keys remain compatible | direct unit tests assert `schema_version == 2`; implementation keeps existing top-level keys and only adds fields | pass | no schema bump |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | observed result | notes |
+|---|---|---|---|---|---|---|---|
+| `tc-s03-001` / `cl-009` | S03 | yes | red-required | S02/S03 handoff observed serializer dropped disposition fields | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k 'deps_issues or deps_check_json'` | pass | `render_deps_check_json()` direct unit |
+| `tc-s03-002` / `cl-010` | S03 | yes | red-required | worker red run got missing `dependency_contexts` | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k 'deps_issues or deps_check_json'` | pass | active graph / top-level context separation |
+| `tc-s03-003` / `cl-011` | S03 | yes | covered-existing | existing schema v2 tests existed before S03 | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k 'deps_issues or deps_check_json'`; `py_compile` | pass | additive fields only |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | stale after follow-up | failed | N/A | re-review required | first reviewer found missing report evidence and blocker provenance issue |
+| S03 | step reviewer re-review | code-reviewer | stale after follow-up | failed | N/A | re-review required | second reviewer found raw/evaluated dependency context duplication |
+| S03 | step reviewer final re-review | code-reviewer | stale after follow-up | failed | N/A | re-review required | third reviewer found satisfied direct issue dependency still rendered in active graph |
+| S03 | step reviewer fourth re-review | code-reviewer | stale after follow-up | failed | N/A | re-review required | fourth reviewer found direct issue satisfied context lost evaluated lifecycle/disposition after edge removal |
+| S03 | step reviewer fifth re-review | code-reviewer | fresh | passed | accepted P2 provenance edge-case follow-up | proceed to S03 commit gate | only P2 finding: same issue/target/expansion declarations with different `source_node_id` can be collapsed |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S03 | committed | presentation JSON contract and S03 report evidence | `HEAD` (S03 commit) | clean | N/A | N/A | N/A | N/A |
