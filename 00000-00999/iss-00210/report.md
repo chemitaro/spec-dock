@@ -499,12 +499,13 @@ pass: all S02 mirror terms present.
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| shipped skill / workflow docs and dogfooding mirror | yes | doc-writer | S01/S02/S03 commits `3be63624`, `d8d712ad`, `d31eb1f6`; P1 follow-up updated provider/mirror `workflow_epic.md`; final ledger re-review passed; PR review follow-up removed local Issue ids from shipped docs and labeled dependency direction; `validate` ok nodes=133; `sync` ok active unchanged; provider/mirror `cmp` for changed docs passed | pass |
+| shipped skill / workflow docs and dogfooding mirror | yes | doc-writer | S01/S02/S03 commits `3be63624`, `d8d712ad`, `d31eb1f6`; P1 follow-up updated provider/mirror `workflow_epic.md`; final ledger re-review passed; PR review follow-up removed local Issue ids from shipped docs and labeled dependency direction; PR CI repair changed `workflow_epic.md` heading/prose to Japanese-primary wording and preserved provider/mirror `cmp`; `validate` ok nodes=133; `sync` ok active unchanged; focused docs policy test passed | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
 | qa-reviewer | whole issue obligation coverage after P1 fix | already sufficient / no additional integration test required | QA re-review passed: docs/skill-only closure ids `tc-001`/`tc-002`/`tc-003` remain covered by targeted inspection, provider/mirror comparison, fresh reviewer evidence, `validate`, `sync`, and `diff --check` | pass |
+| dev-coder / orchestrator | PR CI repair for provider-tests failure | focused tests sufficient for failure signatures | `test_spec_document_templates_keep_policy_out_of_scaffold` passed; `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` passed; `git diff --check` passed | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
@@ -526,6 +527,8 @@ pass: all S02 mirror terms present.
   - 解決: Provider and dogfooding `workflow_epic.md` now require artifact paths for each target Issue after Issue creation, or explicit skip/fallback evidence with target Issue id, skipped draft type(s), reason, non-blocking rationale, and revisit/follow-up condition.
 - 問題: PR review found local Issue 210/211 wording in shipped workflow docs and an ambiguous `deps add` direction example.
   - 解決: Provider and dogfooding `workflow_epic.md` now use generic downstream Issue wording and label `--from` as dependent node / `.meta.json.depends_on` owner and `--to` as prerequisite node.
+- 問題: PR provider-tests failed because shipped `workflow_epic.md` used English-primary heading/prose and dogfooding `.meta.json` snapshots missed newly checked-in Issues 209/210/211.
+  - 解決: Provider and dogfooding `workflow_epic.md` now use Japanese-primary heading/prose for the handoff section, and `tests/unit/infra/test_init_update.py` snapshot constants include the current three dogfooding `.meta.json` paths with empty `depends_on` baselines.
 
 ## 学んだこと (任意)
 - Final handoff wording must distinguish optional artifact existence from explicit skip/fallback evidence; otherwise downstream Issue planning inputs become silently optional.
