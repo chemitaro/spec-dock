@@ -1,0 +1,31 @@
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam linetype ortho
+
+legend right
+|= State |= Color |
+| doing |<#DAE8FC> |
+| ready |<#D5E8D4> |
+| blocked |<#F8CECC> |
+| done |<#E3E3E3> |
+| unknown |<#EEEEEE> |
+| blocking edge | solid |
+endlegend
+
+rectangle "epic-01930\nepic\nOpen\nready=false" as Nepic_01930 #FFFFFF
+rectangle "iss-01933\nissue\nBlocked\nready=false" as Niss_01933 #F8CECC
+rectangle "iss-01935\nissue\nBlocked\nready=false" as Niss_01935 #F8CECC
+rectangle "iss-01936\nissue\nReady" as Niss_01936 #D5E8D4
+rectangle "iss-01938\nissue\nReady" as Niss_01938 #D5E8D4
+rectangle "iss-01939\nissue\nBlocked\nready=false" as Niss_01939 #F8CECC
+rectangle "iss-01940\nissue\nReady" as Niss_01940 #D5E8D4
+rectangle "epic-01941\nepic\nUnknown\nready=false" as Nepic_01941 #EEEEEE
+rectangle "iss-01942\nissue\nBlocked\nready=false" as Niss_01942 #F8CECC
+
+Nepic_01930 --> Niss_01933 : blocks
+Niss_01933 --> Niss_01935 : blocks
+Niss_01933 --> Niss_01939 : blocks
+Niss_01936 --> Niss_01935 : blocks
+Nepic_01941 --> Niss_01942 : blocks
+@enduml

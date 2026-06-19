@@ -1,0 +1,79 @@
+{
+  "schema_version": 2,
+  "target": "iss-01933",
+  "target_status": {
+    "authority": "github",
+    "effective_status": "open",
+    "source": "cache",
+    "stale": true,
+    "last_sync_at": "2026-06-19T00:13:00Z"
+  },
+  "ready": false,
+  "effective_depends_on": [],
+  "blockers": [
+    "epic-01930"
+  ],
+  "issue_blockers": [],
+  "node_blockers": [
+    {
+      "node_id": "epic-01930",
+      "reason": "empty_open",
+      "state": "open",
+      "state_source": "cache",
+      "source_issue_id": "iss-01933",
+      "lifecycle_state": "open",
+      "lifecycle_source": "cache",
+      "dependency_disposition": "blocking",
+      "disposition_basis": "empty_open_container"
+    }
+  ],
+  "satisfied_dependencies": [
+    {
+      "source_node_id": "iss-01933",
+      "source_issue_id": "iss-01933",
+      "target_node_id": "epic-01929",
+      "target_node_kind": "epic",
+      "target_issue_ids": [
+        "iss-01730",
+        "iss-01731"
+      ],
+      "expansion": "expanded",
+      "lifecycle_state": "open",
+      "lifecycle_source": "cache",
+      "dependency_disposition": "satisfied",
+      "disposition_basis": "all_descendant_issues_done"
+    }
+  ],
+  "nodes": {
+    "iss-01730": {
+      "state": "done",
+      "ready": true,
+      "authority": "github",
+      "effective_status": "done",
+      "source": "cache",
+      "stale": true,
+      "last_sync_at": "2026-06-19T00:50:00Z"
+    },
+    "iss-01731": {
+      "state": "done",
+      "ready": true,
+      "authority": "github",
+      "effective_status": "done",
+      "source": "cache",
+      "stale": true,
+      "last_sync_at": "2026-06-19T00:51:00Z"
+    },
+    "iss-01933": {
+      "state": "ready",
+      "ready": true,
+      "authority": "github",
+      "effective_status": "open",
+      "source": "cache",
+      "stale": true,
+      "last_sync_at": "2026-06-19T00:13:00Z"
+    }
+  },
+  "warnings": [
+    "deps_ref_expanded_to_empty"
+  ]
+}

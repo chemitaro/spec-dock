@@ -1,0 +1,51 @@
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #9CA3AF
+  FontColor #111827
+}
+skinparam rectangle {
+  RoundCorner 6
+}
+
+legend right
+|= Kind / State |= Color |
+| issue doing |<#DAE8FC> |
+| issue ready |<#D5E8D4> |
+| issue blocked |<#F8CECC> |
+| issue done |<#E3E3E3> |
+| issue unknown |<#EEEEEE> |
+| high-level open |<#FFFFFF> |
+| high-level done |<#E3E3E3> |
+| high-level unknown |<#EEEEEE> |
+| raw direct dependencies; not readiness authority | |
+endlegend
+
+package "init-01920\nRealistic dependency projection\nOpen (github)" as Ninit_01920 <<initiative>> #FFFFFF {
+  package "epic-01930\nEmpty open blocker epic\nOpen (github)" as Nepic_01930 <<epic>> #FFFFFF {
+  }
+
+  package "epic-01931\nIntegration dependencies\nOpen (github)" as Nepic_01931 <<epic>> #FFFFFF {
+    rectangle "iss-01935\nBlocked by feature epic\nBlocked" as Niss_01935 #F8CECC
+    rectangle "iss-01939\nBlocked by open issue\nBlocked" as Niss_01939 #F8CECC
+    rectangle "iss-01942\nBlocked by empty unknown epic\nBlocked" as Niss_01942 #F8CECC
+  }
+
+  package "epic-01934\nFeature epic with mixed children\nOpen (github)" as Nepic_01934 <<epic>> #FFFFFF {
+    rectangle "iss-01933\nBlocked by empty open epic\nBlocked" as Niss_01933 #F8CECC
+  }
+
+  package "epic-01941\nEmpty unknown blocker epic\nUnknown (none)" as Nepic_01941 <<epic>> #EEEEEE {
+  }
+
+}
+
+Nepic_01930 --> Niss_01933 : raw_direct
+Niss_01933 --> Niss_01939 : raw_direct
+Nepic_01934 --> Niss_01935 : raw_direct
+Nepic_01941 --> Niss_01942 : raw_direct
+@enduml

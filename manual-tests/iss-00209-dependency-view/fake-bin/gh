@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+import json
+import sys
+
+
+ISSUES = {
+    1729: ("CLOSED", "Done foundation epic"),
+    1730: ("CLOSED", "Prepare base schema"),
+    1731: ("CLOSED", "Migrate existing data"),
+    1920: ("OPEN", "Realistic dependency projection"),
+    1929: ("OPEN", "Open foundation epic with done descendants"),
+    1930: ("OPEN", "Empty open blocker epic"),
+    1931: ("OPEN", "Integration epic"),
+    1933: ("OPEN", "Blocked by empty open epic"),
+    1934: ("OPEN", "Feature epic with mixed children"),
+    1935: ("OPEN", "Blocked by feature epic"),
+    1936: ("OPEN", "Ready by empty closed epic"),
+    1937: ("CLOSED", "Empty closed prerequisite epic"),
+    1938: ("OPEN", "Ready by done issue"),
+    1939: ("OPEN", "Blocked by open issue"),
+    1940: ("OPEN", "Ready by all done epic"),
+    1942: ("OPEN", "Blocked by empty unknown epic"),
+}
+
+
+def payload(number):
+    state, title = ISSUES[number]
+    return {
+        "number": number,
+        "state": state,
+        "title": title,
+        "labels": [],
+        "updatedAt": f"2026-06-19T00:{number % 60:02d}:00Z",
+        "url": f"https://github.com/example/repo/issues/{number}",
+    }
+
+
+def main(argv):
+    if argv[:3] == ["issue", "list", "--state"]:
+        print(json.dumps([payload(number) for number in sorted(ISSUES)]))
+        return 0
+    if argv[:2] == ["issue", "view"] and len(argv) >= 3:
+        try:
+            number = int(argv[2])
+        except ValueError:
+            print(f"unexpected issue number: {argv[2]}", file=sys.stderr)
+            return 2
+        if number not in ISSUES:
+            print(f"issue not found: {number}", file=sys.stderr)
+            return 1
+        requested = payload(number)
+        if "--json" in argv:
+            print(json.dumps(requested))
+            return 0
+    if argv[:1] == ["--version"]:
+        print("gh version 2.0.0-fake")
+        return 0
+    print(f"fake gh: unsupported argv={argv!r}", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

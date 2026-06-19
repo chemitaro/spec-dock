@@ -551,7 +551,9 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
                 lines.append(
                     "- node_blocker: "
                     f"{blocker.node_id} reason={blocker.reason} "
-                    f"state={blocker.state} source={blocker.state_source}"
+                    f"state={blocker.state} source={blocker.state_source} "
+                    f"dependency_disposition={blocker.dependency_disposition or '-'} "
+                    f"disposition_basis={blocker.disposition_basis or '-'}"
                 )
             raise RuntimeError("\n".join(lines))
         _append_unique(
