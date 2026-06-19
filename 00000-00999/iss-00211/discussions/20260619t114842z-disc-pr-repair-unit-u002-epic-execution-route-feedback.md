@@ -96,6 +96,8 @@ reflected_to: []
 - Continued U002 repair after carryover non-outdated review threads: made `spec-dock-epic-execution` stop before `issue finish` when PR preparation returns blocked/stale/limited/human-gate evidence, strengthened `/execute-initiative` so `/execute-epic` is the sole owner after reviewed Epic handoff, and documented the managed-skill/docs README alignment invariant near `_MANAGED_SKILL_NAMES`.
 - Focused tests passed after carryover-thread repair: `test_issue_211_epic_execution_skill_content_regression_contract`, `test_issue_211_epic_execution_route_content_regression_contract`, `test_issue_93_execute_prompts_contract`, and `test_init_creates_expected_structure` -> `4 passed`.
 - Provider/mirror `cmp -s` checks passed for `spec-dock-epic-execution/SKILL.md` and `execute-initiative.md`.
+- Continued U002 repair after PR re-observation left only the docs-entrypoint carryover thread: updated the `spec-dock-epic-execution` managed skill list item so the line itself documents that docs README exposes Epic execution separately.
+- Focused tests passed after docs-entrypoint carryover repair: `test_bundled_skill_assets_cover_managed_manifest` and `test_init_creates_expected_structure` -> `2 passed`.
 - `git diff --check` passed.
 
 ## Commit Evidence
