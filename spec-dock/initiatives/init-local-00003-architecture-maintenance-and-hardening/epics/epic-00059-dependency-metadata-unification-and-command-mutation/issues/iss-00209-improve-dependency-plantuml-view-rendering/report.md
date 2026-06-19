@@ -160,4 +160,90 @@ git diff --check
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S01 | ready to commit | domain disposition implementation and S01 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S01 | committed | domain disposition implementation and S01 report evidence | `95be339c` | clean | N/A | N/A | N/A | N/A |
+
+### S02 — Application Readiness Consumers（2026-06-19）
+
+#### 対象
+- Step: S02
+- AC/EC: AC-001, AC-002, AC-003, AC-006, EC-001, EC-002, EC-003
+- Closure IDs: `cl-005`, `cl-006`, `cl-007`, `cl-008`, `cl-022`, `cl-023`
+
+#### 実施内容
+- `dev-coder` に S02 allowed paths のみを委任した。
+- Application readiness result が保持する `dependency_disposition` / `disposition_basis` を `deps check` application tests で明示的に固定した。
+- `active set` の high-level node blocker エラーに disposition / basis を含め、empty open high-level blocker の理由を確認できるようにした。
+- GitHub-open high-level dependency でも descendant issues が all done の場合、`deps check` / `active set` が ready と判断することを application tests で固定した。
+- `deps check --json` の field exposure は S03 の Presentation JSON Contract の責務として維持し、S02 では presentation serializer を変更していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/application/test_check_deps.py tests/unit/application/test_set_active.py
+# baseline before S02 worker: 21 passed
+
+uv run pytest tests/unit/application/test_set_active.py -k 'high_level_node_blocker or all_descendants_done'
+# red evidence from worker: 1 failed, 1 passed
+
+uv run pytest tests/unit/application/test_check_deps.py tests/unit/application/test_set_active.py
+# green verification after S02 implementation: 23 passed
+
+uv run pytest tests/cli_runtime/test_deps.py -k 'empty_open_high_level_dependency or empty_closed_epic_context'
+# focused CLI regression: 1 passed, 107 deselected
+
+uv run pytest tests/cli_runtime/test_issue_lifecycle.py
+# lifecycle CLI regression: 28 passed
+
+git diff --check
+# pass
+```
+
+#### TDD / Red / Green / Refactor Evidence
+| step | phase | planned evidence | observed evidence | method | result | notes |
+|---|---|---|---|---|---|---|
+| S02 | Red | red-required for `cl-006` guard observability | worker reported `1 failed, 1 passed` before error message included disposition/basis | `uv run pytest tests/unit/application/test_set_active.py -k 'high_level_node_blocker or all_descendants_done'` | pass | empty open blocker existed but error did not expose disposition/basis |
+| S02 | Alternative Red | JSON field exposure belongs to S03 | worker observed focused CLI JSON assertion failed because `presentation/json_state.py` drops disposition fields | `uv run pytest tests/cli_runtime/test_deps.py -k 'empty_open_high_level_dependency or empty_closed_epic_context'` | pass | S02 did not expand into presentation layer; S03 keeps `cl-009` |
+| S02 | Green | application readiness consumers agree on disposition | `23 passed` | `uv run pytest tests/unit/application/test_check_deps.py tests/unit/application/test_set_active.py` | pass | parent re-ran and confirmed |
+| S02 | Green | issue lifecycle guard regressions remain green | `28 passed` | `uv run pytest tests/cli_runtime/test_issue_lifecycle.py` | pass | parent re-ran and confirmed |
+| S02 | Focused CLI regression | existing deps high-level open/closed CLI behavior remains green | `1 passed, 107 deselected` | `uv run pytest tests/cli_runtime/test_deps.py -k 'empty_open_high_level_dependency or empty_closed_epic_context'` | pass | full `test_deps.py` is very slow in this environment |
+| S02 | Refactor guard | no presentation/storage mutation change | whitespace check clean and changed files limited to S02 application/test paths | `git diff --check`; `git diff --stat` | pass | presentation JSON deferred to S03 |
+
+#### Implementation Delegation Gate
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | runtime/application readiness behavior step | dev-coder | application readiness consumers and application/CLI tests | `requirement.md`, `design.md`, `plan.md` S02 | `application/check_deps.py`, `application/set_active.py`, `application/sync_state.py`, application/CLI tests | presentation rendering/JSON formatting, docs, storage mutation, new CLI flags | S02 unit/CLI commands and `git diff --check` | new option, force behavior change, persistence/schema change | changed files, verification, risks, ledger note | partial pass; parent kept S02 scoped to application and deferred JSON field exposure to S03 |
+
+#### Delegated Worker Evidence
+| step | delegated role | worker summary | changed files | tests run | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Added application assertions for disposition/basis and active-set guard message details; identified presentation JSON field exposure belongs to `presentation/json_state.py`. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py`; `tests/unit/application/test_check_deps.py`; `tests/unit/application/test_set_active.py`; `tests/cli_runtime/test_deps.py` | application suite -> 23 passed; lifecycle CLI -> 28 passed; `git diff --check` -> pass; focused CLI JSON assertion exposed S03 gap | pending code-reviewer re-review | full `tests/cli_runtime/test_deps.py` too slow for routine S02 gate; JSON field exposure remains S03 | accepted after removing S03-owned JSON field assertions from S02 diff |
+
+#### Step Contract Closure
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S02 | `cl-005` | `deps check --json` reports ready satisfied context | application check now asserts GitHub-open parent with all descendants done is ready and has satisfied context | pass | machine-readable additional fields remain S03 `cl-009` |
+| S02 | `cl-006` | `active set` / `issue start` reject empty open blocker | `active set` rejects empty open high-level blocker and reports `dependency_disposition=blocking`, `disposition_basis=empty_open_container` | pass | issue-start shares readiness guard via lifecycle path covered by `test_issue_lifecycle.py` |
+| S02 | `cl-007` | descendant count uses full graph | application check asserts expanded parent dependency with done descendants is not treated as empty | pass | protects todo-projection false empty case |
+| S02 | `cl-022` | commands do not block on closed empty high-level dependency | application check and focused CLI deps test confirm closed empty parent is satisfied | pass | no presentation fields required in S02 |
+| S02 | `cl-023` | commands fail closed on unknown high-level or descendant state | application check asserts unknown empty high-level context remains `indeterminate` / `empty_unknown_container` | pass | unknown descendant domain branch covered by S01 |
+| S02 | `cl-008` | mutation CLI behavior unchanged | focused deps CLI regression and lifecycle CLI suite remain green; no mutation/storage files changed | pass | full `test_deps.py` omitted due known runtime slowness |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | observed result | notes |
+|---|---|---|---|---|---|---|---|
+| `tc-s02-001` / `cl-005` | S02 | yes | red-required | worker added application readiness coverage | `uv run pytest tests/unit/application/test_check_deps.py tests/unit/application/test_set_active.py` | pass | open all-done high-level dependency ready |
+| `tc-s02-002` / `cl-006` | S02 | yes | red-required | worker red run showed missing guard message fields | `uv run pytest tests/unit/application/test_check_deps.py tests/unit/application/test_set_active.py` | pass | empty open blocker rejected and explained |
+| `tc-s02-003` / `cl-007` | S02 | yes | red-required | worker added application assertion against false empty parent | `uv run pytest tests/unit/application/test_check_deps.py tests/unit/application/test_set_active.py` | pass | full graph descendants counted |
+| `tc-s02-004` / `cl-022` | S02 | yes | red-required | existing S01 semantics projected into application test | `uv run pytest tests/cli_runtime/test_deps.py -k 'empty_open_high_level_dependency or empty_closed_epic_context'` | pass | closed empty high-level dependency does not block |
+| `tc-s02-005` / `cl-008` | S02 | yes | covered-existing | baseline lifecycle CLI passed before S02 | `uv run pytest tests/cli_runtime/test_issue_lifecycle.py` | pass | no force/bypass lifecycle regression observed |
+| `tc-s02-006` / `cl-023` | S02 | yes | red-required | worker added/strengthened indeterminate field assertions | `uv run pytest tests/unit/application/test_check_deps.py tests/unit/application/test_set_active.py` | pass | unknown high-level context fails closed |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | stale after report update | failed | N/A | re-review required | first reviewer found missing S02 report evidence |
+| S02 | step reviewer re-review | code-reviewer | fresh | passed | N/A | proceed to S02 commit gate | no findings |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S02 | committed | application readiness consumers and S02 report evidence | `HEAD` (S02 commit) | clean | N/A | N/A | N/A | N/A |
