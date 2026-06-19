@@ -31,7 +31,7 @@ reflected_to: []
 - Resume metadata: not used; observation reached terminal CI failure
 - New trigger approved: no
 - Observation limitation: Codex review returned usage-limit issue comment; review completion is not clean and remains a human gate after CI is repaired unless a later observation produces a trusted completion signal.
-- Batch status: implemented locally; latest-head re-observation pending after push
+- Batch status: implemented locally in commit `63f774a2ec03f6eb8313a4d96c06ffadfa936397`; latest-head re-observation pending after push
 
 ## Batch Purpose
 
