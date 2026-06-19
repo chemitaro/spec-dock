@@ -2,7 +2,7 @@
 種別: interview
 ID: "20260619t152719z-interview"
 タイトル: "No Findings Issue Comment Promotion Boundary"
-状態: "draft"
+状態: "answered"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-20"
 親: ["iss-00218"]
@@ -11,13 +11,16 @@ scope: "issue"
 scope_id: "iss-00218"
 created_at: "2026-06-20T00:27:19+09:00"
 created_by: "iwasawayuuta"
-status: "unanswered | answered | superseded | deferred"
-authority: "proposed | user-approved | synthesized"
-adoption_status: "unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked"
+status: "answered"
+authority: "user-approved"
+adoption_status: "adopted"
 derived_from:
   - "20260619t131514z-research"
   - "20260619t151927z-disc"
-reflected_to: []
+reflected_to:
+  - "requirement.md"
+  - "design.md"
+  - "plan.md"
 ---
 
 # 20260619t152719z-interview No Findings Issue Comment Promotion Boundary
@@ -102,41 +105,47 @@ reflected_to: []
 
 ## ユーザー回答 (回答後に必須)
 - answer capture:
-  - ...
+  - ユーザーは Option A を採用すると回答した。
 - 回答:
-  - ...
+  - Option A を採用する。条件をすべて満たす strict no-findings issue comment は、新 signal `codex_no_findings_issue_comment` として `passed` / `merge_prepared` / `observation_complete=true` に昇格する。
 - 回答日時:
-  - ...
+  - 2026-06-20
 
 ## 追加確認の要否 (回答後に必須)
 - 追加確認が必要か:
-  - yes | no
+  - no
 - 必要な場合に次の unanswered `interview` として切り出す質問:
-  - ...
+  - なし。
 
 ## 採用判断 (回答後に必須)
 - adoption_status:
-  - unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked
+  - adopted
 - adoption target:
-  - `requirement.md` | `design.md` | `plan.md` | `ADR` | `report.md` Evidence Adoption Ledger | none
+  - `requirement.md`
+  - `design.md`
+  - `plan.md`
+  - `report.md` Evidence Adoption Ledger
 - 採用 / 棄却 / deferred の理由:
-  - ...
+  - Option A は、`fallback_issue_comment` の安全側 contract を維持しつつ、strict no-findings issue comment だけを distinct completion signal として扱うため、PR #216 型の false block を解消しながら generic issue comment false pass を避けられる。
 - `report.md` Evidence Adoption Ledger への反映要否:
-  - yes | no
+  - yes
 
 ## requirement / design / plan / ADR への含意 (回答後に必須)
 - `requirement.md`:
-  - ...
+  - AC と scope に、`codex_no_findings_issue_comment` の昇格条件を明記する。
+  - `fallback_issue_comment` は引き続き low-confidence / non-promoting とすることを非交渉制約に入れる。
 - `design.md`:
-  - ...
+  - completion signal taxonomy に `codex_no_findings_issue_comment` を追加する。
+  - current trigger / current head / strict allow-list / blockers absent / CI passed / no collection limitation を昇格条件として設計する。
+  - `wait_or_resume` は retryable pending に限定し、generic fallback は non-retryable human action として分離する。
 - `plan.md`:
-  - ...
+  - fake `gh` fixture で strict no-findings issue comment promotion、generic fallback non-promotion、old head / pre-trigger rejection、blocker precedence、CI non-pass rejection、wait propagation をテスト義務にする。
 - `ADR`:
-  - ...
+  - 現時点では不要。issue-local additive signal として扱う。
 - reflected_to 更新方針:
-  - ...
+  - requirement / design / plan 作成時に本回答を採用し、front matter `reflected_to` は必要に応じて更新する。
 - adoption reflection:
-  - ...
+  - この回答により、iss-00218 は Option A を前提に要件定義へ進める。
 
 ## 条件付き補足 (必要な場合だけ)
 - PlantUML 図:
