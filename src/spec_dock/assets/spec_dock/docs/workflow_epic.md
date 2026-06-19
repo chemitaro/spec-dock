@@ -76,7 +76,7 @@ Target Issue が draft-requirement または draft-design の一方または両�
 
 Downstream Issue は、Epic planning outputs とこの completion / handoff contract を input として参照できます。各 downstream Issue は、Epic plan が dependency edge を明示しない限り独立した Issue として扱います。Epic execution coordinator behavior、issue start / finish cycle、PR merge-ready preparation は、later Issue が明示的に定義しない限り、この Epic planning handoff section の外側に置きます。
 
-## Epic 実行ライフサイクル（Execution Lifecycle）
+## 実行ライフサイクル（Epic Execution Lifecycle）
 
 Epic planning completion 後の実行調整は `spec-dock-epic-execution` を first-read coordinator とします。この coordinator は ready Issue を一つずつ選び、Issue planning / execution へ渡し、Issue 実装後の PR delivery は `github-pr-merge-preparer` へ handoff します。Issue の詳細な実行規約と `issue finish` 判断は [workflow_issue.md](workflow_issue.md) を正本とし、この workflow では重複定義しません。
 
