@@ -1143,6 +1143,7 @@ class TestCliDeps(CliRuntimeHarness):
                     "issue_blockers",
                     "node_blockers",
                     "satisfied_dependencies",
+                    "dependency_contexts",
                     "nodes",
                     "warnings",
                 ]
@@ -1154,6 +1155,20 @@ class TestCliDeps(CliRuntimeHarness):
             assert data["issue_blockers"] == ["iss-00401", "iss-00403"]
             assert data["node_blockers"] == []
             assert data["satisfied_dependencies"] == []
+            assert data["dependency_contexts"] == [
+                {
+                    "source_node_id": "iss-00301",
+                    "source_issue_id": "iss-00301",
+                    "target_node_id": "epic-00202",
+                    "target_node_kind": "epic",
+                    "target_issue_ids": ["iss-00401", "iss-00402"],
+                    "expansion": "expanded",
+                    "lifecycle_state": "open",
+                    "lifecycle_source": "github",
+                    "dependency_disposition": "blocking",
+                    "disposition_basis": "descendant_issue_open",
+                }
+            ]
             assert data["warnings"] == []
 
     def test_deps_check_json_reports_empty_open_epic_as_node_blocker(self) -> None:
@@ -1217,6 +1232,10 @@ class TestCliDeps(CliRuntimeHarness):
                     "state": "open",
                     "state_source": "github",
                     "source_issue_id": "iss-00301",
+                    "lifecycle_state": "open",
+                    "lifecycle_source": "github",
+                    "dependency_disposition": "blocking",
+                    "disposition_basis": "empty_open_container",
                 }
             ]
 
@@ -1282,6 +1301,10 @@ class TestCliDeps(CliRuntimeHarness):
                     "target_node_kind": "epic",
                     "target_issue_ids": [],
                     "expansion": "empty",
+                    "lifecycle_state": "closed",
+                    "lifecycle_source": "github",
+                    "dependency_disposition": "satisfied",
+                    "disposition_basis": "lifecycle_closed",
                 }
             ]
 

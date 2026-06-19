@@ -979,7 +979,7 @@ class TestRuntimeDomainS03:
             "iss-local-00002": _issue_status_snapshot(
                 domain_models,
                 issue_id="iss-local-00002",
-                effective_status="done",
+                effective_status="closed",
                 source="cache",
                 github_number=302,
             ),
@@ -1071,6 +1071,8 @@ class TestRuntimeDomainS03:
         by_id = {node.node_id: node for node in state.nodes}
         assert by_id["iss-local-00001"].status == "doing"
         assert by_id["iss-local-00001"].ready
+        assert by_id["iss-local-00002"].status == "done"
+        assert by_id["iss-local-00002"].ready
         assert by_id["iss-local-00003"].status == "blocked"
         assert not by_id["iss-local-00003"].ready
 

@@ -355,6 +355,10 @@ class TestCliSync(CliRuntimeHarness):
                     "state": "open",
                     "state_source": "cache",
                     "source_issue_id": "iss-00301",
+                    "lifecycle_state": "open",
+                    "lifecycle_source": "cache",
+                    "dependency_disposition": "blocking",
+                    "disposition_basis": "empty_open_container",
                 },
                 {
                     "node_id": "epic-00202",
@@ -362,6 +366,10 @@ class TestCliSync(CliRuntimeHarness):
                     "state": "open",
                     "state_source": "cache",
                     "source_issue_id": "iss-00301",
+                    "lifecycle_state": "open",
+                    "lifecycle_source": "cache",
+                    "dependency_disposition": "blocking",
+                    "disposition_basis": "empty_open_container",
                 },
             ]
             assert deps_issues["nodes"]["init-00102"]["type"] == "initiative"
@@ -425,15 +433,28 @@ class TestCliSync(CliRuntimeHarness):
             assert deps_issues["schema_version"] == 2
             assert deps_issues["nodes"]["iss-00301"]["ready"] is True
             assert deps_issues["nodes"]["iss-00301"]["node_blockers"] == []
-            assert deps_issues["nodes"]["epic-00202"]["type"] == "epic"
-            assert deps_issues["nodes"]["epic-00202"]["state"] == "closed"
+            assert "epic-00202" not in deps_issues["nodes"]
             assert [
                 (edge["from"], edge["to"], edge["state"], edge["relation"])
                 for edge in deps_issues["edges"]
-            ] == [("iss-00301", "epic-00202", "satisfied", "raw_direct")]
+            ] == []
+            assert deps_issues["dependency_contexts"] == [
+                {
+                    "source_node_id": "iss-00301",
+                    "source_issue_id": "iss-00301",
+                    "target_node_id": "epic-00202",
+                    "target_node_kind": "epic",
+                    "target_issue_ids": [],
+                    "expansion": "empty",
+                    "lifecycle_state": "closed",
+                    "lifecycle_source": "github",
+                    "dependency_disposition": "satisfied",
+                    "disposition_basis": "lifecycle_closed",
+                }
+            ]
 
             deps_puml = (target / "spec-dock" / "deps-issues.puml").read_text(encoding="utf-8")
-            assert "Nepic_00202 ..> Niss_00301 : satisfied (raw_direct)" in deps_puml
+            assert "Nepic_00202 ..> Niss_00301 : satisfied (raw_direct)" not in deps_puml
             assert "Nepic_00202 --> Niss_00301 : blocks" not in deps_puml
 
             guard_log = bin_dir / "gh-guard-sync-no-github.log"
@@ -450,11 +471,25 @@ class TestCliSync(CliRuntimeHarness):
             )
             assert cached_deps_issues["nodes"]["iss-00301"]["ready"] is True
             assert cached_deps_issues["nodes"]["iss-00301"]["node_blockers"] == []
-            assert cached_deps_issues["nodes"]["epic-00202"]["state"] == "closed"
+            assert "epic-00202" not in cached_deps_issues["nodes"]
             assert [
                 (edge["from"], edge["to"], edge["state"], edge["relation"])
                 for edge in cached_deps_issues["edges"]
-            ] == [("iss-00301", "epic-00202", "satisfied", "raw_direct")]
+            ] == []
+            assert cached_deps_issues["dependency_contexts"] == [
+                {
+                    "source_node_id": "iss-00301",
+                    "source_issue_id": "iss-00301",
+                    "target_node_id": "epic-00202",
+                    "target_node_kind": "epic",
+                    "target_issue_ids": [],
+                    "expansion": "empty",
+                    "lifecycle_state": "closed",
+                    "lifecycle_source": "cache",
+                    "dependency_disposition": "satisfied",
+                    "disposition_basis": "lifecycle_closed",
+                }
+            ]
 
             p_cached_again = self._run_runtime_capture(
                 target,
@@ -467,11 +502,12 @@ class TestCliSync(CliRuntimeHarness):
             )
             assert cached_again_deps_issues["nodes"]["iss-00301"]["ready"] is True
             assert cached_again_deps_issues["nodes"]["iss-00301"]["node_blockers"] == []
-            assert cached_again_deps_issues["nodes"]["epic-00202"]["state"] == "closed"
+            assert "epic-00202" not in cached_again_deps_issues["nodes"]
             assert [
                 (edge["from"], edge["to"], edge["state"], edge["relation"])
                 for edge in cached_again_deps_issues["edges"]
-            ] == [("iss-00301", "epic-00202", "satisfied", "raw_direct")]
+            ] == []
+            assert cached_again_deps_issues["dependency_contexts"] == cached_deps_issues["dependency_contexts"]
 
             p_deps_check = self._run_runtime_capture(
                 target,
@@ -490,6 +526,10 @@ class TestCliSync(CliRuntimeHarness):
                     "target_node_kind": "epic",
                     "target_issue_ids": [],
                     "expansion": "empty",
+                    "lifecycle_state": "closed",
+                    "lifecycle_source": "cache",
+                    "dependency_disposition": "satisfied",
+                    "disposition_basis": "lifecycle_closed",
                 }
             ]
 
@@ -550,12 +590,26 @@ class TestCliSync(CliRuntimeHarness):
             )
             assert deps_issues["nodes"]["iss-00301"]["ready"] is True
             assert deps_issues["nodes"]["iss-00301"]["node_blockers"] == []
-            assert deps_issues["nodes"]["epic-00202"]["type"] == "epic"
+            assert "epic-00202" not in deps_issues["nodes"]
             assert [
                 (edge["from"], edge["to"], edge["state"], edge["relation"])
                 for edge in deps_issues["edges"]
                 if edge["from"] == "iss-00301"
-            ] == [("iss-00301", "epic-00202", "satisfied", "raw_direct")]
+            ] == []
+            assert deps_issues["dependency_contexts"] == [
+                {
+                    "source_node_id": "iss-00301",
+                    "source_issue_id": "iss-00301",
+                    "target_node_id": "epic-00202",
+                    "target_node_kind": "epic",
+                    "target_issue_ids": ["iss-00401"],
+                    "expansion": "expanded",
+                    "lifecycle_state": "open",
+                    "lifecycle_source": "github",
+                    "dependency_disposition": "satisfied",
+                    "disposition_basis": "all_descendant_issues_done",
+                }
+            ]
 
     def test_sync_fails_on_unresolved_ref(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -889,7 +943,6 @@ class TestCliSync(CliRuntimeHarness):
             assert deps_issues["projection"] == "issue-readiness-with-dependency-context"
             assert deps_issues["source"] == {"sync_state": "readiness_evaluation", "schema_version": 2}
             assert set(deps_issues["nodes"].keys()) == {
-                "iss-00301",
                 "iss-00302",
                 "iss-00303",
                 "iss-00304",
@@ -912,15 +965,15 @@ class TestCliSync(CliRuntimeHarness):
             edge_pairs = [(edge["from"], edge["to"], edge["state"], edge["relation"]) for edge in deps_issues["edges"]]
             assert edge_pairs == [
                 ("iss-00302", "iss-00303", "blocking", "compiled_issue"),
-                ("iss-00304", "iss-00301", "satisfied", "raw_direct"),
             ]
 
             puml = deps_issues_puml_path.read_text(encoding="utf-8")
             assert "iss-00302" in puml
             assert "iss-00303" in puml
-            assert "iss-00301" in puml
+            assert "iss-00301" not in puml
             assert "iss-00305" in puml
-            assert "satisfied" in puml
+            assert "satisfied" not in puml
+            assert "raw_direct" not in puml
             assert "Niss_00303 --> Niss_00302 : blocks" in puml
 
     def test_sync_todo_projection_excludes_done_and_empty_branches(self) -> None:
@@ -1553,14 +1606,26 @@ class TestCliSync(CliRuntimeHarness):
             assert deps_issues["source"] == {"sync_state": "readiness_evaluation", "schema_version": 2}
             assert deps_issues["deps"]["valid"]
             assert deps_issues["deps"]["error"] is None
-            assert "iss-00301" in deps_issues["nodes"]  # satisfied context remains visible
+            assert "iss-00301" not in deps_issues["nodes"]  # satisfied-only context stays out of active graph
             assert "iss-00302" in deps_issues["nodes"]
             assert "iss-00303" in deps_issues["nodes"]
+            assert {
+                    "source_node_id": "iss-00302",
+                    "source_issue_id": "iss-00302",
+                    "target_node_id": "iss-00301",
+                    "target_node_kind": "issue",
+                    "target_issue_ids": ["iss-00301"],
+                    "expansion": "issue",
+                    "lifecycle_state": "done",
+                    "lifecycle_source": "github",
+                    "dependency_disposition": "satisfied",
+                    "disposition_basis": "local_done",
+                } in deps_issues["dependency_contexts"]
 
             deps_issues_puml = deps_issues_puml_path.read_text(encoding="utf-8")
             assert "iss-00302" in deps_issues_puml
             assert "iss-00303" in deps_issues_puml
-            assert "iss-00301" in deps_issues_puml
+            assert "iss-00301" not in deps_issues_puml
 
             # Legacy v1 deps artifacts are no longer generated.
             assert not (target / "spec-dock" / ".agent" / "deps.json").exists()
