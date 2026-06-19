@@ -63,8 +63,10 @@ When the initiative is ready:
   `spec-dock/docs/rules/initiative/epics.md`,
   `spec-dock/docs/reference_github.md`, `spec-dock/docs/reference_deps.md`, and
   `spec-dock/docs/reference_sync.md`.
-- For each epic, execute epic-level planning and issue decomposition using the
-  `/execute-epic` contract.
+- For each epic that still needs planning or issue decomposition, use
+  `$spec-dock-epic-planning` before execution.
+- For each epic with reviewed planning outputs and ready Issue work, use
+  `/execute-epic` for Epic execution coordination.
 - For each issue produced by those epics, run
   `./spec-dock/scripts/spec-dock issue start <issue-id>` before implementation,
   then execute the issue using the `/execute-issue` contract.
