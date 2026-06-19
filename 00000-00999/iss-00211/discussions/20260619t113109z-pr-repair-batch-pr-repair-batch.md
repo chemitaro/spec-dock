@@ -21,17 +21,17 @@ reflected_to: []
 - Repository: chemitaro/spec-dock
 - Base branch: main
 - Head branch: iss-00211-epic-execution-coordinator-skill
-- Latest head SHA: 881ef59eb1e1f95b9bfdf5a61eb9f7d25dabbb13
+- Latest head SHA: 031944911af581c9e4f5ed150b3cae74451b8d41
 - Observation command: `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh --repo chemitaro/spec-dock --pr 217 --head-sha 881ef59eb1e1f95b9bfdf5a61eb9f7d25dabbb13`
-- Observation final JSON / evidence: stdout final JSON, observed_at `2026-06-19T11:31:02.320328Z`, fingerprint `401b4e40e4fc3715877807a154f4f2882592852410649d5dd99be4682b6fefe7`
-- Observation status: failed
-- Trigger comment id: 4751023793
-- Trigger created_at: 2026-06-19T11:17:39Z
-- Trigger boundary: current trigger boundary for head `881ef59eb1e1f95b9bfdf5a61eb9f7d25dabbb13`
-- Resume metadata: N/A; first observation completed with CI failure
+- Observation final JSON / evidence: second stdout final JSON, observed_at `2026-06-19T11:48:33.327857Z`, fingerprint `c4ddc75b13769f1f43245c8afd974a1713e00b82e7e7095e4f398d4bc88ff4e9`
+- Observation status: human_gate; CI passed, review unresolved
+- Trigger comment id: 4751168856
+- Trigger created_at: 2026-06-19T11:35:04Z
+- Trigger boundary: current trigger boundary for head `031944911af581c9e4f5ed150b3cae74451b8d41`
+- Resume metadata: N/A; second observation completed with review feedback
 - New trigger approved: no
 - Observation limitation: none; review-thread state available with 0 unresolved threads
-- Batch status: implemented; re-observation pending
+- Batch status: U001 implemented and reobserved-CI-pass; U002 implemented, re-observation pending
 
 ## Batch Purpose
 
@@ -42,12 +42,16 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 | concern_id | concern | related_inventory_ids | suspected_root_cause | repair_unit | notes |
 | --- | --- | --- | --- | --- | --- |
 | C001 | Provider CI snapshot drift on PR merge ref | I001 | base `main` added `iss-00214-pr-observation-review-target-state` after this issue branch was cut; PR merge ref includes the new `.meta.json`, but this branch's checked-in dogfooding meta path snapshot does not. | U001 | Repair should merge/reconcile `origin/main` and update the snapshot, then re-run focused provider test. |
+| C002 | Epic execution route consistency after coordinator split | I002, I003, I004 | The new coordinator split moved decomposition/planning out of `/execute-epic`, but related prompt/skill wording still assumes `/execute-epic` handles initiative decomposition, requested epic resolution, or no-op epic completion consistently. | U002 | Repair should align execute-initiative handoff and spec-dock-epic-execution stop rules without reintroducing issue creation authority. |
 
 ## Inventory
 
 | ID | source_type | concern | failure_class | evidence | summary | validity | risk_class | need_to_fix | disposition | repair_unit | status | rationale | residual_risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | I001 | CI failure | C001 | check_failure:provider-tests | Provider CI run 27822529397, job 82338831912, failed step `Run provider pytest suite`; failing test `TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`; left contains one more path `spec-dock/.../issues/iss-00214-pr-observation-review-target-state/.meta.json`. | Checked-in dogfooding `.meta.json` snapshot diverges after base branch drift. | valid | blocking | yes | fix-now | U001 | implemented | Required check failure blocks merge-prepared state; local focused repair verification passed. | Low after snapshot repair and re-observation; without repair the PR remains UNSTABLE. |
+| I002 | review feedback | C002 | review_feedback:initiative-execute-epic-decomposition-route | Codex review comment 3442232087 on `src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md`; thread `PRRT_kwDOQ99OK86K0kEi`. | `/execute-initiative` still routes epic decomposition to `/execute-epic`, while `/execute-epic` now refuses issue creation and hands planning back. | valid | blocking | yes | fix-now | U002 | implemented | Prompt route wording updated; focused route tests passed. | Low after re-observation. |
+| I003 | review feedback | C002 | review_feedback:requested-epic-active-state | Codex review comment 3442232093 on `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md`; thread `PRRT_kwDOQ99OK86K0kEo`. | Skill advertises active or requested Epic, but first-read stop rule requires an active Epic before resolving requested targets. | valid | blocking | yes | fix-now | U002 | implemented | Skill wording updated to resolve requested Epic before active-Epic checks; focused route tests passed. | Low after re-observation. |
+| I004 | review feedback | C002 | review_feedback:no-op-epic-completion | Codex review comment 3442232098 on `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md`; thread `PRRT_kwDOQ99OK86K0kEt`. | No ready Issue currently forces blocker/escalation before the later no-op Epic completion gate can be used. | valid | blocking | yes | fix-now | U002 | implemented | Skill wording updated to allow explicit no-executable-Issue-work completion path; focused route tests passed. | Low after re-observation. |
 
 ## Classification Values
 
@@ -71,11 +75,23 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 - Rationale: The failure is deterministic from merge-ref content and can be repaired with a bounded snapshot/base reconciliation.
 - Residual risk: If main advances again with new dogfooding scaffold metadata before merge, the same snapshot test may need another reconciliation.
 
+### C002
+
+- Covered inventory IDs: I002, I003, I004
+- Validity analysis: valid. The comments identify cross-surface route contradictions introduced by the coordinator split.
+- Need-to-fix decision: yes. Unresolved review threads block merge-prepared state, and the route contradictions affect documented agent entrypoints.
+- Root cause: S02 updated `/execute-epic` and `spec-dock-epic-execution`, but did not fully reconcile upstream `/execute-initiative` handoff wording, requested Epic resolution semantics, and no-op Epic completion precedence.
+- Options considered: ignore as P2; update only tests; align prompt/skill wording and regression tests.
+- Recommended disposition: fix-now via U002.
+- Rationale: The repair is bounded to prompt/skill wording and route/content tests.
+- Residual risk: If initiative execution has additional undocumented assumptions, a future Issue may need a broader initiative-execution route pass.
+
 ## Repair Queue
 
 | unit_id | source_batch | covered_ids | disposition | risk_class | repair_unit_disc | status | Implementation Plan | Re-observation Result | Residual Risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| U001 | 20260619t113109z-pr-repair-batch | I001 | fix-now | blocking | `20260619t113206z-disc-pr-repair-unit-u001-provider-tests-snapshot.md` | implemented | Merged `origin/main`, updated checked-in dogfooding meta snapshot for Issue 214, ran focused failing test and `git diff --check`. | pending | Low; repair is snapshot/base reconciliation only. |
+| U001 | 20260619t113109z-pr-repair-batch | I001 | fix-now | blocking | `20260619t113206z-disc-pr-repair-unit-u001-provider-tests-snapshot.md` | reobserved-pass | Merged `origin/main`, updated checked-in dogfooding meta snapshot for Issue 214, ran focused failing test and `git diff --check`. | CI passed on head `031944911af581c9e4f5ed150b3cae74451b8d41`; review feedback then opened U002. | Low; repair is snapshot/base reconciliation only. |
+| U002 | 20260619t113109z-pr-repair-batch | I002, I003, I004 | fix-now | blocking | `20260619t114842z-disc-pr-repair-unit-u002-epic-execution-route-feedback.md` | implemented | Aligned `/execute-initiative` handoff, requested Epic handling, no-op Epic completion, provider/mirror skill prompt parity, and route/content regression tests. | pending | Low; repair is documentation/prompt/skill route wording plus tests. |
 
 ## Unit Discussion Plan
 
