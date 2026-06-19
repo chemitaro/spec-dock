@@ -52,6 +52,7 @@ Disposition ごとの必須証跡:
 | D-001 | resolved | scope | orchestrator / user interview | strict no-findings issue comment を merge-prepared evidence に昇格するか | Option A: strict condition で昇格; Option B: manual/non-retryable; Option C: 現状維持 | Option A を採用し、`codex_no_findings_issue_comment` を issue-local additive signal とする | ユーザー回答が Option A。generic fallback の安全契約を維持しつつ PR #216 型 false block を解消できる | promoted_to_design | `discussions/20260619t152719z-interview-no-findings-issue-comment-promotion-boundary.md` | `requirement.md`, `design.md`, `plan.md` に反映済み |
 | D-002 | resolved | implementation | spec-reviewer | design review で collector と snapshot / wait の authority 境界が曖昧 | collector が merge-prepared まで返す; collector は review completion のみ返す | collector は `review_completion_observed` まで、top-level `merge_prepared` は snapshot / wait のみ返す | collector は CI / PR metadata を持たないため、merge-prepared authority を持たせない | promoted_to_design | design reviewer fail/pass sequence | `design.md` に反映済み |
 | D-003 | resolved | operation | dev-coder / orchestrator | `requirement.md`, `design.md`, `plan.md` frontmatter が reviewer pass 後も `draft` のままだった | そのまま実装を続ける; planning へ戻す; reviewer-pass 証跡に合わせて frontmatter を `approved` に修正する | reviewer-pass と Spec Authoring Gate の execution-ready 証跡に合わせ、3 artifact と `report.md` の状態を `approved` に修正した | execution skill は draft artifact を実装開始ブロッカーにするため、reviewer-pass 証跡と metadata を一致させる必要がある | applied | requirement/design/plan reviewer pass; Spec Authoring Gate; frontmatter diff | none |
+| D-004 | resolved | test-strategy | dev-coder / orchestrator | S02 の concrete test は wrapper execution と書かれているが、変更点は `classify_snapshot` の top-level classification に局在していた | full fake `gh` wrapper fixture を追加する; direct classifier fixture を採用する | S02 は direct classifier fixture を採用し、wrapper integration は既存 snapshot tests に委ねる | S02 の責務は collector decision と CI / metadata / blocker の統合であり、body matching や collector 実行を再検証しない方が step boundary に合う | applied | S02 Red/Green selector; existing wrapper snapshot tests; changed production branch in `classify_snapshot`; code-reviewer pass | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -280,6 +281,114 @@ The same issue_170 test passed when rerun directly.
 
 #### メモ
 - Material implementation decisions are recorded in D-003 and reviewer follow-up rows above.
+
+---
+
+### セッションログ（2026-06-20 S02）
+
+#### 対象
+- Step: S02 Snapshot top-level promotion and blocker precedence
+- AC/EC: AC-001, AC-003, AC-004, EC-004, EC-005, EC-006
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S02 — Snapshot top-level promotion and blocker precedence`
+  - closure ids: `tc-004`, `tc-005`
+
+#### 実施内容
+- `dev-coder` に S02 のみを委任し、許可 path を `pr_observation_snapshot.py` と `tests/unit/infra/test_init_update.py` に限定した。
+- Snapshot の `classify_snapshot` に `codex_no_findings_issue_comment` / `review_completion_observed` / passed collector decision を top-level `merge_prepared` に昇格する branch を追加した。
+- 既存 blocker precedence の前に昇格 branch を置かず、stale head、draft / non-open PR、CI failed / pending / running / none、review blockers、blocking limitation が先に勝つことをテストで確認した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "snapshot and (no_findings or fallback_issue_comment or blocker)"
+
+7 passed, 446 deselected
+```
+
+```bash
+git diff --check
+
+pass: no output
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ（Red） | red-required for `tc-004`, `tc-005` | delegated worker reported 1 failed / 6 passed before implementation | `uv run pytest tests/unit/infra/test_init_update.py -k "snapshot and (no_findings or fallback_issue_comment or blocker)"` | pass | green integration case returned generic `passed` reason instead of `codex_no_findings_issue_comment` |
+| S02 | 緑フェーズ（Green） | S02 snapshot tests pass | parent rerun of S02 selector: 7 passed | `uv run pytest tests/unit/infra/test_init_update.py -k "snapshot and (no_findings or fallback_issue_comment or blocker)"` | pass | validates tc-s02-001 through tc-s02-006 and existing fallback snapshot behavior |
+| S02 | リファクタリング（Refactor） | guardrail satisfied / no broad refactor | one classifier branch added; no whitespace issues | `git diff --check` | pass | no snapshot structure refactor |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | direct classifier fixture と wrapper fixture のどちらを S02 evidence とするか | delegated worker Ledger Note | D-004 に採用判断を記録し、reviewer gate で確認する | tc-004, tc-005 | no | S02 selector 7 passed; existing wrapper snapshot tests remain in suite |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | tc-004, tc-005 | Snapshot top-level status が design の blocker precedence に一致する | S02-focused pytest 7 passed; `git diff --check` pass | pass | step reviewer gate passed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-004 / tc-s02-001 | S02 | yes | red-required | delegated worker reported expected Red failure before implementation | S02-focused pytest selector | pass | new signal + green integration promotes top-level |
+| tc-005 / tc-s02-002 | S02 | yes | red-required | delegated worker reported Red phase before implementation | S02-focused pytest selector | pass | CI failed overrides no-findings |
+| tc-005 / tc-s02-003 | S02 | yes | red-required | delegated worker reported Red phase before implementation | S02-focused pytest selector | pass | pending/running/none CI does not promote |
+| tc-005 / tc-s02-004 | S02 | yes | red-required | delegated worker reported Red phase before implementation | S02-focused pytest selector | pass | draft / non-open PR does not promote |
+| tc-005 / tc-s02-005 | S02 | yes | red-required | delegated worker reported Red phase before implementation | S02-focused pytest selector | pass | stale head does not promote |
+| tc-005 / tc-s02-006 | S02 | yes | red-required | delegated worker reported Red phase before implementation | S02-focused pytest selector | pass | review blockers and blocking limitations override no-findings |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-004 | S02 | S02-focused pytest selector | pass | top-level promotion from collector review completion |
+| tc-005 | S02 | S02-focused pytest selector | pass | CI / metadata / head / review / limitation blockers win |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | tc-004 | `test_issue_218_s02_snapshot_no_findings_green_integration_promotes_top_level` | tc-004 | new signal propagation を snapshot authority で固定するため | no | yes |
+| added | tc-005 | `test_issue_218_s02_snapshot_no_findings_failed_ci_blocker_takes_precedence` | tc-005 | failed CI precedence を固定するため | no | yes |
+| added | tc-005 | `test_issue_218_s02_snapshot_no_findings_non_terminal_ci_blockers_do_not_promote` | tc-005 | pending/running/none CI precedence を固定するため | no | yes |
+| added | tc-005 | `test_issue_218_s02_snapshot_no_findings_pr_lifecycle_blockers_do_not_promote` | tc-005 | draft / non-open PR precedence を固定するため | no | yes |
+| added | tc-005 | `test_issue_218_s02_snapshot_no_findings_stale_head_blocker_does_not_promote` | tc-005 | stale head precedence を固定するため | no | yes |
+| added | tc-005 | `test_issue_218_s02_snapshot_no_findings_review_and_limitation_blockers_do_not_promote` | tc-005 | review blockers / blocking limitation precedence を固定するため | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | snapshot behavior in shipped installed skill asset | dev-coder | snapshot top-level promotion and blocker precedence only | requirement/design/plan S02 | `pr_observation_snapshot.py`, `tests/unit/infra/test_init_update.py` | collector/wait/docs/canonical docs/GitHub state/secrets | S02 targeted pytest and `git diff --check` | need to move CI/metadata conditions into collector | changed files, tests, risks, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Added explicit snapshot promotion from `codex_no_findings_issue_comment` review completion to top-level merge readiness after blocker checks; added blocker precedence tests | `pr_observation_snapshot.py`; `tests/unit/infra/test_init_update.py` | worker reported Red: 1 failed / 6 passed; Green: 7 passed; tidy: `git diff --check` pass | passed: code-reviewer | direct classifier fixture is accepted in D-004 and confirmed by reviewer | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | N/A delegated path used | N/A | N/A | N/A | revert S02 commit if needed after review | S02-focused pytest; `git diff --check` | code-reviewer pending | none |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to Step Commit Gate | no findings; reviewer confirmed direct classifier fixture is sufficient for S02 |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | committed | `pr_observation_snapshot.py`, `tests/unit/infra/test_init_update.py`, `report.md` | S02 commit at `HEAD` after commit gate | `git status --short --branch` -> clean working tree, branch ahead 1 | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py` - S02 snapshot top-level promotion。
+- `tests/unit/infra/test_init_update.py` - S02 snapshot tests。
+- `spec-dock/active/issue/report.md` - S02 observed evidence ledger。
+
+#### コミット
+- S02 commit at `HEAD`: `fix(pr-observation): no-findings signalをsnapshotで昇格`
+
+#### メモ
+- Material test-strategy decision is recorded in D-004.
 
 ---
 
