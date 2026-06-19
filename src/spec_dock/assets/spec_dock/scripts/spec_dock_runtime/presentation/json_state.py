@@ -22,6 +22,35 @@ OPEN_ISSUES_DEPENDENCY_VIEW_PROJECTION = "open-issues-dependency-view"
 ISSUE_READINESS_WITH_DEPENDENCY_CONTEXT_PROJECTION = "issue-readiness-with-dependency-context"
 
 
+def _deps_node_blocker_payload(blocker: object) -> dict[str, object]:
+    return {
+        "node_id": _object_value(blocker, "node_id", ""),
+        "reason": _object_value(blocker, "reason", ""),
+        "state": _object_value(blocker, "state", ""),
+        "state_source": _object_value(blocker, "state_source", ""),
+        "source_issue_id": _object_value(blocker, "source_issue_id", ""),
+        "lifecycle_state": _object_value(blocker, "lifecycle_state", None),
+        "lifecycle_source": _object_value(blocker, "lifecycle_source", None),
+        "dependency_disposition": _object_value(blocker, "dependency_disposition", None),
+        "disposition_basis": _object_value(blocker, "disposition_basis", None),
+    }
+
+
+def _deps_dependency_context_payload(context: object) -> dict[str, object]:
+    return {
+        "source_node_id": _object_value(context, "source_node_id", ""),
+        "source_issue_id": _object_value(context, "source_issue_id", ""),
+        "target_node_id": _object_value(context, "target_node_id", ""),
+        "target_node_kind": _object_value(context, "target_node_kind", ""),
+        "target_issue_ids": list(_object_value(context, "target_issue_ids", ())),
+        "expansion": _object_value(context, "expansion", ""),
+        "lifecycle_state": _object_value(context, "lifecycle_state", None),
+        "lifecycle_source": _object_value(context, "lifecycle_source", None),
+        "dependency_disposition": _object_value(context, "dependency_disposition", None),
+        "disposition_basis": _object_value(context, "disposition_basis", None),
+    }
+
+
 def render_deps_check_json(result: DepsCheckResult) -> str:
     inspection = result.inspection
     target_id = inspection.target_id.value
@@ -44,24 +73,11 @@ def render_deps_check_json(result: DepsCheckResult) -> str:
         "blockers": list(inspection.evaluation.blockers),
         "issue_blockers": list(inspection.evaluation.issue_blockers),
         "node_blockers": [
-            {
-                "node_id": blocker.node_id,
-                "reason": blocker.reason,
-                "state": blocker.state,
-                "state_source": blocker.state_source,
-                "source_issue_id": blocker.source_issue_id,
-            }
+            _deps_node_blocker_payload(blocker)
             for blocker in inspection.evaluation.node_blockers
         ],
         "satisfied_dependencies": [
-            {
-                "source_node_id": context.source_node_id,
-                "source_issue_id": context.source_issue_id,
-                "target_node_id": context.target_node_id,
-                "target_node_kind": context.target_node_kind,
-                "target_issue_ids": list(context.target_issue_ids),
-                "expansion": context.expansion,
-            }
+            _deps_dependency_context_payload(context)
             for context in inspection.evaluation.satisfied_dependencies
         ],
         "nodes": {
@@ -635,13 +651,7 @@ def _node_payload(result: SyncStateResult, node_id: str) -> dict[str, object] | 
                 "depends_on": list(evaluation.blockers) if evaluation is not None else [],
                 "issue_blockers": list(evaluation.issue_blockers) if evaluation is not None else [],
                 "node_blockers": [
-                    {
-                        "node_id": blocker.node_id,
-                        "reason": blocker.reason,
-                        "state": blocker.state,
-                        "state_source": blocker.state_source,
-                        "source_issue_id": blocker.source_issue_id,
-                    }
+                    _deps_node_blocker_payload(blocker)
                     for blocker in (evaluation.node_blockers if evaluation is not None else [])
                 ],
                 "state": _issue_raw_state(result, node.id),
@@ -663,6 +673,63 @@ def _node_payload(result: SyncStateResult, node_id: str) -> dict[str, object] | 
 def _build_deps_issues_v2_payload(result: SyncStateResult) -> dict[str, object]:
     include_ids: set[str] = set()
     edges_by_key: dict[tuple[str, str, str, str], dict[str, str]] = {}
+    dependency_contexts_by_key: dict[tuple[str, str, str], dict[str, object]] = {}
+
+    def add_dependency_context(context: object) -> None:
+        payload = _deps_dependency_context_payload(context)
+        source_issue_id = str(payload["source_issue_id"])
+        target_node_id = str(payload["target_node_id"])
+        expansion = str(payload["expansion"])
+        if not source_issue_id or not target_node_id:
+            return
+        if (
+            payload["target_node_kind"] == "issue"
+            and payload["dependency_disposition"] is None
+            and _issue_is_satisfied(result, target_node_id)
+        ):
+            status = result.issue_statuses.get(target_node_id)
+            payload["lifecycle_state"] = _issue_status_value(result, target_node_id)
+            payload["lifecycle_source"] = status.source if status is not None else "unknown"
+            payload["dependency_disposition"] = "satisfied"
+            payload["disposition_basis"] = "local_done"
+        key = (source_issue_id, target_node_id, expansion)
+        existing = dependency_contexts_by_key.get(key)
+        if existing is None:
+            dependency_contexts_by_key[key] = payload
+            return
+        if existing.get("source_node_id") in {None, "", existing.get("source_issue_id")}:
+            existing["source_node_id"] = payload["source_node_id"]
+        for field in (
+            "lifecycle_state",
+            "lifecycle_source",
+            "dependency_disposition",
+            "disposition_basis",
+        ):
+            if payload.get(field) is not None:
+                existing[field] = payload[field]
+
+    def add_node_blocker_context(blocker: object) -> None:
+        blocker_payload = _deps_node_blocker_payload(blocker)
+        target_node_id = str(blocker_payload["node_id"])
+        source_issue_id = str(blocker_payload["source_issue_id"])
+        if not target_node_id or not source_issue_id:
+            return
+        target_node = result.graph.nodes_by_id.get(target_node_id)
+        key = (source_issue_id, target_node_id, "empty")
+        if key in dependency_contexts_by_key:
+            return
+        dependency_contexts_by_key[key] = {
+            "source_node_id": source_issue_id,
+            "source_issue_id": source_issue_id,
+            "target_node_id": target_node_id,
+            "target_node_kind": target_node.kind if target_node is not None else "unknown",
+            "target_issue_ids": [],
+            "expansion": "empty",
+            "lifecycle_state": blocker_payload["lifecycle_state"],
+            "lifecycle_source": blocker_payload["lifecycle_source"],
+            "dependency_disposition": blocker_payload["dependency_disposition"],
+            "disposition_basis": blocker_payload["disposition_basis"],
+        }
 
     def add_edge(
         *,
@@ -703,6 +770,7 @@ def _build_deps_issues_v2_payload(result: SyncStateResult) -> dict[str, object]:
                     source="readiness",
                 )
             for blocker in evaluation.node_blockers:
+                add_node_blocker_context(blocker)
                 add_edge(
                     source_issue_id=issue_id,
                     target_node_id=blocker.node_id,
@@ -711,26 +779,18 @@ def _build_deps_issues_v2_payload(result: SyncStateResult) -> dict[str, object]:
                     source="readiness",
                 )
             for context in evaluation.satisfied_dependencies:
-                add_edge(
-                    source_issue_id=str(_object_value(context, "source_issue_id", issue_id)),
-                    target_node_id=str(_object_value(context, "target_node_id", "")),
-                    state="satisfied",
-                    relation="raw_direct",
-                    source="debug",
-                )
+                add_dependency_context(context)
 
-    for issue_id in _sort_ids(list(include_ids)):
+    for issue_id in _sort_ids(list(result.deps_eval_by_id.keys())):
+        evaluation = result.deps_eval_by_id[issue_id]
+        for blocker in evaluation.node_blockers:
+            add_node_blocker_context(blocker)
+        for context in evaluation.satisfied_dependencies:
+            add_dependency_context(context)
+
+    for issue_id in _sort_ids(list(result.dependency_contexts_by_issue_id.keys())):
         for context in result.dependency_contexts_by_issue_id.get(issue_id, []):
-            target_node_id = str(_object_value(context, "target_node_id", ""))
-            target_kind = str(_object_value(context, "target_node_kind", ""))
-            if target_kind == "issue" and _issue_is_satisfied(result, target_node_id):
-                add_edge(
-                    source_issue_id=issue_id,
-                    target_node_id=target_node_id,
-                    state="satisfied",
-                    relation="raw_direct",
-                    source="debug",
-                )
+            add_dependency_context(context)
 
     nodes: dict[str, object] = {}
     for node_id in _sort_ids(list(include_ids)):
@@ -747,6 +807,13 @@ def _build_deps_issues_v2_payload(result: SyncStateResult) -> dict[str, object]:
             edge["relation"],
         ),
     )
+    dependency_contexts = [
+        dependency_contexts_by_key[key]
+        for key in sorted(
+            dependency_contexts_by_key,
+            key=lambda item: (_sort_key(item[0]), _sort_key(item[1]), item[2]),
+        )
+    ]
     return {
         "schema_version": 2,
         "generated_at": result.generated_at,
@@ -755,6 +822,7 @@ def _build_deps_issues_v2_payload(result: SyncStateResult) -> dict[str, object]:
         "deps": {"valid": True, "error": None},
         "nodes": nodes,
         "edges": edges,
+        "dependency_contexts": dependency_contexts,
         "edge_direction": "depends_on (dependent -> prerequisite)",
     }
 
@@ -772,6 +840,7 @@ def render_deps_issues_artifact(result: SyncStateResult) -> DepsIssuesArtifact:
             "deps": {"valid": False, "error": result.deps_preflight_error},
             "nodes": {},
             "edges": [],
+            "dependency_contexts": [],
             "edge_direction": "depends_on (dependent -> prerequisite)",
         }
         puml = render_deps_disabled_deps_issues_puml(error=result.deps_preflight_error)

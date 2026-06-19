@@ -1217,6 +1217,10 @@ class TestCliDeps(CliRuntimeHarness):
                     "state": "open",
                     "state_source": "github",
                     "source_issue_id": "iss-00301",
+                    "lifecycle_state": "open",
+                    "lifecycle_source": "github",
+                    "dependency_disposition": "blocking",
+                    "disposition_basis": "empty_open_container",
                 }
             ]
 
@@ -1282,6 +1286,10 @@ class TestCliDeps(CliRuntimeHarness):
                     "target_node_kind": "epic",
                     "target_issue_ids": [],
                     "expansion": "empty",
+                    "lifecycle_state": "closed",
+                    "lifecycle_source": "github",
+                    "dependency_disposition": "satisfied",
+                    "disposition_basis": "lifecycle_closed",
                 }
             ]
 
