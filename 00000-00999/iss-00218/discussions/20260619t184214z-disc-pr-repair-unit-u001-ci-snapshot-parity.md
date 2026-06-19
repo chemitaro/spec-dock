@@ -194,11 +194,23 @@ pass
 
 ### Re-observation Result
 
-- pending latest-head push and PR #220 re-observation
+- Reobserved-pass for the CI repair.
+- Latest head: `db9495fd9c539e395caf994d5ca276c8451f04b5`
+- PR #220 state: open / ready; base `main`; merge state `CLEAN`.
+- GitHub checks:
+  - `validate`: pass
+  - `provider-tests`: pass
+- Read-only observation snapshot:
+  - `/private/tmp/spec-dock-pr220-observation-latest-readonly/result.json`
+  - `head_matches_expected=true`
+  - `summary.ci=passed`
+  - `review.threads.unresolved=0`
+  - `normalized_status=human_gate`
+  - `recommended_next_action=manual_review_required_non_retryable`
 
 ### Residual Risk / Follow-up
 
-- Provider CI latest-head result is pending until the repair commit is pushed and checks complete.
+- Provider CI repair risk is low after latest-head pass.
 - Codex review usage limit remains external/human-gate unless a later observation can complete review after quota is available or the user explicitly waives the limitation.
 
 ## 推奨反映先 (必須)
