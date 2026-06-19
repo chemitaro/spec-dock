@@ -246,7 +246,7 @@ git diff --check
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S02 | committed | application readiness consumers and S02 report evidence | `HEAD` (S02 commit) | clean | N/A | N/A | N/A | N/A |
+| S02 | committed | application readiness consumers and S02 report evidence | `ac917309` | clean | N/A | N/A | N/A | N/A |
 
 ### S03 — Presentation JSON Contract（2026-06-19）
 
@@ -335,7 +335,7 @@ git diff --check
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S03 | committed | presentation JSON contract and S03 report evidence | `HEAD` (S03 commit) | clean | N/A | N/A | N/A | N/A |
+| S03 | committed | presentation JSON contract and S03 report evidence | `17f43501` | clean | N/A | N/A | N/A | N/A |
 
 ### S04 — PlantUML Rendering（2026-06-19）
 
@@ -419,4 +419,100 @@ git diff --check
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S04 | ready to commit | PlantUML rendering and S04 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S04 | committed | PlantUML rendering and S04 report evidence | `d122e983` | clean | N/A | N/A | N/A | N/A |
+
+### S90 — Docs / Manual Verification（2026-06-19）
+
+#### 対象
+- Step: S90
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, EC-001, EC-002, EC-003, EC-004
+- Closure IDs: `cl-015`, `cl-016`, `cl-017`
+
+#### 実施内容
+- `doc-writer` に S90 allowed paths のみを委任した。
+- provider docs と dogfooding docs に lifecycle fact と dependency disposition の違いを明記した。
+- high-level dependency の empty open / open all-descendant-done / closed / unknown 判定表を `reference_deps.md` に追加した。
+- `deps-issues.*` が readiness / blocker authority、`deps-raw.puml` が active raw direct visual/debug artifact であることを docs に明記した。
+- `manual-tests/iss-00209-dependency-view/` に deterministic fake GitHub を使う realistic manual fixture を作成した。
+- manual evidence では `dependency_contexts` に satisfied high-level context が残り、`deps-issues.puml` / `deps-raw.puml` から satisfied-only high-level noise が省かれることを確認した。
+- spec-reviewer P1 を受け、empty unknown high-level dependency の fail-closed manual case（`iss-01942 -> epic-01941`）を追加した。
+
+#### 実行コマンド / 結果
+```bash
+cmp -s src/spec_dock/assets/spec_dock/docs/reference_deps.md spec-dock/docs/reference_deps.md
+# pass
+
+cmp -s src/spec_dock/assets/spec_dock/docs/reference_sync.md spec-dock/docs/reference_sync.md
+# pass
+
+uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/unit/presentation/test_deps_raw_puml.py
+# 71 passed
+
+./capture_evidence.py
+# sync-github: exit=0
+# deps-check-ready-iss-01940-github: exit=0
+# deps-check-blocked-iss-01933-github: exit=3
+# deps-check-blocked-iss-01933-no-github: exit=3
+# deps-check-unknown-iss-01942-github: exit=3
+# verifier: exit=0
+
+./verify_projection.py
+# RESULT PASS
+
+git diff --check
+# pass
+```
+
+#### Manual Evidence
+| artifact | path | result |
+|---|---|---|
+| test plan | `manual-tests/iss-00209-dependency-view/test-plan.md` | PASS |
+| progress log | `manual-tests/iss-00209-dependency-view/progress-log.md` | PASS |
+| summary report | `manual-tests/iss-00209-dependency-view/summary-report.md` | PASS |
+| generated JSON evidence | `manual-tests/iss-00209-dependency-view/evidence/.agent__deps-issues.json` | PASS |
+| PlantUML evidence | `manual-tests/iss-00209-dependency-view/evidence/deps-issues.puml`; `manual-tests/iss-00209-dependency-view/evidence/deps-raw.puml` | PASS |
+| verifier | `manual-tests/iss-00209-dependency-view/verify_projection.py` | PASS |
+
+#### Docs / Manual Verification Evidence
+| step | phase | planned evidence | observed evidence | method | result | notes |
+|---|---|---|---|---|---|---|
+| S90 | Docs | docs explain lifecycle vs disposition and artifact authority | provider and dogfooding docs include lifecycle/disposition table and active view authority notes | docs diff inspection; `cmp -s` mirror checks | pass | `reference_deps.md`, `reference_sync.md` |
+| S90 | Manual | realistic fixture validates active graph and machine-readable context | fake GitHub fixture covers open all-done satisfied, empty open blocker, closed empty satisfied, empty unknown fail-closed, and issue blocker | `./capture_evidence.py`; `./verify_projection.py` | pass | no real GitHub repository required |
+| S90 | Regression | presentation PUML/JSON behavior remains green | presentation lane passed | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/unit/presentation/test_deps_raw_puml.py` | pass | 71 passed |
+| S90 | Refactor guard | docs/manual only | runtime source and tests unchanged in S90 diff | `git diff --check`; `git status --short` | pass | manual fixture is committed with `git add -f` because `manual-tests/*` is ignored by default |
+
+#### Implementation Delegation Gate
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S90 | delegated | docs/manual verification step | doc-writer | provider docs, dogfooding docs, manual fixture | `requirement.md`, `design.md`, `plan.md` S90 | reference docs and `manual-tests/**` | runtime source, canonical issue docs, workflow policy, skills/templates | docs mirror checks, manual capture/verifier, presentation lane | runtime change needed | changed files, commands, manual evidence path, risks | pass; no material implementation decisions beyond approved plan |
+
+#### Delegated Worker Evidence
+| step | delegated role | worker summary | changed files | checks run | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S90 | doc-writer | Documented lifecycle/disposition semantics and created deterministic manual fixture for active dependency views. | `src/spec_dock/assets/spec_dock/docs/reference_deps.md`; `src/spec_dock/assets/spec_dock/docs/reference_sync.md`; `spec-dock/docs/reference_deps.md`; `spec-dock/docs/reference_sync.md`; `manual-tests/iss-00209-dependency-view/**` | manual capture/verifier passed; presentation lane 71 passed; docs mirror checks passed | spec-reviewer failed P1 | fake GitHub did not initially cover unknown fail-closed | accepted with parent follow-up |
+| S90 | parent follow-up | Added empty unknown high-level manual case and regenerated evidence for spec-reviewer P1. | `manual-tests/iss-00209-dependency-view/**`; `spec-dock/active/issue/report.md` | manual capture/verifier passed with `deps-check-unknown-iss-01942-github: exit=3`; `git diff --check` -> pass | pending re-review | fake GitHub does not cover live API failure modes; fixture is targeted rather than exhaustive | accepted for re-review |
+
+#### Step Contract Closure
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S04/S90 | `cl-015` | realistic mixed-state PlantUML remains visually usable | `manual-tests/iss-00209-dependency-view` verifies active blockers render and satisfied-only high-level noise is omitted from PUML | pass | closes S04 manual-required evidence |
+| S90 | `cl-016` | docs explain lifecycle vs disposition and artifact authority | `reference_deps.md` / `reference_sync.md` explain lifecycle fact, disposition result, `dependency_contexts`, and active PUML authority | pass | provider and dogfooding docs match |
+| S90 | `cl-017` | realistic manual evidence matches runtime | fake GitHub trial repo evidence shows ready/blocker/unknown exits, JSON context, and PUML active views | pass | no real GitHub repo required |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | observed result | notes |
+|---|---|---|---|---|---|---|---|
+| `tc-s04-004` / `cl-015` | S90 | yes | manual-required | S04 deferred manual evidence | `manual-tests/iss-00209-dependency-view/./capture_evidence.py`; `./verify_projection.py` | pass | manual fixture validates mixed-state active PUML |
+| `cl-016` | S90 | yes | inspect-only | docs were incomplete for lifecycle/disposition distinction | docs diff inspection; `cmp -s` mirror checks | pass | docs aligned across provider/dogfooding copies |
+| `cl-017` | S90 | yes | manual-required | not applicable | manual capture/verifier; presentation lane | pass | fake GitHub deterministic fixture includes unknown fail-closed case |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S90 | step reviewer | spec-reviewer | stale after follow-up | failed | N/A | re-review required | reviewer found missing unknown fail-closed manual evidence |
+| S90 | step reviewer re-review | spec-reviewer | fresh | passed | N/A | proceed to S90 commit gate | no findings; prior P1 resolved |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S90 | committed | docs/manual verification and S90 report evidence | `HEAD` (S90 commit) | clean | N/A | N/A | N/A | N/A |
