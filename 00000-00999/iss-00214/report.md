@@ -12,7 +12,7 @@ ID: "iss-00214"
 
 # iss-00214 PR Observation Review Target State — 実装報告
 
-この `report.md` は実装前の Issue Planning / Clarification 証跡と、次の Issue Execution へ渡す handoff readiness を記録する。実装結果、Red / Green / Refactor evidence、step commit evidence は実装フェーズで追記する。
+この `report.md` は Issue Planning / Clarification 証跡、S01 / S90 / S99 の実行証跡、reviewer gate、commit gate、PR delivery 前の残状態を記録する observed evidence ledger である。
 
 ## 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger）
 
@@ -21,8 +21,8 @@ ID: "iss-00214"
 | D-001 | resolved | interpretation | user interview | `review=` が観測者側の作業状態を表示していた | `review=observing`; `review=pending`; `review=pending_signal` | no-signal wait state は `review=pending_signal` とし、`review=` は観測対象の Codex review state を表示する | ユーザー回答で `review=pending_signal` が明示され、観測する自分ではなく観測対象の状態を表示すべきとされた | applied | `discussions/20260619t064502z-interview-review-pending-state-naming.md`; `requirement.md`; `design.md`; `plan.md` | なし |
 | D-002 | resolved | scope | orchestrator | `observer=` / `wait=` 追加案の扱い | 今回追加する; 今回は追加しない | この issue では `review=` の target-state 表示だけに限定し、新 field は追加しない | 要件と設計で final JSON / progress line 以外の contract 変更を scope 外に固定した | applied | `requirement.md`; `design.md`; `plan.md` | 必要なら別 issue |
 | D-003 | resolved | test-strategy | spec-reviewer | EC-003 fallback issue comment semantics の検証が条件付きだった | 条件付きのまま; 必須 focused pytest に含める | fallback issue comment regression を必須検証に含める | plan review P1 finding により closure が実装者判断に残ると判定された | applied | `plan.md`; spec-reviewer Avicenna finding; spec-reviewer Epicurus pass | なし |
-| D-004 | resolved | test-strategy | dev-coder | S01 Red が計画した `review=` assertion の前に timeout / fixture 境界で失敗した | 実装を止める; timeout だけ延ばす; S04 fixture を planned payload 観測用に修理する | S04 fixture repair を採用し、Red/Green が計画済みの wait progress behavior を観測できるようにする | 修理は allowed test file に限定され、product final JSON semantics や trigger / snapshot runtime を変更しない。修理後の Red は `review=observing` に対して期待どおり失敗し、Green は focused regression set で pass した | applied | `tests/unit/infra/test_init_update.py`; S01 Red/Green evidence | code-reviewer が fixture repair を確認する |
-| D-005 | resolved | implementation | qa-reviewer / dev-coder / orchestrator | latency-guard no-completion path で `review_status="approved"` だが trusted completion signal がない wait progress が `review=approved` と表示され得た | `none`/`pending`/`unknown` だけを pending signal 候補にする; `approved`/`passed` も no-completion wait に限り候補にする; timeout phase も候補にする | `approved`/`passed` は no trusted completion signal、no actionable feedback、no completed lifecycle の wait progress に限って `pending_signal` 候補にする。timeout phase への拡張は採用しない | QA P1 は EC-001 の wait/progress 可読性 gap を指摘しており、design は final / timeout phase では existing final status を優先し得るため、補修範囲を wait display-only に限定する | applied | `progress_line(...)`; `test_issue_187_s204_wait_does_not_promote_unknown_before_trigger_age`; focused pytest | code-reviewer / qa-reviewer / spec-reviewer re-review |
+| D-004 | resolved | test-strategy | dev-coder | S01 Red が計画した `review=` assertion の前に timeout / fixture 境界で失敗した | 実装を止める; timeout だけ延ばす; S04 fixture を planned payload 観測用に修理する | S04 fixture repair を採用し、Red/Green が計画済みの wait progress behavior を観測できるようにする | 修理は allowed test file に限定され、product final JSON semantics や trigger / snapshot runtime を変更しない。修理後の Red は `review=observing` に対して期待どおり失敗し、Green は focused regression set で pass した | applied | `tests/unit/infra/test_init_update.py`; S01 Red/Green evidence; code-reviewer pass | なし |
+| D-005 | resolved | implementation | qa-reviewer / dev-coder / orchestrator | latency-guard no-completion path で `review_status="approved"` だが trusted completion signal がない wait progress が `review=approved` と表示され得た | `none`/`pending`/`unknown` だけを pending signal 候補にする; `approved`/`passed` も no-completion wait に限り候補にする; timeout phase も候補にする | `approved`/`passed` は no trusted completion signal、no actionable feedback、no completed lifecycle の wait progress に限って `pending_signal` 候補にする。timeout phase への拡張は採用しない | QA P1 は EC-001 の wait/progress 可読性 gap を指摘しており、design は final / timeout phase では existing final status を優先し得るため、補修範囲を wait display-only に限定する | applied | `design.md`; `plan.md`; `progress_line(...)`; `test_issue_187_s204_wait_does_not_promote_unknown_before_trigger_age`; focused pytest; fresh spec-reviewer pass | final reviewer gates |
 
 ## 証跡採用台帳（Evidence Adoption Ledger）
 
@@ -33,7 +33,7 @@ ID: "iss-00214"
 | EAL-003 | adopted | reviewer | requirement.md | AC-002 の `など` が曖昧という requirement review P2 を受け、`review=unresolved` の exact expectation へ修正した | spec-reviewer Carson finding; spec-reviewer Lorentz pass | なし |
 | EAL-004 | adopted | reviewer | design.md | design は localized/trivial として system-architect draft を省略可能、かつ仕様整合は pass と判定された | spec-reviewer Ohm pass | なし |
 | EAL-005 | adopted | reviewer | plan.md | EC-003 fallback verification を必須化する P1 を受け、focused command と concrete test case に既存 fallback tests を追加した | spec-reviewer Avicenna fail; spec-reviewer Epicurus pass | なし |
-| EAL-006 | adopted | worker | report.md / tests | dev-coder の Ledger Note を親が確認し、S04 fixture repair を evidence-path repair として採用した | `tests/unit/infra/test_init_update.py`; S01 Red/Green evidence | code-reviewer gate |
+| EAL-006 | adopted | worker | report.md / tests | dev-coder の Ledger Note を親が確認し、S04 fixture repair を evidence-path repair として採用した | `tests/unit/infra/test_init_update.py`; S01 Red/Green evidence; code-reviewer pass | なし |
 | EAL-007 | adopted | reviewer / worker | implementation/tests/report | QA P1 と dev-coder follow-up を親が確認し、`approved` / `passed` legacy review values を no-completion wait display の `pending_signal` 候補として採用した | QA reviewer finding; `tests/unit/infra/test_init_update.py`; `pr_observation_wait.py` | final re-review gates |
 
 ## 目的整合台帳（Objective Alignment Ledger）
@@ -228,7 +228,7 @@ Notes:
 | Command | Result | Evidence |
 |---|---|---|
 | `./spec-dock/scripts/spec-dock validate` | pass | `spec-dock: ok (validate) nodes=134` |
-| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint or issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review or issue_174_pr_observation_wait_preserves_output_boundary_and_line_budget or issue_187_s204_wait or issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback or issue_187_s100_fallback_issue_comment_is_not_no_completion_evidence"` | pass | `10 passed, 429 deselected in 27.89s` |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint or issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review or issue_174_pr_observation_wait_preserves_output_boundary_and_line_budget or issue_187_s204_wait or issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback or issue_187_s100_fallback_issue_comment_is_not_no_completion_evidence"` | pass | `10 passed, 429 deselected in 32.42s` |
 | `./spec-dock/scripts/spec-dock sync --github` | pass | active unchanged; generated projection wrote successfully and left no git diff |
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
@@ -247,7 +247,7 @@ Notes:
 
 | レビュアー | 範囲 | 統合テスト判断 | 証跡 | 結果 |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | failed, then bounded follow-up implemented | QA P1 found EC-001 latency-guard no-completion progress gap for `review_status="approved"` without trusted completion signal | pending parent commit / re-review |
+| qa-reviewer | whole issue obligation coverage | failed, then bounded follow-up implemented | QA P1 found EC-001 latency-guard no-completion progress gap for `review_status="approved"` without trusted completion signal; follow-up committed in `4fc56b26` | pending re-review |
 
 #### QA P1 Follow-up Evidence
 
@@ -257,9 +257,18 @@ Notes:
 | Red evidence | After changing `test_issue_187_s204_wait_does_not_promote_unknown_before_trigger_age` to assert stderr progress, `uv run pytest tests/unit/infra/test_init_update.py -k "test_issue_187_s204_wait_does_not_promote_unknown_before_trigger_age"` failed as expected: stderr contained `phase=wait ci=passed review=approved` instead of `review=pending_signal`. |
 | Fix | `progress_line(...)` display-only derivation now treats no-signal `approved` / `passed` legacy review display values as `pending_signal` for wait progress when there is no actionable feedback and no trusted completion signal. Provider and dogfooding mirror were updated equivalently. |
 | Final JSON | No classify / final JSON decision schema / fingerprint code was edited. The focused test still asserts `recommended_next_action == "wait_or_resume"`, `observation_complete is False`, and latency guard remains unsatisfied before trigger age. |
-| Green verification | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint or issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review or issue_174_pr_observation_wait_preserves_output_boundary_and_line_budget or issue_187_s204_wait or issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback or issue_187_s100_fallback_issue_comment_is_not_no_completion_evidence"` passed: `10 passed, 429 deselected in 28.40s`. |
+| Green verification | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint or issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review or issue_174_pr_observation_wait_preserves_output_boundary_and_line_budget or issue_187_s204_wait or issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback or issue_187_s100_fallback_issue_comment_is_not_no_completion_evidence"` passed: `10 passed, 429 deselected in 32.42s`. |
 | Structural inspection | `rg -n "review=observing|pending_signal|render_review" src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py .agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py tests/unit/infra/test_init_update.py` found no `review=observing`; provider and mirror both contain matching `render_review` / `pending_signal` derivation. `diff -u` between provider and mirror wait libraries produced no output. |
-| Step Commit Gate | Follow-up changes are not committed. Parent Step Commit Gate is pending after code-reviewer pass. |
+| Step Commit Gate | Follow-up committed in `4fc56b26` `fix(pr-observation): no-completion時のreview表示を補強`; post-commit worktree was clean before S99 validation rerun. |
+
+#### QA / Code Review Follow-up Spec Amendment
+
+| Item | Evidence |
+|---|---|
+| Trigger | Final code/spec review found D-005 changed the exact `pending_signal` derivation without promoting the decision into `design.md` / `plan.md`, and QA noted `passed` legacy value was not explicitly tested. |
+| Amendment | `design.md` now states that legacy/audit `approved` / `passed` values without trusted completion signal, actionable feedback, or completed lifecycle are `pending_signal` candidates only for wait progress. `plan.md` now records this no-completion payload shape and the required focused test. |
+| Test | `test_issue_187_s204_wait_does_not_promote_unknown_before_trigger_age` is parameterized across `approved` and `passed`. |
+| Spec review | Fresh spec-reviewer pass confirmed the amendment promotes D-005, remains wait-phase scoped, and does not expand timeout/final behavior. |
 
 #### QA P1 Follow-up Reviewer Gate
 
@@ -300,5 +309,5 @@ Notes:
 
 - S01: committed in `b476e6f3`.
 - S90: docs impact resolved as approved-no-op in `488aaf9c`.
-- S99: validation commands passed before final QA; final QA found a P1 coverage / behavior gap and bounded follow-up is now uncommitted pending parent review / commit gate.
+- S99: validation commands passed after QA P1 follow-up commit `4fc56b26`; final QA/spec re-review is pending.
 - PR delivery / merge preparation / issue finish: pending final gates and final report commit.

@@ -217,6 +217,7 @@ ID: "iss-00214"
     - Need to add observer/wait field.
     - Need to change trigger / resume / snapshot behavior.
     - `pending_signal` cannot be derived without weakening AC-001 or AC-003.
+    - QA/final review discovers a no-completion wait payload shape that requires adding a new `review_status` candidate outside `none` / `pending` / `unknown`; in that case amend design/plan and rerun fresh spec review before final handoff.
 
 #### 委任契約（delegation contract）
 
@@ -258,10 +259,11 @@ ID: "iss-00214"
 
 - `tc-s01-001` acceptance: no-signal wait progress uses pending_signal
   - 前提: Existing fixture produces wait-phase payload where CI passed, review status is `none` or `pending`, lifecycle is pending/none, and no Codex completion/comment signal exists.
+  - 追加前提: Existing latency-guard no-completion fixture may report legacy `approved` / `passed` review status without a trusted Codex completion signal; this is still a no-signal wait display state and must render `review=pending_signal` while final JSON remains wait/resume / non-terminal.
   - 操作: Update the existing `test_issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint` expectation before implementation.
   - 期待結果: Pre-implementation run fails because stderr still contains `review=observing`; post-implementation run passes with `review=pending_signal`.
   - 失敗検出: Observer state remains displayed in `review=`.
-  - 検証方法: Focused `uv run pytest ... -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint"`.
+  - 検証方法: Focused `uv run pytest ... -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint or issue_187_s204_wait_does_not_promote_unknown_before_trigger_age"`.
   - 関連 closure id: tc-001
 - `tc-s01-002` regression: unresolved feedback keeps unresolved target state and counts
   - 前提: Existing issue 174 fixture contains current unresolved Codex review feedback with review comments and threads.
