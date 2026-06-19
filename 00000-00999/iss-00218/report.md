@@ -72,6 +72,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-004 | adopted | reviewer | `requirement.md` | fresh spec-reviewer が requirement を pass したため requirement gate を通過 | spec-reviewer Bohr: `review_status=pass` | none |
 | EAL-005 | adopted | reviewer | `design.md` | design reviewer の P1/P2 指摘を修正し、fresh re-review が pass した | spec-reviewer Helmholtz/McClintock/Wegener/Huygens sequence | none |
 | EAL-006 | adopted | reviewer | `plan.md` | plan reviewer の P1/P2 指摘を修正し、fresh re-review が pass した | spec-reviewer Tesla/Dalton sequence | none |
+| EAL-007 | adopted | delegated worker | `report.md` S03 evidence | S03 worker の Red/Green/非回帰/diff-check 証跡を親が再実行結果と照合して採用 | parent rerun: S03 selector 3 passed; missing-completion selector 2 passed; `git diff --check` pass; code-reviewer pass with P2 bookkeeping finding | none |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -389,6 +390,113 @@ pass: no output
 
 #### メモ
 - Material test-strategy decision is recorded in D-004.
+
+---
+
+### セッションログ（2026-06-20 S03）
+
+#### 対象
+- Step: S03 Wait propagation and non-retryable fallback action
+- AC/EC: AC-001, AC-002, AC-003
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S03 — Wait propagation and non-retryable fallback action`
+  - closure id: `tc-006`
+
+#### 実施内容
+- `dev-coder` に S03 のみを委任し、許可 path を `pr_observation_wait.py` と `tests/unit/infra/test_init_update.py` に限定した。
+- Wait classification で `codex_no_findings_issue_comment` が safe snapshot 後の terminal pass として `merge_prepared` に到達するようにした。
+- Generic `fallback_issue_comment` は `manual_review_required_non_retryable` を返し、resume hint を出さない human gate として扱うようにした。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "wait and (no_findings or fallback_issue_comment or manual_review_required_non_retryable)"
+
+3 passed, 452 deselected
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "wait_missing_current_completion_signal_stays_pending or wait_pending_review_beats_unknown"
+
+2 passed, 453 deselected
+```
+
+```bash
+git diff --check
+
+pass: no output
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ（Red） | red-required for `tc-006` | delegated worker reported 2 failed / 1 passed before implementation | `uv run pytest tests/unit/infra/test_init_update.py -k "wait and (no_findings or fallback_issue_comment or manual_review_required_non_retryable)"` | pass | no-findings was unknown; fallback used `wait_or_resume` |
+| S03 | 緑フェーズ（Green） | S03 wait tests pass | parent rerun of S03 selector: 3 passed | `uv run pytest tests/unit/infra/test_init_update.py -k "wait and (no_findings or fallback_issue_comment or manual_review_required_non_retryable)"` | pass | validates tc-s03-001 and tc-s03-002 |
+| S03 | 緑フェーズ（Green） | missing completion remains retryable pending | parent rerun of non-regression selector: 2 passed | `uv run pytest tests/unit/infra/test_init_update.py -k "wait_missing_current_completion_signal_stays_pending or wait_pending_review_beats_unknown"` | pass | protects retryable pending behavior |
+| S03 | リファクタリング（Refactor） | guardrail satisfied / no broad refactor | no whitespace issues | `git diff --check` | pass | no wait structure refactor |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | downstream consumers が `manual_review_required_non_retryable` を unknown action として扱う可能性 | plan residual risk / delegated worker | S90 docs と S99 final review の確認観点に残す | tc-006 | no | S03 tests 3 passed; missing completion non-regression 2 passed |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | tc-006 | Wait terminal result が design taxonomy に一致する | S03-focused pytest 3 passed; missing-completion non-regression 2 passed; `git diff --check` pass | pass | step reviewer gate pending |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-006 / tc-s03-001 | S03 | yes | red-required | delegated worker reported expected Red failure before implementation | S03-focused pytest selector | pass | no-findings issue comment reaches terminal pass after safe snapshot |
+| tc-006 / tc-s03-002 | S03 | yes | red-required | delegated worker reported expected Red failure before implementation | S03-focused pytest selector | pass | generic fallback is non-retryable human gate |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-006 | S03 | S03-focused pytest selector; missing-completion non-regression selector | pass | terminal no-findings and non-retryable fallback both covered |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | tc-006 | `test_issue_218_s03_wait_no_findings_issue_comment_is_terminal_pass` | tc-006 | wait が new signal を pending / unknown に戻さないことを固定するため | no | yes |
+| added | tc-006 | `test_issue_218_s03_wait_fallback_issue_comment_is_non_retryable_human_gate` | tc-006 | generic fallback に resume guidance が残らないことを固定するため | no | yes |
+| changed | tc-006 | `test_issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback` | tc-006 | legacy fallback wait expectation を non-retryable action に合わせるため | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | wait behavior in shipped installed skill asset | dev-coder | wait propagation and non-retryable fallback action only | requirement/design/plan S03 | `pr_observation_wait.py`, `tests/unit/infra/test_init_update.py` | collector/snapshot/docs/canonical docs/GitHub state/secrets | S03 targeted pytest and `git diff --check` | downstream action schema conflict | changed files, tests, risks, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | Added wait terminal pass for no-findings snapshot and non-retryable fallback action; updated legacy fallback wait expectation | `pr_observation_wait.py`; `tests/unit/infra/test_init_update.py` | worker reported Red: 2 failed / 1 passed; Green: 3 passed; non-regression: 2 passed; tidy: `git diff --check` pass | pending code-reviewer | downstream consumers of the new action require S90/S99 confirmation | accepted pending reviewer gate |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | N/A delegated path used | N/A | N/A | N/A | revert S03 commit if needed after review | S03-focused pytest; non-regression pytest; `git diff --check` | code-reviewer pending | none |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to Step Commit Gate | no P0/P1 findings; P2 evidence adoption bookkeeping fixed in EAL-007 |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | committed | `pr_observation_wait.py`, `tests/unit/infra/test_init_update.py`, `report.md` | S03 commit at `HEAD` after commit gate | `git status --short --branch` -> clean working tree, branch ahead 1 | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py` - S03 wait propagation。
+- `tests/unit/infra/test_init_update.py` - S03 wait tests。
+- `spec-dock/active/issue/report.md` - S03 observed evidence ledger。
+
+#### コミット
+- S03 commit at `HEAD`: `fix(pr-observation): waitでnon-retryable fallbackを扱う`
+
+#### メモ
+- No material implementation decisions beyond the approved plan.
 
 ---
 
