@@ -531,6 +531,10 @@ class TestCheckDepsApplication:
         assert [(b.node_id, b.reason, b.state, b.state_source) for b in result.inspection.evaluation.node_blockers] == [
             ("epic-00203", "empty_open", "open", "github")
         ]
+        assert [
+            (b.dependency_disposition, b.disposition_basis)
+            for b in result.inspection.evaluation.node_blockers
+        ] == [("blocking", "empty_open_container")]
 
     def test_deps_check_exposes_satisfied_closed_high_level_context(self) -> None:
         app_check_deps, app_contracts, app_ports, domain_models, infra_contracts = _runtime_modules()
@@ -566,6 +570,48 @@ class TestCheckDepsApplication:
         assert [(c.target_node_id, c.expansion) for c in result.inspection.evaluation.satisfied_dependencies] == [
             ("epic-00203", "empty")
         ]
+        assert [
+            (c.dependency_disposition, c.disposition_basis)
+            for c in result.inspection.evaluation.satisfied_dependencies
+        ] == [("satisfied", "lifecycle_closed")]
+
+    def test_deps_check_exposes_satisfied_open_high_level_context_when_descendants_done(self) -> None:
+        app_check_deps, app_contracts, app_ports, domain_models, infra_contracts = _runtime_modules()
+        records = self._records(infra_contracts) + self._external_records(infra_contracts)
+        context = infra_contracts.DepsDependencyContext(
+            source_node_id="iss-00302",
+            source_issue_id="iss-00302",
+            target_node_id="epic-00202",
+            target_node_kind="epic",
+            target_issue_ids=("iss-00401", "iss-00402"),
+            expansion="expanded",
+        )
+        ports = self._ports(
+            app_ports,
+            infra_contracts,
+            records=records,
+            deps={"iss-00302": ["iss-00401", "iss-00402"]},
+            dependency_contexts={"iss-00302": [context]},
+            issue_gateway=_StubIssueGateway(
+                [
+                    self._snapshot(domain_models, 102, "OPEN"),
+                    self._snapshot(domain_models, 202, "OPEN"),
+                    self._snapshot(domain_models, 302, "OPEN"),
+                    self._snapshot(domain_models, 401, "CLOSED"),
+                    self._snapshot(domain_models, 402, "CLOSED"),
+                ]
+            ),
+        )
+
+        result = app_check_deps.check_deps(self._request(app_contracts, use_github=True), ports)
+
+        assert result.inspection.evaluation.ready
+        assert result.inspection.evaluation.blockers == []
+        assert result.inspection.evaluation.node_blockers == []
+        assert [
+            (c.target_node_id, c.expansion, c.dependency_disposition, c.disposition_basis)
+            for c in result.inspection.evaluation.satisfied_dependencies
+        ] == [("epic-00202", "expanded", "satisfied", "all_descendant_issues_done")]
 
     def test_no_github_uses_cached_high_level_github_state_from_sync_artifact(self, tmp_path) -> None:
         app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
@@ -657,6 +703,10 @@ class TestCheckDepsApplication:
         assert [(b.node_id, b.reason, b.state, b.state_source) for b in result.inspection.evaluation.node_blockers] == [
             ("epic-00203", "empty_unknown", "unknown", "none")
         ]
+        assert [
+            (b.dependency_disposition, b.disposition_basis)
+            for b in result.inspection.evaluation.node_blockers
+        ] == [("indeterminate", "empty_unknown_container")]
 
     def test_local_empty_high_level_dependency_preserves_open_status(self) -> None:
         app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
@@ -765,6 +815,10 @@ class TestCheckDepsApplication:
         assert [(c.target_node_id, c.expansion) for c in result.inspection.evaluation.satisfied_dependencies] == [
             ("epic-local-00203", "expanded")
         ]
+        assert [
+            (c.dependency_disposition, c.disposition_basis)
+            for c in result.inspection.evaluation.satisfied_dependencies
+        ] == [("satisfied", "local_done")]
 
         graph = build_graph([app_check_deps._to_spec_node_seed(record) for record in records])
         high_level_statuses = app_check_deps.resolve_high_level_status_context(
