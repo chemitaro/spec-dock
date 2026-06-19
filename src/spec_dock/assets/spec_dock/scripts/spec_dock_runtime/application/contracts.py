@@ -7,7 +7,9 @@ from typing import Callable, Literal
 from ..domain.models import (
     ActiveSelection,
     BranchDecision,
+    DepsDependencyContext,
     DepsEvaluation,
+    DepsHighLevelStatus,
     DepsState,
     IssueSnapshot,
     IssueStatusSnapshot,
@@ -607,6 +609,8 @@ class SyncStateResult:
         default_factory=dict
     )
     github_snapshot_by_issue_id: dict[str, IssueSnapshot] = field(default_factory=dict)
+    dependency_contexts_by_issue_id: dict[str, list[DepsDependencyContext]] = field(default_factory=dict)
+    high_level_statuses_by_node_id: dict[str, DepsHighLevelStatus] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

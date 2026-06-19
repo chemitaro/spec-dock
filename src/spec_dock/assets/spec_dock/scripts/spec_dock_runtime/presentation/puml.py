@@ -219,6 +219,9 @@ def _render_deps_issues_puml(deps_issues_state: dict[str, Any]) -> str:
         "doing": "#DAE8FC",
         "ready": "#D5E8D4",
         "blocked": "#F8CECC",
+        "done": "#E3E3E3",
+        "closed": "#E3E3E3",
+        "open": "#FFFFFF",
         "unknown": "#EEEEEE",
     }
 
@@ -243,9 +246,12 @@ def _render_deps_issues_puml(deps_issues_state: dict[str, Any]) -> str:
         ("doing", "#DAE8FC"),
         ("ready", "#D5E8D4"),
         ("blocked", "#F8CECC"),
+        ("done", "#E3E3E3"),
         ("unknown", "#EEEEEE"),
     ):
         lines.append(f"| {state} |<{color}> |")
+    lines.append("| blocking edge | solid |")
+    lines.append("| satisfied edge | dashed |")
     lines.append("endlegend")
     lines.append("")
 
@@ -255,13 +261,14 @@ def _render_deps_issues_puml(deps_issues_state: dict[str, Any]) -> str:
             continue
         state = str(item.get("state") or "unknown")
         color = state_color.get(state, state_color["unknown"])
-        label = f"{node_id}\\n{state.capitalize()}"
+        node_type = str(item.get("type") or "issue")
+        label = f"{node_id}\\n{node_type}\\n{state.capitalize()}"
         if item.get("ready") is False:
             label += "\\nready=false"
         lines.append(f'rectangle "{label}" as {alias(node_id)} {color}')
     lines.append("")
 
-    block_edges: list[tuple[str, str]] = []
+    block_edges: list[tuple[str, str, str, str]] = []
     for edge in raw_edges:
         if not isinstance(edge, dict):
             continue
@@ -271,10 +278,15 @@ def _render_deps_issues_puml(deps_issues_state: dict[str, Any]) -> str:
             continue
         if dependent not in include_set or prerequisite not in include_set:
             continue
-        block_edges.append((prerequisite, dependent))
+        state = str(edge.get("state") or "blocking")
+        relation = str(edge.get("relation") or "compiled_issue")
+        block_edges.append((prerequisite, dependent, state, relation))
     block_edges.sort(key=lambda x: (deps_node_sort_key(x[0]), deps_node_sort_key(x[1])))
-    for prerequisite, dependent in block_edges:
-        lines.append(f"{alias(prerequisite)} --> {alias(dependent)} : blocks")
+    for prerequisite, dependent, state, relation in block_edges:
+        if state == "satisfied":
+            lines.append(f"{alias(prerequisite)} ..> {alias(dependent)} : satisfied ({relation})")
+        else:
+            lines.append(f"{alias(prerequisite)} --> {alias(dependent)} : blocks ({relation})")
 
     lines.append("@enduml")
     lines.append("")
@@ -294,6 +306,8 @@ def _render_deps_raw_puml(deps_raw_state: dict[str, Any]) -> str:
         "ready": "#D5E8D4",
         "blocked": "#F8CECC",
         "done": "#E3E3E3",
+        "closed": "#E3E3E3",
+        "open": "#FFFFFF",
         "unknown": "#EEEEEE",
     }
 
@@ -326,6 +340,9 @@ def _render_deps_raw_puml(deps_raw_state: dict[str, Any]) -> str:
     lines.append("|= Kind / State |= Color |")
     for state in ("doing", "ready", "blocked", "done", "unknown"):
         lines.append(f"| issue {state} |<{state_color[state]}> |")
+    for state in ("open", "done", "unknown"):
+        lines.append(f"| high-level {state} |<{state_color[state]}> |")
+    lines.append("| raw direct dependencies; not readiness authority | |")
     lines.append("endlegend")
     lines.append("")
 
@@ -339,9 +356,18 @@ def _render_deps_raw_puml(deps_raw_state: dict[str, Any]) -> str:
             continue
         if not isinstance(init_title, str):
             init_title = ""
+        init_state = init_item.get("state")
+        init_state_source = init_item.get("state_source")
+        init_label = f"{esc(init_id)}\\n{esc(init_title)}"
+        init_color = ""
+        if isinstance(init_state, str):
+            state = init_state.lower()
+            source = str(init_state_source or "none")
+            init_label += f"\\n{state.capitalize()} ({esc(source)})"
+            init_color = f" {state_color.get(state, state_color['unknown'])}"
         include_ids.add(init_id)
         rendered_any = True
-        lines.append(f'package "{esc(init_id)}\\n{esc(init_title)}" as {alias(init_id)} <<initiative>> {{')
+        lines.append(f'package "{init_label}" as {alias(init_id)} <<initiative>>{init_color} {{')
         raw_epics = init_item.get("epics")
         if isinstance(raw_epics, list):
             for epic_item in raw_epics:
@@ -353,8 +379,17 @@ def _render_deps_raw_puml(deps_raw_state: dict[str, Any]) -> str:
                     continue
                 if not isinstance(epic_title, str):
                     epic_title = ""
+                epic_state = epic_item.get("state")
+                epic_state_source = epic_item.get("state_source")
+                epic_label = f"{esc(epic_id)}\\n{esc(epic_title)}"
+                epic_color = ""
+                if isinstance(epic_state, str):
+                    state = epic_state.lower()
+                    source = str(epic_state_source or "none")
+                    epic_label += f"\\n{state.capitalize()} ({esc(source)})"
+                    epic_color = f" {state_color.get(state, state_color['unknown'])}"
                 include_ids.add(epic_id)
-                lines.append(f'  package "{esc(epic_id)}\\n{esc(epic_title)}" as {alias(epic_id)} <<epic>> {{')
+                lines.append(f'  package "{epic_label}" as {alias(epic_id)} <<epic>>{epic_color} {{')
                 raw_issues = epic_item.get("issues")
                 if isinstance(raw_issues, list):
                     for issue_item in raw_issues:
@@ -398,7 +433,7 @@ def _render_deps_raw_puml(deps_raw_state: dict[str, Any]) -> str:
 
     if block_edges:
         for prerequisite, dependent in block_edges:
-            lines.append(f"{alias(prerequisite)} --> {alias(dependent)} : blocks")
+            lines.append(f"{alias(prerequisite)} --> {alias(dependent)} : raw_direct")
     elif not rendered_any:
         lines.append('note "No raw direct dependencies to render" as Empty')
 

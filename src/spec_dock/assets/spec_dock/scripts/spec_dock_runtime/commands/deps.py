@@ -3,7 +3,13 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 
-from ..application.contracts import CheckDepsRequest, MutateDepsError, MutateDepsRequest, TargetRef, UseCases
+from ..application.contracts import (
+    CheckDepsRequest,
+    MutateDepsError,
+    MutateDepsRequest,
+    TargetRef,
+    UseCases,
+)
 from ..presentation.cli_text import (
     render_deps_check_text,
     render_deps_mutation_error_text,

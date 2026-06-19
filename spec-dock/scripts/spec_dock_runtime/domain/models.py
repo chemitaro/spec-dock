@@ -113,12 +113,42 @@ class DepsState:
 
 
 @dataclass(frozen=True)
+class DepsDependencyContext:
+    source_node_id: str
+    source_issue_id: str
+    target_node_id: str
+    target_node_kind: SpecNodeKind
+    target_issue_ids: tuple[str, ...]
+    expansion: Literal["issue", "expanded", "empty"]
+
+
+@dataclass(frozen=True)
+class DepsHighLevelStatus:
+    node_id: str
+    state: Literal["open", "closed", "done", "unknown"]
+    source: str
+
+
+@dataclass(frozen=True)
+class DepsNodeBlocker:
+    node_id: str
+    reason: Literal["empty_open", "empty_unknown"]
+    state: Literal["open", "unknown"]
+    state_source: str
+    source_issue_id: str
+
+
+@dataclass(frozen=True)
 class DepsEvaluation:
     ready: bool
     guard_reason: Literal["ready", "blocked", "unknown"]
     blockers: list[str]
     blockers_top: list[str]
     closure: list[str]
+    issue_blockers: list[str] = field(default_factory=list)
+    node_blockers: list[DepsNodeBlocker] = field(default_factory=list)
+    satisfied_dependencies: list[DepsDependencyContext] = field(default_factory=list)
+    debug_context: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

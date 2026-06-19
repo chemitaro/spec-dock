@@ -46,6 +46,23 @@ def _runtime_modules():
     )
 
 
+def _presentation_json_state_module():
+    runtime_scripts_dir = (
+        Path(__file__).resolve().parents[3]
+        / "src"
+        / "spec_dock"
+        / "assets"
+        / "spec_dock"
+        / "scripts"
+    )
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.presentation import json_state as presentation_json_state
+    finally:
+        sys.path.pop(0)
+    return presentation_json_state
+
+
 def _record(
     infra_contracts,
     *,
@@ -1584,8 +1601,8 @@ class TestRuntimeSyncS07:
                 assert not node_path.startswith(repo_root.as_posix()), node_path
 
             deps_issues = json.loads((specdock_dir / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
-            assert deps_issues["projection"] == "open-issues-dependency-view"
-            assert deps_issues["source"] == {"index": "spec-dock/.agent/index.json", "schema_version": 2}
+            assert deps_issues["projection"] == "issue-readiness-with-dependency-context"
+            assert deps_issues["source"] == {"sync_state": "readiness_evaluation", "schema_version": 2}
             assert deps_issues["deps"]["valid"]
             assert "iss-local-00001" in deps_issues["nodes"]
             assert "iss-local-00002" not in deps_issues["nodes"]
@@ -1686,8 +1703,8 @@ class TestRuntimeSyncS07:
             assert "Dependency cycle detected" in str(index_all["deps"]["error"])
 
             deps_issues = json.loads((specdock_dir / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
-            assert deps_issues["projection"] == "open-issues-dependency-view"
-            assert deps_issues["source"] == {"index": "spec-dock/.agent/index.json", "schema_version": 2}
+            assert deps_issues["projection"] == "issue-readiness-with-dependency-context"
+            assert deps_issues["source"] == {"sync_state": "readiness_evaluation", "schema_version": 2}
             assert not deps_issues["deps"]["valid"]
             assert "Dependency cycle detected" in str(deps_issues["deps"]["error"])
 
@@ -3118,6 +3135,139 @@ class TestRuntimeSyncS07:
         )
         assert "status=failed_partial_or_stale" in failed.stderr_lines[0]
         assert "stale" in failed.stderr_lines[1]
+
+    def test_deps_issues_does_not_include_historical_satisfied_high_level_context(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            _app_ports,
+            _app_sync_state,
+            domain_models,
+            _infra_artifact_writer,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        presentation_json_state = _presentation_json_state_module()
+
+        def _node(
+            kind: str,
+            node_id: str,
+            title: str,
+            *,
+            parent_id: str | None = None,
+            initiative_id: str | None = None,
+            epic_id: str | None = None,
+        ):
+            path = Path(f"/repo/spec-dock/{node_id}")
+            return domain_models.SpecNode(
+                kind=kind,
+                id=node_id,
+                title=title,
+                slug=node_id,
+                path=path,
+                meta_path=path / ".meta.json",
+                parent_id=parent_id,
+                initiative_id=initiative_id,
+                epic_id=epic_id,
+                github_issue_number=None,
+            )
+
+        def _status(issue_id: str, effective_status: str):
+            return domain_models.IssueStatusSnapshot(
+                issue_id=issue_id,
+                authority="derived",
+                effective_status=effective_status,
+                source="local",
+                stale=False,
+                last_sync_at="2026-06-18T00:00:00Z",
+                github_number=None,
+            )
+
+        state = app_contracts.SyncStateResult(
+            graph=domain_models.SpecGraph(
+                nodes_by_id={
+                    "init-00101": _node("initiative", "init-00101", "Init"),
+                    "epic-00201": _node(
+                        "epic",
+                        "epic-00201",
+                        "Open epic",
+                        parent_id="init-00101",
+                        initiative_id="init-00101",
+                    ),
+                    "epic-00202": _node(
+                        "epic",
+                        "epic-00202",
+                        "Closed historical epic",
+                        parent_id="init-00101",
+                        initiative_id="init-00101",
+                    ),
+                    "iss-00301": _node(
+                        "issue",
+                        "iss-00301",
+                        "Current issue",
+                        parent_id="epic-00201",
+                        initiative_id="init-00101",
+                        epic_id="epic-00201",
+                    ),
+                    "iss-00302": _node(
+                        "issue",
+                        "iss-00302",
+                        "Historical done issue",
+                        parent_id="epic-00201",
+                        initiative_id="init-00101",
+                        epic_id="epic-00201",
+                    ),
+                }
+            ),
+            active=None,
+            issue_statuses={
+                "iss-00301": _status("iss-00301", "open"),
+                "iss-00302": _status("iss-00302", "done"),
+            },
+            progress=domain_models.ProgressMap(by_node_id={}, counts={}),
+            deps_state=domain_models.DepsState(nodes=[], warnings=[]),
+            deps_eval_by_id={
+                "iss-00301": domain_models.DepsEvaluation(
+                    ready=True,
+                    guard_reason="ready",
+                    blockers=[],
+                    blockers_top=[],
+                    closure=[],
+                ),
+                "iss-00302": domain_models.DepsEvaluation(
+                    ready=True,
+                    guard_reason="ready",
+                    blockers=[],
+                    blockers_top=[],
+                    closure=[],
+                    satisfied_dependencies=[
+                        domain_models.DepsDependencyContext(
+                            source_node_id="iss-00302",
+                            source_issue_id="iss-00302",
+                            target_node_id="epic-00202",
+                            target_node_kind="epic",
+                            target_issue_ids=(),
+                            expansion="empty",
+                        )
+                    ],
+                ),
+            },
+            generated_at="2026-06-18T00:00:00Z",
+            warnings=[],
+            deps_preflight_error=None,
+            high_level_statuses_by_node_id={
+                "epic-00202": domain_models.DepsHighLevelStatus(
+                    node_id="epic-00202",
+                    state="closed",
+                    source="github",
+                )
+            },
+        )
+
+        payload = json.loads(presentation_json_state.render_deps_issues_artifact(state).json_text)
+
+        assert set(payload["nodes"]) == {"iss-00301"}
+        assert payload["edges"] == []
 
     def test_sync_exit_behavior_regression(self) -> None:
         (

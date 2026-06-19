@@ -67,6 +67,7 @@ def _state(
     deps_eval_by_id=None,
     active_issue_id=None,
     deps_preflight_error=None,
+    high_level_statuses_by_node_id=None,
 ):
     app_contracts, domain_models, presentation_json_state = _runtime_modules()
     nodes = {
@@ -126,6 +127,7 @@ def _state(
             deps_preflight_error=deps_preflight_error,
             repo_root=Path("/repo"),
             raw_node_depends_on_map=raw_node_depends_on_map,
+            high_level_statuses_by_node_id=high_level_statuses_by_node_id or {},
         ),
         presentation_json_state,
         domain_models,
@@ -149,7 +151,7 @@ def test_tc_s02_001_issue_to_issue_edge_with_ancestors():
     assert 'package "epic-a\\nEpic A" as Nepic_a <<epic>> {' in puml
     assert 'rectangle "iss-a\\nIssue A\\nReady" as Niss_a #D5E8D4' in puml
     assert 'rectangle "iss-b\\nIssue B\\nReady" as Niss_b #D5E8D4' in puml
-    assert "Niss_a --> Niss_b : blocks" in puml
+    assert "Niss_a --> Niss_b : raw_direct" in puml
 
 
 def test_tc_s02_002_parent_level_package_endpoint_edge():
@@ -171,7 +173,7 @@ def test_tc_s02_002_parent_level_package_endpoint_edge():
 
     puml = presentation_json_state.render_deps_raw_artifact(state).puml_text
 
-    assert "Nepic_a --> Nepic_b : blocks" in puml
+    assert "Nepic_a --> Nepic_b : raw_direct" in puml
     assert 'package "epic-a\\nEpic A" as Nepic_a <<epic>> {' in puml
     assert 'package "epic-b\\nEpic B" as Nepic_b <<epic>> {' in puml
     assert "Niss_a -->" not in puml
@@ -181,7 +183,7 @@ def test_tc_s02_002_parent_level_package_endpoint_edge():
 def test_tc_s02_003_epic_issue_mixed_edge():
     puml = _render(raw_node_depends_on_map={"iss-a": ["epic-a"]})
 
-    assert "Nepic_a --> Niss_a : blocks" in puml
+    assert "Nepic_a --> Niss_a : raw_direct" in puml
     assert 'package "epic-a\\nEpic A" as Nepic_a <<epic>> {' in puml
     assert 'rectangle "iss-a\\nIssue A\\nReady" as Niss_a #D5E8D4' in puml
 
@@ -189,9 +191,36 @@ def test_tc_s02_003_epic_issue_mixed_edge():
 def test_tc_s02_004_initiative_issue_mixed_edge():
     puml = _render(raw_node_depends_on_map={"iss-a": ["init-a"]})
 
-    assert "Ninit_a --> Niss_a : blocks" in puml
+    assert "Ninit_a --> Niss_a : raw_direct" in puml
     assert 'package "init-a\\nInitiative A" as Ninit_a <<initiative>> {' in puml
     assert 'rectangle "iss-a\\nIssue A\\nReady" as Niss_a #D5E8D4' in puml
+
+
+def test_tc_s04_003_high_level_participant_state_comes_from_payload():
+    _unused_app_contracts, domain_models, presentation_json_state = _runtime_modules()
+    state, _unused, _unused_domain = _state(
+        raw_node_depends_on_map={"iss-a": ["epic-a"]},
+        high_level_statuses_by_node_id={
+            "init-a": domain_models.DepsHighLevelStatus(
+                node_id="init-a",
+                state="open",
+                source="descendant",
+            ),
+            "epic-a": domain_models.DepsHighLevelStatus(
+                node_id="epic-a",
+                state="unknown",
+                source="none",
+            ),
+        },
+    )
+
+    puml = presentation_json_state.render_deps_raw_artifact(state).puml_text
+
+    assert "| high-level unknown |<#EEEEEE> |" in puml
+    assert "raw direct dependencies; not readiness authority" in puml
+    assert 'package "init-a\\nInitiative A\\nOpen (descendant)" as Ninit_a <<initiative>> #FFFFFF {' in puml
+    assert 'package "epic-a\\nEpic A\\nUnknown (none)" as Nepic_a <<epic>> #EEEEEE {' in puml
+    assert "Nepic_a --> Niss_a : raw_direct" in puml
 
 
 def test_tc_s02_005_nonparticipants_omitted_and_ancestors_retained():
@@ -224,7 +253,7 @@ def test_tc_s02_005_nonparticipants_omitted_and_ancestors_retained():
 def test_tc_s02_006_parent_participant_without_descendant_issue_expansion():
     puml = _render(raw_node_depends_on_map={"epic-a": ["init-a"]})
 
-    assert "Ninit_a --> Nepic_a : blocks" in puml
+    assert "Ninit_a --> Nepic_a : raw_direct" in puml
     assert 'package "epic-a\\nEpic A" as Nepic_a <<epic>> {' in puml
     assert "iss-a" not in puml
     assert "iss-b" not in puml
@@ -240,7 +269,7 @@ def test_tc_s02_007_done_closed_participant_included():
     puml = presentation_json_state.render_deps_raw_artifact(state).puml_text
 
     assert 'rectangle "iss-a\\nIssue A\\nDone" as Niss_a #E3E3E3' in puml
-    assert "Niss_a --> Niss_b : blocks" in puml
+    assert "Niss_a --> Niss_b : raw_direct" in puml
 
 
 def test_tc_s02_008_zero_raw_direct_dependencies_valid_note():
