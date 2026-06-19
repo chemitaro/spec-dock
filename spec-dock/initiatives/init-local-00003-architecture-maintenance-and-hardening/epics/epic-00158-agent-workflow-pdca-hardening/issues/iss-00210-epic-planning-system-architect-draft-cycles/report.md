@@ -241,7 +241,7 @@ pass: diff touched only provider-side workflow_epic.md; workflow_spec_authoring.
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
 | S02 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only | Existing provider-side workflow_epic.md lacked explicit planning completion / handoff package, cross-issue draft package, issue-local `--issue` draft commands, and Issue 211 independence wording. | pre-change targeted `rg` / manual inspection | pass | Docs-only step; no code test required. |
-| S02 | 緑フェーズ（Green） | inspect-only | Updated provider-side workflow_epic.md contains planning completion / handoff, cross-issue draft, `draft-requirement`, `draft-design`, `--issue`, `Issue 211`, `deps add/remove/check`, and no direct metadata/canonical issue doc substitute. | targeted `rg` / manual workflow inspection | pass | Issue 211 remains independent downstream consumer. |
+| S02 | 緑フェーズ（Green） | inspect-only | Updated provider-side workflow_epic.md contains planning completion / handoff, cross-issue draft, `draft-requirement`, `draft-design`, `--issue`, generic downstream Issue independence wording, labeled `deps add/remove` dependent/prerequisite direction, and no direct metadata/canonical issue doc substitute. | targeted `rg` / manual workflow inspection | pass | PR follow-up superseded the earlier local Issue literal with generic downstream Issue wording. |
 | S02 | リファクタリング（Refactor） | guardrail satisfied | No refactor needed; change is a single Epic-specific handoff section and references existing authoring policy instead of duplicating it. | diff inspection | pass | `workflow_spec_authoring.md` unchanged. |
 
 #### 発見されたテスト / リスク（Discovered Tests）
@@ -257,7 +257,7 @@ pass: diff touched only provider-side workflow_epic.md; workflow_spec_authoring.
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-002 | S02 | yes | inspect-only | Pre-change workflow_epic.md did not explicitly define Issue 210 handoff package / Issue 211 independence boundary. | `rg -n "planning completion|handoff|cross-issue draft|draft-requirement|draft-design|--issue|Issue 211|deps add|deps remove|deps check|metadata directly|canonical issue docs|ad hoc" src/spec_dock/assets/spec_dock/docs/workflow_epic.md` | pass | All planned S02 terms and boundaries present after update. |
+| tc-002 | S02 | yes | inspect-only | Pre-change workflow_epic.md did not explicitly define the Epic planning handoff package or downstream Issue independence boundary. | `rg -n "planning completion|handoff|cross-issue draft|draft-requirement|draft-design|--issue|Downstream Issues|dependent-node-id|prerequisite-node-id|depends_on|metadata directly|canonical issue docs|ad hoc" src/spec_dock/assets/spec_dock/docs/workflow_epic.md` | pass | All planned S02 terms and generic boundaries present after PR follow-up update. |
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
@@ -267,7 +267,7 @@ pass: diff touched only provider-side workflow_epic.md; workflow_spec_authoring.
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none | tc-002 | tc-s02-001 | tc-002 | Planned inspect-only closure was sufficient. | no | no |
+| PR follow-up | tc-002 | tc-s02-001 | tc-002 | Earlier S02 evidence used local Issue 211 literal wording; PR review required shipped docs to stay generic. Closure is superseded by generic downstream Issue wording plus labeled dependent/prerequisite direction evidence. | no | yes; fresh spec-reviewer returned pass with non-blocking P2 cleanup |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
@@ -277,7 +277,7 @@ pass: diff touched only provider-side workflow_epic.md; workflow_spec_authoring.
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S02 | doc-writer | Added `Planning Completion / Handoff` section with handoff package, cross-issue draft package, issue-local draft commands, command-first dependency mutation, and Issue 211 independence. Worker reported: `No material implementation decisions beyond the approved plan.` | `src/spec_dock/assets/spec_dock/docs/workflow_epic.md` | targeted `rg` -> pass; manual workflow inspection -> pass | `spec-reviewer` pass | none | accepted |
+| S02 | doc-writer | Added `Planning Completion / Handoff` section with handoff package, cross-issue draft package, issue-local draft commands, command-first dependency mutation, and downstream Issue independence. PR follow-up made shipped wording generic and labeled dependency direction. Worker reported: `No material implementation decisions beyond the approved plan.` | `src/spec_dock/assets/spec_dock/docs/workflow_epic.md` | targeted `rg` -> pass; manual workflow inspection -> pass | `spec-reviewer` pass | none | accepted |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
