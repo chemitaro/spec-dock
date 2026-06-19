@@ -5,6 +5,17 @@ from pathlib import Path
 from typing import Literal
 
 SpecNodeKind = Literal["initiative", "epic", "issue"]
+DepsLifecycleState = Literal["open", "closed", "done", "unknown"]
+DepsDependencyDisposition = Literal["blocking", "satisfied", "indeterminate"]
+DepsDispositionBasis = Literal[
+    "empty_open_container",
+    "empty_unknown_container",
+    "lifecycle_closed",
+    "local_done",
+    "all_descendant_issues_done",
+    "descendant_issue_open",
+    "descendant_issue_unknown",
+]
 
 
 @dataclass(frozen=True)
@@ -120,12 +131,16 @@ class DepsDependencyContext:
     target_node_kind: SpecNodeKind
     target_issue_ids: tuple[str, ...]
     expansion: Literal["issue", "expanded", "empty"]
+    lifecycle_state: DepsLifecycleState | None = field(default=None, compare=False)
+    lifecycle_source: str | None = field(default=None, compare=False)
+    dependency_disposition: DepsDependencyDisposition | None = field(default=None, compare=False)
+    disposition_basis: DepsDispositionBasis | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True)
 class DepsHighLevelStatus:
     node_id: str
-    state: Literal["open", "closed", "done", "unknown"]
+    state: DepsLifecycleState
     source: str
 
 
@@ -136,6 +151,10 @@ class DepsNodeBlocker:
     state: Literal["open", "unknown"]
     state_source: str
     source_issue_id: str
+    lifecycle_state: DepsLifecycleState | None = None
+    lifecycle_source: str | None = None
+    dependency_disposition: DepsDependencyDisposition | None = None
+    disposition_basis: DepsDispositionBasis | None = None
 
 
 @dataclass(frozen=True)
