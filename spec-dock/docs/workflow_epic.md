@@ -58,7 +58,7 @@ Handoff package は少なくとも次を含みます。
 
 - reviewer-gated Epic requirement / design / plan
 - Issue list, responsibility boundary, dependency order, and known non-blocking deferrals
-- command evidence for dependency mutation using `./spec-dock/scripts/spec-dock deps add --from <node-id> --to <node-id>`, `./spec-dock/scripts/spec-dock deps remove --from <node-id> --to <node-id>`, and `./spec-dock/scripts/spec-dock deps check <target>`; do not edit metadata directly
+- command evidence for dependency mutation using `./spec-dock/scripts/spec-dock deps add --from <dependent-node-id> --to <prerequisite-node-id>`, `./spec-dock/scripts/spec-dock deps remove --from <dependent-node-id> --to <prerequisite-node-id>`, and `./spec-dock/scripts/spec-dock deps check <target>`; `--from` is the node whose `.meta.json.depends_on` is updated, and `--to` is the prerequisite it depends on; do not edit metadata directly
 - cross-issue draft package covering shared vocabulary, responsibility boundaries, dependency order, handoff inputs / outputs, and validation strategy across the planned Issues
 - issue-local draft requirement / draft design artifact paths for each target Issue after Issue creation, or explicit skip / fallback evidence
 
@@ -73,7 +73,7 @@ Cross-issue draft package は planning evidence であり、Issue の canonical 
 
 Target Issue が draft-requirement または draft-design の一方または両方を意図的に受け取らない場合、Epic report / handoff evidence は target Issue id、skipped draft type(s)、理由、その omission が Issue planning handoff を block しない理由、必要に応じた revisit / follow-up condition を記録します。
 
-Issue 211 may reference Issue 210 outputs and this Epic planning completion / handoff contract as downstream input. Issue 211 remains an independent Issue, not a subtask or completion condition of Issue 210; Epic execution coordinator behavior, issue start / finish cycle, and PR merge-ready preparation stay outside this Epic planning handoff section unless a later Issue explicitly defines them.
+Downstream Issues may reference the Epic planning outputs and this completion / handoff contract as input. Each downstream Issue remains independent unless the Epic plan explicitly defines a dependency edge; Epic execution coordinator behavior, issue start / finish cycle, and PR merge-ready preparation stay outside this Epic planning handoff section unless a later Issue explicitly defines them.
 
 ## 品質ゲート
 
