@@ -11923,10 +11923,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert mirror_skill_path.read_bytes() == provider_skill_path.read_bytes()
         for phrase in (
             "active Epic",
+            "requested-Epic resolution",
             "active Issue",
             "GitHub freshness",
             "deps check",
             "no Issue is ready",
+            "no executable Issue work",
             "multiple Issues are ready",
             "issue start",
             "spec-dock-issue-planning",
@@ -11952,6 +11954,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             ),
             ".codex/prompts/execute-epic.md": (
                 "src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md"
+            ),
+            ".codex/prompts/execute-initiative.md": (
+                "src/spec_dock/assets/install_root/.codex/prompts/execute-initiative.md"
             ),
         }
         route_texts: dict[str, str] = {}
@@ -12019,6 +12024,20 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             with _case(prompt=prompt_rel_path):
                 for phrase in stale_execute_epic_prompt_phrases:
                     assert phrase not in route_texts[prompt_rel_path]
+
+        execute_initiative_prompt = route_texts[
+            "src/spec_dock/assets/install_root/.codex/prompts/execute-initiative.md"
+        ]
+        for phrase in (
+            "$spec-dock-epic-planning",
+            "planning or issue decomposition",
+            "reviewed planning outputs and ready Issue work",
+            "/execute-epic",
+            "Epic execution coordination",
+        ):
+            assert phrase in execute_initiative_prompt
+        assert "issue decomposition using the\n  `/execute-epic` contract" not in \
+            execute_initiative_prompt
 
     def test_issue_93_execute_prompts_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]

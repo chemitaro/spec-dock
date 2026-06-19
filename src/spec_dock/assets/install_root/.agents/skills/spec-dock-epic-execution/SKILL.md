@@ -10,16 +10,18 @@ Use this skill after Epic planning is complete and the Epic requirement, design,
 ## First-Read Coordinator Flow
 
 1. Bootstrap current state.
+   - Resolve an explicitly requested Epic to the active Epic, or route the required lifecycle activation / selection step before applying active-Epic checks.
    - Confirm the active Epic and read its reviewed planning outputs.
    - Check `./spec-dock/scripts/spec-dock active show` for an active Issue.
    - Check git/projection/GitHub freshness as needed for the user's request, using `sync`, `sync --github`, `validate`, `git status`, `git fetch`, or GitHub inspection when stale state could affect Issue readiness or PR delivery.
-   - If no active Epic or no reviewed Epic planning handoff exists, stop and route back to `spec-dock-epic-planning` or the Epic workflow.
+   - If no active Epic remains after requested-Epic resolution, or no reviewed Epic planning handoff exists, stop and route back to `spec-dock-epic-planning` or the Epic workflow.
 2. If an active Issue already exists, stop before selecting another Issue.
    - Require a continuation, finish evaluation, or explicit user decision for the current active Issue.
    - Do not run `issue start` for a different Issue while the current active Issue is unresolved.
 3. Select the next Issue from existing dependency state.
    - Use the Epic plan, current projections, and `./spec-dock/scripts/spec-dock deps check <issue-id>` to identify ready Issues.
-   - If no Issue is ready, record blocker evidence, dependency/check output, and the next human or planning action; stop and escalate instead of implementing.
+   - If no Issue is ready but the Epic plan explicitly has no executable Issue work, continue to the no-op Epic completion evidence path instead of creating unnecessary Issues.
+   - If no Issue is ready and executable Issue work remains, record blocker evidence, dependency/check output, and the next human or planning action; stop and escalate instead of implementing.
    - If multiple Issues are ready, choose exactly one by dependency order, priority, and risk. Do not default to parallel execution.
 4. Start the selected ready Issue through the lifecycle command.
    - Run or route `./spec-dock/scripts/spec-dock issue start <issue-id>` before Issue planning or execution.
@@ -41,8 +43,8 @@ Use this skill after Epic planning is complete and the Epic requirement, design,
 ## Stop Conditions
 
 - Active Issue exists and needs continuation, finish evaluation, or user decision.
-- Active Epic or reviewed Epic planning handoff is missing.
-- Dependency state is stale, unavailable, or says no Issue is ready.
+- Active Epic or reviewed Epic planning handoff is missing after requested-Epic resolution.
+- Dependency state is stale, unavailable, or says no Issue is ready while executable Issue work remains.
 - Multiple ready Issues exist but dependency/priority/risk cannot justify a single next Issue.
 - Selected Issue cannot be started through `issue start`.
 - Issue specs are missing, stale, unreviewed, or not executable.
