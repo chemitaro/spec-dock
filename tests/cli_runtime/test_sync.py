@@ -355,6 +355,10 @@ class TestCliSync(CliRuntimeHarness):
                     "state": "open",
                     "state_source": "cache",
                     "source_issue_id": "iss-00301",
+                    "lifecycle_state": "open",
+                    "lifecycle_source": "cache",
+                    "dependency_disposition": "blocking",
+                    "disposition_basis": "empty_open_container",
                 },
                 {
                     "node_id": "epic-00202",
@@ -362,6 +366,10 @@ class TestCliSync(CliRuntimeHarness):
                     "state": "open",
                     "state_source": "cache",
                     "source_issue_id": "iss-00301",
+                    "lifecycle_state": "open",
+                    "lifecycle_source": "cache",
+                    "dependency_disposition": "blocking",
+                    "disposition_basis": "empty_open_container",
                 },
             ]
             assert deps_issues["nodes"]["init-00102"]["type"] == "initiative"
@@ -1598,14 +1606,26 @@ class TestCliSync(CliRuntimeHarness):
             assert deps_issues["source"] == {"sync_state": "readiness_evaluation", "schema_version": 2}
             assert deps_issues["deps"]["valid"]
             assert deps_issues["deps"]["error"] is None
-            assert "iss-00301" in deps_issues["nodes"]  # satisfied context remains visible
+            assert "iss-00301" not in deps_issues["nodes"]  # satisfied-only context stays out of active graph
             assert "iss-00302" in deps_issues["nodes"]
             assert "iss-00303" in deps_issues["nodes"]
+            assert {
+                    "source_node_id": "iss-00302",
+                    "source_issue_id": "iss-00302",
+                    "target_node_id": "iss-00301",
+                    "target_node_kind": "issue",
+                    "target_issue_ids": ["iss-00301"],
+                    "expansion": "issue",
+                    "lifecycle_state": "done",
+                    "lifecycle_source": "github",
+                    "dependency_disposition": "satisfied",
+                    "disposition_basis": "local_done",
+                } in deps_issues["dependency_contexts"]
 
             deps_issues_puml = deps_issues_puml_path.read_text(encoding="utf-8")
             assert "iss-00302" in deps_issues_puml
             assert "iss-00303" in deps_issues_puml
-            assert "iss-00301" in deps_issues_puml
+            assert "iss-00301" not in deps_issues_puml
 
             # Legacy v1 deps artifacts are no longer generated.
             assert not (target / "spec-dock" / ".agent" / "deps.json").exists()
