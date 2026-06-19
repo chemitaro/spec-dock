@@ -50,6 +50,29 @@ Epic は設計の背骨です。
 - `note` は新規作成 catalog から retired。既存 `note` artifact は grandfathered として壊さない。
 - shared な書き方は `phase_*.md`、lifecycle / governance と Epic 固有の分割判断はこの workflow を正本とする
 
+## Planning Completion / Handoff
+
+Epic planning completion は、Epic の `requirement.md` / `design.md` / `plan.md` が必要な phase promotion gate と fresh `spec-reviewer` の `review_status: pass` を通過し、downstream Issue が参照できる handoff package が揃った状態です。委任 draft の採用、Evidence Adoption Ledger、diff guard、fresh reviewer gate の詳細は [workflow_spec_authoring.md](workflow_spec_authoring.md) を正本とし、この節では Epic 固有の handoff 境界だけを定義します。
+
+Handoff package は少なくとも次を含みます。
+
+- reviewer-gated Epic requirement / design / plan
+- Issue list, responsibility boundary, dependency order, and known non-blocking deferrals
+- command evidence for dependency mutation using `./spec-dock/scripts/spec-dock deps add --from <node-id> --to <node-id>`, `./spec-dock/scripts/spec-dock deps remove --from <node-id> --to <node-id>`, and `./spec-dock/scripts/spec-dock deps check <target>`; do not edit metadata directly
+- cross-issue draft package covering shared vocabulary, responsibility boundaries, dependency order, handoff inputs / outputs, and validation strategy across the planned Issues
+- issue-local draft requirement / draft design artifact paths for each target Issue, when such drafts are created
+
+Cross-issue draft package は planning evidence であり、Issue の canonical `requirement.md` / `design.md` / `plan.md` ではありません。個別 Issue の draft requirement / draft design は、既存の runtime-owned discussion creation command で作成します。
+
+```bash
+./spec-dock/scripts/spec-dock new doc draft-requirement --issue <issue-id> --title "..."
+./spec-dock/scripts/spec-dock new doc draft-design --issue <issue-id> --title "..."
+```
+
+各 command が返す `path=...` が artifact path です。これらの issue-local drafts は discussion evidence / planning input として扱い、ad hoc file writes や canonical issue docs への直接書き込みで代替してはいけません。Canonical issue docs は個別 Issue planning workflow と [workflow_issue.md](workflow_issue.md) の authoring contract で正式化します。
+
+Issue 211 may reference Issue 210 outputs and this Epic planning completion / handoff contract as downstream input. Issue 211 remains an independent Issue, not a subtask or completion condition of Issue 210; Epic execution coordinator behavior, issue start / finish cycle, and PR merge-ready preparation stay outside this Epic planning handoff section unless a later Issue explicitly defines them.
+
 ## 品質ゲート
 
 - requirement:

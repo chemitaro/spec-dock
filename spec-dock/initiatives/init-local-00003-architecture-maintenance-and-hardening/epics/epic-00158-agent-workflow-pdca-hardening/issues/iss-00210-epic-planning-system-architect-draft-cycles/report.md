@@ -131,6 +131,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ## 実装サマリー (任意)
 - S01 で provider-side `spec-dock-epic-planning` skill の first-read spine を更新し、non-trivial Epic planning の `system-architect` draft cycle、skip/fallback、gap return、formal baseline/diff-guard、EAL、fresh reviewer gate を concise に明記した。
 - S01 は docs-only / inspect-only step として `doc-writer` に委任し、targeted `rg` と fresh `spec-reviewer` pass で `tc-001` を閉じた。
+- S02 で provider-side `workflow_epic.md` に Epic planning completion / handoff package、cross-issue draft package、issue-local draft command、Issue 211 の独立境界を追加し、fresh `spec-reviewer` pass で `tc-002` を閉じた。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -207,6 +208,80 @@ pass: diff touched only the S01 allowed provider-side skill file and added conci
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | S01 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed to S01 commit gate | Reviewer found no findings; S01 acceptance / tc-001 satisfied. |
+
+### セッションログ（2026-06-19 S02 — Epic planning completion and handoff workflow contract）
+
+#### 対象
+- Step: S02
+- AC/EC: AC-003, AC-004, AC-005, AC-006, AC-007, EC-004
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S02 — Epic planning completion and handoff workflow contract`
+  - closure ids: `tc-002`
+
+#### 実施内容
+- `doc-writer` に S02 の bounded docs-only update を委任した。
+- Provider-side `src/spec_dock/assets/spec_dock/docs/workflow_epic.md` だけを変更した。`workflow_spec_authoring.md` は既存 policy を参照できるため変更不要と判断した。
+- 親 orchestrator が差分、allowed path、targeted `rg`、fresh step `spec-reviewer` pass を確認した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n "planning completion|handoff|cross-issue draft|draft-requirement|draft-design|--issue|Issue 211|deps add|deps remove|deps check|metadata directly|canonical issue docs|ad hoc" src/spec_dock/assets/spec_dock/docs/workflow_epic.md
+
+pass: all required S02 terms and negative-boundary wording were present in provider-side workflow_epic.md.
+```
+
+```bash
+git diff -- src/spec_dock/assets/spec_dock/docs/workflow_epic.md src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md
+
+pass: diff touched only provider-side workflow_epic.md; workflow_spec_authoring.md had no S02 diff.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only | Existing provider-side workflow_epic.md lacked explicit planning completion / handoff package, cross-issue draft package, issue-local `--issue` draft commands, and Issue 211 independence wording. | pre-change targeted `rg` / manual inspection | pass | Docs-only step; no code test required. |
+| S02 | 緑フェーズ（Green） | inspect-only | Updated provider-side workflow_epic.md contains planning completion / handoff, cross-issue draft, `draft-requirement`, `draft-design`, `--issue`, `Issue 211`, `deps add/remove/check`, and no direct metadata/canonical issue doc substitute. | targeted `rg` / manual workflow inspection | pass | Issue 211 remains independent downstream consumer. |
+| S02 | リファクタリング（Refactor） | guardrail satisfied | No refactor needed; change is a single Epic-specific handoff section and references existing authoring policy instead of duplicating it. | diff inspection | pass | `workflow_spec_authoring.md` unchanged. |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | none | implementation / review | recorded | tc-002 | no | `doc-writer` returned no material decisions; `spec-reviewer` returned no findings. |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | tc-002 | Provider-side workflow docs satisfy S02 acceptance and step `spec-reviewer` passes. | `rg` terms present; diff allowed path only; fresh S02 `spec-reviewer` pass. | pass | Commit gate closes with the S02 commit; post-commit hash and clean check are external evidence. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-002 | S02 | yes | inspect-only | Pre-change workflow_epic.md did not explicitly define Issue 210 handoff package / Issue 211 independence boundary. | `rg -n "planning completion|handoff|cross-issue draft|draft-requirement|draft-design|--issue|Issue 211|deps add|deps remove|deps check|metadata directly|canonical issue docs|ad hoc" src/spec_dock/assets/spec_dock/docs/workflow_epic.md` | pass | All planned S02 terms and boundaries present after update. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-002 | S02 | targeted `rg`, diff inspection, fresh `spec-reviewer` pass | pass | Covers AC-003, AC-004, AC-005, AC-006, AC-007, EC-004. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-002 | tc-s02-001 | tc-002 | Planned inspect-only closure was sufficient. | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | shipped workflow text change | doc-writer | Provider-side Epic workflow planning completion / handoff section | `requirement.md`, `design.md`, `plan.md`, provider-side workflow docs | `src/spec_dock/assets/spec_dock/docs/workflow_epic.md`; optional `workflow_spec_authoring.md` only if needed | canonical issue docs, runtime code, tests, dogfooding mirror, Git/GitHub state, Issue 211 execution scope | targeted `rg`, manual inspection, fresh `spec-reviewer` | required wording conflicts with reviewed design; runtime command contract absent; Issue 211 scope creep required | changed files, summary, verification, risks, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | doc-writer | Added `Planning Completion / Handoff` section with handoff package, cross-issue draft package, issue-local draft commands, command-first dependency mutation, and Issue 211 independence. Worker reported: `No material implementation decisions beyond the approved plan.` | `src/spec_dock/assets/spec_dock/docs/workflow_epic.md` | targeted `rg` -> pass; manual workflow inspection -> pass | `spec-reviewer` pass | none | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed to S02 commit gate | Reviewer found no findings; S02 acceptance / tc-002 satisfied with no Issue 211 scope creep. |
 
 ### セッションログ（2026-06-19 HH:MM - HH:MM）
 
@@ -297,6 +372,7 @@ pass: diff touched only the S01 allowed provider-side skill file and added conci
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed | Provider-side skill S01 change plus S01 report evidence | external evidence: S01 commit hash reported after commit | external evidence: `git status --short` after commit | N/A | N/A | N/A | N/A |
+| S02 | committed | Provider-side workflow_epic S02 change plus S02 report evidence | external evidence: S02 commit hash reported after commit | external evidence: `git status --short` after commit | N/A | N/A | N/A | N/A |
 | S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
 
 #### 変更したファイル
