@@ -49,7 +49,8 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | orchestrator / user interview | strict no-findings issue comment を merge-prepared evidence に昇格するか | Option A: strict condition で昇格; Option B: manual/non-retryable; Option C: 現状維持 | Option A を採用し、`codex_no_findings_issue_comment` を issue-local additive signal とする | ユーザー回答が Option A。generic fallback の安全契約を維持しつつ PR #216 型 false block を解消できる | promoted_to_design | `discussions/20260619t152719z-interview-no-findings-issue-comment-promotion-boundary.md` | `requirement.md`, `design.md`, `plan.md` に反映済み |
+| D-002 | resolved | implementation | spec-reviewer | design review で collector と snapshot / wait の authority 境界が曖昧 | collector が merge-prepared まで返す; collector は review completion のみ返す | collector は `review_completion_observed` まで、top-level `merge_prepared` は snapshot / wait のみ返す | collector は CI / PR metadata を持たないため、merge-prepared authority を持たせない | promoted_to_design | design reviewer fail/pass sequence | `design.md` に反映済み |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +64,12 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | research | `requirement.md`, `design.md`, `plan.md` | PR #216 の root cause と existing code contract を source-grounded facts として採用 | `discussions/20260619t131514z-research-pr-observation-fallback-signal-root-cause-analysis.md` | none |
+| EAL-002 | adopted | discussion | `requirement.md`, `design.md`, `plan.md` | Option A を best practice proposal として採用し、B/C/D/E は non-blocking rejected/deferred とした | `discussions/20260619t151927z-disc-fallback-signal-improvement-options.md` | none |
+| EAL-003 | adopted | interview | `requirement.md`, `design.md`, `plan.md` | ユーザーが Option A を明示採用したため、promotion boundary を canonical docs に反映 | `discussions/20260619t152719z-interview-no-findings-issue-comment-promotion-boundary.md` | none |
+| EAL-004 | adopted | reviewer | `requirement.md` | fresh spec-reviewer が requirement を pass したため requirement gate を通過 | spec-reviewer Bohr: `review_status=pass` | none |
+| EAL-005 | adopted | reviewer | `design.md` | design reviewer の P1/P2 指摘を修正し、fresh re-review が pass した | spec-reviewer Helmholtz/McClintock/Wegener/Huygens sequence | none |
+| EAL-006 | adopted | reviewer | `plan.md` | plan reviewer の P1/P2 指摘を修正し、fresh re-review が pass した | spec-reviewer Tesla/Dalton sequence | none |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +77,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | `codex_no_findings_issue_comment` を追加し、PR #216 型 false block を解消する要件・設計・計画を作成 | `fallback_issue_comment` non-promotion、retryable/non-retryable action 分離、docs clarity | low | requirement/design/plan reviewer pass |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +85,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | research / discussion / interview / parent epic requirement / provider code | Option A adopted in `discussions/20260619t152719z-interview-no-findings-issue-comment-promotion-boundary.md` | adopted | passed: spec-reviewer Bohr | no | promoted to design |
+| design | reviewed requirement / discussions / provider scripts / tests | reviewer found head-sha, collector authority, evidence-field gaps; all fixed | adopted after fixes | failed then passed: Helmholtz fail, McClintock fail, Wegener fail, Huygens pass | no | promoted to plan |
+| plan | reviewed requirement / reviewed design / phase_plan_issue / authoring/issue-plan | reviewer found blocker coverage, boundary coverage, report gates, docs-only case gaps; all fixed | adopted after fixes | failed then passed: Tesla fail, Dalton pass | no | execution-ready after final validation |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -107,7 +115,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| system-architect | iss-00218 | 該当なし | requirement / discussions / provider code | design.md | not used | [] | not_run | 手動 authoring fallback | 該当なし | scope-local direct-write consent が未確認 | final design reviewer pass | 委任ドラフト昇格なし |
+| implementation-planner | iss-00218 | 該当なし | reviewed requirement / reviewed design / plan docs | plan.md | not used | [] | not_run | 手動 authoring fallback | 該当なし | scope-local direct-write consent が未確認 | final plan reviewer pass | 委任ドラフト昇格なし |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
