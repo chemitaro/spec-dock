@@ -21,6 +21,12 @@ description: Leaf skill for epic planning tasks in spec-dock.
 - Keep scope-specific constraints and decisions in `workflow_epic.md`.
 - In spec authoring mode, do not move from requirement to design, design to plan, or plan to Issue decomposition until a fresh `spec-reviewer` returns `review_status: pass`; fix findings and re-run a fresh reviewer until pass.
 - Record each `Spec Authoring Gate` in the epic `report.md`, including investigation, user questions/answers, reviewer verdict, fixes, and promotion decision.
+- For non-trivial Epic planning, consider a `system-architect` scope-local discussion draft before canonical design / plan promotion; keep the draft as evidence only, and keep canonical `requirement.md` / `design.md` / `plan.md` / `report.md` under main orchestrator authority.
+- Do not make heavyweight delegation mandatory for every Epic. If the `system-architect` draft cycle is trivial or intentionally skipped, record a `skip reason` and continue through manual authoring plus the same fresh `spec-reviewer` gates.
+- If `system-architect` delegation is unavailable, denied, or unsupported, record the `fallback` path; do not claim delegated draft evidence, and do not weaken reviewer or promotion gates.
+- If delegated drafting exposes a requirement / design / plan gap, return to the prior authoring phase or `workflow_clarification.md`; do not absorb the gap as an Epic planning assumption.
+- Before adopting any delegated draft, require formal pre-delegation `baseline-status` evidence and post-delegation `diff-guard` pass per `workflow_spec_authoring.md`.
+- Adopt delegated evidence only through the Evidence Adoption Ledger, then run a fresh `spec-reviewer` against the orchestrator-integrated canonical artifact before phase promotion.
 - Bounded depth=2 delegation is allowed only as main orchestrator -> epic planning authoring specialist -> leaf-only evidence producer.
 - Depth=3 / grandchild delegation is forbidden.
 - Leaf-only evidence producers must not edit canonical artifacts, perform implementation edits, claim final authority, claim reviewer pass, or claim phase promotion / issue ready / issue finish.
