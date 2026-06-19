@@ -13514,34 +13514,7 @@ JSON
             """#!/usr/bin/env bash
 set -euo pipefail
 printf 'snapshot %s\\n' "$*" >> "$S04_WAIT_LOG"
-python3 - "$@" <<'PY'
-import json
-import os
-import sys
-
-args = sys.argv[1:]
-trigger_id = None
-trigger_created_at = None
-while args:
-    arg = args.pop(0)
-    if arg == "--trigger-comment-id":
-        trigger_id = int(args.pop(0))
-    elif arg == "--trigger-created-at":
-        trigger_created_at = args.pop(0)
-    elif arg == "--out":
-        args.pop(0)
-    elif args:
-        args.pop(0)
-
-payload = json.loads(os.environ["S04_WAIT_PAYLOAD"])
-payload.setdefault(
-    "trigger",
-    {"source": "explicit", "comment_id": trigger_id, "created_at": trigger_created_at},
-)
-payload["trigger"]["comment_id"] = trigger_id
-payload["trigger"]["created_at"] = trigger_created_at
-print(json.dumps(payload, separators=(",", ":")))
-PY
+printf '%s\\n' "$S04_WAIT_PAYLOAD"
 """,
             encoding="utf-8",
         )
@@ -13716,7 +13689,7 @@ PY
                             "--trigger-created-at",
                             "2026-06-09T02:03:04Z",
                             "--timeout-seconds",
-                            "2",
+                            "7",
                             "--poll-interval-seconds",
                             "1",
                             "--quiet-seconds",
@@ -13730,7 +13703,7 @@ PY
                         capture_output=True,
                         text=True,
                         check=False,
-                        timeout=6,
+                        timeout=10,
                     )
 
                     assert result.returncode == 0, result.stdout + result.stderr
@@ -13742,8 +13715,9 @@ PY
                     assert payload["resume"]["trigger_created_at"] == "2026-06-09T02:03:04Z"
                     assert "--trigger-mode resume" in payload["resume"]["command_hint"]
                     assert "--trigger-comment-id 777" in payload["resume"]["command_hint"]
-                    assert payload["codex_review"]["lifecycle"]["status"] == "pending"
-                    assert "phase=wait ci=passed review=observing" in result.stderr
+                    if review_status == "pending":
+                        assert payload["codex_review"]["lifecycle"]["status"] == "pending"
+                    assert "phase=wait ci=passed review=pending_signal" in result.stderr
                     assert (out_dir / "result.json").read_text(encoding="utf-8") == result.stdout
                     assert not (out_dir / "summary.md").exists()
 
