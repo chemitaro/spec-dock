@@ -66,7 +66,9 @@ ID: "iss-00214"
 - S01 `Target review progress display` を実装済み。
 - `progress_line(...)` の display-only derivation を変更し、trigger-boundary no-signal wait state は `review=pending_signal`、actionable / explicit review target state は既存 status を表示する。
 - Provider-side source と dogfooding mirror の同等変更を structural inspection で確認した。
-- S90 / S99、step reviewer gate、Step Commit Gate は未実施。Step Commit Gate は parent commit 待ち。
+- S01 step reviewer gate と Step Commit Gate は完了済み。
+- S90 docs impact は approved-no-op として spec-reviewer pass 済み。
+- S99 final gates は未実施。
 
 ## 実装記録（セッションログ）
 
@@ -209,7 +211,7 @@ Notes:
 
 | Step | Review scope | Step reviewer verdict | Commit scope | Closure state | Commit evidence | Post-commit clean check |
 |---|---|---|---|---|---|---|
-| S01 | provider/mirror wait display derivation, focused tests, report evidence | code-reviewer pass | S01 files only | tc-001..tc-004 pass evidence recorded; reviewer passed | pending parent commit | pending parent commit |
+| S01 | provider/mirror wait display derivation, focused tests, report evidence | code-reviewer pass | S01 files only | committed | `b476e6f3` `fix(pr-observation): progressのreview表示を対象状態に修正` | `git status --short --branch` showed no staged / unstaged changes after S01 commit |
 
 #### Closure Delta
 
@@ -223,7 +225,13 @@ Notes:
 
 | 対象 | 更新要否 | 担当 | 証跡 | 仕様レビュアー結果 |
 |---|---|---|---|---|
-| PR observation skill docs | 未実施 | future S90 | `plan.md` S90 に検査コマンドと更新条件を定義 | pending execution |
+| PR observation skill docs | no | N/A | `rg -n "observing|pending_signal|progress lines|progress line|review" src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md .agents/skills/github-pr-observation/SKILL.md` confirmed no stale `review=observing` contract; docs describe bounded progress fields and final stdout JSON authority without enumerating review display values | pass |
+
+#### S90 Docs Impact Evidence
+
+- Result: approved-no-op with spec-reviewer pass.
+- Rationale: `github-pr-observation/SKILL.md` describes progress lines as bounded diagnostic key/value summaries and keeps final `stdout` JSON as the authoritative information boundary. It does not document `review=observing` or any conflicting progress review value, so the S01 vocabulary change does not require a docs text update.
+- Provider/mirror docs parity: both provider and dogfooding skill docs have the same relevant matches and no stale `review=observing` contract.
 
 ### 最終 QA ゲート（Final QA Gate）
 
