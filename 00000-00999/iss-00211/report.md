@@ -49,7 +49,8 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | orchestrator / user answer | GitHub #211 は新 skill を主眼にしつつ docs 更新を「必要なら」としており、Issue 211 の変更範囲を固定する必要があった。 | Option A: skill-only; Option B: skill + `workflow_epic.md` minimal reference; Option C: broad docs update | Option B を採用する。新 `spec-dock-epic-execution` skill に加えて、`workflow_epic.md` に Epic execution lifecycle / completion gate / PR merge-preparer handoff の短い reference section を追加する。他 docs は明確な欠落がある場合だけ最小更新する。 | Issue 210 の Epic planning handoff と Issue 211 の execution coordinator を repo docs 上で接続し、Option C のような broad docs cleanup へ膨らむことを避けるため。 | promoted_to_design | `discussions/20260619t063017z-research-issue-211-clarification-source-review.md`; `discussions/20260619t063303z-disc-issue-211-clarification-synthesis.md`; `discussions/20260619t063309z-interview-issue-211-scope-pressure-test.md` | `requirement.md`, `design.md`, `plan.md` に反映する。ADR は不要。 |
+| D-002 | resolved | scope | system-architect draft / orchestrator | `execute-epic.md` に「この workflow のために新 skill を作らない」という現行文があり、Issue 211 の new skill requirement と衝突した。 | Option A: prompt を触らない; Option B: discovery surface の明確な欠落として最小更新に含める | `execute-epic.md` を最小更新対象に含める。 | `/execute-epic` は Epic execution entrypoint であり、new coordinator skill の discoverability を阻害する明確な矛盾であるため。これは broad docs cleanup ではなく AC-004 の discoverability に属する。 | promoted_to_design | `discussions/20260619t064618z-draft-design-issue-211-system-architecture-draft.md`; `src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md` | `design.md`, `plan.md` に反映する。 |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +64,9 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | research / discussion / interview | `requirement.md`, `design.md`, `plan.md` | Source review と scope discussion を踏まえ、ユーザー回答により Option B が採用されたため。 | `discussions/20260619t063017z-research-issue-211-clarification-source-review.md`; `discussions/20260619t063303z-disc-issue-211-clarification-synthesis.md`; `discussions/20260619t063309z-interview-issue-211-scope-pressure-test.md` | Canonical authoring で Option B を反映する。 |
+| EAL-002 | adopted | delegated design draft: system-architect | `design.md` | Draft は requirement pass 後の design evidence として、責務境界、file plan、test strategy、`execute-epic.md` discovery gap を具体化しており、canonical design へ採用可能だったため。 | `discussions/20260619t064618z-draft-design-issue-211-system-architecture-draft.md` | Fresh `spec-reviewer` で canonical `design.md` を review する。 |
+| EAL-003 | adopted | delegated plan draft: implementation-planner | `plan.md` | Draft は design pass 後の plan evidence として、S01/S02/S03/S90/S99、closure index、delegation contract、concrete test cases、final exit contract を満たしており、canonical plan へ採用可能だったため。 | `discussions/20260619t070007z-draft-plan-issue-211-implementation-plan-draft.md` | Fresh `spec-reviewer` で canonical `plan.md` を review する。 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -79,13 +82,19 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement / design / plan | GitHub #211、active issue docs、parent epic docs、existing skills、`workflow_epic.md` / `workflow_issue.md`、clarification artifacts | Option B 採用。追加 interview は現時点で不要。 | adopted | provisional | no | Canonical requirement / design / plan authoring へ進む。 |
+| requirement | `requirement.md`; `workflow_epic.md`; `workflow_issue.md`; clarification `research` / `disc` / `interview`; existing skill responsibility boundaries | Option B 採用済み。未確定事項なし。 | adopted | passed: fresh `spec-reviewer` returned `review_status: pass` with no findings. | no | design authoring へ昇格する。 |
+| design | `design.md`; `requirement.md`; delegated design draft; `workflow_epic.md`; `workflow_issue.md`; existing skill responsibility boundaries | Reviewer found missing `issue start` / post-PR `issue finish` lifecycle handoffs. | fix applied | failed: fresh `spec-reviewer` returned `review_status: fail` with P1 finding. | no after fix | `design.md` に lifecycle handoff を追記し、fresh re-review を実行する。 |
+| design | `design.md`; `requirement.md`; `workflow_epic.md`; `workflow_issue.md`; prior P1 fix | Previous P1 fixed. Reviewer returned P2 diagram metadata recommendation. | adopted; P2 fixed after pass | passed: fresh `spec-reviewer` returned `review_status: pass`. | no | plan authoring へ昇格する。P2 は diagram metadata 追記で解消、substantive design change ではないため再レビュー不要。 |
+| plan | `plan.md`; `requirement.md`; `design.md`; delegated plan draft; `phase_plan_issue.md`; `authoring/issue-plan.md`; `workflow_issue.md` | Plan draft adopted. Unresolved blockers none. | adopted | pending fresh `spec-reviewer` | no | canonical `plan.md` fresh review を実行する。 |
+| plan | `plan.md`; `report.md`; reviewer findings | Reviewer found S90/S99 lacked full executable step schema, S01 did not lock all coordinator stop conditions, and delegated draft provenance still had scaffold contradiction. | fix applied | failed: fresh `spec-reviewer` returned `review_status: fail` with two P1 findings and one P2 finding. | no after fix | S90/S99 を full executable step schema に展開し、S01 full coordinator boundary を closure/test/close condition に固定し、委任ドラフト証跡の矛盾を解消した。fresh re-review を実行する。 |
+| plan | `plan.md`; `report.md`; prior P1/P2 fixes | Previous P1 findings resolved. Reviewer returned P2 summary wording mismatch for S90 reviewer gate. | adopted; P2 fixed after pass | passed: fresh `spec-reviewer` returned `review_status: pass`. | no | execution handoff ready. P2 は S90 summary を detailed contract と揃える表現補正で解消、substantive plan change ではないため再レビュー不要。 |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
-  - used / not used
+  - used
 - 未使用の場合:
-  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
+  - N/A
 - lifecycle state（契約値）:
   - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
 - 昇格不可 state:
@@ -107,7 +116,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| system-architect | iss-00211 | `discussions/20260619t064618z-draft-design-issue-211-system-architecture-draft.md` | `requirement.md`; parent docs; workflow docs; existing skills; tests | `design.md`, `report.md` | adopted | `design.md`, `report.md` | manual diff guard: only requested discussion draft was changed by delegate; no forbidden canonical / implementation / tests edits observed from delegate | integrated | none | none | pending fresh `spec-reviewer` | promoted to canonical design by orchestrator |
+| implementation-planner | iss-00211 | `discussions/20260619t070007z-draft-plan-issue-211-implementation-plan-draft.md` | `requirement.md`; `design.md`; `report.md`; issue plan workflow docs; design-named files | `plan.md`, `report.md` | adopted | `plan.md`, `report.md` | manual diff guard: only requested discussion draft was changed by delegate; no forbidden canonical / implementation / tests edits observed from delegate | integrated | none | none | pending fresh `spec-reviewer` | promoted to canonical plan by orchestrator |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
