@@ -3,277 +3,365 @@
 ID: "iss-00214"
 タイトル: "PR Observation Review Target State"
 関連GitHub: ["#214"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-19"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00158", "init-local-00003"]
 ---
 
-# iss-00214 PR Observation Review Target State — 実装報告（観測証跡台帳 / Observed Evidence Ledger）
+# iss-00214 PR Observation Review Target State — 実装報告
 
-> `report.md` は観測証跡台帳（observed evidence ledger）の scaffold です。planned requirements、evidence destination、closure 条件は `plan.md` が持ち、この文書は実際の Red / Green / Refactor evidence、発見された tests、closure delta、reviewer status、commit/no-op evidence を記録する evidence slot です。workflow / compliance authority は skills、docs、accepted ADRs、reviewer gates に置きます。
+この `report.md` は Issue Planning / Clarification 証跡、S01 / S90 / S99 の実行証跡、reviewer gate、commit gate、PR delivery 前の残状態を記録する observed evidence ledger である。
 
-## 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger / 必須）
+## 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger）
 
-`report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
-
-Material な判断がない場合もこの section は残し、次を明示する。
-
-- No material interpretation changes.
-- No decision entries.
-
-Ledger entry は次の契約値を使う。
-
-- `Status`: `open` / `resolved` / `superseded`
-- `Type`: `interpretation` / `scope` / `implementation` / `compatibility` / `test-strategy` / `operation` / `deviation` / `follow-up`
-- `Disposition`: `applied` / `rejected` / `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` / `converted_to_followup` / `deferred` / `no_action` / `superseded`
-
-完了時の意味論（completion semantics）:
-- issue completion 前に `Status=open` の entry を残してはならない。
-- `Status=resolved` は `Disposition`、evidence、必要な follow-up を持つ。
-- `Status=superseded` または `Disposition=superseded` は置換先 entry ID を持つ。
-- `Disposition=promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` は昇格先 artifact と evidence を持つ。
-- `Disposition=converted_to_followup` は follow-up issue / discussion / ADR candidate の参照を持つ。
-- `Disposition=deferred` は scope 外である理由、blocking でない根拠、revisit 条件を持つ。
-- `Disposition=no_action` は issue-local な判断で追加対応不要である理由を持つ。将来も効く durable decision を `report.md` だけに閉じ込めてはならない。
-
-Disposition ごとの必須証跡:
-- `applied`: 変更した artifact / 実装証跡と、issue-local 適用で十分な理由。
-- `rejected`: 却下した選択肢、理由、blocking impact が残らない根拠。
-- `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan`: 昇格先 artifact 参照と証跡。
-- `converted_to_followup`: follow-up issue / discussion / ADR candidate 参照と blocking / non-blocking の分類。
-- `deferred`: scope-out 理由、non-blocking の根拠、revisit 条件。
-- `no_action`: 判断が issue-local で durable ではない理由。
-- `superseded`: 置換先 entry ID と置換理由。
-
-| 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
+| 識別子 | 状態 | 種別 | 起票元 | 契機 / 差分 | 検討した選択肢 | 判断 / 解釈 | 根拠 | 処置 | 証跡 | フォローアップ |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | interpretation | user interview | `review=` が観測者側の作業状態を表示していた | `review=observing`; `review=pending`; `review=pending_signal` | no-signal wait state は `review=pending_signal` とし、`review=` は観測対象の Codex review state を表示する | ユーザー回答で `review=pending_signal` が明示され、観測する自分ではなく観測対象の状態を表示すべきとされた | applied | `discussions/20260619t064502z-interview-review-pending-state-naming.md`; `requirement.md`; `design.md`; `plan.md` | なし |
+| D-002 | resolved | scope | orchestrator | `observer=` / `wait=` 追加案の扱い | 今回追加する; 今回は追加しない | この issue では `review=` の target-state 表示だけに限定し、新 field は追加しない | 要件と設計で final JSON / progress line 以外の contract 変更を scope 外に固定した | applied | `requirement.md`; `design.md`; `plan.md` | 必要なら別 issue |
+| D-003 | resolved | test-strategy | spec-reviewer | EC-003 fallback issue comment semantics の検証が条件付きだった | 条件付きのまま; 必須 focused pytest に含める | fallback issue comment regression を必須検証に含める | plan review P1 finding により closure が実装者判断に残ると判定された | applied | `plan.md`; spec-reviewer Avicenna finding; spec-reviewer Epicurus pass | なし |
+| D-004 | resolved | test-strategy | dev-coder | S01 Red が計画した `review=` assertion の前に timeout / fixture 境界で失敗した | 実装を止める; timeout だけ延ばす; S04 fixture を planned payload 観測用に修理する | S04 fixture repair を採用し、Red/Green が計画済みの wait progress behavior を観測できるようにする | 修理は allowed test file に限定され、product final JSON semantics や trigger / snapshot runtime を変更しない。修理後の Red は `review=observing` に対して期待どおり失敗し、Green は focused regression set で pass した | applied | `tests/unit/infra/test_init_update.py`; S01 Red/Green evidence; code-reviewer pass | なし |
+| D-005 | resolved | implementation | qa-reviewer / dev-coder / orchestrator | latency-guard no-completion path で `review_status="approved"` だが trusted completion signal がない wait progress が `review=approved` と表示され得た | `none`/`pending`/`unknown` だけを pending signal 候補にする; `approved`/`passed` も no-completion wait に限り候補にする; timeout phase も候補にする | `approved`/`passed` は no trusted completion signal、no actionable feedback、no completed lifecycle の wait progress に限って `pending_signal` 候補にする。timeout phase への拡張は採用しない | QA P1 は EC-001 の wait/progress 可読性 gap を指摘しており、design は final / timeout phase では existing final status を優先し得るため、補修範囲を wait display-only に限定する | applied | `design.md`; `plan.md`; `progress_line(...)`; `test_issue_187_s204_wait_does_not_promote_unknown_before_trigger_age`; focused pytest; fresh spec-reviewer pass | final reviewer gates |
 
-## 証跡採用台帳（Evidence Adoption Ledger / 必須）
+## 証跡採用台帳（Evidence Adoption Ledger）
 
-Delegated draft、worker note、research、reviewer finding、discussion、command output を canonical artifact や実装判断へ取り込む場合、この台帳に採用判断を記録する。raw transcript ではなく、orchestrator が検証した採否・理由・証跡・次アクションだけを記録する。
-
-- `adoption_status`: `adopted` / `partially_adopted` / `rejected` / `deferred` / `stale` / `blocked`
-- `blocked` または `stale` の unresolved entry は promotion / implementation start / issue ready / issue finish / phase completion を止める。
-- `deferred` は blocking でない根拠と revisit 条件を持つ場合だけ完了時に残せる。
-- Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
-- Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
-
-| 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
+| 識別子 | 採用状態 | 出所 | 対象 | 判断理由 | 証跡 | 次アクション |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | research | requirement/design/plan | 現行実装が wait 中に `review=observing` を強制し、既存テストもそれを期待していることを確認した | `discussions/20260619t064501z-research-review-progress-target-state-source-analysis.md` | 実装フェーズで S01 の red target として使う |
+| EAL-002 | adopted | discussion | requirement/design/plan | ユーザーが no-signal wait state の表示名として `review=pending_signal` を承認した | `discussions/20260619t064502z-interview-review-pending-state-naming.md` | 実装フェーズで exact string として守る |
+| EAL-003 | adopted | reviewer | requirement.md | AC-002 の `など` が曖昧という requirement review P2 を受け、`review=unresolved` の exact expectation へ修正した | spec-reviewer Carson finding; spec-reviewer Lorentz pass | なし |
+| EAL-004 | adopted | reviewer | design.md | design は localized/trivial として system-architect draft を省略可能、かつ仕様整合は pass と判定された | spec-reviewer Ohm pass | なし |
+| EAL-005 | adopted | reviewer | plan.md | EC-003 fallback verification を必須化する P1 を受け、focused command と concrete test case に既存 fallback tests を追加した | spec-reviewer Avicenna fail; spec-reviewer Epicurus pass | なし |
+| EAL-006 | adopted | worker | report.md / tests | dev-coder の Ledger Note を親が確認し、S04 fixture repair を evidence-path repair として採用した | `tests/unit/infra/test_init_update.py`; S01 Red/Green evidence; code-reviewer pass | なし |
+| EAL-007 | adopted | reviewer / worker | implementation/tests/report | QA P1 と dev-coder follow-up を親が確認し、`approved` / `passed` legacy review values を no-completion wait display の `pending_signal` 候補として採用した | QA reviewer finding; `tests/unit/infra/test_init_update.py`; `pr_observation_wait.py` | final re-review gates |
 
-## 目的整合台帳（Objective Alignment Ledger / 必須）
+## 目的整合台帳（Objective Alignment Ledger）
 
-主要目的と副次要件の主従が逆転していないことを記録する。特に clarification / authoring / handoff の変更では、primary objective evidence、secondary requirement evidence、inversion risk、reviewer verdict を残す。
-
-| 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
+| 対象 | 主要目的の証跡 | 副次要件の証跡 | 逆転リスク | レビュアー判定 |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | `requirement.md` AC-001/AC-002 と `design.md` は `review=` を target Codex review state として定義している | AC-003/EC-001..EC-004 は final JSON、latency guard、fallback、line budget の非回帰を固定している | low | requirement/design/plan の fresh spec-reviewer pass |
 
-## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
+## 仕様 authoring ゲート（Spec Authoring Gate）
 
-Requirement / design / plan の phase promotion ごとに、調査、未確定事項、回答、採用判断、reviewer verdict、blocking / non-blocking、次アクションを記録する。
-
-| フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
+| フェーズ | 調査証跡 | 未確定事項 / 回答 | 採用判断 | レビュアー判定 | ブロック有無 | 昇格 / 次アクション |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | source analysis discussion; existing wait script; existing tests | `review=pending_signal` をユーザー回答として取得 | adopted | first review fail -> fixed -> re-review pass | no | design へ昇格済み |
+| design | approved requirement; existing `progress_line(...)`, `review_progress_counts(...)`, `classify(...)`; PlantUML dependency map | additional question none | adopted | pass | no | plan へ昇格済み |
+| plan | approved requirement/design; existing focused tests; review finding for EC-003 | implementation-planner skip acceptable for localized/trivial plan | adopted | first review fail -> fixed -> re-review pass | no | Issue Execution handoff ready |
 
-## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
-- 委任 authoring の使用:
-  - used / not used
-- 未使用の場合:
-  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
-- lifecycle state（契約値）:
-  - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
-- 昇格不可 state:
-  - `stale`, `rejected`, `superseded`, `blocked`
-- 標準出力先:
-  - 対象 scope の `discussions/` direct child にある flat Markdown
-  - filename: `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md`
-- 軽量 provenance:
-  - `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, fallback decision, report evidence destination, adoption ledger note
-  - 互換 label: source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
-- 禁止 self-claim:
-  - `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`, reviewer pass, phase completion, implementation readiness
-- 禁止 wildcard token:
-  - `*`, `grants.*`, `all`
-- 標準必須にしない field:
-  - task manifest hash, Permission Profile hash, session invocation hash, probe run id, session hash
-- historical note:
-  - 既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない。
+## 委任ドラフト証跡（Delegated Draft Evidence）
 
-| ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
+| ロール | 範囲 | ドラフトパス | 参照元 | 予定反映先 | 採用状態 | 反映先 | 差分ガード結果 | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果 | 昇格判断 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| system-architect | iss-00214 design | 該当なし | requirement/research/interview | design.md | not used | [] | not_run | manual authoring | 該当なし | none | spec-reviewer pass; skip acceptable | design approved |
+| implementation-planner | iss-00214 plan | 該当なし | requirement/design/tests | plan.md | not used | [] | not_run | manual authoring | 該当なし | none | spec-reviewer pass; skip acceptable | plan approved |
 
-### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
-| 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
-|---|---|---|---|---|
-| 同意なし（missing consent） | blocked / incomplete | 範囲付き同意を取得する、または手動 authoring に戻す | この section | ineligible |
-| 前段 reviewer pass 不足 / stale（missing/stale previous reviewer pass） | blocked / incomplete | レビューゲートを再実行する（rerun reviewer gate） | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
-| 設計中の要件 gap（requirement gap during design） | blocked / incomplete | requirement phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| 計画中の設計 gap（design gap during plan） | blocked / incomplete | design phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| ロール利用不可（role unavailable） | blocked / manual path | 利用不可を記録し、妥当なら手動で続行する | この section | ineligible |
-| 禁止行為の試行（forbidden action attempt） | rejected | ドラフトを破棄し incident を記録する | この section / decision ledger | ineligible |
-| 古いドラフト（stale draft） | stale | 再生成または差分調整する | この section | ineligible |
-| 置換済みドラフト（superseded draft） | superseded | 置換先ドラフトを参照する | この section | ineligible |
-| 委任使用主張に対する証跡不足（missing draft evidence when delegated use is claimed） | incomplete | 証跡を追加する、または委任使用 claim を外す | この section | ineligible |
-| reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
+## ワークフロー委任同意の証跡（Workflow Delegation Consent）
 
-## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+| 同意元 | リポジトリ / worktree | 対象課題 | セッション | 指名ロール | 境界 | 期限 / 無効化条件 | 拒否 / 利用不可理由 | 次アクション |
+|---|---|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/26b6/spec-dock` | iss-00214 | current session | spec-reviewer; system-architect; implementation-planner; future dev-coder/code-reviewer/qa-reviewer per plan | same repo, active issue, named role, workflow-scoped; no destructive action, publishing, credential expansion, or scope expansion | issue complete; session end; scope change; host policy conflict; user revocation | none | proceed to Issue Execution when requested |
 
-## 実装記録（セッションログ） (必須)
+## 実装サマリー
 
-### セッションログ（2026-06-19 HH:MM - HH:MM）
+- S01 `Target review progress display` を実装済み。
+- `progress_line(...)` の display-only derivation を変更し、trigger-boundary no-signal wait state は `review=pending_signal`、actionable / explicit review target state は既存 status を表示する。
+- Provider-side source と dogfooding mirror の同等変更を structural inspection で確認した。
+- S01 step reviewer gate と Step Commit Gate は完了済み。
+- S90 docs impact は approved-no-op として spec-reviewer pass 済み。
+- S99 final gates は未実施。
+
+## 実装記録（セッションログ）
+
+### セッションログ（2026-06-19 15:45 - 16:30 JST）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+
+- Step: planning only
+- AC/EC: AC-001..AC-004, EC-001..EC-004
+- 計画上の出典:
+  - `requirement.md`
+  - `design.md`
+  - `plan.md`
 
 #### 実施内容
-- ...
+
+- GitHub issue #214 を `iss-00214` として start 済みの active issue 文脈で、source analysis と user interview の discussion artifact を作成した。
+- `requirement.md`、`design.md`、`plan.md` を Issue Planning workflow に沿って作成した。
+- `review=pending_signal` を no-signal wait state の exact expectation として採用した。
+- requirement/design/plan それぞれに fresh `spec-reviewer` gate を実施し、blocking finding を修正して pass を得た。
 
 #### 実行コマンド / 結果
-```bash
-<command>
 
-<result>
+```bash
+./spec-dock/scripts/spec-dock issue start --id iss-00214
+
+spec-dock: ok (issue start) target=iss-00214 initiative=init-local-00003 epic=epic-00158 issue=iss-00214
+spec-dock: ok (issue checkout) branch=iss-00214-pr-observation-review-target-state
 ```
 
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
-
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
-
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
-
-#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
-`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
-
-| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
-|---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00214 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
-
-#### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
-
-| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
-
-#### 委任 worker 証跡（Delegated Worker Evidence）
-| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
-|---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
-
-#### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
-
 #### レビューゲート状態（Reviewer Gate Status）
-| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
 
-#### ステップ commit ゲート（Step Commit Gate）
-| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| ステップ | ゲート名 | レビュアーロール | 鮮度 | 状態 | リスク受容 | 昇格 / 完了判断 | メモ |
+|---|---|---|---|---|---|---|---|
+| requirement | requirement spec review | spec-reviewer | fresh | failed -> passed | N/A | proceed | First pass found AC-002 ambiguity; fixed and re-reviewed |
+| design | design spec review | spec-reviewer | fresh | passed | N/A | proceed | system-architect skip accepted as localized/trivial |
+| plan | plan spec review | spec-reviewer | fresh | failed -> passed | N/A | proceed | First pass found EC-003 fallback verification gap; fixed and re-reviewed |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
 
-#### コミット
-- <hash> <message>
+- `spec-dock/active/issue/requirement.md` - `review=` target state 表示の要件、AC/EC、scope constraints を定義
+- `spec-dock/active/issue/design.md` - `pending_signal` display-only derivation、provider/mirror impact、test strategy を定義
+- `spec-dock/active/issue/plan.md` - S01/S90/S99、closure index、delegation contract、concrete tests を定義
+- `spec-dock/active/issue/report.md` - planning evidence と execution handoff readiness を記録
+- `spec-dock/active/issue/discussions/20260619t064501z-research-review-progress-target-state-source-analysis.md` - source-grounded clarification research
+- `spec-dock/active/issue/discussions/20260619t064502z-interview-review-pending-state-naming.md` - user interview and adoption record
 
-#### メモ
-- ...
-
----
-
-### セッションログ（2026-06-19 HH:MM - HH:MM）
+### セッションログ（2026-06-19 16:48 JST）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
 
-#### 実施内容
-- ...
+- Step: S01 `Target review progress display`
+- AC/EC: AC-001, AC-002, AC-003, AC-004, EC-001, EC-002, EC-003, EC-004
+- Closure ids: tc-001, tc-002, tc-003, tc-004
 
----
+#### Implementation Delegation Gate
 
-## 最終品質ゲート（Final Quality Gate / 必須）
+| Step | Decision | Required reason | Delegated role | Scope | Source of truth | Allowed changes | Forbidden changes | Required verification | Stop conditions | Output required | Result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated | runtime / tests / shipped scaffold behavior across provider and dogfooding mirror | dev-coder | `progress_line(...)` display derivation, focused regression test, provider/mirror inspection | `requirement.md`, `design.md`, `plan.md` S01, `workflow_issue.md`, existing tests | S01 allowed paths only | trigger helper, snapshot collectors, GitHub auth/token behavior, final JSON schema/fingerprint semantics, unrelated tests/refactors | required Red, focused Green pytest, structural `rg` inspection | forbidden path required; final JSON semantics change required; trigger/resume/snapshot behavior change required; focused tests cannot run | changed files, Red/Green/structural result, risks, Ledger Note or no-material statement | delegated worker completed bounded S01 implementation; parent integration pending reviewer/commit |
+
+#### Red evidence
+
+| Command | Result | Evidence |
+|---|---|---|
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint"` | failed as expected after evidence-path repair | `AssertionError`: expected `phase=wait ci=passed review=pending_signal`; observed stderr contained `phase=wait ci=passed review=observing` |
+
+Notes:
+
+- Initial Red attempt failed for the wrong reason before reaching the display assertion: the S04 snapshot fixture could timeout before emitting the planned payload, and the existing `payload["codex_review"]` assertion was not valid for the `review_status="none"` case.
+- Evidence-path repair stayed inside `tests/unit/infra/test_init_update.py`: the S04 snapshot fixture now returns `S04_WAIT_PAYLOAD` directly, the timeout budget allows a snapshot poll, and the `codex_review.lifecycle.status` assertion remains scoped to the `pending` case that carries that lifecycle contract.
+
+#### Implementation evidence
+
+| File | Change |
+|---|---|
+| `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py` | Changed wait progress display derivation so no-signal `none` / `pending` / `unknown` review states render `pending_signal` only when there is no actionable feedback and no completion signal. |
+| `.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py` | Mirrored the provider-side display derivation. |
+| `tests/unit/infra/test_init_update.py` | Updated the S01 Red expectation to `review=pending_signal` and repaired the S04 fixture so the test observes the intended wait payload. |
+| `spec-dock/active/issue/report.md` | Recorded S01 execution evidence. |
+
+#### Green verification
+
+| Command | Result | Evidence |
+|---|---|---|
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint or issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review or issue_174_pr_observation_wait_preserves_output_boundary_and_line_budget or issue_187_s204_wait or issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback or issue_187_s100_fallback_issue_comment_is_not_no_completion_evidence"` | passed | `10 passed, 429 deselected in 27.90s` |
+
+#### Structural inspection
+
+| Command | Result | Evidence |
+|---|---|---|
+| `rg -n "review=observing|pending_signal|render_review" src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py .agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py tests/unit/infra/test_init_update.py` | passed | No `review=observing` matches. Provider and mirror each contain `render_review = review_status`, `render_review = "pending_signal"`, and `fields.append(("review", str(render_review), False))`; the focused test expects `review=pending_signal`. |
+
+#### Step Contract Closure
+
+| Step | Closure id | Close condition | Evidence | Result |
+|---|---|---|---|---|
+| S01 | tc-001 | no-signal wait progress renders `review=pending_signal` instead of `review=observing` | Red failure on `review=observing`; Green focused pytest pass | pass |
+| S01 | tc-002 | actionable unresolved feedback still renders `review=unresolved` with counts | Focused Green includes `test_issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review` | pass |
+| S01 | tc-003 | final JSON decision / fingerprint / next action / no-completion / fallback semantics remain unchanged | Focused Green includes issue 187 S204 and fallback regression tests | pass |
+| S01 | tc-004 | provider and mirror display derivation match | Structural `rg` inspection for provider and mirror | pass |
+| S90 | tc-005 | docs impact is resolved as update-needed or no-update with evidence | PR observation skill docs inspection found no stale `review=observing` contract; S90 spec-reviewer passed approved-no-op | pass |
+| S99 | tc-006 | final handoff readiness is recorded after final QA/code/spec reviewers pass | S99 validation passed after amendment commit `2b4f6b48`; final QA, issue-wide code review, and final spec review all passed | pass |
+
+#### Test Contract Closure
+
+| Closure id | Step | Evidence level | Pre-implementation evidence | Verification command | Result |
+|---|---|---|---|---|---|
+| tc-001 | S01 | red-required | Red failed because stderr still rendered `review=observing` after test expectation changed to `review=pending_signal` | focused Green pytest command | pass |
+| tc-002 | S01 | covered-existing | Existing issue 174 test covers unresolved review display and counts | focused Green pytest command | pass |
+| tc-003 | S01 | covered-existing | Existing issue 187 / issue 176 tests cover no-completion, wait_or_resume, fallback issue comment semantics | focused Green pytest command | pass |
+| tc-004 | S01 | inspect-only | Provider and mirror target files inspected with planned `rg` | structural `rg` command | pass |
+| tc-005 | S90 | inspect-only | Docs inspection found no stale public progress review contract requiring update | S90 docs impact inspection plus spec-reviewer pass | pass |
+| tc-006 | S99 | inspect-only | Final handoff readiness requires final QA/code/spec pass and final report commit | S99 validation commands passed; final QA/code/spec reviewer gates passed | pass |
+
+#### Closure Coverage
+
+| Required closure id | AC/EC covered | Verification evidence | Result |
+|---|---|---|---|
+| tc-001 | AC-001, EC-001 | Red/Green focused test for pending signal wait progress | covered |
+| tc-002 | AC-002 | Focused issue 174 unresolved review regression | covered |
+| tc-003 | AC-003, EC-001, EC-002, EC-003, EC-004 | Focused issue 174 / 176 / 187 regression set | covered |
+| tc-004 | AC-004 | Provider/mirror structural inspection | covered |
+| tc-005 | AC-003, AC-004 | S90 docs impact inspection and spec-reviewer pass | covered |
+| tc-006 | all AC/EC | S99 validation passed; final QA/code/spec reviewer gates passed | covered |
+
+#### Worker evidence draft
+
+- Worker summary: implemented S01 display-only change in provider and mirror wait scripts; repaired the focused S04 test fixture so Red/Green observe the planned wait payload; final JSON decision path was not edited.
+- Changed files:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+  - `.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+  - `tests/unit/infra/test_init_update.py`
+  - `spec-dock/active/issue/report.md`
+- Verification result: focused Green command passed with `10 passed, 429 deselected`; structural inspection found no `review=observing` and matching provider/mirror `pending_signal` display derivation.
+- Unresolved risks: per-step `code-reviewer` pass, Step Commit Gate, S90 docs impact resolution, and S99 final gates remain pending outside this S01 worker run.
+- Worker ledger note: material evidence-path repair was required because the initial Red failed for the wrong reason. Parent disposition: adopted in D-004 / EAL-006, pending code-reviewer confirmation.
+
+#### Reviewer Gate Status
+
+| ステップ | ゲート名 | レビュアーロール | 鮮度 | 状態 | リスク受容 | 昇格 / 完了判断 | メモ |
+|---|---|---|---|---|---|---|---|
+| S01 | step code review | code-reviewer | fresh | passed | N/A | proceed to Step Commit Gate | No findings; provider/mirror parity, fixture repair, and S01 closure evidence are consistent |
+
+#### Step Commit Gate
+
+| Step | Review scope | Step reviewer verdict | Commit scope | Closure state | Commit evidence | Post-commit clean check |
+|---|---|---|---|---|---|---|
+| S01 | provider/mirror wait display derivation, focused tests, report evidence | code-reviewer pass | S01 files only | committed | `b476e6f3` `fix(pr-observation): progressのreview表示を対象状態に修正` | `git status --short --branch` showed no staged / unstaged changes after S01 commit |
+
+#### Closure Delta
+
+| Step | Added | Removed | Changed | Re-review needed |
+|---|---|---|---|---|
+| S01 | none | none | Evidence-path repair in existing S04 focused test fixture; no closure id changed | code-reviewer pass |
+
+## 最終品質ゲート（Final Quality Gate）
+
+### S99 Validation Evidence
+
+| Command | Result | Evidence |
+|---|---|---|
+| `./spec-dock/scripts/spec-dock validate` | pass | `spec-dock: ok (validate) nodes=134` |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint or issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review or issue_174_pr_observation_wait_preserves_output_boundary_and_line_budget or issue_187_s204_wait or issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback or issue_187_s100_fallback_issue_comment_is_not_no_completion_evidence"` | pass | `10 passed, 429 deselected in 30.33s` |
+| `./spec-dock/scripts/spec-dock sync --github` | pass | active unchanged; generated projection wrote successfully and left no git diff |
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
-| 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
+
+| 対象 | 更新要否 | 担当 | 証跡 | 仕様レビュアー結果 |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| PR observation skill docs | no | N/A | `rg -n "observing|pending_signal|progress lines|progress line|review" src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md .agents/skills/github-pr-observation/SKILL.md` confirmed no stale `review=observing` contract; docs describe bounded progress fields and final stdout JSON authority without enumerating review display values | pass |
+
+#### S90 Docs Impact Evidence
+
+- Result: approved-no-op with spec-reviewer pass.
+- Rationale: `github-pr-observation/SKILL.md` describes progress lines as bounded diagnostic key/value summaries and keeps final `stdout` JSON as the authoritative information boundary. It does not document `review=observing` or any conflicting progress review value, so the S01 vocabulary change does not require a docs text update.
+- Provider/mirror docs parity: both provider and dogfooding skill docs have the same relevant matches and no stale `review=observing` contract.
 
 ### 最終 QA ゲート（Final QA Gate）
-| レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
+
+| レビュアー | 範囲 | 統合テスト判断 | 証跡 | 結果 |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | sufficient after bounded follow-up | QA P1 found EC-001 latency-guard no-completion progress gap; follow-up committed in `4fc56b26` and amended in `2b4f6b48`; final QA re-review found no blocking coverage gaps | pass |
+
+#### QA P1 Follow-up Evidence
+
+| Item | Evidence |
+|---|---|
+| Trigger | Final QA failed after S01 commit `b476e6f3` because EC-001 latency-guard no-completion progress could show `review=approved` when CI passed, trusted Codex completion signal was absent, and final JSON remained wait/resume / non-terminal. |
+| Red evidence | After changing `test_issue_187_s204_wait_does_not_promote_unknown_before_trigger_age` to assert stderr progress, `uv run pytest tests/unit/infra/test_init_update.py -k "test_issue_187_s204_wait_does_not_promote_unknown_before_trigger_age"` failed as expected: stderr contained `phase=wait ci=passed review=approved` instead of `review=pending_signal`. |
+| Fix | `progress_line(...)` display-only derivation now treats no-signal `approved` / `passed` legacy review display values as `pending_signal` for wait progress when there is no actionable feedback and no trusted completion signal. Provider and dogfooding mirror were updated equivalently. |
+| Final JSON | No classify / final JSON decision schema / fingerprint code was edited. The focused test still asserts `recommended_next_action == "wait_or_resume"`, `observation_complete is False`, and latency guard remains unsatisfied before trigger age. |
+| Green verification | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint or issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review or issue_174_pr_observation_wait_preserves_output_boundary_and_line_budget or issue_187_s204_wait or issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback or issue_187_s100_fallback_issue_comment_is_not_no_completion_evidence"` passed: `10 passed, 429 deselected in 30.33s`. |
+| Structural inspection | `rg -n "review=observing|pending_signal|render_review" src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py .agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py tests/unit/infra/test_init_update.py` found no `review=observing`; provider and mirror both contain matching `render_review` / `pending_signal` derivation. `diff -u` between provider and mirror wait libraries produced no output. |
+| Step Commit Gate | Follow-up committed in `4fc56b26` `fix(pr-observation): no-completion時のreview表示を補強`; post-commit worktree was clean before S99 validation rerun. |
+
+#### QA / Code Review Follow-up Spec Amendment
+
+| Item | Evidence |
+|---|---|
+| Trigger | Final code/spec review found D-005 changed the exact `pending_signal` derivation without promoting the decision into `design.md` / `plan.md`, and QA noted `passed` legacy value was not explicitly tested. |
+| Amendment | `design.md` now states that legacy/audit `approved` / `passed` values without trusted completion signal, actionable feedback, or completed lifecycle are `pending_signal` candidates only for wait progress. `plan.md` now records this no-completion payload shape and the required focused test. |
+| Test | `test_issue_187_s204_wait_does_not_promote_unknown_before_trigger_age` is parameterized across `approved` and `passed`. |
+| Spec review | Fresh spec-reviewer pass confirmed the amendment promotes D-005, remains wait-phase scoped, and does not expand timeout/final behavior. |
+
+#### QA P1 Follow-up Reviewer Gate
+
+| レビュアー | 範囲 | 指摘 / 修正 | 結果 |
+|---|---|---|---|
+| code-reviewer | wait-only `pending_signal` derivation, focused latency-guard progress test, report follow-up evidence | no findings | pass |
+
+#### QA P1 Follow-up Ledger Note
+
+- source-agent: dev-coder
+- topic: EC-001 latency-guard no-completion progress display after QA fail
+- trigger: final QA P1 found that `review_status="approved"` with no trusted completion signal could still render `review=approved`
+- ambiguity / constraint: approved/passed review display values can be legacy audit status rather than trusted Codex completion; final JSON decision semantics and fingerprint schema must remain unchanged
+- observed facts: pre-fix focused test failed with stderr containing `phase=wait ci=passed review=approved`
+- options considered: only map `none` / `pending` / `unknown`; map `approved` only while `status_reason` is `missing_current_completion_signal`; map `approved` / `passed` when no completion signal, no actionable feedback, and no completed lifecycle exists
+- proposed decision: display-only pending-signal derivation should include `approved` / `passed` legacy review values under no-completion/no-actionable/no-lifecycle-completion conditions for wait progress lines
+- rationale: this satisfies EC-001 without touching classify, final JSON decision schema, trigger behavior, snapshot collectors, or auth behavior
+- affected files: `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`; `.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`; `tests/unit/infra/test_init_update.py`; `spec-dock/active/issue/report.md`
+- affected tests: `test_issue_187_s204_wait_does_not_promote_unknown_before_trigger_age`; S01 focused pytest set
+- risk if wrong: progress display could hide a genuinely trusted approved state if future payloads omit completion signal incorrectly; final JSON remains authoritative
+- rollback or revisit: revert the display-only candidate expansion and the stderr assertions, then add a more specific payload field for trusted review display if needed
+- confidence: medium-high
+- needs orchestrator decision: resolved; parent adopted the wait-only follow-up in D-005 / EAL-007 and intentionally did not adopt timeout-phase expansion
 
 ### 最終コードレビューゲート（Final Code Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
+
+| レビュアー | 範囲 | 指摘 / 修正 | 再 review 回数 | 結果 |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | initial final review failed on D-005 spec promotion and `passed` coverage; fixed by `2b4f6b48`; final re-review had no findings | 2 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
+
+| レビュアー | 範囲 | 指摘 / 修正 | 再 review 回数 | 結果 |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement/design/plan/report and implementation alignment | initial final review required tc-005/tc-006 closure rows and D-005 promotion; fixed in report and `2b4f6b48`; final re-review had no findings | 2 | pass |
 
-### 最終 commit（Final Commit）
-| 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
-|---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+## Execution Status
 
-## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- S01: committed in `b476e6f3`.
+- S90: docs impact resolved as approved-no-op in `488aaf9c`.
+- S99: validation commands passed after amendment commit `2b4f6b48`; final QA/code/spec re-review passed.
+- PR delivery: PR #216 created for branch `iss-00214-pr-observation-review-target-state`.
+- PR repair: initial observation on `f3b95994d94923c3e700e4fc54e52f5e70ee8c92` found `Provider CI / provider-tests` failure caused by the checked-in dogfooding metadata snapshot missing `iss-00214.../.meta.json`; repaired in `397900ef`.
+- Merge preparation / issue finish: pending human gate resolution for low-confidence fallback Codex review observation.
 
-## 学んだこと (任意)
-- ...
+## PR Delivery / Merge Preparation Evidence
 
-## 今後の推奨事項 (任意)
-- ...
+### PR Delivery Gate
 
-## 省略/例外メモ (必須)
-- 該当なし
+| Item | Evidence |
+|---|---|
+| PR URL | https://github.com/chemitaro/spec-dock/pull/216 |
+| Base / head | `main` / `iss-00214-pr-observation-review-target-state` |
+| Latest head SHA | `397900ef60152ef5bb00c0d5012014b358fa02c2` |
+| Draft state | ready PR (`isDraft=false`) |
+| Merge state | `CLEAN` via `gh pr view 216 --repo chemitaro/spec-dock --json mergeStateStatus` |
+
+### PR Repair Evidence
+
+| Item | Evidence |
+|---|---|
+| Failed observation | `normalized_status=failed`, `recommended_next_action=fix_ci`, head matched `f3b95994d94923c3e700e4fc54e52f5e70ee8c92` |
+| Failed check | `Provider CI / provider-tests`, GitHub Actions run `27820892612`, job `82333463397` |
+| Root cause | `tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` reported the checked-in dogfooding `.meta.json` path set had one extra committed path: `iss-00214-pr-observation-review-target-state/.meta.json` |
+| Repair | Added the `iss-00214.../.meta.json` path to `_CHECKED_IN_DOGFOODING_META_JSON_PATHS` and `_CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH` with `[]`; recorded PR repair batch/unit discussions |
+| Local repair validation | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` passed: `1 passed in 0.08s`; `./spec-dock/scripts/spec-dock validate` passed: `spec-dock: ok (validate) nodes=134` |
+
+### Latest PR Observation
+
+| Item | Evidence |
+|---|---|
+| Observation command | `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh --repo chemitaro/spec-dock --pr 216 --head-sha 397900ef60152ef5bb00c0d5012014b358fa02c2 --timeout-seconds 900 --poll-interval-seconds 30 --quiet-seconds 30 --same-fingerprint-count 2 --progress stderr-summary` |
+| Resume command | `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh --repo chemitaro/spec-dock --pr 216 --head-sha 397900ef60152ef5bb00c0d5012014b358fa02c2 --trigger-mode resume --trigger-comment-id 4750906881 --trigger-created-at 2026-06-19T10:59:59Z --timeout-seconds 600 --poll-interval-seconds 30 --quiet-seconds 30 --same-fingerprint-count 2 --progress stderr-summary` |
+| Trigger comment | `4750906881`, created at `2026-06-19T10:59:59Z` |
+| Codex review signal | Issue comment `4750944056`, created at `2026-06-19T11:05:37Z`, says no major issues for reviewed commit `397900ef60`; observation classified this as low-confidence fallback issue comment |
+| CI result | `CI / validate` and `Provider CI / provider-tests` all passed for head `397900ef60152ef5bb00c0d5012014b358fa02c2`; `gh pr checks 216 --repo chemitaro/spec-dock` showed 4 passing checks |
+| Review threads | `threads.total=0`, `threads.unresolved=0` |
+| Observation result | `normalized_status=human_gate`, `recommended_next_action=wait_or_resume`, `observation_complete=false`, reason `fallback_issue_comment_low_confidence` |
+
+### Merge-Prepared Gate
+
+| Condition | Status | Evidence / Rationale |
+|---|---|---|
+| PR open and ready | pass | PR #216 is `OPEN` and `isDraft=false` |
+| Latest head matches expected | pass | Observation and `gh pr view` both report `397900ef60152ef5bb00c0d5012014b358fa02c2` |
+| Required / visible checks pass | pass | `validate` and `provider-tests` are all success |
+| Merge conflict absent | pass | `mergeStateStatus=CLEAN` |
+| Blocking review feedback absent | pass-with-limitation | Codex fallback comment says no major issues and no review threads exist; observation classifies fallback comment as low confidence |
+| Observation complete | blocked | `observation_complete=false` because the review completion signal is a low-confidence fallback issue comment |
+| Merge-prepared decision | no | Human gate remains; issue finish is intentionally deferred |
