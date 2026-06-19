@@ -3,7 +3,7 @@
 ID: "iss-00218"
 タイトル: "Codex Review Fallback Signal Semantics"
 関連GitHub: ["#218"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-20"
 親: ["epic-00158", "init-local-00003"]

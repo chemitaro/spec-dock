@@ -3,9 +3,9 @@
 ID: "iss-00218"
 タイトル: "Codex Review Fallback Signal Semantics"
 関連GitHub: ["#218"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-06-19"
+最終更新: "2026-06-20"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00158", "init-local-00003"]
 ---
@@ -51,6 +51,7 @@ Disposition ごとの必須証跡:
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | scope | orchestrator / user interview | strict no-findings issue comment を merge-prepared evidence に昇格するか | Option A: strict condition で昇格; Option B: manual/non-retryable; Option C: 現状維持 | Option A を採用し、`codex_no_findings_issue_comment` を issue-local additive signal とする | ユーザー回答が Option A。generic fallback の安全契約を維持しつつ PR #216 型 false block を解消できる | promoted_to_design | `discussions/20260619t152719z-interview-no-findings-issue-comment-promotion-boundary.md` | `requirement.md`, `design.md`, `plan.md` に反映済み |
 | D-002 | resolved | implementation | spec-reviewer | design review で collector と snapshot / wait の authority 境界が曖昧 | collector が merge-prepared まで返す; collector は review completion のみ返す | collector は `review_completion_observed` まで、top-level `merge_prepared` は snapshot / wait のみ返す | collector は CI / PR metadata を持たないため、merge-prepared authority を持たせない | promoted_to_design | design reviewer fail/pass sequence | `design.md` に反映済み |
+| D-003 | resolved | operation | dev-coder / orchestrator | `requirement.md`, `design.md`, `plan.md` frontmatter が reviewer pass 後も `draft` のままだった | そのまま実装を続ける; planning へ戻す; reviewer-pass 証跡に合わせて frontmatter を `approved` に修正する | reviewer-pass と Spec Authoring Gate の execution-ready 証跡に合わせ、3 artifact と `report.md` の状態を `approved` に修正した | execution skill は draft artifact を実装開始ブロッカーにするため、reviewer-pass 証跡と metadata を一致させる必要がある | applied | requirement/design/plan reviewer pass; Spec Authoring Gate; frontmatter diff | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -133,9 +134,154 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- S01 では、PR review collector に `codex_no_findings_issue_comment` の review-level completion signal を追加した。
+- Generic `fallback_issue_comment` は low-confidence / non-promoting のまま維持し、non-retryable fallback action として `manual_review_required_non_retryable` を返す。
+- Step review の指摘により、no-findings issue comment の昇格条件を current PR head と expected head の一致、full-body exact allow-list、actionable unresolved thread 不在に限定した。
 
 ## 実装記録（セッションログ） (必須)
+
+### セッションログ（2026-06-20 S01）
+
+#### 対象
+- Step: S01 Collector no-findings signal taxonomy
+- AC/EC: AC-001, AC-002, AC-004, EC-001, EC-002, EC-003
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S01 — Collector no-findings signal taxonomy`
+  - closure ids: `tc-001`, `tc-002`, `tc-003`
+
+#### 実施内容
+- `dev-coder` に S01 のみを委任し、許可 path を `pr_review_snapshot.py` と `tests/unit/infra/test_init_update.py` に限定した。
+- Collector に review-level signal `codex_no_findings_issue_comment`、必須 evidence `no_findings_completion_candidate`、strict no-findings allow-list、missing expected head / old trigger / stale head context rejection を追加した。
+- Generic `fallback_issue_comment` は success に昇格せず、`manual_review_required_non_retryable` を返すようにした。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "issue_218_s01 or issue_182_s01_review_collector_marks_no_major_issues_fallback_candidate or issue_176_s03_review_collector_does_not_mark_fallback_as_primary or issue_187_s100_fallback_issue_comment_is_not_no_completion_evidence"
+
+11 passed, 436 deselected
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_170_pr_review_collector_excludes_resolved_thread_inline_comments_from_status -vv
+
+1 passed
+```
+
+```bash
+git diff --check
+
+pass: no output
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "review_collector or no_findings or fallback_issue_comment"
+
+interrupted after 27 passed, 397 deselected in 201.17s while running existing issue_170 collector test.
+The same issue_170 test passed when rerun directly.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S01 | 赤フェーズ（Red） | red-required for `tc-001`, `tc-002`, `tc-003` | delegated worker reported 6 expected failures after adding S01 expectations before implementation | delegated worker evidence | pass | worker did not stage/commit/report |
+| S01 | 緑フェーズ（Green） | S01 collector tests pass | parent rerun of S01-focused selector: 11 passed | `uv run pytest ... -k "issue_218_s01 or issue_182_s01_review_collector_marks_no_major_issues_fallback_candidate or issue_176_s03_review_collector_does_not_mark_fallback_as_primary or issue_187_s100_fallback_issue_comment_is_not_no_completion_evidence"` | pass | validates tc-s01-001 through tc-s01-008 and adjacent fallback behavior |
+| S01 | 緑フェーズ（Green） | existing collector regression remains healthy | issue_170 resolved-thread collector test passed directly | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_170_pr_review_collector_excludes_resolved_thread_inline_comments_from_status -vv` | pass | broad selector was interrupted while this existing test was active; direct rerun passed |
+| S01 | リファクタリング（Refactor） | guardrail satisfied / no broad refactor | no formatting whitespace issues | `git diff --check` | pass | no broad collector refactor |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S01 | broad selector was slow/interrupted while an existing issue_170 test was active | parent verification | reran the active existing test directly and confirmed pass; used narrower S01 selector for S01 closure | tc-001, tc-002, tc-003 | no | direct issue_170 test pass; S01-focused 8-test pass |
+| S01 | future Codex wording changes may need allow-list expansion | delegated worker | recorded as non-blocking future risk; current issue keeps strict allow-list | tc-001 | no | worker Ledger Note |
+| S01 | no-findings body with additional caveat lines could otherwise false-promote | code-reviewer | delegated follow-up added full-body exact allow-list regression | tc-001 | no | S01-focused pytest 10 passed |
+| S01 | expected head alone was insufficient without current PR head confirmation | code-reviewer | delegated follow-up added current PR head mismatch regression | tc-003 | no | S01-focused pytest 10 passed |
+| S01 | current/actionable unresolved threads not tied to selected Codex review could otherwise be bypassed | code-reviewer | delegated follow-up gated no-findings promotion on `actionable_unresolved_thread_ids` and added regression | tc-001, tc-003 | no | S01-focused pytest 11 passed |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S01 | tc-001, tc-002, tc-003 | Collector decision が design の signal taxonomy に一致する | S01-focused pytest 11 passed; `git diff --check` pass | pass | second step re-review passed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-001 / tc-s01-001 | S01 | yes | red-required | delegated worker reported expected Red failure before implementation | S01-focused pytest selector | pass | observed Codex Review wording promotes at collector review level |
+| tc-002 / tc-s01-002 | S01 | yes | red-required | delegated worker reported expected Red failure before implementation | S01-focused pytest selector | pass | generic comment remains non-promoting fallback |
+| tc-003 / tc-s01-003 | S01 | yes | red-required | delegated worker reported expected Red failure before implementation | S01-focused pytest selector | pass | missing expected head does not promote |
+| tc-003 / tc-s01-004 | S01 | yes | red-required | delegated worker reported expected Red failure before implementation | S01-focused pytest selector | pass | no-findings comment outside trigger boundary does not promote |
+| tc-003 / tc-s01-005 | S01 | yes | red-required | delegated worker reported expected Red failure before implementation | S01-focused pytest selector | pass | stale head context does not promote |
+| tc-001 / tc-s01-006 | S01 | yes | red-required | delegated follow-up worker reported expected Red failure before implementation | S01-focused pytest selector | pass | no-findings body with caveat line does not promote |
+| tc-003 / tc-s01-007 | S01 | yes | red-required | delegated follow-up worker reported expected Red failure before implementation | S01-focused pytest selector | pass | current PR head mismatch does not promote |
+| tc-001, tc-003 / tc-s01-008 | S01 | yes | red-required | delegated follow-up worker reported expected Red failure before implementation | S01-focused pytest selector | pass | actionable unresolved thread prevents no-findings promotion |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-001 | S01 | S01-focused pytest selector | pass | no-findings issue comment new signal; full-body exact allow-list; no actionable unresolved threads |
+| tc-002 | S01 | S01-focused pytest selector | pass | generic fallback non-promotion |
+| tc-003 | S01 | S01-focused pytest selector | pass | missing expected head / old trigger / stale head context / current PR head mismatch / actionable unresolved thread rejection |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-001 | `test_issue_182_s01_review_collector_marks_no_major_issues_fallback_candidate` | tc-001 | existing no-major wording now maps to new signal instead of non-promoting fallback candidate | no | step code review required |
+| added | tc-001 | `test_issue_218_s01_no_findings_comment_with_caveat_line_remains_fallback` | tc-001 | step reviewer found loose line-level body matching could false-promote caveated comments | no | yes, step re-review required |
+| added | tc-003 | `test_issue_218_s01_no_findings_comment_current_pr_head_mismatch_does_not_promote` | tc-003 | step reviewer found expected-head presence alone did not prove current PR head match | no | yes, step re-review required |
+| added | tc-001, tc-003 | `test_issue_218_s01_review_collector_no_findings_with_actionable_unresolved_thread_does_not_promote` | tc-001, tc-003 | step reviewer found current unresolved threads outside selected Codex review evidence could otherwise be bypassed | no | yes, step re-review required |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
+
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction to execute issue workflow | `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/26b6/spec-dock` | iss-00218 | current session | dev-coder, code-reviewer, spec-reviewer, qa-reviewer | same repo, active issue, current session, named roles; no destructive action / publishing / credentialed access / scope expansion | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
+
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated | runtime / tests behavior in shipped installed skill asset | dev-coder | collector taxonomy only | requirement/design/plan S01 | `pr_review_snapshot.py`, `tests/unit/infra/test_init_update.py` | snapshot/wait/docs/canonical docs/GitHub state/secrets | S01 targeted pytest and `git diff --check` | expected head missing promotion, broad matcher, allowed paths outside scope | changed files, tests, risks, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S01 | dev-coder | Added `codex_no_findings_issue_comment`, strict allow-list, mandatory `no_findings_completion_candidate`, boundary rejection, and non-retryable generic fallback action | `pr_review_snapshot.py`; `tests/unit/infra/test_init_update.py` | worker reported Red: 6 expected failures; Green: targeted pytest 47 passed; tidy: `git diff --check` pass | failed: code-reviewer found head-match and full-body-match gaps | future Codex wording changes out of scope | accepted with bounded follow-up |
+| S01 | dev-coder | Tightened promotion to require current PR head / expected head match and full-body exact no-findings body match; added regressions for caveat-line body and current head mismatch | `pr_review_snapshot.py`; `tests/unit/infra/test_init_update.py` | worker reported Red: 2 expected failures; Green: targeted pytest 49 passed; tidy: `git diff --check` pass | failed: first re-review found actionable unresolved thread gap | frontmatter readiness metadata discrepancy resolved in D-003 | accepted with bounded follow-up |
+| S01 | dev-coder | Tightened promotion to reject current/actionable unresolved review threads; added regression for strict no-findings plus actionable unresolved thread | `pr_review_snapshot.py`; `tests/unit/infra/test_init_update.py` | worker reported Red: 1 failed / 10 passed; Green: targeted pytest 11 passed; tidy: `git diff --check` pass | passed: second code-reviewer re-review | none | accepted |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S01 | N/A delegated path used | N/A | N/A | N/A | revert S01 commit if needed after review | S01-focused pytest; `git diff --check` | code-reviewer pending | none |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S01 | step reviewer | code-reviewer | stale initial review | failed | N/A | bounded follow-up delegated | initial review found missing current PR head comparison and loose line-level no-findings match |
+| S01 | step reviewer | code-reviewer | stale first re-review | failed | N/A | bounded follow-up delegated | first re-review found no-findings could bypass actionable unresolved threads |
+| S01 | step reviewer | code-reviewer | fresh second re-review | passed | N/A | proceed to Step Commit Gate | no findings; reviewer confirmed S01 scope is correct |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S01 | committed | `pr_review_snapshot.py`, `tests/unit/infra/test_init_update.py`, `requirement.md`, `design.md`, `plan.md`, `report.md` | S01 commit at `HEAD` after commit gate | `git status --short --branch` -> clean working tree, branch ahead 1 | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` - S01 collector taxonomy。
+- `tests/unit/infra/test_init_update.py` - S01 collector tests。
+- `spec-dock/active/issue/report.md` - S01 observed evidence ledger。
+- `spec-dock/active/issue/requirement.md` - reviewer-pass と一致する frontmatter status 修正。
+- `spec-dock/active/issue/design.md` - reviewer-pass と一致する frontmatter status 修正。
+- `spec-dock/active/issue/plan.md` - reviewer-pass と一致する frontmatter status 修正。
+
+#### コミット
+- S01 commit at `HEAD`: `fix(pr-observation): no-findings issue commentのcollector分類を追加`
+
+#### メモ
+- Material implementation decisions are recorded in D-003 and reviewer follow-up rows above.
+
+---
 
 ### セッションログ（2026-06-19 HH:MM - HH:MM）
 
