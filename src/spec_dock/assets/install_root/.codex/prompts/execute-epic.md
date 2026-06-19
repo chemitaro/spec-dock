@@ -56,7 +56,10 @@ authoring, initiative-driven decomposition, dependency, or Issue readiness repai
 When the epic is ready:
 
 - Select the next ready Issue from the approved Epic plan, dependency state, and
-  `spec-dock/docs/workflow_epic.md`. If no Issue is ready, record blocker
+  `spec-dock/docs/workflow_epic.md`. If no Issue is ready because all required
+  Issues are complete or the reviewed plan explicitly has no executable Issue
+  work, record no-op / completion evidence and continue to the Epic completion
+  gate. If executable Issue work remains blocked or unready, record blocker
   evidence and hand the Epic back to `$spec-dock-epic-planning` or the relevant
   workflow gate instead of inventing execution work.
 - For the selected Issue, run

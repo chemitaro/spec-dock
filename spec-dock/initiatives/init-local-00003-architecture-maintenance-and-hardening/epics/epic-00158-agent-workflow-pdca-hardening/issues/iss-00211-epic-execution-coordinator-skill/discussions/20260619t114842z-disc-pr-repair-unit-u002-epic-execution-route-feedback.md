@@ -90,6 +90,9 @@ reflected_to: []
 - Provider/mirror `cmp -s` checks passed for `spec-dock-epic-execution/SKILL.md` and `execute-initiative.md`.
 - Additional focused tests passed after `execute-epic.md` anchor repair: `test_issue_211_epic_execution_route_content_regression_contract` and `test_issue_93_execute_prompts_contract` -> `2 passed`.
 - Provider/mirror `cmp -s` check passed for `execute-epic.md`.
+- Continued U002 repair after a later review pass: removed initiative-level direct Issue execution ownership after `/execute-epic` handoff, added the completed/no-op Epic path to `execute-epic.md`, and added `spec-dock-epic-execution` to docs README Epic entrypoints.
+- Focused tests passed after continued repair: `test_issue_211_epic_execution_route_content_regression_contract`, `test_issue_93_execute_prompts_contract`, and `test_init_creates_expected_structure` -> `3 passed`.
+- Provider/mirror `cmp -s` checks passed for `execute-initiative.md`, `execute-epic.md`, and docs `README.md`.
 - `git diff --check` passed.
 
 ## Commit Evidence
