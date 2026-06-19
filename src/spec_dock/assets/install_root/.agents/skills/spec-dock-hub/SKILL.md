@@ -25,6 +25,7 @@ description: Entry/routing skill for SpecDock work; use it as the route selector
 
 - `spec-dock-initiative-planning`: initiative-level requirement/design/plan planning.
 - `spec-dock-epic-planning`: epic-level requirement/design/plan planning.
+- `spec-dock-epic-execution`: epic execution coordination after Epic planning is complete; selects one ready Issue at a time, routes to Issue planning/execution, and hands PR delivery to the merge-preparer without replacing issue execution.
 - `spec-dock-issue-planning`: issue-level requirement/design/plan planning, review readiness, and implementation handoff readiness.
 - `spec-dock-issue-execution`: issue-level TDD execution and report updates after approved / reviewer-pass planning artifacts and an executable `plan.md` are ready.
 - `spec-dock-clarification`: first-class docs-aware clarification companion for planning, source-grounded ambiguity, one-question-at-a-time user clarification through the orchestrator, and analysis-only / authoring handoff.

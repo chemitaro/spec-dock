@@ -1553,8 +1553,9 @@ class TestRuntimeSyncS07:
             assert "iss-local-00002" not in index_todo["nodes"]
             assert "iss-local-00002" in index_all["nodes"]
             assert "@startuml" in deps_raw_puml
-            assert "iss-local-00001" in deps_raw_puml
-            assert "iss-local-00002" in deps_raw_puml
+            assert "iss-local-00001" not in deps_raw_puml
+            assert "iss-local-00002" not in deps_raw_puml
+            assert 'note "No raw direct dependencies to render" as Empty' in deps_raw_puml
 
             def _index_paths(payload: dict[str, object]) -> list[str]:
                 nodes = payload.get("nodes")
@@ -3217,22 +3218,44 @@ class TestRuntimeSyncS07:
                         initiative_id="init-00101",
                         epic_id="epic-00201",
                     ),
+                    "iss-00303": _node(
+                        "issue",
+                        "iss-00303",
+                        "Open issue with done dependency",
+                        parent_id="epic-00201",
+                        initiative_id="init-00101",
+                        epic_id="epic-00201",
+                    ),
                 }
             ),
             active=None,
             issue_statuses={
                 "iss-00301": _status("iss-00301", "open"),
                 "iss-00302": _status("iss-00302", "done"),
+                "iss-00303": _status("iss-00303", "open"),
             },
             progress=domain_models.ProgressMap(by_node_id={}, counts={}),
             deps_state=domain_models.DepsState(nodes=[], warnings=[]),
             deps_eval_by_id={
                 "iss-00301": domain_models.DepsEvaluation(
-                    ready=True,
-                    guard_reason="ready",
-                    blockers=[],
+                    ready=False,
+                    guard_reason="blocked",
+                    blockers=["epic-00201"],
                     blockers_top=[],
                     closure=[],
+                    node_blockers=[
+                        domain_models.DepsNodeBlocker(
+                            node_id="epic-00201",
+                            reason="empty_open",
+                            state="open",
+                            state_source="github",
+                            source_issue_id="iss-00301",
+                            lifecycle_state="open",
+                            lifecycle_source="github",
+                            dependency_disposition="blocking",
+                            disposition_basis="empty_open_container",
+                        )
+                    ],
                 ),
                 "iss-00302": domain_models.DepsEvaluation(
                     ready=True,
@@ -3248,14 +3271,64 @@ class TestRuntimeSyncS07:
                             target_node_kind="epic",
                             target_issue_ids=(),
                             expansion="empty",
+                            lifecycle_state="closed",
+                            lifecycle_source="github",
+                            dependency_disposition="satisfied",
+                            disposition_basis="lifecycle_closed",
                         )
                     ],
+                ),
+                "iss-00303": domain_models.DepsEvaluation(
+                    ready=True,
+                    guard_reason="ready",
+                    blockers=[],
+                    blockers_top=[],
+                    closure=[],
                 ),
             },
             generated_at="2026-06-18T00:00:00Z",
             warnings=[],
             deps_preflight_error=None,
+            dependency_contexts_by_issue_id={
+                "iss-00301": [
+                    domain_models.DepsDependencyContext(
+                        source_node_id="epic-00201",
+                        source_issue_id="iss-00301",
+                        target_node_id="epic-00201",
+                        target_node_kind="epic",
+                        target_issue_ids=(),
+                        expansion="empty",
+                        lifecycle_state="open",
+                        lifecycle_source="github",
+                        dependency_disposition="blocking",
+                        disposition_basis="empty_open_container",
+                    )
+                ],
+                "iss-00303": [
+                    domain_models.DepsDependencyContext(
+                        source_node_id="iss-00303",
+                        source_issue_id="iss-00303",
+                        target_node_id="iss-00302",
+                        target_node_kind="issue",
+                        target_issue_ids=("iss-00302",),
+                        expansion="issue",
+                    ),
+                    domain_models.DepsDependencyContext(
+                        source_node_id="iss-00303",
+                        source_issue_id="iss-00303",
+                        target_node_id="iss-00301",
+                        target_node_kind="issue",
+                        target_issue_ids=("iss-00301",),
+                        expansion="issue",
+                    )
+                ],
+            },
             high_level_statuses_by_node_id={
+                "epic-00201": domain_models.DepsHighLevelStatus(
+                    node_id="epic-00201",
+                    state="open",
+                    source="github",
+                ),
                 "epic-00202": domain_models.DepsHighLevelStatus(
                     node_id="epic-00202",
                     state="closed",
@@ -3265,9 +3338,214 @@ class TestRuntimeSyncS07:
         )
 
         payload = json.loads(presentation_json_state.render_deps_issues_artifact(state).json_text)
+        puml = presentation_json_state.render_deps_issues_artifact(state).puml_text
 
-        assert set(payload["nodes"]) == {"iss-00301"}
-        assert payload["edges"] == []
+        assert set(payload["nodes"]) == {"epic-00201", "iss-00301", "iss-00303"}
+        assert "iss-00302" not in payload["nodes"]
+        assert [
+            (edge["from"], edge["to"], edge["state"], edge["relation"])
+            for edge in payload["edges"]
+        ] == [("iss-00301", "epic-00201", "blocking", "raw_direct")]
+        assert payload["dependency_contexts"] == [
+            {
+                "source_node_id": "epic-00201",
+                "source_issue_id": "iss-00301",
+                "target_node_id": "epic-00201",
+                "target_node_kind": "epic",
+                "target_issue_ids": [],
+                "expansion": "empty",
+                "lifecycle_state": "open",
+                "lifecycle_source": "github",
+                "dependency_disposition": "blocking",
+                "disposition_basis": "empty_open_container",
+            },
+            {
+                "source_node_id": "iss-00302",
+                "source_issue_id": "iss-00302",
+                "target_node_id": "epic-00202",
+                "target_node_kind": "epic",
+                "target_issue_ids": [],
+                "expansion": "empty",
+                "lifecycle_state": "closed",
+                "lifecycle_source": "github",
+                "dependency_disposition": "satisfied",
+                "disposition_basis": "lifecycle_closed",
+            },
+            {
+                "source_node_id": "iss-00303",
+                "source_issue_id": "iss-00303",
+                "target_node_id": "iss-00302",
+                "target_node_kind": "issue",
+                "target_issue_ids": ["iss-00302"],
+                "expansion": "issue",
+                "lifecycle_state": "done",
+                "lifecycle_source": "local",
+                "dependency_disposition": "satisfied",
+                "disposition_basis": "local_done",
+            },
+        ]
+        assert not any(
+            context["target_node_id"] == "iss-00301" and context["target_node_kind"] == "issue"
+            for context in payload["dependency_contexts"]
+        )
+        assert "Nepic_00201 --> Niss_00301 : blocks" in puml
+        assert "raw_direct" not in puml
+        assert "satisfied edge" not in puml
+
+    def test_deps_check_json_includes_lifecycle_and_disposition_context(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            _app_ports,
+            _app_sync_state,
+            domain_models,
+            _infra_artifact_writer,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        presentation_json_state = _presentation_json_state_module()
+
+        inspection = domain_models.TargetDepsInspection(
+            target_id=domain_models.NodeId("iss-00301"),
+            evaluation=domain_models.DepsEvaluation(
+                ready=False,
+                guard_reason="blocked",
+                blockers=[],
+                blockers_top=[],
+                closure=[],
+                node_blockers=[
+                    domain_models.DepsNodeBlocker(
+                        node_id="epic-00201",
+                        reason="empty_open",
+                        state="open",
+                        state_source="github",
+                        source_issue_id="iss-00301",
+                        lifecycle_state="open",
+                        lifecycle_source="github",
+                        dependency_disposition="blocking",
+                        disposition_basis="empty_open_container",
+                    )
+                ],
+                dependency_contexts=[
+                    domain_models.DepsDependencyContext(
+                        source_node_id="iss-00301",
+                        source_issue_id="iss-00301",
+                        target_node_id="epic-00201",
+                        target_node_kind="epic",
+                        target_issue_ids=(),
+                        expansion="empty",
+                        lifecycle_state="open",
+                        lifecycle_source="github",
+                        dependency_disposition="blocking",
+                        disposition_basis="empty_open_container",
+                    )
+                ],
+                satisfied_dependencies=[
+                    domain_models.DepsDependencyContext(
+                        source_node_id="iss-00301",
+                        source_issue_id="iss-00301",
+                        target_node_id="epic-00202",
+                        target_node_kind="epic",
+                        target_issue_ids=(),
+                        expansion="empty",
+                        lifecycle_state="closed",
+                        lifecycle_source="github",
+                        dependency_disposition="satisfied",
+                        disposition_basis="lifecycle_closed",
+                    )
+                ],
+            ),
+            node_states={
+                "iss-00301": domain_models.DepsNodeState(
+                    node_id="iss-00301",
+                    status="open",
+                    ready=False,
+                    blockers_top=[],
+                    effective_depends_on=["epic-00201", "epic-00202"],
+                )
+            },
+            effective_depends_on=["epic-00201", "epic-00202"],
+            warnings=[],
+            issue_statuses={
+                "iss-00301": domain_models.IssueStatusSnapshot(
+                    issue_id="iss-00301",
+                    authority="derived",
+                    effective_status="open",
+                    source="local",
+                    stale=False,
+                    last_sync_at="2026-06-18T00:00:00Z",
+                    github_number=None,
+                )
+            },
+        )
+        result = app_contracts.DepsCheckResult(
+            target=app_contracts.TargetRef(
+                kind="id",
+                node_id="iss-00301",
+                github_issue_number=None,
+            ),
+            inspection=inspection,
+            warnings=[],
+        )
+
+        payload = json.loads(presentation_json_state.render_deps_check_json(result))
+
+        assert payload["schema_version"] == 2
+        assert {
+            "schema_version",
+            "target",
+            "target_status",
+            "ready",
+            "effective_depends_on",
+            "blockers",
+            "issue_blockers",
+            "node_blockers",
+            "satisfied_dependencies",
+            "dependency_contexts",
+            "nodes",
+            "warnings",
+        } <= set(payload)
+        assert payload["node_blockers"] == [
+            {
+                "node_id": "epic-00201",
+                "reason": "empty_open",
+                "state": "open",
+                "state_source": "github",
+                "source_issue_id": "iss-00301",
+                "lifecycle_state": "open",
+                "lifecycle_source": "github",
+                "dependency_disposition": "blocking",
+                "disposition_basis": "empty_open_container",
+            }
+        ]
+        assert payload["satisfied_dependencies"] == [
+            {
+                "source_node_id": "iss-00301",
+                "source_issue_id": "iss-00301",
+                "target_node_id": "epic-00202",
+                "target_node_kind": "epic",
+                "target_issue_ids": [],
+                "expansion": "empty",
+                "lifecycle_state": "closed",
+                "lifecycle_source": "github",
+                "dependency_disposition": "satisfied",
+                "disposition_basis": "lifecycle_closed",
+            }
+        ]
+        assert payload["dependency_contexts"] == [
+            {
+                "source_node_id": "iss-00301",
+                "source_issue_id": "iss-00301",
+                "target_node_id": "epic-00201",
+                "target_node_kind": "epic",
+                "target_issue_ids": [],
+                "expansion": "empty",
+                "lifecycle_state": "open",
+                "lifecycle_source": "github",
+                "dependency_disposition": "blocking",
+                "disposition_basis": "empty_open_container",
+            },
+        ]
 
     def test_sync_exit_behavior_regression(self) -> None:
         (

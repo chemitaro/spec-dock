@@ -1,0 +1,46 @@
+{
+  "schema_version": 2,
+  "target": "iss-01942",
+  "target_status": {
+    "authority": "github",
+    "effective_status": "open",
+    "source": "github",
+    "stale": false,
+    "last_sync_at": "2026-06-19T00:22:00Z"
+  },
+  "ready": false,
+  "effective_depends_on": [],
+  "blockers": [
+    "epic-01941"
+  ],
+  "issue_blockers": [],
+  "node_blockers": [
+    {
+      "node_id": "epic-01941",
+      "reason": "empty_unknown",
+      "state": "unknown",
+      "state_source": "none",
+      "source_issue_id": "iss-01942",
+      "lifecycle_state": "unknown",
+      "lifecycle_source": "none",
+      "dependency_disposition": "indeterminate",
+      "disposition_basis": "empty_unknown_container"
+    }
+  ],
+  "satisfied_dependencies": [],
+  "nodes": {
+    "iss-01942": {
+      "state": "ready",
+      "ready": true,
+      "authority": "github",
+      "effective_status": "open",
+      "source": "github",
+      "stale": false,
+      "last_sync_at": "2026-06-19T00:22:00Z"
+    }
+  },
+  "warnings": [
+    "deps_ref_expanded_to_empty",
+    "gh_fetch_failed"
+  ]
+}

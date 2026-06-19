@@ -6,6 +6,7 @@ Epic は設計の背骨です。
 
 対応 leaf skill:
 - `.agents/skills/spec-dock-epic-planning/SKILL.md`
+- `.agents/skills/spec-dock-epic-execution/SKILL.md`
 
 関連:
 - 総合: [guide.md](guide.md)
@@ -74,6 +75,12 @@ Cross-issue draft package は planning evidence であり、Issue の canonical 
 Target Issue が draft-requirement または draft-design の一方または両方を意図的に受け取らない場合、Epic report / handoff evidence は target Issue id、skipped draft type(s)、理由、その omission が Issue planning handoff を block しない理由、必要に応じた revisit / follow-up condition を記録します。
 
 Downstream Issue は、Epic planning outputs とこの completion / handoff contract を input として参照できます。各 downstream Issue は、Epic plan が dependency edge を明示しない限り独立した Issue として扱います。Epic execution coordinator behavior、issue start / finish cycle、PR merge-ready preparation は、later Issue が明示的に定義しない限り、この Epic planning handoff section の外側に置きます。
+
+## 実行ライフサイクル（Epic Execution Lifecycle）
+
+Epic planning completion 後の実行調整は `spec-dock-epic-execution` を first-read coordinator とします。この coordinator は ready Issue を一つずつ選び、Issue planning / execution へ渡し、Issue 実装後の PR delivery は `github-pr-merge-preparer` へ handoff します。Issue の詳細な実行規約と `issue finish` 判断は [workflow_issue.md](workflow_issue.md) を正本とし、この workflow では重複定義しません。
+
+Epic completion gate は、required Issues が完了済みまたは fresh spec-reviewed plan により明示的に不要化され、Epic-level evidence、品質ゲート、PR handoff expectation が揃った状態です。no-op / small Epic でも、不要な Issue を作らず、skipped-work rationale と completion evidence を Epic `report.md` に残します。
 
 ## 品質ゲート
 

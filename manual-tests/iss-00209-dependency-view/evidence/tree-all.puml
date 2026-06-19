@@ -1,0 +1,32 @@
+@startuml
+left to right direction
+skinparam shadowing false
+
+legend right
+|= State |= Color |
+| READY |<#D5E8D4> |
+| BLOCKED |<#F8CECC> |
+| DOING |<#DAE8FC> |
+| DONE |<#E3E3E3> |
+| UNKNOWN |<#EEEEEE> |
+endlegend
+
+  package "init-01920\nRealistic dependency projection" as Ninit_01920 {
+    package "epic-01929\nOpen foundation epic with done descendants" as Nepic_01929 {
+      rectangle "iss-01730\n[DONE]" as Niss_01730 #E3E3E3
+      rectangle "iss-01731\n[DONE]" as Niss_01731 #E3E3E3
+    }
+    package "epic-01931\nIntegration dependencies" as Nepic_01931 {
+      rectangle "iss-01935\n[BLOCKED]\nblockers: iss-01933,iss-01936" as Niss_01935 #F8CECC
+      rectangle "iss-01938\n[READY]" as Niss_01938 #D5E8D4
+      rectangle "iss-01939\n[BLOCKED]\nblockers: iss-01933" as Niss_01939 #F8CECC
+      rectangle "iss-01940\n[READY]" as Niss_01940 #D5E8D4
+      rectangle "iss-01942\n[BLOCKED]\nblockers: epic-01941" as Niss_01942 #F8CECC
+    }
+    package "epic-01934\nFeature epic with mixed children" as Nepic_01934 {
+      rectangle "iss-01933\n[BLOCKED]\nblockers: epic-01930" as Niss_01933 #F8CECC
+      rectangle "iss-01936\n[READY]" as Niss_01936 #D5E8D4
+    }
+  }
+
+@enduml
