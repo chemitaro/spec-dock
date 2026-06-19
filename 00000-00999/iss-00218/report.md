@@ -73,6 +73,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-005 | adopted | reviewer | `design.md` | design reviewer の P1/P2 指摘を修正し、fresh re-review が pass した | spec-reviewer Helmholtz/McClintock/Wegener/Huygens sequence | none |
 | EAL-006 | adopted | reviewer | `plan.md` | plan reviewer の P1/P2 指摘を修正し、fresh re-review が pass した | spec-reviewer Tesla/Dalton sequence | none |
 | EAL-007 | adopted | delegated worker | `report.md` S03 evidence | S03 worker の Red/Green/非回帰/diff-check 証跡を親が再実行結果と照合して採用 | parent rerun: S03 selector 3 passed; missing-completion selector 2 passed; `git diff --check` pass; code-reviewer pass with P2 bookkeeping finding | none |
+| EAL-008 | adopted | PR repair batch / repair unit | `report.md` final PR repair evidence | PR #220 observation 後の Provider CI failure 5件は checked-in dogfooding snapshot/parity の更新漏れとして分類し、U001 で局所修復した | `discussions/20260619t184139z-pr-repair-batch-pr-repair-batch.md`; `discussions/20260619t184214z-disc-pr-repair-unit-u001-ci-snapshot-parity.md`; five failing tests now pass locally; S99 selector 87 passed; validate pass; diff-check pass | push and latest-head PR re-observation |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -728,6 +729,11 @@ pass: no output
 |---|---|---|---|
 | S99 evidence updated through broad selector pass and final reviewer passes | S99 test fixture stabilization, snapshot fallback action alignment, no-findings blocker precedence, and report update | final response / PR | ready |
 
+### PR repair gate（PR #220 / U001）
+| repair batch | trigger / observation evidence | finding | local repair evidence | remaining gate |
+|---|---|---|---|---|
+| `discussions/20260619t184139z-pr-repair-batch-pr-repair-batch.md` | PR #220 observation at `fc9a8ad07ec327bf409cd15e5a9df403aca19f69`; result `/private/tmp/spec-dock-pr220-observation/result.json` | Provider CI failed five snapshot/parity tests; Codex review returned usage-limit issue comment | U001 implemented: dogfooding metadata snapshot updated, `.agents/skills/github-pr-observation/` mirror synced from provider, fallback action expectation updated; original five tests passed; broad S99 selector 87 passed; `spec-dock validate` passed; `git diff --check` passed | repair commit push and latest-head PR re-observation pending; Codex usage-limit remains human gate unless later review completes or user waives |
+
 ## 遭遇した問題と解決 (任意)
 - 問題: S99 broad selector exposed legacy PR observation tests that entered the new post-once trigger path even though their assertions targeted wait/snapshot classification.
   - 解決: Those tests now pass explicit resume trigger metadata, preserving their original classification scope while avoiding trigger posting semantics.
@@ -739,6 +745,8 @@ pass: no output
   - 解決: Post-once trigger tests were restored for permission denial, helper ordering, and trigger metadata propagation; the targeted reviewer regression selector passed.
 - 問題: Final code review found that no-findings issue comments could promote even when GitHub `reviewDecision` was `CHANGES_REQUESTED`.
   - 解決: No-findings promotion now requires `reviewDecision` not to be `CHANGES_REQUESTED`; a regression test fixes this blocker precedence.
+- 問題: PR #220 Provider CI found checked-in dogfooding snapshot/parity drift after PR observation.
+  - 解決: U001 repaired the local snapshot/parity surfaces and verified the five failing Provider CI tests locally; latest-head CI re-observation remains pending until push.
 
 ## 学んだこと (任意)
 - ...
