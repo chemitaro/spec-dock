@@ -73,6 +73,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-006 | adopted | S02 reviewer-fix: doc-writer | `/execute-epic` planning-vs-execution wording | Fresh `spec-reviewer` found the prompt still instructed Epic decomposition / Issue creation in the execution path. The fix rewrote `/execute-epic` to hand incomplete planning/decomposition back to `$spec-dock-epic-planning` and operate only on ready Issues from the approved Epic plan. | spec-reviewer P1; doc-writer reviewer-fix Ledger Note; `rg` no-match for stale decomposition/create Issue phrases; prompt provider/mirror `cmp -s` | Fresh re-review で AC-004 boundary を確認する。 |
 | EAL-007 | adopted | S02 reviewer-fix: dev-coder | S02 stale decomposition phrase regression | Reviewer finding exposed a test coverage gap: the route/content regression could pass while stale decomposition/create Issue wording remained. The fix added provider/mirror negative assertions for those phrases. | dev-coder reviewer-fix Ledger Note; `test_issue_211_epic_execution_route_content_regression_contract` -> pass; focused Issue 211 lane -> pass | Fresh re-review で `tc-005` negative coverage を確認する。 |
 | EAL-008 | adopted | S02 reviewer-fix 2: doc-writer / dev-coder | `/execute-epic` no suitable Epic and legacy prompt contract | Fresh re-review found remaining Epic create/import ownership wording and direct execution of `test_issue_93_execute_prompts_contract` failed because the legacy contract did not match the rewritten prompt. The fix routes unsuitable/missing Epic selection back to `$spec-dock-epic-planning`, keeps `spec-dock/docs/rules/epic/issues.md` only as planning handoff reference, and restores the prompt contract to require that reference without issue-creation authority. | spec-reviewer P1; code-reviewer P1; `test_issue_93_execute_prompts_contract` observed fail before fix; after fix direct prompt contract -> pass; S02 route/content test -> pass; focused lane -> pass; stale phrase `rg` no-match; prompt provider/mirror `cmp -s` | Fresh re-review で prompt boundary and prompt contract repair を確認する。 |
+| EAL-009 | adopted | S03 bounded repair: doc-writer | `workflow_epic.md` Japanese-primary heading repair | S03 full `test_init_update.py` run found S02-added heading `## Epic 実行ライフサイクル（Execution Lifecycle）` violated Japanese-primary heading policy. The bounded repair changed provider/mirror headings to `## 実行ライフサイクル（Epic Execution Lifecycle）`. | `test_spec_document_templates_keep_policy_out_of_scaffold` failure; doc-writer repair note; repair single test -> pass; full `test_init_update.py` rerun -> pass; provider/mirror `cmp -s` | Fresh reviewers で S03 repair and evidence を確認する。 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -388,7 +389,99 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S02 | ready to commit | S02 target files plus report evidence | pending commit | pending | N/A | N/A | N/A | N/A |
+| S02 | committed | S02 target files plus report evidence | `a7273edb` `docs(spec-dock): Epic execution routeをworkflowへ接続` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
+
+---
+
+### セッションログ（2026-06-19 S03）
+
+#### 対象
+- Step: S03 Targeted integration verification and bounded repair
+- AC/EC: AC-001..AC-005, tc-006
+- 計画上の出典（Planned source）:
+  - `plan.md` section: 実装ステップ S03
+  - closure id: `tc-006`
+
+#### 実施内容
+- S01/S02 統合後の targeted regression lane と provider/mirror parity guard を実行した。
+- 初回 `uv run pytest tests/unit/infra/test_init_update.py` で S02 の `workflow_epic.md` 見出しが Japanese-primary heading policy に違反していることを発見した。
+- `doc-writer` が provider / dogfooding mirror の `workflow_epic.md` 見出しを `## 実行ライフサイクル（Epic Execution Lifecycle）` に修正した。
+- 同じ初回 full lane で PR observation 系 test が一度失敗したが、単体再実行では pass し、S01/S02 変更と直接関係しない non-deterministic failure と判断した。
+- 修正後に `tests/unit/infra/test_init_update.py` 全体を再実行し、pass を確認した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime
+# Green: 634 passed, 76 skipped
+
+uv run pytest tests/unit/infra/test_init_update.py
+# Initial: 2 failed, 439 passed
+# - S02-caused: test_spec_document_templates_keep_policy_out_of_scaffold failed on English-primary heading.
+# - Rechecked unrelated failure: test_issue_187_s430_under_budget_final_poll_preserves_latest_useful_payload passed in isolation.
+
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_187_s430_under_budget_final_poll_preserves_latest_useful_payload -q
+# Recheck: 1 passed
+
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_spec_document_templates_keep_policy_out_of_scaffold -q
+# After bounded repair: 1 passed
+
+uv run pytest tests/unit/infra/test_init_update.py
+# After bounded repair: 441 passed
+
+rg -n "Do not create a new skill for this workflow" src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md .codex/prompts/execute-epic.md
+# expected no matches, exit 1
+
+git diff --check
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ / 既存カバレッジ（covered-existing） | integration check only | Full `test_init_update.py` caught S02-caused Japanese-primary heading violation in `workflow_epic.md`. | `uv run pytest tests/unit/infra/test_init_update.py` | pass as detection | Required bounded repair in S02 docs target files. |
+| S03 | 緑フェーズ（Green） | tc-006 targeted verification | `tests/cli_runtime` pass; `test_init_update.py` pass after bounded repair; stale prompt phrase no-match; `git diff --check` pass. | pytest / `rg` / `git diff --check` | pass | Integration lane closed after bounded repair. |
+| S03 | リファクタリング（Refactor） | no opportunistic cleanup | Only S02-caused heading repair was applied. | diff inspection | pass | No runtime or unrelated docs cleanup. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-006 | S03 | yes | covered-existing | S01/S02 changes committed and present (`4888d720`, `783342e3`, `a7273edb`). | `uv run pytest tests/cli_runtime`; `uv run pytest tests/unit/infra/test_init_update.py`; `rg` old phrase no-match; `git diff --check` | pass | Initial full lane found and bounded-repaired a S02 heading policy violation; fresh reviewers passed. |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | tc-006 | Targeted commands pass or blocked/incomplete evidence is recorded; repair diff receives required reviewer pass and commit gate. | `tests/cli_runtime` pass; `test_init_update.py` pass after bounded repair; stale prompt phrase no-match; `git diff --check` pass; fresh code-reviewer/spec-reviewer pass. | pass | S03 may proceed to commit gate. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-006 | S03 | full CLI runtime lane + full init/update lane + stale prompt no-match + diff check + reviewers pass | pass | Integration verification closed. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| changed | tc-006 | `test_spec_document_templates_keep_policy_out_of_scaffold` | tc-006 | S03 integration lane found S02 docs heading policy violation; bounded repair stayed within S02 docs target files. | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated repair | S03 integration failure caused by S02 docs heading | doc-writer | provider/mirror `workflow_epic.md` heading only | requirement/design/plan S03 | heading text in two workflow docs | unrelated docs cleanup, tests, runtime code, report | provider/mirror parity, policy test, diff check | repair exceeds S01/S02 target files | changed files, verification, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | doc-writer | Changed `workflow_epic.md` heading from English-primary to Japanese-primary with English anchor. | `src/spec_dock/assets/spec_dock/docs/workflow_epic.md`; `spec-dock/docs/workflow_epic.md` | provider/mirror `cmp -s`; heading policy test -> `1 passed`; `git diff --check` | code-reviewer pass; spec-reviewer pass | none | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | fresh after bounded repair | passed | N/A | proceed to commit gate | `review_status: pass`; no findings. |
+| S03 | step reviewer | spec-reviewer | fresh after bounded repair | passed | N/A | proceed to commit gate | `review_status: pass`; P2 stale S02 commit gate evidence corrected. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | ready to commit | S03 repair files plus report evidence | pending commit | pending | N/A | N/A | N/A | N/A |
 
 ---
 
