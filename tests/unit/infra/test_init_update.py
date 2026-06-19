@@ -1260,6 +1260,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00210-epic-planning-system-architect-draft-cycles/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00211-epic-execution-coordinator-skill/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00214-pr-observation-review-target-state/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00218-codex-review-fallback-signal-semantics/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1472,6 +1473,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00210-epic-planning-system-architect-draft-cycles/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00211-epic-execution-coordinator-skill/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00214-pr-observation-review-target-state/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00218-codex-review-fallback-signal-semantics/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -19857,7 +19859,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             "scope": "current_trigger_boundary",
             "status": "human_gate",
             "status_reason": "fallback_issue_comment_low_confidence",
-            "recommended_next_action": "wait_or_resume",
+            "recommended_next_action": "manual_review_required_non_retryable",
             "observation_complete": False,
             "selected_review_ids": [],
             "selected_review_comment_ids": [],
@@ -19884,7 +19886,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                         "status": "human_gate",
                         "overall_status": "human_gate",
                         "normalized_status": "human_gate",
-                        "recommended_next_action": "wait_or_resume",
+                        "recommended_next_action": "manual_review_required_non_retryable",
                         "decision": decision,
                         "decision_fingerprint": "fallback-decision-s03",
                         "check_runs": {"total": 1, "success": 1},
@@ -19899,7 +19901,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
             assert payload["normalized_status"] == "human_gate"
-            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["recommended_next_action"] == "manual_review_required_non_retryable"
             assert payload["observation_complete"] is False
             assert payload["decision"]["fallback_pass_candidate"]["present"] is True
             stderr_line = result.stderr.strip().splitlines()[-1]
