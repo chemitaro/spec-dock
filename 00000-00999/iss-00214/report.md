@@ -21,6 +21,7 @@ ID: "iss-00214"
 | D-001 | resolved | interpretation | user interview | `review=` が観測者側の作業状態を表示していた | `review=observing`; `review=pending`; `review=pending_signal` | no-signal wait state は `review=pending_signal` とし、`review=` は観測対象の Codex review state を表示する | ユーザー回答で `review=pending_signal` が明示され、観測する自分ではなく観測対象の状態を表示すべきとされた | applied | `discussions/20260619t064502z-interview-review-pending-state-naming.md`; `requirement.md`; `design.md`; `plan.md` | なし |
 | D-002 | resolved | scope | orchestrator | `observer=` / `wait=` 追加案の扱い | 今回追加する; 今回は追加しない | この issue では `review=` の target-state 表示だけに限定し、新 field は追加しない | 要件と設計で final JSON / progress line 以外の contract 変更を scope 外に固定した | applied | `requirement.md`; `design.md`; `plan.md` | 必要なら別 issue |
 | D-003 | resolved | test-strategy | spec-reviewer | EC-003 fallback issue comment semantics の検証が条件付きだった | 条件付きのまま; 必須 focused pytest に含める | fallback issue comment regression を必須検証に含める | plan review P1 finding により closure が実装者判断に残ると判定された | applied | `plan.md`; spec-reviewer Avicenna finding; spec-reviewer Epicurus pass | なし |
+| D-004 | resolved | test-strategy | dev-coder | S01 Red が計画した `review=` assertion の前に timeout / fixture 境界で失敗した | 実装を止める; timeout だけ延ばす; S04 fixture を planned payload 観測用に修理する | S04 fixture repair を採用し、Red/Green が計画済みの wait progress behavior を観測できるようにする | 修理は allowed test file に限定され、product final JSON semantics や trigger / snapshot runtime を変更しない。修理後の Red は `review=observing` に対して期待どおり失敗し、Green は focused regression set で pass した | applied | `tests/unit/infra/test_init_update.py`; S01 Red/Green evidence | code-reviewer が fixture repair を確認する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger）
 
@@ -31,6 +32,7 @@ ID: "iss-00214"
 | EAL-003 | adopted | reviewer | requirement.md | AC-002 の `など` が曖昧という requirement review P2 を受け、`review=unresolved` の exact expectation へ修正した | spec-reviewer Carson finding; spec-reviewer Lorentz pass | なし |
 | EAL-004 | adopted | reviewer | design.md | design は localized/trivial として system-architect draft を省略可能、かつ仕様整合は pass と判定された | spec-reviewer Ohm pass | なし |
 | EAL-005 | adopted | reviewer | plan.md | EC-003 fallback verification を必須化する P1 を受け、focused command と concrete test case に既存 fallback tests を追加した | spec-reviewer Avicenna fail; spec-reviewer Epicurus pass | なし |
+| EAL-006 | adopted | worker | report.md / tests | dev-coder の Ledger Note を親が確認し、S04 fixture repair を evidence-path repair として採用した | `tests/unit/infra/test_init_update.py`; S01 Red/Green evidence | code-reviewer gate |
 
 ## 目的整合台帳（Objective Alignment Ledger）
 
@@ -61,8 +63,10 @@ ID: "iss-00214"
 
 ## 実装サマリー
 
-- 未実装。今回の作業範囲は Issue Planning workflow に沿った仕様書作成と authoring gate の通過まで。
-- 実装対象は S01 `Target review progress display`、S90 `Docs impact resolution`、S99 `Final quality gate` として `plan.md` に固定した。
+- S01 `Target review progress display` を実装済み。
+- `progress_line(...)` の display-only derivation を変更し、trigger-boundary no-signal wait state は `review=pending_signal`、actionable / explicit review target state は既存 status を表示する。
+- Provider-side source と dogfooding mirror の同等変更を structural inspection で確認した。
+- S90 / S99、step reviewer gate、Step Commit Gate は未実施。Step Commit Gate は parent commit 待ち。
 
 ## 実装記録（セッションログ）
 
@@ -109,6 +113,109 @@ spec-dock: ok (issue checkout) branch=iss-00214-pr-observation-review-target-sta
 - `spec-dock/active/issue/report.md` - planning evidence と execution handoff readiness を記録
 - `spec-dock/active/issue/discussions/20260619t064501z-research-review-progress-target-state-source-analysis.md` - source-grounded clarification research
 - `spec-dock/active/issue/discussions/20260619t064502z-interview-review-pending-state-naming.md` - user interview and adoption record
+
+### セッションログ（2026-06-19 16:48 JST）
+
+#### 対象
+
+- Step: S01 `Target review progress display`
+- AC/EC: AC-001, AC-002, AC-003, AC-004, EC-001, EC-002, EC-003, EC-004
+- Closure ids: tc-001, tc-002, tc-003, tc-004
+
+#### Implementation Delegation Gate
+
+| Step | Decision | Required reason | Delegated role | Scope | Source of truth | Allowed changes | Forbidden changes | Required verification | Stop conditions | Output required | Result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated | runtime / tests / shipped scaffold behavior across provider and dogfooding mirror | dev-coder | `progress_line(...)` display derivation, focused regression test, provider/mirror inspection | `requirement.md`, `design.md`, `plan.md` S01, `workflow_issue.md`, existing tests | S01 allowed paths only | trigger helper, snapshot collectors, GitHub auth/token behavior, final JSON schema/fingerprint semantics, unrelated tests/refactors | required Red, focused Green pytest, structural `rg` inspection | forbidden path required; final JSON semantics change required; trigger/resume/snapshot behavior change required; focused tests cannot run | changed files, Red/Green/structural result, risks, Ledger Note or no-material statement | delegated worker completed bounded S01 implementation; parent integration pending reviewer/commit |
+
+#### Red evidence
+
+| Command | Result | Evidence |
+|---|---|---|
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint"` | failed as expected after evidence-path repair | `AssertionError`: expected `phase=wait ci=passed review=pending_signal`; observed stderr contained `phase=wait ci=passed review=observing` |
+
+Notes:
+
+- Initial Red attempt failed for the wrong reason before reaching the display assertion: the S04 snapshot fixture could timeout before emitting the planned payload, and the existing `payload["codex_review"]` assertion was not valid for the `review_status="none"` case.
+- Evidence-path repair stayed inside `tests/unit/infra/test_init_update.py`: the S04 snapshot fixture now returns `S04_WAIT_PAYLOAD` directly, the timeout budget allows a snapshot poll, and the `codex_review.lifecycle.status` assertion remains scoped to the `pending` case that carries that lifecycle contract.
+
+#### Implementation evidence
+
+| File | Change |
+|---|---|
+| `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py` | Changed wait progress display derivation so no-signal `none` / `pending` / `unknown` review states render `pending_signal` only when there is no actionable feedback and no completion signal. |
+| `.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py` | Mirrored the provider-side display derivation. |
+| `tests/unit/infra/test_init_update.py` | Updated the S01 Red expectation to `review=pending_signal` and repaired the S04 fixture so the test observes the intended wait payload. |
+| `spec-dock/active/issue/report.md` | Recorded S01 execution evidence. |
+
+#### Green verification
+
+| Command | Result | Evidence |
+|---|---|---|
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint or issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review or issue_174_pr_observation_wait_preserves_output_boundary_and_line_budget or issue_187_s204_wait or issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback or issue_187_s100_fallback_issue_comment_is_not_no_completion_evidence"` | passed | `10 passed, 429 deselected in 27.90s` |
+
+#### Structural inspection
+
+| Command | Result | Evidence |
+|---|---|---|
+| `rg -n "review=observing|pending_signal|render_review" src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py .agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py tests/unit/infra/test_init_update.py` | passed | No `review=observing` matches. Provider and mirror each contain `render_review = review_status`, `render_review = "pending_signal"`, and `fields.append(("review", str(render_review), False))`; the focused test expects `review=pending_signal`. |
+
+#### Step Contract Closure
+
+| Step | Closure id | Close condition | Evidence | Result |
+|---|---|---|---|---|
+| S01 | tc-001 | no-signal wait progress renders `review=pending_signal` instead of `review=observing` | Red failure on `review=observing`; Green focused pytest pass | pass |
+| S01 | tc-002 | actionable unresolved feedback still renders `review=unresolved` with counts | Focused Green includes `test_issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review` | pass |
+| S01 | tc-003 | final JSON decision / fingerprint / next action / no-completion / fallback semantics remain unchanged | Focused Green includes issue 187 S204 and fallback regression tests | pass |
+| S01 | tc-004 | provider and mirror display derivation match | Structural `rg` inspection for provider and mirror | pass |
+
+#### Test Contract Closure
+
+| Closure id | Step | Evidence level | Pre-implementation evidence | Verification command | Result |
+|---|---|---|---|---|---|
+| tc-001 | S01 | red-required | Red failed because stderr still rendered `review=observing` after test expectation changed to `review=pending_signal` | focused Green pytest command | pass |
+| tc-002 | S01 | covered-existing | Existing issue 174 test covers unresolved review display and counts | focused Green pytest command | pass |
+| tc-003 | S01 | covered-existing | Existing issue 187 / issue 176 tests cover no-completion, wait_or_resume, fallback issue comment semantics | focused Green pytest command | pass |
+| tc-004 | S01 | inspect-only | Provider and mirror target files inspected with planned `rg` | structural `rg` command | pass |
+
+#### Closure Coverage
+
+| Required closure id | AC/EC covered | Verification evidence | Result |
+|---|---|---|---|
+| tc-001 | AC-001, EC-001 | Red/Green focused test for pending signal wait progress | covered |
+| tc-002 | AC-002 | Focused issue 174 unresolved review regression | covered |
+| tc-003 | AC-003, EC-001, EC-002, EC-003, EC-004 | Focused issue 174 / 176 / 187 regression set | covered |
+| tc-004 | AC-004 | Provider/mirror structural inspection | covered |
+
+#### Worker evidence draft
+
+- Worker summary: implemented S01 display-only change in provider and mirror wait scripts; repaired the focused S04 test fixture so Red/Green observe the planned wait payload; final JSON decision path was not edited.
+- Changed files:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+  - `.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+  - `tests/unit/infra/test_init_update.py`
+  - `spec-dock/active/issue/report.md`
+- Verification result: focused Green command passed with `10 passed, 429 deselected`; structural inspection found no `review=observing` and matching provider/mirror `pending_signal` display derivation.
+- Unresolved risks: per-step `code-reviewer` pass, Step Commit Gate, S90 docs impact resolution, and S99 final gates remain pending outside this S01 worker run.
+- Worker ledger note: material evidence-path repair was required because the initial Red failed for the wrong reason. Parent disposition: adopted in D-004 / EAL-006, pending code-reviewer confirmation.
+
+#### Reviewer Gate Status
+
+| ステップ | ゲート名 | レビュアーロール | 鮮度 | 状態 | リスク受容 | 昇格 / 完了判断 | メモ |
+|---|---|---|---|---|---|---|---|
+| S01 | step code review | code-reviewer | fresh | passed | N/A | proceed to Step Commit Gate | No findings; provider/mirror parity, fixture repair, and S01 closure evidence are consistent |
+
+#### Step Commit Gate
+
+| Step | Review scope | Step reviewer verdict | Commit scope | Closure state | Commit evidence | Post-commit clean check |
+|---|---|---|---|---|---|---|
+| S01 | provider/mirror wait display derivation, focused tests, report evidence | code-reviewer pass | S01 files only | tc-001..tc-004 pass evidence recorded; reviewer passed | pending parent commit | pending parent commit |
+
+#### Closure Delta
+
+| Step | Added | Removed | Changed | Re-review needed |
+|---|---|---|---|---|
+| S01 | none | none | Evidence-path repair in existing S04 focused test fixture; no closure id changed | code-reviewer review pending |
 
 ## 最終品質ゲート（Final Quality Gate）
 
