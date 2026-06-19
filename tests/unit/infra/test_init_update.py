@@ -3043,6 +3043,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "spec-dock-clarification" in docs_readme
             assert "spec-dock-initiative-planning" in docs_readme
             assert "spec-dock-epic-planning" in docs_readme
+            assert "spec-dock-epic-execution" in docs_readme
             assert "spec-dock-issue-planning" in docs_readme
             assert "spec-dock-issue-execution" in docs_readme
             assert "spec-dock-adr-facilitation" in docs_readme
@@ -12031,13 +12032,19 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         ]
         for phrase in (
             "$spec-dock-epic-planning",
+            "$spec-dock-epic-execution",
             "planning or issue decomposition",
             "reviewed planning outputs and ready Issue work",
             "/execute-epic",
             "Epic execution coordination",
+            "Do not start or execute Issues directly",
         ):
             assert phrase in execute_initiative_prompt
         assert "issue decomposition using the\n  `/execute-epic` contract" not in \
+            execute_initiative_prompt
+        assert "For each issue produced by those epics, run" not in \
+            execute_initiative_prompt
+        assert "`./spec-dock/scripts/spec-dock issue start <issue-id>` before implementation" not in \
             execute_initiative_prompt
 
     def test_issue_93_execute_prompts_contract(self) -> None:
@@ -12065,7 +12072,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "spec-dock/docs/workflow_initiative.md",
                 "spec-dock/docs/phase_plan_initiative.md",
                 "spec-dock/docs/rules/initiative/epics.md",
-                "issue start <issue-id>",
+                "$spec-dock-epic-execution",
                 "active initiative `report.md`",
                 "report the initiative as blocked or",
                 "initiative and affected epic plans are amended",
