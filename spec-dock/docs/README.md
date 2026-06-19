@@ -13,7 +13,8 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 - Hub: `.agents/skills/spec-dock-hub/SKILL.md`
 - Clarification: `.agents/skills/spec-dock-clarification/SKILL.md`
 - Initiative: `.agents/skills/spec-dock-initiative-planning/SKILL.md`
-- Epic: `.agents/skills/spec-dock-epic-planning/SKILL.md`
+- Epic planning: `.agents/skills/spec-dock-epic-planning/SKILL.md`
+- Epic execution: `.agents/skills/spec-dock-epic-execution/SKILL.md`
 - Issue planning: `.agents/skills/spec-dock-issue-planning/SKILL.md`
 - Issue execution: `.agents/skills/spec-dock-issue-execution/SKILL.md`
 - ADR: `.agents/skills/spec-dock-adr-facilitation/SKILL.md`
