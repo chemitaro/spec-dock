@@ -132,6 +132,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - S01 で provider-side `spec-dock-epic-planning` skill の first-read spine を更新し、non-trivial Epic planning の `system-architect` draft cycle、skip/fallback、gap return、formal baseline/diff-guard、EAL、fresh reviewer gate を concise に明記した。
 - S01 は docs-only / inspect-only step として `doc-writer` に委任し、targeted `rg` と fresh `spec-reviewer` pass で `tc-001` を閉じた。
 - S02 で provider-side `workflow_epic.md` に Epic planning completion / handoff package、cross-issue draft package、issue-local draft command、Issue 211 の独立境界を追加し、fresh `spec-reviewer` pass で `tc-002` を閉じた。
+- S03 で provider-side skill/docs 変更を dogfooding mirror 2 ファイルへ反映し、targeted provider-vs-mirror comparison と fresh `spec-reviewer` pass で `tc-003` を閉じた。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -283,6 +284,100 @@ pass: diff touched only provider-side workflow_epic.md; workflow_spec_authoring.
 |---|---|---|---|---|---|---|---|
 | S02 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed to S02 commit gate | Reviewer found no findings; S02 acceptance / tc-002 satisfied with no Issue 211 scope creep. |
 
+### セッションログ（2026-06-19 S03 — Dogfooding mirror validation and evidence recording）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-008
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S03 — Dogfooding mirror validation and evidence recording`
+  - closure ids: `tc-003`
+
+#### 実施内容
+- `doc-writer` に S03 の bounded mirror-only update を委任した。
+- Provider-side S01/S02 変更を dogfooding mirror の `.agents/skills/spec-dock-epic-planning/SKILL.md` と `spec-dock/docs/workflow_epic.md` に反映した。
+- `spec-dock/docs/workflow_spec_authoring.md` は provider-side と既に一致していたため変更しなかった。
+- Broad `spec-dock update .` は、S03 の targeted mirror validation scope を越える unrelated scaffold drift を持ち込む可能性があるため実行しなかった。
+- `./spec-dock/scripts/spec-dock validate` / `sync` は S99 final validation で実行対象に残し、S03 では targeted provider-vs-mirror comparison を closure evidence とした。
+
+#### 実行コマンド / 結果
+```bash
+cmp -s src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md .agents/skills/spec-dock-epic-planning/SKILL.md
+
+pass: exit 0
+```
+
+```bash
+cmp -s src/spec_dock/assets/spec_dock/docs/workflow_epic.md spec-dock/docs/workflow_epic.md
+
+pass: exit 0
+```
+
+```bash
+cmp -s src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md spec-dock/docs/workflow_spec_authoring.md
+
+pass: exit 0
+```
+
+```bash
+rg -n "system-architect|baseline-status|diff-guard|Evidence Adoption Ledger|spec-reviewer|skip reason|fallback" .agents/skills/spec-dock-epic-planning/SKILL.md
+
+pass: all S01 mirror terms present.
+```
+
+```bash
+rg -n "planning completion|handoff|cross-issue draft|draft-requirement|draft-design|--issue|Issue 211|deps add|deps remove|deps check" spec-dock/docs/workflow_epic.md
+
+pass: all S02 mirror terms present.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ / 代替証跡（Red / alternative） | manual-required | Provider/mirror diff existed for S01 skill and S02 workflow_epic before S03. | pre-change `diff -u` / manual inspection | pass | `workflow_spec_authoring.md` already matched provider. |
+| S03 | 緑フェーズ（Green） | manual-required | Provider/mirror `cmp` exits 0 for changed skill, changed workflow_epic, and unchanged workflow_spec_authoring; mirror targeted `rg` terms present. | `cmp`, targeted `rg`, manual inspection | pass | Targeted mirror validation closes AC-008 for changed surfaces. |
+| S03 | リファクタリング（Refactor） | guardrail satisfied | No broad update/refactor run; only two mirror files changed. | diff inspection | pass | Avoided unrelated scaffold churn. |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | Broad update / validate / sync not run in S03 | implementation / review | recorded no-run rationale; defer validate/sync to S99 final validation | tc-003 | no | S03 reviewer accepted targeted comparison evidence and noted report no-run rationale requirement, now recorded. |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | tc-003 | Mirror validation evidence satisfies AC-008 and step `spec-reviewer` passes. | provider/mirror `cmp` exits 0; mirror targeted `rg` terms present; fresh S03 `spec-reviewer` pass; no-run rationale recorded for broad update/validate/sync. | pass | Commit gate closes with the S03 commit; post-commit hash and clean check are external evidence. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-003 | S03 | yes | manual-required | Provider/mirror diff existed for changed skill and workflow_epic before S03. | `cmp -s` for provider/mirror skill, workflow_epic, workflow_spec_authoring; mirror targeted `rg`; fresh `spec-reviewer` | pass | `validate` / `sync` remain final validation obligations in S99. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-003 | S03 | provider/mirror `cmp`, mirror targeted `rg`, fresh `spec-reviewer` pass | pass | Covers AC-008 for changed provider-side surfaces. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-003 | tc-s03-001 | tc-003 | Planned manual-required mirror validation closure was sufficient. | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | dogfooding mirror validation target update | doc-writer | Mirror changed S01/S02 provider surfaces only | provider-side skill/docs and `plan.md` S03 | `.agents/skills/spec-dock-epic-planning/SKILL.md`; `spec-dock/docs/workflow_epic.md` | provider files, workflow_spec_authoring, runtime code, tests, unrelated dogfooding issue data, Git/GitHub state | provider/mirror `cmp`, targeted `rg`, fresh `spec-reviewer` | broad update required; unrelated mirror drift; provider/mirror mismatch cannot be explained | changed files, validation commands, no-run rationale, risks, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | doc-writer | Mirrored provider S01/S02 changes into dogfooding skill/docs; workflow_spec_authoring stayed unchanged and matching. Worker reported: `No material implementation decisions beyond the approved plan.` | `.agents/skills/spec-dock-epic-planning/SKILL.md`; `spec-dock/docs/workflow_epic.md` | provider/mirror `cmp` -> pass; targeted `rg` -> pass; `git diff --check -- <mirror files>` -> pass | `spec-reviewer` pass | none | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed to S03 commit gate | Reviewer found no findings; report now records targeted mirror evidence and no-run rationale. |
+
 ### セッションログ（2026-06-19 HH:MM - HH:MM）
 
 #### 対象
@@ -373,6 +468,7 @@ pass: diff touched only provider-side workflow_epic.md; workflow_spec_authoring.
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed | Provider-side skill S01 change plus S01 report evidence | external evidence: S01 commit hash reported after commit | external evidence: `git status --short` after commit | N/A | N/A | N/A | N/A |
 | S02 | committed | Provider-side workflow_epic S02 change plus S02 report evidence | external evidence: S02 commit hash reported after commit | external evidence: `git status --short` after commit | N/A | N/A | N/A | N/A |
+| S03 | committed | Dogfooding mirror S03 change plus S03 report evidence | external evidence: S03 commit hash reported after commit | external evidence: `git status --short` after commit | N/A | N/A | N/A | N/A |
 | S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
 
 #### 変更したファイル
