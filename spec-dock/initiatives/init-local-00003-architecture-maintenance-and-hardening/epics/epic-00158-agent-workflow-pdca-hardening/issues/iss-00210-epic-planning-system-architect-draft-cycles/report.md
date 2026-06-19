@@ -499,37 +499,37 @@ pass: all S02 mirror terms present.
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| shipped skill / workflow docs and dogfooding mirror | yes | doc-writer | S01/S02/S03 commits `3be63624`, `d8d712ad`, `d31eb1f6`; P1 follow-up updated provider/mirror `workflow_epic.md`; `validate` ok nodes=133; `sync` ok active unchanged; provider/mirror `cmp` for changed docs passed | pass after P1 fix; final ledger re-review pending |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage after P1 fix | already sufficient / no additional integration test required | QA re-review passed: docs/skill-only closure ids `tc-001`/`tc-002`/`tc-003` remain covered by targeted inspection, provider/mirror comparison, fresh reviewer evidence, `validate`, `sync`, and `diff --check` | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff after P1 fix | no findings; confirmed provider/mirror consistency, no runtime/test scope, no Issue 211 execution coordinator, no issue start/finish or PR merge-ready scope creep | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | initial final review failed P1 because issue-local draft paths were optional; fixed by requiring paths for each target Issue or explicit skip/fallback evidence. Re-review passed with remaining P2 report ledger update; this table records that update. | 1 | pass after final ledger update re-review |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S01/S02/S03 closure rows, final validation, QA/code/spec review outcomes, and P1 follow-up disposition recorded | P1 workflow_epic provider/mirror fix plus final report ledger update | final response; later PR Delivery Gate / Merge Preparation Gate if PR delivery is requested before `issue finish` | ready after final commit and clean check |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: Final spec review found that issue-local draft requirement/design artifact paths were phrased as optional.
+  - 解決: Provider and dogfooding `workflow_epic.md` now require artifact paths for each target Issue after Issue creation, or explicit skip/fallback evidence with target Issue id, skipped draft type(s), reason, non-blocking rationale, and revisit/follow-up condition.
 
 ## 学んだこと (任意)
-- ...
+- Final handoff wording must distinguish optional artifact existence from explicit skip/fallback evidence; otherwise downstream Issue planning inputs become silently optional.
 
 ## 今後の推奨事項 (任意)
-- ...
+- During Issue 211, reference the Issue 210 handoff contract but keep Issue 211 execution coordination decisions independent.
 
 ## 省略/例外メモ (必須)
 - 該当なし
