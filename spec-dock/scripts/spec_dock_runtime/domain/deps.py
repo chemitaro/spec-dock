@@ -482,6 +482,13 @@ def _evaluate_dependency_contexts(
 
             if context.expansion == "empty":
                 if state == "open":
+                    evaluated = _with_disposition(
+                        context,
+                        lifecycle_state="open",
+                        lifecycle_source=state_source,
+                        dependency_disposition="blocking",
+                        disposition_basis="empty_open_container",
+                    )
                     node_blockers_by_id[context.target_node_id] = DepsNodeBlocker(
                         node_id=context.target_node_id,
                         reason="empty_open",
@@ -493,7 +500,15 @@ def _evaluate_dependency_contexts(
                         dependency_disposition="blocking",
                         disposition_basis="empty_open_container",
                     )
+                    dependency_contexts_by_key[key] = evaluated
                 else:
+                    evaluated = _with_disposition(
+                        context,
+                        lifecycle_state="unknown",
+                        lifecycle_source=state_source,
+                        dependency_disposition="indeterminate",
+                        disposition_basis="empty_unknown_container",
+                    )
                     node_blockers_by_id[context.target_node_id] = DepsNodeBlocker(
                         node_id=context.target_node_id,
                         reason="empty_unknown",
@@ -505,6 +520,7 @@ def _evaluate_dependency_contexts(
                         dependency_disposition="indeterminate",
                         disposition_basis="empty_unknown_container",
                     )
+                    dependency_contexts_by_key[key] = evaluated
 
     return (
         [node_blockers_by_id[node_id] for node_id in _safe_sorted_node_ids(list(node_blockers_by_id.keys()))],

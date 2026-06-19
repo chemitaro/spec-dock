@@ -224,6 +224,11 @@ class TestDepsDomain:
         assert result.node_blockers[0].lifecycle_source == "github"
         assert result.node_blockers[0].dependency_disposition == "blocking"
         assert result.node_blockers[0].disposition_basis == "empty_open_container"
+        assert result.dependency_contexts == [dependency_context]
+        assert result.dependency_contexts[0].lifecycle_state == "open"
+        assert result.dependency_contexts[0].lifecycle_source == "github"
+        assert result.dependency_contexts[0].dependency_disposition == "blocking"
+        assert result.dependency_contexts[0].disposition_basis == "empty_open_container"
 
     def test_evaluate_readiness_records_empty_closed_high_level_dependency_as_satisfied(self) -> None:
         domain_deps, domain_models, _domain_tree = _runtime_modules()
@@ -344,6 +349,11 @@ class TestDepsDomain:
         assert result.node_blockers[0].lifecycle_source == "none"
         assert result.node_blockers[0].dependency_disposition == "indeterminate"
         assert result.node_blockers[0].disposition_basis == "empty_unknown_container"
+        assert result.dependency_contexts == [dependency_context]
+        assert result.dependency_contexts[0].lifecycle_state == "unknown"
+        assert result.dependency_contexts[0].lifecycle_source == "none"
+        assert result.dependency_contexts[0].dependency_disposition == "indeterminate"
+        assert result.dependency_contexts[0].disposition_basis == "empty_unknown_container"
 
     def test_evaluate_readiness_fails_closed_for_unknown_descendant_high_level_dependency(self) -> None:
         domain_deps, domain_models, _domain_tree = _runtime_modules()
