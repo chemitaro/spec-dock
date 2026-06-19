@@ -31,7 +31,7 @@ _MANAGED_SKILL_NAMES = (
     "spec-dock-hub",
     "spec-dock-initiative-planning",
     "spec-dock-epic-planning",
-    "spec-dock-epic-execution",
+    "spec-dock-epic-execution",  # Docs README exposes Epic execution separately.
     "spec-dock-issue-planning",
     "spec-dock-issue-execution",
     "spec-dock-clarification",
