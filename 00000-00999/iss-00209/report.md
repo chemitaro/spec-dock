@@ -336,3 +336,87 @@ git diff --check
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
 | S03 | committed | presentation JSON contract and S03 report evidence | `HEAD` (S03 commit) | clean | N/A | N/A | N/A | N/A |
+
+### S04 — PlantUML Rendering（2026-06-19）
+
+#### 対象
+- Step: S04
+- AC/EC: AC-001, AC-004, AC-005, AC-006, EC-004
+- Closure IDs: `cl-012`, `cl-013`, `cl-014`, `cl-015`
+
+#### 実施内容
+- `dev-coder` に S04 allowed paths のみを委任した。
+- `deps-issues.puml` は active graph の blocking edge のみを描画し、edge label を `blocks` に統一した。
+- `deps-issues.puml` から user-facing な `raw_direct` / `satisfied edge` 表記を除外した。
+- `deps-raw.puml` は active raw direct view として、active な raw dependency edge だけを `raw_direct` で描画するようにした。
+- done/closed issue、高水準 closed/done endpoint、evaluated context が `satisfied` の high-level dependency edge は `deps-raw.puml` から除外した。
+- high-level node の package 表現は維持した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/unit/presentation/test_deps_raw_puml.py
+# green verification after S04 implementation: 69 passed
+
+uv run pytest tests/cli_runtime/test_sync.py::TestCliSync::test_sync_emits_deps_issues_json_and_puml_todo_only -q
+# exact CLI PUML smoke: 1 passed
+
+git diff --check
+# pass
+```
+
+#### 未完了 / 代替検証
+- `uv run pytest tests/cli_runtime/test_sync.py -k deps_issues`
+  - worker reported 4 selected tests but no progress; interrupted after about 137s.
+- `uv run pytest tests/cli_runtime/test_sync.py::TestCliSync::test_sync_deps_issues_marks_empty_closed_epic_dependency_satisfied`
+  - worker reported `sync --github` subprocess stalled and was interrupted after about 97s.
+- The exact non-hanging CLI PUML smoke plus presentation unit lane were used as S04 automated evidence. Manual mixed-state evidence remains S90/S04-manual follow-up for `cl-015`.
+- A final parent re-run of the same exact CLI smoke stalled before any test ran and was interrupted after about 136s; the earlier exact run remains the available CLI green evidence for S04.
+
+#### TDD / Red / Green / Refactor Evidence
+| step | phase | planned evidence | observed evidence | method | result | notes |
+|---|---|---|---|---|---|---|
+| S04 | Red | `deps-issues.puml` should not surface `raw_direct` in readiness view | worker reported focused test failed before implementation because PUML emitted `blocks (raw_direct)` | focused PUML assertion | pass | fixed to `blocks` only |
+| S04 | Red | `deps-raw.puml` should omit done/resolved-only noise | worker reported focused test failed before implementation because done prerequisite issue and raw edge rendered | focused raw PUML assertion | pass | fixed active raw filtering |
+| S04 | Green | PUML presentation lane passes | `71 passed` | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/unit/presentation/test_deps_raw_puml.py` | pass | parent re-ran and confirmed after reviewer P1 fixes |
+| S04 | Green | CLI PUML smoke passes | `1 passed` | `uv run pytest tests/cli_runtime/test_sync.py::TestCliSync::test_sync_emits_deps_issues_json_and_puml_todo_only -q` | pass | parent re-ran and confirmed |
+| S04 | Refactor guard | no domain/application readiness change | whitespace check clean and changed files limited to S04 allowed paths plus report evidence | `git diff --check`; `git diff --stat` | pass | JSON filtering only for PUML/raw payload generation |
+
+#### Implementation Delegation Gate
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | delegated | runtime/presentation PUML rendering step | dev-coder | PUML renderer, minimal JSON filtering, PUML tests | `requirement.md`, `design.md`, `plan.md` S04 | `presentation/puml.py`, `presentation/json_state.py` for PUML payload filtering, presentation/CLI sync tests | domain/application readiness, schema version, new raw-all artifact, docs | S04 unit/CLI commands and `git diff --check` | new UX rule or artifact needed | changed files, generated PUML observations, verification, risks | pass with CLI lane limitation recorded |
+
+#### Delegated Worker Evidence
+| step | delegated role | worker summary | changed files | tests run | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S04 | dev-coder | Updated deps-issues PUML to show blocking edges as `blocks` only and filtered deps-raw active raw view to omit done/closed/satisfied-only noise. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/puml.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py`; `tests/unit/presentation/test_runtime_sync_s07.py`; `tests/unit/presentation/test_deps_raw_puml.py`; `tests/cli_runtime/test_sync.py` | presentation lane -> 69 passed; exact CLI smoke -> 1 passed; `git diff --check` -> pass | pending code-reviewer | full `test_sync.py -k deps_issues` slow/hanging locally; manual evidence remains S90 | accepted for review |
+| S04 | parent follow-up | Fixed reviewer P1 so satisfied high-level raw dependencies declared on epic/initiative source nodes are filtered using descendant dependency contexts. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py`; `tests/unit/presentation/test_deps_raw_puml.py` | presentation lane -> 70 passed; exact CLI smoke -> 1 passed; `git diff --check` -> pass | pending re-review | full `test_sync.py -k deps_issues` slow/hanging locally; manual evidence remains S90 | accepted for re-review |
+| S04 | parent follow-up | Fixed reviewer P1 using the actual sync data flow by scanning evaluated satisfied contexts across descendant issue evaluations when filtering high-level raw source edges. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py`; `tests/unit/presentation/test_deps_raw_puml.py` | presentation lane -> 71 passed; exact CLI smoke -> 1 passed; `git diff --check` -> pass | pending re-review | full `test_sync.py -k deps_issues` slow/hanging locally; manual evidence remains S90 | accepted for re-review |
+
+#### Step Contract Closure
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S04 | `cl-012` | `deps-issues.puml` omits satisfied-only context | presentation tests assert satisfied-only nodes/edges and `satisfied edge` legend are absent from readiness PUML | pass | S03 JSON context remains machine-readable |
+| S04 | `cl-013` | active blockers render with `blocks` | presentation/CLI tests assert blocking edge renders as `blocks` and `raw_direct` is absent from deps-issues PUML | pass | active empty-open blockers remain visible |
+| S04 | `cl-014` | `deps-raw.puml` is active raw direct view | raw PUML tests assert active raw edges use `raw_direct`, high-level nodes are packages, and done/satisfied-only noise is omitted | pass | no new raw-all artifact |
+| S04 | `cl-015` | realistic mixed-state PlantUML remains visually usable | automated PUML evidence is present; manual mixed-state evidence is deferred to S90/manual | pending | manual-required closure not fully closed until S90 |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | observed result | notes |
+|---|---|---|---|---|---|---|---|
+| `tc-s04-001` / `cl-012` | S04 | yes | red-required | worker reported failing assertion before implementation | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/unit/presentation/test_deps_raw_puml.py` | pass | satisfied-only readiness graph noise removed |
+| `tc-s04-002` / `cl-013` | S04 | yes | red-required | worker reported readiness PUML exposed `raw_direct` before implementation | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/unit/presentation/test_deps_raw_puml.py`; exact CLI smoke | pass | `blocks` label only |
+| `tc-s04-003` / `cl-014` | S04 | yes | red-required | worker reported raw PUML rendered done prerequisite before implementation | `uv run pytest tests/unit/presentation/test_deps_raw_puml.py` | pass | active raw direct view |
+| `tc-s04-004` / `cl-015` | S04 | yes | manual-required | not applicable | S90/manual fixture pending | pending | manual evidence required before final closeout |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | code-reviewer | stale after follow-up | failed | N/A | re-review required | reviewer found satisfied high-level raw dependencies declared on epic/initiative source nodes were not filtered |
+| S04 | step reviewer re-review | code-reviewer | stale after follow-up | failed | N/A | re-review required | reviewer found high-level raw source filtering did not scan evaluated contexts across descendant issue evaluations |
+| S04 | step reviewer final re-review | code-reviewer | fresh | passed | N/A | proceed to S04 commit gate | no findings |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S04 | ready to commit | PlantUML rendering and S04 report evidence | pending | pending | N/A | N/A | N/A | N/A |
