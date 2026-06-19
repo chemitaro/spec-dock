@@ -522,6 +522,11 @@ pass: all S02 mirror terms present.
 |---|---|---|---|
 | S01/S02/S03 closure rows, final validation, QA/code/spec review outcomes, and P1 follow-up disposition recorded | P1 workflow_epic provider/mirror fix plus final report ledger update | final response; later PR Delivery Gate / Merge Preparation Gate if PR delivery is requested before `issue finish` | ready after final commit and clean check |
 
+### PR delivery / merge preparation gate
+| PR | Head SHA | Checks | Codex review | Merge state | Result |
+|---|---|---|---|---|---|
+| #212 `https://github.com/chemitaro/spec-dock/pull/212` | `20076bf1aa8ad22d39115e394e1ba556a5aa7702` | `CI / validate` success on push and pull_request; `Provider CI / provider-tests` success on push and pull_request | `@codex review` returned no major issues for reviewed commit `20076bf1aa` | `CLEAN` | pass; PR is merge-ready from observed checks/review state |
+
 ## 遭遇した問題と解決 (任意)
 - 問題: Final spec review found that issue-local draft requirement/design artifact paths were phrased as optional.
   - 解決: Provider and dogfooding `workflow_epic.md` now require artifact paths for each target Issue after Issue creation, or explicit skip/fallback evidence with target Issue id, skipped draft type(s), reason, non-blocking rationale, and revisit/follow-up condition.
