@@ -26,6 +26,7 @@ from spec_dock import __version__
 _SPEC_DOCK_DIRNAME = "spec-dock"
 _LEGACY_SPEC_DOCK_DIRNAME = ".spec-dock"
 _MANAGED_DIRS = ("docs", "templates", "scripts", "system")
+# Keep managed skill installation aligned with docs README entrypoints.
 _MANAGED_SKILL_NAMES = (
     "spec-dock-hub",
     "spec-dock-initiative-planning",

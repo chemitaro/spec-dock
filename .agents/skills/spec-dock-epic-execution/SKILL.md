@@ -33,8 +33,9 @@ Use this skill after Epic planning is complete and the Epic requirement, design,
 6. After Issue final local gates, route PR delivery and merge preparation.
    - Hand off to `github-pr-merge-preparer` for PR creation/reuse, observation, repair loop coordination, and merge-prepared evidence.
    - If PR preparation is blocked, stale, limited, or returns a human gate, preserve that evidence and stop; do not claim merge readiness.
-7. Return to `workflow_issue.md` for `issue finish` evaluation.
-   - After `github-pr-merge-preparer` returns merge-prepared evidence or a blocked result, use `spec-dock/docs/workflow_issue.md` to decide whether `./spec-dock/scripts/spec-dock issue finish` may run.
+7. Return to `workflow_issue.md` only after merge-prepared evidence.
+   - If `github-pr-merge-preparer` returns blocked, stale, limited, or human-gate evidence, preserve that terminal PR-preparation evidence and stop; do not run `issue finish`.
+   - Only after `github-pr-merge-preparer` returns merge-prepared evidence, use `spec-dock/docs/workflow_issue.md` to decide whether `./spec-dock/scripts/spec-dock issue finish` may run.
    - This skill does not claim reviewer pass, issue finish, delivery completion, PR merge readiness, or GitHub closure.
 8. Repeat one Issue at a time until the Epic has no remaining executable Issue work.
    - For a small or no-op Epic with no executable Issue work, record completion evidence, skipped-work rationale, and the Epic-level gate instead of creating unnecessary Issues.
