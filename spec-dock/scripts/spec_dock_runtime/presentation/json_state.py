@@ -19,6 +19,7 @@ from .puml import (
 CURRENT_FUTURE_PROJECTION = "current-future"
 FULL_HISTORY_PROJECTION = "full-history"
 OPEN_ISSUES_DEPENDENCY_VIEW_PROJECTION = "open-issues-dependency-view"
+ISSUE_READINESS_WITH_DEPENDENCY_CONTEXT_PROJECTION = "issue-readiness-with-dependency-context"
 
 
 def render_deps_check_json(result: DepsCheckResult) -> str:
@@ -35,12 +36,34 @@ def render_deps_check_json(result: DepsCheckResult) -> str:
     }
 
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "target": target_id,
         "target_status": target_status_payload,
         "ready": bool(inspection.evaluation.ready),
         "effective_depends_on": list(inspection.effective_depends_on),
         "blockers": list(inspection.evaluation.blockers),
+        "issue_blockers": list(inspection.evaluation.issue_blockers),
+        "node_blockers": [
+            {
+                "node_id": blocker.node_id,
+                "reason": blocker.reason,
+                "state": blocker.state,
+                "state_source": blocker.state_source,
+                "source_issue_id": blocker.source_issue_id,
+            }
+            for blocker in inspection.evaluation.node_blockers
+        ],
+        "satisfied_dependencies": [
+            {
+                "source_node_id": context.source_node_id,
+                "source_issue_id": context.source_issue_id,
+                "target_node_id": context.target_node_id,
+                "target_node_kind": context.target_node_kind,
+                "target_issue_ids": list(context.target_issue_ids),
+                "expansion": context.expansion,
+            }
+            for context in inspection.evaluation.satisfied_dependencies
+        ],
         "nodes": {
             node_id: {
                 "state": node_state.status,
@@ -183,6 +206,23 @@ def _issue_raw_state(result: SyncStateResult, issue_id: str) -> str:
     return "blocked"
 
 
+def _object_value(item: object, field_name: str, default: object = None) -> object:
+    if isinstance(item, dict):
+        return item.get(field_name, default)
+    return getattr(item, field_name, default)
+
+
+def _high_level_visual_state(result: SyncStateResult, node_id: str) -> dict[str, str] | None:
+    raw_status = result.high_level_statuses_by_node_id.get(node_id)
+    if raw_status is None:
+        return None
+    state = str(_object_value(raw_status, "state", "unknown") or "unknown").lower()
+    if state not in {"open", "closed", "done", "unknown"}:
+        state = "unknown"
+    source = str(_object_value(raw_status, "source", "none") or "none")
+    return {"state": state, "state_source": source}
+
+
 def _raw_dependency_participant_ids(result: SyncStateResult) -> tuple[set[str], list[dict[str, str]]]:
     graph_nodes = result.graph.nodes_by_id
     participant_ids: set[str] = set()
@@ -243,6 +283,9 @@ def _build_deps_raw_payload(result: SyncStateResult) -> dict[str, object]:
             "participant": init_node.id in participant_ids,
             "epics": [],
         }
+        init_visual_state = _high_level_visual_state(result, init_node.id)
+        if init_visual_state is not None:
+            init_item.update(init_visual_state)
         epic_items: list[dict[str, object]] = []
         epic_ids = _sort_ids(
             [
@@ -259,6 +302,9 @@ def _build_deps_raw_payload(result: SyncStateResult) -> dict[str, object]:
                 "participant": epic_node.id in participant_ids,
                 "issues": [],
             }
+            epic_visual_state = _high_level_visual_state(result, epic_node.id)
+            if epic_visual_state is not None:
+                epic_item.update(epic_visual_state)
             issue_items: list[dict[str, object]] = []
             issue_ids = _sort_ids(
                 [
@@ -370,6 +416,15 @@ def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], d
                         "labels": list(snapshot.labels),
                     }
                 )
+            elif node.kind in {"initiative", "epic"}:
+                visual_state = _high_level_visual_state(result, node.id)
+                if visual_state is not None and visual_state["state_source"] in {"github", "cache"}:
+                    github_item.update(
+                        {
+                            "state": visual_state["state"].upper(),
+                            "updated_at": result.generated_at,
+                        }
+                    )
             item["github"] = github_item
 
         if node.kind in ("initiative", "epic"):
@@ -542,89 +597,178 @@ def render_tree_artifact(result: SyncStateResult) -> TreeArtifact:
     )
 
 
+def _issue_status_value(result: SyncStateResult, issue_id: str) -> str:
+    status = result.issue_statuses.get(issue_id)
+    return status.effective_status.lower() if status is not None else "unknown"
+
+
+def _issue_is_satisfied(result: SyncStateResult, issue_id: str) -> bool:
+    return _issue_status_value(result, issue_id) in {"done", "closed"}
+
+
+def _node_payload(result: SyncStateResult, node_id: str) -> dict[str, object] | None:
+    node = result.graph.nodes_by_id.get(node_id)
+    if node is None:
+        return None
+    item: dict[str, object] = {
+        "id": node.id,
+        "type": node.kind,
+        "title": node.title,
+        "parent_id": node.parent_id,
+        "initiative_id": node.initiative_id,
+        "epic_id": node.epic_id,
+    }
+    if node.kind == "issue":
+        status = result.issue_statuses.get(node.id)
+        effective_status = status.effective_status if status is not None else "unknown"
+        evaluation = result.deps_eval_by_id.get(node.id)
+        ready = bool(evaluation.ready) if evaluation is not None else False
+        item.update(
+            {
+                "status": effective_status,
+                "authority": status.authority if status is not None else "unknown",
+                "effective_status": effective_status,
+                "source": status.source if status is not None else "unknown",
+                "stale": bool(status.stale) if status is not None else True,
+                "last_sync_at": status.last_sync_at if status is not None else None,
+                "ready": ready,
+                "depends_on": list(evaluation.blockers) if evaluation is not None else [],
+                "issue_blockers": list(evaluation.issue_blockers) if evaluation is not None else [],
+                "node_blockers": [
+                    {
+                        "node_id": blocker.node_id,
+                        "reason": blocker.reason,
+                        "state": blocker.state,
+                        "state_source": blocker.state_source,
+                        "source_issue_id": blocker.source_issue_id,
+                    }
+                    for blocker in (evaluation.node_blockers if evaluation is not None else [])
+                ],
+                "state": _issue_raw_state(result, node.id),
+            }
+        )
+    else:
+        visual_state = _high_level_visual_state(result, node.id)
+        state = visual_state["state"] if visual_state is not None else "unknown"
+        item.update(
+            {
+                "state": state,
+                "state_source": visual_state["state_source"] if visual_state is not None else "none",
+                "ready": state in {"closed", "done"},
+            }
+        )
+    return item
+
+
+def _build_deps_issues_v2_payload(result: SyncStateResult) -> dict[str, object]:
+    include_ids: set[str] = set()
+    edges_by_key: dict[tuple[str, str, str, str], dict[str, str]] = {}
+
+    def add_edge(
+        *,
+        source_issue_id: str,
+        target_node_id: str,
+        state: str,
+        relation: str,
+        source: str,
+    ) -> None:
+        if source_issue_id not in result.graph.nodes_by_id or target_node_id not in result.graph.nodes_by_id:
+            return
+        include_ids.add(source_issue_id)
+        include_ids.add(target_node_id)
+        key = (source_issue_id, target_node_id, state, relation)
+        edges_by_key[key] = {
+            "from": source_issue_id,
+            "to": target_node_id,
+            "state": state,
+            "relation": relation,
+            "source": source,
+        }
+
+    for issue_id, node in result.graph.nodes_by_id.items():
+        if node.kind != "issue":
+            continue
+        if not _issue_is_satisfied(result, issue_id):
+            include_ids.add(issue_id)
+
+    for issue_id in _sort_ids(list(result.deps_eval_by_id.keys())):
+        evaluation = result.deps_eval_by_id[issue_id]
+        if issue_id in include_ids:
+            for blocker_id in evaluation.issue_blockers:
+                add_edge(
+                    source_issue_id=issue_id,
+                    target_node_id=blocker_id,
+                    state="blocking",
+                    relation="compiled_issue",
+                    source="readiness",
+                )
+            for blocker in evaluation.node_blockers:
+                add_edge(
+                    source_issue_id=issue_id,
+                    target_node_id=blocker.node_id,
+                    state="blocking",
+                    relation="raw_direct",
+                    source="readiness",
+                )
+            for context in evaluation.satisfied_dependencies:
+                add_edge(
+                    source_issue_id=str(_object_value(context, "source_issue_id", issue_id)),
+                    target_node_id=str(_object_value(context, "target_node_id", "")),
+                    state="satisfied",
+                    relation="raw_direct",
+                    source="debug",
+                )
+
+    for issue_id in _sort_ids(list(include_ids)):
+        for context in result.dependency_contexts_by_issue_id.get(issue_id, []):
+            target_node_id = str(_object_value(context, "target_node_id", ""))
+            target_kind = str(_object_value(context, "target_node_kind", ""))
+            if target_kind == "issue" and _issue_is_satisfied(result, target_node_id):
+                add_edge(
+                    source_issue_id=issue_id,
+                    target_node_id=target_node_id,
+                    state="satisfied",
+                    relation="raw_direct",
+                    source="debug",
+                )
+
+    nodes: dict[str, object] = {}
+    for node_id in _sort_ids(list(include_ids)):
+        node_payload = _node_payload(result, node_id)
+        if node_payload is not None:
+            nodes[node_id] = node_payload
+
+    edges = sorted(
+        edges_by_key.values(),
+        key=lambda edge: (
+            _sort_key(edge["from"]),
+            _sort_key(edge["to"]),
+            edge["state"],
+            edge["relation"],
+        ),
+    )
+    return {
+        "schema_version": 2,
+        "generated_at": result.generated_at,
+        "projection": ISSUE_READINESS_WITH_DEPENDENCY_CONTEXT_PROJECTION,
+        "source": {"sync_state": "readiness_evaluation", "schema_version": 2},
+        "deps": {"valid": True, "error": None},
+        "nodes": nodes,
+        "edges": edges,
+        "edge_direction": "depends_on (dependent -> prerequisite)",
+    }
+
+
 def render_deps_issues_artifact(result: SyncStateResult) -> DepsIssuesArtifact:
     if result.deps_preflight_error is None:
-        index_artifact = render_index_artifact(result)
-        index_payload = json.loads(index_artifact.todo_json_text)
-        deps_top = index_payload.get("deps") if isinstance(index_payload, dict) else {}
-        index_nodes = index_payload.get("nodes") if isinstance(index_payload, dict) else {}
-        active = index_payload.get("active") if isinstance(index_payload, dict) else None
-        if not isinstance(index_nodes, dict):
-            index_nodes = {}
-        active_issue_id = None
-        if isinstance(active, dict):
-            issue_entry = active.get("issue")
-            if isinstance(issue_entry, dict) and isinstance(issue_entry.get("id"), str):
-                active_issue_id = issue_entry["id"]
-
-        issue_nodes: dict[str, object] = {}
-        for node_id in _sort_ids(list(index_nodes.keys())):
-            item = index_nodes.get(node_id)
-            if not isinstance(item, dict) or item.get("type") != "issue":
-                continue
-            status = str(item.get("status") or "unknown")
-            deps = item.get("deps")
-            ready = False
-            depends_on: list[str] = []
-            if isinstance(deps, dict):
-                raw_ready = deps.get("ready")
-                if isinstance(raw_ready, bool):
-                    ready = raw_ready
-                raw_depends_on = deps.get("depends_on")
-                if isinstance(raw_depends_on, list):
-                    depends_on = [str(dep_id) for dep_id in raw_depends_on if isinstance(dep_id, str)]
-            if node_id == active_issue_id:
-                state = "doing"
-            elif status == "unknown":
-                state = "unknown"
-            elif ready:
-                state = "ready"
-            else:
-                state = "blocked"
-            issue_nodes[node_id] = {
-                "id": node_id,
-                "title": item.get("title"),
-                "status": status,
-                "ready": ready,
-                "depends_on": depends_on,
-                "state": state,
-            }
-
-        edge_items = deps_top.get("issue_edges") if isinstance(deps_top, dict) else []
-        edges: list[dict[str, str]] = []
-        issue_id_set = set(issue_nodes.keys())
-        if isinstance(edge_items, list):
-            for edge in edge_items:
-                if not isinstance(edge, dict):
-                    continue
-                from_id = edge.get("from")
-                to_id = edge.get("to")
-                if (
-                    isinstance(from_id, str)
-                    and isinstance(to_id, str)
-                    and from_id in issue_id_set
-                    and to_id in issue_id_set
-                ):
-                    edges.append({"from": from_id, "to": to_id})
-        edges.sort(key=lambda edge: (_sort_key(edge["from"]), _sort_key(edge["to"])))
-
-        payload = {
-            "schema_version": 1,
-            "generated_at": result.generated_at,
-            "projection": OPEN_ISSUES_DEPENDENCY_VIEW_PROJECTION,
-            "source": {"index": "spec-dock/.agent/index.json", "schema_version": 2},
-            "deps": {"valid": True, "error": None},
-            "nodes": issue_nodes,
-            "edges": edges,
-            "edge_direction": "depends_on (dependent -> prerequisite)",
-        }
+        payload = _build_deps_issues_v2_payload(result)
         puml = render_deps_issues_puml(payload)
     else:
         payload = {
-            "schema_version": 1,
+            "schema_version": 2,
             "generated_at": result.generated_at,
-            "projection": OPEN_ISSUES_DEPENDENCY_VIEW_PROJECTION,
-            "source": {"index": "spec-dock/.agent/index.json", "schema_version": 2},
+            "projection": ISSUE_READINESS_WITH_DEPENDENCY_CONTEXT_PROJECTION,
+            "source": {"sync_state": "readiness_evaluation", "schema_version": 2},
             "deps": {"valid": False, "error": result.deps_preflight_error},
             "nodes": {},
             "edges": [],

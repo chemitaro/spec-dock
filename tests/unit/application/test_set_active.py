@@ -34,11 +34,15 @@ class _StubNodeReader:
 
 
 class _StubDepsTopologyReader:
-    def __init__(self, issue_depends_on_map=None, node_depends_on_map=None):
+    def __init__(self, issue_depends_on_map=None, node_depends_on_map=None, dependency_contexts=None):
         self.issue_depends_on_map = dict(issue_depends_on_map or {})
         self.node_depends_on_map = {
             node_id: list(depends_on)
             for node_id, depends_on in (node_depends_on_map or {}).items()
+        }
+        self.dependency_contexts = {
+            issue_id: list(contexts)
+            for issue_id, contexts in (dependency_contexts or {}).items()
         }
 
     def load_issue_depends_on_map(self, specdock_dir, graph):
@@ -46,6 +50,7 @@ class _StubDepsTopologyReader:
         return infra_contracts.DepsTopologyLoadResult(
             issue_depends_on_map=dict(self.issue_depends_on_map),
             warnings=[],
+            dependency_contexts_by_issue_id=dict(self.dependency_contexts),
         )
 
     def load_node_dependency_resolutions(self, specdock_dir, graph):
@@ -285,16 +290,18 @@ class TestSetActiveApplication:
         derived_state_reader=None,
         issue_gateway=None,
         git_gateway=None,
+        dependency_contexts=None,
+        specdock_dir=Path("/repo/spec-dock"),
     ):
         deps_reader = (
-            _StubDepsTopologyReader(deps, node_deps)
+            _StubDepsTopologyReader(deps, node_deps, dependency_contexts)
             if expose_node_resolutions
             else _StubIssueOnlyDepsTopologyReader(deps)
         )
         return app_ports.Ports(
             node_reader=_StubNodeReader(self._records(infra_contracts)),
             repo_root=Path("/repo"),
-            specdock_dir=Path("/repo/spec-dock"),
+            specdock_dir=specdock_dir,
             active_state_store=active_store or _StubActiveStateStore(),
             deps_topology_reader=deps_reader,
             derived_state_reader=derived_state_reader,
@@ -389,6 +396,44 @@ class TestSetActiveApplication:
         assert "deps_blocked" in "\n".join(forced.warnings)
         assert active_store.written[-1].issue.id == "iss-00302"
 
+    def test_set_active_rejects_empty_open_high_level_node_blocker_even_with_force(self) -> None:
+        app_contracts, app_ports, app_set_active, domain_models, infra_contracts = _runtime_modules()
+        active_store = _StubActiveStateStore()
+        context = infra_contracts.DepsDependencyContext(
+            source_node_id="iss-00302",
+            source_issue_id="iss-00302",
+            target_node_id="epic-00202",
+            target_node_kind="epic",
+            target_issue_ids=(),
+            expansion="empty",
+        )
+        ports = self._ports(
+            app_ports,
+            infra_contracts,
+            active_store=active_store,
+            deps={"iss-00302": []},
+            dependency_contexts={"iss-00302": [context]},
+            issue_gateway=_StubIssueGateway(
+                [
+                    self._snapshot(domain_models, 202, "OPEN"),
+                    self._snapshot(domain_models, 302, "OPEN"),
+                ]
+            ),
+        )
+
+        with pytest.raises(RuntimeError, match="epic-00202"):
+            app_set_active.set_active(
+                self._request(
+                    app_contracts,
+                    target=self._node_id_target(app_contracts, "iss-00302"),
+                    use_github=True,
+                    force=True,
+                ),
+                ports,
+            )
+
+        assert active_store.written == []
+
     def test_set_active_raw_empty_container_cycle_blocks_before_writing_without_cli(self) -> None:
         app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
         active_store = _StubActiveStateStore()
@@ -459,6 +504,47 @@ class TestSetActiveApplication:
         )
         assert cache_only.selection.issue_id == "iss-00302"
         assert cache_only_ports.issue_gateway.issue_index_calls == []
+
+    def test_set_active_no_github_uses_cached_high_level_github_state(self, tmp_path) -> None:
+        app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
+        specdock_dir = tmp_path / "spec-dock"
+        agent_dir = specdock_dir / ".agent"
+        agent_dir.mkdir(parents=True)
+        (agent_dir / "index-all.json").write_text(
+            (
+                '{"nodes":{"epic-00202":{"type":"epic",'
+                '"github":{"issue_number":202,"state":"CLOSED","updated_at":"2026-06-05T00:00:00Z"}}}}\n'
+            ),
+            encoding="utf-8",
+        )
+        active_store = _StubActiveStateStore()
+        context = infra_contracts.DepsDependencyContext(
+            source_node_id="iss-00302",
+            source_issue_id="iss-00302",
+            target_node_id="epic-00202",
+            target_node_kind="epic",
+            target_issue_ids=(),
+            expansion="empty",
+        )
+        ports = self._ports(
+            app_ports,
+            infra_contracts,
+            active_store=active_store,
+            deps={"iss-00302": []},
+            dependency_contexts={"iss-00302": [context]},
+            derived_state_reader=_StubDerivedStateReader({"iss-00302": "open"}),
+            issue_gateway=_StubIssueGateway([]),
+            specdock_dir=specdock_dir,
+        )
+
+        result = app_set_active.set_active(
+            self._request(app_contracts, target=self._node_id_target(app_contracts, "iss-00302")),
+            ports,
+        )
+
+        assert result.selection.issue_id == "iss-00302"
+        assert active_store.written[-1].issue.id == "iss-00302"
+        assert ports.issue_gateway.issue_index_calls == []
 
     def test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git(self) -> None:
         app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()

@@ -144,7 +144,7 @@ class TestCliDeps(CliRuntimeHarness):
         assert deps_json_path.is_file(), f"missing artifact: {deps_json_path}"
         assert deps_puml_path.is_file(), f"missing artifact: {deps_puml_path}"
         deps_issues = json.loads(deps_json_path.read_text(encoding="utf-8"))
-        assert {"from": from_id, "to": to_id} in deps_issues["edges"]
+        assert any(edge.get("from") == from_id and edge.get("to") == to_id for edge in deps_issues["edges"])
         deps_puml = deps_puml_path.read_text(encoding="utf-8")
         assert from_id in deps_puml
         assert to_id in deps_puml
@@ -156,7 +156,7 @@ class TestCliDeps(CliRuntimeHarness):
         assert deps_json_path.is_file(), f"missing artifact: {deps_json_path}"
         assert deps_puml_path.is_file(), f"missing artifact: {deps_puml_path}"
         deps_issues = json.loads(deps_json_path.read_text(encoding="utf-8"))
-        assert {"from": from_id, "to": to_id} not in deps_issues["edges"]
+        assert not any(edge.get("from") == from_id and edge.get("to") == to_id for edge in deps_issues["edges"])
         deps_puml = deps_puml_path.read_text(encoding="utf-8")
         assert ": blocks" not in deps_puml
 
@@ -380,7 +380,7 @@ class TestCliDeps(CliRuntimeHarness):
             assert nodes["iss-00302"]["status"] == "open"
             assert nodes["iss-00303"]["status"] == "open"
 
-    def test_sync_deps_empty_epic_and_initiative_are_done_and_non_blocking(self) -> None:
+    def test_sync_deps_empty_open_epic_blocks_with_node_context(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
@@ -437,9 +437,9 @@ class TestCliDeps(CliRuntimeHarness):
             nodes = index["nodes"]
             assert nodes["epic-00201"]["progress"] == {"total": 0, "done": 0, "open": 0, "unknown": 0}
             assert nodes["init-00101"]["progress"] == {"total": 0, "done": 0, "open": 0, "unknown": 0}
-            assert nodes["iss-00301"]["deps"]["ready"]
-            assert nodes["iss-00301"]["deps"]["depends_on"] == []
-            assert nodes["iss-00301"]["deps"]["blockers_top"] == []
+            assert not nodes["iss-00301"]["deps"]["ready"]
+            assert nodes["iss-00301"]["deps"]["depends_on"] == ["epic-00201"]
+            assert nodes["iss-00301"]["deps"]["blockers_top"] == ["epic-00201"]
 
     def test_sync_deps_ignores_parent_github_closed_for_done(self) -> None:
         if os.name == "nt":
@@ -1140,14 +1140,150 @@ class TestCliDeps(CliRuntimeHarness):
                     "ready",
                     "effective_depends_on",
                     "blockers",
+                    "issue_blockers",
+                    "node_blockers",
+                    "satisfied_dependencies",
                     "nodes",
                     "warnings",
                 ]
+            assert data["schema_version"] == 2
             assert data["target"] == "iss-00301"
             assert not data["ready"]
             assert data["effective_depends_on"] == ["iss-00401", "iss-00403"]
             assert data["blockers"] == ["iss-00401", "iss-00403"]
+            assert data["issue_blockers"] == ["iss-00401", "iss-00403"]
+            assert data["node_blockers"] == []
+            assert data["satisfied_dependencies"] == []
             assert data["warnings"] == []
+
+    def test_deps_check_json_reports_empty_open_epic_as_node_blocker(self) -> None:
+        if os.name == "nt":
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._init_origin_repo(target)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "202", "--title", "Empty blocker"],
+            )
+            target_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-main-epic"
+                / "issues"
+                / "iss-00301-target-issue"
+            )
+            self._set_meta_depends_on(target_issue_dir, ["epic-00202"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Main epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 202, "state": "OPEN", "title": "Empty blocker", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "OPEN", "title": "Target", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00301", "--github", "--json"], env=test_env)
+            assert p.returncode == 3, p.stdout + p.stderr
+            data = json.loads(p.stdout)
+            assert data["schema_version"] == 2
+            assert not data["ready"]
+            assert data["blockers"] == ["epic-00202"]
+            assert data["issue_blockers"] == []
+            assert data["node_blockers"] == [
+                {
+                    "node_id": "epic-00202",
+                    "reason": "empty_open",
+                    "state": "open",
+                    "state_source": "github",
+                    "source_issue_id": "iss-00301",
+                }
+            ]
+
+    def test_deps_check_json_exits_zero_for_empty_closed_epic_context(self) -> None:
+        if os.name == "nt":
+            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._init_origin_repo(target)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "202", "--title", "Closed dependency"],
+            )
+            target_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-main-epic"
+                / "issues"
+                / "iss-00301-target-issue"
+            )
+            self._set_meta_depends_on(target_issue_dir, ["epic-00202"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Main epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 202, "state": "CLOSED", "title": "Closed dep", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "OPEN", "title": "Target", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00301", "--github", "--json"], env=test_env)
+            assert p.returncode == 0, p.stdout + p.stderr
+            data = json.loads(p.stdout)
+            assert data["schema_version"] == 2
+            assert data["ready"]
+            assert data["blockers"] == []
+            assert data["node_blockers"] == []
+            assert data["satisfied_dependencies"] == [
+                {
+                    "source_node_id": "iss-00301",
+                    "source_issue_id": "iss-00301",
+                    "target_node_id": "epic-00202",
+                    "target_node_kind": "epic",
+                    "target_issue_ids": [],
+                    "expansion": "empty",
+                }
+            ]
 
     @pytest.mark.skip(reason="S04: covered by TestCheckDepsApplication.test_no_github_uses_cached_status_and_last_sync_without_fetching_github")
     def test_deps_check_without_github_uses_index_snapshot_when_present(self) -> None:
@@ -2522,8 +2658,8 @@ class TestCliDeps(CliRuntimeHarness):
             assert tree_all_issue_deps["iss-00303"] is None
 
             deps_issues = json.loads((agent_dir / "deps-issues.json").read_text(encoding="utf-8"))
-            assert deps_issues["projection"] == "open-issues-dependency-view"
-            assert deps_issues["source"] == {"index": "spec-dock/.agent/index.json", "schema_version": 2}
+            assert deps_issues["projection"] == "issue-readiness-with-dependency-context"
+            assert deps_issues["source"] == {"sync_state": "readiness_evaluation", "schema_version": 2}
             assert not deps_issues["deps"]["valid"]
             assert "Dependency cycle detected" in str(deps_issues["deps"]["error"])
             assert deps_issues["nodes"] == {}

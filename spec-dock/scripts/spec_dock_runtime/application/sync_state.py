@@ -23,6 +23,7 @@ from ..domain.deps import (
 from ..domain.ids import deps_node_sort_key
 from ..domain.models import (
     ActiveSelection,
+    DepsDependencyContext,
     DepsEvaluation,
     DepsState,
     IssueSnapshot,
@@ -62,6 +63,7 @@ from .github_issue_targets import (
     normalize_repo_slug,
     snapshot_repo_issue_key,
 )
+from .check_deps import load_cached_high_level_github_state_by_id, resolve_high_level_status_context
 from .ports import Ports
 from .repo_context import (
     resolve_current_repo_slug,
@@ -436,6 +438,7 @@ def collect_sync_state(
     deps_preflight_error: str | None = None
     issue_depends_on_map: dict[str, list[str]] = {}
     raw_node_depends_on_map: dict[str, list[str]] = {}
+    dependency_contexts_by_issue_id: dict[str, list[DepsDependencyContext]] = {}
     validation = validate_graph_and_deps(
         graph,
         issue_depends_on_map=None,
@@ -465,6 +468,7 @@ def collect_sync_state(
         else:
             topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
             issue_depends_on_map = dict(topology.issue_depends_on_map)
+            dependency_contexts_by_issue_id = dict(topology.dependency_contexts_by_issue_id)
             for warning in topology.warnings:
                 _append_unique(warnings, warning)
             try:
@@ -562,9 +566,12 @@ def collect_sync_state(
 
     cached_issue_status_by_id: dict[str, str] = {}
     cached_issue_last_sync_at_by_id: dict[str, str | None] = {}
+    cached_high_level_github_state_by_id: dict[str, str] = {}
     if ports.derived_state_reader is not None:
         cached_issue_status_by_id = ports.derived_state_reader.load_cached_issue_status_by_id(specdock_dir)
         cached_issue_last_sync_at_by_id = _load_cached_issue_last_sync_at_by_id(ports, specdock_dir)
+        if not req.github_enabled:
+            cached_high_level_github_state_by_id = load_cached_high_level_github_state_by_id(specdock_dir)
     status_context = resolve_issue_status_context(
         graph,
         github_enabled=req.github_enabled,
@@ -588,6 +595,11 @@ def collect_sync_state(
 
     deps_state: DepsState
     deps_eval_by_id: dict[str, DepsEvaluation]
+    high_level_statuses_by_node_id = resolve_high_level_status_context(
+        graph,
+        issue_statuses=status_context.issue_statuses,
+        cached_high_level_github_state_by_id=cached_high_level_github_state_by_id,
+    )
     if deps_preflight_error is None:
         effective_deps_map = build_effective_deps_map(graph, issue_depends_on_map)
         deps_state = build_deps_state(
@@ -606,6 +618,8 @@ def collect_sync_state(
                 issue_depends_on_map,
                 NodeId(node_id),
                 status_context.issue_statuses,
+                dependency_contexts_by_issue_id=dependency_contexts_by_issue_id,
+                high_level_statuses_by_node_id=high_level_statuses_by_node_id,
             )
     else:
         deps_state = DepsState(nodes=[], warnings=[])
@@ -628,6 +642,8 @@ def collect_sync_state(
         github_snapshot_by_repo_and_issue_number=github_snapshot_by_repo_and_issue_number,
         github_snapshot_by_repo_scope_and_issue_number=github_snapshot_by_repo_scope_and_issue_number,
         github_snapshot_by_issue_id=github_snapshot_by_issue_id,
+        dependency_contexts_by_issue_id=dependency_contexts_by_issue_id,
+        high_level_statuses_by_node_id=high_level_statuses_by_node_id,
     )
 
 
