@@ -68,6 +68,7 @@ def _state(
     active_issue_id=None,
     deps_preflight_error=None,
     high_level_statuses_by_node_id=None,
+    dependency_contexts_by_issue_id=None,
 ):
     app_contracts, domain_models, presentation_json_state = _runtime_modules()
     nodes = {
@@ -128,6 +129,7 @@ def _state(
             repo_root=Path("/repo"),
             raw_node_depends_on_map=raw_node_depends_on_map,
             high_level_statuses_by_node_id=high_level_statuses_by_node_id or {},
+            dependency_contexts_by_issue_id=dependency_contexts_by_issue_id or {},
         ),
         presentation_json_state,
         domain_models,
@@ -259,7 +261,7 @@ def test_tc_s02_006_parent_participant_without_descendant_issue_expansion():
     assert "iss-b" not in puml
 
 
-def test_tc_s02_007_done_closed_participant_included():
+def test_tc_s04_004_done_dependency_is_omitted_from_active_raw_view():
     _unused_app_contracts, domain_models, presentation_json_state = _runtime_modules()
     state, _unused, _unused_domain = _state(
         raw_node_depends_on_map={"iss-b": ["iss-a"]},
@@ -268,8 +270,169 @@ def test_tc_s02_007_done_closed_participant_included():
 
     puml = presentation_json_state.render_deps_raw_artifact(state).puml_text
 
-    assert 'rectangle "iss-a\\nIssue A\\nDone" as Niss_a #E3E3E3' in puml
-    assert "Niss_a --> Niss_b : raw_direct" in puml
+    assert "iss-a" not in puml
+    assert "Niss_a --> Niss_b : raw_direct" not in puml
+    assert 'note "No raw direct dependencies to render" as Empty' in puml
+
+
+def test_tc_s04_005_satisfied_high_level_dependency_is_omitted_from_active_raw_view():
+    _unused_app_contracts, domain_models, presentation_json_state = _runtime_modules()
+    state, _unused, _unused_domain = _state(
+        raw_node_depends_on_map={"iss-a": ["epic-a"]},
+        dependency_contexts_by_issue_id={
+            "iss-a": [
+                domain_models.DepsDependencyContext(
+                    source_node_id="iss-a",
+                    source_issue_id="iss-a",
+                    target_node_id="epic-a",
+                    target_node_kind="epic",
+                    target_issue_ids=("iss-done",),
+                    expansion="expanded",
+                    lifecycle_state="open",
+                    lifecycle_source="github",
+                    dependency_disposition="satisfied",
+                    disposition_basis="all_descendant_issues_done",
+                )
+            ]
+        },
+        high_level_statuses_by_node_id={
+            "epic-a": domain_models.DepsHighLevelStatus(
+                node_id="epic-a",
+                state="open",
+                source="github",
+            )
+        },
+    )
+
+    puml = presentation_json_state.render_deps_raw_artifact(state).puml_text
+
+    assert "epic-a" not in puml
+    assert "Nepic_a --> Niss_a : raw_direct" not in puml
+    assert 'note "No raw direct dependencies to render" as Empty' in puml
+
+
+def test_tc_s04_006_satisfied_high_level_source_dependency_is_omitted_from_active_raw_view():
+    _unused_app_contracts, domain_models, presentation_json_state = _runtime_modules()
+    extra_nodes = {
+        "epic-b": _node(
+            domain_models,
+            "epic",
+            "epic-b",
+            "Epic B",
+            parent_id="init-a",
+            initiative_id="init-a",
+        )
+    }
+    state, _unused, _unused_domain = _state(
+        raw_node_depends_on_map={"epic-b": ["epic-a"]},
+        extra_nodes=extra_nodes,
+        dependency_contexts_by_issue_id={
+            "iss-b": [
+                domain_models.DepsDependencyContext(
+                    source_node_id="epic-b",
+                    source_issue_id="iss-b",
+                    target_node_id="epic-a",
+                    target_node_kind="epic",
+                    target_issue_ids=("iss-done",),
+                    expansion="expanded",
+                )
+            ]
+        },
+        deps_eval_by_id={
+            "iss-b": domain_models.DepsEvaluation(
+                ready=True,
+                guard_reason="ready",
+                blockers=[],
+                blockers_top=[],
+                closure=[],
+                satisfied_dependencies=[
+                    domain_models.DepsDependencyContext(
+                        source_node_id="epic-b",
+                        source_issue_id="iss-b",
+                        target_node_id="epic-a",
+                        target_node_kind="epic",
+                        target_issue_ids=("iss-done",),
+                        expansion="expanded",
+                        lifecycle_state="open",
+                        lifecycle_source="github",
+                        dependency_disposition="satisfied",
+                        disposition_basis="all_descendant_issues_done",
+                    )
+                ],
+            )
+        },
+        high_level_statuses_by_node_id={
+            "epic-a": domain_models.DepsHighLevelStatus(
+                node_id="epic-a",
+                state="open",
+                source="github",
+            ),
+            "epic-b": domain_models.DepsHighLevelStatus(
+                node_id="epic-b",
+                state="open",
+                source="github",
+            ),
+        },
+    )
+
+    puml = presentation_json_state.render_deps_raw_artifact(state).puml_text
+
+    assert "epic-a" not in puml
+    assert "epic-b" not in puml
+    assert "Nepic_a --> Nepic_b : raw_direct" not in puml
+    assert 'note "No raw direct dependencies to render" as Empty' in puml
+
+
+def test_tc_s04_007_satisfied_high_level_source_dependency_with_raw_context_only_renders_active_edge():
+    _unused_app_contracts, domain_models, presentation_json_state = _runtime_modules()
+    extra_nodes = {
+        "epic-b": _node(
+            domain_models,
+            "epic",
+            "epic-b",
+            "Epic B",
+            parent_id="init-a",
+            initiative_id="init-a",
+        )
+    }
+    state, _unused, _unused_domain = _state(
+        raw_node_depends_on_map={"epic-b": ["epic-a"]},
+        extra_nodes=extra_nodes,
+        dependency_contexts_by_issue_id={
+            "iss-b": [
+                domain_models.DepsDependencyContext(
+                    source_node_id="epic-b",
+                    source_issue_id="iss-b",
+                    target_node_id="epic-a",
+                    target_node_kind="epic",
+                    target_issue_ids=("iss-open",),
+                    expansion="expanded",
+                    lifecycle_state="open",
+                    lifecycle_source="github",
+                    dependency_disposition="blocking",
+                    disposition_basis="descendant_issue_open",
+                )
+            ]
+        },
+        high_level_statuses_by_node_id={
+            "epic-a": domain_models.DepsHighLevelStatus(
+                node_id="epic-a",
+                state="open",
+                source="github",
+            ),
+            "epic-b": domain_models.DepsHighLevelStatus(
+                node_id="epic-b",
+                state="open",
+                source="github",
+            ),
+        },
+    )
+
+    puml = presentation_json_state.render_deps_raw_artifact(state).puml_text
+
+    assert "Nepic_a --> Nepic_b : raw_direct" in puml
+    assert 'package "epic-a\\nEpic A\\nOpen (github)" as Nepic_a <<epic>> #FFFFFF {' in puml
+    assert 'package "epic-b\\nEpic B\\nOpen (github)" as Nepic_b <<epic>> #FFFFFF {' in puml
 
 
 def test_tc_s02_008_zero_raw_direct_dependencies_valid_note():

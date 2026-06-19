@@ -935,7 +935,6 @@ class TestCliSync(CliRuntimeHarness):
             assert deps_issues["projection"] == "issue-readiness-with-dependency-context"
             assert deps_issues["source"] == {"sync_state": "readiness_evaluation", "schema_version": 2}
             assert set(deps_issues["nodes"].keys()) == {
-                "iss-00301",
                 "iss-00302",
                 "iss-00303",
                 "iss-00304",
@@ -963,9 +962,10 @@ class TestCliSync(CliRuntimeHarness):
             puml = deps_issues_puml_path.read_text(encoding="utf-8")
             assert "iss-00302" in puml
             assert "iss-00303" in puml
-            assert "iss-00301" in puml
+            assert "iss-00301" not in puml
             assert "iss-00305" in puml
             assert "satisfied" not in puml
+            assert "raw_direct" not in puml
             assert "Niss_00303 --> Niss_00302 : blocks" in puml
 
     def test_sync_todo_projection_excludes_done_and_empty_branches(self) -> None:
