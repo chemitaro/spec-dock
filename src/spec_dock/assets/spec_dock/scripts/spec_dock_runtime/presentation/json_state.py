@@ -263,8 +263,12 @@ def _raw_dependency_edge_is_satisfied(result: SyncStateResult, dependent_id: str
                 contexts.append(context)
     evaluation = result.deps_eval_by_id.get(dependent_id)
     if evaluation is not None:
+        contexts.extend(evaluation.dependency_contexts)
         contexts.extend(evaluation.satisfied_dependencies)
     for issue_evaluation in result.deps_eval_by_id.values():
+        for context in issue_evaluation.dependency_contexts:
+            if _object_value(context, "source_node_id", None) == dependent_id:
+                contexts.append(context)
         for context in issue_evaluation.satisfied_dependencies:
             if _object_value(context, "source_node_id", None) == dependent_id:
                 contexts.append(context)
@@ -822,6 +826,8 @@ def _build_deps_issues_v2_payload(result: SyncStateResult) -> dict[str, object]:
                     relation="raw_direct",
                     source="readiness",
                 )
+            for context in evaluation.dependency_contexts:
+                add_dependency_context(context)
             for context in evaluation.satisfied_dependencies:
                 add_dependency_context(context)
 
@@ -829,6 +835,8 @@ def _build_deps_issues_v2_payload(result: SyncStateResult) -> dict[str, object]:
         evaluation = result.deps_eval_by_id[issue_id]
         for blocker in evaluation.node_blockers:
             add_node_blocker_context(blocker)
+        for context in evaluation.dependency_contexts:
+            add_dependency_context(context)
         for context in evaluation.satisfied_dependencies:
             add_dependency_context(context)
 

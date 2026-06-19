@@ -251,7 +251,6 @@ def _render_deps_issues_puml(deps_issues_state: dict[str, Any]) -> str:
     ):
         lines.append(f"| {state} |<{color}> |")
     lines.append("| blocking edge | solid |")
-    lines.append("| satisfied edge | dashed |")
     lines.append("endlegend")
     lines.append("")
 
@@ -268,7 +267,7 @@ def _render_deps_issues_puml(deps_issues_state: dict[str, Any]) -> str:
         lines.append(f'rectangle "{label}" as {alias(node_id)} {color}')
     lines.append("")
 
-    block_edges: list[tuple[str, str, str, str]] = []
+    block_edges: list[tuple[str, str]] = []
     for edge in raw_edges:
         if not isinstance(edge, dict):
             continue
@@ -279,14 +278,12 @@ def _render_deps_issues_puml(deps_issues_state: dict[str, Any]) -> str:
         if dependent not in include_set or prerequisite not in include_set:
             continue
         state = str(edge.get("state") or "blocking")
-        relation = str(edge.get("relation") or "compiled_issue")
-        block_edges.append((prerequisite, dependent, state, relation))
+        if state != "blocking":
+            continue
+        block_edges.append((prerequisite, dependent))
     block_edges.sort(key=lambda x: (deps_node_sort_key(x[0]), deps_node_sort_key(x[1])))
-    for prerequisite, dependent, state, relation in block_edges:
-        if state == "satisfied":
-            lines.append(f"{alias(prerequisite)} ..> {alias(dependent)} : satisfied ({relation})")
-        else:
-            lines.append(f"{alias(prerequisite)} --> {alias(dependent)} : blocks ({relation})")
+    for prerequisite, dependent in block_edges:
+        lines.append(f"{alias(prerequisite)} --> {alias(dependent)} : blocks")
 
     lines.append("@enduml")
     lines.append("")
