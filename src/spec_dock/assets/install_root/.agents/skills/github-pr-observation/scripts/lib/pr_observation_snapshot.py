@@ -367,6 +367,12 @@ def classify_snapshot(
         if missing_action == "wait_or_resume" and not trigger_comment_id and not trigger_created_at:
             missing_action = "wait"
         return str(missing_status), missing_action, False, "missing_current_completion_signal"
+    if (
+        completion_signal == "codex_no_findings_issue_comment"
+        and decision_status == "passed"
+        and decision_action == "review_completion_observed"
+    ):
+        return "passed", "merge_prepared", True, "codex_no_findings_issue_comment"
     if decision_status == "passed":
         return "passed", "merge_prepared", True, "passed"
     if decision_status_reason:
