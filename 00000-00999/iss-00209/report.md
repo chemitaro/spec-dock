@@ -516,3 +516,70 @@ git diff --check
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
 | S90 | committed | docs/manual verification and S90 report evidence | `HEAD` (S90 commit) | clean | N/A | N/A | N/A | N/A |
+
+### S99 — Final Quality Gate（2026-06-19）
+
+#### 対象
+- Step: S99
+- AC/EC: all AC/EC
+- Closure IDs: `cl-018`, `cl-019`, `cl-020`; final audit also rechecks `cl-021`, `cl-022`, `cl-023`
+
+#### Final Quality Gate
+| check | command | result | notes |
+|---|---|---|---|
+| domain regression | `uv run pytest tests/unit/domain/test_deps.py` | PASS: 17 passed | S01 domain disposition lane |
+| application regression | `uv run pytest tests/unit/application/test_check_deps.py tests/unit/application/test_set_active.py` | PASS: 23 passed | S02 application readiness lane |
+| presentation regression | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/unit/presentation/test_deps_raw_puml.py` | PASS: 71 passed | S03/S04 JSON/PUML lane |
+| CLI runtime targeted repair check | `PYTHONDONTWRITEBYTECODE=1 uv run pytest tests/cli_runtime/test_deps.py::TestCliDeps::test_deps_check_returns_ready_and_blockers_and_closure_json tests/cli_runtime/test_sync.py::TestCliSync::test_sync_generates_index_deps_and_deps_issues_artifacts -q -p no:cacheprovider` | PASS: 2 passed | refreshed stale CLI assertions for lifecycle/disposition contexts and active graph filtering |
+| CLI runtime full lane | `PYTHONDONTWRITEBYTECODE=1 uv run pytest tests/cli_runtime/test_deps.py tests/cli_runtime/test_sync.py tests/cli_runtime/test_issue_lifecycle.py -p no:cacheprovider` | PASS: 152 passed, 12 skipped | resolved local hang by making the CLI fake `gh` harness deterministic under `/bin/bash` and adding `issue view` support |
+| dogfooding validation | `./spec-dock/scripts/spec-dock validate` | PASS: `spec-dock: ok (validate) nodes=131` | no validation errors |
+| dogfooding sync | `./spec-dock/scripts/spec-dock sync` | PASS: wrote generated artifacts | post-sync `git status --short` was clean |
+| manual realistic fixture | `manual-tests/iss-00209-dependency-view/./capture_evidence.py`; `./verify_projection.py` | PASS | ready/blocker/unknown exits and verifier `RESULT PASS` |
+| whitespace | `git diff --check`; `git diff --cached --check` before S90 commit | PASS | no whitespace errors |
+
+#### Closure Coverage
+| closure id | step | required evidence | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| `cl-001` | S01 | empty open high-level dependency blocks | domain tests and S90 manual `iss-01933 -> epic-01930` | pass | `dependency_disposition=blocking` |
+| `cl-002` | S01 | open all-descendant-done high-level dependency is satisfied | domain tests and S90 manual `iss-01940 -> epic-01929` | pass | `all_descendant_issues_done` |
+| `cl-003` | S01 | unknown high-level/descendant state fails closed | domain tests and S90 manual `iss-01942 -> epic-01941` | pass | `indeterminate`, `empty_unknown_container` |
+| `cl-004` | S01 | raw storage/mutation rules unchanged | domain regression suite and full CLI lane passed; no storage mutation contract changed | pass | no raw metadata mutation introduced |
+| `cl-005` | S02 | `deps check --json` reports ready satisfied context | presentation JSON tests and manual ready check evidence | pass | `satisfied_dependencies` / `dependency_contexts` retained |
+| `cl-006` | S02 | active/issue-start guard rejects empty open blocker | application tests passed | pass | lifecycle CLI suite previously passed in S02 |
+| `cl-007` | S02 | descendant count uses full graph | application/domain tests and manual all-done fixture | pass | guards todo projection false-empty |
+| `cl-008` | S02 | mutation CLI behavior unchanged | S02 focused CLI evidence and S99 full CLI lane passed; no mutation code changed | pass | active/sync lifecycle lane remained green |
+| `cl-009` | S03 | JSON surfaces lifecycle/disposition fields | presentation tests and manual evidence | pass | schema v2 additive fields |
+| `cl-010` | S03 | active graph and dependency contexts separated | presentation tests and manual evidence | pass | satisfied-only context kept in `dependency_contexts` |
+| `cl-011` | S03 | schema v2 compatibility | presentation tests assert schema v2 | pass | no schema bump |
+| `cl-012` | S04 | `deps-issues.puml` omits satisfied-only context | presentation tests and manual PUML evidence | pass | active blocker view |
+| `cl-013` | S04 | active blockers render with `blocks` | presentation tests and manual PUML evidence | pass | `raw_direct` absent from readiness PUML |
+| `cl-014` | S04 | `deps-raw.puml` is active raw direct view | presentation tests and manual PUML evidence | pass | raw active view, not complete audit |
+| `cl-015` | S90 | realistic mixed-state PlantUML remains usable | manual fixture and spec-reviewer S90 re-review | pass | reviewer passed after unknown case was added |
+| `cl-016` | S90 | docs explain lifecycle vs disposition and artifact authority | reference docs and S90 spec-reviewer pass | pass | provider/dogfooding docs match |
+| `cl-017` | S90 | realistic manual evidence matches runtime | manual capture/verifier and S90 spec-reviewer pass | pass | fake GitHub fixture |
+| `cl-018` | S99 | focused regression lane passes | unit lanes, targeted CLI repair check, and full CLI lane passed | pass | local fake `gh` harness hang repaired |
+| `cl-019` | S99 | `validate` and `sync` pass | both commands passed and worktree stayed clean | pass | dogfooding state valid |
+| `cl-020` | S99 | final QA/code/spec reviewers pass | QA/spec/code reviewers passed | pass | code reviewer accepted one P2 provenance risk |
+| `cl-021` | S01 | closed empty high-level dependency is satisfied | domain regression suite and S01 report evidence passed | pass | `lifecycle_closed` prevents empty-open blocker misread |
+| `cl-022` | S02 | commands do not block on closed empty high-level dependency | application regression and focused CLI evidence passed | pass | guard consumes domain disposition |
+| `cl-023` | S02 | commands fail closed on unknown high-level or descendant state | application regression and S90 manual unknown fixture passed | pass | unknown lifecycle/disposition remains blocking |
+
+#### Closure Delta
+| item | status | rationale |
+|---|---|---|
+| full CLI runtime lane | closed | Required S99 command completed after repairing the CLI fake `gh` harness and stale assertions. |
+| live GitHub API behavior | residual risk | Manual fixture uses deterministic fake `gh`; live API failure modes are not covered by this issue. |
+| `dependency_contexts` source-node provenance | residual risk | Code reviewer P2: if one issue has multiple raw high-level dependencies that expand to the same target node with the same expansion mode, `.agent/deps-issues.json` may retain only one `source_node_id`. Readiness and PUML remain correct; this can be followed up for machine-consumer provenance fidelity. |
+| runtime/docs changes after S90 | test harness and report only | S99 repaired CLI test harness/expectations and updated final evidence; runtime product code did not change after S04. |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S99 | final QA reviewer | qa-reviewer | fresh after CLI harness/test/report repair | pass | N/A | accepted | no findings; active graph/dependency_contexts split and harness determinism accepted |
+| S99 | final code reviewer | code-reviewer | fresh after CLI harness/test/report repair | pass | accept P2 | accepted | P2 source-node provenance risk remains non-blocking; no P0/P1 |
+| S99 | final spec reviewer | spec-reviewer | fresh after CLI harness/test/report repair | pass | N/A | accepted | cl-001..cl-023 coverage and S99 evidence accepted |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S99 | pass | final CLI gate, reviewer evidence, and report closure | S99 commit | pending until commit completes | N/A | N/A | N/A | N/A |
