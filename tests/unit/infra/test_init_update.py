@@ -1,5 +1,6 @@
 import ast
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -26092,6 +26093,189 @@ esac
             assert payload["decision"]["status_reason"] == "passed"
             assert payload["decision"]["recommended_next_action"] == "merge_prepared"
             assert payload["decision"]["observation_complete"] is True
+
+    def _issue_218_s02_load_observation_snapshot_module(self):
+        repo_root = Path(__file__).resolve().parents[3]
+        module_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py"
+        )
+        spec = importlib.util.spec_from_file_location("issue_218_s02_pr_observation_snapshot", module_path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _issue_218_s02_classify_no_findings_snapshot(
+        self,
+        *,
+        ci_status: str = "passed",
+        metadata: dict[str, object] | None = None,
+        limitations: list[object] | None = None,
+        head_matches_expected: bool | None = True,
+        normalized_status: str = "unknown",
+        decision_overrides: dict[str, object] | None = None,
+        review_status: str = "none",
+    ) -> tuple[str, str, bool, str | None]:
+        module = self._issue_218_s02_load_observation_snapshot_module()
+        decision: dict[str, object] = {
+            "status": "passed",
+            "status_reason": "codex_no_findings_issue_comment",
+            "recommended_next_action": "review_completion_observed",
+            "observation_complete": True,
+            "completion_signal": "codex_no_findings_issue_comment",
+            "confidence": "medium",
+            "no_findings_completion_candidate": {
+                "present": True,
+                "source": "issue_comment",
+                "source_ids": [100],
+                "reason": "current_boundary_codex_no_findings_comment",
+                "promotes_top_level_status": True,
+            },
+        }
+        if decision_overrides:
+            decision.update(decision_overrides)
+        return module.classify_snapshot(
+            summary={"ci": ci_status, "review": review_status, "head": "matched"},
+            ci_payload={"status": ci_status},
+            review_payload={"status": review_status},
+            review_wrapper_payload={
+                "decision": decision,
+                "codex_review": {
+                    "lifecycle": {
+                        "completion_signal": "codex_no_findings_issue_comment",
+                    },
+                },
+            },
+            metadata=metadata if metadata is not None else {"state": "OPEN", "isDraft": False},
+            limitations=limitations if limitations is not None else [],
+            head_matches_expected=head_matches_expected,
+            normalized_status=normalized_status,
+            trigger_comment_id="99",
+            trigger_created_at="2026-06-08T01:00:00Z",
+        )
+
+    def test_issue_218_s02_snapshot_no_findings_green_integration_promotes_top_level(self) -> None:
+        status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot()
+
+        assert status == "passed"
+        assert action == "merge_prepared"
+        assert complete is True
+        assert reason == "codex_no_findings_issue_comment"
+
+    def test_issue_218_s02_snapshot_no_findings_failed_ci_blocker_takes_precedence(self) -> None:
+        status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(
+            ci_status="failed",
+        )
+
+        assert status == "failed"
+        assert action == "fix_ci"
+        assert complete is False
+        assert reason == "ci_failed"
+        assert action != "merge_prepared"
+
+    def test_issue_218_s02_snapshot_no_findings_non_terminal_ci_blockers_do_not_promote(self) -> None:
+        for ci_status in ("pending", "running", "none"):
+            with _case(ci_status=ci_status):
+                status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(
+                    ci_status=ci_status,
+                )
+
+                assert status == ci_status
+                assert action == "wait"
+                assert complete is False
+                assert reason == "ci_pending"
+                assert action != "merge_prepared"
+
+    def test_issue_218_s02_snapshot_no_findings_pr_lifecycle_blockers_do_not_promote(self) -> None:
+        cases = [
+            ({"state": "OPEN", "isDraft": True}, "human_gate", "mark_pr_ready_for_review", "draft_pr"),
+            ({"state": "CLOSED", "isDraft": False}, "human_gate", "reopen_or_use_open_pr", "non_open_pr"),
+        ]
+
+        for metadata, expected_status, expected_action, expected_reason in cases:
+            with _case(metadata=metadata):
+                status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(
+                    metadata=metadata,
+                )
+
+                assert status == expected_status
+                assert action == expected_action
+                assert complete is False
+                assert reason == expected_reason
+                assert action != "merge_prepared"
+
+    def test_issue_218_s02_snapshot_no_findings_stale_head_blocker_does_not_promote(self) -> None:
+        status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(
+            head_matches_expected=False,
+            normalized_status="stale_head",
+        )
+
+        assert status == "stale_head"
+        assert action == "rerun_for_current_head"
+        assert complete is False
+        assert reason == "stale_head"
+        assert action != "merge_prepared"
+
+    def test_issue_218_s02_snapshot_no_findings_review_and_limitation_blockers_do_not_promote(self) -> None:
+        cases = [
+            (
+                {
+                    "status": "human_gate",
+                    "status_reason": "current_selected_unresolved_thread",
+                    "recommended_next_action": "address_review_feedback",
+                    "actionable_unresolved_thread_ids": ["RT_actionable"],
+                },
+                [],
+                "human_gate",
+                "address_review_feedback",
+                True,
+                "current_selected_unresolved_thread",
+            ),
+            (
+                {
+                    "status": "human_gate",
+                    "status_reason": "current_selected_changes_requested",
+                    "recommended_next_action": "address_review_feedback",
+                    "selected_changes_requested_evidence": [
+                        {"kind": "pull_review", "id": 201, "state": "changes_requested"},
+                    ],
+                },
+                [],
+                "human_gate",
+                "address_review_feedback",
+                True,
+                "current_selected_changes_requested",
+            ),
+            (
+                {},
+                [
+                    {
+                        "code": "thread_state_unavailable",
+                        "source": "fetch_pr_review_snapshot.sh",
+                        "severity": "blocking",
+                    },
+                ],
+                "unknown",
+                "human_gate",
+                False,
+                "blocking_limitation",
+            ),
+        ]
+
+        for decision_overrides, limitations, expected_status, expected_action, expected_complete, expected_reason in cases:
+            with _case(expected_reason=expected_reason):
+                status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(
+                    limitations=limitations,
+                    decision_overrides=decision_overrides,
+                )
+
+                assert status == expected_status
+                assert action == expected_action
+                assert complete is expected_complete
+                assert reason == expected_reason
+                assert action != "merge_prepared"
 
     def test_issue_170_pr_observation_review_collector_keeps_feedback_with_trigger_text(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
