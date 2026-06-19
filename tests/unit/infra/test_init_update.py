@@ -13777,12 +13777,9 @@ printf '%s\\n' "$S04_WAIT_PAYLOAD"
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
             assert payload["normalized_status"] == "human_gate"
-            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["recommended_next_action"] == "manual_review_required_non_retryable"
             assert payload["observation_complete"] is False
-            assert payload["resume"]["available"] is True
-            assert payload["resume"]["trigger_comment_id"] == 777
-            assert payload["resume"]["trigger_created_at"] == "2026-06-09T02:03:04Z"
-            assert "--trigger-mode resume" in payload["resume"]["command_hint"]
+            assert "resume" not in payload
             assert payload["codex_review"]["lifecycle"]["completion_signal"] == "fallback_issue_comment"
 
     def test_issue_176_s04_wait_post_once_first_poll_timeout_keeps_resume_hint(self) -> None:
@@ -20055,6 +20052,135 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert payload["normalized_status"] != "passed"
             assert payload["recommended_next_action"] == "wait_or_resume"
             assert payload["observation_complete"] is False
+
+    def test_issue_218_s03_wait_no_findings_issue_comment_is_terminal_pass(self) -> None:
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "passed",
+            "status_reason": "codex_no_findings_issue_comment",
+            "recommended_next_action": "review_completion_observed",
+            "observation_complete": True,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "selected_changes_requested_evidence": [],
+            "completion_signal": "codex_no_findings_issue_comment",
+            "confidence": "medium",
+            "no_findings_completion_candidate": {
+                "present": True,
+                "source": "issue_comment",
+                "source_ids": [100],
+                "reason": "current_boundary_codex_no_findings_comment",
+                "promotes_top_level_status": True,
+            },
+            "fingerprint": "no-findings-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "passed",
+                        "overall_status": "passed",
+                        "normalized_status": "passed",
+                        "recommended_next_action": "merge_prepared",
+                        "observation_complete": True,
+                        "decision": decision,
+                        "decision_fingerprint": "no-findings-s03",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "completed",
+                                "completion_signal": "codex_no_findings_issue_comment",
+                                "confidence": "medium",
+                                "no_findings_completion_candidate": decision[
+                                    "no_findings_completion_candidate"
+                                ],
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["overall_status"] == "passed"
+            assert payload["recommended_next_action"] == "merge_prepared"
+            assert payload["observation_complete"] is True
+            assert payload["decision"]["completion_signal"] == "codex_no_findings_issue_comment"
+
+    def test_issue_218_s03_wait_fallback_issue_comment_is_non_retryable_human_gate(self) -> None:
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "human_gate",
+            "status_reason": "fallback_issue_comment_low_confidence",
+            "recommended_next_action": "manual_review_required_non_retryable",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "selected_changes_requested_evidence": [],
+            "completion_signal": "fallback_issue_comment",
+            "confidence": "low",
+            "fallback_pass_candidate": {
+                "present": True,
+                "source": "issue_comment",
+                "source_ids": [100],
+                "reason": "current_boundary_codex_issue_comment",
+                "promotes_top_level_status": False,
+            },
+            "fingerprint": "fallback-non-retryable-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "commented",
+                        "status": "human_gate",
+                        "overall_status": "human_gate",
+                        "normalized_status": "human_gate",
+                        "recommended_next_action": "manual_review_required_non_retryable",
+                        "decision": decision,
+                        "decision_fingerprint": "fallback-non-retryable-s03",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "human_gate",
+                                "completion_signal": "fallback_issue_comment",
+                                "confidence": "low",
+                                "fallback_pass_candidate": decision["fallback_pass_candidate"],
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["overall_status"] == "human_gate"
+            assert payload["recommended_next_action"] == "manual_review_required_non_retryable"
+            assert payload["observation_complete"] is False
+            assert payload["decision"]["recommended_next_action"] == (
+                "manual_review_required_non_retryable"
+            )
 
     def test_issue_187_s101_wait_promotes_stable_no_completion_to_human_gate_unknown(self) -> None:
         evidence = {
