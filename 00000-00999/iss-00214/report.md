@@ -172,6 +172,8 @@ Notes:
 | S01 | tc-002 | actionable unresolved feedback still renders `review=unresolved` with counts | Focused Green includes `test_issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review` | pass |
 | S01 | tc-003 | final JSON decision / fingerprint / next action / no-completion / fallback semantics remain unchanged | Focused Green includes issue 187 S204 and fallback regression tests | pass |
 | S01 | tc-004 | provider and mirror display derivation match | Structural `rg` inspection for provider and mirror | pass |
+| S90 | tc-005 | docs impact is resolved as update-needed or no-update with evidence | PR observation skill docs inspection found no stale `review=observing` contract; S90 spec-reviewer passed approved-no-op | pass |
+| S99 | tc-006 | final handoff readiness is recorded after final QA/code/spec reviewers pass | S99 validation passed after amendment commit `2b4f6b48`; final QA, issue-wide code review, and final spec review all passed | pass |
 
 #### Test Contract Closure
 
@@ -181,6 +183,8 @@ Notes:
 | tc-002 | S01 | covered-existing | Existing issue 174 test covers unresolved review display and counts | focused Green pytest command | pass |
 | tc-003 | S01 | covered-existing | Existing issue 187 / issue 176 tests cover no-completion, wait_or_resume, fallback issue comment semantics | focused Green pytest command | pass |
 | tc-004 | S01 | inspect-only | Provider and mirror target files inspected with planned `rg` | structural `rg` command | pass |
+| tc-005 | S90 | inspect-only | Docs inspection found no stale public progress review contract requiring update | S90 docs impact inspection plus spec-reviewer pass | pass |
+| tc-006 | S99 | inspect-only | Final handoff readiness requires final QA/code/spec pass and final report commit | S99 validation commands passed; final QA/code/spec reviewer gates passed | pass |
 
 #### Closure Coverage
 
@@ -190,6 +194,8 @@ Notes:
 | tc-002 | AC-002 | Focused issue 174 unresolved review regression | covered |
 | tc-003 | AC-003, EC-001, EC-002, EC-003, EC-004 | Focused issue 174 / 176 / 187 regression set | covered |
 | tc-004 | AC-004 | Provider/mirror structural inspection | covered |
+| tc-005 | AC-003, AC-004 | S90 docs impact inspection and spec-reviewer pass | covered |
+| tc-006 | all AC/EC | S99 validation passed; final QA/code/spec reviewer gates passed | covered |
 
 #### Worker evidence draft
 
@@ -228,7 +234,7 @@ Notes:
 | Command | Result | Evidence |
 |---|---|---|
 | `./spec-dock/scripts/spec-dock validate` | pass | `spec-dock: ok (validate) nodes=134` |
-| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint or issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review or issue_174_pr_observation_wait_preserves_output_boundary_and_line_budget or issue_187_s204_wait or issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback or issue_187_s100_fallback_issue_comment_is_not_no_completion_evidence"` | pass | `10 passed, 429 deselected in 32.42s` |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint or issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review or issue_174_pr_observation_wait_preserves_output_boundary_and_line_budget or issue_187_s204_wait or issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback or issue_187_s100_fallback_issue_comment_is_not_no_completion_evidence"` | pass | `10 passed, 429 deselected in 30.33s` |
 | `./spec-dock/scripts/spec-dock sync --github` | pass | active unchanged; generated projection wrote successfully and left no git diff |
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
@@ -247,7 +253,7 @@ Notes:
 
 | レビュアー | 範囲 | 統合テスト判断 | 証跡 | 結果 |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | failed, then bounded follow-up implemented | QA P1 found EC-001 latency-guard no-completion progress gap for `review_status="approved"` without trusted completion signal; follow-up committed in `4fc56b26` | pending re-review |
+| qa-reviewer | whole issue obligation coverage | sufficient after bounded follow-up | QA P1 found EC-001 latency-guard no-completion progress gap; follow-up committed in `4fc56b26` and amended in `2b4f6b48`; final QA re-review found no blocking coverage gaps | pass |
 
 #### QA P1 Follow-up Evidence
 
@@ -257,7 +263,7 @@ Notes:
 | Red evidence | After changing `test_issue_187_s204_wait_does_not_promote_unknown_before_trigger_age` to assert stderr progress, `uv run pytest tests/unit/infra/test_init_update.py -k "test_issue_187_s204_wait_does_not_promote_unknown_before_trigger_age"` failed as expected: stderr contained `phase=wait ci=passed review=approved` instead of `review=pending_signal`. |
 | Fix | `progress_line(...)` display-only derivation now treats no-signal `approved` / `passed` legacy review display values as `pending_signal` for wait progress when there is no actionable feedback and no trusted completion signal. Provider and dogfooding mirror were updated equivalently. |
 | Final JSON | No classify / final JSON decision schema / fingerprint code was edited. The focused test still asserts `recommended_next_action == "wait_or_resume"`, `observation_complete is False`, and latency guard remains unsatisfied before trigger age. |
-| Green verification | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint or issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review or issue_174_pr_observation_wait_preserves_output_boundary_and_line_budget or issue_187_s204_wait or issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback or issue_187_s100_fallback_issue_comment_is_not_no_completion_evidence"` passed: `10 passed, 429 deselected in 32.42s`. |
+| Green verification | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s04_wait_ci_passed_codex_review_pending_times_out_with_resume_hint or issue_174_pr_observation_wait_compacts_terminal_ci_and_human_gate_review or issue_174_pr_observation_wait_preserves_output_boundary_and_line_budget or issue_187_s204_wait or issue_176_s04_wait_fallback_issue_comment_does_not_request_review_feedback or issue_187_s100_fallback_issue_comment_is_not_no_completion_evidence"` passed: `10 passed, 429 deselected in 30.33s`. |
 | Structural inspection | `rg -n "review=observing|pending_signal|render_review" src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py .agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py tests/unit/infra/test_init_update.py` found no `review=observing`; provider and mirror both contain matching `render_review` / `pending_signal` derivation. `diff -u` between provider and mirror wait libraries produced no output. |
 | Step Commit Gate | Follow-up committed in `4fc56b26` `fix(pr-observation): no-completion時のreview表示を補強`; post-commit worktree was clean before S99 validation rerun. |
 
@@ -297,17 +303,17 @@ Notes:
 
 | レビュアー | 範囲 | 指摘 / 修正 | 再 review 回数 | 結果 |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | pending execution | 0 | pending execution |
+| code-reviewer | issue-wide integrated diff | initial final review failed on D-005 spec promotion and `passed` coverage; fixed by `2b4f6b48`; final re-review had no findings | 2 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 
 | レビュアー | 範囲 | 指摘 / 修正 | 再 review 回数 | 結果 |
 |---|---|---|---|---|
-| spec-reviewer | requirement/design/plan/report and implementation alignment | pending execution | 0 | pending execution |
+| spec-reviewer | requirement/design/plan/report and implementation alignment | initial final review required tc-005/tc-006 closure rows and D-005 promotion; fixed in report and `2b4f6b48`; final re-review had no findings | 2 | pass |
 
 ## Execution Status
 
 - S01: committed in `b476e6f3`.
 - S90: docs impact resolved as approved-no-op in `488aaf9c`.
-- S99: validation commands passed after QA P1 follow-up commit `4fc56b26`; final QA/spec re-review is pending.
-- PR delivery / merge preparation / issue finish: pending final gates and final report commit.
+- S99: validation commands passed after amendment commit `2b4f6b48`; final QA/code/spec re-review passed.
+- PR delivery / merge preparation / issue finish: pending final report commit, PR delivery gate, merge preparation gate, and issue finish.
