@@ -3312,6 +3312,14 @@ class TestRuntimeSyncS07:
                         target_node_kind="issue",
                         target_issue_ids=("iss-00302",),
                         expansion="issue",
+                    ),
+                    domain_models.DepsDependencyContext(
+                        source_node_id="iss-00303",
+                        source_issue_id="iss-00303",
+                        target_node_id="iss-00301",
+                        target_node_kind="issue",
+                        target_issue_ids=("iss-00301",),
+                        expansion="issue",
                     )
                 ],
             },
@@ -3376,6 +3384,10 @@ class TestRuntimeSyncS07:
                 "disposition_basis": "local_done",
             },
         ]
+        assert not any(
+            context["target_node_id"] == "iss-00301" and context["target_node_kind"] == "issue"
+            for context in payload["dependency_contexts"]
+        )
         assert "Nepic_00201 --> Niss_00301 : blocks" in puml
         assert "raw_direct" not in puml
         assert "satisfied edge" not in puml

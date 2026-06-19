@@ -411,7 +411,85 @@ def test_tc_s04_006_satisfied_high_level_source_dependency_is_omitted_from_activ
     assert 'note "No raw direct dependencies to render" as Empty' in puml
 
 
-def test_tc_s04_007_satisfied_high_level_source_dependency_with_raw_context_only_renders_active_edge():
+def test_tc_s04_007_unknown_high_level_source_dependency_remains_in_active_raw_view():
+    _unused_app_contracts, domain_models, presentation_json_state = _runtime_modules()
+    extra_nodes = {
+        "epic-b": _node(
+            domain_models,
+            "epic",
+            "epic-b",
+            "Epic B",
+            parent_id="init-a",
+            initiative_id="init-a",
+        )
+    }
+    state, _unused, _unused_domain = _state(
+        raw_node_depends_on_map={"epic-b": ["epic-a"]},
+        extra_nodes=extra_nodes,
+        issue_statuses={
+            "iss-a": _status(domain_models, "iss-a", "done"),
+            "iss-b": _status(domain_models, "iss-b", "done"),
+        },
+        dependency_contexts_by_issue_id={
+            "iss-b": [
+                domain_models.DepsDependencyContext(
+                    source_node_id="epic-b",
+                    source_issue_id="iss-b",
+                    target_node_id="epic-a",
+                    target_node_kind="epic",
+                    target_issue_ids=("iss-a",),
+                    expansion="expanded",
+                    lifecycle_state="unknown",
+                    lifecycle_source="none",
+                    dependency_disposition="indeterminate",
+                    disposition_basis="descendant_issue_unknown",
+                )
+            ]
+        },
+        deps_eval_by_id={
+            "iss-b": domain_models.DepsEvaluation(
+                ready=False,
+                guard_reason="unknown",
+                blockers=["epic-a"],
+                blockers_top=["epic-a"],
+                closure=[],
+                node_blockers=[
+                    domain_models.DepsNodeBlocker(
+                        node_id="epic-a",
+                        reason="lifecycle_unknown",
+                        state="unknown",
+                        state_source="none",
+                        source_issue_id="iss-b",
+                        lifecycle_state="unknown",
+                        lifecycle_source="none",
+                        dependency_disposition="indeterminate",
+                        disposition_basis="descendant_issue_unknown",
+                    )
+                ],
+            )
+        },
+        high_level_statuses_by_node_id={
+            "epic-a": domain_models.DepsHighLevelStatus(
+                node_id="epic-a",
+                state="unknown",
+                source="none",
+            ),
+            "epic-b": domain_models.DepsHighLevelStatus(
+                node_id="epic-b",
+                state="unknown",
+                source="none",
+            ),
+        },
+    )
+
+    puml = presentation_json_state.render_deps_raw_artifact(state).puml_text
+
+    assert "Nepic_a --> Nepic_b : raw_direct" in puml
+    assert 'package "epic-a\\nEpic A\\nUnknown (none)" as Nepic_a <<epic>> #EEEEEE {' in puml
+    assert 'package "epic-b\\nEpic B\\nUnknown (none)" as Nepic_b <<epic>> #EEEEEE {' in puml
+
+
+def test_tc_s04_008_satisfied_high_level_source_dependency_with_raw_context_only_renders_active_edge():
     _unused_app_contracts, domain_models, presentation_json_state = _runtime_modules()
     extra_nodes = {
         "epic-b": _node(

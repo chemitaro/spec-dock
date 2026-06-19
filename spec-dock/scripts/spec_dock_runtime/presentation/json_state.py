@@ -259,11 +259,13 @@ def _node_is_active_raw_participant(result: SyncStateResult, node_id: str) -> bo
             or candidate.initiative_id == node_id
         )
     ]
-    if descendant_issue_ids and all(_issue_is_satisfied(result, issue_id) for issue_id in descendant_issue_ids):
-        return False
     visual_state = _high_level_visual_state(result, node_id)
     if visual_state is None:
         return True
+    if visual_state["state"] == "unknown":
+        return True
+    if descendant_issue_ids and all(_issue_is_satisfied(result, issue_id) for issue_id in descendant_issue_ids):
+        return False
     return visual_state["state"] not in {"closed", "done"}
 
 
@@ -858,6 +860,12 @@ def _build_deps_issues_v2_payload(result: SyncStateResult) -> dict[str, object]:
 
     for issue_id in _sort_ids(list(result.dependency_contexts_by_issue_id.keys())):
         for context in result.dependency_contexts_by_issue_id.get(issue_id, []):
+            if (
+                _object_value(context, "target_node_kind", None) == "issue"
+                and _object_value(context, "dependency_disposition", None) is None
+                and not _issue_is_satisfied(result, str(_object_value(context, "target_node_id", "")))
+            ):
+                continue
             add_dependency_context(context)
 
     nodes: dict[str, object] = {}
