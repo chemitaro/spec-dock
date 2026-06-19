@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from .ids import deps_node_sort_key
 from .models import (
     ActiveSelection,
+    DepsDependencyDisposition,
     DepsDependencyContext,
+    DepsDispositionBasis,
     DepsEvaluation,
     DepsHighLevelStatus,
     DepsNodeState,
@@ -16,8 +20,7 @@ from .models import (
 )
 
 _BLOCKERS_TOP_LIMIT = 5
-_KNOWN_ISSUE_STATUSES = {"done", "open", "unknown"}
-_SATISFIED_HIGH_LEVEL_STATES = {"closed", "done"}
+_KNOWN_ISSUE_STATUSES = {"done", "open", "closed", "unknown"}
 
 DependencyContextInput = DepsDependencyContext | object
 
@@ -128,7 +131,7 @@ def _derive_issue_depends_on_view(
             if dep_id in seen:
                 continue
 
-            if _issue_status(dep_id, issue_statuses) == "done":
+            if _issue_status(dep_id, issue_statuses) in {"closed", "done"}:
                 continue
 
             seen.add(dep_id)
@@ -143,7 +146,7 @@ def _derive_issue_depends_on_view(
     derived: dict[str, dict[str, object]] = {}
     for issue_id in all_issue_ids:
         status = _issue_status(issue_id, issue_statuses)
-        if status == "done":
+        if status in {"closed", "done"}:
             depends_on: list[str] = []
             ready = True
         else:
@@ -229,7 +232,38 @@ def _all_target_issues_satisfied(
 ) -> bool:
     if not target_issue_ids:
         return False
-    return all(_issue_status(issue_id, issue_statuses) == "done" for issue_id in target_issue_ids)
+    return all(_issue_status(issue_id, issue_statuses) in {"closed", "done"} for issue_id in target_issue_ids)
+
+
+def _any_target_issue_unknown(
+    target_issue_ids: tuple[str, ...],
+    issue_statuses: dict[str, IssueStatusSnapshot],
+) -> bool:
+    return any(_issue_status(issue_id, issue_statuses) == "unknown" for issue_id in target_issue_ids)
+
+
+def _any_target_issue_open(
+    target_issue_ids: tuple[str, ...],
+    issue_statuses: dict[str, IssueStatusSnapshot],
+) -> bool:
+    return any(_issue_status(issue_id, issue_statuses) == "open" for issue_id in target_issue_ids)
+
+
+def _with_disposition(
+    context: DepsDependencyContext,
+    *,
+    lifecycle_state: str,
+    lifecycle_source: str,
+    dependency_disposition: DepsDependencyDisposition,
+    disposition_basis: DepsDispositionBasis,
+) -> DepsDependencyContext:
+    return replace(
+        context,
+        lifecycle_state=lifecycle_state,  # type: ignore[arg-type]
+        lifecycle_source=lifecycle_source,
+        dependency_disposition=dependency_disposition,
+        disposition_basis=disposition_basis,
+    )
 
 
 def _dependency_context_from_input(context: DependencyContextInput) -> DepsDependencyContext:
@@ -264,7 +298,7 @@ def _evaluate_dependency_contexts(
     satisfied_by_key: dict[tuple[str, str, str], DepsDependencyContext] = {}
 
     for issue_id in target_issue_ids:
-        if _issue_status(issue_id, issue_statuses) == "done":
+        if _issue_status(issue_id, issue_statuses) in {"closed", "done"}:
             continue
         for raw_context in dependency_contexts_by_issue_id.get(issue_id, []):
             context = _dependency_context_from_input(raw_context)
@@ -275,11 +309,64 @@ def _evaluate_dependency_contexts(
             state = _normalize_high_level_state(status.state if status is not None else None)
             state_source = status.source if status is not None else "none"
 
-            if state in _SATISFIED_HIGH_LEVEL_STATES or _all_target_issues_satisfied(
-                context.target_issue_ids,
-                issue_statuses,
-            ):
-                satisfied_by_key[(context.source_issue_id, context.target_node_id, context.expansion)] = context
+            if state == "closed":
+                satisfied_by_key[(context.source_issue_id, context.target_node_id, context.expansion)] = (
+                    _with_disposition(
+                        context,
+                        lifecycle_state=state,
+                        lifecycle_source=state_source,
+                        dependency_disposition="satisfied",
+                        disposition_basis="lifecycle_closed",
+                    )
+                )
+                continue
+
+            if state == "done":
+                satisfied_by_key[(context.source_issue_id, context.target_node_id, context.expansion)] = (
+                    _with_disposition(
+                        context,
+                        lifecycle_state=state,
+                        lifecycle_source=state_source,
+                        dependency_disposition="satisfied",
+                        disposition_basis="local_done",
+                    )
+                )
+                continue
+
+            if _all_target_issues_satisfied(context.target_issue_ids, issue_statuses):
+                satisfied_by_key[(context.source_issue_id, context.target_node_id, context.expansion)] = (
+                    _with_disposition(
+                        context,
+                        lifecycle_state=state,
+                        lifecycle_source=state_source,
+                        dependency_disposition="satisfied",
+                        disposition_basis="all_descendant_issues_done",
+                    )
+                )
+                continue
+
+            if context.target_issue_ids and _any_target_issue_unknown(context.target_issue_ids, issue_statuses):
+                satisfied_by_key[(context.source_issue_id, context.target_node_id, context.expansion)] = (
+                    _with_disposition(
+                        context,
+                        lifecycle_state=state,
+                        lifecycle_source=state_source,
+                        dependency_disposition="indeterminate",
+                        disposition_basis="descendant_issue_unknown",
+                    )
+                )
+                continue
+
+            if context.target_issue_ids and _any_target_issue_open(context.target_issue_ids, issue_statuses):
+                satisfied_by_key[(context.source_issue_id, context.target_node_id, context.expansion)] = (
+                    _with_disposition(
+                        context,
+                        lifecycle_state=state,
+                        lifecycle_source=state_source,
+                        dependency_disposition="blocking",
+                        disposition_basis="descendant_issue_open",
+                    )
+                )
                 continue
 
             if context.expansion == "empty":
@@ -290,6 +377,10 @@ def _evaluate_dependency_contexts(
                         state="open",
                         state_source=state_source,
                         source_issue_id=context.source_issue_id,
+                        lifecycle_state="open",
+                        lifecycle_source=state_source,
+                        dependency_disposition="blocking",
+                        disposition_basis="empty_open_container",
                     )
                 else:
                     node_blockers_by_id[context.target_node_id] = DepsNodeBlocker(
@@ -298,6 +389,10 @@ def _evaluate_dependency_contexts(
                         state="unknown",
                         state_source=state_source,
                         source_issue_id=context.source_issue_id,
+                        lifecycle_state="unknown",
+                        lifecycle_source=state_source,
+                        dependency_disposition="indeterminate",
+                        disposition_basis="empty_unknown_container",
                     )
 
     return (

@@ -220,6 +220,10 @@ class TestDepsDomain:
         assert len(result.node_blockers) == 1
         assert result.node_blockers[0].node_id == "epic-00002"
         assert result.node_blockers[0].reason == "empty_open"
+        assert result.node_blockers[0].lifecycle_state == "open"
+        assert result.node_blockers[0].lifecycle_source == "github"
+        assert result.node_blockers[0].dependency_disposition == "blocking"
+        assert result.node_blockers[0].disposition_basis == "empty_open_container"
 
     def test_evaluate_readiness_records_empty_closed_high_level_dependency_as_satisfied(self) -> None:
         domain_deps, domain_models, _domain_tree = _runtime_modules()
@@ -254,6 +258,10 @@ class TestDepsDomain:
         assert result.blockers == []
         assert result.node_blockers == []
         assert result.satisfied_dependencies == [dependency_context]
+        assert result.satisfied_dependencies[0].lifecycle_state == "closed"
+        assert result.satisfied_dependencies[0].lifecycle_source == "github"
+        assert result.satisfied_dependencies[0].dependency_disposition == "satisfied"
+        assert result.satisfied_dependencies[0].disposition_basis == "lifecycle_closed"
 
     def test_evaluate_readiness_records_expanded_all_done_high_level_dependency_as_satisfied(self) -> None:
         domain_deps, domain_models, _domain_tree = _runtime_modules()
@@ -292,6 +300,10 @@ class TestDepsDomain:
         assert result.blockers == []
         assert result.node_blockers == []
         assert result.satisfied_dependencies == [dependency_context]
+        assert result.satisfied_dependencies[0].lifecycle_state == "open"
+        assert result.satisfied_dependencies[0].lifecycle_source == "github"
+        assert result.satisfied_dependencies[0].dependency_disposition == "satisfied"
+        assert result.satisfied_dependencies[0].disposition_basis == "all_descendant_issues_done"
 
     def test_evaluate_readiness_fails_closed_for_empty_unknown_high_level_dependency(self) -> None:
         domain_deps, domain_models, _domain_tree = _runtime_modules()
@@ -328,6 +340,52 @@ class TestDepsDomain:
         assert len(result.node_blockers) == 1
         assert result.node_blockers[0].node_id == "epic-00002"
         assert result.node_blockers[0].reason == "empty_unknown"
+        assert result.node_blockers[0].lifecycle_state == "unknown"
+        assert result.node_blockers[0].lifecycle_source == "none"
+        assert result.node_blockers[0].dependency_disposition == "indeterminate"
+        assert result.node_blockers[0].disposition_basis == "empty_unknown_container"
+
+    def test_evaluate_readiness_fails_closed_for_unknown_descendant_high_level_dependency(self) -> None:
+        domain_deps, domain_models, _domain_tree = _runtime_modules()
+        graph = self._graph()
+        statuses = {
+            "iss-00003": _issue_status(domain_models, "iss-00003", "open"),
+            "iss-00004": _issue_status(domain_models, "iss-00004", "unknown"),
+        }
+        dependency_context = domain_models.DepsDependencyContext(
+            source_node_id="iss-00003",
+            source_issue_id="iss-00003",
+            target_node_id="epic-00002",
+            target_node_kind="epic",
+            target_issue_ids=("iss-00004",),
+            expansion="expanded",
+        )
+
+        result = domain_deps.evaluate_readiness(
+            graph,
+            issue_depends_on_map={"iss-00003": ["iss-00004"], "iss-00004": []},
+            target_id=domain_models.NodeId("iss-00003"),
+            issue_statuses=statuses,
+            dependency_contexts_by_issue_id={"iss-00003": [dependency_context]},
+            high_level_statuses_by_node_id={
+                "epic-00002": domain_models.DepsHighLevelStatus(
+                    node_id="epic-00002",
+                    state="open",
+                    source="github",
+                )
+            },
+        )
+
+        assert not result.ready
+        assert result.guard_reason == "unknown"
+        assert result.blockers == ["iss-00004"]
+        assert result.issue_blockers == ["iss-00004"]
+        assert result.node_blockers == []
+        assert result.satisfied_dependencies == [dependency_context]
+        assert result.satisfied_dependencies[0].lifecycle_state == "open"
+        assert result.satisfied_dependencies[0].lifecycle_source == "github"
+        assert result.satisfied_dependencies[0].dependency_disposition == "indeterminate"
+        assert result.satisfied_dependencies[0].disposition_basis == "descendant_issue_unknown"
 
     def test_evaluate_readiness_records_done_descendant_high_level_dependency_as_satisfied(self) -> None:
         domain_deps, domain_models, _domain_tree = _runtime_modules()
@@ -366,11 +424,90 @@ class TestDepsDomain:
         assert result.issue_blockers == []
         assert result.node_blockers == []
         assert result.satisfied_dependencies == [dependency_context]
+        assert result.satisfied_dependencies[0].lifecycle_state == "done"
+        assert result.satisfied_dependencies[0].lifecycle_source == "descendant_aggregate"
+        assert result.satisfied_dependencies[0].dependency_disposition == "satisfied"
+        assert result.satisfied_dependencies[0].disposition_basis == "local_done"
+
+    def test_evaluate_readiness_records_open_descendant_high_level_dependency_as_blocking(self) -> None:
+        domain_deps, domain_models, _domain_tree = _runtime_modules()
+        graph = self._graph()
+        statuses = {
+            "iss-00003": _issue_status(domain_models, "iss-00003", "open"),
+            "iss-00004": _issue_status(domain_models, "iss-00004", "open"),
+        }
+        dependency_context = domain_models.DepsDependencyContext(
+            source_node_id="iss-00003",
+            source_issue_id="iss-00003",
+            target_node_id="epic-00002",
+            target_node_kind="epic",
+            target_issue_ids=("iss-00004",),
+            expansion="expanded",
+        )
+
+        result = domain_deps.evaluate_readiness(
+            graph,
+            issue_depends_on_map={"iss-00003": ["iss-00004"], "iss-00004": []},
+            target_id=domain_models.NodeId("iss-00003"),
+            issue_statuses=statuses,
+            dependency_contexts_by_issue_id={"iss-00003": [dependency_context]},
+            high_level_statuses_by_node_id={
+                "epic-00002": domain_models.DepsHighLevelStatus(
+                    node_id="epic-00002",
+                    state="open",
+                    source="github",
+                )
+            },
+        )
+
+        assert not result.ready
+        assert result.guard_reason == "blocked"
+        assert result.blockers == ["iss-00004"]
+        assert result.issue_blockers == ["iss-00004"]
+        assert result.node_blockers == []
+        assert result.satisfied_dependencies == [dependency_context]
+        assert result.satisfied_dependencies[0].lifecycle_state == "open"
+        assert result.satisfied_dependencies[0].lifecycle_source == "github"
+        assert result.satisfied_dependencies[0].dependency_disposition == "blocking"
+        assert result.satisfied_dependencies[0].disposition_basis == "descendant_issue_open"
 
     def test_evaluate_readiness_does_not_apply_node_blockers_to_done_source_issue(self) -> None:
         domain_deps, domain_models, _domain_tree = _runtime_modules()
         graph = self._graph()
         statuses = {"iss-00003": _issue_status(domain_models, "iss-00003", "done")}
+        dependency_context = domain_models.DepsDependencyContext(
+            source_node_id="iss-00003",
+            source_issue_id="iss-00003",
+            target_node_id="epic-00002",
+            target_node_kind="epic",
+            target_issue_ids=(),
+            expansion="empty",
+        )
+
+        result = domain_deps.evaluate_readiness(
+            graph,
+            issue_depends_on_map={"iss-00003": []},
+            target_id=domain_models.NodeId("iss-00003"),
+            issue_statuses=statuses,
+            dependency_contexts_by_issue_id={"iss-00003": [dependency_context]},
+            high_level_statuses_by_node_id={
+                "epic-00002": domain_models.DepsHighLevelStatus(
+                    node_id="epic-00002",
+                    state="open",
+                    source="github",
+                )
+            },
+        )
+
+        assert result.ready
+        assert result.guard_reason == "ready"
+        assert result.blockers == []
+        assert result.node_blockers == []
+
+    def test_evaluate_readiness_does_not_apply_node_blockers_to_closed_source_issue(self) -> None:
+        domain_deps, domain_models, _domain_tree = _runtime_modules()
+        graph = self._graph()
+        statuses = {"iss-00003": _issue_status(domain_models, "iss-00003", "closed")}
         dependency_context = domain_models.DepsDependencyContext(
             source_node_id="iss-00003",
             source_issue_id="iss-00003",
