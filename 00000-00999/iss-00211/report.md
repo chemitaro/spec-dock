@@ -68,6 +68,11 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-001 | adopted | research / discussion / interview | `requirement.md`, `design.md`, `plan.md` | Source review と scope discussion を踏まえ、ユーザー回答により Option B が採用されたため。 | `discussions/20260619t063017z-research-issue-211-clarification-source-review.md`; `discussions/20260619t063303z-disc-issue-211-clarification-synthesis.md`; `discussions/20260619t063309z-interview-issue-211-scope-pressure-test.md` | Canonical authoring で Option B を反映する。 |
 | EAL-002 | adopted | delegated design draft: system-architect | `design.md` | Draft は requirement pass 後の design evidence として、責務境界、file plan、test strategy、`execute-epic.md` discovery gap を具体化しており、canonical design へ採用可能だったため。 | `discussions/20260619t064618z-draft-design-issue-211-system-architecture-draft.md` | Fresh `spec-reviewer` で canonical `design.md` を review する。 |
 | EAL-003 | adopted | delegated plan draft: implementation-planner | `plan.md` | Draft は design pass 後の plan evidence として、S01/S02/S03/S90/S99、closure index、delegation contract、concrete test cases、final exit contract を満たしており、canonical plan へ採用可能だったため。 | `discussions/20260619t070007z-draft-plan-issue-211-implementation-plan-draft.md` | Fresh `spec-reviewer` で canonical `plan.md` を review する。 |
+| EAL-004 | adopted | S02 delegated implementation: doc-writer | S02 workflow / hub / prompt prose | S02 の approved plan に沿って provider/mirror の `workflow_epic.md`、`spec-dock-hub/SKILL.md`、`execute-epic.md` を限定更新し、Epic planning / Epic execution coordination / Issue execution の route 境界を具体化したため。 | doc-writer Ledger Note; provider/mirror `cmp -s`; old phrase `rg` no-match; route phrase inspection; `git diff --check` | Reviewer findings を反映し、fresh `spec-reviewer` で wording gate を確認する。 |
+| EAL-005 | adopted | S02 delegated implementation: dev-coder | S02 route/content regression tests | S02 の `tc-004` / `tc-005` を閉じるため、provider/mirror parity、旧矛盾文言 no-match、新 coordinator route、既存 planning / issue execution route の保持を test に固定したため。 | dev-coder Ledger Note; `test_issue_211_epic_execution_route_content_regression_contract`; focused lane `3 passed, 438 deselected`; `git diff --check` | Reviewer findings を反映し、fresh `code-reviewer` で test gate を確認する。 |
+| EAL-006 | adopted | S02 reviewer-fix: doc-writer | `/execute-epic` planning-vs-execution wording | Fresh `spec-reviewer` found the prompt still instructed Epic decomposition / Issue creation in the execution path. The fix rewrote `/execute-epic` to hand incomplete planning/decomposition back to `$spec-dock-epic-planning` and operate only on ready Issues from the approved Epic plan. | spec-reviewer P1; doc-writer reviewer-fix Ledger Note; `rg` no-match for stale decomposition/create Issue phrases; prompt provider/mirror `cmp -s` | Fresh re-review で AC-004 boundary を確認する。 |
+| EAL-007 | adopted | S02 reviewer-fix: dev-coder | S02 stale decomposition phrase regression | Reviewer finding exposed a test coverage gap: the route/content regression could pass while stale decomposition/create Issue wording remained. The fix added provider/mirror negative assertions for those phrases. | dev-coder reviewer-fix Ledger Note; `test_issue_211_epic_execution_route_content_regression_contract` -> pass; focused Issue 211 lane -> pass | Fresh re-review で `tc-005` negative coverage を確認する。 |
+| EAL-008 | adopted | S02 reviewer-fix 2: doc-writer / dev-coder | `/execute-epic` no suitable Epic and legacy prompt contract | Fresh re-review found remaining Epic create/import ownership wording and direct execution of `test_issue_93_execute_prompts_contract` failed because the legacy contract did not match the rewritten prompt. The fix routes unsuitable/missing Epic selection back to `$spec-dock-epic-planning`, keeps `spec-dock/docs/rules/epic/issues.md` only as planning handoff reference, and restores the prompt contract to require that reference without issue-creation authority. | spec-reviewer P1; code-reviewer P1; `test_issue_93_execute_prompts_contract` observed fail before fix; after fix direct prompt contract -> pass; S02 route/content test -> pass; focused lane -> pass; stale phrase `rg` no-match; prompt provider/mirror `cmp -s` | Fresh re-review で prompt boundary and prompt contract repair を確認する。 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -276,14 +281,114 @@ git diff --check
 
 ---
 
-### セッションログ（2026-06-19 HH:MM - HH:MM）
+### セッションログ（2026-06-19 S02）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S02 Epic workflow and discovery route connection
+- AC/EC: AC-003, AC-004, EC-004, EC-005
+- 計画上の出典（Planned source）:
+  - `plan.md` section: 実装ステップ S02
+  - closure ids: `tc-004`, `tc-005`
 
 #### 実施内容
-- ...
+- `doc-writer` が provider / dogfooding mirror の `workflow_epic.md`、`spec-dock-hub/SKILL.md`、`execute-epic.md` を更新した。
+- `workflow_epic.md` に `spec-dock-epic-execution` と Epic execution lifecycle reference を追加し、Issue 実行詳細は `workflow_issue.md` 正本へ委譲した。
+- hub route に `spec-dock-epic-execution` を追加し、Epic planning / Epic execution coordination / Issue execution の責務境界を明示した。
+- `/execute-epic` prompt から旧矛盾文言 `Do not create a new skill for this workflow` を削除し、Epic execution の first-read coordinator を `$spec-dock-epic-execution` に更新した。
+- `dev-coder` が S02 route/content regression test を追加し、provider/mirror parity、旧矛盾文言 no-match、新 coordinator route、既存 planning / issue execution route の保持を assertion した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_211_epic_execution_route_content_regression_contract -q
+# Green: 1 passed
+
+uv run pytest tests/unit/infra/test_init_update.py -k "issue_211 or execute_epic or workflow_epic or dogfooding_agent_tooling_parity" -q
+# Green: 3 passed, 438 deselected
+
+rg -n "Do not create a new skill for this workflow" src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md .codex/prompts/execute-epic.md
+# expected no matches, exit 1
+
+rg -n "Do not create a new skill for this workflow|Decompose the epic plan|Create or update issues" src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md .codex/prompts/execute-epic.md
+# after reviewer fix: expected no matches, exit 1
+
+rg -n "before creating or importing a new epic|creating or importing a new epic|Do not create a new skill for this workflow|Decompose the epic plan|Create or update issues" src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md .codex/prompts/execute-epic.md
+# after second reviewer fix: expected no matches, exit 1
+
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_93_execute_prompts_contract -q
+# after second reviewer fix: 1 passed
+
+cmp -s src/spec_dock/assets/spec_dock/docs/workflow_epic.md spec-dock/docs/workflow_epic.md
+# pass
+
+cmp -s src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md .agents/skills/spec-dock-hub/SKILL.md
+# pass
+
+cmp -s src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md .codex/prompts/execute-epic.md
+# pass
+
+git diff --check
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ / 代替証跡（Red / alternative） | red-required preferred for old `/execute-epic` phrase; inspect-only acceptable for concise workflow prose | doc-writer changes were already present before test edit, so pure Red was not reproducible; old phrase no-match and new route assertion would fail if prose is reverted. | `rg` no-match; new route/content test design | approved alternative | The stale prompt phrase existed before S02 source inspection and was removed by doc-writer. |
+| S02 | 緑フェーズ（Green） | tc-004 / tc-005 focused verification | route/content regression, focused lane, provider/mirror parity, and diff check passed. | pytest / `rg` / `cmp -s` / `git diff --check` | pass | S02 targeted lane is green. |
+| S02 | リファクタリング（Refactor） | concise docs and no unrelated cleanup | Changes are limited to S02 target docs/prompt/hub skill and one focused test. | diff inspection | pass | No broad docs cleanup, runtime code, `workflow_issue.md`, or PR-preparer changes. |
+| S02 | Reviewer fix | spec-reviewer P1 and code-reviewer P1 | Prompt decomposition/create Issue ownership was removed from `/execute-epic`; EAL-004..EAL-007 now records S02 delegated evidence adoption; tests assert the stale phrases stay absent. | prompt inspection; pytest; `rg`; `cmp -s` | pass | Fresh code-reviewer/spec-reviewer re-review passed after second fix; code-reviewer left only P2 count correction. |
+| S02 | Reviewer fix 2 | spec-reviewer P1 and code-reviewer P1 | Direct run of `test_issue_93_execute_prompts_contract` failed on stale execute-epic prompt contract; spec-reviewer found remaining Epic create/import ownership wording. Prompt now routes missing/unsuitable Epic selection back to `$spec-dock-epic-planning`, preserves `rules/epic/issues.md` only as planning handoff reference, and tests assert stale phrases stay absent. | direct prompt contract test; S02 route/content test; focused lane; stale phrase `rg`; prompt `cmp -s`; reviewer findings | pass | Fresh code-reviewer/spec-reviewer re-review passed; P2 count correction applied. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-004 | S02 | yes | inspect-only + content assertion | `workflow_epic.md` previously kept Epic execution coordinator outside the planning handoff section without routing to the new skill. | `test_issue_211_epic_execution_route_content_regression_contract`; provider/mirror `cmp -s`; fresh spec-reviewer pass | pass | Workflow reference now points to `spec-dock-epic-execution`, PR handoff, `workflow_issue.md`, and `issue finish`. |
+| tc-005 | S02 | yes | red-required / content assertion | `/execute-epic` previously contained `Do not create a new skill for this workflow`; hub lacked the new execution route; reviewers later found stale decomposition / create Issue ownership and Epic create/import wording. | route/content regression; direct prompt contract; `rg` no-match for stale ownership phrases; provider/mirror `cmp -s`; fresh code-reviewer/spec-reviewer pass | pass | Old contradiction and stale ownership phrases are absent; hub and prompt route Epic execution to the new skill while preserving planning handoff and issue execution routes. |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | tc-004, tc-005 | Old `/execute-epic` contradiction is absent; provider/mirror docs/prompt/skill files are aligned; required reviewer gates are fresh pass. | route/content test pass; direct prompt contract pass; focused lane pass; stale ownership phrases no-match; three provider/mirror `cmp -s` checks pass; `git diff --check` pass; fresh code-reviewer/spec-reviewer pass. | pass | S02 may proceed to commit gate. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-004 | S02 | route/content regression + provider/mirror parity + spec-reviewer pass | pass | Epic workflow reference closed. |
+| tc-005 | S02 | route/content regression + direct prompt contract + stale phrase no-match + provider/mirror parity + reviewers pass | pass | Discovery route closed. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-004, tc-005 | N/A | tc-004, tc-005 | Existing plan closure ids remained sufficient; new focused test maps directly to S02 closure ids. | no | yes |
+| changed | tc-005 | stale decomposition/create Issue phrase assertions | tc-005 | Fresh spec-reviewer found `/execute-epic` still mixed Epic decomposition with execution coordination; test was strengthened to guard this boundary. | no | yes |
+| changed | tc-005 | stale Epic create/import phrase assertions and prompt contract update | tc-005 | Fresh spec-reviewer found remaining Epic create/import ownership wording; code-reviewer found prompt contract failure after execution-only rewrite. The test contract now requires the planning handoff reference while stale ownership phrases are negative-asserted. | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | workflow docs / hub / prompt prose | doc-writer | S02 docs, hub skill, execute-epic provider/mirror files | requirement/design/plan S02 | six S02 prose files | unrelated docs cleanup, runtime code, tests, report, PR merge semantics, `workflow_issue.md` | provider/mirror parity, stale phrase no-match, route phrase inspection, diff check | route cannot be represented without broad rewrite | changed files, verification, risks, Ledger Note | pass |
+| S02 | delegated | route/content regression coverage | dev-coder | `tests/unit/infra/test_init_update.py` | requirement/design/plan S02 | focused S02 test assertions | docs, prompts, skills, source, report | focused pytest and diff check | need to edit outside allowed path | changed files, tests, risks, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | doc-writer | Added concise Epic execution lifecycle and discovery route references, then fixed `/execute-epic` to remove execution-path decomposition / Issue creation / Epic create-import ownership. | six provider/mirror docs, hub, prompt files | three `cmp -s` checks; stale ownership phrase `rg` no-match; route phrase inspection; `git diff --check` | spec-reviewer pass | prompt wording ambiguity addressed by reviewer fixes | accepted |
+| S02 | dev-coder | Added S02 route/content regression test, updated execute prompt contract, and strengthened stale ownership phrase negative assertions. | `tests/unit/infra/test_init_update.py` | new focused test -> `1 passed`; direct prompt contract -> `1 passed`; focused lane -> `3 passed, 438 deselected`; `git diff --check` | code-reviewer pass with P2 count cleanup | pure Red not reproducible because docs changes were already present; exact-string guard may need future expansion if wording changes | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh after initial S02 implementation | failed | N/A | fix report evidence and re-review | P1: S02 delegated worker adoption was missing from Evidence Adoption Ledger. Fixed with EAL-004 / EAL-005 and reviewer-fix EAL-006 / EAL-007. |
+| S02 | step reviewer | spec-reviewer | fresh after initial S02 implementation | failed | N/A | fix prompt boundary and re-review | P1: `/execute-epic` still mixed Epic decomposition / Issue creation with execution coordination. Prompt and tests were fixed. |
+| S02 | step reviewer | code-reviewer | fresh after first reviewer fixes | failed | N/A | fix prompt contract and re-review | P1: direct `test_issue_93_execute_prompts_contract` fails because legacy execute-epic prompt contract still expected issue-creation reference after execution-only rewrite. |
+| S02 | step reviewer | spec-reviewer | fresh after first reviewer fixes | failed | N/A | fix remaining planning ownership and re-review | P1: `/execute-epic` still instructed inspection before creating/importing a new Epic; route this back to `$spec-dock-epic-planning`. |
+| S02 | step reviewer | code-reviewer | fresh after second reviewer fixes | passed | N/A | proceed to commit gate | `review_status: pass`; previous P1s resolved; P2 count mismatch corrected. |
+| S02 | step reviewer | spec-reviewer | fresh after second reviewer fixes | passed | N/A | proceed to commit gate | `review_status: pass`; previous prompt boundary P1s resolved; no findings. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | ready to commit | S02 target files plus report evidence | pending commit | pending | N/A | N/A | N/A | N/A |
 
 ---
 
