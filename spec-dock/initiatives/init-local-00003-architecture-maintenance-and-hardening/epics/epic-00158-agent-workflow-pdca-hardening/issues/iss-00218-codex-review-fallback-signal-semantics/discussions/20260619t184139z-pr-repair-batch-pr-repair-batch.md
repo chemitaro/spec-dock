@@ -21,7 +21,7 @@ reflected_to: []
 - Repository: chemitaro/spec-dock
 - Base branch: main
 - Head branch: iss-00218-codex-review-fallback-signal-semantics
-- Latest head SHA: fc9a8ad07ec327bf409cd15e5a9df403aca19f69
+- Latest head SHA: db9495fd9c539e395caf994d5ca276c8451f04b5
 - Observation command: `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh --repo chemitaro/spec-dock --pr 220 --head-sha fc9a8ad07ec327bf409cd15e5a9df403aca19f69 --timeout-seconds 900 --poll-interval-seconds 30 --quiet-seconds 60 --same-fingerprint-count 2 --out /private/tmp/spec-dock-pr220-observation`
 - Observation final JSON / evidence: `/private/tmp/spec-dock-pr220-observation/result.json`
 - Observation status: failed / `recommended_next_action=fix_ci`
@@ -31,7 +31,7 @@ reflected_to: []
 - Resume metadata: not used; observation reached terminal CI failure
 - New trigger approved: no
 - Observation limitation: Codex review returned usage-limit issue comment; review completion is not clean and remains a human gate after CI is repaired unless a later observation produces a trusted completion signal.
-- Batch status: implemented locally in commit `63f774a2ec03f6eb8313a4d96c06ffadfa936397`; latest-head re-observation pending after push
+- Batch status: U001 reobserved-pass at latest head `db9495fd9c539e395caf994d5ca276c8451f04b5`; stopped at I006 human gate for Codex review usage limit
 
 ## Batch Purpose
 
@@ -47,12 +47,12 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 
 | ID | source_type | concern | failure_class | evidence | summary | validity | risk_class | need_to_fix | disposition | repair_unit | status | rationale | residual_risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| I001 | CI failure | C001 | check_failure:provider-tests | run 27842323053; `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` | New `iss-00218` `.meta.json` is checked in but snapshot allow-list lacks the path | valid | blocking | yes | fix-now | U001 | implemented | dogfooding issue scaffold is intentionally added by this branch and snapshot was updated locally | latest-head CI re-observation pending |
-| I002 | CI failure | C001 | check_failure:provider-tests | run 27842323053; `test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets` | checked-in `.agents/skills/github-pr-observation/SKILL.md` no longer matches provider install_root asset | valid | blocking | yes | fix-now | U001 | implemented | shipped skill docs changed in S90 and dogfooding mirror parity was synced from provider install_root | latest-head CI re-observation pending |
-| I003 | CI failure | C001 | check_failure:provider-tests | run 27842323053; `test_issue_75_pr_monitor_assets_retired_and_observation_scaffold_present` | observation scaffold parity also detects the stale dogfooding skill file | duplicate | blocking | yes | covered-by | U001 | implemented | same root cause as I002 and covered by mirror sync | latest-head CI re-observation pending |
-| I004 | CI failure | C001 | check_failure:provider-tests | run 27842323053; `test_issue_182_s03_wait_progress_uses_decision_current_counts_not_audit_threads` | expected `wait_or_resume` was not updated to `manual_review_required_non_retryable` after fallback action change | valid | blocking | yes | fix-now | U001 | implemented | S99 changed fallback action semantics and the remaining expectation was updated locally | latest-head CI re-observation pending |
-| I005 | CI failure | C001 | check_failure:provider-tests | run 27842323053; `test_issue_197_pr_review_snapshot_provider_wrapper_invokes_python_entrypoint` | provider wrapper fixture snapshot is stale after `pr_review_snapshot.py` output-shape edits | valid | blocking | yes | fix-now | U001 | implemented | branch changed provider Python entrypoint and dogfooding mirror was synced from provider install_root | latest-head CI re-observation pending |
-| I006 | Review observation | Codex usage limit comment | permission_or_auth | `/private/tmp/spec-dock-pr220-observation/result.json`; comment 4753968203 | Codex review could not run because code review usage limit was reached | valid | material-follow-up | human-decision | needs-human | N/A | triaged | Not fixable in repo; after CI repair, merge-prepared may still stop at human gate unless review is retried after quota is available or explicitly waived | review-clean cannot be claimed from this observation |
+| I001 | CI failure | C001 | check_failure:provider-tests | run 27842323053; `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` | New `iss-00218` `.meta.json` is checked in but snapshot allow-list lacks the path | valid | blocking | yes | fix-now | U001 | reobserved-pass | dogfooding issue scaffold is intentionally added by this branch and snapshot was updated locally | latest-head CI pass confirmed |
+| I002 | CI failure | C001 | check_failure:provider-tests | run 27842323053; `test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets` | checked-in `.agents/skills/github-pr-observation/SKILL.md` no longer matches provider install_root asset | valid | blocking | yes | fix-now | U001 | reobserved-pass | shipped skill docs changed in S90 and dogfooding mirror parity was synced from provider install_root | latest-head CI pass confirmed |
+| I003 | CI failure | C001 | check_failure:provider-tests | run 27842323053; `test_issue_75_pr_monitor_assets_retired_and_observation_scaffold_present` | observation scaffold parity also detects the stale dogfooding skill file | duplicate | duplicate | yes | covered-by | U001 | reobserved-pass | same root cause as I002 and covered by mirror sync | latest-head CI pass confirmed |
+| I004 | CI failure | C001 | check_failure:provider-tests | run 27842323053; `test_issue_182_s03_wait_progress_uses_decision_current_counts_not_audit_threads` | expected `wait_or_resume` was not updated to `manual_review_required_non_retryable` after fallback action change | valid | blocking | yes | fix-now | U001 | reobserved-pass | S99 changed fallback action semantics and the remaining expectation was updated locally | latest-head CI pass confirmed |
+| I005 | CI failure | C001 | check_failure:provider-tests | run 27842323053; `test_issue_197_pr_review_snapshot_provider_wrapper_invokes_python_entrypoint` | provider wrapper fixture snapshot is stale after `pr_review_snapshot.py` output-shape edits | valid | blocking | yes | fix-now | U001 | reobserved-pass | branch changed provider Python entrypoint and dogfooding mirror was synced from provider install_root | latest-head CI pass confirmed |
+| I006 | Review observation | Codex usage limit comment | permission_or_auth | `/private/tmp/spec-dock-pr220-observation-latest-readonly/result.json`; comment 4753968203 | Codex review could not run because code review usage limit was reached | valid | material-follow-up | human-decision | needs-human | N/A | blocked | Not fixable in repo; latest-head CI and merge state are clean, but review-clean cannot be claimed unless review is retried after quota is available or explicitly waived | review-clean cannot be claimed from this observation |
 
 ## Classification Values
 
@@ -82,7 +82,7 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 
 | unit_id | source_batch | covered_ids | disposition | risk_class | repair_unit_disc | status | Implementation Plan | Re-observation Result | Residual Risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| U001 | 20260619t184139z-pr-repair-batch | I001, I002, I003, I004, I005 | fix-now | blocking | `20260619t184214z-disc-pr-repair-unit-u001-ci-snapshot-parity.md` | implemented | Updated dogfooding meta snapshot, dogfooding skill mirror, fallback action expectations, and provider wrapper fixture snapshot; targeted CI failure tests and broad S99 selector passed locally | pending latest-head CI re-observation | low if CI re-observation passes; Codex usage-limit remains separate I006 human gate |
+| U001 | 20260619t184139z-pr-repair-batch | I001, I002, I003, I004, I005 | fix-now | blocking | `20260619t184214z-disc-pr-repair-unit-u001-ci-snapshot-parity.md` | reobserved-pass | Updated dogfooding meta snapshot, dogfooding skill mirror, fallback action expectations, and provider wrapper fixture snapshot; targeted CI failure tests and broad S99 selector passed locally | latest head `db9495fd9c539e395caf994d5ca276c8451f04b5`: `validate` pass, `provider-tests` pass, merge state `CLEAN`; read-only snapshot result `/private/tmp/spec-dock-pr220-observation-latest-readonly/result.json` | low for CI repair; Codex usage-limit remains separate I006 human gate |
 
 ## Unit Discussion Plan
 
