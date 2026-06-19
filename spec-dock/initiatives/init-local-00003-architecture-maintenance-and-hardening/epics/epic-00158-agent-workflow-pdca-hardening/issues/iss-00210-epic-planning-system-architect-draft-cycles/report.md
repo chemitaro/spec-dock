@@ -129,9 +129,84 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- S01 で provider-side `spec-dock-epic-planning` skill の first-read spine を更新し、non-trivial Epic planning の `system-architect` draft cycle、skip/fallback、gap return、formal baseline/diff-guard、EAL、fresh reviewer gate を concise に明記した。
+- S01 は docs-only / inspect-only step として `doc-writer` に委任し、targeted `rg` と fresh `spec-reviewer` pass で `tc-001` を閉じた。
 
 ## 実装記録（セッションログ） (必須)
+
+### セッションログ（2026-06-19 S01 — Epic planning skill first-read spine）
+
+#### 対象
+- Step: S01
+- AC/EC: AC-001, AC-002, EC-001, EC-002, EC-003
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S01 — Epic planning skill first-read spine`
+  - closure ids: `tc-001`
+
+#### 実施内容
+- `doc-writer` に S01 の bounded docs-only update を委任した。
+- Provider-side `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md` だけを変更し、dogfooding mirror と canonical issue docs は S01 の委任範囲外に保った。
+- 親 orchestrator が差分、allowed path、targeted `rg`、fresh step `spec-reviewer` pass を確認した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n "system-architect|baseline-status|diff-guard|Evidence Adoption Ledger|spec-reviewer|skip reason|fallback" src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md
+
+pass: all required terms were present in the provider-side skill.
+```
+
+```bash
+git diff -- src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md
+
+pass: diff touched only the S01 allowed provider-side skill file and added concise first-read bullets.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S01 | 赤フェーズ / 代替証跡（Red / alternative） | inspect-only | Existing provider-side skill lacked `baseline-status`, `diff-guard`, `skip reason`, and `fallback` terms before S01 update. | pre-change targeted `rg` / manual inspection | pass | Docs-only step; no code test required. |
+| S01 | 緑フェーズ（Green） | inspect-only | Updated provider-side skill contains `system-architect`, `baseline-status`, `diff-guard`, `Evidence Adoption Ledger`, `spec-reviewer`, `skip reason`, and `fallback`. | targeted `rg` / manual first-read inspection | pass | First-read spine remains concise and routes detail semantics to workflow docs. |
+| S01 | リファクタリング（Refactor） | guardrail satisfied | No refactor needed; change is six concise bullets in the provider-side skill. | diff inspection | pass | No broad workflow text copy or unrelated cleanup. |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S01 | none | implementation / review | recorded | tc-001 | no | `doc-writer` returned no material decisions; `spec-reviewer` returned no findings. |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S01 | tc-001 | Provider-side skill satisfies S01 acceptance and step `spec-reviewer` passes. | `rg` terms present; diff allowed path only; fresh S01 `spec-reviewer` pass. | pass | Commit gate closes with the S01 commit; post-commit hash and clean check are external evidence. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-001 | S01 | yes | inspect-only | Pre-change skill did not include formal baseline/diff-guard or skip/fallback terms. | `rg -n "system-architect|baseline-status|diff-guard|Evidence Adoption Ledger|spec-reviewer|skip reason|fallback" src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md` | pass | All planned terms present after S01 update. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-001 | S01 | targeted `rg`, diff inspection, fresh `spec-reviewer` pass | pass | Covers AC-001, AC-002, EC-001, EC-002, EC-003. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-001 | tc-s01-001 | tc-001 | Planned inspect-only closure was sufficient. | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated | shipped skill text change | doc-writer | Provider-side Epic planning skill first-read spine | `requirement.md`, `design.md`, `plan.md`, provider-side skill | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md` | canonical issue docs, runtime code, tests, dogfooding mirror, Git/GitHub state | targeted `rg`, manual inspection, fresh `spec-reviewer` | required wording conflicts with reviewed design; allowed path insufficient | changed files, summary, verification, risks, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S01 | doc-writer | Added concise non-trivial Epic planning draft-cycle, skip/fallback, gap return, baseline/diff-guard, EAL, and fresh reviewer gate bullets. Worker reported: `No material implementation decisions beyond the approved plan.` | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md` | targeted `rg` -> pass; manual first-read inspection -> pass | `spec-reviewer` pass | none | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S01 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed to S01 commit gate | Reviewer found no findings; S01 acceptance / tc-001 satisfied. |
 
 ### セッションログ（2026-06-19 HH:MM - HH:MM）
 
@@ -221,6 +296,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
+| S01 | committed | Provider-side skill S01 change plus S01 report evidence | external evidence: S01 commit hash reported after commit | external evidence: `git status --short` after commit | N/A | N/A | N/A | N/A |
 | S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
 
 #### 変更したファイル
