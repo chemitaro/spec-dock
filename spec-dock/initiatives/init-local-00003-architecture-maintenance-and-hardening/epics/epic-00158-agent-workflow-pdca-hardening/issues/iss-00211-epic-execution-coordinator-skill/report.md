@@ -18,10 +18,7 @@ ID: "iss-00211"
 
 `report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
 
-Material な判断がない場合もこの section は残し、次を明示する。
-
-- No material interpretation changes.
-- No decision entries.
+Material な判断がない場合もこの section は残す。Issue 211 では D-001 から D-003 までの resolved entry を canonical decision として記録し、未解決の decision entry は残していない。
 
 Ledger entry は次の契約値を使う。
 
@@ -481,7 +478,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S03 | ready to commit | S03 repair files plus report evidence | pending commit | pending | N/A | N/A | N/A | N/A |
+| S03 | committed | S03 repair files plus report evidence | `899ecc99` `test(spec-dock): Issue 211統合検証を完了` | `git status --short` -> clean after commit | N/A | N/A | N/A | N/A |
 
 ---
 
@@ -495,15 +492,15 @@ git diff --check
   - closure id: `tc-007`
 
 #### 実施内容
-- S01/S02/S03 の変更済み docs/skill/prompt/test/source list を `git diff --name-status HEAD~4..HEAD` で確認した。
+- S01/S02/S03/S90 の変更済み docs/skill/prompt/test/source/report list を stable endpoint range `git diff --name-status 0e77ba0d..2ee2d4eb` で確認した。
 - `spec-dock/docs`、provider docs、provider/mirror skills、provider/mirror prompts を対象に、new route と old/stale phrase の横断検索を実施した。
 - `workflow_issue.md` / `reference_github.md` / `github-pr-merge-preparer` の `issue finish` / PR merge-preparer 記述は既存 authority source として整合しており、Issue 211 の新 coordinator と直接矛盾しないと判断した。
 - Conditional docs update は不要とし、docs-impact-none / approved-no-op を fresh `spec-reviewer` に確認依頼した。
 
 #### 実行コマンド / 結果
 ```bash
-git diff --name-status HEAD~4..HEAD
-# planned S01/S02/S03 files only: new epic-execution skill provider/mirror, hub/prompt/workflow docs provider/mirror, managed source/list tests, issue docs.
+git diff --name-status 0e77ba0d..2ee2d4eb
+# planned S01/S02/S03 files plus S90 report evidence: new epic-execution skill provider/mirror, hub/prompt/workflow docs provider/mirror, managed source/list tests, issue docs.
 
 rg -n "spec-dock-epic-execution|Epic execution|execute-epic|issue finish|github-pr-merge-preparer|Do not create a new skill for this workflow|Decompose the epic plan|Create or update issues|creating or importing a new epic" spec-dock/docs src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/install_root/.agents/skills src/spec_dock/assets/install_root/.codex/prompts .agents/skills .codex/prompts
 # new route / existing authority references found; old no-skill, stale decomposition/create Issue, and stale create/import ownership phrases had no matches.
@@ -532,7 +529,7 @@ rg -n "spec-dock-epic-execution|Epic execution|execute-epic|issue finish|github-
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S90 | approved-no-op | report evidence only | N/A | N/A | inspected conditional docs and no direct contradiction found; fresh `spec-reviewer` passed docs-impact-none | conditional docs list from `plan.md`; changed S01/S02/S03 docs/skills/prompts | `git diff --name-status HEAD~4..HEAD`; cross-surface `rg` command above | spec-reviewer pass |
+| S90 | approved-no-op | report evidence only | N/A | N/A | inspected conditional docs and no direct contradiction found; fresh `spec-reviewer` passed docs-impact-none | conditional docs list from `plan.md`; changed S01/S02/S03 docs/skills/prompts | `git diff --name-status 0e77ba0d..2ee2d4eb`; cross-surface `rg` command above | spec-reviewer pass |
 
 ---
 
@@ -541,37 +538,39 @@ rg -n "spec-dock-epic-execution|Epic execution|execute-epic|issue finish|github-
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / README / workflow / skill / migration notes | workflow / skill / prompt / tests updated; no additional conditional docs update required | orchestrator + delegated doc-writer/dev-coder | S90 docs impact inspection; `git diff --name-status 0e77ba0d..2ee2d4eb`; cross-surface `rg`; fresh `spec-reviewer` docs-impact-none pass | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage including tc-001 through tc-008 | already sufficient after S03 full regression and S90 docs-impact inspection | Initial final QA review reran three Issue 211 prompt/content tests and found only stale S03 commit-gate report evidence; after report correction, fresh QA re-review returned `review_status: pass` with no findings. | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff and report ledger consistency | Initial final code review found stale S03 commit-gate evidence and no-decision text after D-003; after report correction, fresh code re-review returned `review_status: pass` with no findings. | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment including tc-008 | Initial final spec review found S99 placeholders, stale S03 commit-gate evidence, and unstable S90 `HEAD~4..HEAD` range; after report correction, fresh spec re-review returned `review_status: pass` with no findings. | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| ready for final report ledger commit | final report-only consistency corrections for S03/S90/S99 evidence and reviewer pass recording | final response plus PR / issue workflow handoff after commit | ready |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: S03 full regression で S02 起因の Japanese-primary heading policy violation が検出された。
+  - 解決: S02 target file に限定した heading repair を行い、focused policy test と full `test_init_update.py` を再実行して pass を確認した。
+- 問題: S99 final review で report 台帳に stale S03 commit evidence、S90 unstable diff range、final gate placeholder が残っていると判定された。
+  - 解決: S03/S90/S99 の report evidence を実コミットと stable endpoint range に更新し、fresh final QA / code / spec re-review が pass した。
 
 ## 学んだこと (任意)
-- ...
+- Epic execution coordinator は issue execution skill と PR merge-preparer を直接再実装せず、ready Issue selection と lifecycle handoff を明示するだけに留めると既存 workflow authority と衝突しにくい。
 
 ## 今後の推奨事項 (任意)
-- ...
+- Issue 211 の実装後は、次の Epic-level dogfooding で `$spec-dock-epic-execution` から `/execute-issue` へ渡す運用を実地確認する。
 
 ## 省略/例外メモ (必須)
 - 該当なし
