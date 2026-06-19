@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "type": "initiative",
+  "id": "init-01920",
+  "title": "Realistic dependency projection",
+  "slug": "realistic-dependency-projection",
+  "created_at": "2026-06-19T00:00:00+09:00",
+  "updated_at": "2026-06-19T00:00:00+09:00",
+  "github": {
+    "issue_number": 1920
+  }
+}

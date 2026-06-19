@@ -1272,6 +1272,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00210-epic-planning-system-architect-draft-cycles/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00211-epic-execution-coordinator-skill/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00214-pr-observation-review-target-state/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00215-codex-review-trigger-timeout-diagnostics/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1484,6 +1485,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00210-epic-planning-system-architect-draft-cycles/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00211-epic-execution-coordinator-skill/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00214-pr-observation-review-target-state/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00215-codex-review-trigger-timeout-diagnostics/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -13878,7 +13880,7 @@ printf '%s\\n' "$S04_WAIT_PAYLOAD"
                     assert "--trigger-comment-id 777" in payload["resume"]["command_hint"]
                     if review_status == "pending":
                         assert payload["codex_review"]["lifecycle"]["status"] == "pending"
-                    assert "phase=wait ci=passed review=pending_signal" in result.stderr
+                    assert "phase=wait ci=passed review=observing" in result.stderr
                     assert (out_dir / "result.json").read_text(encoding="utf-8") == result.stdout
                     assert not (out_dir / "summary.md").exists()
 
@@ -14012,7 +14014,7 @@ sleep 5
             assert payload["trigger"]["helper_success"] is True
             log_lines = log_path.read_text(encoding="utf-8").splitlines()
             assert log_lines[0].startswith("trigger ")
-            assert log_lines[1].startswith("snapshot ")
+            assert all(line.startswith("snapshot ") for line in log_lines[1:])
 
     def test_issue_176_s04_wait_human_approval_does_not_complete_without_codex_review(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -20375,7 +20377,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     assert payload["observation_complete"] is False
                     assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
                     assert payload["wait"]["review_trigger_age_seconds"] < 300
-                    assert "phase=wait ci=passed review=pending_signal" in result.stderr
+                    assert "phase=wait ci=passed review=observing" in result.stderr
 
     def test_issue_187_s204_wait_does_not_promote_unknown_before_ci_passed_age(self) -> None:
         evidence = {
@@ -24377,6 +24379,7 @@ esac
                         "recommended_next_action": "wait_or_resume",
                         "decision": decision,
                         "decision_fingerprint": "no-completion-s430-preserve",
+                        "summary": {"ci": "passed", "head": "current", "review": "approved"},
                         "codex_review": {
                             "lifecycle": {
                                 "status": "none",

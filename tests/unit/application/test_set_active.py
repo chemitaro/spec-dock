@@ -421,7 +421,7 @@ class TestSetActiveApplication:
             ),
         )
 
-        with pytest.raises(RuntimeError, match="epic-00202"):
+        with pytest.raises(RuntimeError) as exc_info:
             app_set_active.set_active(
                 self._request(
                     app_contracts,
@@ -432,7 +432,49 @@ class TestSetActiveApplication:
                 ports,
             )
 
+        message = str(exc_info.value)
+        assert "epic-00202" in message
+        assert "dependency_disposition=blocking" in message
+        assert "disposition_basis=empty_open_container" in message
         assert active_store.written == []
+
+    def test_set_active_allows_open_high_level_dependency_when_all_descendants_done(self) -> None:
+        app_contracts, app_ports, app_set_active, domain_models, infra_contracts = _runtime_modules()
+        active_store = _StubActiveStateStore()
+        context = infra_contracts.DepsDependencyContext(
+            source_node_id="iss-00302",
+            source_issue_id="iss-00302",
+            target_node_id="init-00101",
+            target_node_kind="initiative",
+            target_issue_ids=("iss-00301",),
+            expansion="expanded",
+        )
+        ports = self._ports(
+            app_ports,
+            infra_contracts,
+            active_store=active_store,
+            deps={"iss-00302": ["iss-00301"]},
+            dependency_contexts={"iss-00302": [context]},
+            issue_gateway=_StubIssueGateway(
+                [
+                    self._snapshot(domain_models, 101, "OPEN"),
+                    self._snapshot(domain_models, 301, "CLOSED"),
+                    self._snapshot(domain_models, 302, "OPEN"),
+                ]
+            ),
+        )
+
+        result = app_set_active.set_active(
+            self._request(
+                app_contracts,
+                target=self._node_id_target(app_contracts, "iss-00302"),
+                use_github=True,
+            ),
+            ports,
+        )
+
+        assert result.selection.issue_id == "iss-00302"
+        assert active_store.written[-1].issue.id == "iss-00302"
 
     def test_set_active_raw_empty_container_cycle_blocks_before_writing_without_cli(self) -> None:
         app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
