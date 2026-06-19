@@ -50,7 +50,7 @@ Epic は設計の背骨です。
 - `note` は新規作成 catalog から retired。既存 `note` artifact は grandfathered として壊さない。
 - shared な書き方は `phase_*.md`、lifecycle / governance と Epic 固有の分割判断はこの workflow を正本とする
 
-## Planning Completion / Handoff
+## 計画完了 / 引き継ぎ（Planning Completion / Handoff）
 
 Epic planning completion は、Epic の `requirement.md` / `design.md` / `plan.md` が必要な phase promotion gate と fresh `spec-reviewer` の `review_status: pass` を通過し、downstream Issue が参照できる handoff package が揃った状態です。委任 draft の採用、Evidence Adoption Ledger、diff guard、fresh reviewer gate の詳細は [workflow_spec_authoring.md](workflow_spec_authoring.md) を正本とし、この節では Epic 固有の handoff 境界だけを定義します。
 
@@ -58,7 +58,7 @@ Handoff package は少なくとも次を含みます。
 
 - reviewer-gated Epic requirement / design / plan
 - Issue list, responsibility boundary, dependency order, and known non-blocking deferrals
-- command evidence for dependency mutation using `./spec-dock/scripts/spec-dock deps add --from <dependent-node-id> --to <prerequisite-node-id>`, `./spec-dock/scripts/spec-dock deps remove --from <dependent-node-id> --to <prerequisite-node-id>`, and `./spec-dock/scripts/spec-dock deps check <target>`; `--from` is the node whose `.meta.json.depends_on` is updated, and `--to` is the prerequisite it depends on; do not edit metadata directly
+- dependency mutation の command evidence は `./spec-dock/scripts/spec-dock deps add --from <dependent-node-id> --to <prerequisite-node-id>`、`./spec-dock/scripts/spec-dock deps remove --from <dependent-node-id> --to <prerequisite-node-id>`、`./spec-dock/scripts/spec-dock deps check <target>` を使う。`--from` は `.meta.json.depends_on` を更新する node、`--to` はその prerequisite を指す。metadata を直接編集しない
 - cross-issue draft package covering shared vocabulary, responsibility boundaries, dependency order, handoff inputs / outputs, and validation strategy across the planned Issues
 - issue-local draft requirement / draft design artifact paths for each target Issue after Issue creation, or explicit skip / fallback evidence
 
@@ -73,7 +73,7 @@ Cross-issue draft package は planning evidence であり、Issue の canonical 
 
 Target Issue が draft-requirement または draft-design の一方または両方を意図的に受け取らない場合、Epic report / handoff evidence は target Issue id、skipped draft type(s)、理由、その omission が Issue planning handoff を block しない理由、必要に応じた revisit / follow-up condition を記録します。
 
-Downstream Issues may reference the Epic planning outputs and this completion / handoff contract as input. Each downstream Issue remains independent unless the Epic plan explicitly defines a dependency edge; Epic execution coordinator behavior, issue start / finish cycle, and PR merge-ready preparation stay outside this Epic planning handoff section unless a later Issue explicitly defines them.
+Downstream Issue は、Epic planning outputs とこの completion / handoff contract を input として参照できます。各 downstream Issue は、Epic plan が dependency edge を明示しない限り独立した Issue として扱います。Epic execution coordinator behavior、issue start / finish cycle、PR merge-ready preparation は、later Issue が明示的に定義しない限り、この Epic planning handoff section の外側に置きます。
 
 ## 品質ゲート
 
