@@ -243,7 +243,7 @@ class CliRuntimeHarness:
         if gh_path.exists():
             return
         gh_path.write_text(
-            "#!/usr/bin/env bash\n"
+            "#!/bin/bash\n"
             "set -euo pipefail\n"
             'if [[ "$1" == "issue" && "$2" == "list" ]]; then\n'
             "  cat <<'JSON'\n"
@@ -354,7 +354,7 @@ class CliRuntimeHarness:
 
         gh_path = bin_dir / "gh"
         gh_path.write_text(
-            "#!/usr/bin/env bash\n"
+            "#!/bin/bash\n"
             "set -euo pipefail\n"
             f'fail_nums="{fail_nums}"\n'
             'if [[ "$1" == "issue" && "$2" == "view" ]]; then\n'
@@ -399,10 +399,23 @@ class CliRuntimeHarness:
             normalized.append(item)
 
         payload = json.dumps(normalized, ensure_ascii=False)
+        view_cases = ""
+        for item in normalized:
+            number = item.get("number")
+            if not isinstance(number, int):
+                continue
+            view_cases += (
+                f"    {number})\n"
+                "      cat <<'JSON'\n"
+                f"{json.dumps(item, ensure_ascii=False)}\n"
+                "JSON\n"
+                "      exit 0\n"
+                "      ;;\n"
+            )
 
         gh_path = bin_dir / "gh"
         gh_path.write_text(
-            "#!/usr/bin/env bash\n"
+            "#!/bin/bash\n"
             "set -euo pipefail\n"
             'if [[ "$1" == "issue" && "$2" == "list" ]]; then\n'
             f"{log_line}"
@@ -411,6 +424,15 @@ class CliRuntimeHarness:
             + f"{payload}\n"
             + "JSON\n"
             "  exit 0\n"
+            "fi\n"
+            'if [[ "$1" == "issue" && "$2" == "view" ]]; then\n'
+            f"{log_line}"
+            '  n="$3"\n'
+            "  case \"$n\" in\n"
+            f"{view_cases}"
+            "  esac\n"
+            '  echo "issue not found: $n" >&2\n'
+            "  exit 1\n"
             "fi\n"
             'echo "unexpected gh args: $@" >&2\n'
             "exit 99\n",
