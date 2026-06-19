@@ -84,9 +84,12 @@ reflected_to: []
 - Updated provider and mirror `spec-dock-epic-execution/SKILL.md` so requested Epic resolution happens before active-Epic checks.
 - Updated provider and mirror `spec-dock-epic-execution/SKILL.md` so no-ready-Issue handling distinguishes explicit no-executable-Issue-work Epics from blocked executable work.
 - Updated provider and mirror `execute-initiative.md` so planning/decomposition uses `$spec-dock-epic-planning`, while `/execute-epic` is reserved for reviewed planning outputs and ready Issue work.
+- Updated provider and mirror `execute-epic.md` so its planning handback line explicitly covers initiative-driven decomposition.
 - Added focused regression assertions for initiative route wording, requested-Epic resolution, and no-executable-Issue-work.
 - Focused tests passed: `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_211_epic_execution_skill_content_regression_contract tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_211_epic_execution_route_content_regression_contract tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_93_execute_prompts_contract` -> `3 passed`.
 - Provider/mirror `cmp -s` checks passed for `spec-dock-epic-execution/SKILL.md` and `execute-initiative.md`.
+- Additional focused tests passed after `execute-epic.md` anchor repair: `test_issue_211_epic_execution_route_content_regression_contract` and `test_issue_93_execute_prompts_contract` -> `2 passed`.
+- Provider/mirror `cmp -s` check passed for `execute-epic.md`.
 - `git diff --check` passed.
 
 ## Commit Evidence

@@ -12004,6 +12004,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "$spec-dock-epic-execution",
             "Epic execution",
             "$spec-dock-epic-planning",
+            "initiative-driven decomposition",
             "/execute-issue",
             "$spec-dock-issue-execution",
             "selects one ready Issue at a time",

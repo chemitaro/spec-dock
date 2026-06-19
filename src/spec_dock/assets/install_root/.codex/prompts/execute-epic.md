@@ -51,7 +51,7 @@ Before Epic execution starts:
 If the epic requirement, design, or plan is missing, contradictory,
 template-only, or not ready for Issue execution, do not execute or create Issues
 from this prompt. Hand the Epic back to `$spec-dock-epic-planning` for spec
-authoring, decomposition, dependency, or Issue readiness repair.
+authoring, initiative-driven decomposition, dependency, or Issue readiness repair.
 
 When the epic is ready:
 
