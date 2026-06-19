@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "type": "epic",
+  "id": "epic-01930",
+  "title": "Empty open blocker epic",
+  "slug": "empty-open-blocker",
+  "created_at": "2026-06-19T00:00:00+09:00",
+  "updated_at": "2026-06-19T00:00:00+09:00",
+  "parent_id": "init-01920",
+  "initiative_id": "init-01920",
+  "github": {
+    "issue_number": 1930
+  }
+}

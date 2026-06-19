@@ -36,7 +36,9 @@
 - raw node-level self / ancestor-container / descendant / cycle と、candidate compiled issue-level cycle / self-edge は保存前に拒否されます。
 - empty initiative / epic dependency は raw node-level validation を通れば保存できます。storage format は変えず、`.meta.json.depends_on` は raw direct dependency の保存場所のままです。
 - issue-level expansion が空の場合でも、readiness は high-level node status を評価します。open / unknown の empty initiative / epic は node-level blocker になり、done / closed / all-descendant-done の context は satisfied dependency として扱います。
-- `deps-issues.*` は readiness / blocker authority で、`deps-raw.puml` は raw visual/debug artifact です。`deps-raw.puml` に high-level state/source が表示されても readiness authority ではありません。
+- GitHub の `open` / `closed` は lifecycle fact であり、SpecDock dependency readiness の `blocking` / `satisfied` / `indeterminate` と同義ではありません。readiness は `dependency_disposition` と `disposition_basis` で説明します。
+- `deps-issues.*` は readiness / blocker authority で、`deps-raw.puml` は active raw direct visual/debug artifact です。`deps-raw.puml` に high-level state/source が表示されても readiness authority ではありません。
+- `deps-issues.puml` と `deps-raw.puml` は active view です。done / closed / satisfied-only context は `.agent/deps-issues.json` の machine-readable context に残しつつ、図では表示ノイズとして省くことがあります。
 - add/remove は `.meta.json` だけを書き換え、write failure 時も partial write を残さない atomic replace を前提にします。
 - rollback は compatibility mode ではなく issue diff revert 前提です。
 
@@ -89,7 +91,25 @@
 - shorthand 展開結果が空でも storage error にはせず、warning `deps_ref_expanded_to_empty` を出すことがあります。ただし readiness は warning だけでは決まりません。open / unknown の empty high-level target は node-level blocker、done / closed / all-descendant-done の target は satisfied dependency です。
 - no dual-read / no auto-migration / rollback-by-revert を前提にします。
 
-## 3. 読み取り契約（reader contract）
+## 3. lifecycle / disposition 判定（readiness evaluation）
+
+`lifecycle_state` は GitHub / local state から得る lifecycle fact です。`dependency_disposition` は、その fact と full graph descendant issue を使って dependency readiness 上の意味を決めた結果です。
+
+| high-level target | lifecycle_state | descendant issue count | descendant state | dependency_disposition | disposition_basis | blocker surface |
+|---|---|---:|---|---|---|---|
+| initiative / epic | open | 0 | N/A | blocking | empty_open_container | node_blocker |
+| initiative / epic | unknown | 0 | N/A | indeterminate | empty_unknown_container | node_blocker |
+| initiative / epic | closed | any | any | satisfied | lifecycle_closed | none |
+| initiative / epic | done | any | any | satisfied | local_done | none |
+| initiative / epic | open | >0 | all done / closed | satisfied | all_descendant_issues_done | none |
+| initiative / epic | open | >0 | any open / ready / blocked | blocking | descendant_issue_open | descendant issue blockers |
+| initiative / epic | open | >0 | any unknown | indeterminate | descendant_issue_unknown | descendant issue unknown |
+
+descendant issue は todo projection ではなく full graph で数えます。done issue が `index.json` から消えていても、all-descendant-done 判定では descendant issue として扱います。
+
+unknown は fail-closed です。unknown high-level target や unknown descendant issue は、明示的に satisfied と判断できるまで ready 扱いしません。
+
+## 4. 読み取り契約（reader contract）
 
 - `infra/deps_reader.py` は node 直下 `.meta.json` から `depends_on` を読みます。
 - shorthand 解決、issue-level edge compile、dedupe、deterministic sort、descendant/self reject、warning `deps_ref_expanded_to_empty` は current contract を維持します。
@@ -97,7 +117,7 @@
 - reader は storage / topology facts を返すだけで、readiness authority ではありません。open / unknown / done / closed / all-descendant-done の解釈は readiness evaluation 側で行います。
 - `deps add/remove` の変更契約（mutation contract）は次節の通りで、delete scrub と `validate` / `sync` / `active set` parity の詳細はこの reference の主題に含めません。
 
-## 4. 変更契約（mutation contract）
+## 5. 変更契約（mutation contract）
 
 コマンド surface:
 
@@ -119,30 +139,33 @@
 - mutation write path は node 直下 `.meta.json` の `depends_on` のみです。`deps.json` fallback write や互換モードはありません。
 - write failure は `write_failed` error で返し、temp file + replace の atomic write により partial write を残しません。rollback は compatibility mode ではなく issue diff revert 前提です。
 
-## 5. 下流境界メモ（downstream boundary note）
+## 6. 下流境界メモ（downstream boundary note）
 
 - `deps check`、`active set`、`validate`、`sync`、`delete` は compiled dependency result を消費する downstream consumer です。
 - `deps check` / `active set` / `issue start` / `sync` の readiness interpretation は、issue blockers、node blockers、satisfied dependencies、unknown fail-closed を含む同じ readiness evaluation に基づきます。
 - `.agent/deps-issues.json` は schema v2 の readiness / blocker context artifact です。`projection` は `issue-readiness-with-dependency-context`、`source.sync_state` は `readiness_evaluation` です。
 - `deps-issues` には typed issue blockers、typed node blockers、satisfied dependencies が含まれます。todo-only `index.json` の再パース結果ではありません。
-- `sync` が生成する `deps-raw.puml` は `.meta.json.depends_on` の raw direct dependency を可視化する確認用 artifact です。high-level node の state / source を表示できますが、readiness / blocker 判定の authority は `deps-issues.*` 側にあります。
+- `.agent/deps-issues.json` の `nodes` / `edges` は active readiness graph です。done / closed / satisfied-only context は active graph から省かれることがあります。
+- `.agent/deps-issues.json` の `dependency_contexts` は evaluated high-level dependency context を保持します。GitHub-open all-descendant-done high-level dependency など、図に出ない satisfied context の確認先です。
+- `sync` が生成する `deps-issues.puml` は active readiness / blocker view です。blocking edge は user-facing label `blocks` で表示し、done / closed / satisfied-only edge は表示ノイズとして省きます。
+- `sync` が生成する `deps-raw.puml` は `.meta.json.depends_on` の active raw direct dependency を可視化する確認用 artifact です。high-level node の state / source を表示できますが、readiness / blocker 判定の authority は `deps-issues.*` 側にあります。complete raw metadata audit は `.meta.json.depends_on` と `.agent/index-all.json` を確認します。
 - raw node-level cycle などの deps preflight failure や disabled path は fail-closed です。`sync --force` では stale graph を残さない placeholder が出力され、partial readiness authority として読んではいけません。
 - 運用では `deps add/remove` の後に `./spec-dock/scripts/spec-dock deps check <target>`、`./spec-dock/scripts/spec-dock validate`、`./spec-dock/scripts/spec-dock sync` を順に実行して、標準の GitHub live state で整合を確認します。GitHub を呼ばない cache/local 確認が必要な場合だけ `--no-github` を指定します。
 - この文書は `.meta.json` schema / reader / `deps check` / `deps add/remove` の command contract を固定するもので、downstream parity や hard cutover 完了を意味しません。
 - provider-side のこのファイルが dependency reference の正本であり、dogfooding 側 copy は secondary verification です。
 
-## 6. 移行 / ロールバックのガードレール（migration / rollback guardrails）
+## 7. 移行 / ロールバックのガードレール（migration / rollback guardrails）
 
 - no dual-read: reader は `.meta.json` のみを対象にし、`deps.json` fallback read を持ちません。
 - no auto-migration: runtime は `deps.json` から `.meta.json` への自動変換・救済を行いません。
 - rollback-by-revert: compatibility mode は導入せず、issue diff revert で戻します。
 
-## 7. ハードカットオーバーの所有境界（hard cutover owner boundary）
+## 8. ハードカットオーバーの所有境界（hard cutover owner boundary）
 
 - legacy `deps.json` checked-in data manual fix と dogfooding `./spec-dock/scripts/spec-dock validate` / `sync` evidence、hard cutover judgment の primary owner は `iss-00062` です。
 - `iss-00060` / `iss-00061` がこの reference で固定するのは `.meta.json` schema、読み取り契約（reader contract）、変更コマンド契約（mutation command contract）、provider-side dependency docs 正本更新までです。
 
-## 8. ハードカットオーバー開始契約（hard cutover entry contract / T3/T4 split）
+## 9. ハードカットオーバー開始契約（hard cutover entry contract / T3/T4 split）
 
 - hard cutover entry 条件は次の 3 点に固定します:
   - docs 更新（provider-side 正本 + dogfooding mirror）
