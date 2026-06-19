@@ -74,6 +74,7 @@ ID: "iss-00211"
 
 ## 依存関係分析
 - file 依存:
+  - `src/spec_dock/cli.py` は `_MANAGED_SKILL_NAMES` を持ち、installer/update runtime が managed skill を認識する source of truth になる。
   - `tests/cli_runtime/harness.py` は expected managed skill names を持ち、新 managed skill 追加の prerequisite になる。
   - `tests/unit/infra/test_init_update.py` は provider asset map、authoritative install-root inventory、duplicate-boundary guard、dogfooding parity、content regression を持つ。
   - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md` は new provider asset。
@@ -153,6 +154,7 @@ Tests --> Prompt : conflict regression
 |   `-- .codex/prompts/execute-epic.md          # 変更: new skill 禁止文を解消し coordinator route を追加
 |-- src/spec_dock/assets/spec_dock/docs/
 |   `-- workflow_epic.md                        # 変更: Epic execution lifecycle reference を追加
+|-- src/spec_dock/cli.py                         # 変更: _MANAGED_SKILL_NAMES に new skill を追加
 |-- .agents/skills/
 |   |-- spec-dock-epic-execution/SKILL.md       # 追加: provider skill mirror
 |   `-- spec-dock-hub/SKILL.md                  # 変更: provider hub mirror
@@ -168,7 +170,7 @@ Tests --> Prompt : conflict regression
 - AC-002 lifecycle detail -> selected ready Issue must be started through `issue start`; post-PR completion must return to `workflow_issue.md` and `issue finish` only after existing completion gates。
 - AC-003 -> `workflow_epic.md` reference section in provider and mirror。
 - AC-004 -> `spec-dock-hub` route and `execute-epic.md` conflict removal / route update。
-- AC-005 -> `tests/cli_runtime/harness.py` and `tests/unit/infra/test_init_update.py` updates plus targeted verification。
+- AC-005 -> `src/spec_dock/cli.py`, `tests/cli_runtime/harness.py`, and `tests/unit/infra/test_init_update.py` updates plus targeted verification。
 - EC-001 -> skill active Issue stop condition。
 - EC-002 -> skill no-ready-Issue blocked condition。
 - EC-003 -> skill one-Issue-at-a-time selection rule。
