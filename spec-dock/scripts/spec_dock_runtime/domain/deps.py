@@ -401,12 +401,17 @@ def _evaluate_dependency_contexts(
 
             if state == "done":
                 suppressed_issue_roots_by_issue_id.setdefault(issue_id, set()).update(context.target_issue_ids)
+                disposition_basis: DepsDispositionBasis = (
+                    "all_descendant_issues_done"
+                    if context.target_issue_ids and state_source == "descendant_aggregate"
+                    else "local_done"
+                )
                 evaluated = _with_disposition(
                     context,
                     lifecycle_state=state,
                     lifecycle_source=state_source,
                     dependency_disposition="satisfied",
-                    disposition_basis="local_done",
+                    disposition_basis=disposition_basis,
                 )
                 satisfied_by_key[key] = evaluated
                 dependency_contexts_by_key[key] = evaluated
@@ -414,7 +419,10 @@ def _evaluate_dependency_contexts(
 
             if state == "unknown":
                 unresolved_issue_roots_by_issue_id.setdefault(issue_id, set()).update(context.target_issue_ids)
-                if context.expansion != "empty":
+                if (
+                    context.expansion != "empty"
+                    and not _any_target_issue_unknown(context.target_issue_ids, issue_statuses)
+                ):
                     node_blockers_by_id[context.target_node_id] = DepsNodeBlocker(
                         node_id=context.target_node_id,
                         reason="lifecycle_unknown",
