@@ -3414,6 +3414,20 @@ class TestRuntimeSyncS07:
                         disposition_basis="empty_open_container",
                     )
                 ],
+                dependency_contexts=[
+                    domain_models.DepsDependencyContext(
+                        source_node_id="iss-00301",
+                        source_issue_id="iss-00301",
+                        target_node_id="epic-00201",
+                        target_node_kind="epic",
+                        target_issue_ids=(),
+                        expansion="empty",
+                        lifecycle_state="open",
+                        lifecycle_source="github",
+                        dependency_disposition="blocking",
+                        disposition_basis="empty_open_container",
+                    )
+                ],
                 satisfied_dependencies=[
                     domain_models.DepsDependencyContext(
                         source_node_id="iss-00301",
@@ -3475,6 +3489,7 @@ class TestRuntimeSyncS07:
             "issue_blockers",
             "node_blockers",
             "satisfied_dependencies",
+            "dependency_contexts",
             "nodes",
             "warnings",
         } <= set(payload)
@@ -3504,6 +3519,20 @@ class TestRuntimeSyncS07:
                 "dependency_disposition": "satisfied",
                 "disposition_basis": "lifecycle_closed",
             }
+        ]
+        assert payload["dependency_contexts"] == [
+            {
+                "source_node_id": "iss-00301",
+                "source_issue_id": "iss-00301",
+                "target_node_id": "epic-00201",
+                "target_node_kind": "epic",
+                "target_issue_ids": [],
+                "expansion": "empty",
+                "lifecycle_state": "open",
+                "lifecycle_source": "github",
+                "dependency_disposition": "blocking",
+                "disposition_basis": "empty_open_container",
+            },
         ]
 
     def test_sync_exit_behavior_regression(self) -> None:

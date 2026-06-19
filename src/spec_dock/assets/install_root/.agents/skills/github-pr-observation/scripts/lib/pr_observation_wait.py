@@ -1070,22 +1070,7 @@ def progress_line(
     review_status = review_counts["status"]
     render_review = review_status
     if phase == "wait" and not observation_complete:
-        lifecycle = codex_review_lifecycle(payload)
-        decision = decision_payload(payload)
-        pending_signal_candidate = review_status in {"none", "pending", "unknown", "approved", "passed"}
-        completion_signal = decision.get("completion_signal") or lifecycle.get("completion_signal")
-        lifecycle_status = lifecycle.get("status")
-        has_actionable_feedback = any(
-            int(review_counts.get(key, 0) or 0) > 0
-            for key in ("comments", "threads", "unresolved", "requested")
-        )
-        if (
-            pending_signal_candidate
-            and not has_actionable_feedback
-            and completion_signal in {None, "", "none"}
-            and lifecycle_status in {None, "", "none", "pending", "unknown"}
-        ):
-            render_review = "pending_signal"
+        render_review = "observing"
 
     fields: list[tuple[str, str, bool]] = [
         ("poll", str(poll), False),

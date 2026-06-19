@@ -426,7 +426,7 @@ class TestDepsDomain:
         assert result.satisfied_dependencies[0].lifecycle_state == "done"
         assert result.satisfied_dependencies[0].lifecycle_source == "descendant_aggregate"
         assert result.satisfied_dependencies[0].dependency_disposition == "satisfied"
-        assert result.satisfied_dependencies[0].disposition_basis == "local_done"
+        assert result.satisfied_dependencies[0].disposition_basis == "all_descendant_issues_done"
 
     def test_evaluate_readiness_records_open_descendant_high_level_dependency_as_blocking(self) -> None:
         domain_deps, domain_models, _domain_tree = _runtime_modules()
@@ -670,6 +670,46 @@ class TestDepsDomain:
         assert len(result.node_blockers) == 1
         assert result.node_blockers[0].node_id == "epic-00002"
         assert result.node_blockers[0].reason == "lifecycle_unknown"
+        assert result.satisfied_dependencies == []
+        assert len(result.dependency_contexts) == 1
+        assert result.dependency_contexts[0].dependency_disposition == "indeterminate"
+        assert result.dependency_contexts[0].disposition_basis == "descendant_issue_unknown"
+
+    def test_evaluate_readiness_uses_unknown_descendant_as_blocker_surface_for_unknown_high_level(self) -> None:
+        domain_deps, domain_models, _domain_tree = _runtime_modules()
+        graph = self._graph()
+        statuses = {
+            "iss-00003": _issue_status(domain_models, "iss-00003", "open"),
+            "iss-00004": _issue_status(domain_models, "iss-00004", "unknown"),
+        }
+        dependency_context = domain_models.DepsDependencyContext(
+            source_node_id="iss-00003",
+            source_issue_id="iss-00003",
+            target_node_id="epic-00002",
+            target_node_kind="epic",
+            target_issue_ids=("iss-00004",),
+            expansion="expanded",
+        )
+
+        result = domain_deps.evaluate_readiness(
+            graph,
+            issue_depends_on_map={"iss-00003": ["iss-00004"], "iss-00004": []},
+            target_id=domain_models.NodeId("iss-00003"),
+            issue_statuses=statuses,
+            dependency_contexts_by_issue_id={"iss-00003": [dependency_context]},
+            high_level_statuses_by_node_id={
+                "epic-00002": domain_models.DepsHighLevelStatus(
+                    node_id="epic-00002",
+                    state="unknown",
+                    source="descendant_aggregate",
+                )
+            },
+        )
+
+        assert not result.ready
+        assert result.guard_reason == "unknown"
+        assert result.issue_blockers == ["iss-00004"]
+        assert result.node_blockers == []
         assert result.satisfied_dependencies == []
         assert len(result.dependency_contexts) == 1
         assert result.dependency_contexts[0].dependency_disposition == "indeterminate"

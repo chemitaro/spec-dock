@@ -225,6 +225,34 @@ def test_tc_s04_003_high_level_participant_state_comes_from_payload():
     assert "Nepic_a --> Niss_a : raw_direct" in puml
 
 
+def test_tc_s04_004_completed_high_level_source_is_not_raw_participant():
+    _unused_app_contracts, domain_models, presentation_json_state = _runtime_modules()
+    state, _unused, _unused_domain = _state(
+        raw_node_depends_on_map={"epic-a": ["init-a"]},
+        issue_statuses={
+            "iss-a": _status(domain_models, "iss-a", "done"),
+            "iss-b": _status(domain_models, "iss-b", "done"),
+        },
+        high_level_statuses_by_node_id={
+            "epic-a": domain_models.DepsHighLevelStatus(
+                node_id="epic-a",
+                state="open",
+                source="github",
+            ),
+            "init-a": domain_models.DepsHighLevelStatus(
+                node_id="init-a",
+                state="open",
+                source="github",
+            ),
+        },
+    )
+
+    puml = presentation_json_state.render_deps_raw_artifact(state).puml_text
+
+    assert "Nepic_a --> Ninit_a : raw_direct" not in puml
+    assert 'note "No raw direct dependencies to render" as Empty' in puml
+
+
 def test_tc_s02_005_nonparticipants_omitted_and_ancestors_retained():
     _unused_app_contracts, domain_models, presentation_json_state = _runtime_modules()
     extra_nodes = {
