@@ -1066,6 +1066,7 @@ no_findings_completion_promotes = bool(
     and no_findings_source_ids
     and not stale_codex_head_context_present
     and not actionable_unresolved_thread_ids
+    and not review_decision_changes_requested
     and not blocking_collection_failure
 )
 if selected_review_signals:
