@@ -80,6 +80,10 @@ def render_deps_check_json(result: DepsCheckResult) -> str:
             _deps_dependency_context_payload(context)
             for context in inspection.evaluation.satisfied_dependencies
         ],
+        "dependency_contexts": [
+            _deps_dependency_context_payload(context)
+            for context in inspection.evaluation.dependency_contexts
+        ],
         "nodes": {
             node_id: {
                 "state": node_state.status,
@@ -245,6 +249,18 @@ def _node_is_active_raw_participant(result: SyncStateResult, node_id: str) -> bo
         return False
     if node.kind == "issue":
         return not _issue_is_satisfied(result, node_id)
+    descendant_issue_ids = [
+        candidate.id
+        for candidate in result.graph.nodes_by_id.values()
+        if candidate.kind == "issue"
+        and (
+            candidate.id == node_id
+            or candidate.epic_id == node_id
+            or candidate.initiative_id == node_id
+        )
+    ]
+    if descendant_issue_ids and all(_issue_is_satisfied(result, issue_id) for issue_id in descendant_issue_ids):
+        return False
     visual_state = _high_level_visual_state(result, node_id)
     if visual_state is None:
         return True

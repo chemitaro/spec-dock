@@ -818,7 +818,7 @@ class TestCheckDepsApplication:
         assert [
             (c.dependency_disposition, c.disposition_basis)
             for c in result.inspection.evaluation.satisfied_dependencies
-        ] == [("satisfied", "local_done")]
+        ] == [("satisfied", "all_descendant_issues_done")]
 
         graph = build_graph([app_check_deps._to_spec_node_seed(record) for record in records])
         high_level_statuses = app_check_deps.resolve_high_level_status_context(
