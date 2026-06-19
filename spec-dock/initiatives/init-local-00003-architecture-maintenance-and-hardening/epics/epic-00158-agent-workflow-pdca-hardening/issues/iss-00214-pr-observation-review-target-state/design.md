@@ -61,7 +61,8 @@ ID: "iss-00214"
 - 決定:
   - Wait 中、observation 未完了、Codex review completion / comment signal がまだない target state は `review=pending_signal` と表示する。
   - Actionable review feedback がある場合は、`review=unresolved` を表示し、`comments` / `threads` / `unresolved` count を維持する。
-  - Approved / passed / terminal-like states は existing target state を表示する。
+  - Approved / passed / terminal-like states は trusted completion signal または completed lifecycle がある場合だけ existing target state を表示する。
+  - Legacy / audit 由来の `approved` / `passed` review status でも、trusted completion signal がなく、actionable feedback もなく、lifecycle completion もない wait 中 state では `review=pending_signal` と表示する。
 
 ## pending_signal 導出方針
 
@@ -70,12 +71,13 @@ ID: "iss-00214"
 - `review=pending_signal` を表示する条件:
   - `phase == "wait"`
   - `observation_complete is False`
-  - `review_status` が `none` / `pending` / `unknown` のいずれか、または trusted completion / comment signal がない待機中 state と判断できる
+  - `review_status` が `none` / `pending` / `unknown` のいずれか
+  - または、`review_status` が `approved` / `passed` であっても trusted completion / comment signal がなく、completed lifecycle もない legacy / audit 由来の no-completion wait state と判断できる
   - current trigger boundary の actionable review feedback count がない
   - trusted completion signal が `submitted_pull_request_review` ではない
 - `review=pending_signal` を表示しない条件:
   - `review_status` が `unresolved` / `changes_requested` / `commented` / `requested` のような actionable or explicit target state。
-  - `review_status` が `approved` / `passed` など completion を示す state。
+  - `review_status` が `approved` / `passed` など completion を示し、trusted completion signal または completed lifecycle で裏付けられる state。
   - final phase が `terminal` / `timeout` で、既存 final status を表示するほうが正確な場合。
 - 補足:
   - 実装では `review_progress_counts(payload)`、`decision_payload(payload)`、`codex_review_lifecycle(payload)`、`completion_signal`、selected review/comment counts を使って判定する。
