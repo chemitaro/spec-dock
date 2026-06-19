@@ -11939,10 +11939,90 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         ):
             assert phrase in epic_execution
 
+    def test_issue_211_epic_execution_route_content_regression_contract(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        route_asset_pairs = {
+            "spec-dock/docs/workflow_epic.md": (
+                "src/spec_dock/assets/spec_dock/docs/workflow_epic.md"
+            ),
+            ".agents/skills/spec-dock-hub/SKILL.md": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md"
+            ),
+            ".codex/prompts/execute-epic.md": (
+                "src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md"
+            ),
+        }
+        route_texts: dict[str, str] = {}
+
+        for mirror_rel_path, provider_rel_path in route_asset_pairs.items():
+            with _case(mirror=mirror_rel_path, provider=provider_rel_path):
+                assert self._DOGFOODING_MIRROR_PROVIDER_ASSET_MAP[mirror_rel_path] == \
+                    provider_rel_path
+                mirror_path = repo_root / mirror_rel_path
+                provider_path = repo_root / provider_rel_path
+                assert mirror_path.is_file(), f"missing dogfooding route mirror: {mirror_path}"
+                assert provider_path.is_file(), f"missing provider route asset: {provider_path}"
+                assert mirror_path.read_bytes() == provider_path.read_bytes()
+                route_texts[mirror_rel_path] = mirror_path.read_text(encoding="utf-8")
+                route_texts[provider_rel_path] = provider_path.read_text(encoding="utf-8")
+
+        workflow_epic = route_texts["src/spec_dock/assets/spec_dock/docs/workflow_epic.md"]
+        for phrase in (
+            "spec-dock-epic-execution",
+            "first-read coordinator",
+            "ready Issue",
+            "github-pr-merge-preparer",
+            "workflow_issue.md",
+            "issue finish",
+        ):
+            assert phrase in workflow_epic
+
+        hub_skill = route_texts[
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md"
+        ]
+        for phrase in (
+            "spec-dock-epic-planning",
+            "spec-dock-epic-execution",
+            "spec-dock-issue-execution",
+            "routes to Issue planning/execution",
+            "merge-preparer",
+            "without replacing issue execution",
+        ):
+            assert phrase in hub_skill
+
+        execute_epic_prompt = route_texts[
+            "src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md"
+        ]
+        for phrase in (
+            "$spec-dock-epic-execution",
+            "Epic execution",
+            "$spec-dock-epic-planning",
+            "/execute-issue",
+            "$spec-dock-issue-execution",
+            "selects one ready Issue at a time",
+        ):
+            assert phrase in execute_epic_prompt
+
+        stale_execute_epic_prompt_phrases = (
+            "before creating or importing a new epic",
+            "creating or importing a new epic",
+            "Do not create a new skill for this workflow",
+            "Decompose the epic plan",
+            "Create or update issues",
+        )
+        for prompt_rel_path in (
+            "src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md",
+            ".codex/prompts/execute-epic.md",
+        ):
+            with _case(prompt=prompt_rel_path):
+                for phrase in stale_execute_epic_prompt_phrases:
+                    assert phrase not in route_texts[prompt_rel_path]
+
     def test_issue_93_execute_prompts_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         prompt_contracts = {
             "execute-epic.md": (
+                "$spec-dock-epic-execution",
                 "$spec-dock-epic-planning",
                 "$spec-dock-issue-execution",
                 "/execute-issue",
