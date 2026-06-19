@@ -239,6 +239,44 @@ def _high_level_visual_state(result: SyncStateResult, node_id: str) -> dict[str,
     return {"state": state, "state_source": source}
 
 
+def _node_is_active_raw_participant(result: SyncStateResult, node_id: str) -> bool:
+    node = result.graph.nodes_by_id.get(node_id)
+    if node is None:
+        return False
+    if node.kind == "issue":
+        return not _issue_is_satisfied(result, node_id)
+    visual_state = _high_level_visual_state(result, node_id)
+    if visual_state is None:
+        return True
+    return visual_state["state"] not in {"closed", "done"}
+
+
+def _dependency_context_is_satisfied(context: object) -> bool:
+    return _object_value(context, "dependency_disposition", None) == "satisfied"
+
+
+def _raw_dependency_edge_is_satisfied(result: SyncStateResult, dependent_id: str, prerequisite_id: str) -> bool:
+    contexts = list(result.dependency_contexts_by_issue_id.get(dependent_id, []))
+    for issue_contexts in result.dependency_contexts_by_issue_id.values():
+        for context in issue_contexts:
+            if _object_value(context, "source_node_id", None) == dependent_id:
+                contexts.append(context)
+    evaluation = result.deps_eval_by_id.get(dependent_id)
+    if evaluation is not None:
+        contexts.extend(evaluation.satisfied_dependencies)
+    for issue_evaluation in result.deps_eval_by_id.values():
+        for context in issue_evaluation.satisfied_dependencies:
+            if _object_value(context, "source_node_id", None) == dependent_id:
+                contexts.append(context)
+    for context in contexts:
+        if (
+            _object_value(context, "target_node_id", None) == prerequisite_id
+            and _dependency_context_is_satisfied(context)
+        ):
+            return True
+    return False
+
+
 def _raw_dependency_participant_ids(result: SyncStateResult) -> tuple[set[str], list[dict[str, str]]]:
     graph_nodes = result.graph.nodes_by_id
     participant_ids: set[str] = set()
@@ -251,6 +289,12 @@ def _raw_dependency_participant_ids(result: SyncStateResult) -> tuple[set[str], 
         dep_ids = result.raw_node_depends_on_map.get(dependent_id, [])
         for prerequisite_id in _sort_ids([dep_id for dep_id in dep_ids if isinstance(dep_id, str)]):
             if prerequisite_id not in graph_nodes:
+                continue
+            if not _node_is_active_raw_participant(result, dependent_id):
+                continue
+            if not _node_is_active_raw_participant(result, prerequisite_id):
+                continue
+            if _raw_dependency_edge_is_satisfied(result, dependent_id, prerequisite_id):
                 continue
             edge_key = (dependent_id, prerequisite_id)
             if edge_key in seen_edges:

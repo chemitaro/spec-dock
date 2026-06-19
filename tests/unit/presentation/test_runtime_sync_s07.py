@@ -1553,8 +1553,9 @@ class TestRuntimeSyncS07:
             assert "iss-local-00002" not in index_todo["nodes"]
             assert "iss-local-00002" in index_all["nodes"]
             assert "@startuml" in deps_raw_puml
-            assert "iss-local-00001" in deps_raw_puml
-            assert "iss-local-00002" in deps_raw_puml
+            assert "iss-local-00001" not in deps_raw_puml
+            assert "iss-local-00002" not in deps_raw_puml
+            assert 'note "No raw direct dependencies to render" as Empty' in deps_raw_puml
 
             def _index_paths(payload: dict[str, object]) -> list[str]:
                 nodes = payload.get("nodes")
@@ -3329,6 +3330,7 @@ class TestRuntimeSyncS07:
         )
 
         payload = json.loads(presentation_json_state.render_deps_issues_artifact(state).json_text)
+        puml = presentation_json_state.render_deps_issues_artifact(state).puml_text
 
         assert set(payload["nodes"]) == {"epic-00201", "iss-00301", "iss-00303"}
         assert "iss-00302" not in payload["nodes"]
@@ -3374,6 +3376,9 @@ class TestRuntimeSyncS07:
                 "disposition_basis": "local_done",
             },
         ]
+        assert "Nepic_00201 --> Niss_00301 : blocks" in puml
+        assert "raw_direct" not in puml
+        assert "satisfied edge" not in puml
 
     def test_deps_check_json_includes_lifecycle_and_disposition_context(self) -> None:
         (
