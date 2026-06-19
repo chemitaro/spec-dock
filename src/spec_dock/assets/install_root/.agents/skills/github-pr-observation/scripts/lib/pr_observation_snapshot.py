@@ -360,7 +360,7 @@ def classify_snapshot(
     if decision_status_reason == "current_selected_changes_requested" or selected_changes_requested_evidence:
         return "human_gate", "address_review_feedback", True, "current_selected_changes_requested"
     if completion_signal == "fallback_issue_comment":
-        return "human_gate", "wait_or_resume", False, "fallback_issue_comment_low_confidence"
+        return "human_gate", "manual_review_required_non_retryable", False, "fallback_issue_comment_low_confidence"
     if decision_status_reason == "missing_current_completion_signal":
         missing_status = decision_status if decision_status not in {None, "", "unknown"} else "pending"
         missing_action = decision_action or "wait_or_resume"

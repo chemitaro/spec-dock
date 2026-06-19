@@ -12670,6 +12670,7 @@ else:
                 capture_output=True,
                 text=True,
                 check=False,
+                timeout=10,
             )
             calls = [
                 json.loads(line)
@@ -14124,6 +14125,7 @@ exit 44
                 capture_output=True,
                 text=True,
                 check=False,
+                timeout=10,
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
@@ -14283,6 +14285,7 @@ esac
                 capture_output=True,
                 text=True,
                 check=False,
+                timeout=10,
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
@@ -14345,6 +14348,7 @@ esac
                 capture_output=True,
                 text=True,
                 check=False,
+                timeout=10,
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
@@ -14732,7 +14736,7 @@ esac
             assert payload["summary"]["ci"] == "passed"
             assert payload["codex_review"]["lifecycle"]["completion_signal"] == "fallback_issue_comment"
             assert payload["normalized_status"] == "human_gate"
-            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["recommended_next_action"] == "manual_review_required_non_retryable"
             assert payload["observation_complete"] is False
 
     def _issue_182_s02_run_snapshot_with_collectors(
@@ -14978,7 +14982,7 @@ esac
             )
 
         assert payload["normalized_status"] == "human_gate"
-        assert payload["recommended_next_action"] == "wait_or_resume"
+        assert payload["recommended_next_action"] == "manual_review_required_non_retryable"
         assert payload["observation_complete"] is False
         assert payload["decision"]["status_reason"] == "fallback_issue_comment_low_confidence"
         assert payload["decision"]["selected_unresolved_count"] == 0
@@ -15348,6 +15352,11 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "pr view 13 --repo owner/repo --json headRefOid")
+    cat <<'JSON'
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+JSON
+    ;;
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
     cat <<'JSON'
 {"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
@@ -15419,6 +15428,11 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "pr view 13 --repo owner/repo --json headRefOid")
+    cat <<'JSON'
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+JSON
+    ;;
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
     cat <<'JSON'
 {"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
@@ -15464,6 +15478,7 @@ esac
                 capture_output=True,
                 text=True,
                 check=False,
+                timeout=10,
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
@@ -18790,6 +18805,12 @@ esac
                     "13",
                     "--head-sha",
                     "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
                     "--timeout-seconds",
                     "2",
                     "--poll-interval-seconds",
@@ -20933,6 +20954,12 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     "13",
                     "--head-sha",
                     "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
                     "--timeout-seconds",
                     "2",
                     "--poll-interval-seconds",
@@ -21007,6 +21034,12 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     "13",
                     "--head-sha",
                     "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
                     "--timeout-seconds",
                     "4",
                     "--poll-interval-seconds",
@@ -21543,6 +21576,12 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                         "13",
                         "--head-sha",
                         "a" * 40,
+                        "--trigger-mode",
+                        "resume",
+                        "--trigger-comment-id",
+                        "99",
+                        "--trigger-created-at",
+                        "2026-06-08T01:00:00Z",
                         "--timeout-seconds",
                         "4",
                         "--poll-interval-seconds",
@@ -21608,6 +21647,12 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     "13",
                     "--head-sha",
                     "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
                     "--timeout-seconds",
                     "6",
                     "--poll-interval-seconds",
@@ -21870,6 +21915,12 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     "13",
                     "--head-sha",
                     "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
                     "--timeout-seconds",
                     "6",
                     "--poll-interval-seconds",
@@ -21997,6 +22048,11 @@ JSON
 {"state":"success","statuses":[]}
 JSON
     ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"DIRTY","statusCheckRollup":[{"name":"observed","status":"COMPLETED","conclusion":"SUCCESS"}]}
+JSON
+    ;;
   "api repos/owner/repo/actions/runs/202/jobs --paginate")
     cat <<'JSON'
 {"total_count":1,"jobs":[{"id":303,"run_id":202,"run_attempt":1,"name":"test","status":"completed","conclusion":"failure","html_url":"https://example.test/job/303","check_run_url":"https://api.github.test/check-runs/101","steps":[{"number":1,"name":"Install","status":"completed","conclusion":"success"},{"number":2,"name":"Run tests","status":"completed","conclusion":"failure"}]}]}
@@ -22060,6 +22116,11 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
+  "pr view 13 --repo owner/repo --json headRefOid")
+    cat <<'JSON'
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+JSON
+    ;;
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
     cat <<'JSON'
 {"total_count":1,"workflow_runs":[{"id":203,"run_attempt":1,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success","html_url":"https://example.test/run/203"}]}
@@ -22078,6 +22139,11 @@ JSON
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
     cat <<'JSON'
 {"state":"success","statuses":[]}
+JSON
+    ;;
+  "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
+    cat <<'JSON'
+{"mergeStateStatus":"DIRTY","statusCheckRollup":[{"name":"observed","status":"COMPLETED","conclusion":"SUCCESS"}]}
 JSON
     ;;
   "api repos/owner/repo/actions/runs/202/jobs --paginate")
@@ -25123,6 +25189,87 @@ esac
             assert payload["decision"]["status"] == "passed"
             assert payload["decision"]["recommended_next_action"] == "review_completion_observed"
             assert payload["review"]["current"]["selected_unresolved_thread_ids"] == []
+
+    def test_issue_218_s01_review_collector_no_findings_with_changes_requested_decision_does_not_promote(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"No major issues found."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":"CHANGES_REQUESTED","reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["review"]["status"] == "changes_requested"
+            assert payload["review"]["review_decision"] == "CHANGES_REQUESTED"
+            no_findings = payload["decision"]["no_findings_completion_candidate"]
+            assert no_findings["present"] is False
+            assert no_findings["promotes_top_level_status"] is False
+            assert payload["codex_review"]["lifecycle"]["completion_signal"] == "fallback_issue_comment"
+            assert payload["decision"]["status"] == "human_gate"
+            assert payload["decision"]["recommended_next_action"] == "manual_review_required_non_retryable"
 
     def test_issue_218_s01_review_collector_promotes_observed_no_findings_issue_comment(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]

@@ -706,31 +706,39 @@ pass: no output
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| github-pr-observation skill signal taxonomy | yes | doc-writer | S90 updated provider `github-pr-observation/SKILL.md`; dogfooding mirror inspected and intentionally left unchanged | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | already sufficient plus fixture stabilization | fail: S99 resume fixture stabilization accidentally bypassed post-once trigger tests. Fixed by restoring post-once coverage for permission-denied, helper-before-snapshot ordering, and trigger metadata propagation; targeted 6-test reviewer regression selector -> 6 passed. Final broad selector: 87 passed; `./spec-dock/scripts/spec-dock validate` -> ok nodes=135; `git diff --check` -> pass. Re-review: no findings. | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | fail: no-findings promotion ignored GitHub `reviewDecision=CHANGES_REQUESTED`; snapshot fallback mismatch also reported but already fixed. Added blocker to no-findings promotion and regression test for changes-requested reviewDecision. Targeted 6-test reviewer regression selector -> 6 passed. Re-review: no findings. | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | fail: snapshot aggregation still returned `wait_or_resume` for generic `fallback_issue_comment`; S99 validation evidence lacked validate/diff-check entries. Fixed snapshot action to `manual_review_required_non_retryable`, updated two snapshot expectations, added validation evidence, and corrected final code review row bookkeeping. Re-review: no blocking findings. | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S99 evidence updated through broad selector pass and final reviewer passes | S99 test fixture stabilization, snapshot fallback action alignment, no-findings blocker precedence, and report update | final response / PR | ready |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: S99 broad selector exposed legacy PR observation tests that entered the new post-once trigger path even though their assertions targeted wait/snapshot classification.
+  - 解決: Those tests now pass explicit resume trigger metadata, preserving their original classification scope while avoiding trigger posting semantics.
+- 問題: Some checks collector fixtures did not implement newer `gh pr view --json headRefOid` and merge-state reads, which could leave subprocess-backed tests waiting until interrupted.
+  - 解決: The fake `gh` scripts now provide the collector metadata needed by the current implementation, and the affected selector passed end-to-end.
+- 問題: Final spec review found snapshot aggregation still mapped generic `fallback_issue_comment` to `wait_or_resume`, leaving repeated-resume guidance in one remaining path.
+  - 解決: `pr_observation_snapshot.py` now returns `manual_review_required_non_retryable` for `fallback_issue_comment`, and the snapshot regression tests were updated and passed.
+- 問題: Final QA review found that some S99 fixture stabilization edits converted post-once trigger tests into resume-mode tests.
+  - 解決: Post-once trigger tests were restored for permission denial, helper ordering, and trigger metadata propagation; the targeted reviewer regression selector passed.
+- 問題: Final code review found that no-findings issue comments could promote even when GitHub `reviewDecision` was `CHANGES_REQUESTED`.
+  - 解決: No-findings promotion now requires `reviewDecision` not to be `CHANGES_REQUESTED`; a regression test fixes this blocker precedence.
 
 ## 学んだこと (任意)
 - ...
