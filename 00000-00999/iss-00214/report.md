@@ -316,4 +316,52 @@ Notes:
 - S01: committed in `b476e6f3`.
 - S90: docs impact resolved as approved-no-op in `488aaf9c`.
 - S99: validation commands passed after amendment commit `2b4f6b48`; final QA/code/spec re-review passed.
-- PR delivery / merge preparation / issue finish: pending final report commit, PR delivery gate, merge preparation gate, and issue finish.
+- PR delivery: PR #216 created for branch `iss-00214-pr-observation-review-target-state`.
+- PR repair: initial observation on `f3b95994d94923c3e700e4fc54e52f5e70ee8c92` found `Provider CI / provider-tests` failure caused by the checked-in dogfooding metadata snapshot missing `iss-00214.../.meta.json`; repaired in `397900ef`.
+- Merge preparation / issue finish: pending human gate resolution for low-confidence fallback Codex review observation.
+
+## PR Delivery / Merge Preparation Evidence
+
+### PR Delivery Gate
+
+| Item | Evidence |
+|---|---|
+| PR URL | https://github.com/chemitaro/spec-dock/pull/216 |
+| Base / head | `main` / `iss-00214-pr-observation-review-target-state` |
+| Latest head SHA | `397900ef60152ef5bb00c0d5012014b358fa02c2` |
+| Draft state | ready PR (`isDraft=false`) |
+| Merge state | `CLEAN` via `gh pr view 216 --repo chemitaro/spec-dock --json mergeStateStatus` |
+
+### PR Repair Evidence
+
+| Item | Evidence |
+|---|---|
+| Failed observation | `normalized_status=failed`, `recommended_next_action=fix_ci`, head matched `f3b95994d94923c3e700e4fc54e52f5e70ee8c92` |
+| Failed check | `Provider CI / provider-tests`, GitHub Actions run `27820892612`, job `82333463397` |
+| Root cause | `tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` reported the checked-in dogfooding `.meta.json` path set had one extra committed path: `iss-00214-pr-observation-review-target-state/.meta.json` |
+| Repair | Added the `iss-00214.../.meta.json` path to `_CHECKED_IN_DOGFOODING_META_JSON_PATHS` and `_CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH` with `[]`; recorded PR repair batch/unit discussions |
+| Local repair validation | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` passed: `1 passed in 0.08s`; `./spec-dock/scripts/spec-dock validate` passed: `spec-dock: ok (validate) nodes=134` |
+
+### Latest PR Observation
+
+| Item | Evidence |
+|---|---|
+| Observation command | `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh --repo chemitaro/spec-dock --pr 216 --head-sha 397900ef60152ef5bb00c0d5012014b358fa02c2 --timeout-seconds 900 --poll-interval-seconds 30 --quiet-seconds 30 --same-fingerprint-count 2 --progress stderr-summary` |
+| Resume command | `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh --repo chemitaro/spec-dock --pr 216 --head-sha 397900ef60152ef5bb00c0d5012014b358fa02c2 --trigger-mode resume --trigger-comment-id 4750906881 --trigger-created-at 2026-06-19T10:59:59Z --timeout-seconds 600 --poll-interval-seconds 30 --quiet-seconds 30 --same-fingerprint-count 2 --progress stderr-summary` |
+| Trigger comment | `4750906881`, created at `2026-06-19T10:59:59Z` |
+| Codex review signal | Issue comment `4750944056`, created at `2026-06-19T11:05:37Z`, says no major issues for reviewed commit `397900ef60`; observation classified this as low-confidence fallback issue comment |
+| CI result | `CI / validate` and `Provider CI / provider-tests` all passed for head `397900ef60152ef5bb00c0d5012014b358fa02c2`; `gh pr checks 216 --repo chemitaro/spec-dock` showed 4 passing checks |
+| Review threads | `threads.total=0`, `threads.unresolved=0` |
+| Observation result | `normalized_status=human_gate`, `recommended_next_action=wait_or_resume`, `observation_complete=false`, reason `fallback_issue_comment_low_confidence` |
+
+### Merge-Prepared Gate
+
+| Condition | Status | Evidence / Rationale |
+|---|---|---|
+| PR open and ready | pass | PR #216 is `OPEN` and `isDraft=false` |
+| Latest head matches expected | pass | Observation and `gh pr view` both report `397900ef60152ef5bb00c0d5012014b358fa02c2` |
+| Required / visible checks pass | pass | `validate` and `provider-tests` are all success |
+| Merge conflict absent | pass | `mergeStateStatus=CLEAN` |
+| Blocking review feedback absent | pass-with-limitation | Codex fallback comment says no major issues and no review threads exist; observation classifies fallback comment as low confidence |
+| Observation complete | blocked | `observation_complete=false` because the review completion signal is a low-confidence fallback issue comment |
+| Merge-prepared decision | no | Human gate remains; issue finish is intentionally deferred |

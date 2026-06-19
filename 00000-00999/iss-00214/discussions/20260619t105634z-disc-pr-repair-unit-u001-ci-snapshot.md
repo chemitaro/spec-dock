@@ -74,10 +74,14 @@ reflected_to: []
 - Focused test result: passed, `1 passed in 0.08s`.
 
 ## Commit Evidence
-- Pending.
+- `397900ef` `test(dogfooding): iss-00214のメタデータsnapshotを更新`
 
 ## Re-observation Result
-- Pending.
+- Latest head: `397900ef60152ef5bb00c0d5012014b358fa02c2`
+- `gh pr checks 216 --repo chemitaro/spec-dock` showed all four checks passing: two `validate` and two `provider-tests` entries.
+- PR observation on trigger comment `4750906881` found CI passed, no review threads, and no unresolved feedback.
+- Observation result remained `human_gate` because the Codex review signal was classified as `fallback_issue_comment_low_confidence`; `observation_complete=false`, `recommended_next_action=wait_or_resume`.
 
 ## Residual Risk / Follow-up
-- Low. This repair is expected to affect only the checked-in dogfooding baseline test, not runtime behavior.
+- Snapshot repair risk is low and verified by focused local test plus CI.
+- Merge preparation remains blocked by observation policy, not by the snapshot repair itself.

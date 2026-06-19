@@ -21,17 +21,17 @@ reflected_to: []
 - Repository: chemitaro/spec-dock
 - Base branch: main
 - Head branch: iss-00214-pr-observation-review-target-state
-- Latest head SHA: f3b95994d94923c3e700e4fc54e52f5e70ee8c92
+- Latest head SHA: 397900ef60152ef5bb00c0d5012014b358fa02c2
 - Observation command: `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh --repo chemitaro/spec-dock --pr 216 --head-sha f3b95994d94923c3e700e4fc54e52f5e70ee8c92 --timeout-seconds 900 --poll-interval-seconds 30 --quiet-seconds 30 --same-fingerprint-count 2 --progress stderr-summary`
 - Observation final JSON / evidence: `normalized_status=failed`, `recommended_next_action=fix_ci`, `head_matches_expected=true`
 - Observation status: failed
 - Trigger comment id: 4750792642
 - Trigger created_at: 2026-06-19T10:41:29Z
-- Trigger boundary: fixed trigger comment for head `f3b95994d94923c3e700e4fc54e52f5e70ee8c92`; repair push requires a new latest-head observation.
+- Trigger boundary: repair observation trigger comment `4750906881` for head `397900ef60152ef5bb00c0d5012014b358fa02c2`.
 - Resume metadata: not used; observation completed with CI failure.
-- New trigger approved: no
-- Observation limitation: Codex review returned a low-confidence fallback issue comment with no blocking finding; provider CI failed.
-- Batch status: repair-needed
+- New trigger approved: yes; repair push required a latest-head observation.
+- Observation limitation: Initial observation failed on provider CI; repair observation has all checks passing but remains `human_gate` because Codex review completion is a low-confidence fallback issue comment.
+- Batch status: human-gate
 
 ## Batch Purpose
 
@@ -79,7 +79,7 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 
 | unit_id | source_batch | covered_ids | disposition | risk_class | repair_unit_disc | status | Implementation Plan | Re-observation Result | Residual Risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| U001 | 20260619t105436z-pr-repair-batch | INV-001 | fix-now | blocking | `20260619t105634z-disc-pr-repair-unit-u001-ci-snapshot.md` | implemented | Add `iss-00214.../.meta.json` to both checked-in dogfooding snapshot constants and run the focused failing test. | Pending repair push and latest-head observation. | Low; snapshot-only change. |
+| U001 | 20260619t105436z-pr-repair-batch | INV-001 | fix-now | blocking | `20260619t105634z-disc-pr-repair-unit-u001-ci-snapshot.md` | reobserved-pass | Add `iss-00214.../.meta.json` to both checked-in dogfooding snapshot constants and run the focused failing test. | CI passed on latest head; observation remains `human_gate` because the Codex completion signal is a low-confidence fallback issue comment. | Low; snapshot-only change is repaired, but merge-prepared remains blocked by observation completion policy. |
 
 ## Unit Discussion Plan
 
