@@ -500,6 +500,97 @@ pass: no output
 
 ---
 
+### セッションログ（2026-06-20 S90）
+
+#### 対象
+- Step: S90 Docs impact resolution
+- AC/EC: AC-005
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `ドキュメント影響の解消ステップ S90`
+  - closure id: `tc-007`
+
+#### 実施内容
+- `doc-writer` に S90 のみを委任し、許可 path を provider-side `github-pr-observation/SKILL.md` に限定した。
+- Completion signal taxonomy に `codex_no_findings_issue_comment`、collector-only `review_completion_observed`、snapshot / wait の top-level `merge_prepared` authority、generic `fallback_issue_comment` の `manual_review_required_non_retryable`、missing completion の retryable `wait_or_resume` を追記した。
+- Dogfooding mirror `.agents/skills/github-pr-observation/SKILL.md` は計画どおり inspection 対象に留め、provider update 後の mirror refresh 対象であることを確認した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n "codex_no_findings_issue_comment|manual_review_required_non_retryable|fallback_issue_comment|review_completion_observed|merge_prepared|wait_or_resume" src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md
+
+provider doc contains all queried signal/action names.
+```
+
+```bash
+rg -n "codex_no_findings_issue_comment|manual_review_required_non_retryable|fallback_issue_comment|review_completion_observed|merge_prepared|wait_or_resume" .agents/skills/github-pr-observation/SKILL.md
+
+dogfooding mirror still contains only the old fallback wording; mirror refresh is not performed in S90.
+```
+
+```bash
+git diff --check
+
+pass: no output
+```
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S90 | dogfooding mirror の `SKILL.md` は provider-side update 前の旧説明のまま | parent inspection | provider-side 正本を更新し、mirror は provider update / inspection 対象として扱う | tc-007 | no | mirror `rg` result only old fallback wording |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | tc-007 | Skill doc が AC-005 と設計 taxonomy に一致する | provider doc `rg` hit for required signal/action names; `git diff --check` pass | pass | spec reviewer gate passed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-007 / tc-s90-001 | S90 | yes | inspect-only | provider doc previously documented generic fallback as `wait_or_resume` and had no new signal taxonomy | provider doc `rg` and diff inspection | pass | docs explain submitted review, strict no-findings issue comment, generic fallback, missing completion, retryability |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-007 | S90 | provider doc `rg` / diff inspection | pass | dogfooding mirror inspected but not updated in this step |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | tc-007 | provider `SKILL.md` docs inspection | tc-007 | required operator-facing taxonomy was absent/stale | no | yes |
+
+#### ドキュメント影響の解消（Docs Impact Resolution）
+| 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
+|---|---|---|---|---|
+| provider-side `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md` | yes | doc-writer | required signal/action names present; diff explains taxonomy and authority boundary | pass |
+| dogfooding mirror `.agents/skills/github-pr-observation/SKILL.md` | inspect-only | parent | mirror still has old fallback wording and is not the provider source of truth | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S90 | doc-writer | Updated provider skill docs with no-findings signal taxonomy, authority boundary, non-retryable fallback, and retryable missing completion semantics | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md` | provider doc `rg` pass; `git diff --check` pass | passed: spec-reviewer | dogfooding mirror remains stale until provider update/mirror refresh | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed to Step Commit Gate | no findings; reviewer accepted inspect-only dogfooding mirror handling |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | committed | provider `SKILL.md`, `report.md` | S90 commit at `HEAD` after commit gate | `git status --short --branch` -> clean working tree, branch ahead 1 | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md` - S90 provider docs taxonomy。
+- `spec-dock/active/issue/report.md` - S90 observed evidence ledger。
+
+#### コミット
+- S90 commit at `HEAD`: `docs(pr-observation): review signal taxonomyを更新`
+
+#### メモ
+- No material implementation decisions beyond the approved plan.
+
+---
+
 ### セッションログ（2026-06-19 HH:MM - HH:MM）
 
 #### 対象
