@@ -459,6 +459,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-epic-planning/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md"
         ),
+        ".agents/skills/spec-dock-epic-execution/SKILL.md": (
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md"
+        ),
         ".agents/skills/spec-dock-issue-planning/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md"
         ),
@@ -792,6 +795,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-hub/SKILL.md",
         ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
         ".agents/skills/spec-dock-epic-planning/SKILL.md",
+        ".agents/skills/spec-dock-epic-execution/SKILL.md",
         ".agents/skills/spec-dock-initiative-planning/SKILL.md",
         ".agents/skills/spec-dock-issue-planning/SKILL.md",
         ".agents/skills/spec-dock-issue-execution/SKILL.md",
@@ -857,6 +861,7 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/spec-dock-hub/SKILL.md",
             ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
             ".agents/skills/spec-dock-epic-planning/SKILL.md",
+            ".agents/skills/spec-dock-epic-execution/SKILL.md",
             ".agents/skills/spec-dock-initiative-planning/SKILL.md",
             ".agents/skills/spec-dock-issue-planning/SKILL.md",
             ".agents/skills/spec-dock-issue-execution/SKILL.md",
@@ -941,6 +946,14 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md",
+            ),
+        },
+        "spec-dock-epic-execution skill": {
+            "search_globs": (
+                "**/spec-dock-epic-execution/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md",
             ),
         },
         "spec-dock-initiative-planning skill": {
@@ -11888,6 +11901,43 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         for phrase in issue_execution_phrases:
             assert phrase in issue_execution
+
+    def test_issue_211_epic_execution_skill_content_regression_contract(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        provider_skill_path = (
+            repo_root
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "install_root"
+            / ".agents"
+            / "skills"
+            / "spec-dock-epic-execution"
+            / "SKILL.md"
+        )
+        mirror_skill_path = repo_root / ".agents/skills/spec-dock-epic-execution/SKILL.md"
+        epic_execution = provider_skill_path.read_text(encoding="utf-8")
+
+        assert mirror_skill_path.read_bytes() == provider_skill_path.read_bytes()
+        for phrase in (
+            "active Epic",
+            "active Issue",
+            "GitHub freshness",
+            "deps check",
+            "no Issue is ready",
+            "multiple Issues are ready",
+            "issue start",
+            "spec-dock-issue-planning",
+            "spec-dock-issue-execution",
+            "github-pr-merge-preparer",
+            "workflow_issue.md",
+            "issue finish",
+            "no-op Epic",
+            "Do not merge PRs",
+            "Do not claim reviewer pass",
+            "issue-finish self-claim",
+        ):
+            assert phrase in epic_execution
 
     def test_issue_93_execute_prompts_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]

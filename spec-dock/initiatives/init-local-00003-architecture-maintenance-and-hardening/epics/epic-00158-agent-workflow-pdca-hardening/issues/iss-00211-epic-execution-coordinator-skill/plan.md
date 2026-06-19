@@ -41,7 +41,7 @@ ID: "iss-00211"
   - S01:
     - 依存: reviewer-pass 済み `requirement.md` / `design.md`。
     - unblock: S02 route references。
-    - 対象: new provider skill, dogfooding mirror, managed skill inventories/tests。
+    - 対象: new provider skill, dogfooding mirror, runtime managed skill list, managed skill inventories/tests。
   - S02:
     - 依存: S01 closure。
     - unblock: S03 integration verification。
@@ -62,7 +62,7 @@ ID: "iss-00211"
   - 観測可能な振る舞い: `spec-dock-epic-execution` が managed skill として install/update 対象になり、coordinator boundary を持つ。
   - 依存: requirement/design pass。
   - unblock: S02。
-  - 対象ファイル: `tests/cli_runtime/harness.py`, `tests/unit/infra/test_init_update.py`, provider/mirror `spec-dock-epic-execution/SKILL.md`。
+  - 対象ファイル: `src/spec_dock/cli.py`, `tests/cli_runtime/harness.py`, `tests/unit/infra/test_init_update.py`, provider/mirror `spec-dock-epic-execution/SKILL.md`。
   - 閉じる要件: AC-001, AC-002, AC-005, EC-001..EC-005。
   - レビューゲート: code-reviewer for tests/inventory; spec-reviewer for skill prose。
 - S02 Epic workflow and discovery route connection
@@ -150,12 +150,14 @@ ID: "iss-00211"
 - unblock:
   - S02 route references。
 - 対象ファイル:
+  - `src/spec_dock/cli.py`
   - `tests/cli_runtime/harness.py`
   - `tests/unit/infra/test_init_update.py`
   - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md`
   - `.agents/skills/spec-dock-epic-execution/SKILL.md`
 - 計画済み契約:
   - scope:
+    - Runtime managed skill source list entry in `_MANAGED_SKILL_NAMES`。
     - Expected managed skill name and authoritative installed asset inventory entries。
     - Provider skill and dogfooding mirror。
     - Content/parity assertions for missing coordinator boundaries where practical。
