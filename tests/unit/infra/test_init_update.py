@@ -20200,7 +20200,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                 timeout_seconds=3,
                 quiet_seconds=1,
                 same_fingerprint_count=2,
-                progress="none",
+                progress="stderr-summary",
                 trigger_created_at=trigger["created_at"],
             )
 
@@ -20212,6 +20212,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert payload["observation_complete"] is False
             assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
             assert payload["wait"]["review_trigger_age_seconds"] < 300
+            assert "phase=wait ci=passed review=pending_signal" in result.stderr
 
     def test_issue_187_s204_wait_does_not_promote_unknown_before_ci_passed_age(self) -> None:
         evidence = {
