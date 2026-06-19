@@ -20167,52 +20167,54 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             "comment_id": 99,
             "created_at": "2999-01-01T00:00:00Z",
         }
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
-                Path(tmp_dir),
-                [
-                    {
-                        "ci": "passed",
-                        "review": "approved",
-                        "status": "pending",
-                        "overall_status": "pending",
-                        "normalized_status": "pending",
-                        "recommended_next_action": "wait_or_resume",
-                        "decision": decision,
-                        "decision_fingerprint": "no-completion-s204-young-trigger",
-                        "codex_review": {
-                            "lifecycle": {
-                                "status": "none",
-                                "completion_signal": "none",
-                                "confidence": "medium",
-                                "no_completion_evidence": evidence,
-                            },
-                            "collection_summary": {
-                                "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
-                            },
-                        },
-                        "observed_at": "2000-01-01T00:00:00Z",
-                        "trigger": trigger,
-                        "check_runs": {"total": 1, "success": 1},
-                        "threads": {"total": 0, "unresolved": 0, "items": []},
-                    }
-                ],
-                timeout_seconds=3,
-                quiet_seconds=1,
-                same_fingerprint_count=2,
-                progress="stderr-summary",
-                trigger_created_at=trigger["created_at"],
-            )
+        for review_status in ("approved", "passed"):
+            with _case(review_status=review_status):
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                        Path(tmp_dir),
+                        [
+                            {
+                                "ci": "passed",
+                                "review": review_status,
+                                "status": "pending",
+                                "overall_status": "pending",
+                                "normalized_status": "pending",
+                                "recommended_next_action": "wait_or_resume",
+                                "decision": decision,
+                                "decision_fingerprint": "no-completion-s204-young-trigger",
+                                "codex_review": {
+                                    "lifecycle": {
+                                        "status": "none",
+                                        "completion_signal": "none",
+                                        "confidence": "medium",
+                                        "no_completion_evidence": evidence,
+                                    },
+                                    "collection_summary": {
+                                        "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
+                                    },
+                                },
+                                "observed_at": "2000-01-01T00:00:00Z",
+                                "trigger": trigger,
+                                "check_runs": {"total": 1, "success": 1},
+                                "threads": {"total": 0, "unresolved": 0, "items": []},
+                            }
+                        ],
+                        timeout_seconds=3,
+                        quiet_seconds=1,
+                        same_fingerprint_count=2,
+                        progress="stderr-summary",
+                        trigger_created_at=trigger["created_at"],
+                    )
 
-            assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
-            assert payload["normalized_status"] != "human_gate"
-            assert payload["decision"]["status_reason"] != "review_completion_unknown"
-            assert payload["recommended_next_action"] == "wait_or_resume"
-            assert payload["observation_complete"] is False
-            assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
-            assert payload["wait"]["review_trigger_age_seconds"] < 300
-            assert "phase=wait ci=passed review=pending_signal" in result.stderr
+                    assert result.returncode == 0, result.stdout + result.stderr
+                    payload = json.loads(result.stdout)
+                    assert payload["normalized_status"] != "human_gate"
+                    assert payload["decision"]["status_reason"] != "review_completion_unknown"
+                    assert payload["recommended_next_action"] == "wait_or_resume"
+                    assert payload["observation_complete"] is False
+                    assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
+                    assert payload["wait"]["review_trigger_age_seconds"] < 300
+                    assert "phase=wait ci=passed review=pending_signal" in result.stderr
 
     def test_issue_187_s204_wait_does_not_promote_unknown_before_ci_passed_age(self) -> None:
         evidence = {
