@@ -147,7 +147,7 @@ class DepsHighLevelStatus:
 @dataclass(frozen=True)
 class DepsNodeBlocker:
     node_id: str
-    reason: Literal["empty_open", "empty_unknown"]
+    reason: Literal["empty_open", "empty_unknown", "lifecycle_unknown"]
     state: Literal["open", "unknown"]
     state_source: str
     source_issue_id: str
@@ -167,6 +167,7 @@ class DepsEvaluation:
     issue_blockers: list[str] = field(default_factory=list)
     node_blockers: list[DepsNodeBlocker] = field(default_factory=list)
     satisfied_dependencies: list[DepsDependencyContext] = field(default_factory=list)
+    dependency_contexts: list[DepsDependencyContext] = field(default_factory=list)
     debug_context: dict[str, object] = field(default_factory=dict)
 
 
