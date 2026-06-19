@@ -258,7 +258,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | ready to commit | S01 target files plus report evidence | pending commit | pending | N/A | N/A | N/A | N/A |
+| S01 | committed | S01 target files plus report evidence | `4888d720` `feat(spec-dock): Epic execution skillをmanaged assetに追加` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md` - new provider managed skill.
@@ -269,7 +269,7 @@ git diff --check
 - `spec-dock/.../iss-00211-epic-execution-coordinator-skill/{design.md,plan.md,report.md}` - D-003 amendment and S01 evidence.
 
 #### コミット
-- pending S01 commit.
+- `4888d720` `feat(spec-dock): Epic execution skillをmanaged assetに追加`
 
 #### メモ
 - No material implementation decisions beyond the approved/amended plan.
