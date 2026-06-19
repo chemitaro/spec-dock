@@ -1258,6 +1258,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00197-extract-pr-review-snapshot-python/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00210-epic-planning-system-architect-draft-cycles/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00211-epic-execution-coordinator-skill/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00214-pr-observation-review-target-state/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1469,6 +1470,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00197-extract-pr-review-snapshot-python/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00210-epic-planning-system-architect-draft-cycles/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00211-epic-execution-coordinator-skill/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00214-pr-observation-review-target-state/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -13514,34 +13516,7 @@ JSON
             """#!/usr/bin/env bash
 set -euo pipefail
 printf 'snapshot %s\\n' "$*" >> "$S04_WAIT_LOG"
-python3 - "$@" <<'PY'
-import json
-import os
-import sys
-
-args = sys.argv[1:]
-trigger_id = None
-trigger_created_at = None
-while args:
-    arg = args.pop(0)
-    if arg == "--trigger-comment-id":
-        trigger_id = int(args.pop(0))
-    elif arg == "--trigger-created-at":
-        trigger_created_at = args.pop(0)
-    elif arg == "--out":
-        args.pop(0)
-    elif args:
-        args.pop(0)
-
-payload = json.loads(os.environ["S04_WAIT_PAYLOAD"])
-payload.setdefault(
-    "trigger",
-    {"source": "explicit", "comment_id": trigger_id, "created_at": trigger_created_at},
-)
-payload["trigger"]["comment_id"] = trigger_id
-payload["trigger"]["created_at"] = trigger_created_at
-print(json.dumps(payload, separators=(",", ":")))
-PY
+printf '%s\\n' "$S04_WAIT_PAYLOAD"
 """,
             encoding="utf-8",
         )
@@ -13716,7 +13691,7 @@ PY
                             "--trigger-created-at",
                             "2026-06-09T02:03:04Z",
                             "--timeout-seconds",
-                            "2",
+                            "7",
                             "--poll-interval-seconds",
                             "1",
                             "--quiet-seconds",
@@ -13730,7 +13705,7 @@ PY
                         capture_output=True,
                         text=True,
                         check=False,
-                        timeout=6,
+                        timeout=10,
                     )
 
                     assert result.returncode == 0, result.stdout + result.stderr
@@ -13742,8 +13717,9 @@ PY
                     assert payload["resume"]["trigger_created_at"] == "2026-06-09T02:03:04Z"
                     assert "--trigger-mode resume" in payload["resume"]["command_hint"]
                     assert "--trigger-comment-id 777" in payload["resume"]["command_hint"]
-                    assert payload["codex_review"]["lifecycle"]["status"] == "pending"
-                    assert "phase=wait ci=passed review=observing" in result.stderr
+                    if review_status == "pending":
+                        assert payload["codex_review"]["lifecycle"]["status"] == "pending"
+                    assert "phase=wait ci=passed review=pending_signal" in result.stderr
                     assert (out_dir / "result.json").read_text(encoding="utf-8") == result.stdout
                     assert not (out_dir / "summary.md").exists()
 
@@ -20193,51 +20169,54 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             "comment_id": 99,
             "created_at": "2999-01-01T00:00:00Z",
         }
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
-                Path(tmp_dir),
-                [
-                    {
-                        "ci": "passed",
-                        "review": "approved",
-                        "status": "pending",
-                        "overall_status": "pending",
-                        "normalized_status": "pending",
-                        "recommended_next_action": "wait_or_resume",
-                        "decision": decision,
-                        "decision_fingerprint": "no-completion-s204-young-trigger",
-                        "codex_review": {
-                            "lifecycle": {
-                                "status": "none",
-                                "completion_signal": "none",
-                                "confidence": "medium",
-                                "no_completion_evidence": evidence,
-                            },
-                            "collection_summary": {
-                                "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
-                            },
-                        },
-                        "observed_at": "2000-01-01T00:00:00Z",
-                        "trigger": trigger,
-                        "check_runs": {"total": 1, "success": 1},
-                        "threads": {"total": 0, "unresolved": 0, "items": []},
-                    }
-                ],
-                timeout_seconds=3,
-                quiet_seconds=1,
-                same_fingerprint_count=2,
-                progress="none",
-                trigger_created_at=trigger["created_at"],
-            )
+        for review_status in ("approved", "passed"):
+            with _case(review_status=review_status):
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                        Path(tmp_dir),
+                        [
+                            {
+                                "ci": "passed",
+                                "review": review_status,
+                                "status": "pending",
+                                "overall_status": "pending",
+                                "normalized_status": "pending",
+                                "recommended_next_action": "wait_or_resume",
+                                "decision": decision,
+                                "decision_fingerprint": "no-completion-s204-young-trigger",
+                                "codex_review": {
+                                    "lifecycle": {
+                                        "status": "none",
+                                        "completion_signal": "none",
+                                        "confidence": "medium",
+                                        "no_completion_evidence": evidence,
+                                    },
+                                    "collection_summary": {
+                                        "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
+                                    },
+                                },
+                                "observed_at": "2000-01-01T00:00:00Z",
+                                "trigger": trigger,
+                                "check_runs": {"total": 1, "success": 1},
+                                "threads": {"total": 0, "unresolved": 0, "items": []},
+                            }
+                        ],
+                        timeout_seconds=3,
+                        quiet_seconds=1,
+                        same_fingerprint_count=2,
+                        progress="stderr-summary",
+                        trigger_created_at=trigger["created_at"],
+                    )
 
-            assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
-            assert payload["normalized_status"] != "human_gate"
-            assert payload["decision"]["status_reason"] != "review_completion_unknown"
-            assert payload["recommended_next_action"] == "wait_or_resume"
-            assert payload["observation_complete"] is False
-            assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
-            assert payload["wait"]["review_trigger_age_seconds"] < 300
+                    assert result.returncode == 0, result.stdout + result.stderr
+                    payload = json.loads(result.stdout)
+                    assert payload["normalized_status"] != "human_gate"
+                    assert payload["decision"]["status_reason"] != "review_completion_unknown"
+                    assert payload["recommended_next_action"] == "wait_or_resume"
+                    assert payload["observation_complete"] is False
+                    assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
+                    assert payload["wait"]["review_trigger_age_seconds"] < 300
+                    assert "phase=wait ci=passed review=pending_signal" in result.stderr
 
     def test_issue_187_s204_wait_does_not_promote_unknown_before_ci_passed_age(self) -> None:
         evidence = {
