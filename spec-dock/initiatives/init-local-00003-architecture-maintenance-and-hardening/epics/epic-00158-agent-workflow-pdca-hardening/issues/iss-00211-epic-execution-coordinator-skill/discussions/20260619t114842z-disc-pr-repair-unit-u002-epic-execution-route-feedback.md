@@ -93,6 +93,9 @@ reflected_to: []
 - Continued U002 repair after a later review pass: removed initiative-level direct Issue execution ownership after `/execute-epic` handoff, added the completed/no-op Epic path to `execute-epic.md`, and added `spec-dock-epic-execution` to docs README Epic entrypoints.
 - Focused tests passed after continued repair: `test_issue_211_epic_execution_route_content_regression_contract`, `test_issue_93_execute_prompts_contract`, and `test_init_creates_expected_structure` -> `3 passed`.
 - Provider/mirror `cmp -s` checks passed for `execute-initiative.md`, `execute-epic.md`, and docs `README.md`.
+- Continued U002 repair after carryover non-outdated review threads: made `spec-dock-epic-execution` stop before `issue finish` when PR preparation returns blocked/stale/limited/human-gate evidence, strengthened `/execute-initiative` so `/execute-epic` is the sole owner after reviewed Epic handoff, and documented the managed-skill/docs README alignment invariant near `_MANAGED_SKILL_NAMES`.
+- Focused tests passed after carryover-thread repair: `test_issue_211_epic_execution_skill_content_regression_contract`, `test_issue_211_epic_execution_route_content_regression_contract`, `test_issue_93_execute_prompts_contract`, and `test_init_creates_expected_structure` -> `4 passed`.
+- Provider/mirror `cmp -s` checks passed for `spec-dock-epic-execution/SKILL.md` and `execute-initiative.md`.
 - `git diff --check` passed.
 
 ## Commit Evidence

@@ -11937,6 +11937,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "github-pr-merge-preparer",
             "workflow_issue.md",
             "issue finish",
+            "only after merge-prepared evidence",
+            "do not run `issue finish`",
             "no-op Epic",
             "Do not merge PRs",
             "Do not claim reviewer pass",
@@ -12036,7 +12038,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "planning or issue decomposition",
             "reviewed planning outputs and ready Issue work",
             "/execute-epic",
-            "Epic execution coordination",
+            "sole owner of Epic execution coordination",
             "Do not start or execute Issues directly",
         ):
             assert phrase in execute_initiative_prompt

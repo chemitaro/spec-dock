@@ -66,8 +66,8 @@ When the initiative is ready:
   `spec-dock/docs/reference_sync.md`.
 - For each epic that still needs planning or issue decomposition, use
   `$spec-dock-epic-planning` before execution.
-- For each epic with reviewed planning outputs and ready Issue work, use
-  `/execute-epic` for Epic execution coordination.
+- For each epic with reviewed planning outputs and ready Issue work, hand control
+  to `/execute-epic` as the sole owner of Epic execution coordination.
 - Do not start or execute Issues directly from initiative execution after
   handing a reviewed Epic to `/execute-epic`; Epic execution owns one-ready-Issue
   selection, `issue start`, `/execute-issue`, PR preparation, and issue-finish
