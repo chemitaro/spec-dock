@@ -188,7 +188,9 @@ pass
 
 ### Commit Evidence
 
-- pending until repair commit is created
+- Repair implementation commit:
+  - `63f774a2ec03f6eb8313a4d96c06ffadfa936397`
+  - `fix(pr-observation): PR repairでdogfooding parityを更新`
 
 ### Re-observation Result
 
