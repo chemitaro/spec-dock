@@ -485,6 +485,57 @@ git diff --check
 
 ---
 
+### セッションログ（2026-06-19 S90）
+
+#### 対象
+- Step: S90 Docs Impact Resolution
+- AC/EC: AC-003, AC-004, AC-005, tc-007
+- 計画上の出典（Planned source）:
+  - `plan.md` section: ドキュメント影響の解消ステップ S90
+  - closure id: `tc-007`
+
+#### 実施内容
+- S01/S02/S03 の変更済み docs/skill/prompt/test/source list を `git diff --name-status HEAD~4..HEAD` で確認した。
+- `spec-dock/docs`、provider docs、provider/mirror skills、provider/mirror prompts を対象に、new route と old/stale phrase の横断検索を実施した。
+- `workflow_issue.md` / `reference_github.md` / `github-pr-merge-preparer` の `issue finish` / PR merge-preparer 記述は既存 authority source として整合しており、Issue 211 の新 coordinator と直接矛盾しないと判断した。
+- Conditional docs update は不要とし、docs-impact-none / approved-no-op を fresh `spec-reviewer` に確認依頼した。
+
+#### 実行コマンド / 結果
+```bash
+git diff --name-status HEAD~4..HEAD
+# planned S01/S02/S03 files only: new epic-execution skill provider/mirror, hub/prompt/workflow docs provider/mirror, managed source/list tests, issue docs.
+
+rg -n "spec-dock-epic-execution|Epic execution|execute-epic|issue finish|github-pr-merge-preparer|Do not create a new skill for this workflow|Decompose the epic plan|Create or update issues|creating or importing a new epic" spec-dock/docs src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/install_root/.agents/skills src/spec_dock/assets/install_root/.codex/prompts .agents/skills .codex/prompts
+# new route / existing authority references found; old no-skill, stale decomposition/create Issue, and stale create/import ownership phrases had no matches.
+```
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-007 | S90 | yes | inspect-only | S01/S02/S03 changes present and committed. | diff inspection; cross-surface `rg`; fresh `spec-reviewer` pass | approved-no-op | No conditional docs update required. |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | tc-007 | Docs impact is resolved by conditional updates or approved-no-op with inspection evidence; fresh `spec-reviewer` docs/spec alignment result is recorded. | diff inspection and cross-surface `rg` found no direct contradiction requiring conditional docs update; fresh `spec-reviewer` passed. | approved-no-op | Docs-impact-none accepted. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-007 | S90 | docs impact inspection + fresh spec-reviewer pass | approved-no-op | Conditional docs update unnecessary. |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | docs impact reviewer | spec-reviewer | fresh after docs impact inspection | passed | N/A | approved-no-op | `review_status: pass`; no conditional docs update required. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | approved-no-op | report evidence only | N/A | N/A | inspected conditional docs and no direct contradiction found; fresh `spec-reviewer` passed docs-impact-none | conditional docs list from `plan.md`; changed S01/S02/S03 docs/skills/prompts | `git diff --name-status HEAD~4..HEAD`; cross-surface `rg` command above | spec-reviewer pass |
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
