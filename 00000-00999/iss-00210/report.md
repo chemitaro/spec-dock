@@ -499,7 +499,7 @@ pass: all S02 mirror terms present.
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| shipped skill / workflow docs and dogfooding mirror | yes | doc-writer | S01/S02/S03 commits `3be63624`, `d8d712ad`, `d31eb1f6`; P1 follow-up updated provider/mirror `workflow_epic.md`; `validate` ok nodes=133; `sync` ok active unchanged; provider/mirror `cmp` for changed docs passed | pass after P1 fix; final ledger re-review pending |
+| shipped skill / workflow docs and dogfooding mirror | yes | doc-writer | S01/S02/S03 commits `3be63624`, `d8d712ad`, `d31eb1f6`; P1 follow-up updated provider/mirror `workflow_epic.md`; final ledger re-review passed; PR review follow-up removed local Issue ids from shipped docs and labeled dependency direction; `validate` ok nodes=133; `sync` ok active unchanged; provider/mirror `cmp` for changed docs passed | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
@@ -524,6 +524,8 @@ pass: all S02 mirror terms present.
 ## 遭遇した問題と解決 (任意)
 - 問題: Final spec review found that issue-local draft requirement/design artifact paths were phrased as optional.
   - 解決: Provider and dogfooding `workflow_epic.md` now require artifact paths for each target Issue after Issue creation, or explicit skip/fallback evidence with target Issue id, skipped draft type(s), reason, non-blocking rationale, and revisit/follow-up condition.
+- 問題: PR review found local Issue 210/211 wording in shipped workflow docs and an ambiguous `deps add` direction example.
+  - 解決: Provider and dogfooding `workflow_epic.md` now use generic downstream Issue wording and label `--from` as dependent node / `.meta.json.depends_on` owner and `--to` as prerequisite node.
 
 ## 学んだこと (任意)
 - Final handoff wording must distinguish optional artifact existence from explicit skip/fallback evidence; otherwise downstream Issue planning inputs become silently optional.
