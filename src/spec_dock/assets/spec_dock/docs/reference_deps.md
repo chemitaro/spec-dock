@@ -91,19 +91,19 @@
 - shorthand 展開結果が空でも storage error にはせず、warning `deps_ref_expanded_to_empty` を出すことがあります。ただし readiness は warning だけでは決まりません。open / unknown の empty high-level target は node-level blocker、done / closed / all-descendant-done の target は satisfied dependency です。
 - no dual-read / no auto-migration / rollback-by-revert を前提にします。
 
-## 3. lifecycle / disposition 判定（readiness evaluation）
+## 3. 判定状態（lifecycle / disposition / readiness evaluation）
 
 `lifecycle_state` は GitHub / local state から得る lifecycle fact です。`dependency_disposition` は、その fact と full graph descendant issue を使って dependency readiness 上の意味を決めた結果です。
 
-| high-level target | lifecycle_state | descendant issue count | descendant state | dependency_disposition | disposition_basis | blocker surface |
+| 高水準対象（high-level target） | `lifecycle_state` | 子 issue 数（descendant issue count） | 子 issue 状態（descendant state） | `dependency_disposition` | `disposition_basis` | ブロック面（blocker surface） |
 |---|---|---:|---|---|---|---|
-| initiative / epic | open | 0 | N/A | blocking | empty_open_container | node_blocker |
-| initiative / epic | unknown | 0 | N/A | indeterminate | empty_unknown_container | node_blocker |
-| initiative / epic | closed | any | any | satisfied | lifecycle_closed | none |
-| initiative / epic | done | any | any | satisfied | local_done | none |
-| initiative / epic | open | >0 | all done / closed | satisfied | all_descendant_issues_done | none |
-| initiative / epic | open | >0 | any open / ready / blocked | blocking | descendant_issue_open | descendant issue blockers |
-| initiative / epic | open | >0 | any unknown | indeterminate | descendant_issue_unknown | descendant issue unknown |
+| `initiative / epic` | `open` | 0 | `N/A` | `blocking` | `empty_open_container` | `node_blocker` |
+| `initiative / epic` | `unknown` | 0 | `N/A` | `indeterminate` | `empty_unknown_container` | `node_blocker` |
+| `initiative / epic` | `closed` | `any` | `any` | `satisfied` | `lifecycle_closed` | `none` |
+| `initiative / epic` | `done` | `any` | `any` | `satisfied` | `local_done` | `none` |
+| `initiative / epic` | `open` | `>0` | `all done / closed` | `satisfied` | `all_descendant_issues_done` | `none` |
+| `initiative / epic` | `open` | `>0` | `any open / ready / blocked` | `blocking` | `descendant_issue_open` | `descendant issue blockers` |
+| `initiative / epic` | `open` | `>0` | `any unknown` | `indeterminate` | `descendant_issue_unknown` | `descendant issue unknown` |
 
 descendant issue は todo projection ではなく full graph で数えます。done issue が `index.json` から消えていても、all-descendant-done 判定では descendant issue として扱います。
 
