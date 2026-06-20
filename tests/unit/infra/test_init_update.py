@@ -25674,6 +25674,111 @@ esac
             assert payload["decision"]["status_reason"] == "fallback_issue_comment_low_confidence"
             assert payload["decision"]["recommended_next_action"] == "wait_or_resume"
 
+    def test_issue_219_s01_review_collector_fallback_pass_requires_no_review_blockers(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        scenarios = {
+            "carryover": "carryover_unresolved_count",
+            "pending": "pending_review",
+            "changes_requested": "review_decision",
+        }
+        for scenario, assertion_kind in scenarios.items():
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                tmp_path = Path(tmp_dir)
+                fake_bin = tmp_path / "bin"
+                fake_bin.mkdir()
+                fake_gh = fake_bin / "gh"
+                fake_gh.write_text(
+                    """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. :tada:"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    if [ "$GH_SCENARIO" = "pending" ]; then
+      cat <<'JSON'
+[{"id":201,"user":{"login":"chatgpt-codex-connector[bot]"},"state":"PENDING","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:02:00Z","body":""}]
+JSON
+    else
+      printf '[]\\n'
+    fi
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    if [ "$GH_SCENARIO" = "carryover" ]; then
+      cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_carryover","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_carryover","databaseId":401,"author":{"login":"chatgpt-codex-connector"},"createdAt":"2026-06-08T00:59:00Z","body":"older unresolved"}]}}]}}}}}
+JSON
+    elif [ "$GH_SCENARIO" = "changes_requested" ]; then
+      cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":"CHANGES_REQUESTED","reviewThreads":{"nodes":[]}}}}}
+JSON
+    else
+      cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[]}}}}}
+JSON
+    fi
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                    encoding="utf-8",
+                )
+                fake_gh.chmod(0o755)
+                env = {
+                    **os.environ,
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                    "GH_SCENARIO": scenario,
+                }
+
+                result = subprocess.run(
+                    [
+                        str(script_path),
+                        "--repo",
+                        "owner/repo",
+                        "--pr",
+                        "13",
+                        "--head-sha",
+                        "a" * 40,
+                        "--trigger-comment-id",
+                        "99",
+                        "--trigger-created-at",
+                        "2026-06-08T01:00:00Z",
+                    ],
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+
+                assert result.returncode == 0, result.stdout + result.stderr
+                payload = json.loads(result.stdout)
+                fallback = payload["decision"]["fallback_pass_candidate"]
+                assert fallback["present"] is True
+                assert fallback["source_ids"] == [100]
+                assert fallback["promotes_top_level_status"] is False
+                assert payload["decision"]["status_reason"] == "fallback_issue_comment_low_confidence"
+                if assertion_kind == "carryover_unresolved_count":
+                    assert payload["decision"]["carryover_unresolved_count"] == 1
+                elif assertion_kind == "review_decision":
+                    assert payload["review"]["status"] == "changes_requested"
+
     def test_issue_187_s100_review_completion_unknown_candidate_is_non_pass_evidence(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
