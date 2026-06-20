@@ -635,7 +635,6 @@ pr_view_payload = {}
 check_runs = as_list(check_runs_payload, "check_runs")
 statuses = as_list(statuses_payload, "statuses")
 status_check_rollup = []
-merge_state_status = str(pr_view_payload.get("mergeStateStatus") or "").upper()
 
 check_counts = {
     "total": len(check_runs),
@@ -661,7 +660,7 @@ status_counts = {
 required_check_state = {
     "available": False,
     "collection_policy": "forbidden",
-    "merge_state_status": merge_state_status or None,
+    "merge_state_status": None,
     "status_check_rollup_total": len(status_check_rollup),
     "status_check_rollup_states": [],
 }

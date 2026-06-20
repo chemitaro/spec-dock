@@ -641,6 +641,24 @@ class TestRuntimeDoctorS04:
 
         def record_command(command, **_kwargs):
             commands.append(list(command))
+            if command[:3] == ["gh", "pr", "view"]:
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    json.dumps(
+                        {
+                            "number": 123,
+                            "headRefOid": "abcde12345",
+                            "baseRefName": "main",
+                            "headRefName": "feature",
+                            "headRepositoryOwner": {"login": "example"},
+                            "mergeable": "MERGEABLE",
+                        }
+                    ),
+                    "",
+                )
+            if command == ["gh", "api", "repos/example/repo/branches/main"]:
+                return subprocess.CompletedProcess(command, 0, '{"protected":true}', "")
             return subprocess.CompletedProcess(command, 0, "{}", "")
 
         monkeypatch.setattr(github_capability_cli.subprocess, "run", record_command)
@@ -660,9 +678,15 @@ class TestRuntimeDoctorS04:
             "issue_comments_read",
             "pull_reviews_read",
             "pull_review_comments_read",
+            "compare_read",
+            "branch_metadata_read",
+            "branch_protection_read",
         ]
         rendered_commands = "\n".join(" ".join(command) for command in commands)
-        assert "number,headRefOid,mergeable" in rendered_commands
+        assert "number,headRefOid,baseRefName,headRefName,headRepositoryOwner,mergeable" in rendered_commands
+        assert "repos/example/repo/compare/main...feature" in rendered_commands
+        assert "repos/example/repo/branches/main" in rendered_commands
+        assert "repos/example/repo/branches/main/protection" in rendered_commands
         assert "/check-runs" not in rendered_commands
         assert "/status" not in rendered_commands
         assert "statusCheckRollup" not in rendered_commands

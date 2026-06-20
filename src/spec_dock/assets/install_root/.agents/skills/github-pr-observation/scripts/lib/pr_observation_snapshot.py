@@ -12,6 +12,8 @@ from pathlib import Path
 from urllib.parse import quote
 
 PR_METADATA_FIELDS = "headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable"
+GITHUB_ACTIONS_APP_ID = 15368
+ANY_SOURCE_REQUIRED_CHECK_APP_ID = -1
 
 
 @dataclass(frozen=True)
@@ -414,6 +416,15 @@ def has_permission_limitation(limitations: list[object]) -> bool:
     )
 
 
+def has_waitable_required_actions_context_limitation(limitations: list[object]) -> bool:
+    return any(
+        isinstance(item, dict)
+        and item.get("code") == "required_actions_context_pending"
+        and item.get("recommended_next_action") == "wait"
+        for item in limitations
+    )
+
+
 def mergeability_status(metadata: dict[str, object]) -> str | None:
     value = metadata.get("mergeable")
     if not isinstance(value, str) or not value:
@@ -474,6 +485,12 @@ def classify_snapshot(
                 return "unknown", "fix_github_token_permissions", False, "blocking_limitation"
             return "unknown", "human_gate", False, "blocking_limitation"
         return str(ci_status), "wait", False, "ci_pending"
+    if ci_status == "unknown" and has_waitable_required_actions_context_limitation(limitations):
+        if has_blocking_limitation(limitations, ignored_codes={"required_checks_missing_or_pending"}):
+            if has_permission_limitation(limitations):
+                return "unknown", "fix_github_token_permissions", False, "blocking_limitation"
+            return "unknown", "human_gate", False, "blocking_limitation"
+        return "pending", "wait", False, "ci_pending"
     if ci_status == "passed" and actionable_reason:
         return "human_gate", "address_review_feedback", True, actionable_reason
     if has_permission_limitation(limitations):
@@ -583,29 +600,34 @@ def successful_actions_contexts(ci_payload: dict[str, object]) -> set[str]:
     return contexts
 
 
-def required_status_contexts(protection_payload: object) -> tuple[set[str], bool]:
+def required_status_contexts(protection_payload: object) -> tuple[set[str], set[str], bool]:
     if not isinstance(protection_payload, dict):
-        return set(), False
+        return set(), set(), False
     required_status_checks = protection_payload.get("required_status_checks")
     if required_status_checks is None:
-        return set(), True
+        return set(), set(), True
     if not isinstance(required_status_checks, dict):
-        return set(), False
-    contexts: set[str] = set()
+        return set(), set(), False
+    actions_contexts: set[str] = set()
+    non_actions_contexts: set[str] = set()
     raw_contexts = required_status_checks.get("contexts")
     if isinstance(raw_contexts, list):
         for context in raw_contexts:
             if isinstance(context, str) and context:
-                contexts.add(context)
+                actions_contexts.add(context)
     raw_checks = required_status_checks.get("checks")
     if isinstance(raw_checks, list):
         for check in raw_checks:
             if not isinstance(check, dict):
-                return contexts, False
+                return actions_contexts, non_actions_contexts, False
             context = check.get("context")
-            if isinstance(context, str) and context:
-                contexts.add(context)
-    return contexts, True
+            if not isinstance(context, str) or not context:
+                continue
+            if check.get("app_id") in {GITHUB_ACTIONS_APP_ID, ANY_SOURCE_REQUIRED_CHECK_APP_ID}:
+                actions_contexts.add(context)
+            else:
+                non_actions_contexts.add(context)
+    return actions_contexts, non_actions_contexts, True
 
 
 def head_owner_login(metadata: dict[str, object]) -> str | None:
@@ -762,7 +784,7 @@ def collect_merge_blocker_metadata(
                 "compare": compare_metadata,
                 "branch_protection": protection_metadata,
             }, limitations
-        contexts, schema_ok = required_status_contexts(protection_payload)
+        contexts, non_actions_contexts, schema_ok = required_status_contexts(protection_payload)
         if not schema_ok:
             limitations.append(
                 {
@@ -776,15 +798,47 @@ def collect_merge_blocker_metadata(
             )
         observed_contexts = successful_actions_contexts(ci_payload)
         missing = sorted(context for context in contexts if context not in observed_contexts)
+        ci_status = str(ci_payload.get("status") or "unknown")
         protection_metadata.update(
             {
                 "protected": True,
-                "required_status_contexts": sorted(contexts),
+                "required_status_contexts": sorted(contexts | non_actions_contexts),
+                "required_github_actions_contexts": sorted(contexts),
+                "required_non_actions_contexts": sorted(non_actions_contexts),
                 "observed_successful_actions_contexts": sorted(observed_contexts),
                 "missing_required_status_contexts": missing,
+                "unprovable_required_status_contexts": sorted(non_actions_contexts),
             }
         )
+        if non_actions_contexts:
+            limitations.append(
+                {
+                    "code": "required_non_actions_context_unprovable_by_actions",
+                    "source": protection_api,
+                    "capability": "branch_protection_read",
+                    "severity": "blocking",
+                    "message": "branch protection requires non-GitHub-Actions status contexts that cannot be proven with Actions evidence",
+                    "recommended_next_action": "human_gate",
+                    "unprovable_required_status_contexts": sorted(non_actions_contexts),
+                }
+            )
         if missing:
+            if ci_status in {"pending", "running", "none", "unknown"}:
+                limitations.append(
+                    {
+                        "code": "required_actions_context_pending",
+                        "source": protection_api,
+                        "capability": "branch_protection_read",
+                        "severity": "info",
+                        "message": "branch protection requires GitHub Actions contexts that are not observed successful yet",
+                        "recommended_next_action": "wait",
+                        "missing_required_status_contexts": missing,
+                    }
+                )
+                return {
+                    "compare": compare_metadata,
+                    "branch_protection": protection_metadata,
+                }, limitations
             limitations.append(
                 {
                     "code": "required_actions_context_unobserved",
