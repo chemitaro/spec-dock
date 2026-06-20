@@ -26358,7 +26358,7 @@ esac
 case "$*" in
   "api repos/owner/repo/issues/13/comments --paginate")
     cat <<'JSON'
-[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Chef's kiss."}]
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Swish!\\n\\n**Reviewed commit:** `aaaaaaaaaa`\\n\\n<details><summary>About Codex</summary></details>"}]
 JSON
     ;;
   "api repos/owner/repo/pulls/13/reviews --paginate")

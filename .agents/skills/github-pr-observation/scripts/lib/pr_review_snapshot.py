@@ -1034,7 +1034,22 @@ def is_strict_no_findings_issue_comment(item):
         "codex review: didn't find any major issues. chef's kiss.",
         "codex review: didn't find any major issues. :tada:",
     }
-    return normalized_body_text(raw_body) in allowed_full_bodies
+    normalized_body = normalized_body_text(raw_body)
+    if normalized_body in allowed_full_bodies:
+        return True
+    non_empty_lines = [
+        normalized_body_text(line)
+        for line in raw_body.splitlines()
+        if line.strip()
+    ]
+    if not non_empty_lines:
+        return False
+    first_line = non_empty_lines[0]
+    has_codex_metadata = any(
+        line.startswith("**reviewed commit:**") or line.startswith("<details>")
+        for line in non_empty_lines[1:]
+    )
+    return first_line.startswith("codex review: didn't find any major issues.") and has_codex_metadata
 
 
 current_codex_issue_comments = [
