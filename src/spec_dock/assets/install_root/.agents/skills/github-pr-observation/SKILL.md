@@ -198,14 +198,21 @@ status collection are implemented by the public scripts.
   `ci.actions.jobs_summary.collection` is non-secret operational context;
   failed and non-terminal diagnostics remain preserved where available.
 - Codex review completion is primarily detected from Codex-authored submitted PR
-  review objects. Issue comments, reactions, or quiet windows are fallback or
-  supporting evidence only.
+  review objects. A strict Codex no-findings issue comment can also be selected
+  as the review-level completion signal `codex_no_findings_issue_comment` when
+  the current trigger boundary, expected head, allow-listed no-findings wording,
+  no pending Codex review evidence, and blocker checks all match. In collector
+  output this reports `review_completion_observed`; it is not by itself
+  top-level `merge_prepared` authority.
+- Snapshot and wait output may promote a safe integrated no-findings result to
+  top-level `passed` / `merge_prepared` / complete only after CI, PR metadata,
+  head freshness, unresolved threads, changes-requested reviews, draft/non-open
+  PR state, stale head, and blocking limitations have been integrated. Those
+  blockers override `codex_no_findings_issue_comment`.
 - `review_completion_unknown` is a non-pass terminal-like review state. It means
-  CI passed, the observed head matched, no current-boundary selected actionable
-  feedback exists, and no trusted Codex review completion signal was found after
-  the trigger-age and CI-passed-age guards are satisfied. It does not mean the
-  actionable review inventory is empty; carryover unresolved inventory can still
-  exist and must remain visible in the decision counts and IDs.
+  CI passed, the observed head matched, the actionable review inventory was
+  empty, and no trusted Codex review completion signal was found after the
+  trigger-age and CI-passed-age guards are satisfied.
 - Stable no-completion evidence for the current boundary must not be collapsed
   into a generic timeout. The top-level result is `human_gate`, with the decision
   reason indicating `review_completion_unknown`, so a human can review the
@@ -214,19 +221,6 @@ status collection are implemented by the public scripts.
   merge-ready, and it is not proof that no review work exists. Below the latency
   guards, stable no-completion evidence stays in the wait/resume path instead of
   being promoted early.
-- Carryover-only plus missing current completion signal below the latency guards
-  is not `address_review_feedback`. It remains observation-continuation:
-  `wait_or_resume` with `missing_current_completion_signal`, while carryover IDs
-  remain available for audit and future classification.
-- After the latency guards are satisfied, carryover-only plus missing current
-  completion signal becomes `review_completion_unknown` with fresh-audit
-  metadata. Carryover IDs are still preserved; the unknown state is about the
-  missing current completion signal, not about erasing carryover inventory.
-- Trusted completion from a Codex-authored `submitted_pull_request_review` keeps
-  carryover unresolved inventory actionable. In that case, non-outdated
-  unresolved carryover threads remain
-  `carryover_non_outdated_unresolved_thread` feedback and the recommended next
-  action remains `address_review_feedback`.
 - When `review_completion_unknown` is emitted, wait metadata marks that a fresh
   post-unknown audit is required before any merge-prepared or no-review-work
   reporting. Downstream orchestration must perform that fresh audit instead of
@@ -234,27 +228,22 @@ status collection are implemented by the public scripts.
 - The wait loop may skip a final under-budget snapshot and preserve the latest
   useful payload with `final_poll_skipped_reason="insufficient_next_snapshot_budget"`.
   Treat that as budget-preservation metadata, not as a stronger review result.
-- `fallback_issue_comment` remains low-confidence evidence by default. It keeps
-  the final status in the `human_gate` / `wait_or_resume` path and does not
-  promote a run to `passed`, complete, or merge-ready unless the narrow
-  no-major-issues exception below applies.
-- `fallback_pass_candidate` is usually non-promoting context that a
-  current-boundary fallback issue comment appears positive. It promotes the
-  top-level result only when all current-boundary Codex issue-comment signals
-  are no-major-issues responses, no current or carryover unresolved review
-  inventory exists, no pending review evidence exists, no review blocker exists,
-  and `promotes_top_level_status` is true. In that narrow case, the final
-  decision may be `passed` / `merge_prepared`; mixed, pending, blocked,
-  carryover, or generic fallback issue comments still do not override the
-  `fallback_issue_comment` gate.
+- A missing current completion signal or pending review remains retryable and
+  stays in the wait/resume path, such as `wait_or_resume`, until the configured
+  latency guards or terminal conditions are reached.
+- Generic `fallback_issue_comment` remains low-confidence evidence. It keeps the
+  final status in the human gate path with
+  `manual_review_required_non_retryable` and does not promote a run to
+  `passed`, complete, or `merge_prepared`.
+- `fallback_pass_candidate` is a non-promoting signal that a current-boundary
+  fallback issue comment appears positive. It is useful context, but it does not
+  override the `fallback_issue_comment` gate.
 - S102 is deferred until there is an explicit no-findings artifact contract.
   Generic issue comments, zero selected comments, or review request disappearance
   alone must not mark review completion.
 - `selected_unresolved_count == 0` only means no current-boundary unresolved
-  feedback was selected. Keep current selected counts separate from
-  carryover/actionable counts: zero current selected feedback can coexist with
-  non-zero carryover unresolved inventory. Inspect
-  `decision.actionable_unresolved_count`,
+  feedback was selected. It does not prove that no actionable review work exists;
+  inspect `decision.actionable_unresolved_count`,
   `decision.current_selected_unresolved_count`,
   `decision.carryover_unresolved_count`, and the corresponding IDs before
   reporting no review work.
