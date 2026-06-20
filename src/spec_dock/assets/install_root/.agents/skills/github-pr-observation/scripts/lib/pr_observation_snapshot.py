@@ -723,13 +723,14 @@ def required_status_contexts(protection_payload: object) -> tuple[set[str], set[
         return set(), set(), True
     if not isinstance(required_status_checks, dict):
         return set(), set(), False
+    legacy_contexts: set[str] = set()
     actions_contexts: set[str] = set()
     non_actions_contexts: set[str] = set()
     raw_contexts = required_status_checks.get("contexts")
     if isinstance(raw_contexts, list):
         for context in raw_contexts:
             if isinstance(context, str) and context:
-                non_actions_contexts.add(context)
+                legacy_contexts.add(context)
     raw_checks = required_status_checks.get("checks")
     if isinstance(raw_checks, list):
         for check in raw_checks:
@@ -742,6 +743,8 @@ def required_status_contexts(protection_payload: object) -> tuple[set[str], set[
                 actions_contexts.add(context)
             else:
                 non_actions_contexts.add(context)
+    non_actions_contexts.update(legacy_contexts - actions_contexts)
+    non_actions_contexts.difference_update(actions_contexts)
     return actions_contexts, non_actions_contexts, True
 
 
@@ -793,7 +796,7 @@ def collect_merge_blocker_metadata(
             github_api_failure_limitation(
                 api=compare_api,
                 source=compare_api,
-                capability="contents_read",
+                capability="compare_read",
                 exit_code=compare_exit,
                 stderr=compare_stderr,
                 default_code="pr_compare_metadata_unavailable",
@@ -919,6 +922,43 @@ def collect_merge_blocker_metadata(
         protection_metadata["strict"] = strict_required_checks
         if branch_is_behind and strict_required_checks:
             add_strict_behind_limitation(protection_api)
+        required_pull_request_reviews = (
+            protection_payload.get("required_pull_request_reviews")
+            if isinstance(protection_payload, dict)
+            else None
+        )
+        pull_request_review_metadata = {
+            "required": required_pull_request_reviews is not None,
+        }
+        if isinstance(required_pull_request_reviews, dict):
+            pull_request_review_metadata.update(
+                {
+                    "required_approving_review_count": required_pull_request_reviews.get(
+                        "required_approving_review_count"
+                    ),
+                    "dismiss_stale_reviews": required_pull_request_reviews.get(
+                        "dismiss_stale_reviews"
+                    ),
+                    "require_code_owner_reviews": required_pull_request_reviews.get(
+                        "require_code_owner_reviews"
+                    ),
+                    "require_last_push_approval": required_pull_request_reviews.get(
+                        "require_last_push_approval"
+                    ),
+                }
+            )
+            limitations.append(
+                {
+                    "code": "required_pull_request_reviews_unverified",
+                    "source": protection_api,
+                    "capability": "pull_request_reviews_read",
+                    "severity": "blocking",
+                    "message": "branch protection requires pull request reviews that cannot be fully proven by the observation script",
+                    "recommended_next_action": "human_gate",
+                    "required_pull_request_reviews": pull_request_review_metadata,
+                }
+            )
+        protection_metadata["required_pull_request_reviews"] = pull_request_review_metadata
         contexts, non_actions_contexts, schema_ok = required_status_contexts(protection_payload)
         if not schema_ok:
             limitations.append(
