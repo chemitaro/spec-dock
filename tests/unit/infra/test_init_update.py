@@ -15155,6 +15155,34 @@ esac
         assert payload["review"]["threads"]["unresolved"] == 1
         assert payload["review"]["threads"]["decision_authoritative"] is False
 
+    def test_issue_219_s01_snapshot_fallback_no_findings_with_carryover_inventory_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            payload = self._issue_182_s02_run_snapshot_with_collectors(
+                Path(tmp_dir),
+                review_payload=self._issue_182_s02_review_payload(
+                    decision_status="human_gate",
+                    status_reason="fallback_issue_comment_low_confidence",
+                    recommended_next_action="manual_review_required_non_retryable",
+                    completion_signal="fallback_issue_comment",
+                    fallback_pass_candidate={
+                        "present": True,
+                        "source": "issue_comment",
+                        "source_ids": [100],
+                        "reason": "current_boundary_no_major_issues_comment",
+                        "promotes_top_level_status": True,
+                    },
+                    legacy_review_status="approved",
+                    legacy_unresolved_count=1,
+                ),
+            )
+
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["observation_complete"] is True
+        assert payload["decision"]["fallback_pass_candidate"]["promotes_top_level_status"] is True
+        assert payload["review"]["threads"]["unresolved"] == 1
+        assert payload["review"]["threads"]["decision_authoritative"] is False
+
     def test_issue_182_s02_snapshot_current_selected_unresolved_thread_drives_feedback_action(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             payload = self._issue_182_s02_run_snapshot_with_collectors(
@@ -20304,6 +20332,71 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert payload["observation_complete"] is True
             assert payload["decision"]["completion_signal"] == "codex_no_findings_issue_comment"
 
+    def test_issue_219_s01_wait_fallback_no_findings_with_carryover_inventory_passes(self) -> None:
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "human_gate",
+            "status_reason": "fallback_issue_comment_low_confidence",
+            "recommended_next_action": "manual_review_required_non_retryable",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "carryover_unresolved_count": 1,
+            "carryover_unresolved_thread_ids": ["RT_carryover"],
+            "selected_changes_requested_evidence": [],
+            "completion_signal": "fallback_issue_comment",
+            "confidence": "low",
+            "fallback_pass_candidate": {
+                "present": True,
+                "source": "issue_comment",
+                "source_ids": [100],
+                "reason": "current_boundary_no_major_issues_comment",
+                "promotes_top_level_status": True,
+            },
+            "fingerprint": "fallback-carryover-pass-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "human_gate",
+                        "overall_status": "human_gate",
+                        "normalized_status": "human_gate",
+                        "recommended_next_action": "manual_review_required_non_retryable",
+                        "decision": decision,
+                        "decision_fingerprint": "fallback-carryover-pass-s03",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "fallback",
+                                "completion_signal": "fallback_issue_comment",
+                                "confidence": "low",
+                                "fallback_pass_candidate": decision["fallback_pass_candidate"],
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_carryover"}]},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["overall_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["observation_complete"] is True
+        assert payload["decision"]["fallback_pass_candidate"]["promotes_top_level_status"] is True
+
     def test_issue_218_s03_wait_fallback_issue_comment_is_non_retryable_human_gate(self) -> None:
         decision = {
             "scope": "current_trigger_boundary",
@@ -24144,6 +24237,82 @@ esac
         assert payload["decision"]["carryover_unresolved_thread_ids"] == ["RT_carryover"]
         assert payload["decision"]["status_reason"] != "review_completion_unknown"
 
+    def test_issue_219_s01_wait_guard_under_carryover_only_missing_completion_does_not_timeout(self) -> None:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "carryover_unresolved_count": 1,
+            "carryover_unresolved_thread_ids": ["RT_carryover"],
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": "carryover-missing-guard-under-s01",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "carryover-missing-guard-under-s01",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "no_completion_evidence": evidence,
+                            }
+                        },
+                        "observed_at": "2000-01-01T00:00:00Z",
+                        "trigger": {
+                            "source": "explicit",
+                            "comment_id": 99,
+                            "created_at": "2999-01-01T00:00:00Z",
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_carryover"}]},
+                    }
+                ],
+                timeout_seconds=2,
+                poll_interval_seconds=2,
+                quiet_seconds=90,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2999-01-01T00:00:00Z",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["normalized_status"] == "pending"
+        assert payload["recommended_next_action"] == "wait_or_resume"
+        assert payload["observation_complete"] is False
+        assert payload["decision"]["status_reason"] == "missing_current_completion_signal"
+        assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
+
     def test_issue_187_s420_snapshot_current_selected_reason_wins_over_carryover(self) -> None:
         payload = self._issue_187_s420_run_observation_snapshot(
             review_wrapper_payload={
@@ -25864,7 +26033,7 @@ esac
 case "$*" in
   "api repos/owner/repo/issues/13/comments --paginate")
     cat <<'JSON'
-[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Breezy!"}]
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. :tada:"}]
 JSON
     ;;
   "api repos/owner/repo/pulls/13/reviews --paginate")
@@ -25957,7 +26126,7 @@ esac
 case "$*" in
   "api repos/owner/repo/issues/13/comments --paginate")
     cat <<'JSON'
-[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Breezy!"}]
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. :tada:"}]
 JSON
     ;;
   "api repos/owner/repo/pulls/13/reviews --paginate")
@@ -26097,6 +26266,8 @@ esac
             decision = payload["decision"]
             assert decision["completion_signal"] != "codex_no_findings_issue_comment"
             assert decision["status"] != "passed"
+            assert decision["completion_signal"] == "none"
+            assert decision["status"] == "pending"
             assert decision["no_completion_evidence"]["pending_review_present"] is True
             assert decision["no_findings_completion_candidate"]["present"] is False
             assert decision["no_findings_completion_candidate"]["promotes_top_level_status"] is False
