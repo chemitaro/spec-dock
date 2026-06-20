@@ -15183,6 +15183,33 @@ esac
         assert payload["review"]["threads"]["unresolved"] == 1
         assert payload["review"]["threads"]["decision_authoritative"] is False
 
+    def test_issue_219_s01_snapshot_fallback_no_findings_with_unresolved_review_blocks_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            payload = self._issue_182_s02_run_snapshot_with_collectors(
+                Path(tmp_dir),
+                review_payload=self._issue_182_s02_review_payload(
+                    decision_status="human_gate",
+                    status_reason="fallback_issue_comment_low_confidence",
+                    recommended_next_action="manual_review_required_non_retryable",
+                    completion_signal="fallback_issue_comment",
+                    fallback_pass_candidate={
+                        "present": True,
+                        "source": "issue_comment",
+                        "source_ids": [100],
+                        "reason": "current_boundary_no_major_issues_comment",
+                        "promotes_top_level_status": True,
+                    },
+                    legacy_review_status="unresolved",
+                    legacy_unresolved_count=1,
+                ),
+            )
+
+        assert payload["normalized_status"] == "human_gate"
+        assert payload["recommended_next_action"] == "manual_review_required_non_retryable"
+        assert payload["observation_complete"] is False
+        assert payload["decision"]["fallback_pass_candidate"]["promotes_top_level_status"] is True
+        assert payload["review"]["status"] == "unresolved"
+
     def test_issue_182_s02_snapshot_current_selected_unresolved_thread_drives_feedback_action(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             payload = self._issue_182_s02_run_snapshot_with_collectors(
@@ -20395,6 +20422,71 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
         assert payload["overall_status"] == "passed"
         assert payload["recommended_next_action"] == "merge_prepared"
         assert payload["observation_complete"] is True
+        assert payload["decision"]["fallback_pass_candidate"]["promotes_top_level_status"] is True
+
+    def test_issue_219_s01_wait_fallback_no_findings_with_unresolved_review_blocks_pass(self) -> None:
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "human_gate",
+            "status_reason": "fallback_issue_comment_low_confidence",
+            "recommended_next_action": "manual_review_required_non_retryable",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "carryover_unresolved_count": 0,
+            "carryover_unresolved_thread_ids": [],
+            "selected_changes_requested_evidence": [],
+            "completion_signal": "fallback_issue_comment",
+            "confidence": "low",
+            "fallback_pass_candidate": {
+                "present": True,
+                "source": "issue_comment",
+                "source_ids": [100],
+                "reason": "current_boundary_no_major_issues_comment",
+                "promotes_top_level_status": True,
+            },
+            "fingerprint": "fallback-unresolved-review-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "unresolved",
+                        "status": "human_gate",
+                        "overall_status": "human_gate",
+                        "normalized_status": "human_gate",
+                        "recommended_next_action": "manual_review_required_non_retryable",
+                        "decision": decision,
+                        "decision_fingerprint": "fallback-unresolved-review-s03",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "fallback",
+                                "completion_signal": "fallback_issue_comment",
+                                "confidence": "low",
+                                "fallback_pass_candidate": decision["fallback_pass_candidate"],
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_current"}]},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["overall_status"] == "human_gate"
+        assert payload["recommended_next_action"] == "manual_review_required_non_retryable"
+        assert payload["observation_complete"] is False
         assert payload["decision"]["fallback_pass_candidate"]["promotes_top_level_status"] is True
 
     def test_issue_218_s03_wait_fallback_issue_comment_is_non_retryable_human_gate(self) -> None:
