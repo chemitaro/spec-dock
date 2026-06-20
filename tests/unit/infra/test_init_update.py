@@ -15259,6 +15259,36 @@ esac
         assert payload["decision"]["status_reason"] == "current_selected_unresolved_thread"
         assert payload["decision"]["selected_unresolved_thread_ids"] == ["RT_current"]
 
+    def test_issue_219_s01_snapshot_current_feedback_wins_over_audit_limitation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            review_payload = self._issue_182_s02_review_payload(
+                decision_status="human_gate",
+                status_reason="current_selected_unresolved_thread",
+                recommended_next_action="address_review_feedback",
+                observation_complete=True,
+                selected_unresolved_thread_ids=["RT_current"],
+                completion_signal="submitted_pull_request_review",
+                legacy_review_status="approved",
+                legacy_unresolved_count=0,
+            )
+            review_payload["limitations"] = [
+                {
+                    "code": "thread_state_unavailable",
+                    "severity": "blocking",
+                    "message": "review thread state was unavailable",
+                }
+            ]
+            payload = self._issue_182_s02_run_snapshot_with_collectors(
+                Path(tmp_dir),
+                review_payload=review_payload,
+            )
+
+        assert payload["normalized_status"] == "human_gate"
+        assert payload["recommended_next_action"] == "address_review_feedback"
+        assert payload["observation_complete"] is True
+        assert payload["decision"]["status_reason"] == "current_selected_unresolved_thread"
+        assert payload["limitations"][0]["code"] == "thread_state_unavailable"
+
     def test_issue_182_s02_snapshot_current_changes_requested_drives_feedback_action(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             payload = self._issue_182_s02_run_snapshot_with_collectors(
@@ -25560,6 +25590,89 @@ esac
             assert payload["decision"]["status_reason"] == "fallback_issue_comment_no_major_issues"
             assert payload["decision"]["recommended_next_action"] == "merge_prepared"
             assert payload["review"]["current"]["selected_unresolved_thread_ids"] == []
+
+    def test_issue_219_s01_review_collector_mixed_fallback_comments_do_not_promote(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. :tada:"},{"id":101,"user":{"login":"codex"},"created_at":"2026-06-08T01:04:00Z","body":"Fallback feedback was found outside the PR review surface."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            fallback = payload["decision"]["fallback_pass_candidate"]
+            assert fallback == {
+                "present": True,
+                "source": "issue_comment",
+                "source_ids": [100],
+                "reason": "current_boundary_no_major_issues_comment",
+                "promotes_top_level_status": False,
+            }
+            assert payload["decision"]["status_reason"] == "fallback_issue_comment_low_confidence"
+            assert payload["decision"]["recommended_next_action"] == "wait_or_resume"
 
     def test_issue_187_s100_review_completion_unknown_candidate_is_non_pass_evidence(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]

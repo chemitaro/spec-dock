@@ -1247,6 +1247,11 @@ fallback_pass_source_ids = [
     for item in current_codex_issue_comments
     if item.get("id") is not None and is_no_major_issues_fallback(item)
 ]
+fallback_pass_promotes = bool(
+    completion_signal == "fallback_issue_comment"
+    and fallback_pass_source_ids
+    and len(fallback_pass_source_ids) == len(current_codex_issue_comments)
+)
 for signal in signals:
     signal.pop("_fallback_pass_raw_body", None)
 fallback_pass_candidate = {
@@ -1254,9 +1259,7 @@ fallback_pass_candidate = {
     "source": "issue_comment" if fallback_pass_source_ids else None,
     "source_ids": fallback_pass_source_ids,
     "reason": "current_boundary_no_major_issues_comment" if fallback_pass_source_ids else None,
-    "promotes_top_level_status": bool(
-        completion_signal == "fallback_issue_comment" and fallback_pass_source_ids
-    ),
+    "promotes_top_level_status": fallback_pass_promotes,
 }
 if selected_unresolved_thread_ids:
     decision_status_reason = "current_selected_unresolved_thread"
@@ -1266,7 +1269,7 @@ elif selected_changes_requested_evidence:
     decision_status_reason = "current_selected_changes_requested"
     decision_status = "human_gate"
     decision_action = "address_review_feedback"
-elif completion_signal == "fallback_issue_comment" and fallback_pass_source_ids:
+elif completion_signal == "fallback_issue_comment" and fallback_pass_promotes:
     decision_status_reason = "fallback_issue_comment_no_major_issues"
     decision_status = "passed"
     decision_action = "merge_prepared"
