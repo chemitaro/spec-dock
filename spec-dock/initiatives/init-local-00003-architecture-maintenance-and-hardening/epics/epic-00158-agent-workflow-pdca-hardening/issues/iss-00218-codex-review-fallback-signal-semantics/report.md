@@ -73,8 +73,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-005 | adopted | reviewer | `design.md` | design reviewer の P1/P2 指摘を修正し、fresh re-review が pass した | spec-reviewer Helmholtz/McClintock/Wegener/Huygens sequence | none |
 | EAL-006 | adopted | reviewer | `plan.md` | plan reviewer の P1/P2 指摘を修正し、fresh re-review が pass した | spec-reviewer Tesla/Dalton sequence | none |
 | EAL-007 | adopted | delegated worker | `report.md` S03 evidence | S03 worker の Red/Green/非回帰/diff-check 証跡を親が再実行結果と照合して採用 | parent rerun: S03 selector 3 passed; missing-completion selector 2 passed; `git diff --check` pass; code-reviewer pass with P2 bookkeeping finding | none |
-| EAL-008 | adopted | PR repair batch / repair unit | `report.md` final PR repair evidence | PR #220 observation 後の Provider CI failure 5件は checked-in dogfooding snapshot/parity の更新漏れとして分類し、U001 で局所修復した | `discussions/20260619t184139z-pr-repair-batch-pr-repair-batch.md`; `discussions/20260619t184214z-disc-pr-repair-unit-u001-ci-snapshot-parity.md`; five failing tests now pass locally; S99 selector 87 passed; validate pass; diff-check pass; latest-head GitHub checks pass | Codex review usage-limit human gate remains |
-| EAL-009 | adopted | PR review comments / repair unit | `report.md` PR review repair evidence | PR #220 の直接レビューコメント4件を valid blocking feedback として採用し、no-findings promotion の最新シグナル制約、review-required / changes-requested blocker、explicit completion evidence を補強した | `discussions/20260620t025616z-disc-pr-repair-unit-u002-codex-review-feedback.md`; local PR observation selector 91 passed, 370 deselected | push 後に PR checks と latest-head observation を再確認する |
+| EAL-008 | adopted | PR repair batch / repair unit | `report.md` final PR repair evidence | PR #220 observation 後の Provider CI failure 5件は checked-in dogfooding snapshot/parity の更新漏れとして分類し、U001 で局所修復した | `discussions/20260619t184139z-pr-repair-batch-pr-repair-batch.md`; `discussions/20260619t184214z-disc-pr-repair-unit-u001-ci-snapshot-parity.md`; five failing tests now pass locally; S99 selector 87 passed; validate pass; diff-check pass; GitHub checks pass | none |
+| EAL-009 | adopted | PR review comments / repair unit | `report.md` PR review repair evidence | PR #220 の直接レビューコメント4件を valid blocking feedback として採用し、no-findings promotion の最新シグナル制約、review-required / changes-requested blocker、explicit completion evidence を補強した | `discussions/20260620t025616z-disc-pr-repair-unit-u002-codex-review-feedback.md`; local PR observation selector 91 passed, 370 deselected; full `test_init_update.py` 461 passed; latest head `2183373b41269b4962a86fe54c132dbfc385a304` has GitHub checks pass and merge state `CLEAN`; read-only snapshot `/private/tmp/spec-dock-pr220-observation-after-u002-resolved/result.json` reports unresolved review threads 0 | none |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -730,10 +730,20 @@ pass: no output
 |---|---|---|---|
 | S99 evidence updated through broad selector pass and final reviewer passes | S99 test fixture stabilization, snapshot fallback action alignment, no-findings blocker precedence, and report update | final response / PR | ready |
 
-### PR repair gate（PR #220 / U001）
+### PR 送達ゲート（PR Delivery Gate）
+| PR URL | selected base | base-resolution source | draft / ready decision | head branch | head SHA | issue linkage | existing PR reuse / new PR creation decision |
+|---|---|---|---|---|---|---|---|
+| https://github.com/chemitaro/spec-dock/pull/220 | `main` | existing PR metadata | ready (`isDraft=false`) | `iss-00218-codex-review-fallback-signal-semantics` | `2183373b41269b4962a86fe54c132dbfc385a304` | GitHub issue `#218`; SpecDock issue `iss-00218` | existing PR #220 reused |
+
+### マージ準備ゲート（Merge Preparation Gate）
+| PR open state | monitor status | latest monitored head SHA | fix loop count / history | required check status | non-required check status / waiver | blocking review status | merge conflict / visible blocker | unresolved review-thread limitation | unresolved blockers | final merge-prepared decision |
+|---|---|---|---|---|---|---|---|---|---|---|
+| open / ready | GitHub PR checks pass; read-only snapshot after U002 reports CI passed, head matched, unresolved review threads 0, review pending only because no fresh Codex completion signal exists | `2183373b41269b4962a86fe54c132dbfc385a304` | U001 CI snapshot/parity repair; U002 direct Codex review feedback repair | `validate` pass x2, `provider-tests` pass x2 | none observed; no waiver used | no unresolved review threads after resolving 4 Codex review threads | `mergeStateStatus=CLEAN` | none; thread state available and unresolved 0 | none | merge-prepared: yes; review-clean from fresh Codex completion signal: not claimed |
+
+### PR repair gate（PR #220 / U001-U002）
 | repair batch | trigger / observation evidence | finding | local repair evidence | remaining gate |
 |---|---|---|---|---|
-| `discussions/20260619t184139z-pr-repair-batch-pr-repair-batch.md` | PR #220 observation at `fc9a8ad07ec327bf409cd15e5a9df403aca19f69`; result `/private/tmp/spec-dock-pr220-observation/result.json`; latest-head read-only snapshot `/private/tmp/spec-dock-pr220-observation-latest-readonly/result.json` | Provider CI failed five snapshot/parity tests; Codex review returned usage-limit issue comment | U001 implemented and reobserved-pass: dogfooding metadata snapshot updated, `.agents/skills/github-pr-observation/` mirror synced from provider, fallback action expectation updated; original five tests passed; broad S99 selector 87 passed; `spec-dock validate` passed; `git diff --check` passed; latest head `db9495fd9c539e395caf994d5ca276c8451f04b5` has `validate` pass, `provider-tests` pass, merge state `CLEAN` | Codex usage-limit remains human gate unless later review completes or user waives; new `@codex review` trigger requires explicit approval |
+| `discussions/20260619t184139z-pr-repair-batch-pr-repair-batch.md` | PR #220 observation at `fc9a8ad07ec327bf409cd15e5a9df403aca19f69`; U001 latest-head read-only snapshot `/private/tmp/spec-dock-pr220-observation-latest-readonly/result.json`; U002 resolved snapshot `/private/tmp/spec-dock-pr220-observation-after-u002-resolved/result.json` | U001: Provider CI failed five snapshot/parity tests. U002: direct Codex review comments found four no-findings promotion guard issues. | U001 implemented and reobserved-pass. U002 implemented and reobserved-pass: four review threads resolved, full `test_init_update.py` 461 passed, GitHub `validate` / `provider-tests` pass, latest head `2183373b41269b4962a86fe54c132dbfc385a304` has merge state `CLEAN`. | none for mergeability; fresh Codex completion signal is not claimed |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: S99 broad selector exposed legacy PR observation tests that entered the new post-once trigger path even though their assertions targeted wait/snapshot classification.
@@ -747,9 +757,9 @@ pass: no output
 - 問題: Final code review found that no-findings issue comments could promote even when GitHub `reviewDecision` was `CHANGES_REQUESTED`.
   - 解決: No-findings promotion now requires `reviewDecision` not to be `CHANGES_REQUESTED`; a regression test fixes this blocker precedence.
 - 問題: PR #220 Provider CI found checked-in dogfooding snapshot/parity drift after PR observation.
-  - 解決: U001 repaired the local snapshot/parity surfaces and verified the five failing Provider CI tests locally; latest-head GitHub `validate` / `provider-tests` now pass and merge state is `CLEAN`.
-- 問題: PR #220 Codex review returned a usage-limit issue comment instead of trusted review completion.
-  - 解決: Repo-local repair cannot resolve quota; latest-head read-only snapshot records `human_gate` / `manual_review_required_non_retryable`, unresolved threads 0, and requires either an approved new review trigger after quota is available or explicit human waiver.
+  - 解決: U001 repaired the local snapshot/parity surfaces and verified the five failing Provider CI tests locally; GitHub `validate` / `provider-tests` pass and merge state is `CLEAN`.
+- 問題: PR #220 Codex review returned a usage-limit issue comment before direct review comments became visible.
+  - 解決: Direct PR review comments were fetched, classified as U002, fixed, tested, pushed, and resolved on GitHub. The latest read-only snapshot reports unresolved review threads 0; no fresh Codex completion signal is claimed.
 
 ## 学んだこと (任意)
 - ...
