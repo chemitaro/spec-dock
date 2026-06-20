@@ -15981,6 +15981,289 @@ else:
         assert not any("check-runs" in call for call in gh_calls)
         assert not any("/status" in call for call in gh_calls)
 
+    def _issue_222_s03_actions_summary(self, *, status: str = "passed") -> dict[str, object]:
+        counts = {
+            "success": 1 if status == "passed" else 0,
+            "neutral": 0,
+            "skipped": 0,
+            "failed": 0,
+            "running": 1 if status == "running" else 0,
+            "pending": 0,
+            "unknown": 0,
+        }
+        return {
+            "available": True,
+            "workflow_runs": {"total": 1, "counts": counts},
+            "jobs_summary": {
+                "total": 1,
+                "counts": counts,
+                "collection": {"successful_runs": 1, "failed_runs": 0},
+            },
+            "jobs_detail": [
+                {
+                    "id": 303,
+                    "run_id": 202,
+                    "name": "test",
+                    "status": "completed" if status == "passed" else "in_progress",
+                    "conclusion": "success" if status == "passed" else None,
+                    "html_url": "https://example.test/job/303",
+                }
+            ],
+        }
+
+    def test_issue_222_s03_wait_uses_actions_summary_with_empty_legacy_fields(self) -> None:
+        scenario = [
+            {
+                "ci": "running",
+                "status": "running",
+                "overall_status": "running",
+                "normalized_status": "running",
+                "source_policy": "github_actions_only",
+                "actions": self._issue_222_s03_actions_summary(status="running"),
+                "check_runs": {"total": 0, "success": 0, "running": 0},
+                "commit_statuses": {"total": 0, "success": 0},
+                "required_check_state": {"available": False, "collection_policy": "forbidden"},
+                "review": "pending",
+                "recommended_next_action": "wait",
+            }
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                scenario,
+                timeout_seconds=1,
+                poll_interval_seconds=1,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["ci"]["source_policy"] == "github_actions_only"
+        assert payload["ci"]["check_runs"]["total"] == 0
+        assert payload["normalized_status"] == "timeout"
+        assert "checks=0/1" in result.stderr
+
+    def test_issue_222_s03_wait_uses_workflow_counts_when_jobs_summary_empty(self) -> None:
+        actions = self._issue_222_s03_actions_summary(status="running")
+        actions["jobs_summary"] = {"total": 0, "counts": {}}
+        scenario = [
+            {
+                "ci": "running",
+                "status": "running",
+                "overall_status": "running",
+                "normalized_status": "running",
+                "source_policy": "github_actions_only",
+                "actions": actions,
+                "check_runs": {"total": 0, "success": 0, "running": 0},
+                "commit_statuses": {"total": 0, "success": 0},
+                "required_check_state": {"available": False, "collection_policy": "forbidden"},
+                "review": "pending",
+                "recommended_next_action": "wait",
+            }
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                scenario,
+                timeout_seconds=1,
+                poll_interval_seconds=1,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["ci"]["source_policy"] == "github_actions_only"
+        assert payload["ci"]["actions"]["workflow_runs"]["total"] == 1
+        assert payload["ci"]["actions"]["jobs_summary"]["total"] == 0
+        assert payload["normalized_status"] == "timeout"
+        assert "checks=0/0" not in result.stderr
+        assert "checks=0/1" in result.stderr
+
+    def test_issue_222_s03_wait_fingerprint_ignores_contradictory_legacy_ci_fields(
+        self,
+    ) -> None:
+        base = {
+            "ci": "passed",
+            "status": "passed",
+            "overall_status": "passed",
+            "normalized_status": "passed",
+            "observation_complete": True,
+            "source_policy": "github_actions_only",
+            "actions": self._issue_222_s03_actions_summary(status="passed"),
+            "commit_statuses": {"total": 1, "failure": 1, "aggregate_state": "failure"},
+            "required_check_state": {
+                "available": True,
+                "collection_policy": "legacy",
+                "merge_state_status": "DIRTY",
+                "status_check_rollup_total": 1,
+            },
+            "review": "approved",
+            "recommended_next_action": "merge_prepared",
+            "codex_review": {
+                "lifecycle": {
+                    "status": "completed",
+                    "completion_signal": "submitted_pull_request_review",
+                    "confidence": "high",
+                    "selected_review_ids": [201],
+                    "selected_review_comment_ids": [],
+                    "selected_review_thread_ids": [],
+                }
+            },
+        }
+        legacy_green = {
+            **base,
+            "check_runs": {"total": 1, "success": 1, "failed": 0, "running": 0},
+        }
+        legacy_failed = {
+            **base,
+            "check_runs": {"total": 3, "success": 0, "failed": 3, "running": 0},
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            first, _ = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir) / "first",
+                [legacy_green],
+                timeout_seconds=2,
+                poll_interval_seconds=1,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+            second, _ = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir) / "second",
+                [legacy_failed],
+                timeout_seconds=2,
+                poll_interval_seconds=1,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+        assert first.returncode == 0, first.stdout + first.stderr
+        assert second.returncode == 0, second.stdout + second.stderr
+        first_payload = json.loads(first.stdout)
+        second_payload = json.loads(second.stdout)
+        assert first_payload["normalized_status"] == "passed"
+        assert second_payload["normalized_status"] == "passed"
+        assert first_payload["fingerprint"] == second_payload["fingerprint"]
+
+    def test_issue_222_s03_snapshot_fingerprint_uses_actions_summary_not_legacy_fields(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        source_script = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
+        )
+
+        def run_snapshot(check_runs: dict[str, object], commit_statuses: dict[str, object]) -> dict:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                tmp_path = Path(tmp_dir)
+                script_dir = tmp_path / "scripts"
+                lib_dir = script_dir / "lib"
+                fake_bin = tmp_path / "bin"
+                script_dir.mkdir()
+                lib_dir.mkdir()
+                fake_bin.mkdir()
+                snapshot_script = script_dir / "fetch_pr_observation_snapshot.sh"
+                shutil.copy2(source_script, snapshot_script)
+                snapshot_script.chmod(0o755)
+                shutil.copy2(source_script.parent / "lib" / "pr_observation_snapshot.py", lib_dir)
+                checks_script = lib_dir / "fetch_pr_checks_snapshot.sh"
+                checks_payload = {
+                    "source_policy": "github_actions_only",
+                    "ci": {
+                        "status": "passed",
+                        "progress_status": "passed",
+                        "source_policy": "github_actions_only",
+                        "actions": self._issue_222_s03_actions_summary(status="passed"),
+                        "checks": [],
+                        "failures": [],
+                        "check_runs": check_runs,
+                        "commit_statuses": commit_statuses,
+                        "required_check_state": {
+                            "available": True,
+                            "collection_policy": "legacy",
+                            "merge_state_status": "DIRTY",
+                            "status_check_rollup_total": 3,
+                        },
+                    },
+                    "limitations": [],
+                    "decision": {
+                        "status": "passed",
+                        "recommended_next_action": "merge_prepared",
+                        "observation_complete": True,
+                    },
+                }
+                checks_script.write_text(
+                    "#!/usr/bin/env python3\n"
+                    "import json\n"
+                    f"print({json.dumps(json.dumps(checks_payload, separators=(',', ':')))})\n",
+                    encoding="utf-8",
+                )
+                checks_script.chmod(0o755)
+                review_script = lib_dir / "fetch_pr_review_snapshot.sh"
+                review_script.write_text(
+                    """#!/usr/bin/env bash
+cat <<'JSON'
+{"review":{"status":"approved","signals":[]},"decision":{"status":"passed","status_reason":"passed","recommended_next_action":"merge_prepared","observation_complete":true,"completion_signal":"submitted_pull_request_review"},"codex_review":{"lifecycle":{"status":"submitted","completion_signal":"submitted_pull_request_review"}}}
+JSON
+""",
+                    encoding="utf-8",
+                )
+                review_script.chmod(0o755)
+                fake_gh = fake_bin / "gh"
+                fake_gh.write_text(
+                    """#!/usr/bin/env bash
+case "$*" in
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
+    cat <<'JSON'
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                    encoding="utf-8",
+                )
+                fake_gh.chmod(0o755)
+                env = {
+                    **os.environ,
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                }
+
+                result = subprocess.run(
+                    [str(snapshot_script), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+
+                assert result.returncode == 0, result.stdout + result.stderr
+                return json.loads(result.stdout)
+
+        green_legacy = run_snapshot(
+            {"total": 1, "success": 1, "failed": 0},
+            {"total": 1, "success": 1, "failure": 0, "aggregate_state": "success"},
+        )
+        failed_legacy = run_snapshot(
+            {"total": 4, "success": 0, "failed": 4},
+            {"total": 1, "success": 0, "failure": 1, "aggregate_state": "failure"},
+        )
+
+        assert green_legacy["normalized_status"] == "passed"
+        assert failed_legacy["normalized_status"] == "passed"
+        assert green_legacy["ci"]["source_policy"] == "github_actions_only"
+        assert green_legacy["fingerprint"] == failed_legacy["fingerprint"]
+
     def test_issue_170_pr_observation_checks_collector_polls_unknown_merge_state(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -19555,6 +19838,7 @@ if codex_review is None and review_status in {"approved", "commented", "changes_
     }
 payload = {
     "script": "fetch_pr_observation_snapshot.sh",
+    "source_policy": current.get("source_policy"),
     "status": current.get("status", ci_status),
     "overall_status": current.get("overall_status", ci_status),
     "normalized_status": current.get("normalized_status", ci_status),
@@ -19569,7 +19853,11 @@ payload = {
     "recommended_next_action": current.get("recommended_next_action", "wait"),
     "ci": {
         "status": ci_status,
+        "source_policy": current.get("ci_source_policy", current.get("source_policy")),
+        "actions": current.get("actions", {}),
         "check_runs": check_runs,
+        "commit_statuses": current.get("commit_statuses", {}),
+        "required_check_state": current.get("required_check_state", {}),
         "checks": current.get("checks", []),
         "failures": current.get("failures", []),
     },
@@ -19593,6 +19881,10 @@ payload = {
 }
 if "observed_at" in current:
     payload["observed_at"] = current["observed_at"]
+if payload["source_policy"] is None:
+    payload.pop("source_policy")
+if payload["ci"]["source_policy"] is None:
+    payload["ci"].pop("source_policy")
 if "decision" in current:
     payload["decision"] = current["decision"]
 if "decision_fingerprint" in current:
