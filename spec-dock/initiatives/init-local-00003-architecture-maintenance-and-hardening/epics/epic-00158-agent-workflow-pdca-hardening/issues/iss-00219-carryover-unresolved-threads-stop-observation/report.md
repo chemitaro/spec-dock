@@ -107,6 +107,84 @@ result: existing issue authoring changes and one system-architect draft observed
 | authoring-plan | plan spec review attempt 1 | spec-reviewer | fresh | failed | N/A | fix delegated output contracts and S90 gate, then rerun | P1: delegated output contract lacked worker summary/changed files/risks/report destination/ledger note; P2: S90 commit/no-op gate missing |
 | authoring-plan | plan spec review attempt 2 | spec-reviewer | fresh | passed | N/A | execution handoff ready | previous P1/P2 findings fixed; no remaining findings |
 
+### セッションログ（2026-06-20 execution S01 Regression Tests）
+
+#### 対象
+- Phase: implementation step S01 Regression Tests
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, EC-001, EC-002, EC-003, EC-004
+- Closure ids: tc-001, tc-002, tc-003, tc-004, tc-005, tc-007, tc-008, tc-009, tc-010
+
+#### Implementation Delegation Gate
+| ステップ | 委任ロール | 許可 path | 禁止範囲 | 結果 |
+|---|---|---|---|---|
+| S01 | dev-coder `019ee305-df7b-7e00-8e34-3a022dade2ab` | `tests/unit/infra/test_init_update.py` | runtime/provider/docs/report/GitHub/stage/commit | completed |
+
+#### Delegated Worker Evidence
+| 項目 | 証跡 |
+|---|---|
+| Worker summary | Issue219 S01 regression tests only; runtime/provider/docs/report unchanged |
+| Changed files | `tests/unit/infra/test_init_update.py` |
+| Red / characterization evidence | 旧 Issue187 S420 carryover-only expectation は現行 runtime の premature feedback を通していたため、Issue219 expectation へ supersede |
+| P2 coverage amendment | code-reviewer 指摘により trusted completion + carryover の wait fake-snapshot regression を追加 |
+| Ledger Note | No material implementation decisions beyond the approved plan. |
+
+#### 実施内容
+- Snapshot 側で carryover-only missing completion が `address_review_feedback` に早期収束しないことを固定する regression を追加した。
+- Wait 側で guard-under carryover-only が `wait_or_resume` / `observation_complete=false` / `missing_current_completion_signal` を維持することを固定する regression を追加した。
+- Wait 側で latency guard 満了後の carryover-only が `review_completion_unknown` と `post_unknown_fresh_audit_required=true` になることを固定する regression を追加した。
+- Snapshot / wait の両方で trusted completion + carryover が `carryover_non_outdated_unresolved_thread` による feedback handling になることを固定した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "issue_219 or issue_187_s420 or issue_187_s430"
+
+result: 3 failed, 16 passed, 426 deselected
+expected red failures:
+- test_issue_219_s01_snapshot_carryover_only_missing_completion_waits
+- test_issue_219_s01_wait_guard_under_carryover_only_missing_completion_waits
+- test_issue_219_s01_wait_latency_satisfied_carryover_only_becomes_review_completion_unknown
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_187_s430_zero_check_grace_does_not_hide_permission_under_budget
+
+result: 1 passed
+note: focused subset の初回実行では既存 short-timeout test が一度 `timeout` で揺れたが、単体再実行では通過した。
+```
+
+#### Step Contract Closure
+| closure id | S01 証跡 | 状態 |
+|---|---|---|
+| tc-001 | carryover-only missing completion の snapshot/wait Red tests | red captured |
+| tc-002 | current selected blocker priority existing S420 regression remains in focused subset | characterized |
+| tc-003 | latency-satisfied carryover-only unknown Red test | red captured |
+| tc-004 | trusted completion + carryover snapshot/wait regressions | characterized |
+| tc-005 | snapshot/wait consistency regressions for carryover-only and trusted-completion cases | red/characterized |
+| tc-007 | fallback-related existing tests in focused subset | characterized |
+| tc-008 | outdated exclusion covered by existing Issue187 tests outside changed S01 paths | characterized |
+| tc-009 | CI/head and limitation priority watched by existing S430 focused subset | characterized |
+| tc-010 | empty-inventory unknown existing S420/S430 tests remain in focused subset | characterized |
+
+#### Test Contract Closure
+- S01 は runtime fix 前の Red evidence step として完了した。
+- Red failure は syntax/import 由来ではなく、carryover-only が現行 runtime で `address_review_feedback` に早期収束する既知の分類バグを示している。
+- trusted completion + carryover の snapshot/wait regression は現行 runtime で通過し、S02 で壊してはいけない compatibility behavior として固定された。
+
+#### Closure Delta
+- Issue187 S420 の旧 `snapshot_carryover_unresolved_blocks_unknown` expectation は Issue219 により supersede した。
+- 新 expectation は、completion signal がない carryover-only を terminal feedback にせず、guard-under では wait、guard-satisfied では unknown にする。
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S01 | code review attempt 1 | code-reviewer `019ee309-83ee-70d3-b3d8-50d3871102ad` | fresh before P2 amendment | passed | P2 wait coverage debt fixed before commit | re-review required after amendment | trusted completion + carryover wait regression requested |
+| S01 | code review attempt 2 | code-reviewer `019ee310-7390-7c83-9ecd-0722793c0a04` | fresh | passed | N/A | S01 commit gate ready | no findings; reviewer could not rerun pytest because local `uv` panicked before test collection and relied on parent verification plus diff/runtime inspection |
+
+#### Step Commit Gate
+| ステップ | commit / no-op | 範囲 | 状態 |
+|---|---|---|---|
+| S01 | commit required | S01 tests and S01 report evidence | pending |
+
 ## 最終品質ゲート（Final Quality Gate）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
