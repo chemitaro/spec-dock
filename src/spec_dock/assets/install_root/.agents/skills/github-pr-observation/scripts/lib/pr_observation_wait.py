@@ -719,6 +719,7 @@ def append_snapshot_poll_timeout_limitation(
     stderr_text: object,
     *,
     source: str = "fetch_pr_observation_snapshot.sh",
+    severity: str = "blocking",
     message: str = "snapshot poll exceeded the remaining wait deadline",
     deadline_reached: bool | None = None,
 ) -> None:
@@ -738,7 +739,7 @@ def append_snapshot_poll_timeout_limitation(
         {
             "code": "snapshot_poll_timeout",
             "source": source,
-            "severity": "blocking",
+            "severity": severity,
             "message": message,
             "timeout_seconds": timeout_seconds,
             "stdout_sha256": hashlib.sha256(stdout_text.encode()).hexdigest(),
@@ -1505,13 +1506,15 @@ while True:
     ) + NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS
     if snapshot_poll_timed_out and latest_payload is not None:
         payload = latest_payload
-        if not is_carryover_missing_completion_wait(payload):
-            append_snapshot_poll_timeout_limitation(
-                payload,
-                snapshot_timeout,
-                snapshot_stdout,
-                snapshot_stderr,
-            )
+        carryover_missing_completion_wait = is_carryover_missing_completion_wait(payload)
+        append_snapshot_poll_timeout_limitation(
+            payload,
+            snapshot_timeout,
+            snapshot_stdout,
+            snapshot_stderr,
+            severity="warning" if carryover_missing_completion_wait else "blocking",
+        )
+        if not carryover_missing_completion_wait:
             mark_latest_timeout(payload, latest_change_monotonic, same_count)
         snapshot_text = latest_snapshot_text
     elif snapshot_poll_timed_out:
