@@ -12734,7 +12734,10 @@ def emit_paginated(payloads):
 
 head_sequence = scenario.get("head_sequence") or [scenario.get("head", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
 
-if args == ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,url,state,isDraft,number,mergeable"]:
+if args in (
+    ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,url,state,isDraft,number"],
+    ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,url,state,isDraft,number,mergeable"],
+):
     if scenario.get("metadata_error_after_post", False) and state["pr_view_count"] > 0:
         state["pr_view_count"] += 1
         save_state()
@@ -13229,7 +13232,7 @@ exit 44
             fake_gh.write_text(
                 f"""#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number"|"pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
     cat <<'JSON'
 {{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}}
 JSON
@@ -28670,7 +28673,7 @@ esac
                     },
                 },
             },
-            metadata=metadata if metadata is not None else {"state": "OPEN", "isDraft": False},
+            metadata=metadata if metadata is not None else {"state": "OPEN", "isDraft": False, "mergeable": "MERGEABLE"},
             limitations=limitations if limitations is not None else [],
             head_matches_expected=head_matches_expected,
             normalized_status=normalized_status,
