@@ -64,6 +64,15 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
 | EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-CLAR-001 | `adopted` | 調査（`research`） / 正式質問（`interview`） / ユーザー回答（`user answer`） | `requirement.md` / `design.md` / `plan.md` | Checks API / status rollup 禁止に加え、legacy commit statuses も Actions-only 制約に含める方針がユーザー回答で確定した | `discussions/20260620t140307z-research-checks-api-forbidden-surface-research.md`; `discussions/20260620t140618z-interview-commit-statuses-policy-boundary.md` | Deep Consultant 分析を統合し、canonical docs へ反映する |
+| EAL-DEEP-001 | `adopted` | Deep Consultant（`sub-agent`） / 調査（`research`） / 議論（`discussion`） | `requirement.md` / `design.md` | Checks API / status rollup / commit statuses を完全排除しても PR observation は Actions-centered monitoring として維持可能。ただし GitHub UI の all checks / external checks 再現は失う | `discussions/20260620t141316z-research-actions-only-pr-observation-viability-research.md`; `discussions/20260620t141319z-disc-feasibility-without-checks-api.md` | requirement/design へ Actions-only scope と intentional loss を反映する |
+| EAL-DEEP-002 | `adopted` | Deep Consultant（`sub-agent`） / 議論（`discussion`） | `design.md` / `plan.md` | CI collector は Actions workflow runs/jobs のみに縮小し、run-level conclusion を primary、jobs を diagnostic detail とする。public entrypoint は維持可能 | `discussions/20260620t141320z-disc-actions-only-collector-design.md` | design/plan へ collector structure、forbidden call guard、JSON compatibility 判断を反映する |
+| EAL-DEEP-003 | `adopted` | Deep Consultant（`sub-agent`） / 議論（`discussion`） | `requirement.md` / `design.md` / `plan.md` | zero Actions runs、Actions API unavailable、external/non-Actions checks は pass に倒さず unknown / human gate / out-of-scope として扱う | `discussions/20260620t141317z-disc-observation-semantics-and-losses.md` | edge cases と wording constraints を canonical docs へ反映する |
+| EAL-DEEP-004 | `adopted` | Deep Consultant（`sub-agent`） / 議論（`discussion`） | `design.md` / `plan.md` | doctor capability、tests、skill/docs migration も Actions-only contract に同期する必要がある | `discussions/20260620t141318z-disc-doctor-tests-docs-migration.md` | doctor/test/doc migration を implementation steps と closure index へ反映する |
+| EAL-ADR-001 | `adopted` | ADR（`adr`） / ユーザー依頼（`user request`） | `requirement.md` / `design.md` / `plan.md` | Checks API / statusCheckRollup / gh pr checks / legacy commit statuses を PR observation CI 判定から除外する意思決定を長期参照用 ADR として固定した | `discussions/20260620t143349z-adr-forbid-checks-api-in-pr-observation.md` | requirement/design/plan authoring 時に source decision として反映する |
+| EAL-CLAR-002 | `adopted` | 正式質問（`interview`） / ユーザー回答（`user answer`） | `requirement.md` / `design.md` / `plan.md` | `checks` という語や互換名の禁止ではなく、GitHub Checks API / status rollup surface の利用禁止であることが確定した | `discussions/20260620t144016z-interview-checks-named-compatibility-boundary.md` | compatibility naming を許容しつつ forbidden API guard を canonical docs へ反映する |
+| EAL-DESIGN-DRAFT-001 | `adopted` | system-architect（`sub-agent`） / delegated draft | `design.md` / `report.md` | Actions-only PR observation の architecture、payload compatibility、review boundary、doctor migration、test strategy が requirement/ADR と整合していたため canonical design に統合した | `discussions/20260620t145235z-draft-design-actions-only-pr-observation-design-draft.md` | fresh spec-reviewer で canonical `design.md` を review する |
+| EAL-PLAN-DRAFT-001 | `adopted` | implementation-planner（`sub-agent`） / delegated draft | `plan.md` / `report.md` | Actions-only collector、downstream wait/snapshot、review/comment regression、doctor migration、docs wording、final gates を dependency order と closure evidence に分解しており、approved requirement/design/ADR と整合していたため canonical plan に統合した | `discussions/20260620t151203z-draft-plan-actions-only-pr-observation-plan-draft.md` | fresh spec-reviewer で canonical `plan.md` を review する |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -72,6 +81,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
 | OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-CLAR-001 | Issue #222 とユーザー回答は forbidden API surface の完全排除を主要目的にしている | PR observation の監視価値維持は Actions-centered monitoring として実現する | 低: external/non-Actions checks 再現を目的化すると forbidden surface 排除が崩れるため、loss model を明示した | provisional: requirement/design authoring 前の調査として整合 |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -80,6 +90,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
 | 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | GitHub issue `#222`; active issue scaffold; parent Initiative/Epic docs; clarification workflow docs; provider-side and dogfooding PR observation skill/scripts; doctor capability probe; focused tests; GitHub REST API docs; Deep Consultant 3視点; accepted ADR | `discussions/20260620t140618z-interview-commit-statuses-policy-boundary.md` answered: commit statuses も廃止し Actions workflow runs/jobs のみ許可。`discussions/20260620t144016z-interview-checks-named-compatibility-boundary.md` answered: `checks` 語の禁止ではなく GitHub Checks API 利用禁止 | adopted | passed: spec-reviewer `019ee582-049a-7402-866f-1eac8d3ee2c7` returned `review_status: pass` | no | design phase へ promotion。system-architect delegated draft を作成して canonical `design.md` へ統合する |
+| design | `requirement.md` reviewer pass; accepted ADR; system-architect delegated draft; provider-side PR observation scripts; runtime doctor capability code; merge-preparer skill/template; focused tests | なし。Requirement gap / user-intent blocker は残っていない。review findings により merge-preparer wording surface、Delegated Draft Evidence row、draft frontmatter authority boundary を整合した | adopted | passed: spec-reviewer `019ee593-2508-71f3-9096-799956f2b4b9` returned `review_status: pass` after fixes | no | plan phase へ promotion。implementation-planner delegated draft を作成して canonical `plan.md` へ統合する |
+| plan | `design.md` reviewer pass; accepted ADR; implementation-planner delegated draft; issue plan authoring docs; closure index; delegation contracts; concrete test cases | なし。Design gap / user-intent blocker は残っていない。`checks` 語は禁止しないが forbidden GitHub Checks API / status rollup / commit statuses surfaces は step contracts と tests で閉じる | adopted | passed: spec-reviewer `019ee5a0-eb91-7e73-b65e-9b727aeaaaa2` returned `review_status: pass`; P2 S03/S04 test path concreteness finding was addressed and re-reviewed as pass | no | implementation handoff ready |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -107,7 +120,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| system-architect | iss-00222 | `discussions/20260620t145235z-draft-design-actions-only-pr-observation-design-draft.md` | `requirement.md`; accepted ADR; compatibility interview; Actions-only research/discussions; provider-side PR observation scripts; runtime doctor capability code; focused tests | `design.md`; `report.md` | adopted | `design.md`; `report.md` | passed | canonical `design.md` に統合済み | なし | なし（none） | design reviewer passed after provenance rows were reconciled | design phase promotion evidence として採用 |
+| implementation-planner | iss-00222 | `discussions/20260620t151203z-draft-plan-actions-only-pr-observation-plan-draft.md` | `requirement.md`; `design.md`; accepted ADR; compatibility interview; `phase_plan_issue.md`; `authoring/issue-plan.md`; `workflow_issue.md` | `plan.md`; `report.md` | adopted | `plan.md`; `report.md` | passed | canonical `plan.md` に統合済み | なし | なし（none） | plan reviewer passed after S03/S04 path concreteness fix | plan phase promotion evidence として採用 |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -124,27 +138,68 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- 実装は未着手。Issue 222 の要件定義・設計に向けて、Checks API / `statusCheckRollup` / commit statuses / Actions workflow runs/jobs の現行利用箇所を調査し、research と interview を作成した。
+- ユーザー回答により legacy commit statuses も廃止対象として採用した。
+- Deep Consultant 3視点を使い、Actions-only PR observation の可否、collector design、observability loss、doctor/tests/docs migration を 5つの Markdown artifact に統合した。
+- ユーザー依頼により、Checks API を利用しない意思決定を accepted ADR として作成した。
+- ユーザー回答により、`checks` という語や互換名の削除は要求せず、GitHub Checks API / status rollup surface の利用禁止として要件化した。
+- `requirement.md` を作成し、fresh `spec-reviewer` で pass を得た。
+- system-architect delegated design draft を採用し、canonical `design.md` を作成した。
+- implementation-planner delegated plan draft を採用し、canonical `plan.md` を作成した。
+- `plan.md` は fresh `spec-reviewer` で pass を得た。P2 の S03/S04 test path 具体化指摘は反映し、再レビューで pass を得た。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-06-20 HH:MM - HH:MM）
+### セッションログ（2026-06-20 14:00 - 14:10）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: clarification / source-grounded research
+- AC/EC: 未作成。Requirement / design authoring 前の調査。
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - GitHub issue `#222`
+  - `spec-dock-clarification` source-grounded grill loop
+  - closure ids: N/A
 
 #### 実施内容
-- ...
+- Active issue を `iss-00222` に設定した。
+- GitHub issue `#222` の本文、active issue scaffold、parent Initiative/Epic docs、clarification workflow docs、PR observation 実装、doctor capability probe、関連テストを調査した。
+- Checks API / `statusCheckRollup` の禁止は source-grounded に確定した。
+- Legacy commit statuses を Actions-only 制約に含めるかが要件・設計・テストを分岐させるため、正式質問を作成した。
+- ユーザー回答により、legacy commit statuses も廃止し Actions workflow runs/jobs だけを許可する方針を採用した。
+- Deep Consultant を 3視点で並列利用し、機能維持可否、技術方式、リスク/テスト/doctor migration を分析した。
+- 分析結果を `research-actions-only-pr-observation-viability-research` と 4つの観点別 discussion に統合した。
+- ユーザー依頼により、Checks API を利用しない意思決定を accepted ADR として作成した。
+- 追加のユーザー回答を `checks` named compatibility boundary として採用し、語彙禁止ではなく API 利用禁止であることを確定した。
+- `requirement.md` を作成し、spec-reviewer `019ee582-049a-7402-866f-1eac8d3ee2c7` が `review_status: pass` を返した。
+- system-architect `019ee583-64b5-7ec1-b1a5-0a50942e7fff` が `discussions/20260620t145235z-draft-design-actions-only-pr-observation-design-draft.md` を作成し、内容を canonical `design.md` へ統合した。
+- design spec-reviewer `019ee589-712f-7933-88d6-11bb82e54ad7` が merge-preparer wording scope 欠落を P1 finding として返したため、`design.md` に `github-pr-merge-preparer` skill/template の変更対象を追加した。
+- design spec-reviewer `019ee58c-60a3-7bd0-a332-9585da1012a8` が delegated draft provenance mismatch を P1 finding として返したため、draft frontmatter を `adoption_status: adopted` / `diff_guard_result: passed` / `reflected_to` 更新済みに整合した。
+- design spec-reviewer `019ee58f-28dc-7ab2-be2d-e0684e85e0f3` が Delegated Draft Evidence row mismatch を P1 finding として返したため、report の Delegated Draft Evidence table を実際の system-architect draft 採用状態に整合した。
+- design spec-reviewer `019ee591-375a-7462-8c5e-7eca9f7226dd` が draft self-adoption claim を P1 finding として返したため、draft frontmatter は `adoption_status: unreviewed` / `reflected_to: []` に戻し、report の EAL / Delegated Draft Evidence が採用判断を持つ形に修正した。
+- design spec-reviewer `019ee593-2508-71f3-9096-799956f2b4b9` が `review_status: pass` を返した。
+- implementation-planner `019ee596-0400-75a2-913d-7a966cbac688` が `discussions/20260620t151203z-draft-plan-actions-only-pr-observation-plan-draft.md` を作成し、内容を canonical `plan.md` へ統合した。
+- plan spec-reviewer `019ee5a0-eb91-7e73-b65e-9b727aeaaaa2` が P2 finding とともに `review_status: pass` を返した。S03/S04 の test allowed paths を `tests/unit/infra/test_init_update.py` と bounded `tests/unit/infra/` discovery に具体化し、同 reviewer の再確認で `review_status: pass` を得た。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+./spec-dock/scripts/spec-dock active set --id iss-00222 --no-checkout --github
+# spec-dock: ok (active set) target=iss-00222 initiative=init-local-00003 epic=epic-00158 issue=iss-00222
 
-<result>
+gh issue view 222 --json number,title,body,state,url,labels,comments
+# Issue 222 body confirmed Checks API / statusCheckRollup forbidden and Actions workflow runs/jobs as CI source of truth.
+
+rg -n "statusCheckRollup|check-runs|gh pr checks|ci_coverage_limited_to_github_actions|mergeStateStatus" ...
+# Found provider-side and dogfooding PR observation scripts, doctor capability probe, and focused tests that still rely on supplemental Checks/status rollup behavior.
+
+./spec-dock/scripts/spec-dock new doc --type research --title "Actions Only PR Observation Viability Research" --parent iss-00222
+./spec-dock/scripts/spec-dock new doc --type disc --title "Feasibility Without Checks API" --parent iss-00222
+./spec-dock/scripts/spec-dock new doc --type disc --title "Actions Only Collector Design" --parent iss-00222
+./spec-dock/scripts/spec-dock new doc --type disc --title "Observation Semantics And Losses" --parent iss-00222
+./spec-dock/scripts/spec-dock new doc --type disc --title "Doctor Tests Docs Migration" --parent iss-00222
+# Created issue-local research/discussion artifacts for Deep Consultant synthesis.
+
+./spec-dock/scripts/spec-dock new doc adr --issue iss-00222 --title "Forbid Checks Api In Pr Observation" --slug forbid-checks-api-in-pr-observation
+# Created discussions/20260620t143349z-adr-forbid-checks-api-in-pr-observation.md.
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
