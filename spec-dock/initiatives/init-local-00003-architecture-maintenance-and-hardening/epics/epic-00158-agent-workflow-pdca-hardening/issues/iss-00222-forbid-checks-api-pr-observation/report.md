@@ -141,7 +141,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- 実装は未着手。Issue 222 の要件定義・設計に向けて、Checks API / `statusCheckRollup` / commit statuses / Actions workflow runs/jobs の現行利用箇所を調査し、research と interview を作成した。
+- 実装は S01-S05 / S90 / S99-parity まで完了。PR observation の CI 判定は GitHub Actions workflow runs/jobs のみを source of truth とし、GitHub Checks API / `statusCheckRollup` / legacy commit statuses / `gh pr checks` 相当の利用を禁止する設計・実装・テスト・docs に更新した。
+- Issue 222 の要件定義・設計に向けて、Checks API / `statusCheckRollup` / commit statuses / Actions workflow runs/jobs の現行利用箇所を調査し、research と interview を作成した。
 - ユーザー回答により legacy commit statuses も廃止対象として採用した。
 - Deep Consultant 3視点を使い、Actions-only PR observation の可否、collector design、observability loss、doctor/tests/docs migration を 5つの Markdown artifact に統合した。
 - ユーザー依頼により、Checks API を利用しない意思決定を accepted ADR として作成した。
@@ -382,7 +383,7 @@ rg -n "statusCheckRollup|check-runs|gh pr checks|ci_coverage_limited_to_github_a
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | issue-wide regression lanes completed before final review | `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=138`; `uv run pytest tests/unit/infra/test_init_update.py` -> `487 passed`; `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` -> `43 passed`; generated asset cache scan after cleanup -> empty; final report ledger commit and post-commit clean check required before PR | failed: qa-reviewer `019ee636-a26d-7751-a816-e0e656acb579` P1/P2 report-ledger freshness findings; fixes applied in report and re-review required |
+| qa-reviewer | whole issue obligation coverage | issue-wide regression lanes completed before final review | `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=138`; `uv run pytest tests/unit/infra/test_init_update.py` -> `487 passed`; `uv run pytest tests/cli_runtime/test_runtime_doctor_s04.py` -> `43 passed`; generated asset cache scan after cleanup -> empty; QA re-review confirmed committed branch state and clean worktree | pass: qa-reviewer `019ee63e-8dea-7943-8a3a-24a23a9b01aa` |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
@@ -392,13 +393,13 @@ rg -n "statusCheckRollup|check-runs|gh pr checks|ci_coverage_limited_to_github_a
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | P1 report-ledger pending/stale statuses only; implementation scope aligned | 0 | failed: spec-reviewer `019ee637-0169-7ff3-822e-98f317f0b234`; fixes applied in report and re-review required |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | prior P1 report-ledger blockers resolved; P2 stale implementation summary fixed in final report update | 1 | pass: spec-reviewer `019ee63e-8f42-7762-942f-814766e766ef` |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
 | ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
-| final gate re-review in progress | report-ledger cleanup and final reviewer result integration | PR and manual observation script results to be recorded after PR creation; this row will be replaced with the final pre-PR ledger commit after QA/spec re-review results are recorded | pending re-review |
+| pending pre-PR ledger commit | final reviewer pass results and stale implementation summary fix | PR and manual observation script results to be recorded after PR creation | ready for pre-PR ledger commit |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
