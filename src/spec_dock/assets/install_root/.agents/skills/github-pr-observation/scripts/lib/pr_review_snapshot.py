@@ -1084,6 +1084,10 @@ selected_changes_requested_evidence.extend(
     }
     for item in selected_changes_requested_comments
 )
+current_pending_codex_review_present = any(
+    item.get("codex_authored") and item.get("state") == "pending"
+    for item in active_review_signals
+) or any(item.get("codex_authored") for item in review_request_signals)
 pending_review_present = lifecycle_status == "pending"
 blocking_limitation_present = bool(blocking_collection_failure)
 selected_blocker_present = bool(selected_unresolved_thread_ids or selected_changes_requested_evidence)
@@ -1251,6 +1255,13 @@ fallback_pass_promotes = bool(
     completion_signal == "fallback_issue_comment"
     and fallback_pass_source_ids
     and len(fallback_pass_source_ids) == len(current_codex_issue_comments)
+    and not selected_unresolved_thread_ids
+    and not selected_changes_requested_evidence
+    and not carryover_unresolved_thread_ids
+    and not pending_review_present
+    and not current_pending_codex_review_present
+    and not blocking_collection_failure
+    and status not in {"changes_requested", "requested", "unresolved", "pending", "unknown"}
 )
 for signal in signals:
     signal.pop("_fallback_pass_raw_body", None)

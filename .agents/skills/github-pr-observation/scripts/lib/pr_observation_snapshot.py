@@ -383,6 +383,8 @@ def classify_snapshot(
         completion_signal == "fallback_issue_comment"
         and isinstance(fallback_pass_candidate, dict)
         and fallback_pass_candidate.get("promotes_top_level_status") is True
+        and review_status not in {"changes_requested", "requested", "pending", "unknown"}
+        and not carryover_inventory_reason(decision)
     ):
         return "passed", "merge_prepared", True, "fallback_issue_comment_no_major_issues"
     if completion_signal == "fallback_issue_comment":

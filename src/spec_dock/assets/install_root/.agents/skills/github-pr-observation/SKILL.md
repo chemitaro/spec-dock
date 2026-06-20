@@ -241,9 +241,11 @@ status collection are implemented by the public scripts.
 - `fallback_pass_candidate` is usually non-promoting context that a
   current-boundary fallback issue comment appears positive. It promotes the
   top-level result only when all current-boundary Codex issue-comment signals
-  are no-major-issues responses and `promotes_top_level_status` is true. In
-  that narrow case, the final decision may be `passed` / `merge_prepared`;
-  mixed or generic fallback issue comments still do not override the
+  are no-major-issues responses, no current or carryover unresolved review
+  inventory exists, no pending review evidence exists, no review blocker exists,
+  and `promotes_top_level_status` is true. In that narrow case, the final
+  decision may be `passed` / `merge_prepared`; mixed, pending, blocked,
+  carryover, or generic fallback issue comments still do not override the
   `fallback_issue_comment` gate.
 - S102 is deferred until there is an explicit no-findings artifact contract.
   Generic issue comments, zero selected comments, or review request disappearance
