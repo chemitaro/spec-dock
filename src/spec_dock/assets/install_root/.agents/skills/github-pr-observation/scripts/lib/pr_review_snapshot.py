@@ -1018,6 +1018,14 @@ def normalized_body_text(value):
     return " ".join(str(value or "").strip().split()).casefold()
 
 
+def reviewed_commit_from_no_findings_body(raw_body):
+    for line in str(raw_body or "").splitlines():
+        match = re.search(r"\*\*Reviewed commit:\*\*\s*`([0-9A-Fa-f]{7,64})`", line)
+        if match:
+            return match.group(1)
+    return None
+
+
 def is_strict_no_findings_issue_comment(item):
     raw_body = str(
         item.get("_fallback_pass_raw_body")
@@ -1045,11 +1053,16 @@ def is_strict_no_findings_issue_comment(item):
     if not non_empty_lines:
         return False
     first_line = non_empty_lines[0]
-    has_codex_metadata = any(
-        line.startswith("**reviewed commit:**") or line.startswith("<details>")
-        for line in non_empty_lines[1:]
+    reviewed_commit = reviewed_commit_from_no_findings_body(raw_body)
+    reviewed_commit_matches = bool(
+        reviewed_commit and expected_head_sha and sha_prefix_matches(reviewed_commit, expected_head_sha)
     )
-    return first_line.startswith("codex review: didn't find any major issues.") and has_codex_metadata
+    has_details_metadata = any(line.startswith("<details>") for line in non_empty_lines[1:])
+    return (
+        first_line.startswith("codex review: didn't find any major issues.")
+        and reviewed_commit_matches
+        and has_details_metadata
+    )
 
 
 current_codex_issue_comments = [

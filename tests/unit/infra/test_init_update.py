@@ -13886,7 +13886,7 @@ printf '%s\\n' "$S04_WAIT_PAYLOAD"
                     assert "--trigger-comment-id 777" in payload["resume"]["command_hint"]
                     if review_status == "pending":
                         assert payload["codex_review"]["lifecycle"]["status"] == "pending"
-                    assert "phase=wait ci=passed review=observing" in result.stderr
+                    assert "phase=wait ci=passed review=pending_signal" in result.stderr
                     assert (out_dir / "result.json").read_text(encoding="utf-8") == result.stdout
                     assert not (out_dir / "summary.md").exists()
 
@@ -20714,7 +20714,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     assert payload["observation_complete"] is False
                     assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
                     assert payload["wait"]["review_trigger_age_seconds"] < 300
-                    assert "phase=wait ci=passed review=observing" in result.stderr
+                    assert "phase=wait ci=passed review=pending_signal" in result.stderr
 
     def test_issue_187_s204_wait_does_not_promote_unknown_before_ci_passed_age(self) -> None:
         evidence = {
@@ -26433,6 +26433,84 @@ esac
             assert decision["no_completion_evidence"]["category"] == "explicit_completion"
             assert decision["no_completion_evidence"]["present"] is False
             assert decision["no_completion_evidence"]["explicit_completion_present"] is True
+
+    def test_issue_219_s01_review_collector_no_findings_reviewed_commit_mismatch_does_not_promote(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Swish!\\n\\n**Reviewed commit:** `bbbbbbbbbb`\\n\\n<details><summary>About Codex</summary></details>"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            decision = payload["decision"]
+            assert decision["completion_signal"] == "fallback_issue_comment"
+            assert decision["status"] == "human_gate"
+            assert decision["no_findings_completion_candidate"]["present"] is False
+            assert decision["no_findings_completion_candidate"]["promotes_top_level_status"] is False
 
     def test_issue_219_s01_review_collector_no_findings_with_carryover_sets_fallback_pass(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
