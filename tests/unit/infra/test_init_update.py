@@ -25991,6 +25991,145 @@ esac
             assert "api repos/owner/repo/pulls/13/comments --paginate" in gh_calls
             assert "api graphql " in gh_calls
 
+    def test_issue_222_s04_pr_review_snapshot_preserves_review_payload_without_ci_surfaces(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            gh_log = tmp_path / "gh.log"
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$GH_FAKE_LOG"
+if [[ "$*" == *statusCheckRollup* || "$*" == *"/check-runs"* || "$*" == *"/status"* || "$*" == "pr checks"* ]]; then
+  printf 'forbidden CI surface requested: %s\\n' "$*" >&2
+  exit 45
+fi
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"alice"},"created_at":"2026-06-08T01:02:00Z","body":"issue comment feedback"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"alice"},"state":"CHANGES_REQUESTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:03:00Z","body":"review feedback"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"alice"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:04:00Z","updated_at":"2026-06-08T01:05:00Z","path":"app.py","line":12,"body":"inline review comment"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[{"login":"bob"}],"requested_teams":[{"slug":"platform"}]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":"CHANGES_REQUESTED","reviewThreads":{"nodes":[{"id":"RT_unresolved","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T01:04:00Z","updatedAt":"2026-06-08T01:05:00Z","body":"thread feedback"}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            review = payload["review"]
+            assert review["status"] == "unresolved"
+            assert review["review_decision"] == "CHANGES_REQUESTED"
+            assert any(
+                item["kind"] == "issue_comment" and item["id"] == 100
+                for item in review["signals"]
+            )
+            assert any(
+                item["kind"] == "pull_review" and item["id"] == 201
+                for item in review["signals"]
+            )
+            assert any(
+                item["kind"] == "pull_review_comment" and item["id"] == 301
+                for item in review["signals"]
+            )
+            assert review["review_requests"] == [
+                {
+                    "kind": "review_request",
+                    "target_type": "user",
+                    "target": "bob",
+                    "codex_authored": False,
+                    "state": "requested",
+                },
+                {
+                    "kind": "review_request",
+                    "target_type": "team",
+                    "target": "platform",
+                    "codex_authored": False,
+                    "state": "requested",
+                },
+            ]
+            assert len(review["threads"]["items"]) == 1
+            thread = review["threads"]["items"][0]
+            assert thread["id"] == "RT_unresolved"
+            assert thread["state"] == "unresolved"
+            assert thread["is_resolved"] is False
+            assert thread["is_outdated"] is False
+            assert thread["comment_count"] == 1
+            assert thread["comment_ids"] == [301]
+            assert thread["first_comment_id"] == 301
+            assert thread["first_comment_created_at"] == "2026-06-08T01:04:00Z"
+            assert thread["latest_comment_created_at"] == "2026-06-08T01:04:00Z"
+            assert thread["latest_comment_updated_at"] == "2026-06-08T01:05:00Z"
+            assert thread["activity_at"] == "2026-06-08T01:05:00Z"
+            assert review["audit"]["non_outdated_unresolved_thread_ids"] == ["RT_unresolved"]
+            assert [item["code"] for item in payload["limitations"]] == []
+
+            gh_calls = gh_log.read_text(encoding="utf-8")
+            assert "api graphql " in gh_calls
+            assert "reviewThreads" in gh_calls
+            assert "reviewDecision" in gh_calls
+            assert "statusCheckRollup" not in gh_calls
+            assert "/check-runs" not in gh_calls
+            assert "/status" not in gh_calls
+            assert "pr checks" not in gh_calls
+
     def test_issue_176_s03_review_collector_returns_codex_review_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
