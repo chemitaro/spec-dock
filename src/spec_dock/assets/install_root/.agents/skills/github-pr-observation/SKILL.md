@@ -1,6 +1,6 @@
 ---
 name: github-pr-observation
-description: Trigger a fixed Codex PR review request and observe pull request checks, statuses, reviews, comments, and review threads through bounded scripts. Use when a PR needs deterministic wait or snapshot evidence after creation or push.
+description: Trigger a fixed Codex PR review request and observe GitHub Actions CI, reviews, comments, and review threads through bounded scripts. Use when a PR needs deterministic wait or snapshot evidence after creation or push.
 ---
 
 # GitHub PR Observation
@@ -39,8 +39,13 @@ Triage and judgment over collected evidence belong to
 - Check snapshot collection uses a shell wrapper plus the
   `scripts/lib/pr_observation_checks.py` Python entrypoint. The wrapper owns
   public argument validation and script-relative dispatch; the Python entrypoint
-  owns fixed `gh` reads, JSON parsing, CI taxonomy, limitations, and payload
-  rendering.
+  owns fixed `gh` reads for GitHub Actions workflow runs/jobs, JSON parsing, CI
+  taxonomy, limitations, and payload rendering.
+- Historical compatibility names such as `fetch_pr_checks_snapshot.sh`, the
+  "check snapshot" label, and compatibility `checks` fields do not imply
+  GitHub Checks API usage. The forbidden behavior is using GitHub Checks API,
+  legacy commit statuses, PR status rollup, `gh pr checks`, or equivalent
+  check-rollup surfaces as CI evidence; the word `checks` is not banned.
 - PR observation snapshot aggregation uses `fetch_pr_observation_snapshot.sh`
   plus the adjacent `scripts/lib/pr_observation_snapshot.py` Python entrypoint.
   The shell wrapper keeps the public CLI and validation boundary; the Python
@@ -67,24 +72,27 @@ Triage and judgment over collected evidence belong to
 - The final JSON written to `stdout` is the authority for permission limitation
   semantics; `stderr` progress is non-authoritative.
 - `Actions` read is the normal GitHub token permission for CI observation. It
-  covers the GitHub Actions workflow runs and jobs used as the primary CI
-  evidence for a PR head SHA.
-- Checks, commit statuses, and PR status rollup are supplemental observation
-  surfaces. When Actions evidence is decisive, unavailable supplemental
-  coverage is represented as an informational limitation rather than the normal
-  remediation path.
+  covers the GitHub Actions workflow runs and jobs used as the only CI evidence
+  source for a PR head SHA.
+- GitHub Checks API, legacy commit statuses, PR status rollup,
+  `gh pr checks`, and equivalent check-rollup surfaces are intentionally not
+  used. Missing Checks/status/rollup permissions are not a PR observation
+  repair target.
+- External or non-Actions checks are intentionally unobserved by these scripts.
+  When branch protection depends on those checks, confirm the GitHub UI or the
+  external CI system before making a merge decision.
 - Blocking GitHub token permission failures are reported with
   `limitations[].code="github_token_permission_denied"` and, when permission
   repair is the needed operator action,
   `recommended_next_action="fix_github_token_permissions"`.
-- If `Actions` read is unavailable or CI cannot otherwise be observed
+- If `Actions` read is unavailable or Actions CI cannot otherwise be observed
   decisively, final JSON can still be returned with process exit success, but
   the semantic result remains non-success such as
   `normalized_status="unknown"` and `overall_status="unknown"`.
-- Do not treat missing Checks read or unavailable status rollup as the ordinary
-  fix for Actions-decisive green CI. Treat it as supplemental coverage that may
-  limit what was proven, unless readable supplemental evidence shows a failure,
-  pending state, or other blocker.
+- PR review/comment observation uses PR review, review comment, issue comment,
+  and review thread read surfaces. Do not add Checks/status permission wording
+  to doctor or capability guidance for this skill; mention Actions read and PR
+  review/comment read instead.
 - The fixed `@codex review` trigger comment write failure is separate from read
   collection failures. It returns `normalized_status="human_gate"`,
   `overall_status="human_gate"`, and a
@@ -187,11 +195,10 @@ status collection are implemented by the public scripts.
   and `human_gate`.
 - CI terminal state and Codex review lifecycle are observed independently and
   merged only in the final wait result.
-- Zero Actions workflow runs do not by themselves prove CI success. Readable
-  green external check-runs or commit statuses may be sufficient pass evidence
-  when no required-missing, pending, failed, unknown, or other blocking evidence
-  is observed; no Actions runs plus no readable external evidence remains
-  non-pass, and any external non-green evidence wins.
+- GitHub Actions workflow runs/jobs are the only CI source used by PR
+  observation. Zero Actions workflow runs do not prove CI success and must not
+  be promoted to pass through GitHub Checks API, commit statuses, PR status
+  rollup, `gh pr checks`, or equivalent check-rollup fallback.
 - Actions job expansion is bounded. Failed, running, pending, and unknown
   workflow runs keep diagnostic priority, while terminal-green run expansion may
   be skipped or capped. Collection metadata under
