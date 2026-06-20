@@ -1286,11 +1286,7 @@ def fingerprint_thread(item):
     }
 
 
-fallback_pass_source_ids = [
-    item.get("id")
-    for item in current_codex_issue_comments
-    if item.get("id") is not None and is_strict_no_findings_issue_comment(item)
-]
+fallback_pass_source_ids = list(no_findings_source_ids)
 fallback_pass_promotes = bool(
     expected_head_sha
     and current_pr_head_sha

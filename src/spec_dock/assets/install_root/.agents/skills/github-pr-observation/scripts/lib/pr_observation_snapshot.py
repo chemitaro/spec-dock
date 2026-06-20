@@ -385,6 +385,10 @@ def classify_snapshot(
         and fallback_pass_candidate.get("promotes_top_level_status") is True
         and review_status not in {"changes_requested", "requested", "pending", "unknown"}
     ):
+        decision["status"] = "passed"
+        decision["status_reason"] = "fallback_issue_comment_no_major_issues"
+        decision["recommended_next_action"] = "merge_prepared"
+        decision["observation_complete"] = True
         return "passed", "merge_prepared", True, "fallback_issue_comment_no_major_issues"
     if completion_signal == "fallback_issue_comment":
         return "human_gate", "manual_review_required_non_retryable", False, "fallback_issue_comment_low_confidence"
