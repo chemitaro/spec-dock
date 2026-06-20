@@ -378,6 +378,13 @@ def classify_snapshot(
         return "human_gate", "address_review_feedback", True, actionable_reason
     if decision_status_reason == "current_selected_changes_requested" or selected_changes_requested_evidence:
         return "human_gate", "address_review_feedback", True, "current_selected_changes_requested"
+    fallback_pass_candidate = decision.get("fallback_pass_candidate")
+    if (
+        completion_signal == "fallback_issue_comment"
+        and isinstance(fallback_pass_candidate, dict)
+        and fallback_pass_candidate.get("promotes_top_level_status") is True
+    ):
+        return "passed", "merge_prepared", True, "fallback_issue_comment_no_major_issues"
     if completion_signal == "fallback_issue_comment":
         return "human_gate", "wait_or_resume", False, "fallback_issue_comment_low_confidence"
     if decision_status_reason == "missing_current_completion_signal":

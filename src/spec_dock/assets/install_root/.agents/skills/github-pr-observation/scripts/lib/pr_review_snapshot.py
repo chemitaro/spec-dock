@@ -1222,7 +1222,17 @@ def is_no_major_issues_fallback(item):
         "no major issues were found",
         "no major issues were found.",
     }
-    return any(line in allowed_lines for line in normalized_lines)
+    return any(
+        line in allowed_lines
+        or (
+            line.startswith("codex review:")
+            and (
+                "didn't find any major issues" in line
+                or "did not find any major issues" in line
+            )
+        )
+        for line in normalized_lines
+    )
 
 
 current_codex_issue_comments = [
@@ -1244,7 +1254,9 @@ fallback_pass_candidate = {
     "source": "issue_comment" if fallback_pass_source_ids else None,
     "source_ids": fallback_pass_source_ids,
     "reason": "current_boundary_no_major_issues_comment" if fallback_pass_source_ids else None,
-    "promotes_top_level_status": False,
+    "promotes_top_level_status": bool(
+        completion_signal == "fallback_issue_comment" and fallback_pass_source_ids
+    ),
 }
 if selected_unresolved_thread_ids:
     decision_status_reason = "current_selected_unresolved_thread"
@@ -1254,6 +1266,10 @@ elif selected_changes_requested_evidence:
     decision_status_reason = "current_selected_changes_requested"
     decision_status = "human_gate"
     decision_action = "address_review_feedback"
+elif completion_signal == "fallback_issue_comment" and fallback_pass_source_ids:
+    decision_status_reason = "fallback_issue_comment_no_major_issues"
+    decision_status = "passed"
+    decision_action = "merge_prepared"
 elif completion_signal == "fallback_issue_comment":
     decision_status_reason = "fallback_issue_comment_low_confidence"
     decision_status = "human_gate"

@@ -994,6 +994,13 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
     if decision:
         if decision_reason in {"current_selected_unresolved_thread", "current_selected_changes_requested"}:
             return "human_gate", "human_gate", "address_review_feedback", False, True
+        fallback_pass_candidate = decision.get("fallback_pass_candidate")
+        if (
+            completion_signal == "fallback_issue_comment"
+            and isinstance(fallback_pass_candidate, dict)
+            and fallback_pass_candidate.get("promotes_top_level_status") is True
+        ):
+            return "passed", "passed", "merge_prepared", True, False
         if completion_signal == "fallback_issue_comment" or decision_reason == "fallback_issue_comment_low_confidence":
             return "human_gate", "human_gate", "wait_or_resume", False, True
         if decision_reason == "missing_current_completion_signal":

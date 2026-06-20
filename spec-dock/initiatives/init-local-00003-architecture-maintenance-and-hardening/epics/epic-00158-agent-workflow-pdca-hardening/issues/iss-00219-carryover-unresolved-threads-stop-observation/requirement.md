@@ -20,7 +20,8 @@ ID: "iss-00219"
 - GitHub issue `#219` の観測例では、CI は passed、head は matched、`current_selected_unresolved_count=0`、`completion_signal="none"`、`carryover_unresolved_count=8`、`review_completion_unknown_latency_satisfied=false` であるにもかかわらず、`status_reason="carryover_non_outdated_unresolved_thread"` により `human_gate` / `address_review_feedback` で停止していた。
 - `.agents/skills/github-pr-observation/SKILL.md` は、final readiness を current `@codex review` trigger/resume boundary に scope し、carryover unresolved review threads を decision-facing actionable inventory に含めると説明している。
 - 現行実装では、`actionable_unresolved_reason(...)` が current selected unresolved thread と carryover unresolved thread を同じ terminal 判定入力として扱い、wait / snapshot classification が carryover-only の状態でも `address_review_feedback` へ早期停止し得る。
-- Issue `#218` は `fallback_issue_comment` の completion signal 取り扱いであり、本 Issue の carryover-only premature stop とは別問題である。
+- Issue `#218` は一般の `fallback_issue_comment` completion signal 取り扱いであり、本 Issue の carryover-only premature stop とは別問題である。
+- ただし、本 Issue の PR observation manual test では、Codex が current trigger boundary 内で `Codex Review: Didn't find any major issues. :tada:` を issue comment として返し、CI/head/current blocker が clean でも観測が `wait_or_resume` で終わらない追加問題が見つかった。この no-major-issues fallback は、実 PR 監視を完了可能にするため、本 Issue の範囲で限定的に completion signal として扱う。
 
 ## 対象ユーザー / 利用シナリオ
 - 主な利用者:
@@ -44,7 +45,8 @@ ID: "iss-00219"
   - Carryover unresolved thread を audit-only / non-actionable に落とすこと。
   - `selected_unresolved_count == 0` を no review work / merge-ready / pass の根拠にすること。
   - Current review completion signal がない guard 未満状態を `observation_complete=true` として扱うこと。
-  - `#218` の fallback issue comment completion policy を本 Issue で変更すること。
+  - `#218` の一般 fallback issue comment completion policy を本 Issue で変更すること。
+  - Current trigger boundary 内の明示的な no-major-issues issue comment 以外の fallback issue comment を trusted completion に昇格すること。
 - 対象外:
   - GitHub GraphQL の thread 収集範囲や authentication policy の再設計。
   - PR merge preparation 全体の policy 変更。
@@ -117,8 +119,9 @@ ID: "iss-00219"
 ## 例外・エッジケース
 - EC-001: Fallback issue comment がある。
   - 条件: `completion_signal="fallback_issue_comment"` または fallback low-confidence signal がある。
-  - 期待: `#218` の範囲として扱い、本 Issue では trusted completion へ昇格しない。
-  - 観測点: fallback-related status reason / next action が既存 contract から不用意に変わらないこと。
+  - 期待: 一般 fallback は `#218` の範囲として扱い、本 Issue では trusted completion へ昇格しない。
+  - 例外: Current trigger boundary 内の Codex-authored issue comment が明示的に no major issues を示し、current selected blocker がなく、CI/head が clean の場合だけ、PR observation completion signal として `merge_prepared` へ昇格できる。
+  - 観測点: 通常 fallback-related status reason / next action が既存 contract から不用意に変わらないこと、および no-major-issues fallback だけが昇格すること。
 - EC-002: Carryover thread が outdated または outdated state unavailable/null。
   - 条件: GitHub thread data が outdated、または outdated state を信頼できない。
   - 期待: 既存 contract 通り audit/limitation context に留め、actionable inventory へ昇格しない。

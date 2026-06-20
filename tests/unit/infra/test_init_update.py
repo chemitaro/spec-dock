@@ -13947,6 +13947,90 @@ printf '%s\\n' "$S04_WAIT_PAYLOAD"
             assert "--trigger-mode resume" in payload["resume"]["command_hint"]
             assert payload["codex_review"]["lifecycle"]["completion_signal"] == "fallback_issue_comment"
 
+    def test_issue_219_s01_wait_no_major_issues_fallback_completes_observation(self) -> None:
+        fallback_pass_candidate = {
+            "present": True,
+            "source": "issue_comment",
+            "source_ids": [100],
+            "reason": "current_boundary_no_major_issues_comment",
+            "promotes_top_level_status": True,
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            log_path = tmp_path / "wait.log"
+            wait_script = self._issue_176_write_wait_s04_scripts(tmp_path, log_path)
+            payload = self._issue_176_s04_wait_payload(
+                ci_status="passed",
+                review_status="commented",
+                lifecycle_status="fallback",
+                completion_signal="fallback_issue_comment",
+            )
+            payload["normalized_status"] = "passed"
+            payload["overall_status"] = "passed"
+            payload["status"] = "passed"
+            payload["recommended_next_action"] = "merge_prepared"
+            payload["observation_complete"] = True
+            payload["decision"] = {
+                "status": "passed",
+                "status_reason": "fallback_issue_comment_no_major_issues",
+                "recommended_next_action": "merge_prepared",
+                "observation_complete": True,
+                "completion_signal": "fallback_issue_comment",
+                "fallback_pass_candidate": fallback_pass_candidate,
+                "selected_unresolved_thread_ids": [],
+                "selected_unresolved_count": 0,
+                "selected_review_ids": [],
+                "selected_review_comment_ids": [],
+                "selected_review_thread_ids": [],
+                "selected_changes_requested_evidence": [],
+                "fingerprint": "decision-fallback-no-major",
+            }
+            env = {
+                **os.environ,
+                "S04_WAIT_LOG": str(log_path),
+                "S04_WAIT_PAYLOAD": json.dumps(payload),
+            }
+
+            result = subprocess.run(
+                [
+                    str(wait_script),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "777",
+                    "--trigger-created-at",
+                    "2026-06-09T02:03:04Z",
+                    "--timeout-seconds",
+                    "2",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "1",
+                    "--progress",
+                    "none",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "passed"
+            assert payload["recommended_next_action"] == "merge_prepared"
+            assert payload["observation_complete"] is True
+            assert payload["decision"]["status_reason"] == "fallback_issue_comment_no_major_issues"
+            assert payload["decision"]["fallback_pass_candidate"] == fallback_pass_candidate
+
     def test_issue_176_s04_wait_post_once_first_poll_timeout_keeps_resume_hint(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
@@ -15126,30 +15210,32 @@ esac
             payload = self._issue_182_s02_run_snapshot_with_collectors(
                 Path(tmp_dir),
                 review_payload=self._issue_182_s02_review_payload(
-                    decision_status="human_gate",
-                    status_reason="fallback_issue_comment_low_confidence",
-                    recommended_next_action="wait_or_resume",
+                    decision_status="passed",
+                    status_reason="fallback_issue_comment_no_major_issues",
+                    recommended_next_action="merge_prepared",
+                    observation_complete=True,
                     completion_signal="fallback_issue_comment",
                     fallback_pass_candidate={
                         "present": True,
                         "source": "issue_comment",
                         "source_ids": [100],
                         "reason": "current_boundary_no_major_issues_comment",
-                        "promotes_top_level_status": False,
+                        "promotes_top_level_status": True,
                     },
                     legacy_review_status="unresolved",
                     legacy_unresolved_count=1,
                 ),
             )
 
-        assert payload["normalized_status"] == "human_gate"
-        assert payload["recommended_next_action"] == "wait_or_resume"
-        assert payload["observation_complete"] is False
-        assert payload["decision"]["status_reason"] == "fallback_issue_comment_low_confidence"
-        assert payload["decision"]["selected_unresolved_count"] == 0
-        assert payload["decision"]["fallback_pass_candidate"]["present"] is True
-        assert payload["review"]["threads"]["unresolved"] == 1
-        assert payload["review"]["threads"]["decision_authoritative"] is False
+            assert payload["normalized_status"] == "passed"
+            assert payload["recommended_next_action"] == "merge_prepared"
+            assert payload["observation_complete"] is True
+            assert payload["decision"]["status_reason"] == "fallback_issue_comment_no_major_issues"
+            assert payload["decision"]["selected_unresolved_count"] == 0
+            assert payload["decision"]["fallback_pass_candidate"]["present"] is True
+            assert payload["decision"]["fallback_pass_candidate"]["promotes_top_level_status"] is True
+            assert payload["review"]["threads"]["unresolved"] == 1
+            assert payload["review"]["threads"]["decision_authoritative"] is False
 
     def test_issue_182_s02_snapshot_current_selected_unresolved_thread_drives_feedback_action(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -25381,7 +25467,7 @@ esac
 case "$*" in
   "api repos/owner/repo/issues/13/comments --paginate")
     cat <<'JSON'
-[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"No major issues found."}]
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. :tada:"}]
 JSON
     ;;
   "api repos/owner/repo/pulls/13/reviews --paginate")
@@ -25469,8 +25555,10 @@ esac
                 "source": "issue_comment",
                 "source_ids": [100],
                 "reason": "current_boundary_no_major_issues_comment",
-                "promotes_top_level_status": False,
+                "promotes_top_level_status": True,
             }
+            assert payload["decision"]["status_reason"] == "fallback_issue_comment_no_major_issues"
+            assert payload["decision"]["recommended_next_action"] == "merge_prepared"
             assert payload["review"]["current"]["selected_unresolved_thread_ids"] == []
 
     def test_issue_187_s100_review_completion_unknown_candidate_is_non_pass_evidence(self) -> None:

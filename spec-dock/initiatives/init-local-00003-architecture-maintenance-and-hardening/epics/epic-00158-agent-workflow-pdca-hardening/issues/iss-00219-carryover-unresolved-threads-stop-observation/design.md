@@ -31,7 +31,8 @@ ID: "iss-00219"
   - 必須: current selected blocker は immediate feedback handling を維持する。
   - 必須: carryover unresolved counts / ids は decision-facing inventory として保持する。
   - 禁止: guard 未満の carryover-only missing-completion を `observation_complete=true` にしない。
-  - 禁止: `#218` の fallback issue comment policy を変更しない。
+  - 禁止: `#218` の一般 fallback issue comment policy を変更しない。
+  - 例外: Current trigger boundary 内の Codex-authored no-major-issues issue comment は、PR observation manual test で見つかった完了シグナルとして本 Issue の範囲で限定的に扱う。
 - 非交渉制約:
   - Provider-side `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/...` を source of truth とする。
   - `.agents/skills/github-pr-observation/...` は dogfooding mirror として、provider-side 変更後に同期または同等確認する。
@@ -59,7 +60,7 @@ ID: "iss-00219"
 - 採用しないもの:
   - Carryover-only を audit-only に落とす案。
   - `current_review_completion_unknown_with_carryover_unresolved` のような新 status reason。
-  - Fallback issue comment を trusted completion に昇格する案。
+  - 一般 fallback issue comment を trusted completion に昇格する案。
 - 影響範囲:
   - Provider-side installed skill assets。
   - Dogfooding mirror inspection。
@@ -88,7 +89,8 @@ ID: "iss-00219"
 | Guard-satisfied carryover-only | 上記と同じだが latency guard true | non-pass human gate | `review_completion_unknown` | carryover IDs/counts を保持し、`post_unknown_fresh_audit_required=true` |
 | Current selected blocker | current selected unresolved thread または current selected changes requested が存在 | terminal feedback handling | `current_selected_unresolved_thread` または `current_selected_changes_requested` | carryover が同時にあっても current selected reason が勝つ |
 | Trusted completion + carryover | `completion_signal="submitted_pull_request_review"`、current selected blocker なし、carryover count > 0 | terminal feedback handling | `carryover_non_outdated_unresolved_thread` | carryover IDs/counts が actionable feedback surface |
-| Fallback issue comment | `completion_signal="fallback_issue_comment"` または fallback low-confidence signal | non-pass wait/resume / human gate | `fallback_issue_comment_low_confidence` | 本 Issue では trusted completion へ昇格しない |
+| General fallback issue comment | `completion_signal="fallback_issue_comment"` または fallback low-confidence signal だが no-major-issues completion ではない | non-pass wait/resume / human gate | `fallback_issue_comment_low_confidence` | trusted completion へ昇格しない |
+| No-major-issues fallback issue comment | Current trigger boundary 内の Codex-authored issue comment が no major issues を明示し、current selected blocker なし、CI/head clean | pass / merge prepared | `fallback_issue_comment_no_major_issues` | carryover inventory は保持するが current selected blocker ではない |
 | CI/head blockers | stale head、draft/non-open PR、CI failed/pending/running/none、blocking permission/collection limitation | existing blocker output | existing CI/head/limitation reason | carryover policy は CI/head priority を上書きしない |
 
 ## 依存関係分析
@@ -100,7 +102,7 @@ ID: "iss-00219"
   - `tests/unit/infra/test_init_update.py` が installed asset / runtime behavior regression を担う。
 - function 依存:
   - `actionable_unresolved_reason(...)` は current selected と carryover を分ける helper 群へ分割する。
-  - `classify_snapshot(...)` は CI/head blockers の後、current selected blocker、fallback、missing completion、trusted completion + carryover の順に判定する。
+  - `classify_snapshot(...)` は CI/head blockers の後、current selected blocker、no-major-issues fallback、general fallback、missing completion、trusted completion + carryover の順に判定する。
   - `is_review_completion_unknown_candidate(...)` は carryover-only inventory を除外条件にしない。
   - `classify(...)` と finalization block は carryover-only を `terminal_now=True` にしない。
   - `mark_decision_actionable_unresolved(...)` は current selected または trusted completion 後 carryover のときだけ使う。
@@ -176,6 +178,10 @@ Tests --> Wait : guard latency/finalization
   - `decision.actionable_inventory_reason`
     - carryover-only inventory が存在するが主 `status_reason` を current lifecycle に使う場合、`carryover_non_outdated_unresolved_thread` を設定する。
     - Existing consumers は counts/ids でも判定できるため、後方互換の補助 field とする。
+  - `decision.fallback_pass_candidate.promotes_top_level_status`
+    - Current trigger boundary の Codex-authored no-major-issues issue comment を検出した場合だけ `true`。
+    - `true` の場合、snapshot / wait は CI/head clean かつ current selected blocker なしで `passed` / `merge_prepared` に昇格できる。
+    - 通常 fallback issue comment では `false` のままにし、既存の low-confidence wait/resume path を維持する。
 - Snapshot / wait consistency:
   - Snapshot は guard 未満/満了の wait-specific metadata を持たない場合でも、carryover-only missing completion を terminal feedback handling にしない。
   - Wait は latency guard を満たした時だけ `review_completion_unknown` へ昇格する。
