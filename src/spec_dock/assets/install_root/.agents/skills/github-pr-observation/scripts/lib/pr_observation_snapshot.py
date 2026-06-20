@@ -684,6 +684,7 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
     checks_payload_for_fingerprint = load_json_path(checks_stdout)
     if not isinstance(checks_payload_for_fingerprint, dict):
         checks_payload_for_fingerprint = {}
+    ci_actions = ci_payload.get("actions") if isinstance(ci_payload.get("actions"), dict) else {}
     fingerprint_source = {
         "repo": args.repo,
         "pr": args.pr,
@@ -692,6 +693,13 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
         "normalized_status": normalized_status,
         "limitations": [item["code"] for item in limitations if isinstance(item, dict) and "code" in item],
         "ci_status": ci_payload.get("status"),
+        "ci_source_policy": checks_payload_for_fingerprint.get("source_policy")
+        or ci_payload.get("source_policy"),
+        "ci_actions": {
+            "available": ci_actions.get("available"),
+            "workflow_runs": ci_actions.get("workflow_runs"),
+            "jobs_summary": ci_actions.get("jobs_summary"),
+        },
         "ci_fingerprint": checks_payload_for_fingerprint.get("fingerprint"),
         "review_decision_fingerprint": review_decision_fingerprint,
     }

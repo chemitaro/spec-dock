@@ -84,10 +84,25 @@ def has_blocking_limitation(payload: dict, ignored_codes: set[str] | None = None
     )
 
 
-def has_zero_check_limitation(payload: dict) -> bool:
+def ci_source_policy(payload: dict) -> str | None:
+    ci = payload.get("ci") if isinstance(payload.get("ci"), dict) else {}
+    source_policy = payload.get("source_policy") or ci.get("source_policy")
+    return source_policy if isinstance(source_policy, str) else None
+
+
+def has_zero_actions_limitation(payload: dict) -> bool:
+    limitations = payload.get("limitations", [])
+    has_zero_actions = any(
+        isinstance(item, dict) and item.get("code") == "zero_actions_runs_non_success"
+        for item in limitations
+    )
+    if has_zero_actions:
+        return True
+    if ci_source_policy(payload) == "github_actions_only":
+        return False
     return any(
         isinstance(item, dict) and item.get("code") == "zero_checks_s03_non_success"
-        for item in payload.get("limitations", [])
+        for item in limitations
     )
 
 
@@ -190,18 +205,33 @@ def int_count(source: dict, key: str) -> int:
 def ci_progress_counts(payload: dict) -> dict:
     ci = payload.get("ci") if isinstance(payload.get("ci"), dict) else {}
     summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
-    check_runs = ci.get("check_runs") if isinstance(ci.get("check_runs"), dict) else {}
-    ok = (
-        int_count(check_runs, "success")
-        + int_count(check_runs, "skipped")
-        + int_count(check_runs, "neutral")
+    actions = ci.get("actions") if isinstance(ci.get("actions"), dict) else {}
+    workflow_runs = actions.get("workflow_runs") if isinstance(actions.get("workflow_runs"), dict) else {}
+    workflow_counts = (
+        workflow_runs.get("counts") if isinstance(workflow_runs.get("counts"), dict) else {}
     )
-    fail = int_count(check_runs, "failed")
-    other = int_count(check_runs, "other")
-    run = int_count(check_runs, "running")
-    pend = int_count(check_runs, "pending")
-    stale = int_count(check_runs, "stale")
-    total = int_count(check_runs, "total")
+    jobs_summary = actions.get("jobs_summary") if isinstance(actions.get("jobs_summary"), dict) else {}
+    job_counts = jobs_summary.get("counts") if isinstance(jobs_summary.get("counts"), dict) else {}
+    job_total = int_count(jobs_summary, "total")
+    workflow_total = int_count(workflow_runs, "total")
+    use_jobs = bool(jobs_summary) and bool(job_counts)
+    if use_jobs and job_total == 0 and workflow_total > 0:
+        use_jobs = False
+    counts = job_counts if use_jobs else workflow_counts
+    total = job_total if use_jobs else workflow_total
+    if not counts and total == 0 and ci_source_policy(payload) != "github_actions_only":
+        counts = ci.get("check_runs") if isinstance(ci.get("check_runs"), dict) else {}
+        total = int_count(counts, "total")
+    ok = (
+        int_count(counts, "success")
+        + int_count(counts, "skipped")
+        + int_count(counts, "neutral")
+    )
+    fail = int_count(counts, "failed")
+    other = int_count(counts, "other")
+    run = int_count(counts, "running")
+    pend = int_count(counts, "pending")
+    stale = int_count(counts, "stale")
     done = ok + fail + other
     return {
         "status": ci.get("status") or summary.get("ci") or "unknown",
@@ -984,8 +1014,12 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
         and top_level_next_action in {"mark_pr_ready_for_review", "reopen_or_use_open_pr"}
     ):
         return "human_gate", "human_gate", top_level_next_action, False, True
-    if ci_status == "none" and has_zero_check_limitation(payload):
-        if has_blocking_limitation(payload, ignored_codes={"zero_checks_s03_non_success"}):
+    if ci_status == "none" and has_zero_actions_limitation(payload):
+        zero_ignored_codes = {
+            "zero_actions_runs_non_success",
+            "zero_checks_s03_non_success",
+        }
+        if has_blocking_limitation(payload, ignored_codes=zero_ignored_codes):
             if has_permission_limitation(payload):
                 return "unknown", "unknown", "fix_github_token_permissions", False, True
             return "unknown", "unknown", "human_gate", False, True
@@ -1422,16 +1456,20 @@ while True:
         if terminal_before_poll:
             final_phase = "terminal"
             break
+        zero_ignored_codes = {
+            "zero_actions_runs_non_success",
+            "zero_checks_s03_non_success",
+        }
         zero_check_grace_can_be_evaluated = (
             not (
                 under_budget_poll_exception_used
                 and under_budget_poll_exception_kind == "zero_check_grace"
             )
             and
-            has_zero_check_limitation(latest_payload) and poll < zero_check_grace_polls
+            has_zero_actions_limitation(latest_payload) and poll < zero_check_grace_polls
             and not has_blocking_limitation(
                 latest_payload,
-                ignored_codes={"zero_checks_s03_non_success"},
+                ignored_codes=zero_ignored_codes,
             )
         )
         review_trigger_age_seconds_before_poll = age_seconds_from_timestamp(
