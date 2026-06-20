@@ -21210,6 +21210,77 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
         assert payload["observation_complete"] is True
         assert payload["decision"]["fallback_pass_candidate"]["promotes_top_level_status"] is True
 
+    def test_issue_222_s03_wait_fallback_no_findings_with_actionable_unresolved_blocks_pass(self) -> None:
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "human_gate",
+            "status_reason": "fallback_issue_comment_low_confidence",
+            "recommended_next_action": "manual_review_required_non_retryable",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "carryover_unresolved_count": 0,
+            "carryover_unresolved_thread_ids": [],
+            "actionable_unresolved_count": 1,
+            "actionable_unresolved_thread_ids": ["RT_actionable"],
+            "selected_changes_requested_evidence": [],
+            "completion_signal": "fallback_issue_comment",
+            "confidence": "low",
+            "fallback_pass_candidate": {
+                "present": True,
+                "source": "issue_comment",
+                "source_ids": [100],
+                "reason": "current_boundary_no_major_issues_comment",
+                "promotes_top_level_status": True,
+            },
+            "fingerprint": "fallback-actionable-unresolved-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "human_gate",
+                        "overall_status": "human_gate",
+                        "normalized_status": "human_gate",
+                        "recommended_next_action": "manual_review_required_non_retryable",
+                        "decision": decision,
+                        "decision_fingerprint": "fallback-actionable-unresolved-s03",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "fallback",
+                                "completion_signal": "fallback_issue_comment",
+                                "confidence": "low",
+                                "fallback_pass_candidate": decision["fallback_pass_candidate"],
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_actionable"}]},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["overall_status"] == "human_gate"
+        assert payload["normalized_status"] == "human_gate"
+        assert payload["recommended_next_action"] == "address_review_feedback"
+        assert payload["observation_complete"] is False
+        assert payload["decision"]["status"] == "human_gate"
+        assert payload["decision"]["recommended_next_action"] == "address_review_feedback"
+        assert payload["decision"]["status_reason"] == "actionable_unresolved_thread"
+        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
+
     def test_issue_219_s01_wait_fallback_no_findings_with_unresolved_review_blocks_pass(self) -> None:
         decision = {
             "scope": "current_trigger_boundary",
@@ -28801,6 +28872,59 @@ esac
                 assert complete is expected_complete
                 assert reason == expected_reason
                 assert action != "merge_prepared"
+
+    def test_issue_222_s03_snapshot_fallback_no_findings_with_actionable_unresolved_blocks_pass(self) -> None:
+        module = self._issue_218_s02_load_observation_snapshot_module()
+        fallback_pass_candidate = {
+            "present": True,
+            "source": "issue_comment",
+            "source_ids": [100],
+            "reason": "current_boundary_no_major_issues_comment",
+            "promotes_top_level_status": True,
+        }
+        decision = {
+            "status": "human_gate",
+            "status_reason": "fallback_issue_comment_low_confidence",
+            "recommended_next_action": "manual_review_required_non_retryable",
+            "observation_complete": False,
+            "completion_signal": "fallback_issue_comment",
+            "confidence": "low",
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "selected_unresolved_thread_ids": [],
+            "carryover_unresolved_count": 0,
+            "carryover_unresolved_thread_ids": [],
+            "actionable_unresolved_count": 1,
+            "actionable_unresolved_thread_ids": ["RT_actionable"],
+            "fallback_pass_candidate": fallback_pass_candidate,
+        }
+
+        status, action, complete, reason = module.classify_snapshot(
+            summary={"ci": "passed", "review": "approved", "head": "matched"},
+            ci_payload={"status": "passed"},
+            review_payload={"status": "approved"},
+            review_wrapper_payload={
+                "decision": decision,
+                "codex_review": {
+                    "lifecycle": {
+                        "completion_signal": "fallback_issue_comment",
+                        "fallback_pass_candidate": fallback_pass_candidate,
+                    },
+                },
+            },
+            metadata={"state": "OPEN", "isDraft": False, "mergeable": "MERGEABLE"},
+            limitations=[],
+            head_matches_expected=True,
+            normalized_status="unknown",
+            trigger_comment_id="99",
+            trigger_created_at="2026-06-08T01:00:00Z",
+        )
+
+        assert status == "human_gate"
+        assert action == "address_review_feedback"
+        assert complete is True
+        assert reason == "actionable_unresolved_thread"
+        assert action != "merge_prepared"
 
     def test_issue_170_pr_observation_review_collector_keeps_feedback_with_trigger_text(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]

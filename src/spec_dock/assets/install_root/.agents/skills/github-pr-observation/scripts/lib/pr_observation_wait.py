@@ -386,7 +386,19 @@ def carryover_inventory_reason(payload: dict) -> str | None:
     return None
 
 
+def explicit_actionable_unresolved_reason(payload: dict) -> str | None:
+    decision = decision_payload(payload)
+    actionable_unresolved_count = decision_int(decision, "actionable_unresolved_count")
+    actionable_unresolved_thread_ids = decision_list(decision, "actionable_unresolved_thread_ids")
+    if actionable_unresolved_count > 0 or actionable_unresolved_thread_ids:
+        return "actionable_unresolved_thread"
+    return None
+
+
 def trusted_completion_actionable_reason(payload: dict) -> str | None:
+    explicit_reason = explicit_actionable_unresolved_reason(payload)
+    if explicit_reason:
+        return explicit_reason
     current_reason = current_selected_actionable_reason(payload)
     if current_reason:
         return current_reason
