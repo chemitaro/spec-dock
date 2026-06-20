@@ -403,6 +403,8 @@ def classify_snapshot(
     mergeable = mergeability_status(metadata)
     if mergeable == "CONFLICTING":
         return "human_gate", "resolve_merge_conflict", False, "pr_merge_conflict"
+    if mergeable == "UNKNOWN":
+        return "pending", "wait", False, "pr_mergeability_pending"
     if mergeable != "MERGEABLE":
         return "human_gate", "human_gate", False, "pr_mergeability_unknown"
     if decision_status_reason == "current_selected_changes_requested" or selected_changes_requested_evidence:
