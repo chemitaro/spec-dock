@@ -398,8 +398,8 @@ rg -n "statusCheckRollup|check-runs|gh pr checks|ci_coverage_limited_to_github_a
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
-| pending pre-PR ledger commit | final reviewer pass results and stale implementation summary fix | PR and manual observation script results to be recorded after PR creation | ready for pre-PR ledger commit |
+| `87f60f0d` | final reviewer pass results and stale implementation summary fix | PR #223 created: https://github.com/chemitaro/spec-dock/pull/223 | ready |
+| PR #223 manual observation test 1 | `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 223 --head-sha 87f60f0d8cc6f80a9cbcba5ef9d977f1fa9464d4 --timeout-seconds 1800 --poll-interval-seconds 30 --quiet-seconds 30 --same-fingerprint-count 2 --zero-check-grace-polls 2 --body-mode out-only --out /private/tmp/iss-00222-pr223-observation` | `/private/tmp/iss-00222-pr223-observation/result.json`; final response; latest-head observation must be rerun after this report evidence commit | pass: `overall_status=passed`, `recommended_next_action=merge_prepared`, `head_matches_expected=true`, `ci.source_policy=github_actions_only`, Actions workflow runs `success=4`, compatibility `check_runs.total=0`, `commit_statuses.total=0`, `required_check_state.collection_policy=forbidden`, review signal observed via Codex no-findings issue comment, no actionable unresolved threads |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
