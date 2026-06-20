@@ -471,8 +471,6 @@ def is_review_completion_unknown_candidate(payload: dict) -> bool:
         return False
     if evidence.get("promotes_top_level_status") is True:
         return False
-    if carryover_inventory_reason(payload):
-        return False
     disqualifying_flags = (
         "pending_review_present",
         "blocking_limitation_present",
@@ -1400,6 +1398,20 @@ while True:
                 ignored_codes={"zero_checks_s03_non_success"},
             )
         )
+        review_trigger_age_seconds_before_poll = age_seconds_from_timestamp(
+            trigger_created_at_for_latency(latest_payload, trigger_created_at)
+        )
+        ci_passed_age_seconds_before_poll = (
+            int(max(0, time.monotonic() - ci_passed_first_monotonic))
+            if ci_passed_first_monotonic is not None
+            else 0
+        )
+        latency_satisfied_before_poll = (
+            review_trigger_age_seconds_before_poll
+            >= REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS
+            and ci_passed_age_seconds_before_poll
+            >= REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS
+        )
         under_budget_poll_exception_candidate_kind = None
         if (
             can_complete_when_stable_before_poll
@@ -1421,20 +1433,6 @@ while True:
             and under_budget_poll_exception_candidate_kind is not None
         )
         if not under_budget_poll_allowed:
-            review_trigger_age_seconds_before_poll = age_seconds_from_timestamp(
-                trigger_created_at_for_latency(latest_payload, trigger_created_at)
-            )
-            ci_passed_age_seconds_before_poll = (
-                int(max(0, time.monotonic() - ci_passed_first_monotonic))
-                if ci_passed_first_monotonic is not None
-                else 0
-            )
-            latency_satisfied_before_poll = (
-                review_trigger_age_seconds_before_poll
-                >= REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS
-                and ci_passed_age_seconds_before_poll
-                >= REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS
-            )
             final_poll_skipped_reason = "insufficient_next_snapshot_budget"
             if (
                 is_carryover_missing_completion_wait(latest_payload)

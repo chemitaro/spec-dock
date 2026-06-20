@@ -1291,6 +1291,20 @@ fallback_pass_source_ids = [
     for item in current_codex_issue_comments
     if item.get("id") is not None and is_strict_no_findings_issue_comment(item)
 ]
+fallback_pass_promotes = bool(
+    expected_head_sha
+    and current_pr_head_sha
+    and sha_prefix_matches(current_pr_head_sha, expected_head_sha)
+    and fallback_pass_source_ids
+    and not stale_codex_head_context_present
+    and not selected_unresolved_thread_ids
+    and not selected_changes_requested_evidence
+    and not review_decision_changes_requested
+    and not review_decision_requires_review
+    and not active_changes_requested_review_present
+    and not current_pending_codex_review_present
+    and not blocking_collection_failure
+)
 for signal in signals:
     signal.pop("_fallback_pass_raw_body", None)
 fallback_pass_candidate = {
@@ -1298,7 +1312,7 @@ fallback_pass_candidate = {
     "source": "issue_comment" if fallback_pass_source_ids else None,
     "source_ids": fallback_pass_source_ids,
     "reason": "current_boundary_no_major_issues_comment" if fallback_pass_source_ids else None,
-    "promotes_top_level_status": False,
+    "promotes_top_level_status": bool(completion_signal == "fallback_issue_comment" and fallback_pass_promotes),
 }
 no_findings_completion_candidate = {
     "present": bool(no_findings_completion_promotes),
