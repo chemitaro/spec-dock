@@ -73,8 +73,8 @@ ID: "iss-00219"
 | none observed | N/A | N/A | this section | eligible after canonical integration and fresh reviewer pass |
 
 ## 実装サマリー
-- S01 regression tests、S02 provider runtime classification fix、S03 skill docs / provider-mirror docs は committed。S90/S99 parity correction と final report ledger を実施中。
-- Local validation は focused PR observation subset、SpecDock validate、`git diff --check`、`uv run pytest tests/unit` が pass。PR delivery、merge preparation、PR observation manual test は未実施。
+- S01 regression tests、S02 provider runtime classification fix、S03 skill docs / provider-mirror docs、S90/S99 parity correction、PR #221 feedback fix は committed またはコミット準備中。
+- Local validation は focused PR observation subset、SpecDock validate、`git diff --check`、`uv run pytest tests/unit` が pass。PR observation manual test attempt 1 は Codex review の actionable feedback を検出して human gate で停止し、Issue219 の修正対象として取り込んだ。
 
 ## 実装記録（セッションログ）
 
@@ -359,11 +359,15 @@ result: no output, exit 0
 |---|---|---|
 | `git diff --check` | passed | whitespace check |
 | `./spec-dock/scripts/spec-dock validate` | passed | `spec-dock: ok (validate) nodes=136` |
-| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_219 or issue_187_s420 or issue_187_s430 or github-pr-observation or pr_observation"` | 87 passed, 358 deselected | final focused PR observation regression subset |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_219 or issue_187_s420 or issue_187_s430 or github-pr-observation or pr_observation"` | 87 passed, 358 deselected | final focused PR observation regression subset before PR feedback fix |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_219 or issue_187_s420 or issue_187_s430 or github-pr-observation or pr_observation"` | 88 passed, 358 deselected | PR feedback fix regression subset; includes carryover refresh timeout preservation |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets"` | 1 passed, 445 deselected | provider/mirror agent-tooling parity after PR feedback fix |
+| `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_219_s01_wait_guard_under_carryover_only_missing_completion_waits tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_219_s01_wait_preserves_carryover_refresh_timeout` | 2 passed | isolated rerun after tightening deadline/timeout assertions |
 | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets` | 2 passed | final unit parity correction verification |
 | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_182_s03_wait_preserves_legacy_review_status_without_decision_surface -vv` | 1 passed | isolated rerun after one full-suite short-timeout failure |
 | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_182_s03_wait_preserves_legacy_review_status_without_decision_surface or issue_182_s03_wait"` | 7 passed, 438 deselected | related wait subset stability check |
 | `uv run pytest tests/unit` | 720 passed | final full unit rerun after parity correction and short-timeout rerun |
+| `uv run pytest tests/unit` | 721 passed | final full unit rerun after PR feedback fix |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
@@ -380,10 +384,22 @@ result: no output, exit 0
 |---|---|---|---|---|
 | spec-reviewer `019ee34b-26e0-7841-88bf-0b57cb2ad005` | requirement / design / plan / report / implementation / tests / docs alignment | previous fail fixed: stale S99 gate rows, stale implementation summary, stale delegated plan provenance | 1 | passed |
 
+### PR Observation Manual Test / PR Feedback Fix
+| attempt | PR | head sha | コマンド / artifact | 観測結果 | 処置 |
+|---|---|---|---|---|---|
+| 1 | `#221` | `c2f2b720b3c532632ceb8734f58dedaf01d23d18` | `fetch_pr_observation_snapshot.sh` out: `/private/tmp/issue219-pr221-snapshot-1`; `wait_pr_observation.sh` out: `/private/tmp/issue219-pr221-wait-1` | fixed `@codex review` trigger posted; CI changed from running to passed; Codex review comments and unresolved threads were collected; final status `human_gate`, reason `current_selected_unresolved_thread`, recommended action `address_review_feedback` | actionable feedback を本 issue の修正対象として採用 |
+
+#### PR Feedback Findings / Disposition
+| finding | 対象 | 問題 | 修正 | 検証 |
+|---|---|---|---|---|
+| P2 Preserve timed-out refreshes for carryover waits | `pr_observation_wait.py` carryover missing-completion wait | 後続 snapshot poll が timeout しても、古い carryover-only payload を再利用して `snapshot_poll_timed_out` を消し、stale payload から unknown/fresh-audit metadata を作れる | carryover-only でも snapshot poll timeout は blocking limitation と `wait_timeout` として保持する | new regression `test_issue_219_s01_wait_preserves_carryover_refresh_timeout`; focused subset 88 passed |
+| P2 Report expired carryover waits as deadline-reached | `pr_observation_wait.py` wait metadata | carryover-only wait が期限到達で止まっても `wait.deadline_reached=false` になり、resume 必要性を呼び出し側が見落とせる | `final_phase == "wait"` でも deadline 到達時は `deadline_reached=true` とし、期限直前の予算不足分岐でも carryover/latency guard を評価する。code-reviewer gate の追加 P1 指摘により top-of-loop deadline exit でも stale wait metadata を返さないよう `latest_payload.wait.deadline_reached=true` を明示した | existing guard-under regression に `deadline_reached=true` assertion を追加; focused subset 88 passed |
+
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
 | S90/S99 parity correction and final local validation ledger | `.agents` mirror runtime sync, dogfooding meta baseline update, final report evidence | PR body / final response; PR observation manual test after PR creation | committed in final local ledger commit |
+| PR feedback fix ledger | carryover wait timeout preservation, deadline metadata correction, provider/mirror sync, regression tests, report evidence | PR #221 push and PR observation manual test rerun | pending commit |
 
 ## 実行引き渡し準備（Execution Handoff Readiness）
 
@@ -410,4 +426,4 @@ result: no output, exit 0
 - Plan authoring では Issue219 regression を first-class closure とし、guard-under / guard-satisfied / trusted-completion / current-selected priority の matrix を分ける。
 
 ## 省略/例外メモ
-- Supersedes authoring-phase status note: S01/S02/S03/S90/S99 local gates are committed. PR delivery gate、merge preparation gate、PR observation manual test は未実施。
+- Supersedes authoring-phase status note: S01/S02/S03/S90/S99 local gates are committed. PR delivery gate and PR observation manual test attempt 1 are executed; PR feedback fix is pending commit/push and requires PR observation rerun.
