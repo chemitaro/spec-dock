@@ -263,8 +263,14 @@ def user_login(payload):
     return None
 
 
+TRUSTED_CODEX_LOGINS = {
+    "chatgpt-codex-connector[bot]",
+    "codex",
+}
+
+
 def is_codex_authored(login):
-    return "codex" in str(login or "").lower()
+    return str(login or "").lower() in TRUSTED_CODEX_LOGINS
 
 
 def is_trigger_command_body(body):
@@ -722,10 +728,7 @@ for team in requested_teams:
         }
     )
 
-review_decision_requires_review = (
-    str(review_decision or "").upper() == "REVIEW_REQUIRED"
-    and not review_request_signals
-)
+review_decision_requires_review = str(review_decision or "").upper() == "REVIEW_REQUIRED"
 review_decision_changes_requested = str(review_decision or "").upper() == "CHANGES_REQUESTED"
 
 threads = []
@@ -1325,7 +1328,11 @@ elif completion_signal == "none":
     decision_status = "unknown"
     decision_action = "wait_or_resume"
 else:
-    decision_status_reason = "passed"
+    decision_status_reason = (
+        "codex_no_findings_issue_comment"
+        if completion_signal == "codex_no_findings_issue_comment"
+        else "passed"
+    )
     decision_status = "passed"
     decision_action = (
         "review_completion_observed"
