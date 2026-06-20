@@ -51,14 +51,8 @@ def classify_github_stderr(stderr):
 
 
 def capability_for_api(api):
-    if api == "gh_pr_view.statusCheckRollup":
-        return "status_check_rollup_read"
     if api.endswith("/actions/runs") or "/actions/runs?" in api:
         return "actions_read"
-    if api.endswith("/check-runs"):
-        return "check_runs_read"
-    if api.endswith("/status"):
-        return "commit_statuses_read"
     if "/actions/runs/" in api and api.endswith("/jobs"):
         return "actions_read"
     return "unknown"
@@ -196,31 +190,6 @@ def gh_api(path):
         )
 
 
-def gh_pr_view():
-    command = ["gh", "pr", "view", str(pr), "--repo", repo, "--json", "mergeStateStatus,statusCheckRollup"]
-    completed = subprocess.run(command, capture_output=True, text=True, check=False)
-    if completed.returncode != 0:
-        return {}, github_failure_limitation(
-            api="gh_pr_view.statusCheckRollup",
-            source="gh_pr_view",
-            exit_code=completed.returncode,
-            stderr=completed.stderr,
-            default_code="pr_required_check_state_unavailable",
-            default_message="fixed read-only PR required check state collection failed",
-            default_severity="informational",
-        )
-    try:
-        payload = json.loads(completed.stdout or "{}")
-    except json.JSONDecodeError:
-        return {}, {
-            "code": "pr_required_check_state_unavailable",
-            "source": "gh_pr_view",
-            "severity": "informational",
-            "message": "fixed read-only PR required check state returned non-JSON output",
-        }
-    return payload if isinstance(payload, dict) else {}, None
-
-
 def gh_pr_head_oid():
     command = ["gh", "pr", "view", str(pr), "--repo", repo, "--json", "headRefOid"]
     completed = subprocess.run(command, capture_output=True, text=True, check=False)
@@ -295,32 +264,6 @@ def as_list(payload, key):
     return value if isinstance(value, list) else []
 
 
-def normalize_check_status(check):
-    status = str(check.get("status") or "").lower()
-    conclusion = str(check.get("conclusion") or "").lower()
-    if status == "completed":
-        if conclusion in {
-            "failure",
-            "error",
-            "cancelled",
-            "timed_out",
-            "action_required",
-            "startup_failure",
-            "stale",
-        }:
-            return "failed"
-        if conclusion in {"success", "skipped", "neutral"}:
-            return conclusion
-        if conclusion:
-            return "other"
-        return "other"
-    if status == "in_progress":
-        return "running"
-    if status in {"queued", "requested", "waiting", "pending"}:
-        return "pending"
-    return "other"
-
-
 def normalize_actions_status(item):
     status = str(item.get("status") or "").lower()
     conclusion = str(item.get("conclusion") or "").lower()
@@ -343,40 +286,6 @@ def normalize_actions_status(item):
     if status in {"queued", "requested", "waiting", "pending"}:
         return "pending"
     return "unknown"
-
-
-def normalize_status_state(status):
-    state = str(status.get("state") or "").lower()
-    if state in {"failure", "error"}:
-        return "failed"
-    if state == "pending":
-        return "pending"
-    if state == "success":
-        return "success"
-    return "other"
-
-
-def check_run_failure_fallback(check, limitation=None):
-    payload = {
-        "kind": "check_run",
-        "name": check.get("name"),
-        "check_run_id": check.get("id"),
-        "status": check.get("status"),
-        "conclusion": check.get("conclusion"),
-        "html_url": check.get("html_url"),
-        "details_url": check.get("details_url"),
-    }
-    if limitation:
-        payload["limitation"] = limitation
-    return payload
-
-
-def job_matches_check(job, check_id):
-    if check_id is None:
-        return True
-    check_run_url = str(job.get("check_run_url") or "")
-    terminal_segment = check_run_url.rstrip("/").rsplit("/", 1)[-1]
-    return terminal_segment == str(check_id)
 
 
 FAILED_ACTION_CONCLUSIONS = {
@@ -436,7 +345,6 @@ def actions_failure_entry(run, job=None):
 
 
 limitations = []
-supplemental_limitations = []
 actions_failures = []
 actions_failure_dedupe_keys = set()
 if len(expected_head_sha_lower) < 40:
@@ -617,6 +525,14 @@ if actions_available and not workflow_runs:
             "message": "no GitHub Actions workflow runs were observed for the expected PR head SHA",
         }
     )
+    limitations.append(
+        {
+            "code": "zero_checks_s03_non_success",
+            "source": "ci_collector",
+            "severity": "blocking",
+            "message": "no GitHub Actions workflow runs were observed; S03 keeps this non-success until wait compatibility is migrated",
+        }
+    )
 
 actions_jobs_collection = {
     "successful_runs": action_job_collection_successes,
@@ -713,56 +629,12 @@ actions_decisive_failed = (
     and not (action_run_counts["unknown"] or action_job_counts["unknown"])
     and bool(action_run_counts["failed"] or action_job_counts["failed"])
 )
-check_runs_payload, limitation = gh_api(f"repos/{repo}/commits/{expected_head_sha}/check-runs")
-if limitation:
-    supplemental_limitations.append(limitation)
-    check_runs_payload = {}
-statuses_payload, limitation = gh_api(f"repos/{repo}/commits/{expected_head_sha}/status")
-if limitation:
-    supplemental_limitations.append(limitation)
-    statuses_payload = {}
-pr_view_payload, limitation = gh_pr_view()
-if limitation:
-    supplemental_limitations.append(limitation)
-
-if (
-    actions_decisive_green or actions_decisive_non_terminal or actions_decisive_failed
-) and supplemental_limitations:
-    limitations.append(
-        {
-            "code": "ci_coverage_limited_to_github_actions",
-            "source": "actions_collector",
-            "severity": "informational",
-            "blocking": False,
-            "message": "GitHub Actions evidence determines CI state; supplemental check/status rollup coverage was unavailable",
-            "supplemental_unavailable": [
-                {
-                    "code": item.get("code"),
-                    "capability": item.get("capability"),
-                    "source": item.get("source"),
-                    "status": item.get("status"),
-                    "secret_redacted": item.get("secret_redacted"),
-                    "stderr_sha256": item.get("stderr_sha256"),
-                    "exit_code": item.get("exit_code"),
-                }
-                for item in supplemental_limitations
-            ],
-        }
-    )
-else:
-    limitations.extend(supplemental_limitations)
-
+check_runs_payload = {}
+statuses_payload = {}
+pr_view_payload = {}
 check_runs = as_list(check_runs_payload, "check_runs")
 statuses = as_list(statuses_payload, "statuses")
-aggregate_status_state = (
-    str(statuses_payload.get("state") or "").lower()
-    if isinstance(statuses_payload, dict)
-    else ""
-)
-aggregate_status_classification = normalize_status_state({"state": aggregate_status_state})
-aggregate_status_pending_backstop = aggregate_status_classification == "pending" and bool(statuses)
-aggregate_status_failed_backstop = aggregate_status_classification == "failed" and bool(statuses)
-status_check_rollup = as_list(pr_view_payload, "statusCheckRollup")
+status_check_rollup = []
 merge_state_status = str(pr_view_payload.get("mergeStateStatus") or "").upper()
 
 check_counts = {
@@ -778,7 +650,7 @@ check_counts = {
 }
 status_counts = {
     "total": len(statuses),
-    "aggregate_state": aggregate_status_state or None,
+    "aggregate_state": None,
     "success": 0,
     "failure": 0,
     "pending": 0,
@@ -786,55 +658,9 @@ status_counts = {
     "other": 0,
 }
 
-failed_checks = []
-stale_checks = []
-for check in check_runs:
-    check_head_sha = str(check.get("head_sha") or "")
-    if check_head_sha and not sha_prefix_matches(check_head_sha, expected_head_sha_lower):
-        check_counts["stale"] += 1
-        stale_checks.append(check)
-        continue
-    classification = normalize_check_status(check)
-    if classification == "failed":
-        check_counts["failed"] += 1
-        failed_checks.append(check)
-    elif classification == "running":
-        check_counts["running"] += 1
-    elif classification == "pending":
-        check_counts["pending"] += 1
-    elif classification in {"success", "skipped", "neutral"}:
-        check_counts[classification] += 1
-    else:
-        check_counts["other"] += 1
-
-for status in statuses:
-    classification = normalize_status_state(status)
-    if classification == "failed":
-        state = str(status.get("state") or "").lower()
-        if state == "error":
-            status_counts["error"] += 1
-        else:
-            status_counts["failure"] += 1
-    elif classification == "pending":
-        status_counts["pending"] += 1
-    elif classification == "success":
-        status_counts["success"] += 1
-    else:
-        status_counts["other"] += 1
-
-if stale_checks:
-    limitations.append(
-        {
-            "code": "stale_head_check",
-            "source": "check_runs",
-            "severity": "blocking",
-            "message": "check run head SHA did not match expected head SHA",
-            "count": len(stale_checks),
-        }
-    )
-
 required_check_state = {
-    "available": limitation is None,
+    "available": False,
+    "collection_policy": "forbidden",
     "merge_state_status": merge_state_status or None,
     "status_check_rollup_total": len(status_check_rollup),
     "status_check_rollup_states": [],
@@ -850,172 +676,8 @@ for item in status_check_rollup:
         }
     )
 
-required_check_rollup_pending = any(
-    item.get("state") in {"EXPECTED", "PENDING", "QUEUED", "REQUESTED", "WAITING"}
-    for item in required_check_state["status_check_rollup_states"]
-)
-required_check_rollup_running = any(
-    item.get("state") in {"IN_PROGRESS", "RUNNING"}
-    for item in required_check_state["status_check_rollup_states"]
-)
-required_check_rollup_failed = any(
-    item.get("state") in {"FAILURE", "FAILED", "ERROR", "CANCELLED"}
-    or item.get("conclusion")
-    in {
-        "FAILURE",
-        "ERROR",
-        "CANCELLED",
-        "TIMED_OUT",
-        "ACTION_REQUIRED",
-        "STARTUP_FAILURE",
-        "STALE",
-    }
-    for item in required_check_state["status_check_rollup_states"]
-)
-
 failures = []
 failures.extend(actions_failures)
-for status in statuses:
-    if normalize_status_state(status) == "failed":
-        failures.append(
-            {
-                "kind": "commit_status",
-                "context": status.get("context"),
-                "status": status.get("state"),
-                "description": status.get("description"),
-                "target_url": status.get("target_url"),
-            }
-        )
-if aggregate_status_failed_backstop and not (
-    status_counts["failure"] or status_counts["error"]
-):
-    failures.append(
-        {
-            "kind": "commit_status_aggregate",
-            "state": aggregate_status_state,
-            "description": "combined commit status aggregate state was non-success",
-        }
-    )
-for item in required_check_state["status_check_rollup_states"]:
-    if item.get("state") in {"FAILURE", "FAILED", "ERROR", "CANCELLED"} or item.get(
-        "conclusion"
-    ) in {
-        "FAILURE",
-        "ERROR",
-        "CANCELLED",
-        "TIMED_OUT",
-        "ACTION_REQUIRED",
-        "STARTUP_FAILURE",
-        "STALE",
-    }:
-        failures.append(
-            {
-                "kind": "status_check_rollup",
-                "name": item.get("name"),
-                "state": item.get("state"),
-                "conclusion": item.get("conclusion"),
-            }
-        )
-
-for check in failed_checks:
-    workflow_run = check.get("workflow_run") if isinstance(check.get("workflow_run"), dict) else {}
-    workflow_run_id = workflow_run.get("id")
-    run_attempt = workflow_run.get("run_attempt")
-    if workflow_run_id is None:
-        failures.append(check_run_failure_fallback(check, "workflow_job_steps_unavailable"))
-        continue
-
-    jobs_payload, job_limitation = gh_api(f"repos/{repo}/actions/runs/{workflow_run_id}/jobs")
-    jobs = as_list(jobs_payload or {}, "jobs")
-    matching_failed_jobs = [
-        job
-        for job in jobs
-        if job_matches_check(job, check.get("id"))
-        and str(job.get("conclusion") or "").lower()
-        in {"failure", "error", "cancelled", "timed_out", "action_required", "startup_failure", "stale"}
-    ]
-    if job_limitation or not matching_failed_jobs:
-        failures.append(check_run_failure_fallback(check, "workflow_job_steps_unavailable"))
-        if job_limitation:
-            limitations.append(job_limitation)
-        continue
-
-    for job in matching_failed_jobs:
-        run = {
-            "id": workflow_run_id,
-            "run_attempt": run_attempt,
-            "name": check.get("workflow_name"),
-            "status": check.get("status"),
-            "conclusion": check.get("conclusion"),
-            "html_url": check.get("details_url"),
-        }
-        failure = actions_failure_entry(run, job)
-        if failure["dedupe_key"] not in actions_failure_dedupe_keys:
-            actions_failure_dedupe_keys.add(failure["dedupe_key"])
-            failures.append(failure)
-
-required_checks_missing_or_pending = (
-    merge_state_status == "BLOCKED"
-    and required_check_rollup_pending
-    and not (
-        check_counts["failed"]
-        or status_counts["failure"]
-        or status_counts["error"]
-        or aggregate_status_failed_backstop
-        or required_check_rollup_failed
-        or check_counts["stale"]
-    )
-    and not (
-        check_counts["running"]
-        or check_counts["pending"]
-        or status_counts["pending"]
-        or aggregate_status_pending_backstop
-        or required_check_rollup_running
-    )
-)
-merge_state_blocking = (
-    bool(merge_state_status)
-    and merge_state_status not in {"CLEAN", "HAS_HOOKS", "UNKNOWN"}
-    and not required_checks_missing_or_pending
-    and not (
-        check_counts["failed"]
-        or status_counts["failure"]
-        or status_counts["error"]
-        or aggregate_status_failed_backstop
-        or required_check_rollup_failed
-        or check_counts["stale"]
-    )
-    and not (
-        check_counts["running"]
-        or check_counts["pending"]
-        or status_counts["pending"]
-        or aggregate_status_pending_backstop
-        or required_check_rollup_running
-        or required_check_rollup_pending
-    )
-)
-merge_state_unknown = merge_state_status == "UNKNOWN"
-
-if required_checks_missing_or_pending:
-    limitations.append(
-        {
-            "code": "required_checks_missing_or_pending",
-            "source": "gh_pr_view.mergeStateStatus",
-            "severity": "blocking",
-            "message": "PR merge state indicates required checks are not yet satisfied",
-            "merge_state_status": merge_state_status,
-        }
-    )
-elif merge_state_blocking:
-    limitations.append(
-        {
-            "code": "pr_merge_state_blocking",
-            "source": "gh_pr_view.mergeStateStatus",
-            "severity": "blocking",
-            "message": "PR merge state requires human or branch action before merge",
-            "merge_state_status": merge_state_status,
-        }
-    )
 
 actions_primary_unavailable = any(
     item.get("capability") == "actions_read" and item.get("severity") == "blocking"
@@ -1032,128 +694,25 @@ actions_running = bool(action_run_counts["running"] or action_job_counts["runnin
 actions_pending = bool(action_run_counts["pending"] or action_job_counts["pending"])
 actions_unknown = bool(action_run_counts["unknown"] or action_job_counts["unknown"])
 actions_jobs_unavailable = actions_available and action_job_collection_failures > 0
-blocking_limitations = [item for item in limitations if is_blocking_limitation(item)]
-only_external_ci_read_permission_blocked = bool(blocking_limitations) and all(
-    item.get("code") == "github_token_permission_denied"
-    and item.get("capability") in {"check_runs_read", "commit_statuses_read"}
-    for item in blocking_limitations
-)
-external_green_check_runs = (
-    check_counts["total"] > 0
-    and check_counts["success"] + check_counts["skipped"] + check_counts["neutral"] == check_counts["total"]
-    and check_counts["failed"] == 0
-    and check_counts["running"] == 0
-    and check_counts["pending"] == 0
-    and check_counts["other"] == 0
-    and check_counts["stale"] == 0
-)
-external_green_statuses = (
-    status_counts["total"] > 0
-    and status_counts["success"] == status_counts["total"]
-    and status_counts["failure"] == 0
-    and status_counts["error"] == 0
-    and status_counts["pending"] == 0
-    and status_counts["other"] == 0
-)
-external_green_with_ci_read_permission_limited = (
-    actions_zero_runs
-    and (external_green_check_runs or external_green_statuses)
-    and not aggregate_status_failed_backstop
-    and not aggregate_status_pending_backstop
-    and required_check_state["available"]
-    and merge_state_status == "CLEAN"
-    and not required_check_rollup_failed
-    and not required_check_rollup_running
-    and not required_check_rollup_pending
-    and not required_checks_missing_or_pending
-    and not merge_state_unknown
-    and not merge_state_blocking
-    and only_external_ci_read_permission_blocked
-)
 
 if actions_primary_unavailable or head_sha_resolution_failed:
     ci_status = "unknown"
-elif actions_failed or (
-    check_counts["failed"]
-    or status_counts["failure"]
-    or status_counts["error"]
-    or aggregate_status_failed_backstop
-    or required_check_rollup_failed
-    or check_counts["stale"]
-):
+elif actions_failed:
     ci_status = "failed"
-elif actions_running or check_counts["running"] or required_check_rollup_running:
+elif actions_running:
     ci_status = "running"
-elif (
-    actions_pending
-    or check_counts["pending"]
-    or status_counts["pending"]
-    or aggregate_status_pending_backstop
-    or required_check_rollup_pending
-    or required_checks_missing_or_pending
-    or merge_state_unknown
-):
+elif actions_pending:
     ci_status = "pending"
 elif actions_unknown or actions_jobs_unavailable:
     ci_status = "unknown"
-elif actions_decisive_green and not (
-    check_counts["failed"]
-    or status_counts["failure"]
-    or status_counts["error"]
-    or aggregate_status_failed_backstop
-    or required_check_rollup_failed
-    or check_counts["stale"]
-    or check_counts["running"]
-    or check_counts["pending"]
-    or status_counts["pending"]
-    or aggregate_status_pending_backstop
-    or required_check_rollup_running
-    or required_check_rollup_pending
-    or required_checks_missing_or_pending
-    or merge_state_unknown
-    or merge_state_blocking
-    or check_counts["other"]
-    or status_counts["other"]
-):
+elif actions_decisive_green:
     ci_status = "passed"
-elif external_green_with_ci_read_permission_limited:
-    ci_status = "passed"
-elif any(
-    item.get("code") == "github_token_permission_denied"
-    and is_blocking_limitation(item)
-    for item in limitations
-):
-    ci_status = "unknown"
+elif actions_zero_runs:
+    ci_status = "none"
 elif limitations and any(is_blocking_limitation(item) for item in limitations):
     ci_status = "unknown"
-elif merge_state_blocking or (
-    not required_check_state["available"] and (check_counts["total"] or status_counts["total"])
-):
-    ci_status = "unknown"
-elif check_counts["total"] == 0 and status_counts["total"] == 0:
-    ci_status = "none"
-    limitations.append(
-        {
-            "code": "zero_checks_s03_non_success",
-            "source": "ci_collector",
-            "severity": "blocking",
-            "message": "no check runs or commit statuses were observed; S03 keeps this non-success until S05 grace/deadline handling",
-        }
-    )
-elif check_counts["other"] or status_counts["other"]:
-    ci_status = "unknown"
 else:
-    ci_status = "passed"
-
-if external_green_with_ci_read_permission_limited:
-    for item in limitations:
-        if (
-            item.get("code") == "github_token_permission_denied"
-            and item.get("capability") in {"check_runs_read", "commit_statuses_read"}
-            and is_blocking_limitation(item)
-        ):
-            item["severity"] = "informational"
-            item["blocking"] = False
+    ci_status = "unknown"
 
 sanitized_checks = []
 for check in check_runs:
@@ -1187,6 +746,7 @@ for status in statuses:
 fingerprint_source = {
     "head_sha": expected_head_sha,
     "ci_status": ci_status,
+    "source_policy": "github_actions_only",
     "actions": {
         "available": actions_summary.get("available"),
         "workflow_runs": actions_summary.get("workflow_runs"),
@@ -1231,30 +791,13 @@ fingerprint_source = {
             if item.get("source") == "actions"
         ],
     },
-    "check_runs": [
-        {
-            "id": item.get("id"),
-            "name": item.get("name"),
-            "head_sha": item.get("head_sha"),
-            "status": item.get("status"),
-            "conclusion": item.get("conclusion"),
-        }
-        for item in sanitized_checks
-    ],
-    "statuses": [
-        {
-            "context": item.get("context"),
-            "state": item.get("state"),
-        }
-        for item in sanitized_statuses
-    ],
     "limitations": [item.get("code") for item in limitations],
-    "required_check_state": required_check_state,
 }
 
 payload = {
     "script": "fetch_pr_checks_snapshot.sh",
     "status": ci_status,
+    "source_policy": "github_actions_only",
     "observed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     "repo": repo,
     "pr": pr,
@@ -1262,6 +805,7 @@ payload = {
     "ci": {
         "status": ci_status,
         "progress_status": ci_status,
+        "source_policy": "github_actions_only",
         "check_runs": check_counts,
         "commit_statuses": status_counts,
         "actions": actions_summary,

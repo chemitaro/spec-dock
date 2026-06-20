@@ -41,55 +41,30 @@ class GitHubCapabilityCliGateway:
                 ],
             ),
             (
-                "check_runs_read",
+                "actions_read",
                 "core",
-                "GET /repos/{repo}/commits/{sha}/check-runs",
-                [
-                    "gh",
-                    "api",
-                    f"repos/{request.github_repo}/commits/{request.github_head_sha}/check-runs",
-                    "--paginate",
-                ],
+                "GET /repos/{repo}/actions/runs",
+                ["gh", "api", f"repos/{request.github_repo}/actions/runs"],
             ),
             (
-                "commit_statuses_read",
+                "issue_comments_read",
                 "core",
-                "GET /repos/{repo}/commits/{sha}/status",
-                ["gh", "api", f"repos/{request.github_repo}/commits/{request.github_head_sha}/status"],
+                "GET /repos/{repo}/issues/{pr}/comments",
+                ["gh", "api", f"repos/{request.github_repo}/issues/{request.github_pr}/comments"],
             ),
             (
-                "status_check_rollup_read",
+                "pull_reviews_read",
                 "core",
-                "gh pr view --json statusCheckRollup",
-                [
-                    "gh",
-                    "pr",
-                    "view",
-                    str(request.github_pr),
-                    "--repo",
-                    request.github_repo,
-                    "--json",
-                    "statusCheckRollup",
-                ],
+                "GET /repos/{repo}/pulls/{pr}/reviews",
+                ["gh", "api", f"repos/{request.github_repo}/pulls/{request.github_pr}/reviews"],
+            ),
+            (
+                "pull_review_comments_read",
+                "core",
+                "GET /repos/{repo}/pulls/{pr}/comments",
+                ["gh", "api", f"repos/{request.github_repo}/pulls/{request.github_pr}/comments"],
             ),
         ]
-        if request.include_extended:
-            checks.extend(
-                [
-                    (
-                        "actions_read",
-                        "extended",
-                        "GET /repos/{repo}/actions/runs",
-                        ["gh", "api", f"repos/{request.github_repo}/actions/runs"],
-                    ),
-                    (
-                        "issue_comments_read",
-                        "extended",
-                        "GET /repos/{repo}/issues/{pr}/comments",
-                        ["gh", "api", f"repos/{request.github_repo}/issues/{request.github_pr}/comments"],
-                    ),
-                ]
-            )
         return [
             _diagnostic_from_completed_process(
                 capability=capability,
