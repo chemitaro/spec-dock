@@ -1031,6 +1031,7 @@ def is_strict_no_findings_issue_comment(item):
         "no major issues were found",
         "no major issues were found.",
         "codex review: didn't find any major issues. breezy!",
+        "codex review: didn't find any major issues. :tada:",
     }
     return normalized_body_text(raw_body) in allowed_full_bodies
 
@@ -1102,14 +1103,14 @@ elif no_findings_completion_promotes:
     lifecycle_status = "completed"
     completion_signal = "codex_no_findings_issue_comment"
     lifecycle_confidence = "medium"
-elif current_codex_issue_comments:
-    lifecycle_status = "fallback"
-    completion_signal = "fallback_issue_comment"
-    lifecycle_confidence = "low"
 elif current_pending_codex_review_present:
     lifecycle_status = "pending"
     completion_signal = "none"
     lifecycle_confidence = "medium"
+elif current_codex_issue_comments:
+    lifecycle_status = "fallback"
+    completion_signal = "fallback_issue_comment"
+    lifecycle_confidence = "low"
 elif review_request_signals or review_decision_requires_review:
     lifecycle_status = "pending"
     completion_signal = "none"
@@ -1328,7 +1329,7 @@ elif blocking_collection_failure:
     decision_action = "human_gate"
 elif completion_signal == "none":
     decision_status_reason = "missing_current_completion_signal"
-    decision_status = "unknown"
+    decision_status = "pending" if current_pending_codex_review_present else "unknown"
     decision_action = "wait_or_resume"
 else:
     decision_status_reason = (

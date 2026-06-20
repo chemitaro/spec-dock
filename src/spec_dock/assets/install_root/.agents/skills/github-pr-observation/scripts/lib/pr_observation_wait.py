@@ -371,7 +371,7 @@ def trusted_completion_actionable_reason(payload: dict) -> str | None:
 def is_carryover_missing_completion_wait(payload: dict) -> bool:
     decision = decision_payload(payload)
     return (
-        decision.get("status_reason") == "missing_current_completion_signal"
+        decision.get("status_reason") in {"missing_current_completion_signal", "wait_timeout"}
         and current_selected_actionable_reason(payload) is None
         and carryover_inventory_reason(payload) is not None
     )
@@ -470,6 +470,8 @@ def is_review_completion_unknown_candidate(payload: dict) -> bool:
     if evidence.get("requires_wait_stability") is not True:
         return False
     if evidence.get("promotes_top_level_status") is True:
+        return False
+    if carryover_inventory_reason(payload):
         return False
     disqualifying_flags = (
         "pending_review_present",
@@ -1000,7 +1002,6 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
             and isinstance(fallback_pass_candidate, dict)
             and fallback_pass_candidate.get("promotes_top_level_status") is True
             and review_status not in {"changes_requested", "requested", "pending", "unknown"}
-            and not carryover_inventory_reason(payload)
         ):
             return "passed", "passed", "merge_prepared", True, False
         if completion_signal == "fallback_issue_comment" or decision_reason == "fallback_issue_comment_low_confidence":
@@ -1404,6 +1405,10 @@ while True:
             can_complete_when_stable_before_poll
             and quiet_can_be_evaluated
             and stability_can_be_evaluated
+            and not (
+                is_carryover_missing_completion_wait(latest_payload)
+                and not latency_satisfied_before_poll
+            )
         ):
             under_budget_poll_exception_candidate_kind = "stable_completion"
         elif zero_check_grace_can_be_evaluated:
@@ -1490,7 +1495,8 @@ while True:
             snapshot_stdout,
             snapshot_stderr,
         )
-        mark_latest_timeout(payload, latest_change_monotonic, same_count)
+        if not is_carryover_missing_completion_wait(payload):
+            mark_latest_timeout(payload, latest_change_monotonic, same_count)
         snapshot_text = latest_snapshot_text
     elif snapshot_poll_timed_out:
         payload = timeout_snapshot(snapshot_timeout, snapshot_stdout, snapshot_stderr)
@@ -1576,6 +1582,12 @@ while True:
     remain = int(max(0, deadline - time.monotonic()))
     if observation_complete:
         final_phase = "terminal"
+    elif (
+        snapshot_poll_timed_out
+        and is_carryover_missing_completion_wait(payload)
+        and not review_completion_unknown_latency_satisfied
+    ):
+        final_phase = "wait"
     elif snapshot_poll_timed_out:
         final_phase = "timeout"
         normalized_status = "timeout"
