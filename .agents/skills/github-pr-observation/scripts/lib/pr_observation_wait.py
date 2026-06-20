@@ -115,6 +115,15 @@ def has_permission_limitation(payload: dict) -> bool:
     )
 
 
+def has_waitable_required_actions_context_limitation(payload: dict) -> bool:
+    return any(
+        isinstance(item, dict)
+        and item.get("code") == "required_actions_context_pending"
+        and item.get("recommended_next_action") == "wait"
+        for item in payload.get("limitations", [])
+    )
+
+
 def sanitized_review_signals(payload: dict) -> list:
     review = payload.get("review")
     if not isinstance(review, dict):
@@ -1050,6 +1059,17 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
                 return "unknown", "unknown", "fix_github_token_permissions", False, True
             return "unknown", "unknown", "human_gate", False, True
         return ci_status, ci_status, "wait", False, False
+    if (
+        ci_status == "unknown"
+        and top_level_status == "pending"
+        and top_level_next_action == "wait"
+        and has_waitable_required_actions_context_limitation(payload)
+    ):
+        if has_blocking_limitation(payload, ignored_codes={"required_actions_context_pending"}):
+            if has_permission_limitation(payload):
+                return "unknown", "unknown", "fix_github_token_permissions", False, True
+            return "unknown", "unknown", "human_gate", False, True
+        return "pending", "pending", "wait", False, False
     actionable_reason = trusted_completion_actionable_reason(payload)
     if ci_status == "passed" and actionable_reason:
         return "human_gate", "human_gate", "address_review_feedback", False, True
