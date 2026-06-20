@@ -205,55 +205,58 @@ rg -n "statusCheckRollup|check-runs|gh pr checks|ci_coverage_limited_to_github_a
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | 既存 collector に `gh pr view --json mergeStateStatus,statusCheckRollup`、`/check-runs`、`/status` 呼び出しがあり、広め verification lane は旧 rollup/status 前提で `25 failed, 58 passed, 394 deselected` だった | source inspection; `uv run pytest tests/unit/infra/test_init_update.py -k "observation or checks or github_pr"` before stale-test cleanup | pass | forbidden surface と stale expectations を再現 |
+| S01 | 緑フェーズ（Green） | cl-001 / cl-011 | collector は forbidden supplemental API を呼ばず、S01 guard と広め lane が pass | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_222_s01"` -> `2 passed, 475 deselected`; `uv run pytest tests/unit/infra/test_init_update.py -k "observation or checks or github_pr"` -> `83 passed, 394 deselected` | pass | static guard は `checks` token ではなく forbidden API surface を対象にする |
+| S01 | リファクタリング（Refactor） | guardrail satisfied | unused import / stale supplemental limitation expectations を整理。実装 source は provider-side collector と focused tests のみ | `git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py tests/unit/infra/test_init_update.py` -> pass | pass | full file test は `473 passed, 4 failed`; failure は generated `__pycache__` inventory と dogfooding snapshot/parity。`__pycache__` は削除済み、dogfooding parity は後続 mirror/snapshot synchronization で扱う |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | stale rollup/status/check-runs tests still expected forbidden supplemental API evidence | code-reviewer / verification | updated tests to assert Actions-only forbidden collection policy, non-call behavior, or Actions evidence; no plan amendment | cl-001 / cl-011 | no | code-reviewer fail then pass; `83 passed, 394 deselected` |
+| S01 | full `tests/unit/infra/test_init_update.py` still reports dogfooding snapshot / provider mirror parity failures after provider asset change and issue import | verification | recorded for later sync/mirror step; not S01 blocker per code-reviewer because outside S01 allowed-path contract | follow-up parity risk | no | full file `473 passed, 4 failed`; code-reviewer pass allowed deferral |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | cl-001, cl-011 | cl-001: forbidden API calls are not executed and fake-gh detects them; cl-011: compatibility names may remain without word-ban behavior | provider collector has no forbidden decision call pattern; `test_issue_222_s01_pr_observation_ci_collector_forbids_checks_api_surfaces`; `test_issue_222_s01_static_guard_targets_forbidden_ci_surfaces_not_checks_name`; broad lane pass | pass | S02-S05/S90/S99 remain unlocked only after this committed step |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| cl-001 | S01 | yes | red-required | source inspection showed `statusCheckRollup`, `/check-runs`, commit status calls in collector | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_222_s01"`; `uv run pytest tests/unit/infra/test_init_update.py -k "observation or checks or github_pr"` | pass | fake-gh fails on forbidden surface and collector uses Actions API only |
+| cl-011 | S01 | yes | inspect-only | compatibility names such as `fetch_pr_checks_snapshot.sh` remain intentionally | static test `test_issue_222_s01_static_guard_targets_forbidden_ci_surfaces_not_checks_name`; provider collector `rg` forbidden patterns -> no matches | pass | no word-ban on `checks` token |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| cl-001 | S01 | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_222_s01"` -> `2 passed`; broad lane -> `83 passed` | pass | forbidden API calls removed from runtime path |
+| cl-011 | S01 | static guard plus code-reviewer pass | pass | compatibility names preserved; `checks` word itself not banned |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| changed | cl-001 | legacy rollup/status tests | cl-001 | forbidden supplemental API is no longer observable; stale tests now assert non-call / forbidden policy / Actions evidence | no | yes; code-reviewer re-review passed |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00222 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/1fd6/spec-dock` | iss-00222 | current session | dev-coder, doc-writer, code-reviewer, qa-reviewer, spec-reviewer | same repo, active issue, named role; no destructive action beyond approved cleanup; no scope expansion without report evidence | issue complete / session end / scope change / user revocation | none | proceed |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | shipped scaffold runtime and tests | dev-coder | forbidden CI surface guard and stale test cleanup | requirement/design/plan/ADR/interview | provider `pr_observation_checks.py`; `tests/unit/infra/test_init_update.py` | canonical docs/report by worker; dogfooding mirror as implementation source; review/comment collector; broad rename of `checks` compatibility names | focused and broad pytest; static forbidden pattern inspection; diff check | forbidden API must remain; fake-gh cannot detect forbidden calls; allowed paths insufficient | changed files, tests, closure evidence, ledger note, risks | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | dev-coder | removed forbidden supplemental collector calls; added S01 fake-gh/static guard; updated stale rollup/status/check-runs tests to Actions-only forbidden policy | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py`; `tests/unit/infra/test_init_update.py` | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_222_s01"` -> pass; broad lane -> pass; diff check -> pass | pass: code-reviewer `019ee5aa-8402-7a13-8aca-1ce183fbe83a` after two follow-ups | dogfooding mirror/snapshot parity remains for later step | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -263,12 +266,12 @@ rg -n "statusCheckRollup|check-runs|gh pr checks|ci_coverage_limited_to_github_a
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step reviewer | code-reviewer | fresh | passed | no | proceed to S01 commit | initial reviews found stale tests; final review returned `review_status: pass` |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | committed | provider collector, focused tests, S01 report evidence | pending S01 commit | post-commit clean check to be recorded externally before S02 | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `path/to/file1` - ...
