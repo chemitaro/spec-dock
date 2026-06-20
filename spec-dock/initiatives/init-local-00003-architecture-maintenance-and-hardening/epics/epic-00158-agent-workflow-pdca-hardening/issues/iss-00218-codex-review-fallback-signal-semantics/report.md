@@ -74,6 +74,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-006 | adopted | reviewer | `plan.md` | plan reviewer の P1/P2 指摘を修正し、fresh re-review が pass した | spec-reviewer Tesla/Dalton sequence | none |
 | EAL-007 | adopted | delegated worker | `report.md` S03 evidence | S03 worker の Red/Green/非回帰/diff-check 証跡を親が再実行結果と照合して採用 | parent rerun: S03 selector 3 passed; missing-completion selector 2 passed; `git diff --check` pass; code-reviewer pass with P2 bookkeeping finding | none |
 | EAL-008 | adopted | PR repair batch / repair unit | `report.md` final PR repair evidence | PR #220 observation 後の Provider CI failure 5件は checked-in dogfooding snapshot/parity の更新漏れとして分類し、U001 で局所修復した | `discussions/20260619t184139z-pr-repair-batch-pr-repair-batch.md`; `discussions/20260619t184214z-disc-pr-repair-unit-u001-ci-snapshot-parity.md`; five failing tests now pass locally; S99 selector 87 passed; validate pass; diff-check pass; latest-head GitHub checks pass | Codex review usage-limit human gate remains |
+| EAL-009 | adopted | PR review comments / repair unit | `report.md` PR review repair evidence | PR #220 の直接レビューコメント4件を valid blocking feedback として採用し、no-findings promotion の最新シグナル制約、review-required / changes-requested blocker、explicit completion evidence を補強した | `discussions/20260620t025616z-disc-pr-repair-unit-u002-codex-review-feedback.md`; local PR observation selector 91 passed, 370 deselected | push 後に PR checks と latest-head observation を再確認する |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
