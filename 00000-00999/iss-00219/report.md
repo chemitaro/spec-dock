@@ -375,6 +375,11 @@ result: no output, exit 0
 | `uv run pytest tests/unit` | 720 passed | final full unit rerun after parity correction and short-timeout rerun |
 | `uv run pytest tests/unit` | 721 passed | final full unit rerun after PR feedback fix |
 | `uv run pytest tests/unit` | 722 passed | final full unit rerun after fallback pass promotion |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_219 or issue_218_s01_review_collector_no_findings or issue_218_s03_wait_no_findings or issue_187_s420 or issue_187_s430 or issue_187_s204 or github-pr-observation or pr_observation"` | 112 passed, 362 deselected | final focused PR observation regression subset after multi-line no-findings recognition |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_218_s01_review_collector_no_findings or issue_219_s01_review_collector_no_findings"` | 15 passed, 459 deselected | no-findings collector variant subset |
+| `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets` | 1 passed | provider/mirror agent-tooling parity after final no-findings recognition |
+| `uv run pytest tests/unit` | 749 passed | final full unit rerun after latency/poll-timeout fixes before final no-findings recognition |
+| `./spec-dock/scripts/spec-dock validate` | passed | `spec-dock: ok (validate) nodes=137` after final PR observation loop |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
@@ -396,6 +401,7 @@ result: no output, exit 0
 |---|---|---|---|---|---|
 | 1 | `#221` | `c2f2b720b3c532632ceb8734f58dedaf01d23d18` | `fetch_pr_observation_snapshot.sh` out: `/private/tmp/issue219-pr221-snapshot-1`; `wait_pr_observation.sh` out: `/private/tmp/issue219-pr221-wait-1` | fixed `@codex review` trigger posted; CI changed from running to passed; Codex review comments and unresolved threads were collected; final status `human_gate`, reason `current_selected_unresolved_thread`, recommended action `address_review_feedback` | actionable feedback を本 issue の修正対象として採用 |
 | 2 | `#221` | `2e33b69e1dcddcf46fca32341de13d9169ba0d63` | `fetch_pr_observation_snapshot.sh` out: `/private/tmp/issue219-pr221-snapshot-2`; `wait_pr_observation.sh` out: `/private/tmp/issue219-pr221-wait-2`; resume out: `/private/tmp/issue219-pr221-wait-3` | CI 4 checks passed and old review comments/threads were excluded from current trigger boundary, but Codex returned `Codex Review: Didn't find any major issues. :tada:` as an issue comment fallback; wait result stayed `human_gate` / `fallback_issue_comment_low_confidence` / `wait_or_resume` | fallback no-major-issues issue comment を current trigger completion signal として `merge_prepared` に昇格する follow-up fix を本 issue に追加 |
+| 3 | `#221` | `140e1096e127ad1ccc2a0c3024bf4adbbd0234cc` | `wait_pr_observation.sh` out: `/private/tmp/issue219-pr221-wait-19`; PR view evidence from `gh pr view 221 --json ...` | CI 4 checks passed, PR is open / non-draft / mergeable / CLEAN, current trigger-boundary selected review comments and threads are empty, Codex returned `Codex Review: Didn't find any major issues. Hooray!`, final status `passed`, reason `fallback_issue_comment_no_major_issues`, recommended action `merge_prepared`, `observation_complete=true` | PR monitoring manual test passed; PR is merge-prepared for human merge judgment |
 
 #### PR Feedback Findings / Disposition
 | finding | 対象 | 問題 | 修正 | 検証 |
@@ -403,6 +409,9 @@ result: no output, exit 0
 | P2 Preserve timed-out refreshes for carryover waits | `pr_observation_wait.py` carryover missing-completion wait | 後続 snapshot poll が timeout しても、古い carryover-only payload を再利用して `snapshot_poll_timed_out` を消し、stale payload から unknown/fresh-audit metadata を作れる | carryover-only でも snapshot poll timeout は blocking limitation と `wait_timeout` として保持する | new regression `test_issue_219_s01_wait_preserves_carryover_refresh_timeout`; focused subset 88 passed |
 | P2 Report expired carryover waits as deadline-reached | `pr_observation_wait.py` wait metadata | carryover-only wait が期限到達で止まっても `wait.deadline_reached=false` になり、resume 必要性を呼び出し側が見落とせる | `final_phase == "wait"` でも deadline 到達時は `deadline_reached=true` とし、期限直前の予算不足分岐でも carryover/latency guard を評価する。code-reviewer gate の追加 P1 指摘により top-of-loop deadline exit でも stale wait metadata を返さないよう `latest_payload.wait.deadline_reached=true` を明示した | existing guard-under regression に `deadline_reached=true` assertion を追加; focused subset 88 passed |
 | Manual observation follow-up: no-major-issues fallback cannot complete | `pr_review_snapshot.py`, `pr_observation_snapshot.py`, `pr_observation_wait.py` fallback issue comment completion | 実PRで Codex が PR review ではなく `Codex Review: Didn't find any major issues. :tada:` issue comment を返し、CI pass / current blocker なしでも wait script が `wait_or_resume` を返し続けた | current trigger boundary の no-major-issues fallback issue comment を検出し、`fallback_pass_candidate.promotes_top_level_status=true` の場合だけ `passed` / `merge_prepared` に昇格する。通常のfallback issue comment は従来通り低信頼 human gate のままにする | focused fallback tests 5 passed; PR observation subset 89 passed; provider/mirror parity 1 passed |
+| PR review follow-up: unresolved review must block fallback pass | `pr_observation_snapshot.py`, `pr_observation_wait.py` fallback pass promotion | `review_status=unresolved` でも fallback pass が `passed` / `merge_prepared` に昇格し得る | fallback pass promotion の拒否対象に `unresolved` を追加し、snapshot/wait regressions を追加 | focused subset 110 passed, full unit 747 passed, PR re-observation continued |
+| PR review follow-up: poll timeout evidence must not be hidden | `pr_observation_wait.py` carryover snapshot refresh | carryover-only missing completion wait で snapshot poll timeout を隠すと stale evidence を再利用し続ける | latency 未満は warning limitation として残し、latency 満了後は blocking timeout として扱う | focused subsets 111/112 passed, full unit 748/749 passed, PR re-observation continued |
+| PR review follow-up: no-findings variants use first-line/details format | `pr_review_snapshot.py` no-findings issue comment recognition | Codex no-findings issue comment の suffix が `Chef's kiss` / `Swish` / `Hooray` などに変わり、全文 allowlist では監視が完了しない | 先頭行が `Codex Review: Didn't find any major issues.` で始まり、後続に `Reviewed commit` または `<details>` metadata がある場合だけ strict no-findings と認識する | no-findings collector subset 15 passed, focused subset 112 passed, final PR observation `/private/tmp/issue219-pr221-wait-19/result.json` passed |
 
 #### Plan Amendment Gate / Disposition
 | finding / trigger | 対象 | 処置 | 状態 |
@@ -415,8 +424,9 @@ result: no output, exit 0
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
 | S90/S99 parity correction and final local validation ledger | `.agents` mirror runtime sync, dogfooding meta baseline update, final report evidence | PR body / final response; PR observation manual test after PR creation | committed in final local ledger commit |
-| PR feedback fix ledger | carryover wait timeout preservation, deadline metadata correction, provider/mirror sync, regression tests, report evidence | PR #221 push and PR observation manual test rerun | pending commit |
-| PR observation completion follow-up ledger | no-major-issues fallback promotion, provider/mirror sync, regression tests, report evidence | PR #221 push and PR observation manual test rerun | pending commit |
+| PR feedback fix ledger | carryover wait timeout preservation, deadline metadata correction, provider/mirror sync, regression tests, report evidence | PR #221 push and PR observation manual test rerun | committed and pushed through `140e1096`; reobserved pass |
+| PR observation completion follow-up ledger | no-major-issues fallback promotion, provider/mirror sync, regression tests, report evidence | PR #221 push and PR observation manual test rerun | committed and pushed through `140e1096`; reobserved pass |
+| PR repair batch and merge-prepared evidence ledger | generated `pr-repair-batch` discussion, final PR observation evidence, final report update | PR #221 final response / merge-prepared human judgment | pending commit |
 
 ## 実行引き渡し準備（Execution Handoff Readiness）
 
@@ -443,4 +453,4 @@ result: no output, exit 0
 - Plan authoring では Issue219 regression を first-class closure とし、guard-under / guard-satisfied / trusted-completion / current-selected priority の matrix を分ける。
 
 ## 省略/例外メモ
-- Supersedes authoring-phase status note: S01/S02/S03/S90/S99 local gates are committed. PR delivery gate and PR observation manual test attempt 1 are executed; PR feedback fix is pending commit/push and requires PR observation rerun.
+- Supersedes authoring-phase status note: S01/S02/S03/S90/S99 local gates are committed. PR delivery gate and PR observation manual test were executed through PR #221. Final observation `/private/tmp/issue219-pr221-wait-19/result.json` is `passed` / `merge_prepared`; merge remains a human action.
