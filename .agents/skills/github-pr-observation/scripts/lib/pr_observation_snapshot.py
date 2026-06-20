@@ -568,12 +568,49 @@ def load_metadata(path: Path) -> tuple[dict[str, object], str]:
     return payload, head if isinstance(head, str) else ""
 
 
-def run_gh_api_json(path: str) -> tuple[object, int, str]:
-    completed = subprocess.run(["gh", "api", path], capture_output=True, text=True, check=False)
+def parse_paginated_gh_api_json(stdout: str) -> object:
+    text = stdout.strip()
+    if not text:
+        return {}
+    decoder = json.JSONDecoder()
+    documents: list[object] = []
+    index = 0
+    while index < len(text):
+        document, end_index = decoder.raw_decode(text, index)
+        documents.append(document)
+        index = end_index
+        while index < len(text) and text[index].isspace():
+            index += 1
+    if len(documents) == 1:
+        return documents[0]
+    if all(isinstance(document, dict) and isinstance(document.get("jobs"), list) for document in documents):
+        jobs: list[object] = []
+        total_count = 0
+        saw_total_count = False
+        for document in documents:
+            if not isinstance(document, dict):
+                continue
+            page_jobs = document.get("jobs")
+            if isinstance(page_jobs, list):
+                jobs.extend(page_jobs)
+            page_total_count = document.get("total_count")
+            if isinstance(page_total_count, int):
+                total_count += page_total_count
+                saw_total_count = True
+        return {"total_count": total_count if saw_total_count else len(jobs), "jobs": jobs}
+    return documents
+
+
+def run_gh_api_json(path: str, *, paginate: bool = False) -> tuple[object, int, str]:
+    command = ["gh", "api", path]
+    if paginate:
+        command.append("--paginate")
+    completed = subprocess.run(command, capture_output=True, text=True, check=False)
     if completed.returncode != 0:
         return {}, completed.returncode, completed.stderr or ""
     try:
-        return json.loads(completed.stdout or "{}"), 0, completed.stderr or ""
+        payload = parse_paginated_gh_api_json(completed.stdout) if paginate else json.loads(completed.stdout or "{}")
+        return payload, 0, completed.stderr or ""
     except json.JSONDecodeError:
         return {}, 1, "fixed read-only GitHub API returned non-JSON output"
 
@@ -600,6 +637,84 @@ def successful_actions_contexts(ci_payload: dict[str, object]) -> set[str]:
     return contexts
 
 
+def actions_jobs_collection(ci_payload: dict[str, object]) -> dict[str, object]:
+    actions = ci_payload.get("actions") if isinstance(ci_payload.get("actions"), dict) else {}
+    jobs_summary = actions.get("jobs_summary") if isinstance(actions.get("jobs_summary"), dict) else {}
+    collection = jobs_summary.get("collection") if isinstance(jobs_summary.get("collection"), dict) else {}
+    return collection if isinstance(collection, dict) else {}
+
+
+def has_skipped_green_run_jobs(ci_payload: dict[str, object]) -> bool:
+    skipped = actions_jobs_collection(ci_payload).get("skipped_green_runs")
+    return isinstance(skipped, int) and skipped > 0
+
+
+def successful_jobs_from_payload(payload: object) -> set[str] | None:
+    if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list):
+        return None
+    contexts: set[str] = set()
+    for job in payload.get("jobs", []):
+        if not isinstance(job, dict):
+            continue
+        name = job.get("name")
+        status = str(job.get("status") or "").lower()
+        conclusion = str(job.get("conclusion") or "").lower()
+        if isinstance(name, str) and name and status == "completed" and conclusion in {"success", "neutral", "skipped"}:
+            contexts.add(name)
+    return contexts
+
+
+def expand_successful_actions_contexts(
+    *, repo: str, ci_payload: dict[str, object], missing_contexts: list[str]
+) -> tuple[set[str], bool, list[dict[str, object]]]:
+    contexts = successful_actions_contexts(ci_payload)
+    if not missing_contexts or not has_skipped_green_run_jobs(ci_payload):
+        return contexts, False, []
+    actions = ci_payload.get("actions") if isinstance(ci_payload.get("actions"), dict) else {}
+    limitations: list[dict[str, object]] = []
+    expanded_all = True
+    for run in actions.get("runs", []) if isinstance(actions.get("runs"), list) else []:
+        if not isinstance(run, dict):
+            continue
+        run_id = run.get("id")
+        if not isinstance(run_id, int):
+            expanded_all = False
+            continue
+        jobs_api = f"repos/{repo}/actions/runs/{run_id}/jobs"
+        jobs_payload, jobs_exit, jobs_stderr = run_gh_api_json(jobs_api, paginate=True)
+        if jobs_exit != 0:
+            expanded_all = False
+            limitations.append(
+                {
+                    "code": "required_actions_context_expansion_unavailable",
+                    "source": jobs_api,
+                    "capability": "actions_read",
+                    "severity": "info",
+                    "message": "fixed Actions jobs expansion could not verify required contexts",
+                    "recommended_next_action": "wait",
+                    "exit_code": jobs_exit,
+                    "stderr_classification": classify_github_stderr(jobs_stderr),
+                }
+            )
+            continue
+        expanded = successful_jobs_from_payload(jobs_payload)
+        if expanded is None:
+            expanded_all = False
+            limitations.append(
+                {
+                    "code": "required_actions_context_expansion_unavailable",
+                    "source": jobs_api,
+                    "capability": "actions_read",
+                    "severity": "info",
+                    "message": "fixed Actions jobs expansion returned an unexpected schema",
+                    "recommended_next_action": "wait",
+                }
+            )
+            continue
+        contexts.update(expanded)
+    return contexts, not expanded_all, limitations
+
+
 def required_status_contexts(protection_payload: object) -> tuple[set[str], set[str], bool]:
     if not isinstance(protection_payload, dict):
         return set(), set(), False
@@ -614,7 +729,7 @@ def required_status_contexts(protection_payload: object) -> tuple[set[str], set[
     if isinstance(raw_contexts, list):
         for context in raw_contexts:
             if isinstance(context, str) and context:
-                actions_contexts.add(context)
+                non_actions_contexts.add(context)
     raw_checks = required_status_checks.get("checks")
     if isinstance(raw_checks, list):
         for check in raw_checks:
@@ -707,18 +822,26 @@ def collect_merge_blocker_metadata(
                 "ahead_by": ahead_by,
             }
         )
-        if status in {"behind", "diverged"} or (isinstance(behind_by, int) and behind_by > 0):
-            limitations.append(
-                {
-                    "code": "pr_branch_behind",
-                    "source": compare_api,
-                    "severity": "blocking",
-                    "message": "PR head branch is behind or diverged from the base branch",
-                    "recommended_next_action": "update_pr_branch",
-                    "compare_status": status,
-                    "behind_by": behind_by,
-                }
-            )
+    branch_is_behind = (
+        compare_metadata.get("status") in {"behind", "diverged"}
+        or (
+            isinstance(compare_metadata.get("behind_by"), int)
+            and compare_metadata.get("behind_by") > 0
+        )
+    )
+
+    def add_strict_behind_limitation(source: str) -> None:
+        limitations.append(
+            {
+                "code": "pr_branch_behind",
+                "source": source,
+                "severity": "blocking",
+                "message": "PR head branch is behind or diverged from a strict required-check base branch",
+                "recommended_next_action": "update_pr_branch",
+                "compare_status": compare_metadata.get("status"),
+                "behind_by": compare_metadata.get("behind_by"),
+            }
+        )
 
     branch_api = f"repos/{repo}/branches/{encoded_base}"
     branch_payload, branch_exit, branch_stderr = run_gh_api_json(branch_api)
@@ -784,6 +907,18 @@ def collect_merge_blocker_metadata(
                 "compare": compare_metadata,
                 "branch_protection": protection_metadata,
             }, limitations
+        required_status_checks = (
+            protection_payload.get("required_status_checks")
+            if isinstance(protection_payload, dict)
+            else None
+        )
+        strict_required_checks = (
+            isinstance(required_status_checks, dict)
+            and required_status_checks.get("strict") is True
+        )
+        protection_metadata["strict"] = strict_required_checks
+        if branch_is_behind and strict_required_checks:
+            add_strict_behind_limitation(protection_api)
         contexts, non_actions_contexts, schema_ok = required_status_contexts(protection_payload)
         if not schema_ok:
             limitations.append(
@@ -798,10 +933,21 @@ def collect_merge_blocker_metadata(
             )
         observed_contexts = successful_actions_contexts(ci_payload)
         missing = sorted(context for context in contexts if context not in observed_contexts)
+        expansion_incomplete = False
+        expansion_limitations: list[dict[str, object]] = []
+        if missing and has_skipped_green_run_jobs(ci_payload):
+            observed_contexts, expansion_incomplete, expansion_limitations = expand_successful_actions_contexts(
+                repo=repo,
+                ci_payload=ci_payload,
+                missing_contexts=missing,
+            )
+            limitations.extend(expansion_limitations)
+            missing = sorted(context for context in contexts if context not in observed_contexts)
         ci_status = str(ci_payload.get("status") or "unknown")
         protection_metadata.update(
             {
                 "protected": True,
+                "strict": strict_required_checks,
                 "required_status_contexts": sorted(contexts | non_actions_contexts),
                 "required_github_actions_contexts": sorted(contexts),
                 "required_non_actions_contexts": sorted(non_actions_contexts),
@@ -823,7 +969,7 @@ def collect_merge_blocker_metadata(
                 }
             )
         if missing:
-            if ci_status in {"pending", "running", "none", "unknown"}:
+            if ci_status in {"pending", "running", "none", "unknown"} or expansion_incomplete:
                 limitations.append(
                     {
                         "code": "required_actions_context_pending",
