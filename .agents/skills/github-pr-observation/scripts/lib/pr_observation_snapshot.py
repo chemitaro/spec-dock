@@ -298,12 +298,16 @@ def explicit_actionable_unresolved_reason(decision: dict[str, object]) -> str | 
 def trusted_completion_actionable_reason(
     decision: dict[str, object], completion_signal: object
 ) -> str | None:
-    explicit_reason = explicit_actionable_unresolved_reason(decision)
-    if explicit_reason:
-        return explicit_reason
     current_reason = current_selected_actionable_reason(decision)
     if current_reason:
         return current_reason
+    fallback_pass_candidate = decision.get("fallback_pass_candidate")
+    if (
+        completion_signal == "fallback_issue_comment"
+        and isinstance(fallback_pass_candidate, dict)
+        and fallback_pass_candidate.get("promotes_top_level_status") is True
+    ):
+        return explicit_actionable_unresolved_reason(decision)
     if completion_signal == "submitted_pull_request_review":
         return carryover_inventory_reason(decision)
     return None

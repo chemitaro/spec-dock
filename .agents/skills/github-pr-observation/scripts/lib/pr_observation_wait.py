@@ -396,15 +396,19 @@ def explicit_actionable_unresolved_reason(payload: dict) -> str | None:
 
 
 def trusted_completion_actionable_reason(payload: dict) -> str | None:
-    explicit_reason = explicit_actionable_unresolved_reason(payload)
-    if explicit_reason:
-        return explicit_reason
     current_reason = current_selected_actionable_reason(payload)
     if current_reason:
         return current_reason
     decision = decision_payload(payload)
     lifecycle = codex_review_lifecycle(payload)
     completion_signal = decision.get("completion_signal") or lifecycle.get("completion_signal")
+    fallback_pass_candidate = decision.get("fallback_pass_candidate")
+    if (
+        completion_signal == "fallback_issue_comment"
+        and isinstance(fallback_pass_candidate, dict)
+        and fallback_pass_candidate.get("promotes_top_level_status") is True
+    ):
+        return explicit_actionable_unresolved_reason(payload)
     if completion_signal == "submitted_pull_request_review":
         return carryover_inventory_reason(payload)
     return None
