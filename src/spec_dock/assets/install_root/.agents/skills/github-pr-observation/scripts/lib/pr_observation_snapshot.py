@@ -9,8 +9,9 @@ import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 
-PR_METADATA_FIELDS = "headRefOid,url,state,isDraft,number,mergeable"
+PR_METADATA_FIELDS = "headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable"
 
 
 @dataclass(frozen=True)
@@ -154,6 +155,87 @@ def classify_github_stderr(stderr: str) -> str:
     ):
         return "transient_unknown"
     return "unknown"
+
+
+def github_api_failure_limitation(
+    *,
+    api: str,
+    source: str,
+    capability: str,
+    exit_code: int,
+    stderr: str,
+    default_code: str,
+    default_message: str,
+) -> dict[str, object]:
+    classification = classify_github_stderr(stderr)
+    stderr_sha256 = hashlib.sha256((stderr or "").encode()).hexdigest()
+    base = {
+        "capability": capability,
+        "api": api,
+        "source": source,
+        "token_source": token_source(),
+        "secret_redacted": True,
+        "stderr_sha256": stderr_sha256,
+        "exit_code": exit_code,
+    }
+    if classification == "permission_denied":
+        return {
+            **base,
+            "code": "github_token_permission_denied",
+            "status": "permission_denied",
+            "severity": "blocking",
+            "message": "GitHub token lacks permission for fixed PR observation metadata API",
+            "recommended_next_action": "fix_github_token_permissions",
+        }
+    if classification == "auth_missing":
+        return {
+            **base,
+            "code": "github_auth_missing",
+            "status": "auth_missing",
+            "severity": "blocking",
+            "message": "GitHub authentication is unavailable for fixed PR observation metadata API",
+            "recommended_next_action": "authenticate_github_cli",
+        }
+    if classification == "rate_limited":
+        return {
+            **base,
+            "code": "github_rate_limited",
+            "status": "rate_limited",
+            "severity": "blocking",
+            "message": "GitHub rate limit blocked fixed PR observation metadata API",
+            "recommended_next_action": "wait_or_retry_later",
+        }
+    if classification == "schema_unavailable":
+        return {
+            **base,
+            "code": "github_api_schema_unavailable",
+            "status": "schema_unavailable",
+            "severity": "blocking",
+            "message": "fixed read-only PR observation metadata schema is unavailable",
+            "recommended_next_action": "inspect_github_api_schema",
+        }
+    if classification == "transient_unknown":
+        return {
+            **base,
+            "code": "github_transient_unknown",
+            "status": "transient_unknown",
+            "severity": "blocking",
+            "message": "transient GitHub failure blocked fixed PR observation metadata API",
+            "recommended_next_action": "retry_observation",
+        }
+    return {
+        **base,
+        "code": default_code,
+        "status": classification,
+        "severity": "blocking",
+        "message": default_message,
+        "recommended_next_action": "human_gate",
+    }
+
+
+def is_not_found(stderr: str) -> bool:
+    lowered = (stderr or "").lower()
+    return "http 404" in lowered or "not found" in lowered
 
 
 def pr_metadata_failure_limitation(
@@ -469,6 +551,257 @@ def load_metadata(path: Path) -> tuple[dict[str, object], str]:
     return payload, head if isinstance(head, str) else ""
 
 
+def run_gh_api_json(path: str) -> tuple[object, int, str]:
+    completed = subprocess.run(["gh", "api", path], capture_output=True, text=True, check=False)
+    if completed.returncode != 0:
+        return {}, completed.returncode, completed.stderr or ""
+    try:
+        return json.loads(completed.stdout or "{}"), 0, completed.stderr or ""
+    except json.JSONDecodeError:
+        return {}, 1, "fixed read-only GitHub API returned non-JSON output"
+
+
+def successful_actions_contexts(ci_payload: dict[str, object]) -> set[str]:
+    actions = ci_payload.get("actions") if isinstance(ci_payload.get("actions"), dict) else {}
+    contexts: set[str] = set()
+    for run in actions.get("runs", []) if isinstance(actions.get("runs"), list) else []:
+        if not isinstance(run, dict):
+            continue
+        name = run.get("name")
+        status = str(run.get("status") or "").lower()
+        conclusion = str(run.get("conclusion") or "").lower()
+        if isinstance(name, str) and name and status == "completed" and conclusion in {"success", "neutral", "skipped"}:
+            contexts.add(name)
+    for job in actions.get("jobs", []) if isinstance(actions.get("jobs"), list) else []:
+        if not isinstance(job, dict):
+            continue
+        name = job.get("name")
+        status = str(job.get("status") or "").lower()
+        conclusion = str(job.get("conclusion") or "").lower()
+        if isinstance(name, str) and name and status == "completed" and conclusion in {"success", "neutral", "skipped"}:
+            contexts.add(name)
+    return contexts
+
+
+def required_status_contexts(protection_payload: object) -> tuple[set[str], bool]:
+    if not isinstance(protection_payload, dict):
+        return set(), False
+    required_status_checks = protection_payload.get("required_status_checks")
+    if required_status_checks is None:
+        return set(), True
+    if not isinstance(required_status_checks, dict):
+        return set(), False
+    contexts: set[str] = set()
+    raw_contexts = required_status_checks.get("contexts")
+    if isinstance(raw_contexts, list):
+        for context in raw_contexts:
+            if isinstance(context, str) and context:
+                contexts.add(context)
+    raw_checks = required_status_checks.get("checks")
+    if isinstance(raw_checks, list):
+        for check in raw_checks:
+            if not isinstance(check, dict):
+                return contexts, False
+            context = check.get("context")
+            if isinstance(context, str) and context:
+                contexts.add(context)
+    return contexts, True
+
+
+def head_owner_login(metadata: dict[str, object]) -> str | None:
+    owner = metadata.get("headRepositoryOwner")
+    if not isinstance(owner, dict):
+        return None
+    login = owner.get("login")
+    if isinstance(login, str) and login:
+        return login
+    name = owner.get("name")
+    if isinstance(name, str) and name:
+        return name
+    return None
+
+
+def collect_merge_blocker_metadata(
+    *, repo: str, metadata: dict[str, object], ci_payload: dict[str, object]
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    limitations: list[dict[str, object]] = []
+    base_ref = metadata.get("baseRefName")
+    head_ref = metadata.get("headRefName")
+    if not isinstance(base_ref, str) or not base_ref or not isinstance(head_ref, str) or not head_ref:
+        return {
+            "compare": {"available": False},
+            "branch_protection": {"available": False},
+        }, [
+            {
+                "code": "pr_branch_metadata_schema_unavailable",
+                "source": "gh_pr_view",
+                "severity": "blocking",
+                "message": "fixed PR metadata did not include usable baseRefName and headRefName",
+            }
+        ]
+
+    encoded_base = quote(base_ref, safe="")
+    base_repo_owner = repo.split("/", 1)[0]
+    head_owner = head_owner_login(metadata)
+    encoded_head = (
+        f"{quote(head_owner, safe='')}:{quote(head_ref, safe='')}"
+        if head_owner and head_owner != base_repo_owner
+        else quote(head_ref, safe="")
+    )
+    compare_api = f"repos/{repo}/compare/{encoded_base}...{encoded_head}"
+    compare_payload, compare_exit, compare_stderr = run_gh_api_json(compare_api)
+    compare_metadata: dict[str, object] = {"available": compare_exit == 0, "api": compare_api}
+    if compare_exit != 0:
+        limitations.append(
+            github_api_failure_limitation(
+                api=compare_api,
+                source=compare_api,
+                capability="contents_read",
+                exit_code=compare_exit,
+                stderr=compare_stderr,
+                default_code="pr_compare_metadata_unavailable",
+                default_message="fixed compare metadata could not verify PR branch freshness",
+            )
+        )
+    elif not isinstance(compare_payload, dict):
+        compare_metadata["available"] = False
+        limitations.append(
+            {
+                "code": "pr_compare_metadata_unavailable",
+                "source": compare_api,
+                "severity": "blocking",
+                "message": "fixed compare metadata returned an unexpected schema",
+                "recommended_next_action": "human_gate",
+            }
+        )
+    else:
+        status = compare_payload.get("status")
+        behind_by = compare_payload.get("behind_by")
+        ahead_by = compare_payload.get("ahead_by")
+        compare_metadata.update(
+            {
+                "status": status,
+                "behind_by": behind_by,
+                "ahead_by": ahead_by,
+            }
+        )
+        if status in {"behind", "diverged"} or (isinstance(behind_by, int) and behind_by > 0):
+            limitations.append(
+                {
+                    "code": "pr_branch_behind",
+                    "source": compare_api,
+                    "severity": "blocking",
+                    "message": "PR head branch is behind or diverged from the base branch",
+                    "recommended_next_action": "update_pr_branch",
+                    "compare_status": status,
+                    "behind_by": behind_by,
+                }
+            )
+
+    branch_api = f"repos/{repo}/branches/{encoded_base}"
+    branch_payload, branch_exit, branch_stderr = run_gh_api_json(branch_api)
+    protection_metadata: dict[str, object] = {
+        "available": branch_exit == 0,
+        "api": branch_api,
+    }
+    if branch_exit != 0:
+        limitations.append(
+            github_api_failure_limitation(
+                api=branch_api,
+                source=branch_api,
+                capability="branch_metadata_read",
+                exit_code=branch_exit,
+                stderr=branch_stderr,
+                default_code="branch_metadata_unavailable",
+                default_message="fixed branch metadata could not verify protection state",
+            )
+        )
+    elif not isinstance(branch_payload, dict) or not isinstance(branch_payload.get("protected"), bool):
+        protection_metadata["available"] = False
+        limitations.append(
+            {
+                "code": "branch_metadata_unavailable",
+                "source": branch_api,
+                "capability": "branch_metadata_read",
+                "severity": "blocking",
+                "message": "fixed branch metadata returned an unexpected protection schema",
+                "recommended_next_action": "human_gate",
+            }
+        )
+    elif branch_payload.get("protected") is False:
+        protection_metadata.update(
+            {
+                "available": True,
+                "protected": False,
+                "status": "unprotected",
+            }
+        )
+    else:
+        protection_api = f"repos/{repo}/branches/{encoded_base}/protection"
+        protection_payload, protection_exit, protection_stderr = run_gh_api_json(protection_api)
+        protection_metadata.update(
+            {
+                "protected": True,
+                "protection_api": protection_api,
+                "protection_available": protection_exit == 0,
+            }
+        )
+        if protection_exit != 0:
+            limitations.append(
+                github_api_failure_limitation(
+                    api=protection_api,
+                    source=protection_api,
+                    capability="branch_protection_read",
+                    exit_code=protection_exit,
+                    stderr=protection_stderr,
+                    default_code="branch_protection_metadata_unavailable",
+                    default_message="fixed branch protection metadata could not be verified",
+                )
+            )
+            return {
+                "compare": compare_metadata,
+                "branch_protection": protection_metadata,
+            }, limitations
+        contexts, schema_ok = required_status_contexts(protection_payload)
+        if not schema_ok:
+            limitations.append(
+                {
+                    "code": "branch_protection_metadata_unavailable",
+                    "source": protection_api,
+                    "capability": "branch_protection_read",
+                    "severity": "blocking",
+                    "message": "branch protection metadata returned an unexpected required status checks schema",
+                    "recommended_next_action": "human_gate",
+                }
+            )
+        observed_contexts = successful_actions_contexts(ci_payload)
+        missing = sorted(context for context in contexts if context not in observed_contexts)
+        protection_metadata.update(
+            {
+                "protected": True,
+                "required_status_contexts": sorted(contexts),
+                "observed_successful_actions_contexts": sorted(observed_contexts),
+                "missing_required_status_contexts": missing,
+            }
+        )
+        if missing:
+            limitations.append(
+                {
+                    "code": "required_actions_context_unobserved",
+                    "source": protection_api,
+                    "capability": "branch_protection_read",
+                    "severity": "blocking",
+                    "message": "branch protection requires status contexts not observed as successful GitHub Actions runs or jobs",
+                    "recommended_next_action": "human_gate",
+                    "missing_required_status_contexts": missing,
+                }
+            )
+    return {
+        "compare": compare_metadata,
+        "branch_protection": protection_metadata,
+    }, limitations
+
+
 def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
     checks_script = script_dir / "lib" / "fetch_pr_checks_snapshot.sh"
     review_script = script_dir / "lib" / "fetch_pr_review_snapshot.sh"
@@ -564,6 +897,10 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
         "collector": "pending_s04",
     }
     review_wrapper_payload: dict[str, object] = {}
+    merge_blocker_metadata: dict[str, object] = {
+        "compare": {"available": False},
+        "branch_protection": {"available": False},
+    }
     normalized_status = "unknown"
     recommended_next_action = "human_gate"
 
@@ -677,6 +1014,12 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
                     "stderr_sha256": hashlib.sha256(read_text(review_stderr).encode()).hexdigest(),
                 }
             )
+        merge_blocker_metadata, merge_blocker_limitations = collect_merge_blocker_metadata(
+            repo=args.repo,
+            metadata=metadata,
+            ci_payload=ci_payload,
+        )
+        limitations.extend(merge_blocker_limitations)
     normalized_status, recommended_next_action, observation_complete, status_reason = classify_snapshot(
         summary=summary,
         ci_payload=ci_payload,
@@ -731,6 +1074,7 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
             "workflow_runs": ci_actions.get("workflow_runs"),
             "jobs_summary": ci_actions.get("jobs_summary"),
         },
+        "merge_blocker_metadata": merge_blocker_metadata,
         "ci_fingerprint": checks_payload_for_fingerprint.get("fingerprint"),
         "review_decision_fingerprint": review_decision_fingerprint,
     }
@@ -788,6 +1132,7 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
         "codex_review": codex_review_payload,
         "trigger": trigger,
         "body_mode": args.body_mode,
+        "merge_blocker_metadata": merge_blocker_metadata,
         "artifacts": {
             "result_json": f"{args.out_dir}/result.json" if args.out_dir else None,
             "latest_json": f"{args.out_dir}/latest.json" if args.out_dir else None,

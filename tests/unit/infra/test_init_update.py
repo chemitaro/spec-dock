@@ -12337,7 +12337,7 @@ if log_path:
         log.write(" ".join(args) + "\\n")
 
 if args[:5] == ["pr", "view", "13", "--repo", "owner/repo"]:
-    if "--json" in args and "headRefOid,url,state,isDraft,number,mergeable" in args:
+    if "--json" in args and "headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable" in args:
         metadata_calls += 1
         state_path.write_text(str(metadata_calls), encoding="utf-8")
 elif metadata_calls == 0:
@@ -12358,12 +12358,15 @@ if hang_seconds is not None:
 def emit(payload):
     print(json.dumps(payload, separators=(",", ":")))
 
-if args[:2] == ["pr", "view"] and "--json" in args and "headRefOid,url,state,isDraft,number,mergeable" in args:
+if args[:2] == ["pr", "view"] and "--json" in args and "headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable" in args:
     poll_delay_seconds = current.get("poll_delay_seconds")
     if poll_delay_seconds is not None:
         time.sleep(float(poll_delay_seconds))
     emit({
         "headRefOid": head,
+        "baseRefName": current.get("base_ref", "main"),
+        "headRefName": current.get("head_ref", "feature"),
+        "headRepositoryOwner": {"login": current.get("head_owner", "owner")},
         "url": "https://github.com/owner/repo/pull/13",
         "state": current.get("state", "OPEN"),
         "isDraft": current.get("is_draft", False),
@@ -12430,6 +12433,25 @@ elif args[:2] == ["api", "repos/owner/repo/actions/runs/202/jobs"]:
             "conclusion": None,
             "steps": [],
         }]})
+elif args == ["api", "repos/owner/repo/compare/main...feature"]:
+    emit(current.get("compare", {"status": "ahead", "ahead_by": 1, "behind_by": 0}))
+elif args == ["api", "repos/owner/repo/compare/main...fork-owner:feature"]:
+    emit(current.get("compare", {"status": "ahead", "ahead_by": 1, "behind_by": 0}))
+elif args == ["api", "repos/owner/repo/branches/main"]:
+    branch_error = current.get("branch_error")
+    if branch_error == "permission_denied":
+        print("resource not accessible by personal access token", file=sys.stderr)
+        sys.exit(1)
+    emit(current.get("branch", {"name": "main", "protected": False}))
+elif args == ["api", "repos/owner/repo/branches/main/protection"]:
+    protection_error = current.get("branch_protection_error")
+    if protection_error == "permission_denied":
+        print("resource not accessible by personal access token", file=sys.stderr)
+        sys.exit(1)
+    if "branch_protection" not in current:
+        print("HTTP 404: branch protection not found", file=sys.stderr)
+        sys.exit(1)
+    emit(current["branch_protection"])
 elif args[:2] == ["api", f"repos/owner/repo/commits/{head}/check-runs"]:
             if ci == "passed":
                 emit({"total_count": 1, "check_runs": [{
@@ -12736,7 +12758,7 @@ head_sequence = scenario.get("head_sequence") or [scenario.get("head", "aaaaaaaa
 
 if args in (
     ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,url,state,isDraft,number"],
-    ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,url,state,isDraft,number,mergeable"],
+    ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable"],
 ):
     if scenario.get("metadata_error_after_post", False) and state["pr_view_count"] > 0:
         state["pr_view_count"] += 1
@@ -12748,6 +12770,8 @@ if args in (
     save_state()
     emit({
         "headRefOid": head_sequence[index],
+        "baseRefName": scenario.get("base_ref", "main"),
+        "headRefName": scenario.get("head_ref", "feature"),
         "url": "https://github.com/owner/repo/pull/13",
         "state": scenario.get("state", "OPEN"),
         "isDraft": scenario.get("is_draft", False),
@@ -13232,9 +13256,9 @@ exit 44
             fake_gh.write_text(
                 f"""#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number"|"pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number"|"pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     cat <<'JSON'
-{{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}}
+{{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}}
 JSON
     ;;
   "api repos/owner/repo/issues/13/comments --paginate")
@@ -14375,10 +14399,24 @@ JSON
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main/protection")
+    printf 'HTTP 404: branch protection not found\\n' >&2
+    exit 1
     ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2
@@ -14431,7 +14469,7 @@ esac
             fake_gh.write_text(
                 f"""#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     printf 'GraphQL: Resource not accessible by personal access token {token_marker}\\n' >&2
     exit 1
     ;;
@@ -14469,7 +14507,7 @@ esac
             limitation = payload["limitations"][0]
             assert limitation["code"] == "github_token_permission_denied"
             assert limitation["capability"] == "pull_request_read"
-            assert limitation["api"] == "gh pr view --json headRefOid,url,state,isDraft,number,mergeable"
+            assert limitation["api"] == "gh pr view --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable"
             assert limitation["source"] == "gh_pr_view"
             assert limitation["status"] == "permission_denied"
             assert limitation["token_source"] == "GH_TOKEN"
@@ -14494,7 +14532,7 @@ esac
             fake_gh.write_text(
                 f"""#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     printf 'GraphQL: Resource not accessible by integration {token_marker}\\n' >&2
     exit 1
     ;;
@@ -14532,7 +14570,7 @@ esac
             limitation = payload["limitations"][0]
             assert limitation["code"] == "github_token_permission_denied"
             assert limitation["capability"] == "pull_request_read"
-            assert limitation["api"] == "gh pr view --json headRefOid,url,state,isDraft,number,mergeable"
+            assert limitation["api"] == "gh pr view --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable"
             assert limitation["source"] == "gh_pr_view"
             assert limitation["status"] == "permission_denied"
             assert limitation["token_source"] == "GH_TOKEN"
@@ -14557,7 +14595,7 @@ esac
             fake_gh.write_text(
                 f"""#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     printf 'GraphQL: Resource not accessible by integration {token_marker}\\n' >&2
     exit 1
     ;;
@@ -14609,9 +14647,9 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
@@ -14623,6 +14661,20 @@ JSON
     cat <<'JSON'
 {"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
 JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main/protection")
+    printf 'HTTP 404: branch protection not found\\n' >&2
+    exit 1
     ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
@@ -14707,9 +14759,9 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
@@ -14817,9 +14869,9 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
@@ -14978,10 +15030,24 @@ PY
         fake_gh.write_text(
             """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main/protection")
+    printf 'HTTP 404: branch protection not found\\n' >&2
+    exit 1
     ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2
@@ -15372,9 +15438,9 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     cat <<JSON
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"${PR_STATE:-OPEN}","isDraft":${PR_IS_DRAFT:-false},"number":13,"mergeable":"MERGEABLE"}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"${PR_STATE:-OPEN}","isDraft":${PR_IS_DRAFT:-false},"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
@@ -15386,6 +15452,20 @@ JSON
     cat <<'JSON'
 {"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
 JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main/protection")
+    printf 'HTTP 404: branch protection not found\\n' >&2
+    exit 1
     ;;
   "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
     cat <<'JSON'
@@ -16227,10 +16307,24 @@ JSON
                 fake_gh.write_text(
                     """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main/protection")
+    printf 'HTTP 404: branch protection not found\\n' >&2
+    exit 1
     ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2
@@ -19327,9 +19421,9 @@ JSON
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
   *)
@@ -19685,7 +19779,10 @@ esac
             item["code"] for item in payload["limitations"]
         ]
 
-    def test_issue_222_pr_observation_snapshot_conflicting_mergeability_is_human_gate(self) -> None:
+    def _issue_222_run_observation_snapshot_scenario(
+        self,
+        scenario: dict[str, object],
+    ) -> tuple[dict[str, object], str]:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -19700,17 +19797,7 @@ esac
             scenario_path = tmp_path / "scenario.json"
             state_path = tmp_path / "state.txt"
             gh_log = tmp_path / "gh.log"
-            scenario_path.write_text(
-                json.dumps([
-                    {
-                        "head": "a" * 40,
-                        "ci": "passed",
-                        "review": "approved",
-                        "mergeable": "CONFLICTING",
-                    },
-                ]),
-                encoding="utf-8",
-            )
+            scenario_path.write_text(json.dumps([scenario]), encoding="utf-8")
             self._issue_75_write_pr_observation_wait_fake_gh(
                 fake_gh,
                 scenario_path=scenario_path,
@@ -19734,84 +19821,244 @@ esac
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "passed"
-            assert payload["pr_metadata"]["mergeable"] == "CONFLICTING"
-            assert payload["normalized_status"] == "human_gate"
-            assert payload["recommended_next_action"] == "resolve_merge_conflict"
-            assert payload["decision"]["status_reason"] == "pr_merge_conflict"
-            assert payload["observation_complete"] is False
+            return json.loads(result.stdout), gh_log.read_text(encoding="utf-8")
 
-            gh_calls = gh_log.read_text(encoding="utf-8")
-            assert "headRefOid,url,state,isDraft,number,mergeable" in gh_calls
-            assert "statusCheckRollup" not in gh_calls
-            assert "/check-runs" not in gh_calls
-            assert "/status" not in gh_calls
-            assert "pr checks" not in gh_calls
+    def test_issue_222_pr_observation_snapshot_required_actions_context_missing_blocks_merge_prepared(self) -> None:
+        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch": {"name": "main", "protected": True},
+                "branch_protection": {
+                    "required_status_checks": {
+                        "contexts": ["lint"],
+                        "checks": [],
+                    }
+                },
+            }
+        )
+
+        limitation_codes = [item["code"] for item in payload["limitations"]]
+        assert payload["ci"]["status"] == "passed"
+        assert payload["normalized_status"] == "unknown"
+        assert payload["recommended_next_action"] == "human_gate"
+        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
+        assert "required_actions_context_unobserved" in limitation_codes
+        assert payload["merge_blocker_metadata"]["branch_protection"][
+            "missing_required_status_contexts"
+        ] == ["lint"]
+        assert "repos/owner/repo/branches/main/protection" in gh_calls
+        assert "statusCheckRollup" not in gh_calls
+        assert "/check-runs" not in gh_calls
+        assert "/status" not in gh_calls
+        assert "pr checks" not in gh_calls
+
+    def test_issue_222_pr_observation_snapshot_required_actions_context_matched_allows_merge_prepared(self) -> None:
+        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch": {"name": "main", "protected": True},
+                "branch_protection": {
+                    "required_status_checks": {
+                        "contexts": ["CI"],
+                        "checks": [{"context": "test", "app_id": 15368}],
+                    }
+                },
+            }
+        )
+
+        limitation_codes = [item["code"] for item in payload["limitations"]]
+        assert payload["ci"]["status"] == "passed"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert "required_actions_context_unobserved" not in limitation_codes
+        assert payload["merge_blocker_metadata"]["branch_protection"][
+            "missing_required_status_contexts"
+        ] == []
+        assert "repos/owner/repo/compare/main...feature" in gh_calls
+
+    def test_issue_222_pr_observation_snapshot_fork_head_uses_owner_qualified_compare_ref(self) -> None:
+        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "head_owner": "fork-owner",
+                "branch": {"name": "main", "protected": False},
+            }
+        )
+
+        assert payload["ci"]["status"] == "passed"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert "repos/owner/repo/compare/main...fork-owner:feature" in gh_calls
+        assert "repos/owner/repo/compare/main...feature" not in gh_calls
+
+    def test_issue_222_pr_observation_snapshot_compare_behind_blocks_merge_prepared(self) -> None:
+        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "compare": {"status": "behind", "ahead_by": 0, "behind_by": 1},
+            }
+        )
+
+        limitation_codes = [item["code"] for item in payload["limitations"]]
+        assert payload["ci"]["status"] == "passed"
+        assert payload["normalized_status"] == "unknown"
+        assert payload["recommended_next_action"] == "human_gate"
+        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
+        assert "pr_branch_behind" in limitation_codes
+        assert payload["merge_blocker_metadata"]["compare"]["behind_by"] == 1
+
+    def test_issue_222_pr_observation_snapshot_branch_protection_permission_denied_blocks_merge_prepared(self) -> None:
+        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch": {"name": "main", "protected": True},
+                "branch_protection_error": "permission_denied",
+            }
+        )
+
+        permission_limitations = [
+            item
+            for item in payload["limitations"]
+            if item.get("code") == "github_token_permission_denied"
+        ]
+        assert payload["ci"]["status"] == "passed"
+        assert payload["normalized_status"] == "unknown"
+        assert payload["recommended_next_action"] == "fix_github_token_permissions"
+        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
+        assert permission_limitations
+        assert permission_limitations[0]["capability"] == "branch_protection_read"
+
+    def test_issue_222_pr_observation_snapshot_protected_branch_protection_404_blocks_merge_prepared(self) -> None:
+        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch": {"name": "main", "protected": True},
+            }
+        )
+
+        blocking_limitations = [
+            item
+            for item in payload["limitations"]
+            if item.get("code") == "branch_protection_metadata_unavailable"
+        ]
+        assert payload["ci"]["status"] == "passed"
+        assert payload["normalized_status"] == "unknown"
+        assert payload["recommended_next_action"] == "human_gate"
+        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
+        assert blocking_limitations
+        assert blocking_limitations[0]["severity"] == "blocking"
+        assert payload["merge_blocker_metadata"]["branch_protection"]["protected"] is True
+        assert payload["merge_blocker_metadata"]["branch_protection"]["protection_available"] is False
+        assert "repos/owner/repo/branches/main\n" in gh_calls
+        assert "repos/owner/repo/branches/main/protection" in gh_calls
+
+    def test_issue_222_pr_observation_snapshot_unprotected_branch_skips_protection_endpoint_and_allows_merge_prepared(self) -> None:
+        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch": {"name": "main", "protected": False},
+                "branch_protection_error": "permission_denied",
+            }
+        )
+
+        limitation_codes = [item["code"] for item in payload["limitations"]]
+        assert payload["ci"]["status"] == "passed"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert "github_token_permission_denied" not in limitation_codes
+        assert payload["merge_blocker_metadata"]["branch_protection"]["protected"] is False
+        assert "repos/owner/repo/branches/main\n" in gh_calls
+        assert "repos/owner/repo/branches/main/protection" not in gh_calls
+
+    def test_issue_222_pr_observation_snapshot_branch_metadata_permission_denied_blocks_merge_prepared(self) -> None:
+        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch_error": "permission_denied",
+            }
+        )
+
+        permission_limitations = [
+            item
+            for item in payload["limitations"]
+            if item.get("code") == "github_token_permission_denied"
+        ]
+        assert payload["ci"]["status"] == "passed"
+        assert payload["normalized_status"] == "unknown"
+        assert payload["recommended_next_action"] == "fix_github_token_permissions"
+        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
+        assert permission_limitations
+        assert permission_limitations[0]["capability"] == "branch_metadata_read"
+        assert "repos/owner/repo/branches/main\n" in gh_calls
+        assert "repos/owner/repo/branches/main/protection" not in gh_calls
+
+    def test_issue_222_pr_observation_snapshot_conflicting_mergeability_is_human_gate(self) -> None:
+        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "CONFLICTING",
+            }
+        )
+        assert payload["ci"]["status"] == "passed"
+        assert payload["pr_metadata"]["mergeable"] == "CONFLICTING"
+        assert payload["normalized_status"] == "human_gate"
+        assert payload["recommended_next_action"] == "resolve_merge_conflict"
+        assert payload["decision"]["status_reason"] == "pr_merge_conflict"
+        assert payload["observation_complete"] is False
+
+        assert "headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable" in gh_calls
+        assert "statusCheckRollup" not in gh_calls
+        assert "/check-runs" not in gh_calls
+        assert "/status" not in gh_calls
+        assert "pr checks" not in gh_calls
 
     def test_issue_222_pr_observation_snapshot_unknown_mergeability_is_pending(self) -> None:
-        repo_root = Path(__file__).resolve().parents[3]
-        script_path = (
-            repo_root
-            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
-        )
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_path = Path(tmp_dir)
-            fake_bin = tmp_path / "bin"
-            fake_bin.mkdir()
-            fake_gh = fake_bin / "gh"
-            scenario_path = tmp_path / "scenario.json"
-            state_path = tmp_path / "state.txt"
-            gh_log = tmp_path / "gh.log"
-            scenario_path.write_text(
-                json.dumps([
-                    {
-                        "head": "a" * 40,
-                        "ci": "passed",
-                        "review": "approved",
-                        "mergeable": "UNKNOWN",
-                    },
-                ]),
-                encoding="utf-8",
-            )
-            self._issue_75_write_pr_observation_wait_fake_gh(
-                fake_gh,
-                scenario_path=scenario_path,
-                state_path=state_path,
-                log_path=gh_log,
-            )
-            env = {
-                **os.environ,
-                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
-                "GH_FAKE_WAIT_SCENARIO": str(scenario_path),
-                "GH_FAKE_WAIT_STATE": str(state_path),
-                "GH_FAKE_LOG": str(gh_log),
+        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "UNKNOWN",
             }
+        )
+        assert payload["ci"]["status"] == "passed"
+        assert payload["pr_metadata"]["mergeable"] == "UNKNOWN"
+        assert payload["normalized_status"] == "pending"
+        assert payload["recommended_next_action"] == "wait"
+        assert payload["decision"]["status_reason"] == "pr_mergeability_pending"
+        assert payload["observation_complete"] is False
 
-            result = subprocess.run(
-                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
-                env=env,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-
-            assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "passed"
-            assert payload["pr_metadata"]["mergeable"] == "UNKNOWN"
-            assert payload["normalized_status"] == "pending"
-            assert payload["recommended_next_action"] == "wait"
-            assert payload["decision"]["status_reason"] == "pr_mergeability_pending"
-            assert payload["observation_complete"] is False
-
-            gh_calls = gh_log.read_text(encoding="utf-8")
-            assert "headRefOid,url,state,isDraft,number,mergeable" in gh_calls
-            assert "statusCheckRollup" not in gh_calls
-            assert "/check-runs" not in gh_calls
-            assert "/status" not in gh_calls
-            assert "pr checks" not in gh_calls
+        assert "headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable" in gh_calls
+        assert "statusCheckRollup" not in gh_calls
+        assert "/check-runs" not in gh_calls
+        assert "/status" not in gh_calls
+        assert "pr checks" not in gh_calls
 
     def test_issue_75_pr_observation_wait_stdout_stderr_progress_and_out_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -23536,9 +23783,9 @@ esac
             fake_gh.write_text(
                 f"""#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     cat <<'JSON'
-{{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}}
+{{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}}
 JSON
     ;;
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
@@ -24373,9 +24620,9 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
@@ -24453,7 +24700,7 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     count=0
     if [ -f "$GH_FAKE_PR_VIEW_COUNT" ]; then
       count="$(cat "$GH_FAKE_PR_VIEW_COUNT")"
@@ -24465,7 +24712,7 @@ case "$*" in
     else
       head="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     fi
-    printf '{"headRefOid":"%s","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}\\n' "$head"
+    printf '{"headRefOid":"%s","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}\\n' "$head"
     ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
@@ -24548,7 +24795,7 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     count=0
     if [ -f "$GH_FAKE_PR_VIEW_COUNT" ]; then
       count="$(cat "$GH_FAKE_PR_VIEW_COUNT")"
@@ -24560,7 +24807,7 @@ case "$*" in
     else
       head="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     fi
-    printf '{"headRefOid":"%s","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}\\n' "$head"
+    printf '{"headRefOid":"%s","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}\\n' "$head"
     ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
@@ -24647,9 +24894,9 @@ esac
                 """#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$GH_FAKE_LOG"
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
   "pr view 13 --repo owner/repo --json headRefOid")
@@ -25012,9 +25259,9 @@ JSON
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
   *)
@@ -31876,9 +32123,9 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
