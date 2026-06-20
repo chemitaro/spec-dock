@@ -877,6 +877,12 @@ class TestCliNew(CliRuntimeHarness):
             assert 'タイトル: "PR Repair Batch"' in content
             assert '親: ["iss-00003"]' in content
             assert "# 20260312t010203z-pr-repair-batch PR Repair Batch" in content
+            assert "observed GitHub Actions CI failures" in content
+            assert "`check_failure:<actions_job_or_workflow_name>`" in content
+            assert "External/non-Actions check state" in content
+            assert "triage review findings, CI failures" not in content
+            assert "`check_failure:<job_or_check_name>`" not in content
+            assert "No required check failure remains." not in content
 
     def test_new_doc_renders_body_date_from_same_utc_instant_as_doc_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
