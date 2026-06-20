@@ -185,6 +185,84 @@ note: focused subset の初回実行では既存 short-timeout test が一度 `t
 |---|---|---|---|
 | S01 | commit required | S01 tests and S01 report evidence | pending |
 
+### セッションログ（2026-06-20 execution S02 Provider Runtime Classification Fix）
+
+#### 対象
+- Phase: implementation step S02 Provider Runtime Classification Fix
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, EC-001, EC-002, EC-003, EC-004
+- Closure ids: tc-001, tc-002, tc-003, tc-004, tc-005, tc-007, tc-008, tc-009, tc-010
+
+#### Implementation Delegation Gate
+| ステップ | 委任ロール | 許可 path | 禁止範囲 | 結果 |
+|---|---|---|---|---|
+| S02 | dev-coder `019ee313-3580-7d41-8ca5-eccb3c3662da` | provider runtime observation scripts | tests/docs/report/mirror/GitHub/stage/commit | completed |
+
+#### Delegated Worker Evidence
+| 項目 | 証跡 |
+|---|---|
+| Worker summary | current selected blocker と carryover-only inventory を分離し、completion lifecycle に応じた terminal feedback / wait / unknown を分類するよう provider runtime を修正 |
+| Changed files | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py`, `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py` |
+| Helper split summary | `current_selected_actionable_reason`, `carryover_inventory_reason`, `trusted_completion_actionable_reason`, wait-side `is_carryover_missing_completion_wait` |
+| Ledger Note | No material implementation decisions beyond the approved plan. |
+
+#### 実施内容
+- Snapshot classification で current selected blocker と carryover inventory を分け、carryover-only missing completion が trusted completion なしで terminal feedback にならないようにした。
+- Wait classification で `review_completion_unknown` candidate 判定から carryover-only inventory を除外せず、current selected blocker だけを disqualifier として扱うようにした。
+- Wait finalization で carryover-only missing completion が timeout / terminal actionable に上書きされる経路を guard し、latency guard 未満では wait、guard 満了では unknown へ進むようにした。
+- Trusted completion + carryover は snapshot / wait の両方で `carryover_non_outdated_unresolved_thread` feedback handling を維持した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "issue_219 or issue_187_s420 or issue_187_s430 or fallback_issue_comment"
+
+result: 22 passed, 423 deselected
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation"
+
+result: 68 passed, 377 deselected
+```
+
+```bash
+git diff --check
+
+result: passed
+```
+
+#### Step Contract Closure
+| closure id | S02 証跡 | 状態 |
+|---|---|---|
+| tc-001 | carryover-only missing completion の snapshot/wait regressions pass | closed |
+| tc-002 | current selected blocker priority remains covered in focused subset | closed |
+| tc-003 | latency-satisfied carryover-only unknown regression pass | closed |
+| tc-004 | trusted completion + carryover snapshot/wait regressions pass | closed |
+| tc-005 | snapshot/wait consistency for carryover-only and trusted-completion cases pass | closed |
+| tc-007 | fallback-related focused subset pass | closed |
+| tc-008 | outdated exclusion behavior unchanged by provider runtime diff | closed |
+| tc-009 | CI/head and limitation priority watched by focused subset pass | closed |
+| tc-010 | empty-inventory unknown existing focused subset pass | closed |
+
+#### Test Contract Closure
+- S01 Red failures were resolved by provider runtime changes without editing tests.
+- `pr_review_snapshot.py` は変更せず、collector scope / optional inventory field の追加は不要だった。
+- `.agents` mirror、docs、GitHub state は変更していない。
+
+#### Closure Delta
+- Optional `actionable_inventory_reason` は追加しなかった。
+- Runtime 内の helper split により、`status_reason` は current lifecycle / terminal feedback 用のまま維持し、carryover-only inventory は trusted completion または latency guard 文脈でのみ分類に使う。
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | code review attempt 1 | code-reviewer `019ee31d-8157-7ff3-81d0-5beda80addbd` | fresh before P1 fix | failed | N/A | fix blocker ordering and rerun | P1: current selected unresolved must retain priority over changes requested when both current blockers exist |
+| S02 | code review attempt 2 | code-reviewer `019ee326-22e5-7eb3-b404-d36bd79d7fcb` | fresh | passed | N/A | S02 commit gate ready | previous P1 ordering issue resolved; no findings |
+
+#### Step Commit Gate
+| ステップ | commit / no-op | 範囲 | 状態 |
+|---|---|---|---|
+| S02 | commit required | S02 provider runtime and S02 report evidence | pending |
+
 ## 最終品質ゲート（Final Quality Gate）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
