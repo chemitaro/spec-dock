@@ -336,10 +336,10 @@ def _stale_create_lock_finding(specdock_dir: Path) -> DoctorFinding | None:
 def _github_target_unavailable_diagnostic() -> GitHubCapabilityDiagnostic:
     return GitHubCapabilityDiagnostic(
         code="github_target_unavailable",
-        capability="check_runs_read",
+        capability="actions_read",
         status="target_unavailable",
         token_source="unknown",
-        api="github_pr_core_probe",
+        api="github_pr_observation_probe",
         severity="info",
         message="GitHub PR capability probe skipped because repo, PR, or head SHA was not provided.",
         recommended_next_action="provide_github_repo_pr_and_head_sha_for_capability_probe",
@@ -352,10 +352,10 @@ def _github_target_unavailable_diagnostic() -> GitHubCapabilityDiagnostic:
 def _github_gateway_unavailable_diagnostic() -> GitHubCapabilityDiagnostic:
     return GitHubCapabilityDiagnostic(
         code="github_capability_skipped",
-        capability="check_runs_read",
+        capability="actions_read",
         status="skipped",
         token_source="unknown",
-        api="github_pr_core_probe",
+        api="github_pr_observation_probe",
         severity="info",
         message="GitHub capability gateway is unavailable.",
         recommended_next_action="run_in_installed_runtime_with_github_capability_gateway",
