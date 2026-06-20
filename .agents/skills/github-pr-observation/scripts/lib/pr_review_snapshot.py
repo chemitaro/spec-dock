@@ -1018,6 +1018,14 @@ def normalized_body_text(value):
     return " ".join(str(value or "").strip().split()).casefold()
 
 
+def reviewed_commit_from_no_findings_body(raw_body):
+    for line in str(raw_body or "").splitlines():
+        match = re.search(r"\*\*Reviewed commit:\*\*\s*`([0-9A-Fa-f]{7,64})`", line)
+        if match:
+            return match.group(1)
+    return None
+
+
 def is_strict_no_findings_issue_comment(item):
     raw_body = str(
         item.get("_fallback_pass_raw_body")
@@ -1031,8 +1039,30 @@ def is_strict_no_findings_issue_comment(item):
         "no major issues were found",
         "no major issues were found.",
         "codex review: didn't find any major issues. breezy!",
+        "codex review: didn't find any major issues. chef's kiss.",
+        "codex review: didn't find any major issues. :tada:",
     }
-    return normalized_body_text(raw_body) in allowed_full_bodies
+    normalized_body = normalized_body_text(raw_body)
+    if normalized_body in allowed_full_bodies:
+        return True
+    non_empty_lines = [
+        normalized_body_text(line)
+        for line in raw_body.splitlines()
+        if line.strip()
+    ]
+    if not non_empty_lines:
+        return False
+    first_line = non_empty_lines[0]
+    reviewed_commit = reviewed_commit_from_no_findings_body(raw_body)
+    reviewed_commit_matches = bool(
+        reviewed_commit and expected_head_sha and sha_prefix_matches(reviewed_commit, expected_head_sha)
+    )
+    has_details_metadata = any(line.startswith("<details>") for line in non_empty_lines[1:])
+    return (
+        first_line.startswith("codex review: didn't find any major issues.")
+        and reviewed_commit_matches
+        and has_details_metadata
+    )
 
 
 current_codex_issue_comments = [
@@ -1066,6 +1096,21 @@ stale_codex_head_context_present = any(
 active_changes_requested_review_present = any(
     item.get("state") == "changes_requested" for item in active_review_signals
 )
+pending_codex_review_signals = [
+    item
+    for item in signals
+    if item.get("kind") == "pull_review"
+    and item.get("codex_authored")
+    and item.get("state") == "pending"
+    and not item.get("stale")
+    and (item.get("current_status_signal") or not signal_activity_time(item))
+]
+current_pending_codex_review_present = any(
+    item.get("codex_authored") and item.get("state") == "pending"
+    for item in active_review_signals
+) or any(item.get("codex_authored") for item in review_request_signals)
+if pending_codex_review_signals:
+    current_pending_codex_review_present = True
 no_findings_completion_promotes = bool(
     expected_head_sha
     and current_pr_head_sha
@@ -1076,6 +1121,7 @@ no_findings_completion_promotes = bool(
     and not review_decision_changes_requested
     and not review_decision_requires_review
     and not active_changes_requested_review_present
+    and not current_pending_codex_review_present
     and not blocking_collection_failure
 )
 if selected_review_signals:
@@ -1086,20 +1132,14 @@ elif no_findings_completion_promotes:
     lifecycle_status = "completed"
     completion_signal = "codex_no_findings_issue_comment"
     lifecycle_confidence = "medium"
+elif current_pending_codex_review_present:
+    lifecycle_status = "pending"
+    completion_signal = "none"
+    lifecycle_confidence = "medium"
 elif current_codex_issue_comments:
     lifecycle_status = "fallback"
     completion_signal = "fallback_issue_comment"
     lifecycle_confidence = "low"
-elif any(
-    item.get("kind") == "pull_review"
-    and item.get("codex_authored")
-    and item.get("state") == "pending"
-    and item.get("current_status_signal")
-    for item in signals
-):
-    lifecycle_status = "pending"
-    completion_signal = "none"
-    lifecycle_confidence = "medium"
 elif review_request_signals or review_decision_requires_review:
     lifecycle_status = "pending"
     completion_signal = "none"
@@ -1148,7 +1188,7 @@ selected_changes_requested_evidence.extend(
     }
     for item in selected_changes_requested_comments
 )
-pending_review_present = lifecycle_status == "pending"
+pending_review_present = lifecycle_status == "pending" or current_pending_codex_review_present
 blocking_limitation_present = bool(blocking_collection_failure)
 selected_blocker_present = bool(selected_unresolved_thread_ids or selected_changes_requested_evidence)
 explicit_completion_present = completion_signal in {
@@ -1275,11 +1315,21 @@ def fingerprint_thread(item):
     }
 
 
-fallback_pass_source_ids = [
-    item.get("id")
-    for item in current_codex_issue_comments
-    if item.get("id") is not None and is_strict_no_findings_issue_comment(item)
-]
+fallback_pass_source_ids = list(no_findings_source_ids)
+fallback_pass_promotes = bool(
+    expected_head_sha
+    and current_pr_head_sha
+    and sha_prefix_matches(current_pr_head_sha, expected_head_sha)
+    and fallback_pass_source_ids
+    and not stale_codex_head_context_present
+    and not selected_unresolved_thread_ids
+    and not selected_changes_requested_evidence
+    and not review_decision_changes_requested
+    and not review_decision_requires_review
+    and not active_changes_requested_review_present
+    and not current_pending_codex_review_present
+    and not blocking_collection_failure
+)
 for signal in signals:
     signal.pop("_fallback_pass_raw_body", None)
 fallback_pass_candidate = {
@@ -1287,7 +1337,7 @@ fallback_pass_candidate = {
     "source": "issue_comment" if fallback_pass_source_ids else None,
     "source_ids": fallback_pass_source_ids,
     "reason": "current_boundary_no_major_issues_comment" if fallback_pass_source_ids else None,
-    "promotes_top_level_status": False,
+    "promotes_top_level_status": bool(completion_signal == "fallback_issue_comment" and fallback_pass_promotes),
 }
 no_findings_completion_candidate = {
     "present": bool(no_findings_completion_promotes),
@@ -1318,7 +1368,7 @@ elif blocking_collection_failure:
     decision_action = "human_gate"
 elif completion_signal == "none":
     decision_status_reason = "missing_current_completion_signal"
-    decision_status = "unknown"
+    decision_status = "pending" if current_pending_codex_review_present else "unknown"
     decision_action = "wait_or_resume"
 else:
     decision_status_reason = (

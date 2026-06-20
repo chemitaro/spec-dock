@@ -201,18 +201,20 @@ status collection are implemented by the public scripts.
   review objects. A strict Codex no-findings issue comment can also be selected
   as the review-level completion signal `codex_no_findings_issue_comment` when
   the current trigger boundary, expected head, allow-listed no-findings wording,
-  and blocker checks all match. In collector output this reports
-  `review_completion_observed`; it is not by itself top-level
-  `merge_prepared` authority.
+  no pending Codex review evidence, and blocker checks all match. In collector
+  output this reports `review_completion_observed`; it is not by itself
+  top-level `merge_prepared` authority.
 - Snapshot and wait output may promote a safe integrated no-findings result to
   top-level `passed` / `merge_prepared` / complete only after CI, PR metadata,
   head freshness, unresolved threads, changes-requested reviews, draft/non-open
   PR state, stale head, and blocking limitations have been integrated. Those
   blockers override `codex_no_findings_issue_comment`.
 - `review_completion_unknown` is a non-pass terminal-like review state. It means
-  CI passed, the observed head matched, the actionable review inventory was
-  empty, and no trusted Codex review completion signal was found after the
-  trigger-age and CI-passed-age guards are satisfied.
+  CI passed, the observed head matched, no current trigger-boundary review
+  blocker was selected, and no trusted Codex review completion signal was found
+  after the trigger-age and CI-passed-age guards are satisfied. Carryover
+  unresolved inventory may still be present and must be reported separately from
+  current selected blockers.
 - Stable no-completion evidence for the current boundary must not be collapsed
   into a generic timeout. The top-level result is `human_gate`, with the decision
   reason indicating `review_completion_unknown`, so a human can review the
@@ -235,9 +237,12 @@ status collection are implemented by the public scripts.
   final status in the human gate path with
   `manual_review_required_non_retryable` and does not promote a run to
   `passed`, complete, or `merge_prepared`.
-- `fallback_pass_candidate` is a non-promoting signal that a current-boundary
-  fallback issue comment appears positive. It is useful context, but it does not
-  override the `fallback_issue_comment` gate.
+- `fallback_pass_candidate` is normally non-promoting context for a
+  current-boundary fallback issue comment. It can promote the top-level result
+  only when `promotes_top_level_status=true` after the strict no-findings
+  contract and all CI, PR metadata, head freshness, unresolved review,
+  changes-requested review, draft/non-open PR, stale head, and blocking
+  limitation checks have been integrated.
 - S102 is deferred until there is an explicit no-findings artifact contract.
   Generic issue comments, zero selected comments, or review request disappearance
   alone must not mark review completion.
