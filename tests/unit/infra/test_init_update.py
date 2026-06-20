@@ -24097,7 +24097,7 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             return json.loads(result.stdout)
 
-    def test_issue_187_s420_snapshot_carryover_unresolved_blocks_unknown(self) -> None:
+    def test_issue_187_s420_snapshot_carryover_only_missing_completion_stays_waitable(self) -> None:
         evidence = {
             "present": True,
             "category": "missing_current_completion_signal",
@@ -24137,9 +24137,10 @@ esac
             }
         )
 
-        assert payload["summary"]["review"] == "unresolved"
-        assert payload["recommended_next_action"] == "address_review_feedback"
-        assert payload["decision"]["status_reason"] == "carryover_non_outdated_unresolved_thread"
+        assert payload["summary"]["review"] == "approved"
+        assert payload["recommended_next_action"] == "wait"
+        assert payload["decision"]["status"] == "pending"
+        assert payload["decision"]["status_reason"] == "missing_current_completion_signal"
         assert payload["decision"]["carryover_unresolved_thread_ids"] == ["RT_carryover"]
         assert payload["decision"]["status_reason"] != "review_completion_unknown"
 
@@ -26041,7 +26042,7 @@ JSON
     ;;
   "api repos/owner/repo/pulls/13/reviews --paginate")
     cat <<'JSON'
-[{"id":201,"user":{"login":"chatgpt-codex-connector[bot]"},"state":"PENDING","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:02:00Z","body":""}]
+[{"id":201,"user":{"login":"chatgpt-codex-connector[bot]"},"state":"PENDING","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","body":""}]
 JSON
     ;;
   "api repos/owner/repo/pulls/13/comments --paginate")
@@ -26096,6 +26097,7 @@ esac
             decision = payload["decision"]
             assert decision["completion_signal"] != "codex_no_findings_issue_comment"
             assert decision["status"] != "passed"
+            assert decision["no_completion_evidence"]["pending_review_present"] is True
             assert decision["no_findings_completion_candidate"]["present"] is False
             assert decision["no_findings_completion_candidate"]["promotes_top_level_status"] is False
 
