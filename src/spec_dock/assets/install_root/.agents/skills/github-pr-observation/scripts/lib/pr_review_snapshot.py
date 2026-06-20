@@ -1066,10 +1066,21 @@ stale_codex_head_context_present = any(
 active_changes_requested_review_present = any(
     item.get("state") == "changes_requested" for item in active_review_signals
 )
+pending_codex_review_signals = [
+    item
+    for item in signals
+    if item.get("kind") == "pull_review"
+    and item.get("codex_authored")
+    and item.get("state") == "pending"
+    and not item.get("stale")
+    and (item.get("current_status_signal") or not signal_activity_time(item))
+]
 current_pending_codex_review_present = any(
     item.get("codex_authored") and item.get("state") == "pending"
     for item in active_review_signals
 ) or any(item.get("codex_authored") for item in review_request_signals)
+if pending_codex_review_signals:
+    current_pending_codex_review_present = True
 no_findings_completion_promotes = bool(
     expected_head_sha
     and current_pr_head_sha
@@ -1095,13 +1106,7 @@ elif current_codex_issue_comments:
     lifecycle_status = "fallback"
     completion_signal = "fallback_issue_comment"
     lifecycle_confidence = "low"
-elif any(
-    item.get("kind") == "pull_review"
-    and item.get("codex_authored")
-    and item.get("state") == "pending"
-    and item.get("current_status_signal")
-    for item in signals
-):
+elif current_pending_codex_review_present:
     lifecycle_status = "pending"
     completion_signal = "none"
     lifecycle_confidence = "medium"
@@ -1153,7 +1158,7 @@ selected_changes_requested_evidence.extend(
     }
     for item in selected_changes_requested_comments
 )
-pending_review_present = lifecycle_status == "pending"
+pending_review_present = lifecycle_status == "pending" or current_pending_codex_review_present
 blocking_limitation_present = bool(blocking_collection_failure)
 selected_blocker_present = bool(selected_unresolved_thread_ids or selected_changes_requested_evidence)
 explicit_completion_present = completion_signal in {

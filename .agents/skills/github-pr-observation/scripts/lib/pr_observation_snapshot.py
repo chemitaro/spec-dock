@@ -390,9 +390,6 @@ def classify_snapshot(
     if completion_signal == "fallback_issue_comment":
         return "human_gate", "manual_review_required_non_retryable", False, "fallback_issue_comment_low_confidence"
     if decision_status_reason == "missing_current_completion_signal":
-        carryover_reason = carryover_inventory_reason(decision)
-        if carryover_reason:
-            return "human_gate", "address_review_feedback", True, carryover_reason
         missing_status = decision_status if decision_status not in {None, "", "unknown"} else "pending"
         missing_action = decision_action or "wait_or_resume"
         if (
