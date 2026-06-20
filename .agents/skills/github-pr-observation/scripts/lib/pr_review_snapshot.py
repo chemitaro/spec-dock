@@ -836,14 +836,7 @@ if body_mode == "trigger-window-full":
     )
 
 blocking_collection_failure = any(
-    item.get("code") in {
-        "github_api_collection_failed",
-        "github_api_schema_unavailable",
-        "thread_state_unavailable",
-        "trigger_timestamp_unparseable",
-    }
-    and item.get("severity") == "blocking"
-    for item in limitations
+    item.get("severity") == "blocking" for item in limitations
 )
 
 counts = {

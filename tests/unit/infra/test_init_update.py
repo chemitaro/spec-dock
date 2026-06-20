@@ -26019,6 +26019,87 @@ esac
             assert decision["no_findings_completion_candidate"]["present"] is False
             assert decision["no_findings_completion_candidate"]["promotes_top_level_status"] is False
 
+    def test_issue_218_s01_review_collector_no_findings_with_partial_thread_collection_does_not_promote(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Breezy!"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":true}}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            decision = payload["decision"]
+            assert [item["code"] for item in payload["limitations"]] == ["thread_state_partial"]
+            assert decision["no_completion_evidence"]["blocking_limitation_present"] is True
+            assert payload["codex_review"]["lifecycle"]["completion_signal"] == "fallback_issue_comment"
+            assert decision["completion_signal"] != "codex_no_findings_issue_comment"
+            assert decision["status"] != "passed"
+            assert decision["no_findings_completion_candidate"]["present"] is False
+            assert decision["no_findings_completion_candidate"]["promotes_top_level_status"] is False
+
     def test_issue_218_s01_review_collector_generic_issue_comment_is_non_retryable_fallback(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
