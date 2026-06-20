@@ -316,7 +316,7 @@ def decision_list(decision: dict, key: str) -> list:
     return value if isinstance(value, list) else []
 
 
-def actionable_unresolved_reason(payload: dict) -> str | None:
+def current_selected_actionable_reason(payload: dict) -> str | None:
     decision = decision_payload(payload)
     selected_unresolved_thread_ids = decision_list(decision, "selected_unresolved_thread_ids")
     selected_unresolved_count = decision_int(
@@ -329,9 +329,7 @@ def actionable_unresolved_reason(payload: dict) -> str | None:
         "current_selected_unresolved_count",
         selected_unresolved_count,
     )
-    carryover_unresolved_count = decision_int(decision, "carryover_unresolved_count")
-    actionable_unresolved_count = decision_int(decision, "actionable_unresolved_count")
-    actionable_unresolved_thread_ids = decision_list(decision, "actionable_unresolved_thread_ids")
+    selected_changes_requested_evidence = decision_list(decision, "selected_changes_requested_evidence")
     decision_reason = decision.get("status_reason")
     if (
         decision_reason == "current_selected_unresolved_thread"
@@ -339,14 +337,44 @@ def actionable_unresolved_reason(payload: dict) -> str | None:
         or current_selected_unresolved_count > 0
     ):
         return "current_selected_unresolved_thread"
+    if decision_reason == "current_selected_changes_requested" or selected_changes_requested_evidence:
+        return "current_selected_changes_requested"
+    return None
+
+
+def carryover_inventory_reason(payload: dict) -> str | None:
+    decision = decision_payload(payload)
+    carryover_unresolved_count = decision_int(decision, "carryover_unresolved_count")
+    carryover_unresolved_thread_ids = decision_list(decision, "carryover_unresolved_thread_ids")
+    decision_reason = decision.get("status_reason")
     if (
         decision_reason == "carryover_non_outdated_unresolved_thread"
         or carryover_unresolved_count > 0
-        or actionable_unresolved_count > 0
-        or bool(actionable_unresolved_thread_ids)
+        or bool(carryover_unresolved_thread_ids)
     ):
         return "carryover_non_outdated_unresolved_thread"
     return None
+
+
+def trusted_completion_actionable_reason(payload: dict) -> str | None:
+    current_reason = current_selected_actionable_reason(payload)
+    if current_reason:
+        return current_reason
+    decision = decision_payload(payload)
+    lifecycle = codex_review_lifecycle(payload)
+    completion_signal = decision.get("completion_signal") or lifecycle.get("completion_signal")
+    if completion_signal == "submitted_pull_request_review":
+        return carryover_inventory_reason(payload)
+    return None
+
+
+def is_carryover_missing_completion_wait(payload: dict) -> bool:
+    decision = decision_payload(payload)
+    return (
+        decision.get("status_reason") == "missing_current_completion_signal"
+        and current_selected_actionable_reason(payload) is None
+        and carryover_inventory_reason(payload) is not None
+    )
 
 
 def mark_decision_actionable_unresolved(payload: dict, reason: str) -> None:
@@ -434,7 +462,7 @@ def no_completion_evidence(payload: dict) -> dict:
 
 
 def is_review_completion_unknown_candidate(payload: dict) -> bool:
-    if actionable_unresolved_reason(payload):
+    if current_selected_actionable_reason(payload):
         return False
     evidence = no_completion_evidence(payload)
     if evidence.get("present") is not True:
@@ -954,7 +982,7 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
                 return "unknown", "unknown", "fix_github_token_permissions", False, True
             return "unknown", "unknown", "human_gate", False, True
         return ci_status, ci_status, "wait", False, False
-    actionable_reason = actionable_unresolved_reason(payload)
+    actionable_reason = trusted_completion_actionable_reason(payload)
     if ci_status == "passed" and actionable_reason:
         return "human_gate", "human_gate", "address_review_feedback", False, True
     if has_permission_limitation(payload):
@@ -1386,13 +1414,16 @@ while True:
     ) + NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS
     if snapshot_poll_timed_out and latest_payload is not None:
         payload = latest_payload
-        append_snapshot_poll_timeout_limitation(
-            payload,
-            snapshot_timeout,
-            snapshot_stdout,
-            snapshot_stderr,
-        )
-        mark_latest_timeout(payload, latest_change_monotonic, same_count)
+        if is_carryover_missing_completion_wait(payload):
+            snapshot_poll_timed_out = False
+        else:
+            append_snapshot_poll_timeout_limitation(
+                payload,
+                snapshot_timeout,
+                snapshot_stdout,
+                snapshot_stderr,
+            )
+            mark_latest_timeout(payload, latest_change_monotonic, same_count)
         snapshot_text = latest_snapshot_text
     elif snapshot_poll_timed_out:
         payload = timeout_snapshot(snapshot_timeout, snapshot_stdout, snapshot_stderr)
@@ -1486,6 +1517,12 @@ while True:
         mark_decision_timeout(payload)
     elif terminal_now:
         final_phase = "terminal"
+    elif (
+        time.monotonic() >= deadline
+        and is_carryover_missing_completion_wait(payload)
+        and not review_completion_unknown_latency_satisfied
+    ):
+        final_phase = "wait"
     elif time.monotonic() >= deadline:
         final_phase = "timeout"
         mark_latest_timeout(payload, latest_change_monotonic, same_count, quiet_elapsed)
@@ -1496,7 +1533,7 @@ while True:
     else:
         final_phase = "wait"
 
-    final_actionable_reason = actionable_unresolved_reason(payload)
+    final_actionable_reason = trusted_completion_actionable_reason(payload)
     if final_phase == "terminal" and final_actionable_reason:
         normalized_status = "human_gate"
         overall_status = "human_gate"
@@ -1606,7 +1643,16 @@ while True:
             file=sys.stderr,
         )
 
-    if observation_complete or terminal_now or final_phase == "timeout":
+    if (
+        observation_complete
+        or terminal_now
+        or final_phase == "timeout"
+        or (
+            final_phase == "wait"
+            and is_carryover_missing_completion_wait(payload)
+            and time.monotonic() >= deadline
+        )
+    ):
         break
 
     remaining_after_poll = max(0, deadline - time.monotonic())
