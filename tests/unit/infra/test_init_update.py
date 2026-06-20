@@ -12397,6 +12397,14 @@ elif args[:2] == ["api", f"repos/owner/repo/actions/runs?head_sha={head}"]:
         }]})
     elif ci == "none":
         emit({"total_count": 0, "workflow_runs": []})
+    elif ci == "unknown":
+        emit({"total_count": 1, "workflow_runs": [{
+            "id": 202,
+            "name": "CI",
+            "head_sha": head,
+            "status": "completed",
+            "conclusion": "mystery",
+        }]})
     else:
         emit({"total_count": 1, "workflow_runs": [{
             "id": 202,
@@ -12423,6 +12431,15 @@ elif args[:2] == ["api", "repos/owner/repo/actions/runs/202/jobs"]:
             "status": "completed",
             "conclusion": "failure",
             "steps": [{"number": 1, "name": "Run tests", "status": "completed", "conclusion": "failure"}],
+        }]})
+    elif ci == "unknown":
+        emit({"total_count": 1, "jobs": [{
+            "id": 303,
+            "run_id": 202,
+            "name": "test",
+            "status": "completed",
+            "conclusion": "mystery",
+            "steps": [],
         }]})
     else:
         emit({"total_count": 1, "jobs": [{
@@ -14764,6 +14781,16 @@ case "$*" in
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
+JSON
+    ;;
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
     cat <<'JSON'
 {"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
@@ -14887,6 +14914,16 @@ JSON
   "api repos/owner/repo/actions/runs/202/jobs --paginate")
     cat <<'JSON'
 {"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
 JSON
     ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
@@ -19426,6 +19463,16 @@ case "$*" in
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
+JSON
+    ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2
     exit 44
@@ -19881,6 +19928,112 @@ esac
             "missing_required_status_contexts"
         ] == []
         assert "repos/owner/repo/compare/main...feature" in gh_calls
+
+    def test_issue_222_pr_observation_snapshot_any_source_required_check_matched_allows_merge_prepared(self) -> None:
+        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch": {"name": "main", "protected": True},
+                "branch_protection": {
+                    "required_status_checks": {
+                        "contexts": [],
+                        "checks": [{"context": "test", "app_id": -1}],
+                    }
+                },
+            }
+        )
+
+        limitation_codes = [item["code"] for item in payload["limitations"]]
+        assert payload["ci"]["status"] == "passed"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+        assert "required_non_actions_context_unprovable_by_actions" not in limitation_codes
+        assert "required_actions_context_unobserved" not in limitation_codes
+        protection = payload["merge_blocker_metadata"]["branch_protection"]
+        assert protection["required_github_actions_contexts"] == ["test"]
+        assert protection["required_non_actions_contexts"] == []
+        assert protection["missing_required_status_contexts"] == []
+
+    def test_issue_222_pr_observation_snapshot_non_actions_required_check_blocks_merge_prepared(self) -> None:
+        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch": {"name": "main", "protected": True},
+                "branch_protection": {
+                    "required_status_checks": {
+                        "contexts": [],
+                        "checks": [{"context": "external-ci", "app_id": 12345}],
+                    }
+                },
+            }
+        )
+
+        limitation_codes = [item["code"] for item in payload["limitations"]]
+        assert payload["ci"]["status"] == "passed"
+        assert payload["normalized_status"] == "unknown"
+        assert payload["recommended_next_action"] == "human_gate"
+        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
+        assert "required_non_actions_context_unprovable_by_actions" in limitation_codes
+        assert payload["merge_blocker_metadata"]["branch_protection"][
+            "unprovable_required_status_contexts"
+        ] == ["external-ci"]
+
+    def test_issue_222_pr_observation_snapshot_pending_actions_context_stays_waitable(self) -> None:
+        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "pending",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch": {"name": "main", "protected": True},
+                "branch_protection": {
+                    "required_status_checks": {
+                        "contexts": ["CI"],
+                        "checks": [{"context": "test", "app_id": 15368}],
+                    }
+                },
+            }
+        )
+
+        limitation_codes = [item["code"] for item in payload["limitations"]]
+        assert payload["ci"]["status"] == "pending"
+        assert payload["normalized_status"] == "pending"
+        assert payload["recommended_next_action"] == "wait"
+        assert payload["decision"]["recommended_next_action"] != "human_gate"
+        assert "required_actions_context_pending" in limitation_codes
+        assert "required_actions_context_unobserved" not in limitation_codes
+
+    def test_issue_222_pr_observation_snapshot_unknown_actions_context_stays_waitable(self) -> None:
+        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "unknown",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch": {"name": "main", "protected": True},
+                "branch_protection": {
+                    "required_status_checks": {
+                        "contexts": ["CI"],
+                        "checks": [{"context": "test", "app_id": 15368}],
+                    }
+                },
+            }
+        )
+
+        limitation_codes = [item["code"] for item in payload["limitations"]]
+        assert payload["ci"]["status"] == "unknown"
+        assert payload["normalized_status"] == "pending"
+        assert payload["recommended_next_action"] == "wait"
+        assert payload["decision"]["recommended_next_action"] != "human_gate"
+        assert "required_actions_context_pending" in limitation_codes
+        assert "required_actions_context_unobserved" not in limitation_codes
 
     def test_issue_222_pr_observation_snapshot_fork_head_uses_owner_qualified_compare_ref(self) -> None:
         payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
@@ -25262,6 +25415,16 @@ case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
     cat <<'JSON'
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
 JSON
     ;;
   *)
