@@ -1312,12 +1312,37 @@ under_budget_poll_exception_kind: str | None = None
 
 while True:
     if latest_payload is not None and time.monotonic() >= deadline:
-        final_phase = "timeout"
-        mark_latest_timeout(latest_payload, latest_change_monotonic, same_count)
-        latest_payload.setdefault("wait", {})["next_poll_min_budget_seconds"] = round(
-            next_poll_min_budget_seconds,
-            3,
+        review_trigger_age_seconds_at_deadline = age_seconds_from_timestamp(
+            trigger_created_at_for_latency(latest_payload, trigger_created_at)
         )
+        ci_passed_age_seconds_at_deadline = (
+            int(max(0, time.monotonic() - ci_passed_first_monotonic))
+            if ci_passed_first_monotonic is not None
+            else 0
+        )
+        latency_satisfied_at_deadline = (
+            review_trigger_age_seconds_at_deadline
+            >= REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS
+            and ci_passed_age_seconds_at_deadline
+            >= REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS
+        )
+        if (
+            is_carryover_missing_completion_wait(latest_payload)
+            and not latency_satisfied_at_deadline
+        ):
+            final_phase = "wait"
+            latest_payload.setdefault("wait", {})["deadline_reached"] = True
+            latest_payload["wait"]["next_poll_min_budget_seconds"] = round(
+                next_poll_min_budget_seconds,
+                3,
+            )
+        else:
+            final_phase = "timeout"
+            mark_latest_timeout(latest_payload, latest_change_monotonic, same_count)
+            latest_payload.setdefault("wait", {})["next_poll_min_budget_seconds"] = round(
+                next_poll_min_budget_seconds,
+                3,
+            )
         break
 
     remaining_before_poll = deadline - time.monotonic()
@@ -1375,18 +1400,47 @@ while True:
             and under_budget_poll_exception_candidate_kind is not None
         )
         if not under_budget_poll_allowed:
-            final_phase = "timeout"
+            review_trigger_age_seconds_before_poll = age_seconds_from_timestamp(
+                trigger_created_at_for_latency(latest_payload, trigger_created_at)
+            )
+            ci_passed_age_seconds_before_poll = (
+                int(max(0, time.monotonic() - ci_passed_first_monotonic))
+                if ci_passed_first_monotonic is not None
+                else 0
+            )
+            latency_satisfied_before_poll = (
+                review_trigger_age_seconds_before_poll
+                >= REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS
+                and ci_passed_age_seconds_before_poll
+                >= REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS
+            )
             final_poll_skipped_reason = "insufficient_next_snapshot_budget"
-            mark_latest_timeout(latest_payload, latest_change_monotonic, same_count)
-            latest_payload.setdefault("wait", {})["next_poll_min_budget_seconds"] = round(
-                next_poll_min_budget_seconds,
-                3,
-            )
-            latest_payload["wait"]["final_poll_skipped_reason"] = final_poll_skipped_reason
-            latest_payload["wait"]["remaining_seconds_before_final_poll"] = round(
-                max(0, remaining_before_poll),
-                3,
-            )
+            if (
+                is_carryover_missing_completion_wait(latest_payload)
+                and not latency_satisfied_before_poll
+            ):
+                final_phase = "wait"
+                latest_payload.setdefault("wait", {})["next_poll_min_budget_seconds"] = round(
+                    next_poll_min_budget_seconds,
+                    3,
+                )
+                latest_payload["wait"]["final_poll_skipped_reason"] = final_poll_skipped_reason
+                latest_payload["wait"]["remaining_seconds_before_final_poll"] = round(
+                    max(0, remaining_before_poll),
+                    3,
+                )
+            else:
+                final_phase = "timeout"
+                mark_latest_timeout(latest_payload, latest_change_monotonic, same_count)
+                latest_payload.setdefault("wait", {})["next_poll_min_budget_seconds"] = round(
+                    next_poll_min_budget_seconds,
+                    3,
+                )
+                latest_payload["wait"]["final_poll_skipped_reason"] = final_poll_skipped_reason
+                latest_payload["wait"]["remaining_seconds_before_final_poll"] = round(
+                    max(0, remaining_before_poll),
+                    3,
+                )
             break
         under_budget_poll_exception_used = True
         under_budget_poll_exception_kind = under_budget_poll_exception_candidate_kind
@@ -1414,16 +1468,13 @@ while True:
     ) + NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS
     if snapshot_poll_timed_out and latest_payload is not None:
         payload = latest_payload
-        if is_carryover_missing_completion_wait(payload):
-            snapshot_poll_timed_out = False
-        else:
-            append_snapshot_poll_timeout_limitation(
-                payload,
-                snapshot_timeout,
-                snapshot_stdout,
-                snapshot_stderr,
-            )
-            mark_latest_timeout(payload, latest_change_monotonic, same_count)
+        append_snapshot_poll_timeout_limitation(
+            payload,
+            snapshot_timeout,
+            snapshot_stdout,
+            snapshot_stderr,
+        )
+        mark_latest_timeout(payload, latest_change_monotonic, same_count)
         snapshot_text = latest_snapshot_text
     elif snapshot_poll_timed_out:
         payload = timeout_snapshot(snapshot_timeout, snapshot_stdout, snapshot_stderr)
@@ -1577,7 +1628,7 @@ while True:
         "review_completion_unknown_latency_satisfied": review_completion_unknown_latency_satisfied,
         "zero_check_grace_polls": zero_check_grace_polls,
         "latest_change_poll": latest_delta.get("poll", poll),
-        "deadline_reached": final_phase == "timeout",
+        "deadline_reached": final_phase == "timeout" or time.monotonic() >= deadline,
         "contract_phase": "s05_stable_wait_loop",
     }
     if observation_complete and review_completion_unknown_candidate:

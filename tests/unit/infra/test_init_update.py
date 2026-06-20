@@ -24301,9 +24301,74 @@ esac
             assert payload["recommended_next_action"] == "wait_or_resume"
             assert payload["observation_complete"] is False
             assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
-            assert payload["decision"]["status_reason"] == "missing_current_completion_signal"
+            assert payload["wait"]["deadline_reached"] is True
+            assert payload["decision"]["status_reason"] in {
+                "missing_current_completion_signal",
+                "wait_timeout",
+            }
             assert payload["decision"]["carryover_unresolved_thread_ids"] == ["RT_carryover"]
             assert payload["decision"]["actionable_unresolved_thread_ids"] == ["RT_carryover"]
+
+    def test_issue_219_s01_wait_preserves_carryover_refresh_timeout(self) -> None:
+        decision = self._issue_219_s01_carryover_only_no_completion_decision(
+            "issue-219-carryover-refresh-timeout"
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "issue-219-carryover-refresh-timeout",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "no_completion_evidence": decision["no_completion_evidence"],
+                            },
+                            "collection_summary": {
+                                "review_threads": {
+                                    "unresolved_count": 1,
+                                    "unresolved_ids": ["RT_carryover"],
+                                }
+                            },
+                        },
+                        "observed_at": "2000-01-01T00:00:00Z",
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {
+                            "total": 1,
+                            "unresolved": 1,
+                            "items": [{"id": "RT_carryover", "state": "unresolved"}],
+                        },
+                    },
+                    {"sleep_seconds": 5},
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "timeout"
+            assert payload["overall_status"] == "timeout"
+            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["observation_complete"] is False
+            assert payload["decision"]["status_reason"] == "wait_timeout"
+            assert payload["wait"]["deadline_reached"] is True
+            assert "post_unknown_fresh_audit_required" not in payload["wait"]
+            assert any(
+                item["code"] == "snapshot_poll_timeout" and item["severity"] == "blocking"
+                for item in payload["limitations"]
+            )
 
     def test_issue_219_s01_wait_trusted_completion_carryover_requests_feedback(self) -> None:
         decision = self._issue_219_s01_trusted_completion_carryover_decision(
