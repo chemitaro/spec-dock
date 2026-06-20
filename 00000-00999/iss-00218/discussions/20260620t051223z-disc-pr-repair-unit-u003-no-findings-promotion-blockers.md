@@ -100,11 +100,12 @@ Combine Option C and Option D:
 
 ## Commit Evidence
 
-Pending commit and push.
+- Commit: 7667d20325333b50a1f21c342a882018335b3252
+- Push: branch `iss-00218-codex-review-fallback-signal-semantics` pushed to `origin` after the repair implementation commit.
 
 ## Re-observation Result
 
-Pending latest-head re-observation.
+Pending latest-head re-observation after commit evidence update.
 
 ## Residual Risk / Follow-up
 
