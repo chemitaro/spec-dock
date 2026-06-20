@@ -263,8 +263,14 @@ def user_login(payload):
     return None
 
 
+TRUSTED_CODEX_LOGINS = {
+    "chatgpt-codex-connector[bot]",
+    "codex",
+}
+
+
 def is_codex_authored(login):
-    return "codex" in str(login or "").lower()
+    return str(login or "").lower() in TRUSTED_CODEX_LOGINS
 
 
 def is_trigger_command_body(body):
@@ -561,6 +567,9 @@ reviews = as_list(reviews_payload)
 review_comments = as_list(review_comments_payload)
 requested_reviewers = as_list(pull_payload, "requested_reviewers")
 requested_teams = as_list(pull_payload, "requested_teams")
+current_pr_head_sha = None
+if isinstance(pull_payload, dict) and isinstance(pull_payload.get("head"), dict):
+    current_pr_head_sha = pull_payload["head"].get("sha") or None
 
 if trigger_comment_id and not trigger_created_at:
     for comment in issue_comments:
@@ -719,10 +728,7 @@ for team in requested_teams:
         }
     )
 
-review_decision_requires_review = (
-    str(review_decision or "").upper() == "REVIEW_REQUIRED"
-    and not review_request_signals
-)
+review_decision_requires_review = str(review_decision or "").upper() == "REVIEW_REQUIRED"
 review_decision_changes_requested = str(review_decision or "").upper() == "CHANGES_REQUESTED"
 
 threads = []
@@ -830,14 +836,7 @@ if body_mode == "trigger-window-full":
     )
 
 blocking_collection_failure = any(
-    item.get("code") in {
-        "github_api_collection_failed",
-        "github_api_schema_unavailable",
-        "thread_state_unavailable",
-        "trigger_timestamp_unparseable",
-    }
-    and item.get("severity") == "blocking"
-    for item in limitations
+    item.get("severity") == "blocking" for item in limitations
 )
 
 counts = {
@@ -1013,16 +1012,81 @@ review_collection_summary["review_threads"]["non_outdated_unresolved_ids"] = [
 review_collection_summary["review_threads"]["carryover_non_outdated_unresolved_ids"] = (
     carryover_unresolved_thread_ids
 )
+
+
+def normalized_body_text(value):
+    return " ".join(str(value or "").strip().split()).casefold()
+
+
+def is_strict_no_findings_issue_comment(item):
+    raw_body = str(
+        item.get("_fallback_pass_raw_body")
+        or item.get("_raw_body_artifact")
+        or item.get("body")
+        or ""
+    )
+    allowed_full_bodies = {
+        "no major issues found",
+        "no major issues found.",
+        "no major issues were found",
+        "no major issues were found.",
+        "codex review: didn't find any major issues. breezy!",
+    }
+    return normalized_body_text(raw_body) in allowed_full_bodies
+
+
+current_codex_issue_comments = [
+    item
+    for item in signals
+    if item.get("kind") == "issue_comment"
+    and item.get("codex_authored")
+    and item.get("current_status_signal")
+]
+latest_current_codex_issue_comment = (
+    current_codex_issue_comments[-1] if current_codex_issue_comments else None
+)
+latest_current_codex_issue_comment_is_no_findings = (
+    latest_current_codex_issue_comment is not None
+    and is_strict_no_findings_issue_comment(latest_current_codex_issue_comment)
+)
+no_findings_source_ids = (
+    [latest_current_codex_issue_comment.get("id")]
+    if latest_current_codex_issue_comment_is_no_findings
+    and latest_current_codex_issue_comment.get("id") is not None
+    else []
+)
+stale_codex_head_context_present = any(
+    item.get("codex_authored")
+    and item.get("stale")
+    and item.get("kind") in {"pull_review", "pull_review_comment"}
+    and body_state["trigger_known"]
+    and is_after_trigger(item)
+    for item in signals
+)
+active_changes_requested_review_present = any(
+    item.get("state") == "changes_requested" for item in active_review_signals
+)
+no_findings_completion_promotes = bool(
+    expected_head_sha
+    and current_pr_head_sha
+    and sha_prefix_matches(current_pr_head_sha, expected_head_sha)
+    and no_findings_source_ids
+    and not stale_codex_head_context_present
+    and not actionable_unresolved_thread_ids
+    and not review_decision_changes_requested
+    and not review_decision_requires_review
+    and not active_changes_requested_review_present
+    and not blocking_collection_failure
+)
 if selected_review_signals:
     lifecycle_status = "unresolved" if selected_thread_ids else "completed"
     completion_signal = "submitted_pull_request_review"
     lifecycle_confidence = "high"
-elif any(
-    item.get("kind") == "issue_comment"
-    and item.get("codex_authored")
-    and item.get("current_status_signal")
-    for item in signals
-):
+elif no_findings_completion_promotes:
+    lifecycle_status = "completed"
+    completion_signal = "codex_no_findings_issue_comment"
+    lifecycle_confidence = "medium"
+elif current_codex_issue_comments:
     lifecycle_status = "fallback"
     completion_signal = "fallback_issue_comment"
     lifecycle_confidence = "low"
@@ -1087,7 +1151,10 @@ selected_changes_requested_evidence.extend(
 pending_review_present = lifecycle_status == "pending"
 blocking_limitation_present = bool(blocking_collection_failure)
 selected_blocker_present = bool(selected_unresolved_thread_ids or selected_changes_requested_evidence)
-explicit_completion_present = completion_signal == "submitted_pull_request_review"
+explicit_completion_present = completion_signal in {
+    "submitted_pull_request_review",
+    "codex_no_findings_issue_comment",
+}
 fallback_issue_comment_present = completion_signal == "fallback_issue_comment"
 if selected_blocker_present:
     no_completion_category = "selected_blocker"
@@ -1208,34 +1275,10 @@ def fingerprint_thread(item):
     }
 
 
-def is_no_major_issues_fallback(item):
-    raw_body = str(
-        item.get("_fallback_pass_raw_body")
-        or item.get("_raw_body_artifact")
-        or item.get("body")
-        or ""
-    ).strip().lower()
-    normalized_lines = [" ".join(line.strip().split()) for line in raw_body.splitlines()]
-    allowed_lines = {
-        "no major issues found",
-        "no major issues found.",
-        "no major issues were found",
-        "no major issues were found.",
-    }
-    return any(line in allowed_lines for line in normalized_lines)
-
-
-current_codex_issue_comments = [
-    item
-    for item in signals
-    if item.get("kind") == "issue_comment"
-    and item.get("codex_authored")
-    and item.get("current_status_signal")
-]
 fallback_pass_source_ids = [
     item.get("id")
     for item in current_codex_issue_comments
-    if item.get("id") is not None and is_no_major_issues_fallback(item)
+    if item.get("id") is not None and is_strict_no_findings_issue_comment(item)
 ]
 for signal in signals:
     signal.pop("_fallback_pass_raw_body", None)
@@ -1245,6 +1288,17 @@ fallback_pass_candidate = {
     "source_ids": fallback_pass_source_ids,
     "reason": "current_boundary_no_major_issues_comment" if fallback_pass_source_ids else None,
     "promotes_top_level_status": False,
+}
+no_findings_completion_candidate = {
+    "present": bool(no_findings_completion_promotes),
+    "source": "issue_comment" if no_findings_source_ids else None,
+    "source_ids": no_findings_source_ids,
+    "reason": (
+        "current_boundary_codex_no_findings_comment"
+        if no_findings_completion_promotes
+        else None
+    ),
+    "promotes_top_level_status": bool(no_findings_completion_promotes),
 }
 if selected_unresolved_thread_ids:
     decision_status_reason = "current_selected_unresolved_thread"
@@ -1257,7 +1311,7 @@ elif selected_changes_requested_evidence:
 elif completion_signal == "fallback_issue_comment":
     decision_status_reason = "fallback_issue_comment_low_confidence"
     decision_status = "human_gate"
-    decision_action = "wait_or_resume"
+    decision_action = "manual_review_required_non_retryable"
 elif blocking_collection_failure:
     decision_status_reason = "blocking_limitation"
     decision_status = "unknown"
@@ -1267,9 +1321,17 @@ elif completion_signal == "none":
     decision_status = "unknown"
     decision_action = "wait_or_resume"
 else:
-    decision_status_reason = "passed"
+    decision_status_reason = (
+        "codex_no_findings_issue_comment"
+        if completion_signal == "codex_no_findings_issue_comment"
+        else "passed"
+    )
     decision_status = "passed"
-    decision_action = "merge_prepared"
+    decision_action = (
+        "review_completion_observed"
+        if completion_signal == "codex_no_findings_issue_comment"
+        else "merge_prepared"
+    )
 decision_scope = (
     "current_trigger_boundary"
     if trigger_source == "explicit"
@@ -1307,6 +1369,7 @@ decision_source = {
     "completion_signal": completion_signal,
     "confidence": lifecycle_confidence,
     "fallback_pass_candidate": fallback_pass_candidate,
+    "no_findings_completion_candidate": no_findings_completion_candidate,
     "no_completion_evidence": no_completion_evidence,
     "blocking_limitations": [
         item.get("code")

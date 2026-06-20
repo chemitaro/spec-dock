@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00218",
+  "title": "Codex Review Fallback Signal Semantics",
+  "slug": "codex-review-fallback-signal-semantics",
+  "created_at": "2026-06-19T22:13:48+09:00",
+  "updated_at": "2026-06-19T22:13:48+09:00",
+  "parent_id": "epic-00158",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00158",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 218,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}

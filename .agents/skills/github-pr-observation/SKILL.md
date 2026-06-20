@@ -198,8 +198,17 @@ status collection are implemented by the public scripts.
   `ci.actions.jobs_summary.collection` is non-secret operational context;
   failed and non-terminal diagnostics remain preserved where available.
 - Codex review completion is primarily detected from Codex-authored submitted PR
-  review objects. Issue comments, reactions, or quiet windows are fallback or
-  supporting evidence only.
+  review objects. A strict Codex no-findings issue comment can also be selected
+  as the review-level completion signal `codex_no_findings_issue_comment` when
+  the current trigger boundary, expected head, allow-listed no-findings wording,
+  and blocker checks all match. In collector output this reports
+  `review_completion_observed`; it is not by itself top-level
+  `merge_prepared` authority.
+- Snapshot and wait output may promote a safe integrated no-findings result to
+  top-level `passed` / `merge_prepared` / complete only after CI, PR metadata,
+  head freshness, unresolved threads, changes-requested reviews, draft/non-open
+  PR state, stale head, and blocking limitations have been integrated. Those
+  blockers override `codex_no_findings_issue_comment`.
 - `review_completion_unknown` is a non-pass terminal-like review state. It means
   CI passed, the observed head matched, the actionable review inventory was
   empty, and no trusted Codex review completion signal was found after the
@@ -219,9 +228,13 @@ status collection are implemented by the public scripts.
 - The wait loop may skip a final under-budget snapshot and preserve the latest
   useful payload with `final_poll_skipped_reason="insufficient_next_snapshot_budget"`.
   Treat that as budget-preservation metadata, not as a stronger review result.
-- `fallback_issue_comment` remains low-confidence evidence. It keeps the final
-  status in the `human_gate` / `wait_or_resume` path and does not promote a run
-  to `passed`, complete, or merge-ready.
+- A missing current completion signal or pending review remains retryable and
+  stays in the wait/resume path, such as `wait_or_resume`, until the configured
+  latency guards or terminal conditions are reached.
+- Generic `fallback_issue_comment` remains low-confidence evidence. It keeps the
+  final status in the human gate path with
+  `manual_review_required_non_retryable` and does not promote a run to
+  `passed`, complete, or `merge_prepared`.
 - `fallback_pass_candidate` is a non-promoting signal that a current-boundary
   fallback issue comment appears positive. It is useful context, but it does not
   override the `fallback_issue_comment` gate.
