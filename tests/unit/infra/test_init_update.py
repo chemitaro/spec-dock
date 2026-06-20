@@ -13886,7 +13886,7 @@ printf '%s\\n' "$S04_WAIT_PAYLOAD"
                     assert "--trigger-comment-id 777" in payload["resume"]["command_hint"]
                     if review_status == "pending":
                         assert payload["codex_review"]["lifecycle"]["status"] == "pending"
-                    assert "phase=wait ci=passed review=observing" in result.stderr
+                    assert "phase=wait ci=passed review=pending_signal" in result.stderr
                     assert (out_dir / "result.json").read_text(encoding="utf-8") == result.stdout
                     assert not (out_dir / "summary.md").exists()
 
@@ -15154,6 +15154,61 @@ esac
         assert payload["decision"]["fallback_pass_candidate"]["present"] is True
         assert payload["review"]["threads"]["unresolved"] == 1
         assert payload["review"]["threads"]["decision_authoritative"] is False
+
+    def test_issue_219_s01_snapshot_fallback_no_findings_with_carryover_inventory_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            payload = self._issue_182_s02_run_snapshot_with_collectors(
+                Path(tmp_dir),
+                review_payload=self._issue_182_s02_review_payload(
+                    decision_status="human_gate",
+                    status_reason="fallback_issue_comment_low_confidence",
+                    recommended_next_action="manual_review_required_non_retryable",
+                    completion_signal="fallback_issue_comment",
+                    fallback_pass_candidate={
+                        "present": True,
+                        "source": "issue_comment",
+                        "source_ids": [100],
+                        "reason": "current_boundary_no_major_issues_comment",
+                        "promotes_top_level_status": True,
+                    },
+                    legacy_review_status="approved",
+                    legacy_unresolved_count=1,
+                ),
+            )
+
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["observation_complete"] is True
+        assert payload["decision"]["fallback_pass_candidate"]["promotes_top_level_status"] is True
+        assert payload["review"]["threads"]["unresolved"] == 1
+        assert payload["review"]["threads"]["decision_authoritative"] is False
+
+    def test_issue_219_s01_snapshot_fallback_no_findings_with_unresolved_review_blocks_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            payload = self._issue_182_s02_run_snapshot_with_collectors(
+                Path(tmp_dir),
+                review_payload=self._issue_182_s02_review_payload(
+                    decision_status="human_gate",
+                    status_reason="fallback_issue_comment_low_confidence",
+                    recommended_next_action="manual_review_required_non_retryable",
+                    completion_signal="fallback_issue_comment",
+                    fallback_pass_candidate={
+                        "present": True,
+                        "source": "issue_comment",
+                        "source_ids": [100],
+                        "reason": "current_boundary_no_major_issues_comment",
+                        "promotes_top_level_status": True,
+                    },
+                    legacy_review_status="unresolved",
+                    legacy_unresolved_count=1,
+                ),
+            )
+
+        assert payload["normalized_status"] == "human_gate"
+        assert payload["recommended_next_action"] == "manual_review_required_non_retryable"
+        assert payload["observation_complete"] is False
+        assert payload["decision"]["fallback_pass_candidate"]["promotes_top_level_status"] is True
+        assert payload["review"]["status"] == "unresolved"
 
     def test_issue_182_s02_snapshot_current_selected_unresolved_thread_drives_feedback_action(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -20304,6 +20359,136 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert payload["observation_complete"] is True
             assert payload["decision"]["completion_signal"] == "codex_no_findings_issue_comment"
 
+    def test_issue_219_s01_wait_fallback_no_findings_with_carryover_inventory_passes(self) -> None:
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "human_gate",
+            "status_reason": "fallback_issue_comment_low_confidence",
+            "recommended_next_action": "manual_review_required_non_retryable",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "carryover_unresolved_count": 1,
+            "carryover_unresolved_thread_ids": ["RT_carryover"],
+            "selected_changes_requested_evidence": [],
+            "completion_signal": "fallback_issue_comment",
+            "confidence": "low",
+            "fallback_pass_candidate": {
+                "present": True,
+                "source": "issue_comment",
+                "source_ids": [100],
+                "reason": "current_boundary_no_major_issues_comment",
+                "promotes_top_level_status": True,
+            },
+            "fingerprint": "fallback-carryover-pass-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "human_gate",
+                        "overall_status": "human_gate",
+                        "normalized_status": "human_gate",
+                        "recommended_next_action": "manual_review_required_non_retryable",
+                        "decision": decision,
+                        "decision_fingerprint": "fallback-carryover-pass-s03",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "fallback",
+                                "completion_signal": "fallback_issue_comment",
+                                "confidence": "low",
+                                "fallback_pass_candidate": decision["fallback_pass_candidate"],
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_carryover"}]},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["overall_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["observation_complete"] is True
+        assert payload["decision"]["fallback_pass_candidate"]["promotes_top_level_status"] is True
+
+    def test_issue_219_s01_wait_fallback_no_findings_with_unresolved_review_blocks_pass(self) -> None:
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "human_gate",
+            "status_reason": "fallback_issue_comment_low_confidence",
+            "recommended_next_action": "manual_review_required_non_retryable",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "carryover_unresolved_count": 0,
+            "carryover_unresolved_thread_ids": [],
+            "selected_changes_requested_evidence": [],
+            "completion_signal": "fallback_issue_comment",
+            "confidence": "low",
+            "fallback_pass_candidate": {
+                "present": True,
+                "source": "issue_comment",
+                "source_ids": [100],
+                "reason": "current_boundary_no_major_issues_comment",
+                "promotes_top_level_status": True,
+            },
+            "fingerprint": "fallback-unresolved-review-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "unresolved",
+                        "status": "human_gate",
+                        "overall_status": "human_gate",
+                        "normalized_status": "human_gate",
+                        "recommended_next_action": "manual_review_required_non_retryable",
+                        "decision": decision,
+                        "decision_fingerprint": "fallback-unresolved-review-s03",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "fallback",
+                                "completion_signal": "fallback_issue_comment",
+                                "confidence": "low",
+                                "fallback_pass_candidate": decision["fallback_pass_candidate"],
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_current"}]},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["overall_status"] == "human_gate"
+        assert payload["recommended_next_action"] == "manual_review_required_non_retryable"
+        assert payload["observation_complete"] is False
+        assert payload["decision"]["fallback_pass_candidate"]["promotes_top_level_status"] is True
+
     def test_issue_218_s03_wait_fallback_issue_comment_is_non_retryable_human_gate(self) -> None:
         decision = {
             "scope": "current_trigger_boundary",
@@ -20529,7 +20714,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                     assert payload["observation_complete"] is False
                     assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
                     assert payload["wait"]["review_trigger_age_seconds"] < 300
-                    assert "phase=wait ci=passed review=observing" in result.stderr
+                    assert "phase=wait ci=passed review=pending_signal" in result.stderr
 
     def test_issue_187_s204_wait_does_not_promote_unknown_before_ci_passed_age(self) -> None:
         evidence = {
@@ -24097,7 +24282,7 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             return json.loads(result.stdout)
 
-    def test_issue_187_s420_snapshot_carryover_unresolved_blocks_unknown(self) -> None:
+    def test_issue_187_s420_snapshot_carryover_only_missing_completion_stays_waitable(self) -> None:
         evidence = {
             "present": True,
             "category": "missing_current_completion_signal",
@@ -24137,11 +24322,321 @@ esac
             }
         )
 
-        assert payload["summary"]["review"] == "unresolved"
-        assert payload["recommended_next_action"] == "address_review_feedback"
-        assert payload["decision"]["status_reason"] == "carryover_non_outdated_unresolved_thread"
+        assert payload["summary"]["review"] == "approved"
+        assert payload["recommended_next_action"] == "wait"
+        assert payload["decision"]["status"] == "pending"
+        assert payload["decision"]["status_reason"] == "missing_current_completion_signal"
         assert payload["decision"]["carryover_unresolved_thread_ids"] == ["RT_carryover"]
         assert payload["decision"]["status_reason"] != "review_completion_unknown"
+
+    def test_issue_219_s01_wait_guard_under_carryover_only_missing_completion_does_not_timeout(self) -> None:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "carryover_unresolved_count": 1,
+            "carryover_unresolved_thread_ids": ["RT_carryover"],
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": "carryover-missing-guard-under-s01",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "carryover-missing-guard-under-s01",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "no_completion_evidence": evidence,
+                            }
+                        },
+                        "observed_at": "2000-01-01T00:00:00Z",
+                        "trigger": {
+                            "source": "explicit",
+                            "comment_id": 99,
+                            "created_at": "2999-01-01T00:00:00Z",
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_carryover"}]},
+                    }
+                ],
+                timeout_seconds=2,
+                poll_interval_seconds=2,
+                quiet_seconds=90,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2999-01-01T00:00:00Z",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["normalized_status"] == "pending"
+        assert payload["recommended_next_action"] == "wait_or_resume"
+        assert payload["observation_complete"] is False
+        assert payload["decision"]["status_reason"] == "missing_current_completion_signal"
+        assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
+
+    def test_issue_219_s01_wait_carryover_snapshot_poll_timeout_keeps_limitation(self) -> None:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "carryover_unresolved_count": 1,
+            "carryover_unresolved_thread_ids": ["RT_carryover"],
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": "carryover-missing-poll-timeout-s01",
+        }
+        snapshot = {
+            "ci": "passed",
+            "review": "approved",
+            "status": "pending",
+            "overall_status": "pending",
+            "normalized_status": "pending",
+            "recommended_next_action": "wait_or_resume",
+            "decision": decision,
+            "decision_fingerprint": "carryover-missing-poll-timeout-s01",
+            "codex_review": {
+                "lifecycle": {
+                    "status": "none",
+                    "completion_signal": "none",
+                    "no_completion_evidence": evidence,
+                }
+            },
+            "observed_at": "2000-01-01T00:00:00Z",
+            "trigger": {
+                "source": "explicit",
+                "comment_id": 99,
+                "created_at": "2999-01-01T00:00:00Z",
+            },
+            "check_runs": {"total": 1, "success": 1},
+            "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_carryover"}]},
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [snapshot, {**snapshot, "sleep_seconds": 2.0}],
+                timeout_seconds=2,
+                poll_interval_seconds=1,
+                quiet_seconds=90,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2999-01-01T00:00:00Z",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["normalized_status"] == "pending"
+        assert payload["recommended_next_action"] == "wait_or_resume"
+        assert payload["observation_complete"] is False
+        poll_timeout_limitations = [
+            item
+            for item in payload.get("limitations", [])
+            if item.get("source") == "fetch_pr_observation_snapshot.sh"
+            and item.get("code") == "snapshot_poll_timeout"
+        ]
+        assert poll_timeout_limitations
+        assert poll_timeout_limitations[0]["severity"] == "warning"
+
+    def test_issue_219_s01_wait_carryover_snapshot_poll_timeout_blocks_after_latency(self) -> None:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "carryover_unresolved_count": 1,
+            "carryover_unresolved_thread_ids": ["RT_carryover"],
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": "carryover-missing-poll-timeout-after-latency-s01",
+        }
+        snapshot = {
+            "ci": "passed",
+            "review": "approved",
+            "status": "pending",
+            "overall_status": "pending",
+            "normalized_status": "pending",
+            "recommended_next_action": "wait_or_resume",
+            "decision": decision,
+            "decision_fingerprint": "carryover-missing-poll-timeout-after-latency-s01",
+            "codex_review": {
+                "lifecycle": {
+                    "status": "none",
+                    "completion_signal": "none",
+                    "no_completion_evidence": evidence,
+                }
+            },
+            "observed_at": "2000-01-01T00:00:00Z",
+            "trigger": {
+                "source": "explicit",
+                "comment_id": 99,
+                "created_at": "2000-01-01T00:00:00Z",
+            },
+            "check_runs": {"total": 1, "success": 1},
+            "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_carryover"}]},
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [snapshot, {**snapshot, "sleep_seconds": 2.0}],
+                timeout_seconds=2,
+                poll_interval_seconds=1,
+                quiet_seconds=90,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["normalized_status"] == "timeout"
+        assert payload["recommended_next_action"] == "wait_or_resume"
+        assert payload["observation_complete"] is False
+        poll_timeout_limitations = [
+            item
+            for item in payload.get("limitations", [])
+            if item.get("source") == "fetch_pr_observation_snapshot.sh"
+            and item.get("code") == "snapshot_poll_timeout"
+        ]
+        assert poll_timeout_limitations
+        assert poll_timeout_limitations[0]["severity"] == "blocking"
+        assert payload["decision"]["status_reason"] == "wait_timeout"
+
+    def test_issue_219_s01_wait_carryover_only_missing_completion_reaches_unknown_after_latency(self) -> None:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "carryover_unresolved_count": 1,
+            "carryover_unresolved_thread_ids": ["RT_carryover"],
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": "carryover-missing-after-latency-s01",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "carryover-missing-after-latency-s01",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "no_completion_evidence": evidence,
+                            }
+                        },
+                        "observed_at": "2000-01-01T00:00:00Z",
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_carryover"}]},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["normalized_status"] == "human_gate"
+        assert payload["recommended_next_action"] == "human_gate"
+        assert payload["observation_complete"] is True
+        assert payload["decision"]["status_reason"] == "review_completion_unknown"
+        assert payload["wait"]["review_completion_unknown_latency_satisfied"] is True
 
     def test_issue_187_s420_snapshot_current_selected_reason_wins_over_carryover(self) -> None:
         payload = self._issue_187_s420_run_observation_snapshot(
@@ -25863,7 +26358,7 @@ esac
 case "$*" in
   "api repos/owner/repo/issues/13/comments --paginate")
     cat <<'JSON'
-[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Breezy!"}]
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Swish!\\n\\n**Reviewed commit:** `aaaaaaaaaa`\\n\\n<details><summary>About Codex</summary></details>"}]
 JSON
     ;;
   "api repos/owner/repo/pulls/13/reviews --paginate")
@@ -25939,6 +26434,164 @@ esac
             assert decision["no_completion_evidence"]["present"] is False
             assert decision["no_completion_evidence"]["explicit_completion_present"] is True
 
+    def test_issue_219_s01_review_collector_no_findings_reviewed_commit_mismatch_does_not_promote(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Swish!\\n\\n**Reviewed commit:** `bbbbbbbbbb`\\n\\n<details><summary>About Codex</summary></details>"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            decision = payload["decision"]
+            assert decision["completion_signal"] == "fallback_issue_comment"
+            assert decision["status"] == "human_gate"
+            assert decision["no_findings_completion_candidate"]["present"] is False
+            assert decision["no_findings_completion_candidate"]["promotes_top_level_status"] is False
+
+    def test_issue_219_s01_review_collector_no_findings_with_carryover_sets_fallback_pass(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. :tada:"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_carryover","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_300","databaseId":300,"author":{"login":"reviewer"},"createdAt":"2026-06-08T00:30:00Z","body":"old but still applicable"}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            decision = payload["decision"]
+            assert decision["completion_signal"] == "fallback_issue_comment"
+            assert decision["fallback_pass_candidate"]["present"] is True
+            assert decision["fallback_pass_candidate"]["promotes_top_level_status"] is True
+            assert decision["no_findings_completion_candidate"]["present"] is False
+            assert decision["carryover_unresolved_thread_ids"] == ["RT_carryover"]
+            assert decision["selected_unresolved_thread_ids"] == []
+
     def test_issue_218_s01_review_collector_no_findings_with_actionable_unresolved_thread_does_not_promote(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -25956,7 +26609,7 @@ esac
 case "$*" in
   "api repos/owner/repo/issues/13/comments --paginate")
     cat <<'JSON'
-[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Breezy!"}]
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. :tada:"}]
 JSON
     ;;
   "api repos/owner/repo/pulls/13/reviews --paginate")
@@ -26016,6 +26669,89 @@ esac
             assert decision["actionable_unresolved_count"] == 1
             assert decision["completion_signal"] != "codex_no_findings_issue_comment"
             assert decision["status"] != "passed"
+            assert decision["no_findings_completion_candidate"]["present"] is False
+            assert decision["no_findings_completion_candidate"]["promotes_top_level_status"] is False
+
+    def test_issue_219_s01_review_collector_no_findings_with_pending_codex_review_does_not_promote(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Breezy!"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"chatgpt-codex-connector[bot]"},"state":"PENDING","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","body":""}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            decision = payload["decision"]
+            assert decision["completion_signal"] != "codex_no_findings_issue_comment"
+            assert decision["status"] != "passed"
+            assert decision["completion_signal"] == "none"
+            assert decision["status"] == "pending"
+            assert decision["no_completion_evidence"]["pending_review_present"] is True
             assert decision["no_findings_completion_candidate"]["present"] is False
             assert decision["no_findings_completion_candidate"]["promotes_top_level_status"] is False
 
