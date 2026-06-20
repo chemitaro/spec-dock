@@ -1004,11 +1004,18 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
         ):
             return "passed", "passed", "merge_prepared", True, False
         if completion_signal == "fallback_issue_comment" or decision_reason == "fallback_issue_comment_low_confidence":
-            return "human_gate", "human_gate", "wait_or_resume", False, True
+            return "human_gate", "human_gate", "manual_review_required_non_retryable", False, True
         if decision_reason == "missing_current_completion_signal":
             if is_review_completion_unknown_candidate(payload):
                 return "pending", "pending", "wait_or_resume", True, False
             return "pending", "pending", "wait_or_resume", False, False
+        if (
+            completion_signal == "codex_no_findings_issue_comment"
+            and decision_status == "passed"
+            and top_level_status == "passed"
+            and top_level_next_action == "merge_prepared"
+        ):
+            return "passed", "passed", "merge_prepared", True, False
         if decision_status == "passed" and decision_next_action == "merge_prepared":
             return "passed", "passed", "merge_prepared", True, False
         if decision_status == "human_gate":
@@ -1017,7 +1024,7 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
             return "pending", "pending", decision_next_action or "wait_or_resume", False, False
         return "unknown", "unknown", decision_next_action or "human_gate", False, True
     if completion_signal == "fallback_issue_comment":
-        return "human_gate", "human_gate", "wait_or_resume", False, True
+        return "human_gate", "human_gate", "manual_review_required_non_retryable", False, True
     if summary_review_status in {"requested", "commented", "changes_requested", "unresolved"}:
         return "human_gate", "human_gate", "address_review_feedback", True, False
     if review_status in {"requested", "commented", "changes_requested", "unresolved"}:
