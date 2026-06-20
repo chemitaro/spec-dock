@@ -24405,6 +24405,87 @@ esac
         assert payload["decision"]["status_reason"] == "missing_current_completion_signal"
         assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
 
+    def test_issue_219_s01_wait_carryover_snapshot_poll_timeout_keeps_limitation(self) -> None:
+        evidence = {
+            "present": True,
+            "category": "missing_current_completion_signal",
+            "requires_wait_stability": True,
+            "promotes_top_level_status": False,
+            "pending_review_present": False,
+            "blocking_limitation_present": False,
+            "selected_blocker_present": False,
+            "explicit_completion_present": False,
+            "fallback_issue_comment_present": False,
+        }
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "pending",
+            "status_reason": "missing_current_completion_signal",
+            "recommended_next_action": "wait_or_resume",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "carryover_unresolved_count": 1,
+            "carryover_unresolved_thread_ids": ["RT_carryover"],
+            "completion_signal": "none",
+            "no_completion_evidence": evidence,
+            "fingerprint": "carryover-missing-poll-timeout-s01",
+        }
+        snapshot = {
+            "ci": "passed",
+            "review": "approved",
+            "status": "pending",
+            "overall_status": "pending",
+            "normalized_status": "pending",
+            "recommended_next_action": "wait_or_resume",
+            "decision": decision,
+            "decision_fingerprint": "carryover-missing-poll-timeout-s01",
+            "codex_review": {
+                "lifecycle": {
+                    "status": "none",
+                    "completion_signal": "none",
+                    "no_completion_evidence": evidence,
+                }
+            },
+            "observed_at": "2000-01-01T00:00:00Z",
+            "trigger": {
+                "source": "explicit",
+                "comment_id": 99,
+                "created_at": "2999-01-01T00:00:00Z",
+            },
+            "check_runs": {"total": 1, "success": 1},
+            "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_carryover"}]},
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [snapshot, {**snapshot, "sleep_seconds": 2.0}],
+                timeout_seconds=2,
+                poll_interval_seconds=1,
+                quiet_seconds=90,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2999-01-01T00:00:00Z",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["normalized_status"] == "pending"
+        assert payload["recommended_next_action"] == "wait_or_resume"
+        assert payload["observation_complete"] is False
+        poll_timeout_limitations = [
+            item
+            for item in payload.get("limitations", [])
+            if item.get("source") == "fetch_pr_observation_snapshot.sh"
+            and item.get("code") == "snapshot_poll_timeout"
+        ]
+        assert poll_timeout_limitations
+        assert poll_timeout_limitations[0]["severity"] == "warning"
+
     def test_issue_219_s01_wait_carryover_only_missing_completion_reaches_unknown_after_latency(self) -> None:
         evidence = {
             "present": True,
