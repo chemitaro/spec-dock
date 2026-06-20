@@ -51,14 +51,8 @@ def classify_github_stderr(stderr):
 
 
 def capability_for_api(api):
-    if api == "gh_pr_view.statusCheckRollup":
-        return "status_check_rollup_read"
     if api.endswith("/actions/runs") or "/actions/runs?" in api:
         return "actions_read"
-    if api.endswith("/check-runs"):
-        return "check_runs_read"
-    if api.endswith("/status"):
-        return "commit_statuses_read"
     if "/actions/runs/" in api and api.endswith("/jobs"):
         return "actions_read"
     return "unknown"
@@ -194,31 +188,6 @@ def gh_api(path):
             default_message="fixed read-only GitHub API returned non-JSON output",
             default_severity="blocking",
         )
-
-
-def gh_pr_view():
-    command = ["gh", "pr", "view", str(pr), "--repo", repo, "--json", "mergeStateStatus,statusCheckRollup"]
-    completed = subprocess.run(command, capture_output=True, text=True, check=False)
-    if completed.returncode != 0:
-        return {}, github_failure_limitation(
-            api="gh_pr_view.statusCheckRollup",
-            source="gh_pr_view",
-            exit_code=completed.returncode,
-            stderr=completed.stderr,
-            default_code="pr_required_check_state_unavailable",
-            default_message="fixed read-only PR required check state collection failed",
-            default_severity="informational",
-        )
-    try:
-        payload = json.loads(completed.stdout or "{}")
-    except json.JSONDecodeError:
-        return {}, {
-            "code": "pr_required_check_state_unavailable",
-            "source": "gh_pr_view",
-            "severity": "informational",
-            "message": "fixed read-only PR required check state returned non-JSON output",
-        }
-    return payload if isinstance(payload, dict) else {}, None
 
 
 def gh_pr_head_oid():
@@ -436,7 +405,6 @@ def actions_failure_entry(run, job=None):
 
 
 limitations = []
-supplemental_limitations = []
 actions_failures = []
 actions_failure_dedupe_keys = set()
 if len(expected_head_sha_lower) < 40:
@@ -713,45 +681,9 @@ actions_decisive_failed = (
     and not (action_run_counts["unknown"] or action_job_counts["unknown"])
     and bool(action_run_counts["failed"] or action_job_counts["failed"])
 )
-check_runs_payload, limitation = gh_api(f"repos/{repo}/commits/{expected_head_sha}/check-runs")
-if limitation:
-    supplemental_limitations.append(limitation)
-    check_runs_payload = {}
-statuses_payload, limitation = gh_api(f"repos/{repo}/commits/{expected_head_sha}/status")
-if limitation:
-    supplemental_limitations.append(limitation)
-    statuses_payload = {}
-pr_view_payload, limitation = gh_pr_view()
-if limitation:
-    supplemental_limitations.append(limitation)
-
-if (
-    actions_decisive_green or actions_decisive_non_terminal or actions_decisive_failed
-) and supplemental_limitations:
-    limitations.append(
-        {
-            "code": "ci_coverage_limited_to_github_actions",
-            "source": "actions_collector",
-            "severity": "informational",
-            "blocking": False,
-            "message": "GitHub Actions evidence determines CI state; supplemental check/status rollup coverage was unavailable",
-            "supplemental_unavailable": [
-                {
-                    "code": item.get("code"),
-                    "capability": item.get("capability"),
-                    "source": item.get("source"),
-                    "status": item.get("status"),
-                    "secret_redacted": item.get("secret_redacted"),
-                    "stderr_sha256": item.get("stderr_sha256"),
-                    "exit_code": item.get("exit_code"),
-                }
-                for item in supplemental_limitations
-            ],
-        }
-    )
-else:
-    limitations.extend(supplemental_limitations)
-
+check_runs_payload = {}
+statuses_payload = {}
+pr_view_payload = {}
 check_runs = as_list(check_runs_payload, "check_runs")
 statuses = as_list(statuses_payload, "statuses")
 aggregate_status_state = (
@@ -762,7 +694,7 @@ aggregate_status_state = (
 aggregate_status_classification = normalize_status_state({"state": aggregate_status_state})
 aggregate_status_pending_backstop = aggregate_status_classification == "pending" and bool(statuses)
 aggregate_status_failed_backstop = aggregate_status_classification == "failed" and bool(statuses)
-status_check_rollup = as_list(pr_view_payload, "statusCheckRollup")
+status_check_rollup = []
 merge_state_status = str(pr_view_payload.get("mergeStateStatus") or "").upper()
 
 check_counts = {
@@ -834,7 +766,8 @@ if stale_checks:
     )
 
 required_check_state = {
-    "available": limitation is None,
+    "available": False,
+    "collection_policy": "forbidden",
     "merge_state_status": merge_state_status or None,
     "status_check_rollup_total": len(status_check_rollup),
     "status_check_rollup_states": [],
