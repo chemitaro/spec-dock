@@ -23900,7 +23900,7 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             return json.loads(result.stdout)
 
-    def test_issue_187_s420_snapshot_carryover_unresolved_blocks_unknown(self) -> None:
+    def test_issue_219_s01_snapshot_carryover_only_missing_completion_waits(self) -> None:
         evidence = {
             "present": True,
             "category": "missing_current_completion_signal",
@@ -23940,11 +23940,45 @@ esac
             }
         )
 
-        assert payload["summary"]["review"] == "unresolved"
+        assert payload["recommended_next_action"] == "wait_or_resume"
+        assert payload["observation_complete"] is False
+        assert payload["decision"]["status_reason"] == "missing_current_completion_signal"
+        assert payload["decision"]["carryover_unresolved_thread_ids"] == ["RT_carryover"]
+        assert payload["decision"]["actionable_unresolved_thread_ids"] == ["RT_carryover"]
+        assert payload["decision"]["status_reason"] != "review_completion_unknown"
+
+    def test_issue_219_s01_snapshot_trusted_completion_carryover_requests_feedback(self) -> None:
+        payload = self._issue_187_s420_run_observation_snapshot(
+            review_wrapper_payload={
+                "review": {"status": "approved", "signals": []},
+                "decision": {
+                    "status": "passed",
+                    "status_reason": "passed",
+                    "recommended_next_action": "merge_prepared",
+                    "observation_complete": True,
+                    "selected_unresolved_count": 0,
+                    "current_selected_unresolved_count": 0,
+                    "carryover_unresolved_count": 1,
+                    "actionable_unresolved_count": 1,
+                    "current_selected_unresolved_thread_ids": [],
+                    "carryover_unresolved_thread_ids": ["RT_carryover"],
+                    "actionable_unresolved_thread_ids": ["RT_carryover"],
+                    "completion_signal": "submitted_pull_request_review",
+                },
+                "codex_review": {
+                    "lifecycle": {
+                        "status": "submitted",
+                        "completion_signal": "submitted_pull_request_review",
+                    }
+                },
+            }
+        )
+
+        assert payload["normalized_status"] == "human_gate"
         assert payload["recommended_next_action"] == "address_review_feedback"
         assert payload["decision"]["status_reason"] == "carryover_non_outdated_unresolved_thread"
+        assert payload["decision"]["completion_signal"] == "submitted_pull_request_review"
         assert payload["decision"]["carryover_unresolved_thread_ids"] == ["RT_carryover"]
-        assert payload["decision"]["status_reason"] != "review_completion_unknown"
 
     def test_issue_187_s420_snapshot_current_selected_reason_wins_over_carryover(self) -> None:
         payload = self._issue_187_s420_run_observation_snapshot(
@@ -24158,6 +24192,231 @@ esac
             "no_completion_evidence": evidence,
             "fingerprint": fingerprint,
         }
+
+    def _issue_219_s01_carryover_only_no_completion_decision(self, fingerprint: str) -> dict:
+        decision = self._issue_187_s430_no_completion_decision(fingerprint)
+        decision.update(
+            {
+                "carryover_unresolved_count": 1,
+                "carryover_unresolved_thread_ids": ["RT_carryover"],
+                "actionable_unresolved_count": 1,
+                "actionable_unresolved_thread_ids": ["RT_carryover"],
+            }
+        )
+        return decision
+
+    def _issue_219_s01_trusted_completion_carryover_decision(self, fingerprint: str) -> dict:
+        return {
+            "scope": "current_trigger_boundary",
+            "status": "passed",
+            "status_reason": "passed",
+            "recommended_next_action": "merge_prepared",
+            "observation_complete": True,
+            "selected_unresolved_count": 0,
+            "selected_unresolved_thread_ids": [],
+            "current_selected_unresolved_count": 0,
+            "current_selected_unresolved_thread_ids": [],
+            "carryover_unresolved_count": 1,
+            "carryover_unresolved_thread_ids": ["RT_carryover"],
+            "actionable_unresolved_count": 1,
+            "actionable_unresolved_thread_ids": ["RT_carryover"],
+            "completion_signal": "submitted_pull_request_review",
+            "fingerprint": fingerprint,
+        }
+
+    def test_issue_219_s01_wait_guard_under_carryover_only_missing_completion_waits(self) -> None:
+        decision = self._issue_219_s01_carryover_only_no_completion_decision(
+            "issue-219-carryover-under-guard"
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            out_dir = tmp_path / "out"
+            out_dir.mkdir(parents=True)
+            ci_passed_since = datetime.now(timezone.utc) - timedelta(seconds=124)
+            (out_dir / "result.json").write_text(
+                json.dumps(
+                    {
+                        "repo": "owner/repo",
+                        "pr": 13,
+                        "expected_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                        "observed_at": datetime.now(timezone.utc)
+                        .isoformat()
+                        .replace("+00:00", "Z"),
+                        "resume": {
+                            "repo": "owner/repo",
+                            "pr": 13,
+                            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                            "trigger_comment_id": 99,
+                            "trigger_created_at": "2000-01-01T00:00:00Z",
+                        },
+                        "wait": {
+                            "ci_passed_since": ci_passed_since.isoformat().replace("+00:00", "Z"),
+                        },
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                tmp_path,
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "issue-219-carryover-under-guard",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "no_completion_evidence": decision["no_completion_evidence"],
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {
+                            "total": 1,
+                            "unresolved": 1,
+                            "items": [{"id": "RT_carryover", "state": "unresolved"}],
+                        },
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+                out_dir=out_dir,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["observation_complete"] is False
+            assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
+            assert payload["decision"]["status_reason"] == "missing_current_completion_signal"
+            assert payload["decision"]["carryover_unresolved_thread_ids"] == ["RT_carryover"]
+            assert payload["decision"]["actionable_unresolved_thread_ids"] == ["RT_carryover"]
+
+    def test_issue_219_s01_wait_trusted_completion_carryover_requests_feedback(self) -> None:
+        decision = self._issue_219_s01_trusted_completion_carryover_decision(
+            "issue-219-trusted-completion-carryover"
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "passed",
+                        "overall_status": "passed",
+                        "normalized_status": "passed",
+                        "observation_complete": True,
+                        "recommended_next_action": "merge_prepared",
+                        "decision": decision,
+                        "decision_fingerprint": "issue-219-trusted-completion-carryover",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "submitted",
+                                "completion_signal": "submitted_pull_request_review",
+                            },
+                            "collection_summary": {
+                                "review_threads": {
+                                    "unresolved_count": 1,
+                                    "unresolved_ids": ["RT_carryover"],
+                                }
+                            },
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {
+                            "total": 1,
+                            "unresolved": 1,
+                            "items": [{"id": "RT_carryover", "state": "unresolved"}],
+                        },
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "human_gate"
+            assert payload["recommended_next_action"] == "address_review_feedback"
+            assert (
+                payload["decision"]["status_reason"]
+                == "carryover_non_outdated_unresolved_thread"
+            )
+            assert payload["decision"]["completion_signal"] == "submitted_pull_request_review"
+            assert payload["decision"]["carryover_unresolved_thread_ids"] == ["RT_carryover"]
+            assert payload["decision"]["actionable_unresolved_thread_ids"] == ["RT_carryover"]
+
+    def test_issue_219_s01_wait_latency_satisfied_carryover_only_becomes_review_completion_unknown(
+        self,
+    ) -> None:
+        decision = self._issue_219_s01_carryover_only_no_completion_decision(
+            "issue-219-carryover-latency-satisfied"
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "pending",
+                        "overall_status": "pending",
+                        "normalized_status": "pending",
+                        "recommended_next_action": "wait_or_resume",
+                        "decision": decision,
+                        "decision_fingerprint": "issue-219-carryover-latency-satisfied",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "none",
+                                "completion_signal": "none",
+                                "no_completion_evidence": decision["no_completion_evidence"],
+                            },
+                            "collection_summary": {
+                                "review_threads": {
+                                    "unresolved_count": 1,
+                                    "unresolved_ids": ["RT_carryover"],
+                                }
+                            },
+                        },
+                        "observed_at": "2000-01-01T00:00:00Z",
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {
+                            "total": 1,
+                            "unresolved": 1,
+                            "items": [{"id": "RT_carryover", "state": "unresolved"}],
+                        },
+                    }
+                ],
+                timeout_seconds=3,
+                quiet_seconds=1,
+                same_fingerprint_count=2,
+                progress="none",
+                trigger_created_at="2000-01-01T00:00:00Z",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["normalized_status"] == "human_gate"
+            assert payload["recommended_next_action"] == "human_gate"
+            assert payload["observation_complete"] is True
+            assert payload["decision"]["status"] == "unknown"
+            assert payload["decision"]["status_reason"] == "review_completion_unknown"
+            assert payload["decision"]["completion_signal"] == "none"
+            assert payload["decision"]["carryover_unresolved_thread_ids"] == ["RT_carryover"]
+            assert payload["wait"]["post_unknown_fresh_audit_required"] is True
 
     def test_issue_187_s430_wait_reserves_next_poll_budget(self) -> None:
         decision = self._issue_187_s430_no_completion_decision("no-completion-s430-budget")
