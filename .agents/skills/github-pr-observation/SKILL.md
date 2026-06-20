@@ -234,12 +234,17 @@ status collection are implemented by the public scripts.
 - The wait loop may skip a final under-budget snapshot and preserve the latest
   useful payload with `final_poll_skipped_reason="insufficient_next_snapshot_budget"`.
   Treat that as budget-preservation metadata, not as a stronger review result.
-- `fallback_issue_comment` remains low-confidence evidence. It keeps the final
-  status in the `human_gate` / `wait_or_resume` path and does not promote a run
-  to `passed`, complete, or merge-ready.
-- `fallback_pass_candidate` is a non-promoting signal that a current-boundary
-  fallback issue comment appears positive. It is useful context, but it does not
-  override the `fallback_issue_comment` gate.
+- `fallback_issue_comment` remains low-confidence evidence by default. It keeps
+  the final status in the `human_gate` / `wait_or_resume` path and does not
+  promote a run to `passed`, complete, or merge-ready unless the narrow
+  no-major-issues exception below applies.
+- `fallback_pass_candidate` is usually non-promoting context that a
+  current-boundary fallback issue comment appears positive. It promotes the
+  top-level result only when the comment is Codex-authored, belongs to the
+  current trigger boundary, explicitly reports no major issues, and
+  `promotes_top_level_status` is true. In that narrow case, the final decision
+  may be `passed` / `merge_prepared`; generic fallback issue comments still do
+  not override the `fallback_issue_comment` gate.
 - S102 is deferred until there is an explicit no-findings artifact contract.
   Generic issue comments, zero selected comments, or review request disappearance
   alone must not mark review completion.
