@@ -360,13 +360,19 @@ def classify_snapshot(
     if decision_status_reason == "current_selected_changes_requested" or selected_changes_requested_evidence:
         return "human_gate", "address_review_feedback", True, "current_selected_changes_requested"
     if completion_signal == "fallback_issue_comment":
-        return "human_gate", "wait_or_resume", False, "fallback_issue_comment_low_confidence"
+        return "human_gate", "manual_review_required_non_retryable", False, "fallback_issue_comment_low_confidence"
     if decision_status_reason == "missing_current_completion_signal":
         missing_status = decision_status if decision_status not in {None, "", "unknown"} else "pending"
         missing_action = decision_action or "wait_or_resume"
         if missing_action == "wait_or_resume" and not trigger_comment_id and not trigger_created_at:
             missing_action = "wait"
         return str(missing_status), missing_action, False, "missing_current_completion_signal"
+    if (
+        completion_signal == "codex_no_findings_issue_comment"
+        and decision_status == "passed"
+        and decision_action == "review_completion_observed"
+    ):
+        return "passed", "merge_prepared", True, "codex_no_findings_issue_comment"
     if decision_status == "passed":
         return "passed", "merge_prepared", True, "passed"
     if decision_status_reason:
