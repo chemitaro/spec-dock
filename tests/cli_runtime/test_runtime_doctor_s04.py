@@ -347,10 +347,10 @@ class TestRuntimeDoctorS04:
             records, _issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
             diagnostic = app_contracts.GitHubCapabilityDiagnostic(
                 code="github_token_permission_denied",
-                capability="check_runs_read",
+                capability="actions_read",
                 status="permission_denied",
                 token_source="GH_TOKEN",
-                api="GET /repos/{repo}/commits/{sha}/check-runs",
+                api="GET /repos/{repo}/actions/runs",
                 severity="blocking",
                 message=f"Resource not accessible by personal access token: {_SECRET_TOKEN}",
                 recommended_next_action="fix_github_token_permissions",
@@ -381,9 +381,9 @@ class TestRuntimeDoctorS04:
             text = _render_doctor_text(app_contracts, result)
             rendered = "\n".join(text.stdout_lines + text.stderr_lines + text.warnings)
             assert "github capability diagnostics=1" in rendered
-            assert "capability=check_runs_read" in rendered
+            assert "capability=actions_read" in rendered
             assert "status=permission_denied" in rendered
-            assert "api=GET /repos/{repo}/commits/{sha}/check-runs" in rendered
+            assert "api=GET /repos/{repo}/actions/runs" in rendered
             assert "token_source=GH_TOKEN" in rendered
             assert "fix_github_token_permissions" in rendered
             assert _SECRET_TOKEN not in rendered
@@ -408,15 +408,15 @@ class TestRuntimeDoctorS04:
             assert gateway.requests == []
             assert len(result.github_capability_diagnostics) == 1
             diagnostic = result.github_capability_diagnostics[0]
-            assert diagnostic.capability == "check_runs_read"
+            assert diagnostic.capability == "actions_read"
             assert diagnostic.status == "target_unavailable"
             assert diagnostic.token_source == "unknown"
             text = _render_doctor_text(app_contracts, result)
             rendered = "\n".join(text.stdout_lines + text.stderr_lines + text.warnings)
             assert "status=target_unavailable" in rendered
-            assert "capability=check_runs_read" in rendered
+            assert "capability=actions_read" in rendered
 
-    def test_doctor_renders_optional_extended_diagnostics_separately(self) -> None:
+    def test_issue_222_s05_doctor_reports_actions_and_review_capabilities_without_checks_requirements(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -426,10 +426,10 @@ class TestRuntimeDoctorS04:
                 [
                     app_contracts.GitHubCapabilityDiagnostic(
                         code="github_capability_ok",
-                        capability="check_runs_read",
+                        capability="actions_read",
                         status="ok",
                         token_source="gh_saved_auth",
-                        api="GET /repos/{repo}/commits/{sha}/check-runs",
+                        api="GET /repos/{repo}/actions/runs",
                         severity="info",
                         message="ok",
                         recommended_next_action="none",
@@ -439,16 +439,16 @@ class TestRuntimeDoctorS04:
                     ),
                     app_contracts.GitHubCapabilityDiagnostic(
                         code="github_rate_limited",
-                        capability="actions_read",
+                        capability="pull_reviews_read",
                         status="rate_limited",
                         token_source="gh_saved_auth",
-                        api="GET /repos/{repo}/actions/runs",
+                        api="GET /repos/{repo}/pulls/{pr}/reviews",
                         severity="warning",
                         message="GitHub API rate limit exceeded.",
                         recommended_next_action="retry_after_rate_limit_reset",
                         secret_redacted=True,
                         stderr_sha256="def456",
-                        group="extended",
+                        group="core",
                     ),
                     app_contracts.GitHubCapabilityDiagnostic(
                         code="github_auth_missing",
@@ -461,7 +461,7 @@ class TestRuntimeDoctorS04:
                         recommended_next_action="authenticate_gh_or_set_token",
                         secret_redacted=True,
                         stderr_sha256="ghi789",
-                        group="extended",
+                        group="core",
                     ),
                 ]
             )
@@ -488,9 +488,13 @@ class TestRuntimeDoctorS04:
             rendered = "\n".join(text.stdout_lines + text.stderr_lines + text.warnings)
             assert "github capability diagnostics=3" in rendered
             assert "[github:core]" in rendered
-            assert "[github:extended]" in rendered
-            assert "capability=actions_read status=rate_limited" in rendered
+            assert "[github:extended]" not in rendered
+            assert "capability=actions_read status=ok" in rendered
+            assert "capability=pull_reviews_read status=rate_limited" in rendered
             assert "capability=issue_comments_read status=auth_missing" in rendered
+            assert "check_runs_read" not in rendered
+            assert "commit_statuses_read" not in rendered
+            assert "status_check_rollup_read" not in rendered
 
     def test_doctor_distinguishes_auth_missing_from_permission_denied_without_gh_token(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -542,9 +546,9 @@ class TestRuntimeDoctorS04:
     def test_doctor_renders_rate_transient_and_schema_statuses_distinctly(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
         statuses = [
-            ("github_rate_limited", "commit_statuses_read", "rate_limited"),
+            ("github_rate_limited", "actions_read", "rate_limited"),
             ("github_transient_unknown", "pull_request_read", "transient_unknown"),
-            ("github_schema_unavailable", "status_check_rollup_read", "schema_unavailable"),
+            ("github_schema_unavailable", "pull_review_comments_read", "schema_unavailable"),
         ]
         diagnostics = [
             app_contracts.GitHubCapabilityDiagnostic(
@@ -627,6 +631,40 @@ class TestRuntimeDoctorS04:
         assert diagnostic.code == "github_token_permission_denied"
         assert diagnostic.recommended_next_action == "fix_github_token_permissions"
         assert diagnostic.secret_redacted is True
+
+    def test_issue_222_s05_github_capability_cli_probes_actions_and_review_surfaces_without_checks_api(
+        self, monkeypatch
+    ) -> None:
+        _runtime_app, app_contracts, _app_doctor, _app_ports, _infra_contracts = _runtime_modules()
+        github_capability_cli = _runtime_github_capability_cli()
+        commands: list[list[str]] = []
+
+        def record_command(command, **_kwargs):
+            commands.append(list(command))
+            return subprocess.CompletedProcess(command, 0, "{}", "")
+
+        monkeypatch.setattr(github_capability_cli.subprocess, "run", record_command)
+
+        diagnostics = github_capability_cli.GitHubCapabilityCliGateway().probe(
+            app_contracts.GitHubCapabilityProbeRequest(
+                github_repo="example/repo",
+                github_pr=123,
+                github_head_sha="abcde12345",
+            )
+        )
+
+        assert [diagnostic.capability for diagnostic in diagnostics] == [
+            "repo_metadata_read",
+            "pull_request_read",
+            "actions_read",
+            "issue_comments_read",
+            "pull_reviews_read",
+            "pull_review_comments_read",
+        ]
+        rendered_commands = "\n".join(" ".join(command) for command in commands)
+        assert "/check-runs" not in rendered_commands
+        assert "/status" not in rendered_commands
+        assert "statusCheckRollup" not in rendered_commands
 
     def test_github_capability_cli_token_source_uses_github_token_when_gh_token_absent(self, monkeypatch) -> None:
         github_capability_cli = _runtime_github_capability_cli()
