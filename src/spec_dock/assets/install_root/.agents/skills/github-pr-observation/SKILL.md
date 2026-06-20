@@ -210,9 +210,11 @@ status collection are implemented by the public scripts.
   PR state, stale head, and blocking limitations have been integrated. Those
   blockers override `codex_no_findings_issue_comment`.
 - `review_completion_unknown` is a non-pass terminal-like review state. It means
-  CI passed, the observed head matched, the actionable review inventory was
-  empty, and no trusted Codex review completion signal was found after the
-  trigger-age and CI-passed-age guards are satisfied.
+  CI passed, the observed head matched, no current trigger-boundary review
+  blocker was selected, and no trusted Codex review completion signal was found
+  after the trigger-age and CI-passed-age guards are satisfied. Carryover
+  unresolved inventory may still be present and must be reported separately from
+  current selected blockers.
 - Stable no-completion evidence for the current boundary must not be collapsed
   into a generic timeout. The top-level result is `human_gate`, with the decision
   reason indicating `review_completion_unknown`, so a human can review the

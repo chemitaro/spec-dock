@@ -419,6 +419,23 @@ def mark_decision_timeout(payload: dict) -> None:
     payload["decision_fingerprint"] = fingerprint
 
 
+def mark_decision_fallback_pass(payload: dict) -> None:
+    decision = decision_payload(payload)
+    if not decision:
+        return
+    decision["status"] = "passed"
+    decision["status_reason"] = "fallback_issue_comment_no_major_issues"
+    decision["recommended_next_action"] = "merge_prepared"
+    decision["observation_complete"] = True
+    fingerprint_source = dict(decision)
+    fingerprint_source.pop("fingerprint", None)
+    fingerprint = hashlib.sha256(
+        json.dumps(fingerprint_source, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    decision["fingerprint"] = fingerprint
+    payload["decision_fingerprint"] = fingerprint
+
+
 def mark_decision_review_completion_unknown(payload: dict) -> None:
     decision = decision_payload(payload)
     if not decision:
@@ -1001,6 +1018,7 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
             and fallback_pass_candidate.get("promotes_top_level_status") is True
             and review_status not in {"changes_requested", "requested", "pending", "unknown"}
         ):
+            mark_decision_fallback_pass(payload)
             return "passed", "passed", "merge_prepared", True, False
         if completion_signal == "fallback_issue_comment" or decision_reason == "fallback_issue_comment_low_confidence":
             return "human_gate", "human_gate", "manual_review_required_non_retryable", False, True
@@ -1487,13 +1505,13 @@ while True:
     ) + NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS
     if snapshot_poll_timed_out and latest_payload is not None:
         payload = latest_payload
-        append_snapshot_poll_timeout_limitation(
-            payload,
-            snapshot_timeout,
-            snapshot_stdout,
-            snapshot_stderr,
-        )
         if not is_carryover_missing_completion_wait(payload):
+            append_snapshot_poll_timeout_limitation(
+                payload,
+                snapshot_timeout,
+                snapshot_stdout,
+                snapshot_stderr,
+            )
             mark_latest_timeout(payload, latest_change_monotonic, same_count)
         snapshot_text = latest_snapshot_text
     elif snapshot_poll_timed_out:
