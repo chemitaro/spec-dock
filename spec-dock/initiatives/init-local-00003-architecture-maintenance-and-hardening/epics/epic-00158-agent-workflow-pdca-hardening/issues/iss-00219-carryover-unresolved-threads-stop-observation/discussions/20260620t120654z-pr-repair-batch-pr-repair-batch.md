@@ -44,6 +44,7 @@ This batch records the PR #221 observation-and-repair loop used as the manual te
 | C001 | Current-boundary Codex review findings after PR observation | INV-001, INV-002, INV-003, INV-004, INV-005, INV-006, INV-007, INV-008, INV-009, INV-010, INV-011, INV-012, INV-013, INV-014, INV-015, INV-016 | Observation classification and fallback/no-findings edge cases discovered by live PR review | RU-001..RU-008 | All findings were fixed and reobserved |
 | C002 | Live observation no-findings completion variants | INV-017, INV-018 | Codex no-findings issue comment uses varied first-line suffixes and details block | RU-009 | Fixed by first-line plus metadata recognition |
 | C003 | Final PR readiness | INV-019, INV-020, INV-021 | Required checks, mergeability, and latest-head observation must be proved after the last push | N/A | Final observation passed |
+| C004 | Post-ledger PR observation findings | INV-013, INV-014, INV-015 | Later PR monitoring exposed skill documentation drift, no-findings reviewed-commit mismatch risk, and Issue214 progress display regression | RU-010..RU-012 | Implemented locally; latest-head re-observation required after push |
 
 ## Inventory
 
@@ -61,6 +62,9 @@ This batch records the PR #221 observation-and-repair loop used as the manual te
 | INV-010 | check_status | provider-tests | check_failure:provider-tests | PR #221 statusCheckRollup on head `140e1096` | provider-tests checks completed successfully | valid | false-positive | no | no-action | N/A | reobserved-pass | No CI failure remained | none |
 | INV-011 | merge_state | mergeability | merge_conflict | `gh pr view 221` showed `mergeable=MERGEABLE`, `mergeStateStatus=CLEAN` | no merge conflict observed | valid | false-positive | no | no-action | N/A | reobserved-pass | Merge blocker absent | none |
 | INV-012 | review_state | final current-boundary review | review_feedback:none | wait artifact `/private/tmp/issue219-pr221-wait-19/result.json` | selected current review comments and threads were empty; Codex no-findings issue comment promoted pass | valid | false-positive | no | no-action | N/A | reobserved-pass | No blocking current-boundary review feedback remained | carryover unresolved inventory remains visible but is outside current trigger boundary |
+| INV-013 | review_feedback | fallback-pass documentation drift | review_feedback:skill-contract-drift | wait artifact `/private/tmp/issue219-pr221-wait-20/result.json`, review comment `3446284485` | installed skill text contradicted the promoted fallback-pass JSON contract | valid | blocking | yes | fix-now | RU-010 | implemented | Fixed by local documentation sync; re-observation pending after push | none expected |
+| INV-014 | review_feedback | no-findings reviewed commit mismatch | review_feedback:no-findings-reviewed-commit-match | wait artifact `/private/tmp/issue219-pr221-wait-21/result.json`, review comment `3446321476` | multi-line no-findings issue comments did not require `Reviewed commit` metadata to match expected head | valid | blocking | yes | fix-now | RU-011 | implemented | Fixed by local reviewed-commit prefix match; re-observation pending after push | none expected |
+| INV-015 | manual_observation | Issue214 progress display regression | review_feedback:progress-target-state | live progress logs for wait artifacts `/private/tmp/issue219-pr221-wait-20` and `/private/tmp/issue219-pr221-wait-21` | progress displayed observer-side `review=observing` after Issue214 had specified `review=pending_signal` for no-signal wait state | valid | blocking | yes | fix-now | RU-012 | implemented | Fixed by local progress target-state mapping; re-observation pending after push | none expected |
 
 ## Classification Values
 
@@ -106,6 +110,17 @@ This batch records the PR #221 observation-and-repair loop used as the manual te
 - Rationale: Skill policy forbids merging; final state is ready for human merge judgment.
 - Residual risk: merge remains a human action.
 
+### C004
+
+- Covered inventory IDs: INV-013..INV-015
+- Validity analysis: Valid. INV-013 and INV-014 came from current-boundary Codex review feedback; INV-015 came from the live PR observation progress log and matches closed Issue214 requirements.
+- Need-to-fix decision: yes.
+- Root cause: Issue218/Issue219 follow-up changes altered no-findings/fallback semantics while documentation and progress-line target-state safeguards drifted.
+- Options considered: defer as follow-up; treat as out-of-scope PR delivery feedback; repair in Issue219 as live observation-script defects.
+- Recommended disposition: fix-now, then reobserve latest head.
+- Rationale: The user explicitly treats PR monitoring as a manual test of `github-pr-observation`, and these defects affect operator-facing correctness or merge-prepared safety.
+- Residual risk: latest-head re-observation is still required after push.
+
 ## Repair Queue
 
 | unit_id | source_batch | covered_ids | disposition | risk_class | repair_unit_disc | status | Implementation Plan | Re-observation Result | Residual Risk |
@@ -118,6 +133,9 @@ This batch records the PR #221 observation-and-repair loop used as the manual te
 | RU-006 | 20260620t120654z-pr-repair-batch | INV-006 | fix-now | blocking | retrospective direct commit `71665559` | reobserved-pass | Keep latency-satisfied timed-out refreshes blocking | Later PR observation cycles advanced beyond this finding | none |
 | RU-007 | 20260620t120654z-pr-repair-batch | INV-007 | fix-now | material-follow-up | retrospective direct commit `beae053d` | reobserved-pass | Add observed one-line no-findings suffix to strict recognition | Superseded by RU-009 broader first-line/details recognition | none |
 | RU-009 | 20260620t120654z-pr-repair-batch | INV-008 | fix-now | blocking | retrospective direct commit `140e1096` | reobserved-pass | Recognize multi-line Codex no-findings comments via first line plus metadata | `/private/tmp/issue219-pr221-wait-19/result.json` passed / merge_prepared | none |
+| RU-010 | 20260620t120654z-pr-repair-batch | INV-013 | fix-now | blocking | direct local repair | implemented | Synchronize `fallback_pass_candidate` skill text with the strict no-findings promotion contract | pending latest-head PR observation after push | none expected |
+| RU-011 | 20260620t120654z-pr-repair-batch | INV-014 | fix-now | blocking | direct local repair | implemented | Parse `Reviewed commit` metadata and require prefix match with `expected_head_sha` before multi-line no-findings promotion | pending latest-head PR observation after push | none expected |
+| RU-012 | 20260620t120654z-pr-repair-batch | INV-015 | fix-now | blocking | direct local repair | implemented | Restore Issue214 progress display semantics so no-signal wait states render `review=pending_signal` and actionable states keep target status/counters | pending latest-head PR observation after push | none expected |
 
 ## Unit Discussion Plan
 
