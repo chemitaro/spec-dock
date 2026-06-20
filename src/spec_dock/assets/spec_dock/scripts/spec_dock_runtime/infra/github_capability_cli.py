@@ -37,7 +37,7 @@ class GitHubCapabilityCliGateway:
                     "--repo",
                     request.github_repo,
                     "--json",
-                    "number,headRefOid",
+                    "number,headRefOid,mergeable",
                 ],
             ),
             (

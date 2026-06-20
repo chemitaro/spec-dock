@@ -19749,11 +19749,11 @@ esac
             assert "/status" not in gh_calls
             assert "pr checks" not in gh_calls
 
-    def test_issue_222_pr_observation_wait_unknown_mergeability_is_human_gate(self) -> None:
+    def test_issue_222_pr_observation_snapshot_unknown_mergeability_is_pending(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
-            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
         )
 
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -19761,7 +19761,6 @@ esac
             fake_bin = tmp_path / "bin"
             fake_bin.mkdir()
             fake_gh = fake_bin / "gh"
-            out_dir = tmp_path / "out"
             scenario_path = tmp_path / "scenario.json"
             state_path = tmp_path / "state.txt"
             gh_log = tmp_path / "gh.log"
@@ -19791,47 +19790,20 @@ esac
             }
 
             result = subprocess.run(
-                [
-                    str(script_path),
-                    "--repo",
-                    "owner/repo",
-                    "--pr",
-                    "13",
-                    "--head-sha",
-                    "a" * 40,
-                    "--trigger-mode",
-                    "resume",
-                    "--trigger-comment-id",
-                    "99",
-                    "--trigger-created-at",
-                    "2026-06-08T01:00:00Z",
-                    "--timeout-seconds",
-                    "2",
-                    "--poll-interval-seconds",
-                    "1",
-                    "--quiet-seconds",
-                    "1",
-                    "--same-fingerprint-count",
-                    "1",
-                    "--out",
-                    str(out_dir),
-                    "--progress",
-                    "none",
-                ],
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
                 env=env,
                 capture_output=True,
                 text=True,
                 check=False,
-                timeout=6,
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
             assert payload["ci"]["status"] == "passed"
             assert payload["pr_metadata"]["mergeable"] == "UNKNOWN"
-            assert payload["normalized_status"] == "human_gate"
-            assert payload["recommended_next_action"] == "human_gate"
-            assert payload["decision"]["status_reason"] == "pr_mergeability_unknown"
+            assert payload["normalized_status"] == "pending"
+            assert payload["recommended_next_action"] == "wait"
+            assert payload["decision"]["status_reason"] == "pr_mergeability_pending"
             assert payload["observation_complete"] is False
 
             gh_calls = gh_log.read_text(encoding="utf-8")

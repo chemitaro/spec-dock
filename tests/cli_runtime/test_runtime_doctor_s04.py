@@ -662,6 +662,7 @@ class TestRuntimeDoctorS04:
             "pull_review_comments_read",
         ]
         rendered_commands = "\n".join(" ".join(command) for command in commands)
+        assert "number,headRefOid,mergeable" in rendered_commands
         assert "/check-runs" not in rendered_commands
         assert "/status" not in rendered_commands
         assert "statusCheckRollup" not in rendered_commands
