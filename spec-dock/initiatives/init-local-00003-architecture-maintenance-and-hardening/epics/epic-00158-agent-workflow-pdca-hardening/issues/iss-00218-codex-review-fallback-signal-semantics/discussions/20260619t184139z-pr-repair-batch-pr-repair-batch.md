@@ -42,6 +42,7 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 | concern_id | concern | related_inventory_ids | suspected_root_cause | repair_unit | notes |
 | --- | --- | --- | --- | --- | --- |
 | C001 | Provider CI snapshot/parity failures | I001, I002, I003, I004, I005 | Branch changed dogfooding issue docs and PR observation assets without updating checked-in snapshot/parity expectations and dogfooding mirror | U001 | All five CI failures are deterministic local snapshot/parity regressions from the same branch delta |
+| C002 | Codex no-findings promotion false-positive paths | I007, I008, I009, I010 | The no-findings promotion gate did not require latest current Codex issue signal and did not block on all active review-required / changes-requested states | U002 | Four PR review comments cover the same review-completion guard family |
 
 ## Inventory
 
@@ -53,6 +54,10 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 | I004 | CI failure | C001 | check_failure:provider-tests | run 27842323053; `test_issue_182_s03_wait_progress_uses_decision_current_counts_not_audit_threads` | expected `wait_or_resume` was not updated to `manual_review_required_non_retryable` after fallback action change | valid | blocking | yes | fix-now | U001 | reobserved-pass | S99 changed fallback action semantics and the remaining expectation was updated locally | latest-head CI pass confirmed |
 | I005 | CI failure | C001 | check_failure:provider-tests | run 27842323053; `test_issue_197_pr_review_snapshot_provider_wrapper_invokes_python_entrypoint` | provider wrapper fixture snapshot is stale after `pr_review_snapshot.py` output-shape edits | valid | blocking | yes | fix-now | U001 | reobserved-pass | branch changed provider Python entrypoint and dogfooding mirror was synced from provider install_root | latest-head CI pass confirmed |
 | I006 | Review observation | Codex usage limit comment | permission_or_auth | `/private/tmp/spec-dock-pr220-observation-latest-readonly/result.json`; comment 4753968203 | Codex review could not run because code review usage limit was reached | valid | material-follow-up | human-decision | needs-human | N/A | blocked | Not fixable in repo; latest-head CI and merge state are clean, but review-clean cannot be claimed unless review is retried after quota is available or explicitly waived | review-clean cannot be claimed from this observation |
+| I007 | PR review comment | C002 | review_feedback:no-findings-promotion-guards | https://github.com/chemitaro/spec-dock/pull/220#discussion_r3445140688 | no-findings followed by a later generic current Codex issue comment could still promote | valid | blocking | yes | fix-now | U002 | implemented-local | latest current Codex issue comment must be the strict no-findings signal | pending re-observation after push |
+| I008 | PR review comment | C002 | review_feedback:no-findings-promotion-guards | https://github.com/chemitaro/spec-dock/pull/220#discussion_r3445140690 | `REVIEW_REQUIRED` did not block no-findings promotion | valid | blocking | yes | fix-now | U002 | implemented-local | reviewDecision `REVIEW_REQUIRED` is now a no-findings promotion blocker | pending re-observation after push |
+| I009 | PR review comment | C002 | review_feedback:no-completion-evidence | https://github.com/chemitaro/spec-dock/pull/220#discussion_r3445140692 | `codex_no_findings_issue_comment` was not counted as explicit completion evidence | valid | blocking | yes | fix-now | U002 | implemented-local | no-findings completion now maps to explicit completion evidence | pending re-observation after push |
+| I010 | PR review comment | C002 | review_feedback:no-findings-promotion-guards | https://github.com/chemitaro/spec-dock/pull/220#discussion_r3445140695 | active REST `CHANGES_REQUESTED` review could be bypassed when GraphQL reviewDecision did not report changes requested | valid | blocking | yes | fix-now | U002 | implemented-local | active `changes_requested` review signals are now no-findings promotion blockers | pending re-observation after push |
 
 ## Classification Values
 
@@ -78,11 +83,23 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 - Rationale: failures are local deterministic tests and align with intended shipped/dogfooding changes.
 - Residual risk: low after full targeted Provider CI failures and broad issue selector pass.
 
+### C002
+
+- Covered inventory IDs: I007, I008, I009, I010
+- Validity analysis: valid PR review feedback; all four findings affect the correctness of review-completion promotion.
+- Need-to-fix decision: yes.
+- Root cause: the no-findings promotion gate treated a strict no-findings issue comment as sufficient completion without requiring it to be the latest current Codex issue signal, without blocking on `REVIEW_REQUIRED`, without blocking on active REST `changes_requested` reviews, and without aligning `no_completion_evidence` with the new completion signal.
+- Options considered: strengthen the promotion guards; revert no-findings promotion; defer to follow-up.
+- Recommended disposition: fix-now via U002.
+- Rationale: this is the smallest fix that preserves the accepted Option A requirement while closing false-positive merge-prepared paths.
+- Residual risk: strict no-findings wording still requires explicit allow-list maintenance for future Codex output changes.
+
 ## Repair Queue
 
 | unit_id | source_batch | covered_ids | disposition | risk_class | repair_unit_disc | status | Implementation Plan | Re-observation Result | Residual Risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | U001 | 20260619t184139z-pr-repair-batch | I001, I002, I003, I004, I005 | fix-now | blocking | `20260619t184214z-disc-pr-repair-unit-u001-ci-snapshot-parity.md` | reobserved-pass | Updated dogfooding meta snapshot, dogfooding skill mirror, fallback action expectations, and provider wrapper fixture snapshot; targeted CI failure tests and broad S99 selector passed locally | latest head `db9495fd9c539e395caf994d5ca276c8451f04b5`: `validate` pass, `provider-tests` pass, merge state `CLEAN`; read-only snapshot result `/private/tmp/spec-dock-pr220-observation-latest-readonly/result.json` | low for CI repair; Codex usage-limit remains separate I006 human gate |
+| U002 | 20260619t184139z-pr-repair-batch | I007, I008, I009, I010 | fix-now | blocking | `20260620t025616z-disc-pr-repair-unit-u002-codex-review-feedback.md` | implemented-local | Limit no-findings completion to the latest current Codex issue comment; block promotion on `REVIEW_REQUIRED` and active `changes_requested` reviews; treat no-findings as explicit completion evidence; add regressions for all review comments | local PR observation selector: 91 passed, 370 deselected; re-observation pending after push | strict allow-list maintenance remains a future follow-up risk |
 
 ## Unit Discussion Plan
 

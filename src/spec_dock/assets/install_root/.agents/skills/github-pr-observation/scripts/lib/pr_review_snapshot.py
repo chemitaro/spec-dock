@@ -1046,11 +1046,19 @@ current_codex_issue_comments = [
     and item.get("codex_authored")
     and item.get("current_status_signal")
 ]
-no_findings_source_ids = [
-    item.get("id")
-    for item in current_codex_issue_comments
-    if item.get("id") is not None and is_strict_no_findings_issue_comment(item)
-]
+latest_current_codex_issue_comment = (
+    current_codex_issue_comments[-1] if current_codex_issue_comments else None
+)
+latest_current_codex_issue_comment_is_no_findings = (
+    latest_current_codex_issue_comment is not None
+    and is_strict_no_findings_issue_comment(latest_current_codex_issue_comment)
+)
+no_findings_source_ids = (
+    [latest_current_codex_issue_comment.get("id")]
+    if latest_current_codex_issue_comment_is_no_findings
+    and latest_current_codex_issue_comment.get("id") is not None
+    else []
+)
 stale_codex_head_context_present = any(
     item.get("codex_authored")
     and item.get("stale")
@@ -1058,6 +1066,9 @@ stale_codex_head_context_present = any(
     and body_state["trigger_known"]
     and is_after_trigger(item)
     for item in signals
+)
+active_changes_requested_review_present = any(
+    item.get("state") == "changes_requested" for item in active_review_signals
 )
 no_findings_completion_promotes = bool(
     expected_head_sha
@@ -1067,6 +1078,8 @@ no_findings_completion_promotes = bool(
     and not stale_codex_head_context_present
     and not actionable_unresolved_thread_ids
     and not review_decision_changes_requested
+    and not review_decision_requires_review
+    and not active_changes_requested_review_present
     and not blocking_collection_failure
 )
 if selected_review_signals:
@@ -1142,7 +1155,10 @@ selected_changes_requested_evidence.extend(
 pending_review_present = lifecycle_status == "pending"
 blocking_limitation_present = bool(blocking_collection_failure)
 selected_blocker_present = bool(selected_unresolved_thread_ids or selected_changes_requested_evidence)
-explicit_completion_present = completion_signal == "submitted_pull_request_review"
+explicit_completion_present = completion_signal in {
+    "submitted_pull_request_review",
+    "codex_no_findings_issue_comment",
+}
 fallback_issue_comment_present = completion_signal == "fallback_issue_comment"
 if selected_blocker_present:
     no_completion_category = "selected_blocker"
