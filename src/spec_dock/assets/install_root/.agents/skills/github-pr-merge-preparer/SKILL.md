@@ -9,7 +9,7 @@ description: Coordinate pull request creation or discovery, fixed Codex review t
 
 Use this skill to coordinate the post-implementation PR delivery loop: create or find the PR, monitor the latest head SHA, create and triage a PR repair batch, delegate bounded fixes when appropriate, confirm commit and push evidence, re-monitor, and finally report either `merge-prepared` evidence or a human gate.
 
-This skill is a workflow coordinator. It reuses `github-pr-creator` for PR creation, invokes `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` directly for fixed Codex review triggering plus checks/statuses/review observation, and delegates appropriate repair workers for implementation fixes. It does not implement CI log parsing, review repair logic, or GitHub write operations beyond the delegated branch push needed after an approved fix and the bounded `@codex review` trigger owned by `github-pr-observation`.
+This skill is a workflow coordinator. It reuses `github-pr-creator` for PR creation, invokes `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` directly for fixed Codex review triggering plus GitHub Actions CI and review observation, and delegates appropriate repair workers for implementation fixes. It does not implement CI log parsing, review repair logic, or GitHub write operations beyond the delegated branch push needed after an approved fix and the bounded `@codex review` trigger owned by `github-pr-observation`.
 
 ## Inputs
 
@@ -37,13 +37,13 @@ This skill is a workflow coordinator. It reuses `github-pr-creator` for PR creat
 6. Treat observation output as stale when it is not for the latest head SHA. After every push or re-push, obtain the new latest head SHA and re-run `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh`.
 7. Before fix delegation, pass through the PR Repair Triage Gate:
    - When an active or explicitly provided writable SpecDock issue scope exists and no existing batch path is being continued, run `./spec-dock/scripts/spec-dock new doc pr-repair-batch --issue <issue-id> --title "PR Repair Batch"` with the appropriate scope flag, capture the returned `path=...`, and edit only that generated path. The generated file owns all front matter identity fields (`種別`, `ID`, `タイトル`, `親`, authority/provenance fields, and related identity metadata); do not replace or mix that front matter from the skill-local template. Use `templates/pr-repair-batch.md` only as body-section scaffold for the content below the generated heading/front matter. When continuing an existing batch path, preserve that file's existing front matter identity fields and update only the batch body sections. When no writable SpecDock issue scope exists, maintain an inline PR repair batch section in the response or work log using the same body sections and state `batch_path: N/A`.
-   - Add every review finding, CI failure, merge blocker, and observation limitation from the observation result to the batch `Inventory`.
+   - Add every review finding, observed Actions CI failure, merge blocker, and observation limitation from the observation result to the batch `Inventory`. External/non-Actions checks are intentionally unobserved by PR observation; when branch protection depends on them, record the human/GitHub UI or external CI confirmation status as residual risk or a human gate.
    - Preserve PR metadata, latest head SHA, observation command, stdout final JSON location when available, trigger comment id / created_at, resume metadata, trigger boundary, and any observation limitation.
    - Do not post an unapproved new trigger while resuming a timeout or limit. Continue within the same trigger boundary with explicit resume metadata unless the user approves a new trigger.
    - Triage every inventory item before repair delegation; no item may remain `untriaged`.
    - Use the batch sections `Concern Catalog`, `Inventory`, `Per-Concern Analysis`, `Repair Queue`, `Unit Discussion Plan`, `Stop Conditions`, and `Merge-Prepared Gate`.
 8. Classify failures with coarse labels only:
-   - `check_failure:<job_or_check_name>`
+   - `check_failure:<actions_job_or_workflow_name>`
    - `review_feedback:<topic>`
    - `merge_conflict`
    - `base_branch_conflict`
@@ -74,16 +74,16 @@ This skill is a workflow coordinator. It reuses `github-pr-creator` for PR creat
 
 ## Merge-Prepared Predicate
 
-`review-clean` and `merge-prepared` are different states. `review-clean` means the review has no actionable findings. `merge-prepared` means the latest head has been observed and all findings, failures, blockers, and residual risks are triaged so a human can make the merge decision. `review-clean: no` may still be `merge-prepared: yes` when remaining items are non-blocking and fully dispositioned.
+`review-clean` and `merge-prepared` are different states. `review-clean` means the review has no actionable findings. `merge-prepared` means the latest head has been observed through PR observation and all observed Actions CI findings, review findings, blockers, and residual risks are triaged so a human can make the merge decision. `review-clean: no` may still be `merge-prepared: yes` when remaining items are non-blocking and fully dispositioned.
 
 Report `merge-prepared: yes` only when all of these are evidenced:
 
 - PR is open.
 - Monitor result is for the latest head SHA.
 - Latest head re-observation has completed after the last repair commit or push.
-- No required check failure remains.
-- No non-required check failure remains unless the check is known optional or the user explicitly waived it.
-- Any waived non-required check failure is reported as residual risk.
+- No observed Actions CI failure remains.
+- External/non-Actions checks are not claimed as observed by this skill. If branch protection or the repository workflow depends on them, GitHub UI or external CI confirmation is recorded, or the PR stops at a human gate.
+- Any waived or unconfirmed external/non-Actions check risk is reported as residual risk.
 - No blocking review feedback remains.
 - No visible merge conflict or equivalent merge blocker remains.
 - PR repair batch exists at the runtime-generated `new doc pr-repair-batch` path when a writable SpecDock scope exists, or as an inline batch with `batch_path: N/A` when no writable scope exists.
@@ -126,7 +126,7 @@ When stopping for a human gate, report:
 - PR repair batch path, untriaged count, unresolved `needs-human` count, and repair unit status.
 - Resume metadata, trigger boundary, new trigger approval status, and observation limitation handling when relevant.
 - Failure class history and attempted fixes.
-- Non-required check waiver status, if relevant.
+- External/non-Actions check confirmation or waiver status, if relevant.
 - Review-thread limitation status, if relevant.
 - Remaining blocker and recommended next action.
 
