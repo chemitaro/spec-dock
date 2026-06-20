@@ -50,6 +50,7 @@ Disposition ごとの必須証跡:
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-S02-001 | resolved | compatibility | dev-coder / orchestrator | S02 で `zero_actions_runs_non_success` を導入すると、S03 の wait/snapshot consumer がまだ legacy `zero_checks_s03_non_success` を見ているため挙動が変わる | A: legacy marker を即削除; B: legacy marker のみ維持; C: new marker と legacy compatibility marker を併記 | C を採用し、S02 では Actions-only semantics を `zero_actions_runs_non_success` で示しつつ、S03 migration まで `zero_checks_s03_non_success` を互換 marker として残す | S02 は snapshot/wait consumer 変更禁止。code-reviewer が temporary marker を S02 契約上許容と判定した | applied | `pr_observation_checks.py`; S02 worker ledger note; code-reviewer `019ee5e8-a0e4-75b2-8793-0f5404296571` pass | S03 で wait/snapshot consumption を Actions summary / new marker へ移行し、可能なら legacy marker 削除を再評価する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -208,23 +209,33 @@ rg -n "statusCheckRollup|check-runs|gh pr checks|ci_coverage_limited_to_github_a
 | S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | 既存 collector に `gh pr view --json mergeStateStatus,statusCheckRollup`、`/check-runs`、`/status` 呼び出しがあり、広め verification lane は旧 rollup/status 前提で `25 failed, 58 passed, 394 deselected` だった | source inspection; `uv run pytest tests/unit/infra/test_init_update.py -k "observation or checks or github_pr"` before stale-test cleanup | pass | forbidden surface と stale expectations を再現 |
 | S01 | 緑フェーズ（Green） | cl-001 / cl-011 | collector は forbidden supplemental API を呼ばず、S01 guard と広め lane が pass | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_222_s01"` -> `2 passed, 475 deselected`; `uv run pytest tests/unit/infra/test_init_update.py -k "observation or checks or github_pr"` -> `83 passed, 394 deselected` | pass | static guard は `checks` token ではなく forbidden API surface を対象にする |
 | S01 | リファクタリング（Refactor） | guardrail satisfied | unused import / stale supplemental limitation expectations を整理。実装 source は provider-side collector と focused tests のみ | `git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py tests/unit/infra/test_init_update.py` -> pass | pass | full file test は `473 passed, 4 failed`; failure は generated `__pycache__` inventory と dogfooding snapshot/parity。`__pycache__` は削除済み、dogfooding parity は後続 mirror/snapshot synchronization で扱う |
+| S02 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | S02 edge fixtures were missing before implementation; source inspection showed dead legacy check/status decision branches and no explicit source policy marker | source inspection; worker precheck `uv run pytest tests/unit/infra/test_init_update.py -k "issue_222 or actions or observation or checks"` -> existing lane pass but without S02-specific coverage | pass | missing coverage was closed by new S02 tests |
+| S02 | 緑フェーズ（Green） | cl-002 through cl-006 | Actions-only source policy marker and status classification were implemented; zero/unavailable/job-unavailable cases covered | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_222_s02"` -> `5 passed, 477 deselected`; `uv run pytest tests/unit/infra/test_init_update.py -k "actions or observation or checks"` -> `123 passed, 359 deselected` | pass | static forbidden pattern scan returned no matches |
+| S02 | リファクタリング（Refactor） | guardrail satisfied | dead check/status/status-rollup classification helpers and fallback branches removed; compatibility fields retained empty | `git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py tests/unit/infra/test_init_update.py` -> pass | pass | no broad rename of compatibility fields |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
 | S01 | stale rollup/status/check-runs tests still expected forbidden supplemental API evidence | code-reviewer / verification | updated tests to assert Actions-only forbidden collection policy, non-call behavior, or Actions evidence; no plan amendment | cl-001 / cl-011 | no | code-reviewer fail then pass; `83 passed, 394 deselected` |
 | S01 | full `tests/unit/infra/test_init_update.py` still reports dogfooding snapshot / provider mirror parity failures after provider asset change and issue import | verification | recorded for later sync/mirror step; not S01 blocker per code-reviewer because outside S01 allowed-path contract | follow-up parity risk | no | full file `473 passed, 4 failed`; code-reviewer pass allowed deferral |
+| S02 | S03 consumer still depends on `zero_checks_s03_non_success` | dev-coder / verification | kept compatibility marker alongside new `zero_actions_runs_non_success`; recorded D-S02-001 | cl-004 | no | code-reviewer pass accepted temporary compatibility marker |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
 | S01 | cl-001, cl-011 | cl-001: forbidden API calls are not executed and fake-gh detects them; cl-011: compatibility names may remain without word-ban behavior | provider collector has no forbidden decision call pattern; `test_issue_222_s01_pr_observation_ci_collector_forbids_checks_api_surfaces`; `test_issue_222_s01_static_guard_targets_forbidden_ci_surfaces_not_checks_name`; broad lane pass | pass | S02-S05/S90/S99 remain unlocked only after this committed step |
+| S02 | cl-002, cl-003, cl-004, cl-005, cl-006 | Actions workflow runs/jobs alone determine CI state; zero/unavailable Actions evidence never becomes pass through legacy fallback | S02 focused tests and broad lane pass; code-reviewer pass | pass | S03 migration remains separate |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | cl-001 | S01 | yes | red-required | source inspection showed `statusCheckRollup`, `/check-runs`, commit status calls in collector | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_222_s01"`; `uv run pytest tests/unit/infra/test_init_update.py -k "observation or checks or github_pr"` | pass | fake-gh fails on forbidden surface and collector uses Actions API only |
 | cl-011 | S01 | yes | inspect-only | compatibility names such as `fetch_pr_checks_snapshot.sh` remain intentionally | static test `test_issue_222_s01_static_guard_targets_forbidden_ci_surfaces_not_checks_name`; provider collector `rg` forbidden patterns -> no matches | pass | no word-ban on `checks` token |
+| cl-002 | S02 | yes | red-required | explicit success source-policy coverage absent before S02 | `test_issue_222_s02_actions_success_passes_with_source_policy_marker` | pass | source policy marker is present top-level and under `ci` |
+| cl-003 | S02 | yes | red-required | non-success Actions state coverage incomplete before S02 | `test_issue_222_s02_actions_non_success_states_classify_from_actions_only` | pass | failure/cancelled/timed_out/queued/in_progress/pending/unknown classified from Actions |
+| cl-004 | S02 | yes | red-required | zero Actions needed non-pass/no-fallback evidence | `test_issue_222_s02_zero_actions_runs_never_pass_and_do_not_fallback` | pass | emits `zero_actions_runs_non_success` and temporary S03 compatibility marker |
+| cl-005 | S02 | yes | red-required | Actions unavailable needed no-fallback evidence | `test_issue_222_s02_actions_unavailable_is_unknown_without_fallback` | pass | limitation is `actions_read`; no forbidden fallback |
+| cl-006 | S02 | yes | red-required | failed run with jobs unavailable needed run-level preservation | `test_issue_222_s02_failed_run_stays_failed_when_jobs_api_unavailable` | pass | failed run stays failed and jobs limitation is recorded |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -233,11 +244,17 @@ rg -n "statusCheckRollup|check-runs|gh pr checks|ci_coverage_limited_to_github_a
 |---|---|---|---|---|
 | cl-001 | S01 | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_222_s01"` -> `2 passed`; broad lane -> `83 passed` | pass | forbidden API calls removed from runtime path |
 | cl-011 | S01 | static guard plus code-reviewer pass | pass | compatibility names preserved; `checks` word itself not banned |
+| cl-002 | S02 | S02 focused test | pass | Actions success passes |
+| cl-003 | S02 | S02 focused test | pass | Actions non-success states do not pass incorrectly |
+| cl-004 | S02 | S02 focused test | pass | zero Actions runs non-pass |
+| cl-005 | S02 | S02 focused test | pass | Actions unavailable unknown/no fallback |
+| cl-006 | S02 | S02 focused test | pass | failed run stays failed when jobs unavailable |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
 | changed | cl-001 | legacy rollup/status tests | cl-001 | forbidden supplemental API is no longer observable; stale tests now assert non-call / forbidden policy / Actions evidence | no | yes; code-reviewer re-review passed |
+| added | cl-002..cl-006 | `test_issue_222_s02_*` | cl-002..cl-006 | S02 needed explicit Actions-only classification fixtures | no | yes; code-reviewer passed |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
@@ -252,11 +269,13 @@ rg -n "statusCheckRollup|check-runs|gh pr checks|ci_coverage_limited_to_github_a
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | shipped scaffold runtime and tests | dev-coder | forbidden CI surface guard and stale test cleanup | requirement/design/plan/ADR/interview | provider `pr_observation_checks.py`; `tests/unit/infra/test_init_update.py` | canonical docs/report by worker; dogfooding mirror as implementation source; review/comment collector; broad rename of `checks` compatibility names | focused and broad pytest; static forbidden pattern inspection; diff check | forbidden API must remain; fake-gh cannot detect forbidden calls; allowed paths insufficient | changed files, tests, closure evidence, ledger note, risks | pass |
+| S02 | delegated | shipped scaffold runtime and tests | dev-coder | Actions-only CI classification | requirement/design/plan/ADR/interview; S01 commit evidence | provider `pr_observation_checks.py`; `tests/unit/infra/test_init_update.py` | docs/report by worker; dogfooding mirror; S03 snapshot/wait; S04 review collector; doctor/docs; forbidden API reintroduction | S02 focused and broad pytest; static forbidden pattern inspection; diff check | payload shape cannot support downstream consumers without broader design | changed files, tests, payload notes, ledger note, risks | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
 | S01 | dev-coder | removed forbidden supplemental collector calls; added S01 fake-gh/static guard; updated stale rollup/status/check-runs tests to Actions-only forbidden policy | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py`; `tests/unit/infra/test_init_update.py` | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_222_s01"` -> pass; broad lane -> pass; diff check -> pass | pass: code-reviewer `019ee5aa-8402-7a13-8aca-1ce183fbe83a` after two follow-ups | dogfooding mirror/snapshot parity remains for later step | accepted |
+| S02 | dev-coder | added `source_policy: github_actions_only`; removed dead legacy check/status/rollup decision branches; added S02 focused fixtures | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py`; `tests/unit/infra/test_init_update.py` | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_222_s02"` -> pass; `uv run pytest tests/unit/infra/test_init_update.py -k "actions or observation or checks"` -> pass; diff check -> pass | pass: code-reviewer `019ee5e8-a0e4-75b2-8793-0f5404296571` | temporary `zero_checks_s03_non_success` compatibility marker until S03 | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -267,11 +286,13 @@ rg -n "statusCheckRollup|check-runs|gh pr checks|ci_coverage_limited_to_github_a
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | S01 | step reviewer | code-reviewer | fresh | passed | no | proceed to S01 commit | initial reviews found stale tests; final review returned `review_status: pass` |
+| S02 | step reviewer | code-reviewer | fresh | passed | no | proceed to S02 commit | temporary zero-checks compatibility marker accepted for S02 |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed | provider collector, focused tests, S01 report evidence | pending S01 commit | post-commit clean check to be recorded externally before S02 | N/A | N/A | N/A | N/A |
+| S02 | committed | provider collector, focused tests, S02 report evidence | pending S02 commit | post-commit clean check to be recorded externally before S03 | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `path/to/file1` - ...

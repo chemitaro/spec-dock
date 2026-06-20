@@ -15749,6 +15749,238 @@ else:
         assert "statusCheckRollup" not in collector
         assert '["gh", "pr", "checks"' not in collector
 
+    def _issue_222_s02_run_actions_ci_collector(self, *, case_name: str) -> tuple[dict[str, object], list[str]]:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            gh_log = tmp_path / "gh.log"
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env python3
+import json
+import os
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+joined = " ".join(args)
+log_path = Path(os.environ["GH_FAKE_LOG"])
+with log_path.open("a", encoding="utf-8") as log:
+    log.write(joined + "\\n")
+
+if (
+    "check-runs" in joined
+    or f"commits/{'a' * 40}/status" in joined
+    or "statusCheckRollup" in joined
+    or args[:3] == ["pr", "checks", "13"]
+):
+    print(f"forbidden CI surface called: {joined}", file=sys.stderr)
+    sys.exit(66)
+
+case_name = os.environ["GH_FAKE_CASE"]
+
+def emit(payload):
+    print(json.dumps(payload, separators=(",", ":")))
+
+def run_payload(status, conclusion=None):
+    payload = {
+        "id": 202,
+        "name": "CI",
+        "head_sha": "a" * 40,
+        "status": status,
+    }
+    if conclusion is not None:
+        payload["conclusion"] = conclusion
+    return payload
+
+def job_payload(status, conclusion=None):
+    payload = {
+        "id": 303,
+        "run_id": 202,
+        "name": "test",
+        "status": status,
+        "steps": [],
+    }
+    if conclusion is not None:
+        payload["conclusion"] = conclusion
+    return payload
+
+if args == ["api", "repos/owner/repo/actions/runs?head_sha=" + "a" * 40, "--paginate"]:
+    if case_name == "actions_unavailable":
+        print("resource not accessible by personal access token", file=sys.stderr)
+        sys.exit(66)
+    if case_name == "zero_runs":
+        emit({"total_count": 0, "workflow_runs": []})
+    elif case_name == "failure":
+        emit({"total_count": 1, "workflow_runs": [run_payload("completed", "failure")]})
+    elif case_name == "failed_jobs_unavailable":
+        emit({"total_count": 1, "workflow_runs": [run_payload("completed", "failure")]})
+    elif case_name == "cancelled":
+        emit({"total_count": 1, "workflow_runs": [run_payload("completed", "cancelled")]})
+    elif case_name == "timed_out":
+        emit({"total_count": 1, "workflow_runs": [run_payload("completed", "timed_out")]})
+    elif case_name == "queued":
+        emit({"total_count": 1, "workflow_runs": [run_payload("queued")]})
+    elif case_name == "in_progress":
+        emit({"total_count": 1, "workflow_runs": [run_payload("in_progress")]})
+    elif case_name == "pending":
+        emit({"total_count": 1, "workflow_runs": [run_payload("pending")]})
+    elif case_name == "unknown":
+        emit({"total_count": 1, "workflow_runs": [run_payload("completed", "mystery")]})
+    else:
+        emit({"total_count": 1, "workflow_runs": [run_payload("completed", "success")]})
+elif args == ["api", "repos/owner/repo/actions/runs/202/jobs", "--paginate"]:
+    if case_name == "failed_jobs_unavailable":
+        print("jobs endpoint unavailable", file=sys.stderr)
+        sys.exit(44)
+    if case_name == "failure":
+        emit({"total_count": 1, "jobs": [job_payload("completed", "failure")]})
+    elif case_name == "cancelled":
+        emit({"total_count": 1, "jobs": [job_payload("completed", "cancelled")]})
+    elif case_name == "timed_out":
+        emit({"total_count": 1, "jobs": [job_payload("completed", "timed_out")]})
+    elif case_name == "queued":
+        emit({"total_count": 1, "jobs": [job_payload("queued")]})
+    elif case_name == "in_progress":
+        emit({"total_count": 1, "jobs": [job_payload("in_progress")]})
+    elif case_name == "pending":
+        emit({"total_count": 1, "jobs": [job_payload("pending")]})
+    else:
+        emit({"total_count": 1, "jobs": [job_payload("completed", "success")]})
+else:
+    print(f"unexpected gh call: {joined}", file=sys.stderr)
+    sys.exit(44)
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_CASE": case_name,
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            return payload, gh_log.read_text(encoding="utf-8").splitlines()
+
+    def test_issue_222_s02_actions_success_passes_with_source_policy_marker(self) -> None:
+        payload, gh_calls = self._issue_222_s02_run_actions_ci_collector(case_name="success")
+
+        assert payload["source_policy"] == "github_actions_only"
+        assert payload["ci"]["source_policy"] == "github_actions_only"
+        assert payload["ci"]["status"] == "passed"
+        assert payload["ci"]["progress_status"] == "passed"
+        assert payload["ci"]["actions"]["available"] is True
+        assert payload["ci"]["actions"]["workflow_runs"]["total"] == 1
+        assert payload["ci"]["check_runs"]["total"] == 0
+        assert payload["ci"]["commit_statuses"]["total"] == 0
+        assert "ci_coverage_limited_to_github_actions" not in [
+            item["code"] for item in payload["limitations"]
+        ]
+        assert not any("check-runs" in call for call in gh_calls)
+        assert not any("/status" in call for call in gh_calls)
+        assert not any("statusCheckRollup" in call for call in gh_calls)
+
+    def test_issue_222_s02_actions_non_success_states_classify_from_actions_only(self) -> None:
+        cases = {
+            "failure": "failed",
+            "cancelled": "failed",
+            "timed_out": "failed",
+            "queued": "pending",
+            "in_progress": "running",
+            "pending": "pending",
+            "unknown": "unknown",
+        }
+
+        for case_name, expected_status in cases.items():
+            with _case(name=case_name):
+                payload, gh_calls = self._issue_222_s02_run_actions_ci_collector(case_name=case_name)
+
+                assert payload["ci"]["source_policy"] == "github_actions_only"
+                assert payload["ci"]["status"] == expected_status
+                assert payload["ci"]["status"] != "passed"
+                assert payload["ci"]["check_runs"]["total"] == 0
+                assert payload["ci"]["commit_statuses"]["total"] == 0
+                assert not any("check-runs" in call for call in gh_calls)
+                assert not any("/status" in call for call in gh_calls)
+                assert not any("statusCheckRollup" in call for call in gh_calls)
+
+    def test_issue_222_s02_zero_actions_runs_never_pass_and_do_not_fallback(self) -> None:
+        payload, gh_calls = self._issue_222_s02_run_actions_ci_collector(case_name="zero_runs")
+
+        assert payload["ci"]["source_policy"] == "github_actions_only"
+        assert payload["ci"]["status"] == "none"
+        assert payload["ci"]["status"] != "passed"
+        assert payload["ci"]["actions"]["workflow_runs"]["total"] == 0
+        assert "zero_actions_runs_non_success" in [
+            item["code"] for item in payload["limitations"]
+        ]
+        assert payload["ci"]["check_runs"]["total"] == 0
+        assert payload["ci"]["commit_statuses"]["total"] == 0
+        assert not any("check-runs" in call for call in gh_calls)
+        assert not any("/status" in call for call in gh_calls)
+
+    def test_issue_222_s02_actions_unavailable_is_unknown_without_fallback(self) -> None:
+        payload, gh_calls = self._issue_222_s02_run_actions_ci_collector(case_name="actions_unavailable")
+
+        assert payload["ci"]["source_policy"] == "github_actions_only"
+        assert payload["ci"]["status"] == "unknown"
+        assert payload["ci"]["actions"]["available"] is False
+        assert payload["ci"]["check_runs"]["total"] == 0
+        assert payload["ci"]["commit_statuses"]["total"] == 0
+        assert [item["capability"] for item in payload["limitations"]] == ["actions_read"]
+        assert [item["code"] for item in payload["limitations"]] == ["github_token_permission_denied"]
+        assert not any("check-runs" in call for call in gh_calls)
+        assert not any("/status" in call for call in gh_calls)
+
+    def test_issue_222_s02_failed_run_stays_failed_when_jobs_api_unavailable(self) -> None:
+        payload, gh_calls = self._issue_222_s02_run_actions_ci_collector(
+            case_name="failed_jobs_unavailable"
+        )
+
+        assert payload["ci"]["source_policy"] == "github_actions_only"
+        assert payload["ci"]["status"] == "failed"
+        assert payload["ci"]["progress_status"] == "failed"
+        assert [item["code"] for item in payload["limitations"]] == ["github_api_collection_failed"]
+        assert payload["limitations"][0]["source"] == "repos/owner/repo/actions/runs/202/jobs"
+        assert payload["ci"]["failures"] == [
+            {
+                "dedupe_key": "actions:202:run",
+                "failed_steps": [],
+                "html_url": None,
+                "job_conclusion": None,
+                "job_id": None,
+                "job_name": None,
+                "job_status": None,
+                "kind": "github_actions_job",
+                "source": "actions",
+                "workflow_conclusion": "failure",
+                "workflow_name": "CI",
+                "workflow_run_attempt": None,
+                "workflow_run_id": 202,
+                "workflow_status": "completed",
+            }
+        ]
+        assert not any("check-runs" in call for call in gh_calls)
+        assert not any("/status" in call for call in gh_calls)
+
     def test_issue_170_pr_observation_checks_collector_polls_unknown_merge_state(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
