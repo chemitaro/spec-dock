@@ -1031,6 +1031,7 @@ def is_strict_no_findings_issue_comment(item):
         "no major issues were found",
         "no major issues were found.",
         "codex review: didn't find any major issues. breezy!",
+        "codex review: didn't find any major issues. chef's kiss.",
         "codex review: didn't find any major issues. :tada:",
     }
     return normalized_body_text(raw_body) in allowed_full_bodies
