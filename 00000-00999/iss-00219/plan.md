@@ -21,7 +21,7 @@ ID: "iss-00219"
   - AC-005 snapshot と wait の status contract consistency
   - AC-006 skill docs の two-axis contract
 - EC:
-  - EC-001 fallback issue comment policy は変更しない
+  - EC-001 general fallback issue comment policy は維持し、current-boundary no-major-issues fallback だけを observation completion signal として扱う
   - EC-002 outdated / unknown-outdated threads は actionable inventory に昇格しない
   - EC-003 CI/head blockers を優先する
   - EC-004 empty-inventory unknown path は維持する
@@ -118,7 +118,8 @@ ID: "iss-00219"
 | tc-004 | S01/S02 | trusted completion + carryover | acceptance | AC-004 | `carryover_non_outdated_unresolved_thread` feedback handling | submitted PR review completion, no current blocker, carryover > 0 | false pass / false unknown | yes | red-required | S01/S02 report closure |
 | tc-005 | S01/S02/S99 | snapshot/wait consistency | acceptance | AC-005 | snapshot と wait が同じ next-action family と reason 意味を返す | AC-001..AC-004 fixtures | one-shot / wait contract divergence | yes | red-required | S01/S02/S99 report closure |
 | tc-006 | S03/S90/S99 | skill docs | docs | AC-006 | skill docs が lifecycle/inventory split と unknown semantics を説明する | updated `SKILL.md` and mirror decision | future-agent JSON 誤読 | yes | inspect-only | S03/S90/S99 report closure |
-| tc-007 | S01/S02 | fallback preservation | edge | EC-001 | fallback issue comment は low-confidence path のまま | completion signal fallback | Issue218 policy の accidental change | yes | covered-existing + targeted regression | S01/S02 report closure |
+| tc-007 | S01/S02 | general fallback preservation | edge | EC-001 | no-major-issues ではない fallback issue comment は low-confidence path のまま | completion signal fallback | Issue218 policy の accidental change | yes | covered-existing + targeted regression | S01/S02 report closure |
+| tc-011 | PR follow-up | no-major-issues fallback completion | acceptance | EC-001 / PR manual observation | current trigger boundary の Codex no-major-issues issue comment は `passed` / `merge_prepared` に昇格する | CI/head clean, current selected blocker なし, fallback pass candidate true | real PR monitoring cannot complete after Codex no-findings response | yes | dogfooding-derived regression | PR observation follow-up report closure |
 | tc-008 | S01/S02 | outdated exclusion | edge | EC-002 | outdated/unknown-outdated は actionable inventory に昇格しない | thread outdated true/null/unavailable | stale feedback promotion | yes | covered-existing | S01/S02 report closure |
 | tc-009 | S01/S02 | CI/head priority | edge | EC-003 | CI/head blockers が review/carryover policy より優先される | stale head, CI pending/running/failed/none, limitations | review policy overriding CI/head | yes | covered-existing + targeted regression | S01/S02 report closure |
 | tc-010 | S01/S02 | empty-inventory unknown | edge | EC-004 | empty inventory の existing `review_completion_unknown` path を維持 | no carryover, no current selected, completion none, latency true | unknown path regression | yes | covered-existing | S01/S02 report closure |
@@ -143,7 +144,7 @@ ID: "iss-00219"
 - Step が code/runtime/tests を含む場合は code-reviewer pass が必要。
 - Docs-only step は spec-reviewer docs/spec alignment pass が必要。
 - `plan.md` には planned contract だけを書き、observed result は `report.md` に残す。
-- 新 top-level status、新 primary `status_reason`、fallback issue comment policy 変更、GitHub collection scope 変更が必要になった場合は plan amendment と re-review を先に行う。
+- 新 top-level status、新 primary `status_reason`、fallback issue comment policy 変更、GitHub collection scope 変更が必要になった場合は plan amendment と re-review を先に行う。本 plan amendment は、PR manual observation で見つかった current-boundary no-major-issues fallback completion に限り、`fallback_issue_comment_no_major_issues` と `merge_prepared` 昇格を許可する。
 
 ## 実装ステップ
 
@@ -249,13 +250,20 @@ ID: "iss-00219"
   - 失敗検出: trusted completion + carryover becomes pass or unknown.
   - 検証方法: focused pytest.
   - 関連 closure id: tc-004, tc-005
-- `tc-s01-006` edge: fallback / outdated / CI-head / empty unknown are unchanged
+- `tc-s01-006` edge: general fallback / outdated / CI-head / empty unknown are unchanged
   - 前提: existing fallback, outdated/null, CI/head blocker, empty-inventory unknown fixtures.
   - 操作: targeted pytest subset.
-  - 期待結果: existing EC contracts remain.
+  - 期待結果: no-major-issues fallback 以外の existing EC contracts remain.
   - 失敗検出: Issue219 changes unrelated policy.
   - 検証方法: focused pytest around fallback/outdated/stale_head/review_completion_unknown.
   - 関連 closure id: tc-007, tc-008, tc-009, tc-010
+- `tc-pr-001` acceptance: no-major-issues fallback completes observation
+  - 前提: CI/head clean, current selected blocker なし, current trigger boundary の Codex issue comment が `Codex Review: Didn't find any major issues. :tada:` を返す。
+  - 操作: review snapshot detects fallback pass candidate, snapshot/wait classify.
+  - 期待結果: `normalized_status="passed"`, `recommended_next_action="merge_prepared"`, `observation_complete=true`, `decision.status_reason="fallback_issue_comment_no_major_issues"`。
+  - 失敗検出: wait script が `fallback_issue_comment_low_confidence` / `wait_or_resume` を返し続け、PR monitoring が完了できない。
+  - 検証方法: focused fallback tests and PR observation subset.
+  - 関連 closure id: tc-011
 
 #### ステップ完了契約
 - close 条件:
@@ -305,7 +313,7 @@ ID: "iss-00219"
   - Refactor / cleanup:
     - Small helper split only; no broad runtime restructure.
   - amendment trigger:
-    - Need new top-level status/reason, collection scope change, or fallback policy change.
+    - Need new top-level status/reason, collection scope change, or fallback policy change outside the amended no-major-issues fallback completion scope.
 
 #### 委任契約
 - 委任ロール:
@@ -553,7 +561,7 @@ ID: "iss-00219"
 
 ## 最終完了条件
 - AC/EC 達成:
-  - tc-001..tc-010 が report closure evidence で閉じている。
+  - tc-001..tc-011 が report closure evidence で閉じている。
 - docs 影響解決:
   - S03/S90 で skill docs と provider/mirror decision が記録されている。
 - 全 implementation step 完了:

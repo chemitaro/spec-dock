@@ -18,6 +18,7 @@ ID: "iss-00219"
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | interpretation | orchestrator + deep-consultants | Carryover unresolved thread と current review completion lifecycle が同時に関わる状態分類 | carryover immediate terminal; carryover audit-only; two-axis model | Current review lifecycle と actionable inventory を別軸にする | GitHub thread は actionable inventory だが current `@codex review` completion signal ではない | promoted_to_design | `discussions/20260619t221823z-disc-carryover-review-completion-policy-synthesis.md`, `design.md` | none |
 | D-002 | resolved | compatibility | orchestrator + deep-consultant reason-taxonomy | Latency guard 満了後の exact `status_reason` | reuse `review_completion_unknown`; new combined reason; carryover-specific reason | `review_completion_unknown` を再利用し、carryover は structured fields で表す | Existing consumer compatibility と reason taxonomy の組み合わせ爆発回避 | promoted_to_design | `discussions/20260620t010354z-interview-carryover-unknown-status-reason-naming.md`, `design.md` | none |
+| D-003 | resolved | plan-amendment | PR manual observation + code-reviewer gate | Codex が current trigger boundary で `Codex Review: Didn't find any major issues. :tada:` を issue comment として返した場合、PR monitoring が `fallback_issue_comment_low_confidence` / `wait_or_resume` のまま完了しない | keep general fallback low-confidence; promote all fallback; promote only no-major-issues fallback | Current-boundary no-major-issues fallback だけを `fallback_issue_comment_no_major_issues` / `merge_prepared` へ昇格し、一般 fallback は従来通り low-confidence に残す | PR monitoring manual test の完了要件を満たしつつ、#218 の一般 fallback policy 変更を避ける | promoted_to_requirement_design_plan | PR #221 wait artifacts `/private/tmp/issue219-pr221-wait-2`, `/private/tmp/issue219-pr221-wait-3`; code-reviewer `019ee396-83e0-7a53-b6ba-aac5b7eaf769` P1 finding; spec-reviewer `019ee39a-c09d-70b3-9cde-5dc65da71d03` P1 closure finding fixed by adding tc-011 to final completion contract | fresh spec-review rerun required |
 
 ## 証跡採用台帳（Evidence Adoption Ledger）
 
@@ -44,6 +45,7 @@ ID: "iss-00219"
 | requirement | GitHub issue #219, active epic requirement, source analysis, interviews, policy synthesis, reason naming deep-consultant | Blocking question none; guard-under and reason naming answered in interviews | EAL-001..EAL-004 adopted into `requirement.md` | passed by spec-reviewer `019ee2e6-d0c4-7d42-ab37-2880ffb2fc5e`; P2 reflection metadata finding fixed | no | promoted to design |
 | design | Requirement pass, runtime source inspection, system-architect draft, provider/mirror source map | Blocking question none; `actionable_inventory_reason` remains non-blocking implementation choice | EAL-005 adopted into `design.md`; EAL-006 applied to delegated evidence governance | passed by spec-reviewer `019ee2f2-5b0c-7f81-bfa8-85de08ae3f85` after fixing prior P1 governance findings | no | promoted to plan |
 | plan | design reviewer pass, implementation-planner draft, phase plan docs, issue-plan authoring schema | Blocking question none; implementation choices captured as non-blocking S02/S03 decisions | EAL-007 adopted into `plan.md`; plan reviewer P1/P2 findings fixed | passed by spec-reviewer `019ee300-99ef-7fd3-b4d8-d1d10397a5c1` after fixing prior delegated-output/S90 gate findings | no | ready for issue execution |
+| plan-amendment | PR #221 manual observation found no-major-issues fallback could not complete monitoring; code-reviewer identified plan amendment gate | General fallback remains low-confidence; only current-boundary no-major-issues fallback may promote | D-003 promoted into `requirement.md`, `design.md`, `plan.md` before closing fallback promotion implementation | passed by spec-reviewer `019ee39d-d635-7af1-87e4-2fa4d24ac30e` after fixing prior tc-011 final completion finding | no | code-review/commit may proceed |
 
 ## ワークフロー委任同意の証跡（Workflow Delegation Consent）
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
@@ -363,11 +365,16 @@ result: no output, exit 0
 | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_219 or issue_187_s420 or issue_187_s430 or github-pr-observation or pr_observation"` | 88 passed, 358 deselected | PR feedback fix regression subset; includes carryover refresh timeout preservation |
 | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets"` | 1 passed, 445 deselected | provider/mirror agent-tooling parity after PR feedback fix |
 | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_219_s01_wait_guard_under_carryover_only_missing_completion_waits tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_219_s01_wait_preserves_carryover_refresh_timeout` | 2 passed | isolated rerun after tightening deadline/timeout assertions |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "fallback_issue_comment or no_major_issues_fallback or issue_219_s01_wait_no_major_issues"` | 5 passed, 442 deselected | PR manual observation follow-up for Codex no-major-issues issue comment completion |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_219 or issue_187_s420 or issue_187_s430 or github-pr-observation or pr_observation"` | 89 passed, 358 deselected | PR manual observation follow-up regression subset after fallback pass promotion |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets"` | 1 passed, 446 deselected | provider/mirror agent-tooling parity after fallback pass promotion |
+| `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_182_s02_snapshot_ignores_historical_unresolved_thread_for_final_action` | 1 passed | isolated rerun after aligning historical-unresolved fallback pass fixture |
 | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets` | 2 passed | final unit parity correction verification |
 | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_182_s03_wait_preserves_legacy_review_status_without_decision_surface -vv` | 1 passed | isolated rerun after one full-suite short-timeout failure |
 | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_182_s03_wait_preserves_legacy_review_status_without_decision_surface or issue_182_s03_wait"` | 7 passed, 438 deselected | related wait subset stability check |
 | `uv run pytest tests/unit` | 720 passed | final full unit rerun after parity correction and short-timeout rerun |
 | `uv run pytest tests/unit` | 721 passed | final full unit rerun after PR feedback fix |
+| `uv run pytest tests/unit` | 722 passed | final full unit rerun after fallback pass promotion |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
@@ -388,18 +395,28 @@ result: no output, exit 0
 | attempt | PR | head sha | コマンド / artifact | 観測結果 | 処置 |
 |---|---|---|---|---|---|
 | 1 | `#221` | `c2f2b720b3c532632ceb8734f58dedaf01d23d18` | `fetch_pr_observation_snapshot.sh` out: `/private/tmp/issue219-pr221-snapshot-1`; `wait_pr_observation.sh` out: `/private/tmp/issue219-pr221-wait-1` | fixed `@codex review` trigger posted; CI changed from running to passed; Codex review comments and unresolved threads were collected; final status `human_gate`, reason `current_selected_unresolved_thread`, recommended action `address_review_feedback` | actionable feedback を本 issue の修正対象として採用 |
+| 2 | `#221` | `2e33b69e1dcddcf46fca32341de13d9169ba0d63` | `fetch_pr_observation_snapshot.sh` out: `/private/tmp/issue219-pr221-snapshot-2`; `wait_pr_observation.sh` out: `/private/tmp/issue219-pr221-wait-2`; resume out: `/private/tmp/issue219-pr221-wait-3` | CI 4 checks passed and old review comments/threads were excluded from current trigger boundary, but Codex returned `Codex Review: Didn't find any major issues. :tada:` as an issue comment fallback; wait result stayed `human_gate` / `fallback_issue_comment_low_confidence` / `wait_or_resume` | fallback no-major-issues issue comment を current trigger completion signal として `merge_prepared` に昇格する follow-up fix を本 issue に追加 |
 
 #### PR Feedback Findings / Disposition
 | finding | 対象 | 問題 | 修正 | 検証 |
 |---|---|---|---|---|
 | P2 Preserve timed-out refreshes for carryover waits | `pr_observation_wait.py` carryover missing-completion wait | 後続 snapshot poll が timeout しても、古い carryover-only payload を再利用して `snapshot_poll_timed_out` を消し、stale payload から unknown/fresh-audit metadata を作れる | carryover-only でも snapshot poll timeout は blocking limitation と `wait_timeout` として保持する | new regression `test_issue_219_s01_wait_preserves_carryover_refresh_timeout`; focused subset 88 passed |
 | P2 Report expired carryover waits as deadline-reached | `pr_observation_wait.py` wait metadata | carryover-only wait が期限到達で止まっても `wait.deadline_reached=false` になり、resume 必要性を呼び出し側が見落とせる | `final_phase == "wait"` でも deadline 到達時は `deadline_reached=true` とし、期限直前の予算不足分岐でも carryover/latency guard を評価する。code-reviewer gate の追加 P1 指摘により top-of-loop deadline exit でも stale wait metadata を返さないよう `latest_payload.wait.deadline_reached=true` を明示した | existing guard-under regression に `deadline_reached=true` assertion を追加; focused subset 88 passed |
+| Manual observation follow-up: no-major-issues fallback cannot complete | `pr_review_snapshot.py`, `pr_observation_snapshot.py`, `pr_observation_wait.py` fallback issue comment completion | 実PRで Codex が PR review ではなく `Codex Review: Didn't find any major issues. :tada:` issue comment を返し、CI pass / current blocker なしでも wait script が `wait_or_resume` を返し続けた | current trigger boundary の no-major-issues fallback issue comment を検出し、`fallback_pass_candidate.promotes_top_level_status=true` の場合だけ `passed` / `merge_prepared` に昇格する。通常のfallback issue comment は従来通り低信頼 human gate のままにする | focused fallback tests 5 passed; PR observation subset 89 passed; provider/mirror parity 1 passed |
+
+#### Plan Amendment Gate / Disposition
+| finding / trigger | 対象 | 処置 | 状態 |
+|---|---|---|---|
+| code-reviewer `019ee396-83e0-7a53-b6ba-aac5b7eaf769` P1: fallback promotion introduces new top-level pass/status reason before plan amendment | `requirement.md`, `design.md`, `plan.md`, `report.md` | D-003 と plan-amendment row を追加し、no-major-issues fallback の限定昇格を仕様化した。一般 fallback は EC-001 の preservation として維持する | fixed; spec-reviewer rerun passed |
+| spec-reviewer `019ee39a-c09d-70b3-9cde-5dc65da71d03` P1: amended `tc-011` was missing from final completion contract | `plan.md`, `report.md` | final completion condition を `tc-001..tc-011` に更新し、D-003 evidence に spec-reviewer finding disposition を追記した | fixed; spec-reviewer `019ee39d-d635-7af1-87e4-2fa4d24ac30e` passed |
+| code-reviewer `019ee39f-8de7-7242-a837-244bcc9cfad0` P2: stale report row still said plan amendment review pending | `report.md` | plan-amendment row と disposition rows を spec-reviewer pass / fixed 状態へ更新した | fixed before commit |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
 | S90/S99 parity correction and final local validation ledger | `.agents` mirror runtime sync, dogfooding meta baseline update, final report evidence | PR body / final response; PR observation manual test after PR creation | committed in final local ledger commit |
 | PR feedback fix ledger | carryover wait timeout preservation, deadline metadata correction, provider/mirror sync, regression tests, report evidence | PR #221 push and PR observation manual test rerun | pending commit |
+| PR observation completion follow-up ledger | no-major-issues fallback promotion, provider/mirror sync, regression tests, report evidence | PR #221 push and PR observation manual test rerun | pending commit |
 
 ## 実行引き渡し準備（Execution Handoff Readiness）
 
