@@ -59,7 +59,7 @@ ID: "iss-00219"
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | system-architect | iss-00219 | `discussions/20260620t024411z-draft-design-carryover-observation-design.md` | requirement, evidence discussions, runtime sources, tests | `design.md`, `plan.md`, `report.md` | adopted in report ledger only | canonical `design.md` | pass: one new direct-child Markdown file; no forbidden path changes observed | integrated into canonical `design.md` by orchestrator | none material | none | design spec-reviewer pass | promoted to plan |
-| implementation-planner | iss-00219 | `discussions/20260620t025710z-draft-plan-carryover-observation-implementation-plan.md` | reviewed requirement/design/report, phase plan docs, runtime sources, tests | `plan.md`, `report.md` | adopted in report ledger only | canonical `plan.md` | pass: one new direct-child Markdown file; no forbidden path changes observed | integrated into canonical `plan.md` by orchestrator | none material | none | pending plan spec-reviewer | plan reviewer required before execution |
+| implementation-planner | iss-00219 | `discussions/20260620t025710z-draft-plan-carryover-observation-implementation-plan.md` | reviewed requirement/design/report, phase plan docs, runtime sources, tests | `plan.md`, `report.md` | adopted in report ledger only | canonical `plan.md` | pass: one new direct-child Markdown file; no forbidden path changes observed | integrated into canonical `plan.md` by orchestrator | none material | none | plan spec-reviewer pass after delegated-output/S90 gate fixes | promoted to execution |
 
 ### 委任 invocation 境界（Delegated Authoring Invocation Boundary）
 | invocation | role | allowed output | forbidden output/actions | source artifacts | invalidation conditions | observed result |
@@ -73,7 +73,8 @@ ID: "iss-00219"
 | none observed | N/A | N/A | this section | eligible after canonical integration and fresh reviewer pass |
 
 ## 実装サマリー
-- 未実装。現在は issue authoring phase。
+- S01 regression tests、S02 provider runtime classification fix、S03 skill docs / provider-mirror docs は committed。S90/S99 parity correction と final report ledger を実施中。
+- Local validation は focused PR observation subset、SpecDock validate、`git diff --check`、`uv run pytest tests/unit` が pass。PR delivery、merge preparation、PR observation manual test は未実施。
 
 ## 実装記録（セッションログ）
 
@@ -183,7 +184,7 @@ note: focused subset の初回実行では既存 short-timeout test が一度 `t
 #### Step Commit Gate
 | ステップ | commit / no-op | 範囲 | 状態 |
 |---|---|---|---|
-| S01 | commit required | S01 tests and S01 report evidence | pending |
+| S01 | committed `00ca5b1e` | S01 tests and S01 report evidence | closed |
 
 ### セッションログ（2026-06-20 execution S02 Provider Runtime Classification Fix）
 
@@ -261,7 +262,7 @@ result: passed
 #### Step Commit Gate
 | ステップ | commit / no-op | 範囲 | 状態 |
 |---|---|---|---|
-| S02 | commit required | S02 provider runtime and S02 report evidence | pending |
+| S02 | committed `a65e252f` | S02 provider runtime and S02 report evidence | closed |
 
 ### セッションログ（2026-06-20 execution S03 Skill Docs / Mirror Resolution）
 
@@ -327,34 +328,62 @@ result: no output, exit 0
 #### Step Commit Gate
 | ステップ | commit / no-op | 範囲 | 状態 |
 |---|---|---|---|
-| S03 | commit required | S03 skill docs/mirror and S03 report evidence | pending |
+| S03 | committed `5c0575ba` | S03 skill docs/mirror and S03 report evidence | closed |
 
 ## 最終品質ゲート（Final Quality Gate）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / skill / runtime contract | pending | doc-writer or dev-coder per plan | pending implementation | pending |
+| docs / skill / runtime contract | resolved | S01 Issue187 supersession evidence, S03 provider/mirror equality evidence, final unit parity correction | Additional shipped docs are not required. S90 closure records that Issue187 supersession and provider/mirror resolution are already covered, and final unit parity required dogfooding mirror runtime sync plus checked-in `.meta.json` baseline update. | passed by spec-reviewer `019ee344-b776-7a33-9c53-0dd352d9085b`; approved no-op for additional shipped docs |
+
+#### S90 Scope Amendment / Final Unit Parity Correction
+| 項目 | 内容 |
+|---|---|
+| trigger | `uv run pytest tests/unit` initially failed on dogfooding `.meta.json` cutover snapshot and checked-in agent-tooling parity |
+| amendment | Treat mirror runtime sync and checked-in dogfooding baseline update as S90/S99 parity correction required by final unit gate, not as catch-up provider implementation |
+| changed files | `.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py`, `.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`, `tests/unit/infra/test_init_update.py`, `report.md` |
+| provider/runtime source of truth | provider runtime was already committed in S02 `a65e252f`; mirror files were copied from provider to restore checked-in host-pack parity |
+| verification | provider/mirror `git diff --no-index` for both runtime files returned no output and exit 0; targeted parity tests passed |
+| reviewer gate | code-reviewer `019ee33c-4c4a-74b1-a9a5-a39f22b7d0cc` passed; no findings |
+
+#### S90 Review Attempts
+| attempt | reviewer | result | finding / disposition |
+|---|---|---|---|
+| 1 | spec-reviewer `019ee32e-6946-70b2-9428-661ea036354c` | failed | P1: S90 report row and S01-S03 commit gate rows were stale; fixed by recording committed hashes and S90 resolution |
+| 2 | spec-reviewer `019ee336-9548-7251-8ca7-faf6ee9d1392` | failed | P1: mirror runtime/test baseline edits exceeded report-only S90 scope; fixed by adding this scope amendment and requiring code-reviewer gate |
+| 3 | spec-reviewer `019ee344-b776-7a33-9c53-0dd352d9085b` | passed | S90 can close after scope amendment and code-reviewer gate; additional shipped docs approved no-op |
+
+### 最終検証コマンド（Final Validation Evidence）
+| コマンド | 結果 | メモ |
+|---|---|---|
+| `git diff --check` | passed | whitespace check |
+| `./spec-dock/scripts/spec-dock validate` | passed | `spec-dock: ok (validate) nodes=136` |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_219 or issue_187_s420 or issue_187_s430 or github-pr-observation or pr_observation"` | 87 passed, 358 deselected | final focused PR observation regression subset |
+| `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets` | 2 passed | final unit parity correction verification |
+| `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_182_s03_wait_preserves_legacy_review_status_without_decision_surface -vv` | 1 passed | isolated rerun after one full-suite short-timeout failure |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_182_s03_wait_preserves_legacy_review_status_without_decision_surface or issue_182_s03_wait"` | 7 passed, 438 deselected | related wait subset stability check |
+| `uv run pytest tests/unit` | 720 passed | final full unit rerun after parity correction and short-timeout rerun |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | pending | pending | pending |
+| qa-reviewer `019ee347-9ca5-7193-8bdf-50e02f320ec7` | whole issue obligation coverage | integration/manual PR observation risk explicitly deferred to PR monitoring | tc-001..tc-010 covered by regression tests, docs, full unit evidence, and report closure | passed |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | pending | 0 | pending |
+| code-reviewer `019ee347-cc0d-7c53-a6db-9c910ece579b` | issue-wide integrated diff | no findings | 0 | passed |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | pending | 0 | pending |
+| spec-reviewer `019ee34b-26e0-7841-88bf-0b57cb2ad005` | requirement / design / plan / report / implementation / tests / docs alignment | previous fail fixed: stale S99 gate rows, stale implementation summary, stale delegated plan provenance | 1 | passed |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| pending | pending | final response / PR | pending |
+| S90/S99 parity correction and final local validation ledger | `.agents` mirror runtime sync, dogfooding meta baseline update, final report evidence | PR body / final response; PR observation manual test after PR creation | committed in final local ledger commit |
 
 ## 実行引き渡し準備（Execution Handoff Readiness）
 
@@ -381,4 +410,4 @@ result: no output, exit 0
 - Plan authoring では Issue219 regression を first-class closure とし、guard-under / guard-satisfied / trusted-completion / current-selected priority の matrix を分ける。
 
 ## 省略/例外メモ
-- Supersedes authoring-phase status note: S01/S02 は step review 後にコミット済み。S03 は spec-review pass 後の commit gate 中。S90/final quality gate、PR delivery gate、merge preparation gate は未実施。
+- Supersedes authoring-phase status note: S01/S02/S03/S90/S99 local gates are committed. PR delivery gate、merge preparation gate、PR observation manual test は未実施。
