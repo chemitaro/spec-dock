@@ -237,9 +237,12 @@ status collection are implemented by the public scripts.
   final status in the human gate path with
   `manual_review_required_non_retryable` and does not promote a run to
   `passed`, complete, or `merge_prepared`.
-- `fallback_pass_candidate` is a non-promoting signal that a current-boundary
-  fallback issue comment appears positive. It is useful context, but it does not
-  override the `fallback_issue_comment` gate.
+- `fallback_pass_candidate` is normally non-promoting context for a
+  current-boundary fallback issue comment. It can promote the top-level result
+  only when `promotes_top_level_status=true` after the strict no-findings
+  contract and all CI, PR metadata, head freshness, unresolved review,
+  changes-requested review, draft/non-open PR, stale head, and blocking
+  limitation checks have been integrated.
 - S102 is deferred until there is an explicit no-findings artifact contract.
   Generic issue comments, zero selected comments, or review request disappearance
   alone must not mark review completion.
