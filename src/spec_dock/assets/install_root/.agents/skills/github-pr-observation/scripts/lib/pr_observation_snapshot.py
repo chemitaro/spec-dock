@@ -368,14 +368,14 @@ def classify_snapshot(
                 return "unknown", "fix_github_token_permissions", False, "blocking_limitation"
             return "unknown", "human_gate", False, "blocking_limitation"
         return str(ci_status), "wait", False, "ci_pending"
+    if ci_status == "passed" and actionable_reason:
+        return "human_gate", "address_review_feedback", True, actionable_reason
     if has_permission_limitation(limitations):
         return "unknown", "fix_github_token_permissions", False, "blocking_limitation"
     if has_blocking_limitation(limitations):
         return "unknown", "human_gate", False, "blocking_limitation"
     if ci_status != "passed":
         return "unknown", "human_gate", False, "blocking_limitation"
-    if ci_status == "passed" and actionable_reason:
-        return "human_gate", "address_review_feedback", True, actionable_reason
     if decision_status_reason == "current_selected_changes_requested" or selected_changes_requested_evidence:
         return "human_gate", "address_review_feedback", True, "current_selected_changes_requested"
     fallback_pass_candidate = decision.get("fallback_pass_candidate")
