@@ -21,17 +21,17 @@ reflected_to: []
 - Repository: chemitaro/spec-dock
 - Base branch: main
 - Head branch: iss-00218-codex-review-fallback-signal-semantics
-- Latest head SHA: fa33c967197a6195c66f7bfc05247f1d901d8bc7
+- Latest head SHA: a95205ca1eba5e6f2de4311d82e325bcf6dff318
 - Observation command: manual polling with `gh api`, `gh pr checks`, `gh pr view`, and `sleep`; observation scripts intentionally not used because the current script is known broken in this workflow.
-- Observation final JSON / evidence: PR review 4536548634, inline comments 3445490964, 3445490965, 3445490966, unresolved non-outdated review thread count 3.
-- Observation status: Codex review completed for latest head with 3 actionable inline findings; CI checks pass; PR is open and mergeStateStatus=CLEAN.
-- Trigger comment id: 4756519816
-- Trigger created_at: 2026-06-20T04:52:47Z
-- Trigger boundary: latest manual `@codex review` comment for head fa33c967197a6195c66f7bfc05247f1d901d8bc7
+- Observation final JSON / evidence: PR review 4536607835, inline comment 3445541880, latest trigger comment 4756627312. Previous review comments 3445490964, 3445490965, and 3445490966 were covered by U003.
+- Observation status: Latest-head Codex review completed with 1 new actionable inline finding; provider-tests still pending at observation time.
+- Trigger comment id: 4756627312
+- Trigger created_at: 2026-06-20T05:43:24Z
+- Trigger boundary: latest manual `@codex review` comment for head a95205ca1eba5e6f2de4311d82e325bcf6dff318
 - Resume metadata: N/A; this batch starts from a completed latest-head Codex review, not a timeout continuation.
 - New trigger approved: yes, explicitly requested by user for this manual polling loop.
 - Observation limitation: automated observation script not used; direct GitHub REST/GraphQL polling succeeded after occasional connection retries.
-- Batch status: implemented; re-observation pending.
+- Batch status: U003 implemented and re-reviewed; U004 implemented; re-observation pending.
 
 ## Batch Purpose
 
@@ -42,6 +42,7 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 | concern_id | concern | related_inventory_ids | suspected_root_cause | repair_unit | notes |
 | --- | --- | --- | --- | --- | --- |
 | C001 | No-findings issue comment promotion can overstate review completion | I001, I002, I003 | The no-findings promotion branch lacks a strict trusted Codex author gate, treats some branch-protection review-required states too narrowly, and does not expose the specific status reason when the medium-confidence issue-comment transport is promoted. | U003 | Same root cause and same function surface; one unit is sufficient. |
+| C002 | Partial review thread collection can still allow no-findings promotion | I004 | `blocking_collection_failure` enumerates some blocking limitation codes but omits `thread_state_partial`, despite that limitation being emitted with severity `blocking`. | U004 | Same no-findings promotion branch; distinct collection-limitation root cause from U003. |
 
 ## Inventory
 
@@ -50,6 +51,7 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 | I001 | codex_review_inline_comment | C001 | review_feedback:no-findings-promotion-blockers | comment 3445490964 line 1046 | Require exact trusted Codex login before allowing no-findings issue comments to promote completion. | valid | blocking | yes | fix-now | U003 | implemented | Substring author matching can classify unrelated users/bots as Codex-authored and incorrectly promote completion. | None after exact allow-list and regression test. |
 | I002 | codex_review_inline_comment | C001 | review_feedback:no-findings-promotion-blockers | comment 3445490965 line 1333 | Report `codex_no_findings_issue_comment` as the decision status reason when that branch promotes. | valid | minor | yes | fix-now | U003 | implemented | The contract distinguishes completion transports; consumers should not infer this from secondary fields only. | None after decision reason assertion. |
 | I003 | codex_review_inline_comment | C001 | review_feedback:no-findings-promotion-blockers | comment 3445490966 line 1081 | Block no-findings promotion when GitHub reports `REVIEW_REQUIRED`, including cases with requested reviewers or teams. | valid | blocking | yes | fix-now | U003 | implemented | Branch protection review-required state is an explicit blocker even when requested reviewer metadata is present. | None after review-required/requested-reviewer regression test. |
+| I004 | codex_review_inline_comment | C002 | review_feedback:partial-thread-collection-blocker | comment 3445541880 line 1086 | Block no-findings pass when thread collection is partial. | valid | blocking | yes | fix-now | U004 | implemented | A partial thread collection can miss unresolved threads, so it must block promotion like other blocking limitations. | None after blocking severity gate and regression test. |
 
 ## Classification Values
 
@@ -76,11 +78,25 @@ Use this batch to triage review findings, CI failures, merge blockers, and obser
 - Rationale: one localized implementation and focused regressions can close all three findings without changing the submitted-review completion path.
 - Residual risk: trusted login allow-list may need expansion if GitHub changes the Codex bot login; current evidence from PR #220 uses `chatgpt-codex-connector[bot]`.
 
+### C002
+
+- Covered inventory IDs: I004
+- Validity analysis: valid. `thread_state_partial` is emitted with `severity=blocking`, but the current blocker predicate filters by explicit codes and omits it.
+- Need-to-fix decision: yes. Missing review threads are materially unsafe for a no-findings pass because unresolved feedback may be hidden behind incomplete pagination.
+- Root cause: the collector has both severity and code, but no-findings promotion used a narrow allow-list of blocking codes rather than treating all blocking collection limitations as blockers.
+- Options considered:
+  - Add `thread_state_partial` to the existing allow-list. Minimal but preserves a brittle list that can miss future blocking limitations.
+  - Treat every limitation with `severity=blocking` as `blocking_collection_failure`. Simpler and matches the meaning of the field.
+- Recommended disposition: fix-now through U004.
+- Rationale: the no-findings pass should be impossible whenever the collector itself says a blocking limitation exists.
+- Residual risk: if future blocking limitations are intentionally non-collection, they will still block no-findings pass; that is acceptable for a decision-facing pass.
+
 ## Repair Queue
 
 | unit_id | source_batch | covered_ids | disposition | risk_class | repair_unit_disc | status | Implementation Plan | Re-observation Result | Residual Risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | U003 | 20260620t051224z-pr-repair-batch | I001, I002, I003 | fix-now | blocking | 20260620t051223z-disc-pr-repair-unit-u003-no-findings-promotion-blockers.md | implemented | Implemented exact trusted Codex login, review-required blocker, no-findings status reason, mirror parity, and regressions. | Pending latest-head re-observation after commit and push. | Bot login allow-list may need future update if GitHub changes Codex identity. |
+| U004 | 20260620t051224z-pr-repair-batch | I004 | fix-now | blocking | 20260620t055054z-disc-pr-repair-unit-u004-thread-state-partial-blocker.md | implemented | Treated all blocking limitations as no-findings promotion blockers and added a partial-thread regression. | Pending latest-head re-observation after commit and push. | Future non-blocking limitations must not use `severity=blocking`. |
 
 ## Unit Discussion Plan
 
