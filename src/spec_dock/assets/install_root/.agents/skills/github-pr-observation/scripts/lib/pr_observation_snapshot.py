@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+PR_METADATA_FIELDS = "headRefOid,url,state,isDraft,number,mergeable"
+
 
 @dataclass(frozen=True)
 class Args:
@@ -161,7 +163,7 @@ def pr_metadata_failure_limitation(
     stderr_sha256 = hashlib.sha256((stderr or "").encode()).hexdigest()
     base = {
         "capability": "pull_request_read",
-        "api": "gh pr view --json headRefOid,url,state,isDraft,number",
+        "api": f"gh pr view --json {PR_METADATA_FIELDS}",
         "source": "gh_pr_view",
         "token_source": token_source(),
         "secret_redacted": True,
@@ -315,6 +317,13 @@ def has_permission_limitation(limitations: list[object]) -> bool:
     )
 
 
+def mergeability_status(metadata: dict[str, object]) -> str | None:
+    value = metadata.get("mergeable")
+    if not isinstance(value, str) or not value:
+        return None
+    return value.upper()
+
+
 def classify_snapshot(
     *,
     summary: dict[str, object],
@@ -376,6 +385,11 @@ def classify_snapshot(
         return "unknown", "human_gate", False, "blocking_limitation"
     if ci_status != "passed":
         return "unknown", "human_gate", False, "blocking_limitation"
+    mergeable = mergeability_status(metadata)
+    if mergeable == "CONFLICTING":
+        return "human_gate", "resolve_merge_conflict", False, "pr_merge_conflict"
+    if mergeable != "MERGEABLE":
+        return "human_gate", "human_gate", False, "pr_mergeability_unknown"
     if decision_status_reason == "current_selected_changes_requested" or selected_changes_requested_evidence:
         return "human_gate", "address_review_feedback", True, "current_selected_changes_requested"
     fallback_pass_candidate = decision.get("fallback_pass_candidate")
@@ -445,7 +459,7 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
     gh_stdout = tmp_dir / "gh-pr-view.json"
     gh_stderr = tmp_dir / "gh-pr-view.stderr"
     gh_exit = run_to_files(
-        ["gh", "pr", "view", str(args.pr), "--repo", args.repo, "--json", "headRefOid,url,state,isDraft,number"],
+        ["gh", "pr", "view", str(args.pr), "--repo", args.repo, "--json", PR_METADATA_FIELDS],
         gh_stdout,
         gh_stderr,
     )
@@ -497,7 +511,7 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
                 review_args.extend(["--out", args.out_dir])
             review_exit = run_to_files(review_args, review_stdout, review_stderr)
             final_gh_exit = run_to_files(
-                ["gh", "pr", "view", str(args.pr), "--repo", args.repo, "--json", "headRefOid,url,state,isDraft,number"],
+                ["gh", "pr", "view", str(args.pr), "--repo", args.repo, "--json", PR_METADATA_FIELDS],
                 final_gh_stdout,
                 final_gh_stderr,
             )
