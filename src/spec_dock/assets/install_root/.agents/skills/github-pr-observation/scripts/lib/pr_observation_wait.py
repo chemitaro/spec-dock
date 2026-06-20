@@ -1507,14 +1507,30 @@ while True:
     if snapshot_poll_timed_out and latest_payload is not None:
         payload = latest_payload
         carryover_missing_completion_wait = is_carryover_missing_completion_wait(payload)
+        carryover_trigger_age_seconds = age_seconds_from_timestamp(
+            trigger_created_at_for_latency(payload, trigger_created_at)
+        )
+        carryover_ci_passed_age_seconds = (
+            int(max(0, time.monotonic() - ci_passed_first_monotonic))
+            if ci_passed_first_monotonic is not None
+            else 0
+        )
+        carryover_latency_satisfied = (
+            carryover_trigger_age_seconds >= REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS
+            and carryover_ci_passed_age_seconds >= REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS
+        )
         append_snapshot_poll_timeout_limitation(
             payload,
             snapshot_timeout,
             snapshot_stdout,
             snapshot_stderr,
-            severity="warning" if carryover_missing_completion_wait else "blocking",
+            severity=(
+                "warning"
+                if carryover_missing_completion_wait and not carryover_latency_satisfied
+                else "blocking"
+            ),
         )
-        if not carryover_missing_completion_wait:
+        if not carryover_missing_completion_wait or carryover_latency_satisfied:
             mark_latest_timeout(payload, latest_change_monotonic, same_count)
         snapshot_text = latest_snapshot_text
     elif snapshot_poll_timed_out:
