@@ -201,9 +201,11 @@ status collection are implemented by the public scripts.
   review objects. Issue comments, reactions, or quiet windows are fallback or
   supporting evidence only.
 - `review_completion_unknown` is a non-pass terminal-like review state. It means
-  CI passed, the observed head matched, the actionable review inventory was
-  empty, and no trusted Codex review completion signal was found after the
-  trigger-age and CI-passed-age guards are satisfied.
+  CI passed, the observed head matched, no current-boundary selected actionable
+  feedback exists, and no trusted Codex review completion signal was found after
+  the trigger-age and CI-passed-age guards are satisfied. It does not mean the
+  actionable review inventory is empty; carryover unresolved inventory can still
+  exist and must remain visible in the decision counts and IDs.
 - Stable no-completion evidence for the current boundary must not be collapsed
   into a generic timeout. The top-level result is `human_gate`, with the decision
   reason indicating `review_completion_unknown`, so a human can review the
@@ -212,6 +214,19 @@ status collection are implemented by the public scripts.
   merge-ready, and it is not proof that no review work exists. Below the latency
   guards, stable no-completion evidence stays in the wait/resume path instead of
   being promoted early.
+- Carryover-only plus missing current completion signal below the latency guards
+  is not `address_review_feedback`. It remains observation-continuation:
+  `wait_or_resume` with `missing_current_completion_signal`, while carryover IDs
+  remain available for audit and future classification.
+- After the latency guards are satisfied, carryover-only plus missing current
+  completion signal becomes `review_completion_unknown` with fresh-audit
+  metadata. Carryover IDs are still preserved; the unknown state is about the
+  missing current completion signal, not about erasing carryover inventory.
+- Trusted completion from a Codex-authored `submitted_pull_request_review` keeps
+  carryover unresolved inventory actionable. In that case, non-outdated
+  unresolved carryover threads remain
+  `carryover_non_outdated_unresolved_thread` feedback and the recommended next
+  action remains `address_review_feedback`.
 - When `review_completion_unknown` is emitted, wait metadata marks that a fresh
   post-unknown audit is required before any merge-prepared or no-review-work
   reporting. Downstream orchestration must perform that fresh audit instead of
@@ -229,8 +244,10 @@ status collection are implemented by the public scripts.
   Generic issue comments, zero selected comments, or review request disappearance
   alone must not mark review completion.
 - `selected_unresolved_count == 0` only means no current-boundary unresolved
-  feedback was selected. It does not prove that no actionable review work exists;
-  inspect `decision.actionable_unresolved_count`,
+  feedback was selected. Keep current selected counts separate from
+  carryover/actionable counts: zero current selected feedback can coexist with
+  non-zero carryover unresolved inventory. Inspect
+  `decision.actionable_unresolved_count`,
   `decision.current_selected_unresolved_count`,
   `decision.carryover_unresolved_count`, and the corresponding IDs before
   reporting no review work.

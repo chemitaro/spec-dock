@@ -263,6 +263,72 @@ result: passed
 |---|---|---|---|
 | S02 | commit required | S02 provider runtime and S02 report evidence | pending |
 
+### セッションログ（2026-06-20 execution S03 Skill Docs / Mirror Resolution）
+
+#### 対象
+- Phase: implementation step S03 Skill Docs / Mirror Resolution
+- AC/EC: AC-006
+- Closure ids: tc-006 plus docs side of tc-001, tc-003, tc-004
+
+#### Implementation Delegation Gate
+| ステップ | 委任ロール | 許可 path | 禁止範囲 | 結果 |
+|---|---|---|---|---|
+| S03 | doc-writer `019ee329-4e08-7463-9359-c62078d9245f` | provider and `.agents` mirror `github-pr-observation/SKILL.md` | runtime/tests/GitHub/stage/commit/report | completed |
+
+#### Delegated Worker Evidence
+| 項目 | 証跡 |
+|---|---|
+| Worker summary | `review_completion_unknown` を current-boundary selected feedback と carryover inventory の二軸で読めるよう skill docs を更新 |
+| Changed files | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md`, `.agents/skills/github-pr-observation/SKILL.md` |
+| Provider/mirror decision | provider source-of-truth と dogfooding mirror を同一文面で同期更新 |
+| Ledger Note | No material implementation decisions beyond the approved plan. |
+
+#### Docs Impact Resolution
+- `review_completion_unknown` は actionable inventory empty ではなく、current-boundary selected actionable feedback がなく trusted completion signal も確認できない状態だと明記した。
+- Carryover-only + missing completion + latency guard 未満は `address_review_feedback` ではなく `wait_or_resume` / `missing_current_completion_signal` の観測継続だと明記した。
+- Latency guard 満了後は carryover IDs を保持したまま `review_completion_unknown` と fresh-audit metadata になると明記した。
+- Trusted completion + carryover unresolved は `carryover_non_outdated_unresolved_thread` / `address_review_feedback` になると明記した。
+- `selected_unresolved_count == 0` は current selected feedback のみに関する count であり、carryover/actionable counts と分けて読むよう補強した。
+
+#### 実行コマンド / 結果
+```bash
+git diff -- src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md .agents/skills/github-pr-observation/SKILL.md
+
+result: provider and mirror show identical wording changes
+```
+
+```bash
+git diff --no-index -- src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md .agents/skills/github-pr-observation/SKILL.md
+
+result: no output, exit 0
+```
+
+#### Step Contract Closure
+| closure id | S03 証跡 | 状態 |
+|---|---|---|
+| tc-006 | provider/mirror skill docs explain lifecycle/inventory split, unknown semantics, guard-under wait, trusted-completion carryover feedback | closed |
+| tc-001 docs side | guard-under carryover-only remains wait/resume guidance added | closed |
+| tc-003 docs side | guard-satisfied carryover-only unknown with preserved IDs and fresh audit metadata guidance added | closed |
+| tc-004 docs side | trusted completion plus carryover feedback guidance added | closed |
+
+#### Test Contract Closure
+- S03 は docs-only step のため pytest は実行していない。
+- Provider/mirror equality は `git diff --no-index` で確認した。
+
+#### Closure Delta
+- `review_completion_unknown` wording から actionable inventory empty の含意を除去した。
+- Provider/mirror drift は残していない。
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | spec review | spec-reviewer `019ee32b-7e92-7a22-b564-d55afe22d896` | fresh | passed | P2 stale authoring-phase status note fixed before commit | S03 commit gate ready | provider/mirror docs align with S03 contract and S02 behavior |
+
+#### Step Commit Gate
+| ステップ | commit / no-op | 範囲 | 状態 |
+|---|---|---|---|
+| S03 | commit required | S03 skill docs/mirror and S03 report evidence | pending |
+
 ## 最終品質ゲート（Final Quality Gate）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
@@ -315,4 +381,4 @@ result: passed
 - Plan authoring では Issue219 regression を first-class closure とし、guard-under / guard-satisfied / trusted-completion / current-selected priority の matrix を分ける。
 
 ## 省略/例外メモ
-- 実装、step reviewer、step commit、final quality gate、PR delivery gate、merge preparation gate は未実施。現在は issue planning authoring phase。
+- Supersedes authoring-phase status note: S01/S02 は step review 後にコミット済み。S03 は spec-review pass 後の commit gate 中。S90/final quality gate、PR delivery gate、merge preparation gate は未実施。
