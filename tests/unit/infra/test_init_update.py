@@ -19948,6 +19948,33 @@ esac
         ] == []
         assert "repos/owner/repo/compare/main...feature" in gh_calls
 
+    def test_issue_222_pr_observation_snapshot_workflow_name_only_required_context_does_not_pass(self) -> None:
+        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch": {"name": "main", "protected": True},
+                "branch_protection": {
+                    "required_status_checks": {
+                        "contexts": [],
+                        "checks": [{"context": "CI", "app_id": 15368}],
+                    }
+                },
+            }
+        )
+
+        limitation_codes = [item["code"] for item in payload["limitations"]]
+        assert payload["ci"]["status"] == "passed"
+        assert payload["normalized_status"] == "unknown"
+        assert payload["recommended_next_action"] == "human_gate"
+        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
+        assert "required_actions_context_unobserved" in limitation_codes
+        protection = payload["merge_blocker_metadata"]["branch_protection"]
+        assert protection["observed_successful_actions_contexts"] == ["test"]
+        assert protection["missing_required_status_contexts"] == ["CI"]
+
     def test_issue_222_pr_observation_snapshot_checks_classification_overrides_duplicate_contexts(self) -> None:
         payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
             {
@@ -20268,7 +20295,7 @@ esac
         assert "required_actions_context_pending" not in limitation_codes
         protection = metadata["branch_protection"]
         assert protection["missing_required_status_contexts"] == []
-        assert protection["observed_successful_actions_contexts"] == ["CI", "deploy", "test"]
+        assert protection["observed_successful_actions_contexts"] == ["deploy", "test"]
         assert ("repos/owner/repo/actions/runs/202/jobs", True) in calls
 
     def test_issue_222_pr_observation_snapshot_expands_paginated_jobs_json_documents(self) -> None:
@@ -20379,7 +20406,7 @@ esac
         assert parsed_exit == 0
         assert parsed_jobs_payload["total_count"] == 2
         assert protection["missing_required_status_contexts"] == []
-        assert protection["observed_successful_actions_contexts"] == ["CI", "deploy", "test"]
+        assert protection["observed_successful_actions_contexts"] == ["deploy", "test"]
         assert "required_actions_context_pending" not in limitation_codes
         assert "required_actions_context_unobserved" not in limitation_codes
         assert ("repos/owner/repo/actions/runs/202/jobs", True) in calls
@@ -20538,6 +20565,35 @@ esac
             "dismiss_stale_reviews": True,
             "require_code_owner_reviews": False,
             "require_last_push_approval": True,
+        }
+
+    def test_issue_222_pr_observation_snapshot_locked_branch_blocks_merge_prepared(self) -> None:
+        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch": {"name": "main", "protected": True},
+                "branch_protection": {
+                    "required_status_checks": {
+                        "strict": False,
+                        "contexts": [],
+                        "checks": [{"context": "test", "app_id": 15368}],
+                    },
+                    "lock_branch": {"enabled": True},
+                },
+            }
+        )
+
+        limitation_codes = [item["code"] for item in payload["limitations"]]
+        assert payload["ci"]["status"] == "passed"
+        assert payload["normalized_status"] == "unknown"
+        assert payload["recommended_next_action"] == "human_gate"
+        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
+        assert "protected_branch_locked" in limitation_codes
+        assert payload["merge_blocker_metadata"]["branch_protection"]["lock_branch"] == {
+            "enabled": True
         }
 
     def test_issue_222_pr_observation_snapshot_branch_protection_permission_denied_is_optional_metadata(self) -> None:
