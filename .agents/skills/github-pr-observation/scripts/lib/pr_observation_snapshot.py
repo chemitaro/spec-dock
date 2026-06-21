@@ -530,6 +530,8 @@ def classify_snapshot(
         return "unknown", "fix_github_token_permissions", False, "blocking_limitation"
     if has_blocking_limitation(limitations):
         return "unknown", "human_gate", False, "blocking_limitation"
+    if ci_status == "passed" and has_waitable_required_actions_context_limitation(limitations):
+        return "pending", "wait", False, "ci_pending"
     if ci_status != "passed":
         return "unknown", "human_gate", False, "blocking_limitation"
     mergeable = mergeability_status(metadata)
