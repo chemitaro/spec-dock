@@ -19848,6 +19848,9 @@ esac
     def _issue_222_run_observation_snapshot_scenario(
         self,
         scenario: dict[str, object],
+        *,
+        extra_args: list[str] | None = None,
+        extra_env: dict[str, str] | None = None,
     ) -> tuple[dict[str, object], str]:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -19876,10 +19879,20 @@ esac
                 "GH_FAKE_WAIT_SCENARIO": str(scenario_path),
                 "GH_FAKE_WAIT_STATE": str(state_path),
                 "GH_FAKE_LOG": str(gh_log),
+                **(extra_env or {}),
             }
 
             result = subprocess.run(
-                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    *(extra_args or []),
+                ],
                 env=env,
                 capture_output=True,
                 text=True,
@@ -19888,6 +19901,147 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             return json.loads(result.stdout), gh_log.read_text(encoding="utf-8")
+
+    def test_issue_222_pr_observation_snapshot_can_skip_optional_merge_blocker_metadata(self) -> None:
+        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch": {"name": "main", "protected": True},
+                "branch_protection": {
+                    "required_status_checks": {
+                        "contexts": [],
+                        "checks": [{"context": "test", "app_id": 15368}],
+                    }
+                },
+            },
+            extra_env={"OBS_SKIP_OPTIONAL_MERGE_BLOCKER_METADATA": "1"},
+        )
+
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["merge_blocker_metadata"]["skipped"] is True
+        assert payload["merge_blocker_metadata"]["skip_reason"] == (
+            "optional_metadata_deferred_during_wait_poll"
+        )
+        assert "repos/owner/repo/branches/main" not in gh_calls
+        assert "repos/owner/repo/branches/main/protection" not in gh_calls
+        assert "repos/owner/repo/compare/main...feature" not in gh_calls
+        assert "optional_metadata_deferred_during_wait_poll" not in [
+            item.get("code") for item in payload["limitations"] if isinstance(item, dict)
+        ]
+
+    def test_issue_222_pr_observation_wait_defers_optional_merge_blocker_metadata_until_final_snapshot(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            scenario_path = tmp_path / "scenario.json"
+            state_path = tmp_path / "state.txt"
+            gh_log = tmp_path / "gh.log"
+            scenario_path.write_text(
+                json.dumps([
+                    {
+                        "head": "a" * 40,
+                        "ci": "passed",
+                        "review": "approved",
+                        "mergeable": "MERGEABLE",
+                        "branch": {"name": "main", "protected": True},
+                        "branch_protection": {
+                            "required_status_checks": {
+                                "contexts": [],
+                                "checks": [{"context": "test", "app_id": 15368}],
+                            },
+                            "required_signatures": {"enabled": True},
+                        },
+                    },
+                    {
+                        "head": "a" * 40,
+                        "ci": "passed",
+                        "review": "approved",
+                        "mergeable": "MERGEABLE",
+                        "branch": {"name": "main", "protected": True},
+                        "branch_protection": {
+                            "required_status_checks": {
+                                "contexts": [],
+                                "checks": [{"context": "test", "app_id": 15368}],
+                            },
+                            "required_signatures": {"enabled": True},
+                        },
+                    },
+                ]),
+                encoding="utf-8",
+            )
+            self._issue_75_write_pr_observation_wait_fake_gh(
+                fake_gh,
+                scenario_path=scenario_path,
+                state_path=state_path,
+                log_path=gh_log,
+            )
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_WAIT_SCENARIO": str(scenario_path),
+                "GH_FAKE_WAIT_STATE": str(state_path),
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                    "--timeout-seconds",
+                    "6",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "2",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            gh_calls = gh_log.read_text(encoding="utf-8").splitlines()
+
+        assert payload["wait"]["polls"] >= 2
+        assert payload["normalized_status"] == "unknown"
+        assert payload["recommended_next_action"] == "human_gate"
+        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
+        assert payload["merge_blocker_metadata"]["branch_protection"]["required_signatures"] == {
+            "enabled": True,
+        }
+        assert "required_signatures_unverified" in [
+            item.get("code") for item in payload["limitations"] if isinstance(item, dict)
+        ]
+        assert gh_calls.count("api repos/owner/repo/branches/main") == 1
+        assert gh_calls.count("api repos/owner/repo/branches/main/protection") == 1
+        assert gh_calls.count("api repos/owner/repo/compare/main...feature") == 0
 
     def test_issue_222_pr_observation_snapshot_required_actions_context_missing_blocks_merge_prepared(self) -> None:
         payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
