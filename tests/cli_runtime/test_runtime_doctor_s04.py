@@ -678,7 +678,11 @@ class TestRuntimeDoctorS04:
             "pull_review_comments_read",
         ]
         rendered_commands = "\n".join(" ".join(command) for command in commands)
-        assert "number,headRefOid,baseRefName,headRefName,headRepositoryOwner,mergeable" in rendered_commands
+        assert "number,headRefOid" in rendered_commands
+        assert "mergeable" not in rendered_commands
+        assert "baseRefName" not in rendered_commands
+        assert "headRefName" not in rendered_commands
+        assert "headRepositoryOwner" not in rendered_commands
         assert "repos/example/repo/compare/main...feature" not in rendered_commands
         assert "repos/example/repo/branches/main" not in rendered_commands
         assert "repos/example/repo/branches/main/protection" not in rendered_commands
@@ -686,7 +690,7 @@ class TestRuntimeDoctorS04:
         assert "/status" not in rendered_commands
         assert "statusCheckRollup" not in rendered_commands
 
-    def test_issue_222_s05_github_capability_cli_extended_probes_merge_blocker_metadata(
+    def test_issue_222_s05_github_capability_cli_extended_does_not_probe_merge_blocker_metadata(
         self, monkeypatch
     ) -> None:
         _runtime_app, app_contracts, _app_doctor, _app_ports, _infra_contracts = _runtime_modules()
@@ -724,15 +728,18 @@ class TestRuntimeDoctorS04:
             )
         )
 
-        assert [diagnostic.capability for diagnostic in diagnostics][-3:] == [
-            "compare_read",
-            "branch_metadata_read",
-            "branch_protection_read",
+        assert [diagnostic.capability for diagnostic in diagnostics] == [
+            "repo_metadata_read",
+            "pull_request_read",
+            "actions_read",
+            "issue_comments_read",
+            "pull_reviews_read",
+            "pull_review_comments_read",
         ]
         rendered_commands = "\n".join(" ".join(command) for command in commands)
-        assert "repos/example/repo/compare/release%2F1.0...feature%2Fdo-work" in rendered_commands
-        assert "repos/example/repo/branches/release%2F1.0" in rendered_commands
-        assert "repos/example/repo/branches/release%2F1.0/protection" in rendered_commands
+        assert "repos/example/repo/compare/" not in rendered_commands
+        assert "repos/example/repo/branches/" not in rendered_commands
+        assert "protection" not in rendered_commands
         assert "/check-runs" not in rendered_commands
         assert "/status" not in rendered_commands
         assert "statusCheckRollup" not in rendered_commands
