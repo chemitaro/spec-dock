@@ -73,6 +73,9 @@ GitHubCapability = Literal[
     "status_check_rollup_read",
     "actions_read",
     "issue_comments_read",
+    "pull_reviews_read",
+    "pull_review_comments_read",
+    "pull_review_threads_read",
     "trigger_comment_write",
 ]
 GitHubCapabilityStatus = Literal[

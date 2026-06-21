@@ -35,7 +35,7 @@ reflected_to: []
 
 ## Batch Purpose
 
-Use this batch to triage review findings, CI failures, merge blockers, and observation limitations after PR observation and before repair delegation. The batch separates validity from need-to-fix, groups related concerns, creates repair units when needed, and records residual risk for the final merge-prepared decision.
+Use this batch to triage review findings, observed GitHub Actions CI failures, merge blockers, and observation limitations after PR observation and before repair delegation. The batch separates validity from need-to-fix, groups related concerns, creates repair units when needed, and records residual risk for the final merge-prepared decision. PR observation intentionally does not observe external/non-Actions checks; record GitHub UI or external CI confirmation as residual risk or a human gate when branch protection depends on them.
 
 ## Concern Catalog
 
@@ -54,7 +54,7 @@ Add one row per real review finding, CI failure, merge blocker, or observation l
 ## Classification Values
 
 - `validity`: `valid` / `partially-valid` / `false-positive` / `duplicate` / `unknown`
-- `failure_class`: `check_failure:<job_or_check_name>` / `review_feedback:<topic>` / `merge_conflict` / `base_branch_conflict` / `permission_or_auth` / `external_or_flaky` / `timeout` / `unknown`
+- `failure_class`: `check_failure:<actions_job_or_workflow_name>` / `review_feedback:<topic>` / `merge_conflict` / `base_branch_conflict` / `permission_or_auth` / `external_or_flaky` / `timeout` / `unknown`
 - `risk_class`: `blocking` / `material-follow-up` / `minor` / `false-positive` / `duplicate`
 - `need_to_fix`: `yes` / `no` / `follow-up` / `human-decision`
 - `disposition`: `fix-now` / `follow-up` / `no-action` / `covered-by` / `needs-human`
@@ -125,8 +125,8 @@ Report `merge-prepared: yes` only when all conditions are true:
 
 - PR is open.
 - Latest head re-observation is complete and matches the latest head SHA.
-- No required check failure remains.
-- No non-required check failure remains unless the check is known optional or the user explicitly waived it; waived or optional non-required failures are recorded as residual risk.
+- No observed GitHub Actions CI failure remains.
+- External/non-Actions check state has either been confirmed outside PR observation or is recorded as a human gate/residual risk; do not treat missing Checks API/status rollup evidence as observed pass evidence.
 - No blocking review feedback remains.
 - No visible merge conflict or equivalent merge blocker remains.
 - No `untriaged` inventory item remains.

@@ -18,7 +18,8 @@ from ..application.contracts import GitHubCapabilityTokenSource
 @dataclass(frozen=True)
 class GitHubCapabilityCliGateway:
     def probe(self, request: GitHubCapabilityProbeRequest) -> list[GitHubCapabilityDiagnostic]:
-        checks: list[tuple[GitHubCapability, GitHubCapabilityGroup, str, list[str]]] = [
+        diagnostics: list[GitHubCapabilityDiagnostic] = []
+        fixed_checks: list[tuple[GitHubCapability, GitHubCapabilityGroup, str, list[str]]] = [
             (
                 "repo_metadata_read",
                 "core",
@@ -41,64 +42,102 @@ class GitHubCapabilityCliGateway:
                 ],
             ),
             (
-                "check_runs_read",
+                "actions_read",
                 "core",
-                "GET /repos/{repo}/commits/{sha}/check-runs",
-                [
-                    "gh",
-                    "api",
-                    f"repos/{request.github_repo}/commits/{request.github_head_sha}/check-runs",
-                    "--paginate",
-                ],
+                "GET /repos/{repo}/actions/runs",
+                ["gh", "api", f"repos/{request.github_repo}/actions/runs"],
             ),
             (
-                "commit_statuses_read",
+                "issue_comments_read",
                 "core",
-                "GET /repos/{repo}/commits/{sha}/status",
-                ["gh", "api", f"repos/{request.github_repo}/commits/{request.github_head_sha}/status"],
+                "GET /repos/{repo}/issues/{pr}/comments",
+                ["gh", "api", f"repos/{request.github_repo}/issues/{request.github_pr}/comments"],
             ),
             (
-                "status_check_rollup_read",
+                "pull_reviews_read",
                 "core",
-                "gh pr view --json statusCheckRollup",
-                [
-                    "gh",
-                    "pr",
-                    "view",
-                    str(request.github_pr),
-                    "--repo",
-                    request.github_repo,
-                    "--json",
-                    "statusCheckRollup",
-                ],
+                "GET /repos/{repo}/pulls/{pr}/reviews",
+                ["gh", "api", f"repos/{request.github_repo}/pulls/{request.github_pr}/reviews"],
             ),
+            (
+                "pull_review_comments_read",
+                "core",
+                "GET /repos/{repo}/pulls/{pr}/comments",
+                ["gh", "api", f"repos/{request.github_repo}/pulls/{request.github_pr}/comments"],
+            ),
+            _review_threads_graphql_check(request),
         ]
+        for capability, group, api, command in fixed_checks:
+            completed = _run_fixed_gh(command)
+            diagnostics.append(
+                _diagnostic_from_completed_process(
+                    capability=capability,
+                    group=group,
+                    api=api,
+                    completed=completed,
+                )
+            )
         if request.include_extended:
-            checks.extend(
-                [
-                    (
-                        "actions_read",
-                        "extended",
-                        "GET /repos/{repo}/actions/runs",
-                        ["gh", "api", f"repos/{request.github_repo}/actions/runs"],
-                    ),
-                    (
-                        "issue_comments_read",
-                        "extended",
-                        "GET /repos/{repo}/issues/{pr}/comments",
-                        ["gh", "api", f"repos/{request.github_repo}/issues/{request.github_pr}/comments"],
-                    ),
-                ]
-            )
-        return [
-            _diagnostic_from_completed_process(
-                capability=capability,
-                group=group,
-                api=api,
-                completed=_run_fixed_gh(command),
-            )
-            for capability, group, api, command in checks
-        ]
+            for capability, group, api, command in _extended_checks():
+                completed = _run_fixed_gh(command)
+                diagnostics.append(
+                    _diagnostic_from_completed_process(
+                        capability=capability,
+                        group=group,
+                        api=api,
+                        completed=completed,
+                    )
+                )
+        return diagnostics
+
+
+def _extended_checks(
+) -> list[tuple[GitHubCapability, GitHubCapabilityGroup, str, list[str]]]:
+    return []
+
+
+def _review_threads_graphql_check(
+    request: GitHubCapabilityProbeRequest,
+) -> tuple[GitHubCapability, GitHubCapabilityGroup, str, list[str]]:
+    owner, name = _github_repo_owner_name(request.github_repo)
+    query = (
+        "query($owner:String!,$name:String!,$number:Int!){"
+        "repository(owner:$owner,name:$name){"
+        "pullRequest(number:$number){"
+        "reviewDecision "
+        "reviewThreads(first:1){"
+        "nodes{id isResolved} "
+        "pageInfo{hasNextPage endCursor}"
+        "}"
+        "}"
+        "}"
+        "}"
+    )
+    return (
+        "pull_review_threads_read",
+        "core",
+        "GraphQL PullRequest.reviewDecision/reviewThreads",
+        [
+            "gh",
+            "api",
+            "graphql",
+            "-f",
+            f"owner={owner}",
+            "-f",
+            f"name={name}",
+            "-F",
+            f"number={request.github_pr}",
+            "-f",
+            f"query={query}",
+        ],
+    )
+
+
+def _github_repo_owner_name(github_repo: str) -> tuple[str, str]:
+    owner, separator, name = github_repo.partition("/")
+    if not separator:
+        return owner, ""
+    return owner, name
 
 
 def _run_fixed_gh(command: list[str]) -> subprocess.CompletedProcess[str]:
