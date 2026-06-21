@@ -784,21 +784,22 @@ def current_review_satisfies_simple_required_reviews(
     required_count = required_pull_request_reviews.get("required_approving_review_count")
     if not isinstance(required_count, int):
         return False
-    if required_count > 1:
-        return False
     if required_pull_request_reviews.get("dismiss_stale_reviews") is True:
         return False
     if required_pull_request_reviews.get("require_code_owner_reviews") is True:
         return False
     if required_pull_request_reviews.get("require_last_push_approval") is True:
         return False
-    status = review_payload.get("status")
-    if isinstance(status, str) and status.lower() == "approved":
+    if required_count == 0:
         return True
     decision = collector_decision_payload({}, review_payload)
     decision_status = decision.get("status")
     decision_action = decision.get("recommended_next_action")
-    return decision_status == "passed" and decision_action == "merge_prepared"
+    return (
+        decision_status == "passed"
+        and decision_action == "merge_prepared"
+        and decision.get("protected_required_reviews_satisfied") is True
+    )
 
 
 def head_owner_login(metadata: dict[str, object]) -> str | None:
@@ -846,32 +847,43 @@ def collect_merge_blocker_metadata(
         else quote(head_ref, safe="")
     )
     compare_api = f"repos/{repo}/compare/{encoded_base}...{encoded_head}"
-    compare_payload, compare_exit, compare_stderr = run_gh_api_json(compare_api)
-    compare_metadata: dict[str, object] = {"available": compare_exit == 0, "api": compare_api}
-    if compare_exit != 0:
-        limitations.append(
-            optional_github_api_failure_limitation(
-                api=compare_api,
-                source=compare_api,
-                capability="compare_read",
-                exit_code=compare_exit,
-                stderr=compare_stderr,
-                default_code="pr_compare_metadata_unavailable",
-                default_message="fixed compare metadata could not verify PR branch freshness",
+    compare_metadata: dict[str, object] = {
+        "available": False,
+        "api": compare_api,
+        "skipped": True,
+        "skip_reason": "strict_required_checks_not_proven",
+    }
+
+    def collect_compare_metadata() -> bool:
+        compare_metadata.pop("skipped", None)
+        compare_metadata.pop("skip_reason", None)
+        compare_payload, compare_exit, compare_stderr = run_gh_api_json(compare_api)
+        compare_metadata["available"] = compare_exit == 0
+        if compare_exit != 0:
+            limitations.append(
+                optional_github_api_failure_limitation(
+                    api=compare_api,
+                    source=compare_api,
+                    capability="compare_read",
+                    exit_code=compare_exit,
+                    stderr=compare_stderr,
+                    default_code="pr_compare_metadata_unavailable",
+                    default_message="fixed compare metadata could not verify PR branch freshness",
+                )
             )
-        )
-    elif not isinstance(compare_payload, dict):
-        compare_metadata["available"] = False
-        limitations.append(
-            {
-                "code": "pr_compare_metadata_unavailable",
-                "source": compare_api,
-                "severity": "warning",
-                "message": "fixed compare metadata returned an unexpected schema",
-                "recommended_next_action": "continue_with_available_metadata",
-            }
-        )
-    else:
+            return False
+        if not isinstance(compare_payload, dict):
+            compare_metadata["available"] = False
+            limitations.append(
+                {
+                    "code": "pr_compare_metadata_unavailable",
+                    "source": compare_api,
+                    "severity": "warning",
+                    "message": "fixed compare metadata returned an unexpected schema",
+                    "recommended_next_action": "continue_with_available_metadata",
+                }
+            )
+            return False
         status = compare_payload.get("status")
         behind_by = compare_payload.get("behind_by")
         ahead_by = compare_payload.get("ahead_by")
@@ -882,13 +894,13 @@ def collect_merge_blocker_metadata(
                 "ahead_by": ahead_by,
             }
         )
-    branch_is_behind = (
-        compare_metadata.get("status") in {"behind", "diverged"}
-        or (
-            isinstance(compare_metadata.get("behind_by"), int)
-            and compare_metadata.get("behind_by") > 0
+        return (
+            compare_metadata.get("status") in {"behind", "diverged"}
+            or (
+                isinstance(compare_metadata.get("behind_by"), int)
+                and compare_metadata.get("behind_by") > 0
+            )
         )
-    )
 
     def add_strict_behind_limitation(source: str) -> None:
         limitations.append(
@@ -977,7 +989,8 @@ def collect_merge_blocker_metadata(
             and required_status_checks.get("strict") is True
         )
         protection_metadata["strict"] = strict_required_checks
-        if branch_is_behind and strict_required_checks:
+        branch_is_behind = collect_compare_metadata() if strict_required_checks else False
+        if branch_is_behind:
             add_strict_behind_limitation(protection_api)
         lock_branch = (
             protection_payload.get("lock_branch")
@@ -999,6 +1012,29 @@ def collect_merge_blocker_metadata(
                     "capability": "branch_protection_read",
                     "severity": "blocking",
                     "message": "base branch protection marks the branch as locked/read-only",
+                    "recommended_next_action": "human_gate",
+                }
+            )
+        required_signatures = (
+            protection_payload.get("required_signatures")
+            if isinstance(protection_payload, dict)
+            else None
+        )
+        required_signatures_enabled = (
+            isinstance(required_signatures, dict)
+            and required_signatures.get("enabled") is True
+        )
+        protection_metadata["required_signatures"] = {
+            "enabled": required_signatures_enabled,
+        }
+        if required_signatures_enabled:
+            limitations.append(
+                {
+                    "code": "required_signatures_unverified",
+                    "source": protection_api,
+                    "capability": "commit_signature_verification",
+                    "severity": "blocking",
+                    "message": "branch protection requires signed commits that cannot be proven by the observation script",
                     "recommended_next_action": "human_gate",
                 }
             )
