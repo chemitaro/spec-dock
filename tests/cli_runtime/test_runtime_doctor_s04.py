@@ -463,6 +463,19 @@ class TestRuntimeDoctorS04:
                         stderr_sha256="ghi789",
                         group="core",
                     ),
+                    app_contracts.GitHubCapabilityDiagnostic(
+                        code="github_schema_unavailable",
+                        capability="pull_review_threads_read",
+                        status="schema_unavailable",
+                        token_source="gh_saved_auth",
+                        api="GraphQL PullRequest.reviewDecision/reviewThreads",
+                        severity="warning",
+                        message="GitHub review thread GraphQL schema is unavailable.",
+                        recommended_next_action="inspect_gh_version_or_api_schema",
+                        secret_redacted=True,
+                        stderr_sha256="jkl012",
+                        group="core",
+                    ),
                 ]
             )
             ports = app_ports.Ports(
@@ -486,12 +499,13 @@ class TestRuntimeDoctorS04:
             assert gateway.requests[0].include_extended is True
             text = _render_doctor_text(app_contracts, result)
             rendered = "\n".join(text.stdout_lines + text.stderr_lines + text.warnings)
-            assert "github capability diagnostics=3" in rendered
+            assert "github capability diagnostics=4" in rendered
             assert "[github:core]" in rendered
             assert "[github:extended]" not in rendered
             assert "capability=actions_read status=ok" in rendered
             assert "capability=pull_reviews_read status=rate_limited" in rendered
             assert "capability=issue_comments_read status=auth_missing" in rendered
+            assert "capability=pull_review_threads_read status=schema_unavailable" in rendered
             assert "check_runs_read" not in rendered
             assert "commit_statuses_read" not in rendered
             assert "status_check_rollup_read" not in rendered
@@ -676,9 +690,15 @@ class TestRuntimeDoctorS04:
             "issue_comments_read",
             "pull_reviews_read",
             "pull_review_comments_read",
+            "pull_review_threads_read",
         ]
         rendered_commands = "\n".join(" ".join(command) for command in commands)
         assert "number,headRefOid" in rendered_commands
+        assert "gh api graphql" in rendered_commands
+        assert "owner=example" in rendered_commands
+        assert "name=repo" in rendered_commands
+        assert "reviewDecision" in rendered_commands
+        assert "reviewThreads(first:1)" in rendered_commands
         assert "mergeable" not in rendered_commands
         assert "baseRefName" not in rendered_commands
         assert "headRefName" not in rendered_commands
@@ -735,8 +755,11 @@ class TestRuntimeDoctorS04:
             "issue_comments_read",
             "pull_reviews_read",
             "pull_review_comments_read",
+            "pull_review_threads_read",
         ]
         rendered_commands = "\n".join(" ".join(command) for command in commands)
+        assert "reviewDecision" in rendered_commands
+        assert "reviewThreads(first:1)" in rendered_commands
         assert "repos/example/repo/compare/" not in rendered_commands
         assert "repos/example/repo/branches/" not in rendered_commands
         assert "protection" not in rendered_commands

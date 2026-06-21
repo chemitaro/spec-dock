@@ -65,6 +65,7 @@ class GitHubCapabilityCliGateway:
                 "GET /repos/{repo}/pulls/{pr}/comments",
                 ["gh", "api", f"repos/{request.github_repo}/pulls/{request.github_pr}/comments"],
             ),
+            _review_threads_graphql_check(request),
         ]
         for capability, group, api, command in fixed_checks:
             completed = _run_fixed_gh(command)
@@ -93,6 +94,50 @@ class GitHubCapabilityCliGateway:
 def _extended_checks(
 ) -> list[tuple[GitHubCapability, GitHubCapabilityGroup, str, list[str]]]:
     return []
+
+
+def _review_threads_graphql_check(
+    request: GitHubCapabilityProbeRequest,
+) -> tuple[GitHubCapability, GitHubCapabilityGroup, str, list[str]]:
+    owner, name = _github_repo_owner_name(request.github_repo)
+    query = (
+        "query($owner:String!,$name:String!,$number:Int!){"
+        "repository(owner:$owner,name:$name){"
+        "pullRequest(number:$number){"
+        "reviewDecision "
+        "reviewThreads(first:1){"
+        "nodes{id isResolved} "
+        "pageInfo{hasNextPage endCursor}"
+        "}"
+        "}"
+        "}"
+        "}"
+    )
+    return (
+        "pull_review_threads_read",
+        "core",
+        "GraphQL PullRequest.reviewDecision/reviewThreads",
+        [
+            "gh",
+            "api",
+            "graphql",
+            "-f",
+            f"owner={owner}",
+            "-f",
+            f"name={name}",
+            "-F",
+            f"number={request.github_pr}",
+            "-f",
+            f"query={query}",
+        ],
+    )
+
+
+def _github_repo_owner_name(github_repo: str) -> tuple[str, str]:
+    owner, separator, name = github_repo.partition("/")
+    if not separator:
+        return owner, ""
+    return owner, name
 
 
 def _run_fixed_gh(command: list[str]) -> subprocess.CompletedProcess[str]:
