@@ -1717,68 +1717,91 @@ while True:
         )
     )
     if observation_complete and merge_blocker_metadata_skipped(payload):
-        full_snapshot_timeout = max(0.001, deadline - time.monotonic())
+        stable_normalized_status = normalized_status
+        stable_overall_status = overall_status
+        stable_next_action = next_action
+        stable_observation_complete = observation_complete
+        stable_terminal_now = terminal_now
+        full_snapshot_timeout = deadline - time.monotonic()
         full_snapshot_out_dir = None
         full_snapshot_args = list(snapshot_args)
         if out_dir:
             full_snapshot_out_dir = out_dir / "snapshots" / f"poll-{poll:04d}-full-artifacts"
             full_snapshot_args.extend(["--out", str(full_snapshot_out_dir)])
-        (
-            full_snapshot_exit,
-            full_snapshot_stdout,
-            full_snapshot_stderr,
-            full_snapshot_timed_out,
-        ) = run_snapshot(
-            full_snapshot_args,
-            full_snapshot_timeout,
-            {"OBS_SKIP_OPTIONAL_MERGE_BLOCKER_METADATA": "0"},
-        )
-        if full_snapshot_timed_out:
+        if full_snapshot_timeout < NEXT_SNAPSHOT_BUDGET_FLOOR_SECONDS:
             append_snapshot_poll_timeout_limitation(
                 payload,
                 full_snapshot_timeout,
+                "",
+                "",
+                severity="warning",
+                message="final optional merge blocker metadata snapshot skipped because wait deadline was reached",
+                deadline_reached=True,
+            )
+            normalized_status = stable_normalized_status
+            overall_status = stable_overall_status
+            next_action = stable_next_action
+            observation_complete = stable_observation_complete
+            terminal_now = stable_terminal_now
+        else:
+            (
+                full_snapshot_exit,
                 full_snapshot_stdout,
                 full_snapshot_stderr,
+                full_snapshot_timed_out,
+            ) = run_snapshot(
+                full_snapshot_args,
+                full_snapshot_timeout,
+                {"OBS_SKIP_OPTIONAL_MERGE_BLOCKER_METADATA": "0"},
             )
-            mark_latest_timeout(payload, latest_change_monotonic, same_count, quiet_elapsed)
-            normalized_status = "timeout"
-            overall_status = "timeout"
-            next_action = "wait_or_resume"
-            observation_complete = False
-            mark_decision_timeout(payload)
-        else:
-            full_snapshot_text = full_snapshot_stdout if full_snapshot_stdout else "{}\n"
-            try:
-                full_payload = json.loads(full_snapshot_text)
-                if not isinstance(full_payload, dict):
+            if full_snapshot_timed_out:
+                append_snapshot_poll_timeout_limitation(
+                    payload,
+                    full_snapshot_timeout,
+                    full_snapshot_stdout,
+                    full_snapshot_stderr,
+                    severity="warning",
+                    message="final optional merge blocker metadata snapshot exceeded the remaining wait deadline",
+                    deadline_reached=time.monotonic() >= deadline,
+                )
+                normalized_status = stable_normalized_status
+                overall_status = stable_overall_status
+                next_action = stable_next_action
+                observation_complete = stable_observation_complete
+                terminal_now = stable_terminal_now
+            else:
+                full_snapshot_text = full_snapshot_stdout if full_snapshot_stdout else "{}\n"
+                try:
+                    full_payload = json.loads(full_snapshot_text)
+                    if not isinstance(full_payload, dict):
+                        full_payload = fallback_snapshot(
+                            full_snapshot_exit,
+                            full_snapshot_text,
+                            full_snapshot_stderr,
+                        )
+                        full_snapshot_text = json.dumps(full_payload, sort_keys=True, separators=(",", ":")) + "\n"
+                except Exception:
                     full_payload = fallback_snapshot(
                         full_snapshot_exit,
                         full_snapshot_text,
                         full_snapshot_stderr,
                     )
                     full_snapshot_text = json.dumps(full_payload, sort_keys=True, separators=(",", ":")) + "\n"
-            except Exception:
-                full_payload = fallback_snapshot(
-                    full_snapshot_exit,
-                    full_snapshot_text,
-                    full_snapshot_stderr,
+                payload = full_payload
+                snapshot_text = full_snapshot_text
+                current_snapshot_out_dir = full_snapshot_out_dir
+                normalized_status, overall_status, next_action, can_complete_when_stable, terminal_now = classify(
+                    payload,
+                    poll,
+                    zero_check_grace_polls,
                 )
-                full_snapshot_text = json.dumps(full_payload, sort_keys=True, separators=(",", ":")) + "\n"
-            payload = full_payload
-            snapshot_text = full_snapshot_text
-            current_snapshot_out_dir = full_snapshot_out_dir
-            normalized_status, overall_status, next_action, can_complete_when_stable, terminal_now = classify(
-                payload,
-                poll,
-                zero_check_grace_polls,
-            )
-            observation_complete = bool(
-                can_complete_when_stable
-                and (
-                    not review_completion_unknown_candidate
-                    or review_completion_unknown_latency_satisfied
+                observation_complete = bool(
+                    can_complete_when_stable
+                    and (
+                        not review_completion_unknown_candidate
+                        or review_completion_unknown_latency_satisfied
+                    )
                 )
-            )
     elapsed = int(max(0, time.monotonic() - start_monotonic))
     remain = int(max(0, deadline - time.monotonic()))
     if observation_complete:
