@@ -14,6 +14,11 @@ from urllib.parse import quote
 PR_METADATA_FIELDS = "headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable"
 GITHUB_ACTIONS_APP_ID = 15368
 ANY_SOURCE_REQUIRED_CHECK_APP_ID = -1
+ACTIONS_SATISFIABLE_REQUIRED_CHECK_APP_IDS = {
+    GITHUB_ACTIONS_APP_ID,
+    ANY_SOURCE_REQUIRED_CHECK_APP_ID,
+    None,
+}
 
 
 @dataclass(frozen=True)
@@ -233,6 +238,34 @@ def github_api_failure_limitation(
         "message": default_message,
         "recommended_next_action": "human_gate",
     }
+
+
+def optional_github_api_failure_limitation(
+    *,
+    api: str,
+    source: str,
+    capability: str,
+    exit_code: int,
+    stderr: str,
+    default_code: str,
+    default_message: str,
+    recommended_next_action: str = "continue_with_available_metadata",
+) -> dict[str, object]:
+    limitation = github_api_failure_limitation(
+        api=api,
+        source=source,
+        capability=capability,
+        exit_code=exit_code,
+        stderr=stderr,
+        default_code=default_code,
+        default_message=default_message,
+    )
+    limitation["severity"] = "warning"
+    limitation["recommended_next_action"] = recommended_next_action
+    if limitation.get("code") == "github_token_permission_denied":
+        limitation["code"] = default_code
+    limitation["message"] = default_message
+    return limitation
 
 
 def is_not_found(stderr: str) -> bool:
@@ -739,7 +772,7 @@ def required_status_contexts(protection_payload: object) -> tuple[set[str], set[
             context = check.get("context")
             if not isinstance(context, str) or not context:
                 continue
-            if check.get("app_id") in {GITHUB_ACTIONS_APP_ID, ANY_SOURCE_REQUIRED_CHECK_APP_ID}:
+            if check.get("app_id") in ACTIONS_SATISFIABLE_REQUIRED_CHECK_APP_IDS:
                 actions_contexts.add(context)
             else:
                 non_actions_contexts.add(context)
@@ -793,7 +826,7 @@ def collect_merge_blocker_metadata(
     compare_metadata: dict[str, object] = {"available": compare_exit == 0, "api": compare_api}
     if compare_exit != 0:
         limitations.append(
-            github_api_failure_limitation(
+            optional_github_api_failure_limitation(
                 api=compare_api,
                 source=compare_api,
                 capability="compare_read",
@@ -809,9 +842,9 @@ def collect_merge_blocker_metadata(
             {
                 "code": "pr_compare_metadata_unavailable",
                 "source": compare_api,
-                "severity": "blocking",
+                "severity": "warning",
                 "message": "fixed compare metadata returned an unexpected schema",
-                "recommended_next_action": "human_gate",
+                "recommended_next_action": "continue_with_available_metadata",
             }
         )
     else:
@@ -896,13 +929,13 @@ def collect_merge_blocker_metadata(
         )
         if protection_exit != 0:
             limitations.append(
-                github_api_failure_limitation(
+                optional_github_api_failure_limitation(
                     api=protection_api,
                     source=protection_api,
                     capability="branch_protection_read",
                     exit_code=protection_exit,
                     stderr=protection_stderr,
-                    default_code="branch_protection_metadata_unavailable",
+                    default_code="branch_protection_read_optional",
                     default_message="fixed branch protection metadata could not be verified",
                 )
             )

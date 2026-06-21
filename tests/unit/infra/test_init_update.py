@@ -20033,6 +20033,35 @@ esac
         assert protection["required_non_actions_contexts"] == []
         assert protection["missing_required_status_contexts"] == []
 
+    def test_issue_222_pr_observation_snapshot_null_app_required_check_matched_allows_merge_prepared(self) -> None:
+        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch": {"name": "main", "protected": True},
+                "branch_protection": {
+                    "required_status_checks": {
+                        "contexts": [],
+                        "checks": [{"context": "test", "app_id": None}],
+                    }
+                },
+            }
+        )
+
+        limitation_codes = [item["code"] for item in payload["limitations"]]
+        assert payload["ci"]["status"] == "passed"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+        assert "required_non_actions_context_unprovable_by_actions" not in limitation_codes
+        assert "required_actions_context_unobserved" not in limitation_codes
+        protection = payload["merge_blocker_metadata"]["branch_protection"]
+        assert protection["required_github_actions_contexts"] == ["test"]
+        assert protection["required_non_actions_contexts"] == []
+        assert protection["missing_required_status_contexts"] == []
+
     def test_issue_222_pr_observation_snapshot_non_actions_required_check_blocks_merge_prepared(self) -> None:
         payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
             {
@@ -20373,7 +20402,7 @@ esac
         assert "repos/owner/repo/compare/main...fork-owner:feature" in gh_calls
         assert "repos/owner/repo/compare/main...feature" not in gh_calls
 
-    def test_issue_222_pr_observation_snapshot_compare_permission_denied_uses_compare_read_capability(self) -> None:
+    def test_issue_222_pr_observation_snapshot_compare_permission_denied_is_optional_metadata(self) -> None:
         payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
             {
                 "head": "a" * 40,
@@ -20385,17 +20414,18 @@ esac
             }
         )
 
-        permission_limitations = [
+        compare_limitations = [
             item
             for item in payload["limitations"]
-            if item.get("code") == "github_token_permission_denied"
+            if item.get("code") == "pr_compare_metadata_unavailable"
         ]
         assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "unknown"
-        assert payload["recommended_next_action"] == "fix_github_token_permissions"
-        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
-        assert permission_limitations
-        assert permission_limitations[0]["capability"] == "compare_read"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+        assert compare_limitations
+        assert compare_limitations[0]["capability"] == "compare_read"
+        assert compare_limitations[0]["severity"] == "warning"
 
     def test_issue_222_pr_observation_snapshot_unprotected_compare_behind_does_not_block_merge_prepared(self) -> None:
         payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
@@ -20510,7 +20540,7 @@ esac
             "require_last_push_approval": True,
         }
 
-    def test_issue_222_pr_observation_snapshot_branch_protection_permission_denied_blocks_merge_prepared(self) -> None:
+    def test_issue_222_pr_observation_snapshot_branch_protection_permission_denied_is_optional_metadata(self) -> None:
         payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
             {
                 "head": "a" * 40,
@@ -20522,19 +20552,20 @@ esac
             }
         )
 
-        permission_limitations = [
+        protection_limitations = [
             item
             for item in payload["limitations"]
-            if item.get("code") == "github_token_permission_denied"
+            if item.get("code") == "branch_protection_read_optional"
         ]
         assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "unknown"
-        assert payload["recommended_next_action"] == "fix_github_token_permissions"
-        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
-        assert permission_limitations
-        assert permission_limitations[0]["capability"] == "branch_protection_read"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+        assert protection_limitations
+        assert protection_limitations[0]["capability"] == "branch_protection_read"
+        assert protection_limitations[0]["severity"] == "warning"
 
-    def test_issue_222_pr_observation_snapshot_protected_branch_protection_404_blocks_merge_prepared(self) -> None:
+    def test_issue_222_pr_observation_snapshot_protected_branch_protection_404_is_optional_metadata(self) -> None:
         payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
             {
                 "head": "a" * 40,
@@ -20545,17 +20576,17 @@ esac
             }
         )
 
-        blocking_limitations = [
+        protection_limitations = [
             item
             for item in payload["limitations"]
-            if item.get("code") == "branch_protection_metadata_unavailable"
+            if item.get("code") == "branch_protection_read_optional"
         ]
         assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "unknown"
-        assert payload["recommended_next_action"] == "human_gate"
-        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
-        assert blocking_limitations
-        assert blocking_limitations[0]["severity"] == "blocking"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+        assert protection_limitations
+        assert protection_limitations[0]["severity"] == "warning"
         assert payload["merge_blocker_metadata"]["branch_protection"]["protected"] is True
         assert payload["merge_blocker_metadata"]["branch_protection"]["protection_available"] is False
         assert "repos/owner/repo/branches/main\n" in gh_calls
