@@ -651,14 +651,6 @@ def run_gh_api_json(path: str, *, paginate: bool = False) -> tuple[object, int, 
 def successful_actions_contexts(ci_payload: dict[str, object]) -> set[str]:
     actions = ci_payload.get("actions") if isinstance(ci_payload.get("actions"), dict) else {}
     contexts: set[str] = set()
-    for run in actions.get("runs", []) if isinstance(actions.get("runs"), list) else []:
-        if not isinstance(run, dict):
-            continue
-        name = run.get("name")
-        status = str(run.get("status") or "").lower()
-        conclusion = str(run.get("conclusion") or "").lower()
-        if isinstance(name, str) and name and status == "completed" and conclusion in {"success", "neutral", "skipped"}:
-            contexts.add(name)
     for job in actions.get("jobs", []) if isinstance(actions.get("jobs"), list) else []:
         if not isinstance(job, dict):
             continue
@@ -955,6 +947,29 @@ def collect_merge_blocker_metadata(
         protection_metadata["strict"] = strict_required_checks
         if branch_is_behind and strict_required_checks:
             add_strict_behind_limitation(protection_api)
+        lock_branch = (
+            protection_payload.get("lock_branch")
+            if isinstance(protection_payload, dict)
+            else None
+        )
+        lock_branch_enabled = (
+            isinstance(lock_branch, dict)
+            and lock_branch.get("enabled") is True
+        )
+        protection_metadata["lock_branch"] = {
+            "enabled": lock_branch_enabled,
+        }
+        if lock_branch_enabled:
+            limitations.append(
+                {
+                    "code": "protected_branch_locked",
+                    "source": protection_api,
+                    "capability": "branch_protection_read",
+                    "severity": "blocking",
+                    "message": "base branch protection marks the branch as locked/read-only",
+                    "recommended_next_action": "human_gate",
+                }
+            )
         required_pull_request_reviews = (
             protection_payload.get("required_pull_request_reviews")
             if isinstance(protection_payload, dict)
