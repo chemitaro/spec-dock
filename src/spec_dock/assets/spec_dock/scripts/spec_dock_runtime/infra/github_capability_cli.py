@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import subprocess
 from dataclasses import dataclass
-from urllib.parse import quote
 
 from ..application.contracts import GitHubCapability
 from ..application.contracts import GitHubCapabilityDiagnostic
@@ -40,7 +38,7 @@ class GitHubCapabilityCliGateway:
                     "--repo",
                     request.github_repo,
                     "--json",
-                    "number,headRefOid,baseRefName,headRefName,headRepositoryOwner,mergeable",
+                    "number,headRefOid",
                 ],
             ),
             (
@@ -68,11 +66,8 @@ class GitHubCapabilityCliGateway:
                 ["gh", "api", f"repos/{request.github_repo}/pulls/{request.github_pr}/comments"],
             ),
         ]
-        pr_metadata: dict[str, object] | None = None
         for capability, group, api, command in fixed_checks:
             completed = _run_fixed_gh(command)
-            if capability == "pull_request_read" and completed.returncode == 0:
-                pr_metadata = _json_object(completed.stdout)
             diagnostics.append(
                 _diagnostic_from_completed_process(
                     capability=capability,
@@ -82,7 +77,7 @@ class GitHubCapabilityCliGateway:
                 )
             )
         if request.include_extended:
-            for capability, group, api, command in _extended_checks(request, pr_metadata):
+            for capability, group, api, command in _extended_checks():
                 completed = _run_fixed_gh(command)
                 diagnostics.append(
                     _diagnostic_from_completed_process(
@@ -96,63 +91,8 @@ class GitHubCapabilityCliGateway:
 
 
 def _extended_checks(
-    request: GitHubCapabilityProbeRequest,
-    pr_metadata: dict[str, object] | None,
 ) -> list[tuple[GitHubCapability, GitHubCapabilityGroup, str, list[str]]]:
-    base_ref = _string_field(pr_metadata, "baseRefName")
-    head_ref = _string_field(pr_metadata, "headRefName")
-    if not base_ref or not head_ref:
-        return []
-    repo_owner = request.github_repo.split("/", 1)[0]
-    head_owner = _head_owner_login(pr_metadata) or repo_owner
-    compare_head = head_ref if head_owner == repo_owner else f"{head_owner}:{head_ref}"
-    encoded_base_ref = quote(base_ref, safe="")
-    encoded_compare_head = quote(compare_head, safe="")
-    return [
-        (
-            "compare_read",
-            "extended",
-            "GET /repos/{repo}/compare/{base}...{head}",
-            ["gh", "api", f"repos/{request.github_repo}/compare/{encoded_base_ref}...{encoded_compare_head}"],
-        ),
-        (
-            "branch_metadata_read",
-            "extended",
-            "GET /repos/{repo}/branches/{branch}",
-            ["gh", "api", f"repos/{request.github_repo}/branches/{encoded_base_ref}"],
-        ),
-        (
-            "branch_protection_read",
-            "extended",
-            "GET /repos/{repo}/branches/{branch}/protection",
-            ["gh", "api", f"repos/{request.github_repo}/branches/{encoded_base_ref}/protection"],
-        ),
-    ]
-
-
-def _json_object(text: str) -> dict[str, object] | None:
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
-def _string_field(payload: dict[str, object] | None, key: str) -> str | None:
-    if not payload:
-        return None
-    value = payload.get(key)
-    return value if isinstance(value, str) and value else None
-
-
-def _head_owner_login(payload: dict[str, object] | None) -> str | None:
-    if not payload:
-        return None
-    owner = payload.get("headRepositoryOwner")
-    if not isinstance(owner, dict):
-        return None
-    login = owner.get("login")
-    return login if isinstance(login, str) and login else None
+    return []
 
 
 def _run_fixed_gh(command: list[str]) -> subprocess.CompletedProcess[str]:

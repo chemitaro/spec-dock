@@ -9,16 +9,8 @@ import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import quote
 
-PR_METADATA_FIELDS = "headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable"
-GITHUB_ACTIONS_APP_ID = 15368
-ANY_SOURCE_REQUIRED_CHECK_APP_ID = -1
-ACTIONS_SATISFIABLE_REQUIRED_CHECK_APP_IDS = {
-    GITHUB_ACTIONS_APP_ID,
-    ANY_SOURCE_REQUIRED_CHECK_APP_ID,
-    None,
-}
+PR_METADATA_FIELDS = "headRefOid,url,state,isDraft,number"
 
 
 @dataclass(frozen=True)
@@ -30,7 +22,6 @@ class Args:
     trigger_created_at: str | None
     body_mode: str
     out_dir: str | None
-    skip_optional_merge_blocker_metadata: bool
 
 
 def parse_args(argv: list[str]) -> Args:
@@ -42,7 +33,6 @@ def parse_args(argv: list[str]) -> Args:
         "trigger_created_at": None,
         "body_mode": "trigger-window-truncated",
         "out_dir": None,
-        "skip_optional_merge_blocker_metadata": False,
     }
     idx = 0
     while idx < len(argv):
@@ -55,13 +45,8 @@ def parse_args(argv: list[str]) -> Args:
             "--trigger-created-at",
             "--body-mode",
             "--out",
-            "--skip-optional-merge-blocker-metadata",
         }:
             raise SystemExit(64)
-        if flag == "--skip-optional-merge-blocker-metadata":
-            values["skip_optional_merge_blocker_metadata"] = True
-            idx += 1
-            continue
         if idx + 1 >= len(argv):
             raise SystemExit(64)
         value = argv[idx + 1]
@@ -90,10 +75,6 @@ def parse_args(argv: list[str]) -> Args:
         trigger_created_at=values["trigger_created_at"],
         body_mode=str(values["body_mode"]),
         out_dir=values["out_dir"],
-        skip_optional_merge_blocker_metadata=(
-            bool(values["skip_optional_merge_blocker_metadata"])
-            or os.environ.get("OBS_SKIP_OPTIONAL_MERGE_BLOCKER_METADATA") == "1"
-        ),
     )
 
 
@@ -469,13 +450,6 @@ def has_waitable_required_actions_context_limitation(limitations: list[object]) 
     )
 
 
-def mergeability_status(metadata: dict[str, object]) -> str | None:
-    value = metadata.get("mergeable")
-    if not isinstance(value, str) or not value:
-        return None
-    return value.upper()
-
-
 def classify_snapshot(
     *,
     summary: dict[str, object],
@@ -523,9 +497,6 @@ def classify_snapshot(
         return "human_gate", "reopen_or_use_open_pr", False, "non_open_pr"
     if ci_status == "failed":
         return "failed", "fix_ci", False, "ci_failed"
-    mergeable = mergeability_status(metadata)
-    if mergeable == "CONFLICTING":
-        return "human_gate", "resolve_merge_conflict", False, "pr_merge_conflict"
     if ci_status in {"pending", "running", "none"}:
         if has_blocking_limitation(limitations, ignored_codes={"required_checks_missing_or_pending"}):
             if has_permission_limitation(limitations):
@@ -548,10 +519,6 @@ def classify_snapshot(
         return "pending", "wait", False, "ci_pending"
     if ci_status != "passed":
         return "unknown", "human_gate", False, "blocking_limitation"
-    if mergeable == "UNKNOWN":
-        return "pending", "wait", False, "pr_mergeability_pending"
-    if mergeable != "MERGEABLE":
-        return "human_gate", "human_gate", False, "pr_mergeability_unknown"
     if decision_status_reason == "current_selected_changes_requested" or selected_changes_requested_evidence:
         return "human_gate", "address_review_feedback", True, "current_selected_changes_requested"
     fallback_pass_candidate = decision.get("fallback_pass_candidate")
@@ -613,583 +580,6 @@ def load_metadata(path: Path) -> tuple[dict[str, object], str]:
     head = payload.get("headRefOid")
     return payload, head if isinstance(head, str) else ""
 
-
-def parse_paginated_gh_api_json(stdout: str) -> object:
-    text = stdout.strip()
-    if not text:
-        return {}
-    decoder = json.JSONDecoder()
-    documents: list[object] = []
-    index = 0
-    while index < len(text):
-        document, end_index = decoder.raw_decode(text, index)
-        documents.append(document)
-        index = end_index
-        while index < len(text) and text[index].isspace():
-            index += 1
-    if len(documents) == 1:
-        return documents[0]
-    if all(isinstance(document, dict) and isinstance(document.get("jobs"), list) for document in documents):
-        jobs: list[object] = []
-        total_count = 0
-        saw_total_count = False
-        for document in documents:
-            if not isinstance(document, dict):
-                continue
-            page_jobs = document.get("jobs")
-            if isinstance(page_jobs, list):
-                jobs.extend(page_jobs)
-            page_total_count = document.get("total_count")
-            if isinstance(page_total_count, int):
-                total_count += page_total_count
-                saw_total_count = True
-        return {"total_count": total_count if saw_total_count else len(jobs), "jobs": jobs}
-    return documents
-
-
-def run_gh_api_json(path: str, *, paginate: bool = False) -> tuple[object, int, str]:
-    command = ["gh", "api", path]
-    if paginate:
-        command.append("--paginate")
-    completed = subprocess.run(command, capture_output=True, text=True, check=False)
-    if completed.returncode != 0:
-        return {}, completed.returncode, completed.stderr or ""
-    try:
-        payload = parse_paginated_gh_api_json(completed.stdout) if paginate else json.loads(completed.stdout or "{}")
-        return payload, 0, completed.stderr or ""
-    except json.JSONDecodeError:
-        return {}, 1, "fixed read-only GitHub API returned non-JSON output"
-
-
-def successful_actions_contexts(ci_payload: dict[str, object]) -> set[str]:
-    actions = ci_payload.get("actions") if isinstance(ci_payload.get("actions"), dict) else {}
-    contexts: set[str] = set()
-    for job in actions.get("jobs", []) if isinstance(actions.get("jobs"), list) else []:
-        if not isinstance(job, dict):
-            continue
-        name = job.get("name")
-        status = str(job.get("status") or "").lower()
-        conclusion = str(job.get("conclusion") or "").lower()
-        if isinstance(name, str) and name and status == "completed" and conclusion in {"success", "neutral", "skipped"}:
-            contexts.add(name)
-    return contexts
-
-
-def actions_jobs_collection(ci_payload: dict[str, object]) -> dict[str, object]:
-    actions = ci_payload.get("actions") if isinstance(ci_payload.get("actions"), dict) else {}
-    jobs_summary = actions.get("jobs_summary") if isinstance(actions.get("jobs_summary"), dict) else {}
-    collection = jobs_summary.get("collection") if isinstance(jobs_summary.get("collection"), dict) else {}
-    return collection if isinstance(collection, dict) else {}
-
-
-def has_skipped_green_run_jobs(ci_payload: dict[str, object]) -> bool:
-    skipped = actions_jobs_collection(ci_payload).get("skipped_green_runs")
-    return isinstance(skipped, int) and skipped > 0
-
-
-def successful_jobs_from_payload(payload: object) -> set[str] | None:
-    if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list):
-        return None
-    contexts: set[str] = set()
-    for job in payload.get("jobs", []):
-        if not isinstance(job, dict):
-            continue
-        name = job.get("name")
-        status = str(job.get("status") or "").lower()
-        conclusion = str(job.get("conclusion") or "").lower()
-        if isinstance(name, str) and name and status == "completed" and conclusion in {"success", "neutral", "skipped"}:
-            contexts.add(name)
-    return contexts
-
-
-def expand_successful_actions_contexts(
-    *, repo: str, ci_payload: dict[str, object], missing_contexts: list[str]
-) -> tuple[set[str], bool, list[dict[str, object]]]:
-    contexts = successful_actions_contexts(ci_payload)
-    if not missing_contexts or not has_skipped_green_run_jobs(ci_payload):
-        return contexts, False, []
-    actions = ci_payload.get("actions") if isinstance(ci_payload.get("actions"), dict) else {}
-    limitations: list[dict[str, object]] = []
-    expanded_all = True
-    for run in actions.get("runs", []) if isinstance(actions.get("runs"), list) else []:
-        if not isinstance(run, dict):
-            continue
-        run_id = run.get("id")
-        if not isinstance(run_id, int):
-            expanded_all = False
-            continue
-        jobs_api = f"repos/{repo}/actions/runs/{run_id}/jobs"
-        jobs_payload, jobs_exit, jobs_stderr = run_gh_api_json(jobs_api, paginate=True)
-        if jobs_exit != 0:
-            expanded_all = False
-            limitations.append(
-                {
-                    "code": "required_actions_context_expansion_unavailable",
-                    "source": jobs_api,
-                    "capability": "actions_read",
-                    "severity": "info",
-                    "message": "fixed Actions jobs expansion could not verify required contexts",
-                    "recommended_next_action": "wait",
-                    "exit_code": jobs_exit,
-                    "stderr_classification": classify_github_stderr(jobs_stderr),
-                }
-            )
-            continue
-        expanded = successful_jobs_from_payload(jobs_payload)
-        if expanded is None:
-            expanded_all = False
-            limitations.append(
-                {
-                    "code": "required_actions_context_expansion_unavailable",
-                    "source": jobs_api,
-                    "capability": "actions_read",
-                    "severity": "info",
-                    "message": "fixed Actions jobs expansion returned an unexpected schema",
-                    "recommended_next_action": "wait",
-                }
-            )
-            continue
-        contexts.update(expanded)
-    return contexts, not expanded_all, limitations
-
-
-def required_status_contexts(protection_payload: object) -> tuple[set[str], set[str], bool]:
-    if not isinstance(protection_payload, dict):
-        return set(), set(), False
-    required_status_checks = protection_payload.get("required_status_checks")
-    if required_status_checks is None:
-        return set(), set(), True
-    if not isinstance(required_status_checks, dict):
-        return set(), set(), False
-    legacy_contexts: set[str] = set()
-    actions_contexts: set[str] = set()
-    non_actions_contexts: set[str] = set()
-    raw_contexts = required_status_checks.get("contexts")
-    if isinstance(raw_contexts, list):
-        for context in raw_contexts:
-            if isinstance(context, str) and context:
-                legacy_contexts.add(context)
-    raw_checks = required_status_checks.get("checks")
-    if isinstance(raw_checks, list):
-        for check in raw_checks:
-            if not isinstance(check, dict):
-                return actions_contexts, non_actions_contexts, False
-            context = check.get("context")
-            if not isinstance(context, str) or not context:
-                continue
-            if check.get("app_id") in ACTIONS_SATISFIABLE_REQUIRED_CHECK_APP_IDS:
-                actions_contexts.add(context)
-            else:
-                non_actions_contexts.add(context)
-    concrete_contexts = actions_contexts | non_actions_contexts
-    actions_contexts.update(legacy_contexts - concrete_contexts)
-    non_actions_contexts.difference_update(actions_contexts)
-    return actions_contexts, non_actions_contexts, True
-
-
-def current_review_satisfies_simple_required_reviews(
-    required_pull_request_reviews: object, review_payload: dict[str, object]
-) -> bool:
-    if not isinstance(required_pull_request_reviews, dict):
-        return False
-    required_count = required_pull_request_reviews.get("required_approving_review_count")
-    if not isinstance(required_count, int):
-        return False
-    if required_pull_request_reviews.get("dismiss_stale_reviews") is True:
-        return False
-    if required_pull_request_reviews.get("require_code_owner_reviews") is True:
-        return False
-    if required_pull_request_reviews.get("require_last_push_approval") is True:
-        return False
-    if required_count == 0:
-        return True
-    decision = collector_decision_payload({}, review_payload)
-    decision_status = decision.get("status")
-    decision_action = decision.get("recommended_next_action")
-    return (
-        decision_status == "passed"
-        and decision_action == "merge_prepared"
-        and decision.get("protected_required_reviews_satisfied") is True
-    )
-
-
-def head_owner_login(metadata: dict[str, object]) -> str | None:
-    owner = metadata.get("headRepositoryOwner")
-    if not isinstance(owner, dict):
-        return None
-    login = owner.get("login")
-    if isinstance(login, str) and login:
-        return login
-    name = owner.get("name")
-    if isinstance(name, str) and name:
-        return name
-    return None
-
-
-def collect_merge_blocker_metadata(
-    *,
-    repo: str,
-    metadata: dict[str, object],
-    ci_payload: dict[str, object],
-    review_payload: dict[str, object] | None = None,
-) -> tuple[dict[str, object], list[dict[str, object]]]:
-    limitations: list[dict[str, object]] = []
-    base_ref = metadata.get("baseRefName")
-    head_ref = metadata.get("headRefName")
-    if not isinstance(base_ref, str) or not base_ref or not isinstance(head_ref, str) or not head_ref:
-        return {
-            "compare": {"available": False},
-            "branch_protection": {"available": False},
-        }, [
-            {
-                "code": "pr_branch_metadata_schema_unavailable",
-                "source": "gh_pr_view",
-                "severity": "blocking",
-                "message": "fixed PR metadata did not include usable baseRefName and headRefName",
-            }
-        ]
-
-    encoded_base = quote(base_ref, safe="")
-    base_repo_owner = repo.split("/", 1)[0]
-    head_owner = head_owner_login(metadata)
-    encoded_head = (
-        f"{quote(head_owner, safe='')}:{quote(head_ref, safe='')}"
-        if head_owner and head_owner != base_repo_owner
-        else quote(head_ref, safe="")
-    )
-    compare_api = f"repos/{repo}/compare/{encoded_base}...{encoded_head}"
-    compare_metadata: dict[str, object] = {
-        "available": False,
-        "api": compare_api,
-        "skipped": True,
-        "skip_reason": "strict_required_checks_not_proven",
-    }
-
-    def collect_compare_metadata() -> bool:
-        compare_metadata.pop("skipped", None)
-        compare_metadata.pop("skip_reason", None)
-        compare_payload, compare_exit, compare_stderr = run_gh_api_json(compare_api)
-        compare_metadata["available"] = compare_exit == 0
-        if compare_exit != 0:
-            limitations.append(
-                optional_github_api_failure_limitation(
-                    api=compare_api,
-                    source=compare_api,
-                    capability="compare_read",
-                    exit_code=compare_exit,
-                    stderr=compare_stderr,
-                    default_code="pr_compare_metadata_unavailable",
-                    default_message="fixed compare metadata could not verify PR branch freshness",
-                )
-            )
-            return False
-        if not isinstance(compare_payload, dict):
-            compare_metadata["available"] = False
-            limitations.append(
-                {
-                    "code": "pr_compare_metadata_unavailable",
-                    "source": compare_api,
-                    "severity": "warning",
-                    "message": "fixed compare metadata returned an unexpected schema",
-                    "recommended_next_action": "continue_with_available_metadata",
-                }
-            )
-            return False
-        status = compare_payload.get("status")
-        behind_by = compare_payload.get("behind_by")
-        ahead_by = compare_payload.get("ahead_by")
-        compare_metadata.update(
-            {
-                "status": status,
-                "behind_by": behind_by,
-                "ahead_by": ahead_by,
-            }
-        )
-        return (
-            compare_metadata.get("status") in {"behind", "diverged"}
-            or (
-                isinstance(compare_metadata.get("behind_by"), int)
-                and compare_metadata.get("behind_by") > 0
-            )
-        )
-
-    def add_strict_behind_limitation(source: str) -> None:
-        limitations.append(
-            {
-                "code": "pr_branch_behind",
-                "source": source,
-                "severity": "blocking",
-                "message": "PR head branch is behind or diverged from a strict required-check base branch",
-                "recommended_next_action": "update_pr_branch",
-                "compare_status": compare_metadata.get("status"),
-                "behind_by": compare_metadata.get("behind_by"),
-            }
-        )
-
-    branch_api = f"repos/{repo}/branches/{encoded_base}"
-    branch_payload, branch_exit, branch_stderr = run_gh_api_json(branch_api)
-    protection_metadata: dict[str, object] = {
-        "available": branch_exit == 0,
-        "api": branch_api,
-    }
-    if branch_exit != 0:
-        limitations.append(
-            optional_github_api_failure_limitation(
-                api=branch_api,
-                source=branch_api,
-                capability="branch_metadata_read",
-                exit_code=branch_exit,
-                stderr=branch_stderr,
-                default_code="branch_metadata_unavailable",
-                default_message="fixed branch metadata could not verify protection state",
-            )
-        )
-    elif not isinstance(branch_payload, dict) or not isinstance(branch_payload.get("protected"), bool):
-        protection_metadata["available"] = False
-        limitations.append(
-            {
-                "code": "branch_metadata_unavailable",
-                "source": branch_api,
-                "capability": "branch_metadata_read",
-                "severity": "blocking",
-                "message": "fixed branch metadata returned an unexpected protection schema",
-                "recommended_next_action": "human_gate",
-            }
-        )
-    elif branch_payload.get("protected") is False:
-        protection_metadata.update(
-            {
-                "available": True,
-                "protected": False,
-                "status": "unprotected",
-            }
-        )
-    else:
-        protection_api = f"repos/{repo}/branches/{encoded_base}/protection"
-        protection_payload, protection_exit, protection_stderr = run_gh_api_json(protection_api)
-        protection_metadata.update(
-            {
-                "protected": True,
-                "protection_api": protection_api,
-                "protection_available": protection_exit == 0,
-            }
-        )
-        if protection_exit != 0:
-            limitations.append(
-                optional_github_api_failure_limitation(
-                    api=protection_api,
-                    source=protection_api,
-                    capability="branch_protection_read",
-                    exit_code=protection_exit,
-                    stderr=protection_stderr,
-                    default_code="branch_protection_read_optional",
-                    default_message="fixed branch protection metadata could not be verified",
-                )
-            )
-            return {
-                "compare": compare_metadata,
-                "branch_protection": protection_metadata,
-            }, limitations
-        required_status_checks = (
-            protection_payload.get("required_status_checks")
-            if isinstance(protection_payload, dict)
-            else None
-        )
-        strict_required_checks = (
-            isinstance(required_status_checks, dict)
-            and required_status_checks.get("strict") is True
-        )
-        protection_metadata["strict"] = strict_required_checks
-        branch_is_behind = collect_compare_metadata() if strict_required_checks else False
-        if branch_is_behind:
-            add_strict_behind_limitation(protection_api)
-        lock_branch = (
-            protection_payload.get("lock_branch")
-            if isinstance(protection_payload, dict)
-            else None
-        )
-        lock_branch_enabled = (
-            isinstance(lock_branch, dict)
-            and lock_branch.get("enabled") is True
-        )
-        protection_metadata["lock_branch"] = {
-            "enabled": lock_branch_enabled,
-        }
-        if lock_branch_enabled:
-            limitations.append(
-                {
-                    "code": "protected_branch_locked",
-                    "source": protection_api,
-                    "capability": "branch_protection_read",
-                    "severity": "blocking",
-                    "message": "base branch protection marks the branch as locked/read-only",
-                    "recommended_next_action": "human_gate",
-                }
-            )
-        required_signatures = (
-            protection_payload.get("required_signatures")
-            if isinstance(protection_payload, dict)
-            else None
-        )
-        required_signatures_enabled = (
-            isinstance(required_signatures, dict)
-            and required_signatures.get("enabled") is True
-        )
-        protection_metadata["required_signatures"] = {
-            "enabled": required_signatures_enabled,
-        }
-        if required_signatures_enabled:
-            limitations.append(
-                {
-                    "code": "required_signatures_unverified",
-                    "source": protection_api,
-                    "capability": "commit_signature_verification",
-                    "severity": "blocking",
-                    "message": "branch protection requires signed commits that cannot be proven by the observation script",
-                    "recommended_next_action": "human_gate",
-                }
-            )
-        required_pull_request_reviews = (
-            protection_payload.get("required_pull_request_reviews")
-            if isinstance(protection_payload, dict)
-            else None
-        )
-        pull_request_review_metadata = {
-            "required": required_pull_request_reviews is not None,
-        }
-        if isinstance(required_pull_request_reviews, dict):
-            pull_request_review_metadata.update(
-                {
-                    "required_approving_review_count": required_pull_request_reviews.get(
-                        "required_approving_review_count"
-                    ),
-                    "dismiss_stale_reviews": required_pull_request_reviews.get(
-                        "dismiss_stale_reviews"
-                    ),
-                    "require_code_owner_reviews": required_pull_request_reviews.get(
-                        "require_code_owner_reviews"
-                    ),
-                    "require_last_push_approval": required_pull_request_reviews.get(
-                        "require_last_push_approval"
-                    ),
-                }
-            )
-            review_satisfied = current_review_satisfies_simple_required_reviews(
-                required_pull_request_reviews,
-                review_payload if isinstance(review_payload, dict) else {},
-            )
-            pull_request_review_metadata["satisfied_by_observed_review_evidence"] = review_satisfied
-            if not review_satisfied:
-                limitations.append(
-                    {
-                        "code": "required_pull_request_reviews_unverified",
-                        "source": protection_api,
-                        "capability": "pull_request_reviews_read",
-                        "severity": "blocking",
-                        "message": "branch protection requires pull request reviews that cannot be fully proven by the observation script",
-                        "recommended_next_action": "human_gate",
-                        "required_pull_request_reviews": pull_request_review_metadata,
-                    }
-                )
-        protection_metadata["required_pull_request_reviews"] = pull_request_review_metadata
-        contexts, non_actions_contexts, schema_ok = required_status_contexts(protection_payload)
-        if not schema_ok:
-            limitations.append(
-                {
-                    "code": "branch_protection_metadata_unavailable",
-                    "source": protection_api,
-                    "capability": "branch_protection_read",
-                    "severity": "blocking",
-                    "message": "branch protection metadata returned an unexpected required status checks schema",
-                    "recommended_next_action": "human_gate",
-                }
-            )
-        observed_contexts = successful_actions_contexts(ci_payload)
-        missing = sorted(context for context in contexts if context not in observed_contexts)
-        expansion_incomplete = False
-        expansion_limitations: list[dict[str, object]] = []
-        if missing and has_skipped_green_run_jobs(ci_payload):
-            observed_contexts, expansion_incomplete, expansion_limitations = expand_successful_actions_contexts(
-                repo=repo,
-                ci_payload=ci_payload,
-                missing_contexts=missing,
-            )
-            limitations.extend(expansion_limitations)
-            missing = sorted(context for context in contexts if context not in observed_contexts)
-        ci_status = str(ci_payload.get("status") or "unknown")
-        protection_metadata.update(
-            {
-                "protected": True,
-                "strict": strict_required_checks,
-                "required_status_contexts": sorted(contexts | non_actions_contexts),
-                "required_github_actions_contexts": sorted(contexts),
-                "required_non_actions_contexts": sorted(non_actions_contexts),
-                "observed_successful_actions_contexts": sorted(observed_contexts),
-                "missing_required_status_contexts": missing,
-                "unprovable_required_status_contexts": sorted(non_actions_contexts),
-            }
-        )
-        if non_actions_contexts:
-            limitations.append(
-                {
-                    "code": "required_non_actions_context_unprovable_by_actions",
-                    "source": protection_api,
-                    "capability": "branch_protection_read",
-                    "severity": "blocking",
-                    "message": "branch protection requires non-GitHub-Actions status contexts that cannot be proven with Actions evidence",
-                    "recommended_next_action": "human_gate",
-                    "unprovable_required_status_contexts": sorted(non_actions_contexts),
-                }
-            )
-        if missing:
-            if ci_status in {"pending", "running", "none", "unknown"} or expansion_incomplete:
-                limitations.append(
-                    {
-                        "code": "required_actions_context_pending",
-                        "source": protection_api,
-                        "capability": "branch_protection_read",
-                        "severity": "info",
-                        "message": "branch protection requires GitHub Actions contexts that are not observed successful yet",
-                        "recommended_next_action": "wait",
-                        "missing_required_status_contexts": missing,
-                    }
-                )
-                return {
-                    "compare": compare_metadata,
-                    "branch_protection": protection_metadata,
-                }, limitations
-            limitations.append(
-                {
-                    "code": "required_actions_context_unobserved",
-                    "source": protection_api,
-                    "capability": "branch_protection_read",
-                    "severity": "blocking",
-                    "message": "branch protection requires status contexts not observed as successful GitHub Actions runs or jobs",
-                    "recommended_next_action": "human_gate",
-                    "missing_required_status_contexts": missing,
-                }
-            )
-    return {
-        "compare": compare_metadata,
-        "branch_protection": protection_metadata,
-    }, limitations
-
-
-def skipped_merge_blocker_metadata() -> dict[str, object]:
-    return {
-        "skipped": True,
-        "skip_reason": "optional_metadata_deferred_during_wait_poll",
-        "compare": {
-            "available": False,
-            "skipped": True,
-            "skip_reason": "optional_metadata_deferred_during_wait_poll",
-        },
-        "branch_protection": {
-            "available": False,
-            "skipped": True,
-            "skip_reason": "optional_metadata_deferred_during_wait_poll",
-        },
-    }
 
 
 def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
@@ -1287,10 +677,6 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
         "collector": "pending_s04",
     }
     review_wrapper_payload: dict[str, object] = {}
-    merge_blocker_metadata: dict[str, object] = {
-        "compare": {"available": False},
-        "branch_protection": {"available": False},
-    }
     normalized_status = "unknown"
     recommended_next_action = "human_gate"
 
@@ -1404,16 +790,6 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
                     "stderr_sha256": hashlib.sha256(read_text(review_stderr).encode()).hexdigest(),
                 }
             )
-        if args.skip_optional_merge_blocker_metadata:
-            merge_blocker_metadata = skipped_merge_blocker_metadata()
-        else:
-            merge_blocker_metadata, merge_blocker_limitations = collect_merge_blocker_metadata(
-                repo=args.repo,
-                metadata=metadata,
-                ci_payload=ci_payload,
-                review_payload=review_payload,
-            )
-            limitations.extend(merge_blocker_limitations)
     normalized_status, recommended_next_action, observation_complete, status_reason = classify_snapshot(
         summary=summary,
         ci_payload=ci_payload,
@@ -1468,7 +844,6 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
             "workflow_runs": ci_actions.get("workflow_runs"),
             "jobs_summary": ci_actions.get("jobs_summary"),
         },
-        "merge_blocker_metadata": merge_blocker_metadata,
         "ci_fingerprint": checks_payload_for_fingerprint.get("fingerprint"),
         "review_decision_fingerprint": review_decision_fingerprint,
     }
@@ -1526,7 +901,6 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
         "codex_review": codex_review_payload,
         "trigger": trigger,
         "body_mode": args.body_mode,
-        "merge_blocker_metadata": merge_blocker_metadata,
         "artifacts": {
             "result_json": f"{args.out_dir}/result.json" if args.out_dir else None,
             "latest_json": f"{args.out_dir}/latest.json" if args.out_dir else None,

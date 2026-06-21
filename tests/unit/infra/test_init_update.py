@@ -12337,7 +12337,10 @@ if log_path:
         log.write(" ".join(args) + "\\n")
 
 if args[:5] == ["pr", "view", "13", "--repo", "owner/repo"]:
-    if "--json" in args and "headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable" in args:
+    if "--json" in args and (
+        "headRefOid,url,state,isDraft,number" in args
+        or "headRefOid,url,state,isDraft,number" in args
+    ):
         metadata_calls += 1
         state_path.write_text(str(metadata_calls), encoding="utf-8")
 elif metadata_calls == 0:
@@ -12361,7 +12364,18 @@ if hang_seconds is not None and (
 def emit(payload):
     print(json.dumps(payload, separators=(",", ":")))
 
-if args[:2] == ["pr", "view"] and "--json" in args and "headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable" in args:
+if args[:2] == ["pr", "view"] and "--json" in args and "headRefOid,url,state,isDraft,number" in args:
+    poll_delay_seconds = current.get("poll_delay_seconds")
+    if poll_delay_seconds is not None:
+        time.sleep(float(poll_delay_seconds))
+    emit({
+        "headRefOid": head,
+        "url": "https://github.com/owner/repo/pull/13",
+        "state": current.get("state", "OPEN"),
+        "isDraft": current.get("is_draft", False),
+        "number": 13,
+    })
+elif args[:2] == ["pr", "view"] and "--json" in args and "headRefOid,url,state,isDraft,number" in args:
     poll_delay_seconds = current.get("poll_delay_seconds")
     if poll_delay_seconds is not None:
         time.sleep(float(poll_delay_seconds))
@@ -12797,7 +12811,7 @@ head_sequence = scenario.get("head_sequence") or [scenario.get("head", "aaaaaaaa
 
 if args in (
     ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,url,state,isDraft,number"],
-    ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable"],
+    ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,url,state,isDraft,number"],
 ):
     if scenario.get("metadata_error_after_post", False) and state["pr_view_count"] > 0:
         state["pr_view_count"] += 1
@@ -13295,7 +13309,7 @@ exit 44
             fake_gh.write_text(
                 f"""#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number"|"pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number"|"pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}}
 JSON
@@ -14438,7 +14452,7 @@ JSON
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
@@ -14508,7 +14522,7 @@ esac
             fake_gh.write_text(
                 f"""#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     printf 'GraphQL: Resource not accessible by personal access token {token_marker}\\n' >&2
     exit 1
     ;;
@@ -14546,7 +14560,7 @@ esac
             limitation = payload["limitations"][0]
             assert limitation["code"] == "github_token_permission_denied"
             assert limitation["capability"] == "pull_request_read"
-            assert limitation["api"] == "gh pr view --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable"
+            assert limitation["api"] == "gh pr view --json headRefOid,url,state,isDraft,number"
             assert limitation["source"] == "gh_pr_view"
             assert limitation["status"] == "permission_denied"
             assert limitation["token_source"] == "GH_TOKEN"
@@ -14571,7 +14585,7 @@ esac
             fake_gh.write_text(
                 f"""#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     printf 'GraphQL: Resource not accessible by integration {token_marker}\\n' >&2
     exit 1
     ;;
@@ -14609,7 +14623,7 @@ esac
             limitation = payload["limitations"][0]
             assert limitation["code"] == "github_token_permission_denied"
             assert limitation["capability"] == "pull_request_read"
-            assert limitation["api"] == "gh pr view --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable"
+            assert limitation["api"] == "gh pr view --json headRefOid,url,state,isDraft,number"
             assert limitation["source"] == "gh_pr_view"
             assert limitation["status"] == "permission_denied"
             assert limitation["token_source"] == "GH_TOKEN"
@@ -14634,7 +14648,7 @@ esac
             fake_gh.write_text(
                 f"""#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     printf 'GraphQL: Resource not accessible by integration {token_marker}\\n' >&2
     exit 1
     ;;
@@ -14686,7 +14700,7 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
@@ -14798,7 +14812,7 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
@@ -14918,7 +14932,7 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
@@ -15089,7 +15103,7 @@ PY
         fake_gh.write_text(
             """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
@@ -15497,7 +15511,7 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<JSON
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"${PR_STATE:-OPEN}","isDraft":${PR_IS_DRAFT:-false},"number":13,"mergeable":"MERGEABLE"}
 JSON
@@ -16366,7 +16380,7 @@ JSON
                 fake_gh.write_text(
                     """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
@@ -19480,7 +19494,7 @@ JSON
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
@@ -19905,38 +19919,52 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             return json.loads(result.stdout), gh_log.read_text(encoding="utf-8")
 
-    def test_issue_222_pr_observation_snapshot_can_skip_optional_merge_blocker_metadata(self) -> None:
+    def test_issue_222_pr_observation_snapshot_does_not_call_mergeability_compare_or_protection(self) -> None:
         payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
             {
                 "head": "a" * 40,
                 "ci": "passed",
                 "review": "approved",
-                "mergeable": "MERGEABLE",
+                "mergeable": "CONFLICTING",
+                "compare": {"status": "behind", "ahead_by": 0, "behind_by": 3},
                 "branch": {"name": "main", "protected": True},
                 "branch_protection": {
                     "required_status_checks": {
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    }
+                        "strict": True,
+                        "contexts": ["external-ci"],
+                        "checks": [{"context": "external-ci", "app_id": 12345}],
+                    },
+                    "required_signatures": {"enabled": True},
                 },
-            },
-            extra_env={"OBS_SKIP_OPTIONAL_MERGE_BLOCKER_METADATA": "1"},
+            }
         )
 
+        limitation_codes = [item["code"] for item in payload["limitations"] if isinstance(item, dict)]
+        assert payload["ci"]["source_policy"] == "github_actions_only"
+        assert payload["ci"]["status"] == "passed"
+        assert payload["review"]["status"] == "approved"
         assert payload["normalized_status"] == "passed"
         assert payload["recommended_next_action"] == "merge_prepared"
-        assert payload["merge_blocker_metadata"]["skipped"] is True
-        assert payload["merge_blocker_metadata"]["skip_reason"] == (
-            "optional_metadata_deferred_during_wait_poll"
-        )
+        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+        assert "merge_blocker_metadata" not in payload
+        assert "required_actions_context_unobserved" not in limitation_codes
+        assert "required_non_actions_context_unprovable_by_actions" not in limitation_codes
+        assert "required_signatures_unverified" not in limitation_codes
+        assert "pr_mergeability_pending" not in limitation_codes
+        assert "headRefOid,url,state,isDraft,number" in gh_calls
+        assert "mergeable" not in gh_calls
+        assert "baseRefName" not in gh_calls
+        assert "headRefName" not in gh_calls
+        assert "headRepositoryOwner" not in gh_calls
+        assert "repos/owner/repo/compare/" not in gh_calls
         assert "repos/owner/repo/branches/main" not in gh_calls
         assert "repos/owner/repo/branches/main/protection" not in gh_calls
-        assert "repos/owner/repo/compare/main...feature" not in gh_calls
-        assert "optional_metadata_deferred_during_wait_poll" not in [
-            item.get("code") for item in payload["limitations"] if isinstance(item, dict)
-        ]
+        assert "statusCheckRollup" not in gh_calls
+        assert "/check-runs" not in gh_calls
+        assert "/status" not in gh_calls
+        assert "pr checks" not in gh_calls
 
-    def test_issue_222_pr_observation_wait_defers_optional_merge_blocker_metadata_until_final_snapshot(self) -> None:
+    def test_issue_222_pr_observation_wait_reaches_merge_prepared_without_final_merge_blocker_audit(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -19957,12 +19985,13 @@ esac
                         "head": "a" * 40,
                         "ci": "passed",
                         "review": "approved",
-                        "mergeable": "MERGEABLE",
+                        "mergeable": "CONFLICTING",
                         "branch": {"name": "main", "protected": True},
                         "branch_protection": {
                             "required_status_checks": {
-                                "contexts": [],
-                                "checks": [{"context": "test", "app_id": 15368}],
+                                "strict": True,
+                                "contexts": ["external-ci"],
+                                "checks": [{"context": "external-ci", "app_id": 12345}],
                             },
                             "required_signatures": {"enabled": True},
                         },
@@ -19971,12 +20000,13 @@ esac
                         "head": "a" * 40,
                         "ci": "passed",
                         "review": "approved",
-                        "mergeable": "MERGEABLE",
+                        "mergeable": "CONFLICTING",
                         "branch": {"name": "main", "protected": True},
                         "branch_protection": {
                             "required_status_checks": {
-                                "contexts": [],
-                                "checks": [{"context": "test", "app_id": 15368}],
+                                "strict": True,
+                                "contexts": ["external-ci"],
+                                "checks": [{"context": "external-ci", "app_id": 12345}],
                             },
                             "required_signatures": {"enabled": True},
                         },
@@ -20030,1174 +20060,18 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            gh_calls = gh_log.read_text(encoding="utf-8").splitlines()
-
-        assert payload["wait"]["polls"] >= 2
-        assert payload["normalized_status"] == "unknown"
-        assert payload["recommended_next_action"] == "human_gate"
-        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
-        assert payload["merge_blocker_metadata"]["branch_protection"]["required_signatures"] == {
-            "enabled": True,
-        }
-        assert "required_signatures_unverified" in [
-            item.get("code") for item in payload["limitations"] if isinstance(item, dict)
-        ]
-        assert gh_calls.count("api repos/owner/repo/branches/main") == 1
-        assert gh_calls.count("api repos/owner/repo/branches/main/protection") == 1
-        assert gh_calls.count("api repos/owner/repo/compare/main...feature") == 0
-
-    def test_issue_222_pr_observation_wait_keeps_stable_result_when_final_metadata_snapshot_times_out(self) -> None:
-        repo_root = Path(__file__).resolve().parents[3]
-        script_path = (
-            repo_root
-            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
-        )
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_path = Path(tmp_dir)
-            fake_bin = tmp_path / "bin"
-            fake_bin.mkdir()
-            fake_gh = fake_bin / "gh"
-            scenario_path = tmp_path / "scenario.json"
-            state_path = tmp_path / "state.txt"
-            gh_log = tmp_path / "gh.log"
-            stable_snapshot = {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    },
-                    "required_signatures": {"enabled": True},
-                },
-            }
-            final_snapshot = dict(stable_snapshot)
-            final_snapshot["hang_seconds"] = 6
-            final_snapshot["hang_only_when_full_snapshot"] = True
-            scenario_path.write_text(
-                json.dumps([stable_snapshot, final_snapshot]),
-                encoding="utf-8",
-            )
-            self._issue_75_write_pr_observation_wait_fake_gh(
-                fake_gh,
-                scenario_path=scenario_path,
-                state_path=state_path,
-                log_path=gh_log,
-            )
-            env = {
-                **os.environ,
-                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
-                "GH_FAKE_WAIT_SCENARIO": str(scenario_path),
-                "GH_FAKE_WAIT_STATE": str(state_path),
-                "GH_FAKE_LOG": str(gh_log),
-            }
-
-            result = subprocess.run(
-                [
-                    str(script_path),
-                    "--repo",
-                    "owner/repo",
-                    "--pr",
-                    "13",
-                    "--head-sha",
-                    "a" * 40,
-                    "--trigger-mode",
-                    "resume",
-                    "--trigger-comment-id",
-                    "99",
-                    "--trigger-created-at",
-                    "2026-06-08T01:00:00Z",
-                    "--timeout-seconds",
-                    "6",
-                    "--poll-interval-seconds",
-                    "1",
-                    "--quiet-seconds",
-                    "1",
-                    "--same-fingerprint-count",
-                    "2",
-                ],
-                env=env,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-
-            assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            gh_calls = gh_log.read_text(encoding="utf-8")
 
         assert payload["wait"]["polls"] >= 2
         assert payload["normalized_status"] == "passed"
         assert payload["recommended_next_action"] == "merge_prepared"
         assert payload["decision"]["recommended_next_action"] == "merge_prepared"
-        assert "snapshot_poll_timeout" in [
-            item.get("code") for item in payload["limitations"] if isinstance(item, dict)
-        ]
-
-    def test_issue_222_pr_observation_snapshot_required_actions_context_missing_blocks_merge_prepared(self) -> None:
-        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "contexts": [],
-                        "checks": [{"context": "lint", "app_id": 15368}],
-                    }
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "unknown"
-        assert payload["recommended_next_action"] == "human_gate"
-        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
-        assert "required_actions_context_unobserved" in limitation_codes
-        assert payload["merge_blocker_metadata"]["branch_protection"][
-            "missing_required_status_contexts"
-        ] == ["lint"]
-        assert "repos/owner/repo/branches/main/protection" in gh_calls
-        assert "statusCheckRollup" not in gh_calls
-        assert "/check-runs" not in gh_calls
-        assert "/status" not in gh_calls
-        assert "pr checks" not in gh_calls
-
-    def test_issue_222_pr_observation_snapshot_required_actions_context_matched_allows_merge_prepared(self) -> None:
-        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    }
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "passed"
-        assert payload["recommended_next_action"] == "merge_prepared"
-        assert "required_actions_context_unobserved" not in limitation_codes
-        assert payload["merge_blocker_metadata"]["branch_protection"][
-            "missing_required_status_contexts"
-        ] == []
-        assert payload["merge_blocker_metadata"]["compare"]["skipped"] is True
-        assert "repos/owner/repo/compare/main...feature" not in gh_calls
-
-    def test_issue_222_pr_observation_snapshot_workflow_name_only_required_context_does_not_pass(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "contexts": [],
-                        "checks": [{"context": "CI", "app_id": 15368}],
-                    }
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "unknown"
-        assert payload["recommended_next_action"] == "human_gate"
-        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
-        assert "required_actions_context_unobserved" in limitation_codes
-        protection = payload["merge_blocker_metadata"]["branch_protection"]
-        assert protection["observed_successful_actions_contexts"] == ["test"]
-        assert protection["missing_required_status_contexts"] == ["CI"]
-
-    def test_issue_222_pr_observation_snapshot_checks_classification_overrides_duplicate_contexts(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "contexts": ["test"],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    }
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "passed"
-        assert payload["recommended_next_action"] == "merge_prepared"
-        assert "required_non_actions_context_unprovable_by_actions" not in limitation_codes
-        protection = payload["merge_blocker_metadata"]["branch_protection"]
-        assert protection["required_github_actions_contexts"] == ["test"]
-        assert protection["required_non_actions_contexts"] == []
-        assert protection["unprovable_required_status_contexts"] == []
-
-    def test_issue_222_pr_observation_snapshot_legacy_context_is_actions_satisfiable(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "contexts": ["test"],
-                        "checks": [],
-                    }
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "passed"
-        assert payload["recommended_next_action"] == "merge_prepared"
-        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
-        assert "required_non_actions_context_unprovable_by_actions" not in limitation_codes
-        assert "required_actions_context_unobserved" not in limitation_codes
-        protection = payload["merge_blocker_metadata"]["branch_protection"]
-        assert protection["required_github_actions_contexts"] == ["test"]
-        assert protection["required_non_actions_contexts"] == []
-        assert protection["unprovable_required_status_contexts"] == []
-
-    def test_issue_222_pr_observation_snapshot_any_source_required_check_matched_allows_merge_prepared(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": -1}],
-                    }
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "passed"
-        assert payload["recommended_next_action"] == "merge_prepared"
-        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
-        assert "required_non_actions_context_unprovable_by_actions" not in limitation_codes
-        assert "required_actions_context_unobserved" not in limitation_codes
-        protection = payload["merge_blocker_metadata"]["branch_protection"]
-        assert protection["required_github_actions_contexts"] == ["test"]
-        assert protection["required_non_actions_contexts"] == []
-        assert protection["missing_required_status_contexts"] == []
-
-    def test_issue_222_pr_observation_snapshot_null_app_required_check_matched_allows_merge_prepared(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": None}],
-                    }
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "passed"
-        assert payload["recommended_next_action"] == "merge_prepared"
-        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
-        assert "required_non_actions_context_unprovable_by_actions" not in limitation_codes
-        assert "required_actions_context_unobserved" not in limitation_codes
-        protection = payload["merge_blocker_metadata"]["branch_protection"]
-        assert protection["required_github_actions_contexts"] == ["test"]
-        assert protection["required_non_actions_contexts"] == []
-        assert protection["missing_required_status_contexts"] == []
-
-    def test_issue_222_pr_observation_snapshot_non_actions_required_check_blocks_merge_prepared(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "contexts": [],
-                        "checks": [{"context": "external-ci", "app_id": 12345}],
-                    }
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "unknown"
-        assert payload["recommended_next_action"] == "human_gate"
-        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
-        assert "required_non_actions_context_unprovable_by_actions" in limitation_codes
-        assert payload["merge_blocker_metadata"]["branch_protection"][
-            "unprovable_required_status_contexts"
-        ] == ["external-ci"]
-
-    def test_issue_222_pr_observation_snapshot_pending_actions_context_stays_waitable(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "pending",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    }
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "pending"
-        assert payload["normalized_status"] == "pending"
-        assert payload["recommended_next_action"] == "wait"
-        assert payload["decision"]["recommended_next_action"] != "human_gate"
-        assert "required_actions_context_pending" in limitation_codes
-        assert "required_actions_context_unobserved" not in limitation_codes
-
-    def test_issue_222_pr_observation_snapshot_unknown_actions_context_stays_waitable(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "unknown",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    }
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "unknown"
-        assert payload["normalized_status"] == "pending"
-        assert payload["recommended_next_action"] == "wait"
-        assert payload["decision"]["recommended_next_action"] != "human_gate"
-        assert "required_actions_context_pending" in limitation_codes
-        assert "required_actions_context_unobserved" not in limitation_codes
-
-    def test_issue_222_pr_observation_wait_unknown_required_actions_context_pending_stays_waitable(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
-                Path(tmp_dir),
-                [
-                    {
-                        "ci": "unknown",
-                        "review": "approved",
-                        "status": "pending",
-                        "overall_status": "pending",
-                        "normalized_status": "pending",
-                        "recommended_next_action": "wait",
-                        "limitations": [
-                            {
-                                "code": "required_actions_context_pending",
-                                "severity": "info",
-                                "recommended_next_action": "wait",
-                                "missing_required_status_contexts": ["test"],
-                            }
-                        ],
-                        "decision": {
-                            "status": "pending",
-                            "status_reason": "ci_pending",
-                            "recommended_next_action": "wait",
-                            "observation_complete": False,
-                        },
-                    }
-                ],
-                timeout_seconds=2,
-                quiet_seconds=1,
-                same_fingerprint_count=1,
-                progress="none",
-            )
-
-        assert result.returncode == 0, result.stdout + result.stderr
-        payload = json.loads(result.stdout)
-        assert payload["normalized_status"] == "timeout"
-        assert payload["recommended_next_action"] == "wait_or_resume"
-        assert payload["decision"]["recommended_next_action"] != "human_gate"
-
-    def test_issue_222_pr_observation_snapshot_expands_skipped_green_run_jobs_for_required_context(self) -> None:
-        module = self._issue_218_s02_load_observation_snapshot_module()
-        calls: list[tuple[str, bool]] = []
-
-        def fake_run_gh_api_json(path: str, *, paginate: bool = False) -> tuple[object, int, str]:
-            calls.append((path, paginate))
-            if path == "repos/owner/repo/compare/main...feature":
-                return {"status": "ahead", "ahead_by": 1, "behind_by": 0}, 0, ""
-            if path == "repos/owner/repo/branches/main":
-                return {"name": "main", "protected": True}, 0, ""
-            if path == "repos/owner/repo/branches/main/protection":
-                return {
-                    "required_status_checks": {
-                        "strict": False,
-                        "contexts": [],
-                        "checks": [{"context": "deploy", "app_id": 15368}],
-                    }
-                }, 0, ""
-            if path == "repos/owner/repo/actions/runs/202/jobs":
-                return {
-                    "total_count": 2,
-                    "jobs": [
-                        {
-                            "id": 303,
-                            "run_id": 202,
-                            "name": "test",
-                            "status": "completed",
-                            "conclusion": "success",
-                            "steps": [],
-                        },
-                        {
-                            "id": 304,
-                            "run_id": 202,
-                            "name": "deploy",
-                            "status": "completed",
-                            "conclusion": "success",
-                            "steps": [],
-                        },
-                    ],
-                }, 0, ""
-            return {}, 44, "unexpected"
-
-        module.run_gh_api_json = fake_run_gh_api_json
-        metadata, limitations = module.collect_merge_blocker_metadata(
-            repo="owner/repo",
-            metadata={
-                "baseRefName": "main",
-                "headRefName": "feature",
-                "headRepositoryOwner": {"login": "owner"},
-            },
-            ci_payload={
-                "status": "passed",
-                "actions": {
-                    "runs": [
-                        {
-                            "id": 202,
-                            "name": "CI",
-                            "status": "completed",
-                            "conclusion": "success",
-                        }
-                    ],
-                    "jobs": [
-                        {
-                            "id": 303,
-                            "run_id": 202,
-                            "name": "test",
-                            "status": "completed",
-                            "conclusion": "success",
-                            "steps": [],
-                        }
-                    ],
-                    "jobs_summary": {
-                        "total": 1,
-                        "counts": {"success": 1},
-                        "collection": {
-                            "mode": "bounded",
-                            "successful_runs": 1,
-                            "skipped_green_runs": 1,
-                        },
-                    },
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in limitations]
-        assert "required_actions_context_unobserved" not in limitation_codes
-        assert "required_actions_context_pending" not in limitation_codes
-        protection = metadata["branch_protection"]
-        assert protection["missing_required_status_contexts"] == []
-        assert protection["observed_successful_actions_contexts"] == ["deploy", "test"]
-        assert ("repos/owner/repo/actions/runs/202/jobs", True) in calls
-
-    def test_issue_222_pr_observation_snapshot_expands_paginated_jobs_json_documents(self) -> None:
-        module = self._issue_218_s02_load_observation_snapshot_module()
-        calls: list[tuple[str, bool]] = []
-
-        def fake_run(
-            command: list[str],
-            *,
-            capture_output: bool,
-            text: bool,
-            check: bool,
-        ) -> subprocess.CompletedProcess[str]:
-            assert capture_output is True
-            assert text is True
-            assert check is False
-            calls.append((command[2], "--paginate" in command))
-            if command == ["gh", "api", "repos/owner/repo/compare/main...feature"]:
-                return subprocess.CompletedProcess(
-                    command,
-                    0,
-                    stdout='{"status":"ahead","ahead_by":1,"behind_by":0}\n',
-                    stderr="",
-                )
-            if command == ["gh", "api", "repos/owner/repo/branches/main"]:
-                return subprocess.CompletedProcess(
-                    command,
-                    0,
-                    stdout='{"name":"main","protected":true}\n',
-                    stderr="",
-                )
-            if command == ["gh", "api", "repos/owner/repo/branches/main/protection"]:
-                return subprocess.CompletedProcess(
-                    command,
-                    0,
-                    stdout=(
-                        '{"required_status_checks":{"strict":false,"contexts":[],'
-                        '"checks":[{"context":"deploy","app_id":15368}]}}\n'
-                    ),
-                    stderr="",
-                )
-            if command == ["gh", "api", "repos/owner/repo/actions/runs/202/jobs", "--paginate"]:
-                return subprocess.CompletedProcess(
-                    command,
-                    0,
-                    stdout=(
-                        '{"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test",'
-                        '"status":"completed","conclusion":"success","steps":[]}]}\n'
-                        '{"total_count":1,"jobs":[{"id":304,"run_id":202,"name":"deploy",'
-                        '"status":"completed","conclusion":"success","steps":[]}]}\n'
-                    ),
-                    stderr="",
-                )
-            return subprocess.CompletedProcess(command, 44, stdout="", stderr="unexpected")
-
-        original_run = module.subprocess.run
-        module.subprocess.run = fake_run
-        try:
-            parsed_jobs_payload, parsed_exit, _parsed_stderr = module.run_gh_api_json(
-                "repos/owner/repo/actions/runs/202/jobs",
-                paginate=True,
-            )
-            metadata, limitations = module.collect_merge_blocker_metadata(
-                repo="owner/repo",
-                metadata={
-                    "baseRefName": "main",
-                    "headRefName": "feature",
-                    "headRepositoryOwner": {"login": "owner"},
-                },
-                ci_payload={
-                    "status": "passed",
-                    "actions": {
-                        "runs": [
-                            {
-                                "id": 202,
-                                "name": "CI",
-                                "status": "completed",
-                                "conclusion": "success",
-                            }
-                        ],
-                        "jobs": [
-                            {
-                                "id": 303,
-                                "run_id": 202,
-                                "name": "test",
-                                "status": "completed",
-                                "conclusion": "success",
-                                "steps": [],
-                            }
-                        ],
-                        "jobs_summary": {
-                            "total": 1,
-                            "counts": {"success": 1},
-                            "collection": {
-                                "mode": "bounded",
-                                "successful_runs": 1,
-                                "skipped_green_runs": 1,
-                            },
-                        },
-                    },
-                },
-            )
-        finally:
-            module.subprocess.run = original_run
-
-        limitation_codes = [item["code"] for item in limitations]
-        protection = metadata["branch_protection"]
-        assert parsed_exit == 0
-        assert parsed_jobs_payload["total_count"] == 2
-        assert protection["missing_required_status_contexts"] == []
-        assert protection["observed_successful_actions_contexts"] == ["deploy", "test"]
-        assert "required_actions_context_pending" not in limitation_codes
-        assert "required_actions_context_unobserved" not in limitation_codes
-        assert ("repos/owner/repo/actions/runs/202/jobs", True) in calls
-
-    def test_issue_222_pr_observation_snapshot_fork_head_uses_owner_qualified_compare_ref(self) -> None:
-        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "head_owner": "fork-owner",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "strict": True,
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    }
-                },
-            }
-        )
-
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "passed"
-        assert payload["recommended_next_action"] == "merge_prepared"
-        assert "repos/owner/repo/compare/main...fork-owner:feature" in gh_calls
-        assert "repos/owner/repo/compare/main...feature" not in gh_calls
-
-    def test_issue_222_pr_observation_snapshot_strict_compare_permission_denied_is_optional_metadata(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "compare_error": "permission_denied",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "strict": True,
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    }
-                },
-            }
-        )
-
-        compare_limitations = [
-            item
-            for item in payload["limitations"]
-            if item.get("code") == "pr_compare_metadata_unavailable"
-        ]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "passed"
-        assert payload["recommended_next_action"] == "merge_prepared"
-        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
-        assert compare_limitations
-        assert compare_limitations[0]["capability"] == "compare_read"
-        assert compare_limitations[0]["severity"] == "warning"
-
-    def test_issue_222_pr_observation_snapshot_unprotected_branch_skips_compare(self) -> None:
-        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "compare": {"status": "behind", "ahead_by": 0, "behind_by": 1},
-                "branch": {"name": "main", "protected": False},
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "passed"
-        assert payload["recommended_next_action"] == "merge_prepared"
-        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
-        assert "pr_branch_behind" not in limitation_codes
-        assert payload["merge_blocker_metadata"]["compare"]["skipped"] is True
-        assert "repos/owner/repo/compare/main...feature" not in gh_calls
-
-    def test_issue_222_pr_observation_snapshot_protected_non_strict_compare_behind_does_not_block_merge_prepared(self) -> None:
-        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "compare": {"status": "behind", "ahead_by": 0, "behind_by": 1},
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "strict": False,
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    }
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "passed"
-        assert payload["recommended_next_action"] == "merge_prepared"
-        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
-        assert "pr_branch_behind" not in limitation_codes
-        assert payload["merge_blocker_metadata"]["branch_protection"]["strict"] is False
-        assert payload["merge_blocker_metadata"]["compare"]["skipped"] is True
-        assert "repos/owner/repo/compare/main...feature" not in gh_calls
-
-    def test_issue_222_pr_observation_snapshot_protected_strict_compare_behind_blocks_merge_prepared(self) -> None:
-        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "compare": {"status": "behind", "ahead_by": 0, "behind_by": 1},
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "strict": True,
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    }
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "unknown"
-        assert payload["recommended_next_action"] == "human_gate"
-        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
-        assert "pr_branch_behind" in limitation_codes
-        assert payload["merge_blocker_metadata"]["branch_protection"]["strict"] is True
-        assert payload["merge_blocker_metadata"]["compare"]["behind_by"] == 1
-        assert "repos/owner/repo/compare/main...feature" in gh_calls
-
-    def test_issue_222_pr_observation_snapshot_required_pull_request_reviews_blocks_merge_prepared(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "strict": False,
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    },
-                    "required_pull_request_reviews": {
-                        "required_approving_review_count": 1,
-                        "dismiss_stale_reviews": True,
-                        "require_code_owner_reviews": False,
-                        "require_last_push_approval": True,
-                    },
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "unknown"
-        assert payload["recommended_next_action"] == "human_gate"
-        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
-        assert "required_pull_request_reviews_unverified" in limitation_codes
-        protection = payload["merge_blocker_metadata"]["branch_protection"]
-        assert protection["required_pull_request_reviews"] == {
-            "required": True,
-            "required_approving_review_count": 1,
-            "dismiss_stale_reviews": True,
-            "require_code_owner_reviews": False,
-            "require_last_push_approval": True,
-            "satisfied_by_observed_review_evidence": False,
-        }
-
-    def test_issue_222_pr_observation_snapshot_required_pull_request_review_approved_status_remains_unverified(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "strict": False,
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    },
-                    "required_pull_request_reviews": {
-                        "required_approving_review_count": 1,
-                        "dismiss_stale_reviews": False,
-                        "require_code_owner_reviews": False,
-                        "require_last_push_approval": False,
-                    },
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "unknown"
-        assert payload["recommended_next_action"] == "human_gate"
-        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
-        assert "required_pull_request_reviews_unverified" in limitation_codes
-        protection = payload["merge_blocker_metadata"]["branch_protection"]
-        assert protection["required_pull_request_reviews"] == {
-            "required": True,
-            "required_approving_review_count": 1,
-            "dismiss_stale_reviews": False,
-            "require_code_owner_reviews": False,
-            "require_last_push_approval": False,
-            "satisfied_by_observed_review_evidence": False,
-        }
-
-    def test_issue_222_pr_observation_snapshot_zero_required_pull_request_reviews_allows_merge_prepared(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "strict": False,
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    },
-                    "required_pull_request_reviews": {
-                        "required_approving_review_count": 0,
-                        "dismiss_stale_reviews": False,
-                        "require_code_owner_reviews": False,
-                        "require_last_push_approval": False,
-                    },
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "passed"
-        assert payload["recommended_next_action"] == "merge_prepared"
-        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
-        assert "required_pull_request_reviews_unverified" not in limitation_codes
-        protection = payload["merge_blocker_metadata"]["branch_protection"]
-        assert protection["required_pull_request_reviews"] == {
-            "required": True,
-            "required_approving_review_count": 0,
-            "dismiss_stale_reviews": False,
-            "require_code_owner_reviews": False,
-            "require_last_push_approval": False,
-            "satisfied_by_observed_review_evidence": True,
-        }
-
-    def test_issue_222_pr_observation_snapshot_zero_required_code_owner_reviews_blocks_merge_prepared(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "strict": False,
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    },
-                    "required_pull_request_reviews": {
-                        "required_approving_review_count": 0,
-                        "dismiss_stale_reviews": False,
-                        "require_code_owner_reviews": True,
-                        "require_last_push_approval": False,
-                    },
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "unknown"
-        assert payload["recommended_next_action"] == "human_gate"
-        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
-        assert "required_pull_request_reviews_unverified" in limitation_codes
-        protection = payload["merge_blocker_metadata"]["branch_protection"]
-        assert protection["required_pull_request_reviews"] == {
-            "required": True,
-            "required_approving_review_count": 0,
-            "dismiss_stale_reviews": False,
-            "require_code_owner_reviews": True,
-            "require_last_push_approval": False,
-            "satisfied_by_observed_review_evidence": False,
-        }
-
-    def test_issue_222_pr_observation_snapshot_locked_branch_blocks_merge_prepared(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "strict": False,
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    },
-                    "lock_branch": {"enabled": True},
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "unknown"
-        assert payload["recommended_next_action"] == "human_gate"
-        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
-        assert "protected_branch_locked" in limitation_codes
-        assert payload["merge_blocker_metadata"]["branch_protection"]["lock_branch"] == {
-            "enabled": True
-        }
-
-    def test_issue_222_pr_observation_snapshot_required_signatures_blocks_merge_prepared(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "strict": False,
-                        "contexts": [],
-                        "checks": [{"context": "test", "app_id": 15368}],
-                    },
-                    "required_signatures": {"enabled": True},
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "unknown"
-        assert payload["recommended_next_action"] == "human_gate"
-        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
-        assert "required_signatures_unverified" in limitation_codes
-        protection = payload["merge_blocker_metadata"]["branch_protection"]
-        assert protection["required_signatures"] == {"enabled": True}
-
-    def test_issue_222_pr_observation_snapshot_branch_protection_permission_denied_is_optional_metadata(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection_error": "permission_denied",
-            }
-        )
-
-        protection_limitations = [
-            item
-            for item in payload["limitations"]
-            if item.get("code") == "branch_protection_read_optional"
-        ]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "passed"
-        assert payload["recommended_next_action"] == "merge_prepared"
-        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
-        assert protection_limitations
-        assert protection_limitations[0]["capability"] == "branch_protection_read"
-        assert protection_limitations[0]["severity"] == "warning"
-
-    def test_issue_222_pr_observation_snapshot_protected_branch_protection_404_is_optional_metadata(self) -> None:
-        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": True},
-            }
-        )
-
-        protection_limitations = [
-            item
-            for item in payload["limitations"]
-            if item.get("code") == "branch_protection_read_optional"
-        ]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "passed"
-        assert payload["recommended_next_action"] == "merge_prepared"
-        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
-        assert protection_limitations
-        assert protection_limitations[0]["severity"] == "warning"
-        assert payload["merge_blocker_metadata"]["branch_protection"]["protected"] is True
-        assert payload["merge_blocker_metadata"]["branch_protection"]["protection_available"] is False
-        assert "repos/owner/repo/branches/main\n" in gh_calls
-        assert "repos/owner/repo/branches/main/protection" in gh_calls
-
-    def test_issue_222_pr_observation_snapshot_unprotected_branch_skips_protection_endpoint_and_allows_merge_prepared(self) -> None:
-        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch": {"name": "main", "protected": False},
-                "branch_protection_error": "permission_denied",
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "passed"
-        assert payload["recommended_next_action"] == "merge_prepared"
-        assert "github_token_permission_denied" not in limitation_codes
-        assert payload["merge_blocker_metadata"]["branch_protection"]["protected"] is False
-        assert "repos/owner/repo/branches/main\n" in gh_calls
+        assert "merge_blocker_metadata" not in payload
+        assert "OBS_SKIP_OPTIONAL_MERGE_BLOCKER_METADATA" not in result.stderr
+        assert "mergeable" not in gh_calls
+        assert "repos/owner/repo/compare/" not in gh_calls
+        assert "repos/owner/repo/branches/main" not in gh_calls
         assert "repos/owner/repo/branches/main/protection" not in gh_calls
-
-    def test_issue_222_pr_observation_snapshot_branch_metadata_permission_denied_is_optional_metadata(self) -> None:
-        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "MERGEABLE",
-                "branch_error": "permission_denied",
-            }
-        )
-
-        permission_limitations = [
-            item
-            for item in payload["limitations"]
-            if item.get("code") == "branch_metadata_unavailable"
-        ]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "passed"
-        assert payload["recommended_next_action"] == "merge_prepared"
-        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
-        assert permission_limitations
-        assert permission_limitations[0]["capability"] == "branch_metadata_read"
-        assert permission_limitations[0]["severity"] == "warning"
-        assert "repos/owner/repo/branches/main\n" in gh_calls
-        assert "repos/owner/repo/branches/main/protection" not in gh_calls
-
-    def test_issue_222_pr_observation_snapshot_conflicting_mergeability_beats_required_context_wait(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "CONFLICTING",
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "strict": False,
-                        "contexts": [],
-                        "checks": [{"context": "missing", "app_id": 15368}],
-                    }
-                },
-            }
-        )
-
-        limitation_codes = [item["code"] for item in payload["limitations"]]
-        assert payload["ci"]["status"] == "passed"
-        assert payload["pr_metadata"]["mergeable"] == "CONFLICTING"
-        assert "required_actions_context_unobserved" in limitation_codes
-        assert payload["normalized_status"] == "human_gate"
-        assert payload["recommended_next_action"] == "resolve_merge_conflict"
-        assert payload["decision"]["status_reason"] == "pr_merge_conflict"
-
-    def test_issue_222_pr_observation_snapshot_conflicting_mergeability_beats_pending_ci_wait(self) -> None:
-        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "pending",
-                "review": "approved",
-                "mergeable": "CONFLICTING",
-            }
-        )
-
-        assert payload["ci"]["status"] == "pending"
-        assert payload["pr_metadata"]["mergeable"] == "CONFLICTING"
-        assert payload["normalized_status"] == "human_gate"
-        assert payload["recommended_next_action"] == "resolve_merge_conflict"
-        assert payload["decision"]["status_reason"] == "pr_merge_conflict"
-        assert payload["observation_complete"] is False
-
-    def test_issue_222_pr_observation_snapshot_conflicting_mergeability_is_human_gate(self) -> None:
-        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "CONFLICTING",
-            }
-        )
-        assert payload["ci"]["status"] == "passed"
-        assert payload["pr_metadata"]["mergeable"] == "CONFLICTING"
-        assert payload["normalized_status"] == "human_gate"
-        assert payload["recommended_next_action"] == "resolve_merge_conflict"
-        assert payload["decision"]["status_reason"] == "pr_merge_conflict"
-        assert payload["observation_complete"] is False
-
-        assert "headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable" in gh_calls
-        assert "statusCheckRollup" not in gh_calls
-        assert "/check-runs" not in gh_calls
-        assert "/status" not in gh_calls
-        assert "pr checks" not in gh_calls
-
-    def test_issue_222_pr_observation_snapshot_unknown_mergeability_is_pending(self) -> None:
-        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "UNKNOWN",
-            }
-        )
-        assert payload["ci"]["status"] == "passed"
-        assert payload["pr_metadata"]["mergeable"] == "UNKNOWN"
-        assert payload["normalized_status"] == "pending"
-        assert payload["recommended_next_action"] == "wait"
-        assert payload["decision"]["status_reason"] == "pr_mergeability_pending"
-        assert payload["observation_complete"] is False
-
-        assert "headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable" in gh_calls
-        assert "statusCheckRollup" not in gh_calls
-        assert "/check-runs" not in gh_calls
-        assert "/status" not in gh_calls
-        assert "pr checks" not in gh_calls
 
     def test_issue_75_pr_observation_wait_stdout_stderr_progress_and_out_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -24922,7 +23796,7 @@ esac
             fake_gh.write_text(
                 f"""#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}}
 JSON
@@ -25759,7 +24633,7 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
@@ -25839,7 +24713,7 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     count=0
     if [ -f "$GH_FAKE_PR_VIEW_COUNT" ]; then
       count="$(cat "$GH_FAKE_PR_VIEW_COUNT")"
@@ -25934,7 +24808,7 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     count=0
     if [ -f "$GH_FAKE_PR_VIEW_COUNT" ]; then
       count="$(cat "$GH_FAKE_PR_VIEW_COUNT")"
@@ -26033,7 +24907,7 @@ esac
                 """#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$GH_FAKE_LOG"
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
@@ -26398,7 +25272,7 @@ JSON
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
@@ -30241,56 +29115,6 @@ esac
                 assert reason == expected_reason
                 assert action != "merge_prepared"
 
-    def test_issue_222_pr_observation_snapshot_passed_ci_required_actions_context_pending_stays_waitable(self) -> None:
-        status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(
-            ci_status="passed",
-            limitations=[
-                {
-                    "code": "required_actions_context_pending",
-                    "source": "repos/owner/repo/branches/main/protection",
-                    "capability": "branch_protection_read",
-                    "severity": "info",
-                    "recommended_next_action": "wait",
-                    "missing_required_status_contexts": ["Required Actions Job"],
-                }
-            ],
-        )
-
-        assert status == "pending"
-        assert action == "wait"
-        assert complete is False
-        assert reason == "ci_pending"
-        assert action != "merge_prepared"
-
-    def test_issue_222_pr_observation_snapshot_blocking_limitation_precedes_pending_actions_context(self) -> None:
-        status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(
-            ci_status="passed",
-            limitations=[
-                {
-                    "code": "required_actions_context_pending",
-                    "source": "repos/owner/repo/branches/main/protection",
-                    "capability": "branch_protection_read",
-                    "severity": "info",
-                    "recommended_next_action": "wait",
-                    "missing_required_status_contexts": ["Required Actions Job"],
-                },
-                {
-                    "code": "required_non_actions_context_unprovable_by_actions",
-                    "source": "repos/owner/repo/branches/main/protection",
-                    "capability": "branch_protection_read",
-                    "severity": "blocking",
-                    "recommended_next_action": "human_gate",
-                    "unprovable_required_status_contexts": ["External Required Check"],
-                },
-            ],
-        )
-
-        assert status == "unknown"
-        assert action == "human_gate"
-        assert complete is False
-        assert reason == "blocking_limitation"
-        assert action != "merge_prepared"
-
     def test_issue_222_s03_snapshot_fallback_no_findings_with_actionable_unresolved_blocks_pass(self) -> None:
         module = self._issue_218_s02_load_observation_snapshot_module()
         fallback_pass_candidate = {
@@ -33322,7 +32146,7 @@ esac
             fake_gh.write_text(
                 """#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,baseRefName,headRefName,headRepositoryOwner,url,state,isDraft,number,mergeable")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
 {"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
