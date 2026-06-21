@@ -20002,7 +20002,7 @@ esac
         assert protection["required_non_actions_contexts"] == []
         assert protection["unprovable_required_status_contexts"] == []
 
-    def test_issue_222_pr_observation_snapshot_legacy_context_is_unprovable_by_actions(self) -> None:
+    def test_issue_222_pr_observation_snapshot_legacy_context_is_actions_satisfiable(self) -> None:
         payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
             {
                 "head": "a" * 40,
@@ -20021,15 +20021,15 @@ esac
 
         limitation_codes = [item["code"] for item in payload["limitations"]]
         assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "unknown"
-        assert payload["recommended_next_action"] == "human_gate"
-        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
-        assert "required_non_actions_context_unprovable_by_actions" in limitation_codes
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+        assert "required_non_actions_context_unprovable_by_actions" not in limitation_codes
         assert "required_actions_context_unobserved" not in limitation_codes
         protection = payload["merge_blocker_metadata"]["branch_protection"]
-        assert protection["required_github_actions_contexts"] == []
-        assert protection["required_non_actions_contexts"] == ["test"]
-        assert protection["unprovable_required_status_contexts"] == ["test"]
+        assert protection["required_github_actions_contexts"] == ["test"]
+        assert protection["required_non_actions_contexts"] == []
+        assert protection["unprovable_required_status_contexts"] == []
 
     def test_issue_222_pr_observation_snapshot_any_source_required_check_matched_allows_merge_prepared(self) -> None:
         payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
@@ -20565,6 +20565,47 @@ esac
             "dismiss_stale_reviews": True,
             "require_code_owner_reviews": False,
             "require_last_push_approval": True,
+            "satisfied_by_observed_review_evidence": False,
+        }
+
+    def test_issue_222_pr_observation_snapshot_simple_required_pull_request_review_allows_observed_approval(self) -> None:
+        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch": {"name": "main", "protected": True},
+                "branch_protection": {
+                    "required_status_checks": {
+                        "strict": False,
+                        "contexts": [],
+                        "checks": [{"context": "test", "app_id": 15368}],
+                    },
+                    "required_pull_request_reviews": {
+                        "required_approving_review_count": 1,
+                        "dismiss_stale_reviews": False,
+                        "require_code_owner_reviews": False,
+                        "require_last_push_approval": False,
+                    },
+                },
+            }
+        )
+
+        limitation_codes = [item["code"] for item in payload["limitations"]]
+        assert payload["ci"]["status"] == "passed"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+        assert "required_pull_request_reviews_unverified" not in limitation_codes
+        protection = payload["merge_blocker_metadata"]["branch_protection"]
+        assert protection["required_pull_request_reviews"] == {
+            "required": True,
+            "required_approving_review_count": 1,
+            "dismiss_stale_reviews": False,
+            "require_code_owner_reviews": False,
+            "require_last_push_approval": False,
+            "satisfied_by_observed_review_evidence": True,
         }
 
     def test_issue_222_pr_observation_snapshot_locked_branch_blocks_merge_prepared(self) -> None:
@@ -20669,7 +20710,7 @@ esac
         assert "repos/owner/repo/branches/main\n" in gh_calls
         assert "repos/owner/repo/branches/main/protection" not in gh_calls
 
-    def test_issue_222_pr_observation_snapshot_branch_metadata_permission_denied_blocks_merge_prepared(self) -> None:
+    def test_issue_222_pr_observation_snapshot_branch_metadata_permission_denied_is_optional_metadata(self) -> None:
         payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
             {
                 "head": "a" * 40,
@@ -20683,16 +20724,60 @@ esac
         permission_limitations = [
             item
             for item in payload["limitations"]
-            if item.get("code") == "github_token_permission_denied"
+            if item.get("code") == "branch_metadata_unavailable"
         ]
         assert payload["ci"]["status"] == "passed"
-        assert payload["normalized_status"] == "unknown"
-        assert payload["recommended_next_action"] == "fix_github_token_permissions"
-        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
         assert permission_limitations
         assert permission_limitations[0]["capability"] == "branch_metadata_read"
+        assert permission_limitations[0]["severity"] == "warning"
         assert "repos/owner/repo/branches/main\n" in gh_calls
         assert "repos/owner/repo/branches/main/protection" not in gh_calls
+
+    def test_issue_222_pr_observation_snapshot_conflicting_mergeability_beats_required_context_wait(self) -> None:
+        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "CONFLICTING",
+                "branch": {"name": "main", "protected": True},
+                "branch_protection": {
+                    "required_status_checks": {
+                        "strict": False,
+                        "contexts": [],
+                        "checks": [{"context": "missing", "app_id": 15368}],
+                    }
+                },
+            }
+        )
+
+        limitation_codes = [item["code"] for item in payload["limitations"]]
+        assert payload["ci"]["status"] == "passed"
+        assert payload["pr_metadata"]["mergeable"] == "CONFLICTING"
+        assert "required_actions_context_unobserved" in limitation_codes
+        assert payload["normalized_status"] == "human_gate"
+        assert payload["recommended_next_action"] == "resolve_merge_conflict"
+        assert payload["decision"]["status_reason"] == "pr_merge_conflict"
+
+    def test_issue_222_pr_observation_snapshot_conflicting_mergeability_beats_pending_ci_wait(self) -> None:
+        payload, _gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "pending",
+                "review": "approved",
+                "mergeable": "CONFLICTING",
+            }
+        )
+
+        assert payload["ci"]["status"] == "pending"
+        assert payload["pr_metadata"]["mergeable"] == "CONFLICTING"
+        assert payload["normalized_status"] == "human_gate"
+        assert payload["recommended_next_action"] == "resolve_merge_conflict"
+        assert payload["decision"]["status_reason"] == "pr_merge_conflict"
+        assert payload["observation_complete"] is False
 
     def test_issue_222_pr_observation_snapshot_conflicting_mergeability_is_human_gate(self) -> None:
         payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(

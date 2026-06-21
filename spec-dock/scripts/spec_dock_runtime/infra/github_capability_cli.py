@@ -5,7 +5,6 @@ import json
 import os
 import subprocess
 from dataclasses import dataclass
-from urllib.parse import quote
 
 from ..application.contracts import GitHubCapability
 from ..application.contracts import GitHubCapabilityDiagnostic
@@ -68,10 +67,8 @@ class GitHubCapabilityCliGateway:
                 ["gh", "api", f"repos/{request.github_repo}/pulls/{request.github_pr}/comments"],
             ),
         ]
-        completed_by_capability: dict[GitHubCapability, subprocess.CompletedProcess[str]] = {}
         for capability, group, api, command in fixed_checks:
             completed = _run_fixed_gh(command)
-            completed_by_capability[capability] = completed
             diagnostics.append(
                 _diagnostic_from_completed_process(
                     capability=capability,
@@ -80,76 +77,7 @@ class GitHubCapabilityCliGateway:
                     completed=completed,
                 )
             )
-
-        pr_payload = _json_dict(completed_by_capability.get("pull_request_read"))
-        base_ref = _string_field(pr_payload, "baseRefName") or "HEAD"
-        head_ref = _string_field(pr_payload, "headRefName") or request.github_head_sha
-        base_repo_owner = request.github_repo.split("/", 1)[0]
-        head_owner = _head_owner_login(pr_payload)
-        encoded_base = quote(base_ref, safe="")
-        encoded_head = (
-            f"{quote(head_owner, safe='')}:{quote(head_ref, safe='')}"
-            if head_owner and head_owner != base_repo_owner
-            else quote(head_ref, safe="")
-        )
-        compare_ref = f"{encoded_base}...{encoded_head}"
-        compare_completed = _run_fixed_gh(
-            ["gh", "api", f"repos/{request.github_repo}/compare/{compare_ref}"]
-        )
-        diagnostics.append(
-            _diagnostic_from_completed_process(
-                capability="compare_read",
-                group="core",
-                api="GET /repos/{repo}/compare/{base}...{head}",
-                completed=compare_completed,
-            )
-        )
-
-        branch_completed = _run_fixed_gh(["gh", "api", f"repos/{request.github_repo}/branches/{encoded_base}"])
-        diagnostics.append(
-            _diagnostic_from_completed_process(
-                capability="branch_metadata_read",
-                group="core",
-                api="GET /repos/{repo}/branches/{branch}",
-                completed=branch_completed,
-            )
-        )
-        branch_payload = _json_dict(branch_completed)
-        if branch_payload.get("protected") is True:
-            diagnostics.append(
-                _diagnostic_from_completed_process(
-                    capability="branch_protection_read",
-                    group="core",
-                    api="GET /repos/{repo}/branches/{branch}/protection",
-                    completed=_run_fixed_gh(
-                        ["gh", "api", f"repos/{request.github_repo}/branches/{encoded_base}/protection"]
-                    ),
-                )
-            )
         return diagnostics
-
-
-def _json_dict(completed: subprocess.CompletedProcess[str] | None) -> dict[str, object]:
-    if completed is None or completed.returncode != 0:
-        return {}
-    try:
-        payload = json.loads(completed.stdout or "{}")
-    except json.JSONDecodeError:
-        return {}
-    return payload if isinstance(payload, dict) else {}
-
-
-def _string_field(payload: dict[str, object], key: str) -> str | None:
-    value = payload.get(key)
-    return value if isinstance(value, str) and value else None
-
-
-def _head_owner_login(payload: dict[str, object]) -> str | None:
-    owner = payload.get("headRepositoryOwner")
-    if not isinstance(owner, dict):
-        return None
-    login = owner.get("login")
-    return login if isinstance(login, str) and login else None
 
 
 def _run_fixed_gh(command: list[str]) -> subprocess.CompletedProcess[str]:

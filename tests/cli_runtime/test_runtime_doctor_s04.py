@@ -657,8 +657,6 @@ class TestRuntimeDoctorS04:
                     ),
                     "",
                 )
-            if command == ["gh", "api", "repos/example/repo/branches/main"]:
-                return subprocess.CompletedProcess(command, 0, '{"protected":true}', "")
             return subprocess.CompletedProcess(command, 0, "{}", "")
 
         monkeypatch.setattr(github_capability_cli.subprocess, "run", record_command)
@@ -678,15 +676,12 @@ class TestRuntimeDoctorS04:
             "issue_comments_read",
             "pull_reviews_read",
             "pull_review_comments_read",
-            "compare_read",
-            "branch_metadata_read",
-            "branch_protection_read",
         ]
         rendered_commands = "\n".join(" ".join(command) for command in commands)
         assert "number,headRefOid,baseRefName,headRefName,headRepositoryOwner,mergeable" in rendered_commands
-        assert "repos/example/repo/compare/main...feature" in rendered_commands
-        assert "repos/example/repo/branches/main" in rendered_commands
-        assert "repos/example/repo/branches/main/protection" in rendered_commands
+        assert "repos/example/repo/compare/main...feature" not in rendered_commands
+        assert "repos/example/repo/branches/main" not in rendered_commands
+        assert "repos/example/repo/branches/main/protection" not in rendered_commands
         assert "/check-runs" not in rendered_commands
         assert "/status" not in rendered_commands
         assert "statusCheckRollup" not in rendered_commands

@@ -512,6 +512,9 @@ def classify_snapshot(
         return "human_gate", "reopen_or_use_open_pr", False, "non_open_pr"
     if ci_status == "failed":
         return "failed", "fix_ci", False, "ci_failed"
+    mergeable = mergeability_status(metadata)
+    if mergeable == "CONFLICTING":
+        return "human_gate", "resolve_merge_conflict", False, "pr_merge_conflict"
     if ci_status in {"pending", "running", "none"}:
         if has_blocking_limitation(limitations, ignored_codes={"required_checks_missing_or_pending"}):
             if has_permission_limitation(limitations):
@@ -534,9 +537,6 @@ def classify_snapshot(
         return "pending", "wait", False, "ci_pending"
     if ci_status != "passed":
         return "unknown", "human_gate", False, "blocking_limitation"
-    mergeable = mergeability_status(metadata)
-    if mergeable == "CONFLICTING":
-        return "human_gate", "resolve_merge_conflict", False, "pr_merge_conflict"
     if mergeable == "UNKNOWN":
         return "pending", "wait", False, "pr_mergeability_pending"
     if mergeable != "MERGEABLE":
@@ -770,9 +770,35 @@ def required_status_contexts(protection_payload: object) -> tuple[set[str], set[
                 actions_contexts.add(context)
             else:
                 non_actions_contexts.add(context)
-    non_actions_contexts.update(legacy_contexts - actions_contexts)
+    concrete_contexts = actions_contexts | non_actions_contexts
+    actions_contexts.update(legacy_contexts - concrete_contexts)
     non_actions_contexts.difference_update(actions_contexts)
     return actions_contexts, non_actions_contexts, True
+
+
+def current_review_satisfies_simple_required_reviews(
+    required_pull_request_reviews: object, review_payload: dict[str, object]
+) -> bool:
+    if not isinstance(required_pull_request_reviews, dict):
+        return False
+    required_count = required_pull_request_reviews.get("required_approving_review_count")
+    if not isinstance(required_count, int):
+        return False
+    if required_count > 1:
+        return False
+    if required_pull_request_reviews.get("dismiss_stale_reviews") is True:
+        return False
+    if required_pull_request_reviews.get("require_code_owner_reviews") is True:
+        return False
+    if required_pull_request_reviews.get("require_last_push_approval") is True:
+        return False
+    status = review_payload.get("status")
+    if isinstance(status, str) and status.lower() == "approved":
+        return True
+    decision = collector_decision_payload({}, review_payload)
+    decision_status = decision.get("status")
+    decision_action = decision.get("recommended_next_action")
+    return decision_status == "passed" and decision_action == "merge_prepared"
 
 
 def head_owner_login(metadata: dict[str, object]) -> str | None:
@@ -789,7 +815,11 @@ def head_owner_login(metadata: dict[str, object]) -> str | None:
 
 
 def collect_merge_blocker_metadata(
-    *, repo: str, metadata: dict[str, object], ci_payload: dict[str, object]
+    *,
+    repo: str,
+    metadata: dict[str, object],
+    ci_payload: dict[str, object],
+    review_payload: dict[str, object] | None = None,
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
     limitations: list[dict[str, object]] = []
     base_ref = metadata.get("baseRefName")
@@ -881,7 +911,7 @@ def collect_merge_blocker_metadata(
     }
     if branch_exit != 0:
         limitations.append(
-            github_api_failure_limitation(
+            optional_github_api_failure_limitation(
                 api=branch_api,
                 source=branch_api,
                 capability="branch_metadata_read",
@@ -997,17 +1027,23 @@ def collect_merge_blocker_metadata(
                     ),
                 }
             )
-            limitations.append(
-                {
-                    "code": "required_pull_request_reviews_unverified",
-                    "source": protection_api,
-                    "capability": "pull_request_reviews_read",
-                    "severity": "blocking",
-                    "message": "branch protection requires pull request reviews that cannot be fully proven by the observation script",
-                    "recommended_next_action": "human_gate",
-                    "required_pull_request_reviews": pull_request_review_metadata,
-                }
+            review_satisfied = current_review_satisfies_simple_required_reviews(
+                required_pull_request_reviews,
+                review_payload if isinstance(review_payload, dict) else {},
             )
+            pull_request_review_metadata["satisfied_by_observed_review_evidence"] = review_satisfied
+            if not review_satisfied:
+                limitations.append(
+                    {
+                        "code": "required_pull_request_reviews_unverified",
+                        "source": protection_api,
+                        "capability": "pull_request_reviews_read",
+                        "severity": "blocking",
+                        "message": "branch protection requires pull request reviews that cannot be fully proven by the observation script",
+                        "recommended_next_action": "human_gate",
+                        "required_pull_request_reviews": pull_request_review_metadata,
+                    }
+                )
         protection_metadata["required_pull_request_reviews"] = pull_request_review_metadata
         contexts, non_actions_contexts, schema_ok = required_status_contexts(protection_payload)
         if not schema_ok:
@@ -1308,6 +1344,7 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
             repo=args.repo,
             metadata=metadata,
             ci_payload=ci_payload,
+            review_payload=review_payload,
         )
         limitations.extend(merge_blocker_limitations)
     normalized_status, recommended_next_action, observation_complete, status_reason = classify_snapshot(
