@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+PR_METADATA_FIELDS = "headRefOid,url,state,isDraft,number"
+
 
 @dataclass(frozen=True)
 class Args:
@@ -154,6 +156,115 @@ def classify_github_stderr(stderr: str) -> str:
     return "unknown"
 
 
+def github_api_failure_limitation(
+    *,
+    api: str,
+    source: str,
+    capability: str,
+    exit_code: int,
+    stderr: str,
+    default_code: str,
+    default_message: str,
+) -> dict[str, object]:
+    classification = classify_github_stderr(stderr)
+    stderr_sha256 = hashlib.sha256((stderr or "").encode()).hexdigest()
+    base = {
+        "capability": capability,
+        "api": api,
+        "source": source,
+        "token_source": token_source(),
+        "secret_redacted": True,
+        "stderr_sha256": stderr_sha256,
+        "exit_code": exit_code,
+    }
+    if classification == "permission_denied":
+        return {
+            **base,
+            "code": "github_token_permission_denied",
+            "status": "permission_denied",
+            "severity": "blocking",
+            "message": "GitHub token lacks permission for fixed PR observation metadata API",
+            "recommended_next_action": "fix_github_token_permissions",
+        }
+    if classification == "auth_missing":
+        return {
+            **base,
+            "code": "github_auth_missing",
+            "status": "auth_missing",
+            "severity": "blocking",
+            "message": "GitHub authentication is unavailable for fixed PR observation metadata API",
+            "recommended_next_action": "authenticate_github_cli",
+        }
+    if classification == "rate_limited":
+        return {
+            **base,
+            "code": "github_rate_limited",
+            "status": "rate_limited",
+            "severity": "blocking",
+            "message": "GitHub rate limit blocked fixed PR observation metadata API",
+            "recommended_next_action": "wait_or_retry_later",
+        }
+    if classification == "schema_unavailable":
+        return {
+            **base,
+            "code": "github_api_schema_unavailable",
+            "status": "schema_unavailable",
+            "severity": "blocking",
+            "message": "fixed read-only PR observation metadata schema is unavailable",
+            "recommended_next_action": "inspect_github_api_schema",
+        }
+    if classification == "transient_unknown":
+        return {
+            **base,
+            "code": "github_transient_unknown",
+            "status": "transient_unknown",
+            "severity": "blocking",
+            "message": "transient GitHub failure blocked fixed PR observation metadata API",
+            "recommended_next_action": "retry_observation",
+        }
+    return {
+        **base,
+        "code": default_code,
+        "status": classification,
+        "severity": "blocking",
+        "message": default_message,
+        "recommended_next_action": "human_gate",
+    }
+
+
+def optional_github_api_failure_limitation(
+    *,
+    api: str,
+    source: str,
+    capability: str,
+    exit_code: int,
+    stderr: str,
+    default_code: str,
+    default_message: str,
+    recommended_next_action: str = "continue_with_available_metadata",
+) -> dict[str, object]:
+    limitation = github_api_failure_limitation(
+        api=api,
+        source=source,
+        capability=capability,
+        exit_code=exit_code,
+        stderr=stderr,
+        default_code=default_code,
+        default_message=default_message,
+    )
+    limitation["severity"] = "warning"
+    limitation["recommended_next_action"] = recommended_next_action
+    if limitation.get("code") == "github_token_permission_denied":
+        limitation["code"] = default_code
+    limitation["message"] = default_message
+    return limitation
+
+
+def is_not_found(stderr: str) -> bool:
+    lowered = (stderr or "").lower()
+    return "http 404" in lowered or "not found" in lowered
+
+
 def pr_metadata_failure_limitation(
     *, exit_code: int, stderr: str, default_code: str, default_message: str
 ) -> dict[str, object]:
@@ -161,7 +272,7 @@ def pr_metadata_failure_limitation(
     stderr_sha256 = hashlib.sha256((stderr or "").encode()).hexdigest()
     base = {
         "capability": "pull_request_read",
-        "api": "gh pr view --json headRefOid,url,state,isDraft,number",
+        "api": f"gh pr view --json {PR_METADATA_FIELDS}",
         "source": "gh_pr_view",
         "token_source": token_source(),
         "secret_redacted": True,
@@ -285,12 +396,27 @@ def carryover_inventory_reason(decision: dict[str, object]) -> str | None:
     return None
 
 
+def explicit_actionable_unresolved_reason(decision: dict[str, object]) -> str | None:
+    actionable_unresolved_count = decision_int(decision, "actionable_unresolved_count")
+    actionable_unresolved_thread_ids = decision_list(decision, "actionable_unresolved_thread_ids")
+    if actionable_unresolved_count > 0 or actionable_unresolved_thread_ids:
+        return "actionable_unresolved_thread"
+    return None
+
+
 def trusted_completion_actionable_reason(
     decision: dict[str, object], completion_signal: object
 ) -> str | None:
     current_reason = current_selected_actionable_reason(decision)
     if current_reason:
         return current_reason
+    fallback_pass_candidate = decision.get("fallback_pass_candidate")
+    if (
+        completion_signal == "fallback_issue_comment"
+        and isinstance(fallback_pass_candidate, dict)
+        and fallback_pass_candidate.get("promotes_top_level_status") is True
+    ):
+        return explicit_actionable_unresolved_reason(decision)
     if completion_signal == "submitted_pull_request_review":
         return carryover_inventory_reason(decision)
     return None
@@ -311,6 +437,15 @@ def has_permission_limitation(limitations: list[object]) -> bool:
         isinstance(item, dict)
         and item.get("code") == "github_token_permission_denied"
         and item.get("severity") == "blocking"
+        for item in limitations
+    )
+
+
+def has_waitable_required_actions_context_limitation(limitations: list[object]) -> bool:
+    return any(
+        isinstance(item, dict)
+        and item.get("code") == "required_actions_context_pending"
+        and item.get("recommended_next_action") == "wait"
         for item in limitations
     )
 
@@ -368,12 +503,20 @@ def classify_snapshot(
                 return "unknown", "fix_github_token_permissions", False, "blocking_limitation"
             return "unknown", "human_gate", False, "blocking_limitation"
         return str(ci_status), "wait", False, "ci_pending"
+    if ci_status == "unknown" and has_waitable_required_actions_context_limitation(limitations):
+        if has_blocking_limitation(limitations, ignored_codes={"required_checks_missing_or_pending"}):
+            if has_permission_limitation(limitations):
+                return "unknown", "fix_github_token_permissions", False, "blocking_limitation"
+            return "unknown", "human_gate", False, "blocking_limitation"
+        return "pending", "wait", False, "ci_pending"
     if ci_status == "passed" and actionable_reason:
         return "human_gate", "address_review_feedback", True, actionable_reason
     if has_permission_limitation(limitations):
         return "unknown", "fix_github_token_permissions", False, "blocking_limitation"
     if has_blocking_limitation(limitations):
         return "unknown", "human_gate", False, "blocking_limitation"
+    if ci_status == "passed" and has_waitable_required_actions_context_limitation(limitations):
+        return "pending", "wait", False, "ci_pending"
     if ci_status != "passed":
         return "unknown", "human_gate", False, "blocking_limitation"
     if decision_status_reason == "current_selected_changes_requested" or selected_changes_requested_evidence:
@@ -438,6 +581,7 @@ def load_metadata(path: Path) -> tuple[dict[str, object], str]:
     return payload, head if isinstance(head, str) else ""
 
 
+
 def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
     checks_script = script_dir / "lib" / "fetch_pr_checks_snapshot.sh"
     review_script = script_dir / "lib" / "fetch_pr_review_snapshot.sh"
@@ -445,7 +589,7 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
     gh_stdout = tmp_dir / "gh-pr-view.json"
     gh_stderr = tmp_dir / "gh-pr-view.stderr"
     gh_exit = run_to_files(
-        ["gh", "pr", "view", str(args.pr), "--repo", args.repo, "--json", "headRefOid,url,state,isDraft,number"],
+        ["gh", "pr", "view", str(args.pr), "--repo", args.repo, "--json", PR_METADATA_FIELDS],
         gh_stdout,
         gh_stderr,
     )
@@ -497,7 +641,7 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
                 review_args.extend(["--out", args.out_dir])
             review_exit = run_to_files(review_args, review_stdout, review_stderr)
             final_gh_exit = run_to_files(
-                ["gh", "pr", "view", str(args.pr), "--repo", args.repo, "--json", "headRefOid,url,state,isDraft,number"],
+                ["gh", "pr", "view", str(args.pr), "--repo", args.repo, "--json", PR_METADATA_FIELDS],
                 final_gh_stdout,
                 final_gh_stderr,
             )
@@ -684,6 +828,7 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
     checks_payload_for_fingerprint = load_json_path(checks_stdout)
     if not isinstance(checks_payload_for_fingerprint, dict):
         checks_payload_for_fingerprint = {}
+    ci_actions = ci_payload.get("actions") if isinstance(ci_payload.get("actions"), dict) else {}
     fingerprint_source = {
         "repo": args.repo,
         "pr": args.pr,
@@ -692,6 +837,13 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
         "normalized_status": normalized_status,
         "limitations": [item["code"] for item in limitations if isinstance(item, dict) and "code" in item],
         "ci_status": ci_payload.get("status"),
+        "ci_source_policy": checks_payload_for_fingerprint.get("source_policy")
+        or ci_payload.get("source_policy"),
+        "ci_actions": {
+            "available": ci_actions.get("available"),
+            "workflow_runs": ci_actions.get("workflow_runs"),
+            "jobs_summary": ci_actions.get("jobs_summary"),
+        },
         "ci_fingerprint": checks_payload_for_fingerprint.get("fingerprint"),
         "review_decision_fingerprint": review_decision_fingerprint,
     }

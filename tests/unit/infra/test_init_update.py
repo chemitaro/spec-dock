@@ -1,5 +1,4 @@
 import ast
-import hashlib
 import importlib.util
 import io
 import json
@@ -1276,6 +1275,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00215-codex-review-trigger-timeout-diagnostics/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00218-codex-review-fallback-signal-semantics/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00219-carryover-unresolved-threads-stop-observation/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00222-forbid-checks-api-pr-observation/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1491,6 +1491,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00215-codex-review-trigger-timeout-diagnostics/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00218-codex-review-fallback-signal-semantics/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00219-carryover-unresolved-threads-stop-observation/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00222-forbid-checks-api-pr-observation/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -11875,8 +11876,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "the blocker is `permission_or_auth`, `external_or_flaky`, `base_branch_conflict`, `unknown`",
             "a requirement expansion, a breaking change, a migration, a secret or deployment setting change",
             "ambiguous review intent",
-            "No non-required check failure remains unless the check is known optional",
-            "Any waived non-required check failure is reported as residual risk.",
+            "External/non-Actions checks are not claimed as observed by this skill.",
+            "Any waived or unconfirmed external/non-Actions check risk is reported as residual risk.",
             "If unresolved review-thread state cannot be determined",
             "stop at a human gate. Do not hide the limitation.",
             "If an existing PR exists, use its base for monitoring.",
@@ -12336,7 +12337,10 @@ if log_path:
         log.write(" ".join(args) + "\\n")
 
 if args[:5] == ["pr", "view", "13", "--repo", "owner/repo"]:
-    if "--json" in args and "headRefOid,url,state,isDraft,number" in args:
+    if "--json" in args and (
+        "headRefOid,url,state,isDraft,number" in args
+        or "headRefOid,url,state,isDraft,number" in args
+    ):
         metadata_calls += 1
         state_path.write_text(str(metadata_calls), encoding="utf-8")
 elif metadata_calls == 0:
@@ -12351,7 +12355,10 @@ review_body = current.get("review_body")
 review_thread_state = current.get("review_thread_state", "RESOLVED")
 hang_seconds = current.get("hang_seconds")
 
-if hang_seconds is not None:
+if hang_seconds is not None and (
+    not current.get("hang_only_when_full_snapshot")
+    or os.environ.get("OBS_SKIP_OPTIONAL_MERGE_BLOCKER_METADATA") == "0"
+):
     time.sleep(float(hang_seconds))
 
 def emit(payload):
@@ -12367,6 +12374,21 @@ if args[:2] == ["pr", "view"] and "--json" in args and "headRefOid,url,state,isD
         "state": current.get("state", "OPEN"),
         "isDraft": current.get("is_draft", False),
         "number": 13,
+    })
+elif args[:2] == ["pr", "view"] and "--json" in args and "headRefOid,url,state,isDraft,number" in args:
+    poll_delay_seconds = current.get("poll_delay_seconds")
+    if poll_delay_seconds is not None:
+        time.sleep(float(poll_delay_seconds))
+    emit({
+        "headRefOid": head,
+        "baseRefName": current.get("base_ref", "main"),
+        "headRefName": current.get("head_ref", "feature"),
+        "headRepositoryOwner": {"login": current.get("head_owner", "owner")},
+        "url": "https://github.com/owner/repo/pull/13",
+        "state": current.get("state", "OPEN"),
+        "isDraft": current.get("is_draft", False),
+        "number": 13,
+        "mergeable": current.get("mergeable", "MERGEABLE"),
     })
 elif args[:2] == ["pr", "view"] and "--json" in args and "mergeStateStatus,statusCheckRollup" in args:
     emit({
@@ -12392,6 +12414,14 @@ elif args[:2] == ["api", f"repos/owner/repo/actions/runs?head_sha={head}"]:
         }]})
     elif ci == "none":
         emit({"total_count": 0, "workflow_runs": []})
+    elif ci == "unknown":
+        emit({"total_count": 1, "workflow_runs": [{
+            "id": 202,
+            "name": "CI",
+            "head_sha": head,
+            "status": "completed",
+            "conclusion": "mystery",
+        }]})
     else:
         emit({"total_count": 1, "workflow_runs": [{
             "id": 202,
@@ -12401,7 +12431,20 @@ elif args[:2] == ["api", f"repos/owner/repo/actions/runs?head_sha={head}"]:
             "conclusion": None,
         }]})
 elif args[:2] == ["api", "repos/owner/repo/actions/runs/202/jobs"]:
-    if ci == "passed":
+    if "jobs" in current:
+        emit({"total_count": len(current["jobs"]), "jobs": current["jobs"]})
+    elif "extra_jobs" in current:
+        jobs = [{
+            "id": 303,
+            "run_id": 202,
+            "name": "test",
+            "status": "completed",
+            "conclusion": "success",
+            "steps": [],
+        }]
+        jobs.extend(current["extra_jobs"])
+        emit({"total_count": len(jobs), "jobs": jobs})
+    elif ci == "passed":
         emit({"total_count": 1, "jobs": [{
             "id": 303,
             "run_id": 202,
@@ -12419,6 +12462,15 @@ elif args[:2] == ["api", "repos/owner/repo/actions/runs/202/jobs"]:
             "conclusion": "failure",
             "steps": [{"number": 1, "name": "Run tests", "status": "completed", "conclusion": "failure"}],
         }]})
+    elif ci == "unknown":
+        emit({"total_count": 1, "jobs": [{
+            "id": 303,
+            "run_id": 202,
+            "name": "test",
+            "status": "completed",
+            "conclusion": "mystery",
+            "steps": [],
+        }]})
     else:
         emit({"total_count": 1, "jobs": [{
             "id": 303,
@@ -12428,6 +12480,31 @@ elif args[:2] == ["api", "repos/owner/repo/actions/runs/202/jobs"]:
             "conclusion": None,
             "steps": [],
         }]})
+elif args == ["api", "repos/owner/repo/compare/main...feature"]:
+    if current.get("compare_error") == "permission_denied":
+        print("resource not accessible by personal access token", file=sys.stderr)
+        sys.exit(1)
+    emit(current.get("compare", {"status": "ahead", "ahead_by": 1, "behind_by": 0}))
+elif args == ["api", "repos/owner/repo/compare/main...fork-owner:feature"]:
+    if current.get("compare_error") == "permission_denied":
+        print("resource not accessible by personal access token", file=sys.stderr)
+        sys.exit(1)
+    emit(current.get("compare", {"status": "ahead", "ahead_by": 1, "behind_by": 0}))
+elif args == ["api", "repos/owner/repo/branches/main"]:
+    branch_error = current.get("branch_error")
+    if branch_error == "permission_denied":
+        print("resource not accessible by personal access token", file=sys.stderr)
+        sys.exit(1)
+    emit(current.get("branch", {"name": "main", "protected": False}))
+elif args == ["api", "repos/owner/repo/branches/main/protection"]:
+    protection_error = current.get("branch_protection_error")
+    if protection_error == "permission_denied":
+        print("resource not accessible by personal access token", file=sys.stderr)
+        sys.exit(1)
+    if "branch_protection" not in current:
+        print("HTTP 404: branch protection not found", file=sys.stderr)
+        sys.exit(1)
+    emit(current["branch_protection"])
 elif args[:2] == ["api", f"repos/owner/repo/commits/{head}/check-runs"]:
             if ci == "passed":
                 emit({"total_count": 1, "check_runs": [{
@@ -12732,7 +12809,10 @@ def emit_paginated(payloads):
 
 head_sequence = scenario.get("head_sequence") or [scenario.get("head", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
 
-if args == ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,url,state,isDraft,number"]:
+if args in (
+    ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,url,state,isDraft,number"],
+    ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,url,state,isDraft,number"],
+):
     if scenario.get("metadata_error_after_post", False) and state["pr_view_count"] > 0:
         state["pr_view_count"] += 1
         save_state()
@@ -12743,10 +12823,13 @@ if args == ["pr", "view", "13", "--repo", "owner/repo", "--json", "headRefOid,ur
     save_state()
     emit({
         "headRefOid": head_sequence[index],
+        "baseRefName": scenario.get("base_ref", "main"),
+        "headRefName": scenario.get("head_ref", "feature"),
         "url": "https://github.com/owner/repo/pull/13",
         "state": scenario.get("state", "OPEN"),
         "isDraft": scenario.get("is_draft", False),
         "number": 13,
+        "mergeable": scenario.get("mergeable", "MERGEABLE"),
     })
 elif args == ["api", "repos/owner/repo/issues/13/comments", "--paginate"]:
     state["comments_get_count"] += 1
@@ -13226,9 +13309,9 @@ exit 44
             fake_gh.write_text(
                 f"""#!/usr/bin/env bash
 case "$*" in
-  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number"|"pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
-{{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}}
+{{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}}
 JSON
     ;;
   "api repos/owner/repo/issues/13/comments --paginate")
@@ -14371,8 +14454,22 @@ JSON
 case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main/protection")
+    printf 'HTTP 404: branch protection not found\\n' >&2
+    exit 1
     ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2
@@ -14605,7 +14702,7 @@ esac
 case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
@@ -14617,6 +14714,20 @@ JSON
     cat <<'JSON'
 {"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
 JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main/protection")
+    printf 'HTTP 404: branch protection not found\\n' >&2
+    exit 1
     ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
@@ -14703,7 +14814,17 @@ esac
 case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
 JSON
     ;;
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
@@ -14813,7 +14934,7 @@ esac
 case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
@@ -14829,6 +14950,16 @@ JSON
   "api repos/owner/repo/actions/runs/202/jobs --paginate")
     cat <<'JSON'
 {"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
+JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
 JSON
     ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
@@ -14974,8 +15105,22 @@ PY
 case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main/protection")
+    printf 'HTTP 404: branch protection not found\\n' >&2
+    exit 1
     ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2
@@ -15368,7 +15513,7 @@ esac
 case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<JSON
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"${PR_STATE:-OPEN}","isDraft":${PR_IS_DRAFT:-false},"number":13}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"${PR_STATE:-OPEN}","isDraft":${PR_IS_DRAFT:-false},"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
@@ -15380,6 +15525,20 @@ JSON
     cat <<'JSON'
 {"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
 JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main/protection")
+    printf 'HTTP 404: branch protection not found\\n' >&2
+    exit 1
     ;;
   "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup")
     cat <<'JSON'
@@ -15626,12 +15785,658 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "pending"
-            assert payload["ci"]["progress_status"] == "pending"
-            assert payload["ci"]["required_check_state"]["merge_state_status"] == "BLOCKED"
-            assert "required_checks_missing_or_pending" in [
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["progress_status"] == "passed"
+            assert payload["ci"]["required_check_state"]["available"] is False
+            assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+            assert payload["ci"]["required_check_state"]["merge_state_status"] is None
+            assert "required_checks_missing_or_pending" not in [
                 item["code"] for item in payload["limitations"]
             ]
+
+    def test_issue_222_s01_pr_observation_ci_collector_forbids_checks_api_surfaces(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            gh_log = tmp_path / "gh.log"
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env python3
+import json
+import os
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+log_path = Path(os.environ["GH_FAKE_LOG"])
+with log_path.open("a", encoding="utf-8") as log:
+    log.write(" ".join(args) + "\\n")
+
+joined = " ".join(args)
+if (
+    "check-runs" in joined
+    or f"commits/{'a' * 40}/status" in joined
+    or "statusCheckRollup" in joined
+    or args[:3] == ["pr", "checks", "13"]
+):
+    print(f"forbidden CI surface called: {joined}", file=sys.stderr)
+    sys.exit(66)
+
+def emit(payload):
+    print(json.dumps(payload, separators=(",", ":")))
+
+if args == ["api", "repos/owner/repo/actions/runs?head_sha=" + "a" * 40, "--paginate"]:
+    emit({"total_count": 1, "workflow_runs": [{
+        "id": 202,
+        "name": "CI",
+        "head_sha": "a" * 40,
+        "status": "completed",
+        "conclusion": "success",
+    }]})
+elif args == ["api", "repos/owner/repo/actions/runs/202/jobs", "--paginate"]:
+    emit({"total_count": 1, "jobs": [{
+        "id": 303,
+        "run_id": 202,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "success",
+        "steps": [],
+    }]})
+else:
+    print(f"unexpected gh call: {joined}", file=sys.stderr)
+    sys.exit(44)
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["script"] == "fetch_pr_checks_snapshot.sh"
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+            assert payload["ci"]["required_check_state"]["status_check_rollup_total"] == 0
+            assert payload["ci"]["check_runs"]["total"] == 0
+            assert payload["ci"]["commit_statuses"]["total"] == 0
+            assert "ci_coverage_limited_to_github_actions" not in [
+                item["code"] for item in payload["limitations"]
+            ]
+            gh_calls = gh_log.read_text(encoding="utf-8")
+            assert "actions/runs?head_sha=" in gh_calls
+            assert "actions/runs/202/jobs" in gh_calls
+            assert "check-runs" not in gh_calls
+            assert "/status" not in gh_calls
+            assert "statusCheckRollup" not in gh_calls
+            assert "pr checks" not in gh_calls
+
+    def test_issue_222_s01_static_guard_targets_forbidden_ci_surfaces_not_checks_name(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        collector_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py"
+        )
+        compatibility_script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        collector = collector_path.read_text(encoding="utf-8")
+
+        assert compatibility_script_path.is_file()
+        assert "fetch_pr_checks_snapshot.sh" in compatibility_script_path.name
+        assert "check-runs" not in collector
+        assert "commits/{expected_head_sha}/status" not in collector
+        assert "statusCheckRollup" not in collector
+        assert '["gh", "pr", "checks"' not in collector
+
+    def _issue_222_s02_run_actions_ci_collector(self, *, case_name: str) -> tuple[dict[str, object], list[str]]:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            gh_log = tmp_path / "gh.log"
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env python3
+import json
+import os
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+joined = " ".join(args)
+log_path = Path(os.environ["GH_FAKE_LOG"])
+with log_path.open("a", encoding="utf-8") as log:
+    log.write(joined + "\\n")
+
+if (
+    "check-runs" in joined
+    or f"commits/{'a' * 40}/status" in joined
+    or "statusCheckRollup" in joined
+    or args[:3] == ["pr", "checks", "13"]
+):
+    print(f"forbidden CI surface called: {joined}", file=sys.stderr)
+    sys.exit(66)
+
+case_name = os.environ["GH_FAKE_CASE"]
+
+def emit(payload):
+    print(json.dumps(payload, separators=(",", ":")))
+
+def run_payload(status, conclusion=None):
+    payload = {
+        "id": 202,
+        "name": "CI",
+        "head_sha": "a" * 40,
+        "status": status,
+    }
+    if conclusion is not None:
+        payload["conclusion"] = conclusion
+    return payload
+
+def job_payload(status, conclusion=None):
+    payload = {
+        "id": 303,
+        "run_id": 202,
+        "name": "test",
+        "status": status,
+        "steps": [],
+    }
+    if conclusion is not None:
+        payload["conclusion"] = conclusion
+    return payload
+
+if args == ["api", "repos/owner/repo/actions/runs?head_sha=" + "a" * 40, "--paginate"]:
+    if case_name == "actions_unavailable":
+        print("resource not accessible by personal access token", file=sys.stderr)
+        sys.exit(66)
+    if case_name == "zero_runs":
+        emit({"total_count": 0, "workflow_runs": []})
+    elif case_name == "failure":
+        emit({"total_count": 1, "workflow_runs": [run_payload("completed", "failure")]})
+    elif case_name == "failed_jobs_unavailable":
+        emit({"total_count": 1, "workflow_runs": [run_payload("completed", "failure")]})
+    elif case_name == "cancelled":
+        emit({"total_count": 1, "workflow_runs": [run_payload("completed", "cancelled")]})
+    elif case_name == "timed_out":
+        emit({"total_count": 1, "workflow_runs": [run_payload("completed", "timed_out")]})
+    elif case_name == "queued":
+        emit({"total_count": 1, "workflow_runs": [run_payload("queued")]})
+    elif case_name == "in_progress":
+        emit({"total_count": 1, "workflow_runs": [run_payload("in_progress")]})
+    elif case_name == "pending":
+        emit({"total_count": 1, "workflow_runs": [run_payload("pending")]})
+    elif case_name == "unknown":
+        emit({"total_count": 1, "workflow_runs": [run_payload("completed", "mystery")]})
+    else:
+        emit({"total_count": 1, "workflow_runs": [run_payload("completed", "success")]})
+elif args == ["api", "repos/owner/repo/actions/runs/202/jobs", "--paginate"]:
+    if case_name == "failed_jobs_unavailable":
+        print("jobs endpoint unavailable", file=sys.stderr)
+        sys.exit(44)
+    if case_name == "failure":
+        emit({"total_count": 1, "jobs": [job_payload("completed", "failure")]})
+    elif case_name == "cancelled":
+        emit({"total_count": 1, "jobs": [job_payload("completed", "cancelled")]})
+    elif case_name == "timed_out":
+        emit({"total_count": 1, "jobs": [job_payload("completed", "timed_out")]})
+    elif case_name == "queued":
+        emit({"total_count": 1, "jobs": [job_payload("queued")]})
+    elif case_name == "in_progress":
+        emit({"total_count": 1, "jobs": [job_payload("in_progress")]})
+    elif case_name == "pending":
+        emit({"total_count": 1, "jobs": [job_payload("pending")]})
+    else:
+        emit({"total_count": 1, "jobs": [job_payload("completed", "success")]})
+else:
+    print(f"unexpected gh call: {joined}", file=sys.stderr)
+    sys.exit(44)
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_CASE": case_name,
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            return payload, gh_log.read_text(encoding="utf-8").splitlines()
+
+    def test_issue_222_s02_actions_success_passes_with_source_policy_marker(self) -> None:
+        payload, gh_calls = self._issue_222_s02_run_actions_ci_collector(case_name="success")
+
+        assert payload["source_policy"] == "github_actions_only"
+        assert payload["ci"]["source_policy"] == "github_actions_only"
+        assert payload["ci"]["status"] == "passed"
+        assert payload["ci"]["progress_status"] == "passed"
+        assert payload["ci"]["actions"]["available"] is True
+        assert payload["ci"]["actions"]["workflow_runs"]["total"] == 1
+        assert payload["ci"]["check_runs"]["total"] == 0
+        assert payload["ci"]["commit_statuses"]["total"] == 0
+        assert "ci_coverage_limited_to_github_actions" not in [
+            item["code"] for item in payload["limitations"]
+        ]
+        assert not any("check-runs" in call for call in gh_calls)
+        assert not any("/status" in call for call in gh_calls)
+        assert not any("statusCheckRollup" in call for call in gh_calls)
+
+    def test_issue_222_s02_actions_non_success_states_classify_from_actions_only(self) -> None:
+        cases = {
+            "failure": "failed",
+            "cancelled": "failed",
+            "timed_out": "failed",
+            "queued": "pending",
+            "in_progress": "running",
+            "pending": "pending",
+            "unknown": "unknown",
+        }
+
+        for case_name, expected_status in cases.items():
+            with _case(name=case_name):
+                payload, gh_calls = self._issue_222_s02_run_actions_ci_collector(case_name=case_name)
+
+                assert payload["ci"]["source_policy"] == "github_actions_only"
+                assert payload["ci"]["status"] == expected_status
+                assert payload["ci"]["status"] != "passed"
+                assert payload["ci"]["check_runs"]["total"] == 0
+                assert payload["ci"]["commit_statuses"]["total"] == 0
+                assert not any("check-runs" in call for call in gh_calls)
+                assert not any("/status" in call for call in gh_calls)
+                assert not any("statusCheckRollup" in call for call in gh_calls)
+
+    def test_issue_222_s02_zero_actions_runs_never_pass_and_do_not_fallback(self) -> None:
+        payload, gh_calls = self._issue_222_s02_run_actions_ci_collector(case_name="zero_runs")
+
+        assert payload["ci"]["source_policy"] == "github_actions_only"
+        assert payload["ci"]["status"] == "none"
+        assert payload["ci"]["status"] != "passed"
+        assert payload["ci"]["actions"]["workflow_runs"]["total"] == 0
+        assert "zero_actions_runs_non_success" in [
+            item["code"] for item in payload["limitations"]
+        ]
+        assert payload["ci"]["check_runs"]["total"] == 0
+        assert payload["ci"]["commit_statuses"]["total"] == 0
+        assert not any("check-runs" in call for call in gh_calls)
+        assert not any("/status" in call for call in gh_calls)
+
+    def test_issue_222_s02_actions_unavailable_is_unknown_without_fallback(self) -> None:
+        payload, gh_calls = self._issue_222_s02_run_actions_ci_collector(case_name="actions_unavailable")
+
+        assert payload["ci"]["source_policy"] == "github_actions_only"
+        assert payload["ci"]["status"] == "unknown"
+        assert payload["ci"]["actions"]["available"] is False
+        assert payload["ci"]["check_runs"]["total"] == 0
+        assert payload["ci"]["commit_statuses"]["total"] == 0
+        assert [item["capability"] for item in payload["limitations"]] == ["actions_read"]
+        assert [item["code"] for item in payload["limitations"]] == ["github_token_permission_denied"]
+        assert not any("check-runs" in call for call in gh_calls)
+        assert not any("/status" in call for call in gh_calls)
+
+    def test_issue_222_s02_failed_run_stays_failed_when_jobs_api_unavailable(self) -> None:
+        payload, gh_calls = self._issue_222_s02_run_actions_ci_collector(
+            case_name="failed_jobs_unavailable"
+        )
+
+        assert payload["ci"]["source_policy"] == "github_actions_only"
+        assert payload["ci"]["status"] == "failed"
+        assert payload["ci"]["progress_status"] == "failed"
+        assert [item["code"] for item in payload["limitations"]] == ["github_api_collection_failed"]
+        assert payload["limitations"][0]["source"] == "repos/owner/repo/actions/runs/202/jobs"
+        assert payload["ci"]["failures"] == [
+            {
+                "dedupe_key": "actions:202:run",
+                "failed_steps": [],
+                "html_url": None,
+                "job_conclusion": None,
+                "job_id": None,
+                "job_name": None,
+                "job_status": None,
+                "kind": "github_actions_job",
+                "source": "actions",
+                "workflow_conclusion": "failure",
+                "workflow_name": "CI",
+                "workflow_run_attempt": None,
+                "workflow_run_id": 202,
+                "workflow_status": "completed",
+            }
+        ]
+        assert not any("check-runs" in call for call in gh_calls)
+        assert not any("/status" in call for call in gh_calls)
+
+    def _issue_222_s03_actions_summary(self, *, status: str = "passed") -> dict[str, object]:
+        counts = {
+            "success": 1 if status == "passed" else 0,
+            "neutral": 0,
+            "skipped": 0,
+            "failed": 0,
+            "running": 1 if status == "running" else 0,
+            "pending": 0,
+            "unknown": 0,
+        }
+        return {
+            "available": True,
+            "workflow_runs": {"total": 1, "counts": counts},
+            "jobs_summary": {
+                "total": 1,
+                "counts": counts,
+                "collection": {"successful_runs": 1, "failed_runs": 0},
+            },
+            "jobs_detail": [
+                {
+                    "id": 303,
+                    "run_id": 202,
+                    "name": "test",
+                    "status": "completed" if status == "passed" else "in_progress",
+                    "conclusion": "success" if status == "passed" else None,
+                    "html_url": "https://example.test/job/303",
+                }
+            ],
+        }
+
+    def test_issue_222_s03_wait_uses_actions_summary_with_empty_legacy_fields(self) -> None:
+        scenario = [
+            {
+                "ci": "running",
+                "status": "running",
+                "overall_status": "running",
+                "normalized_status": "running",
+                "source_policy": "github_actions_only",
+                "actions": self._issue_222_s03_actions_summary(status="running"),
+                "check_runs": {"total": 0, "success": 0, "running": 0},
+                "commit_statuses": {"total": 0, "success": 0},
+                "required_check_state": {"available": False, "collection_policy": "forbidden"},
+                "review": "pending",
+                "recommended_next_action": "wait",
+            }
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                scenario,
+                timeout_seconds=1,
+                poll_interval_seconds=1,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["ci"]["source_policy"] == "github_actions_only"
+        assert payload["ci"]["check_runs"]["total"] == 0
+        assert payload["normalized_status"] == "timeout"
+        assert "checks=0/1" in result.stderr
+
+    def test_issue_222_s03_wait_uses_workflow_counts_when_jobs_summary_empty(self) -> None:
+        actions = self._issue_222_s03_actions_summary(status="running")
+        actions["jobs_summary"] = {"total": 0, "counts": {}}
+        scenario = [
+            {
+                "ci": "running",
+                "status": "running",
+                "overall_status": "running",
+                "normalized_status": "running",
+                "source_policy": "github_actions_only",
+                "actions": actions,
+                "check_runs": {"total": 0, "success": 0, "running": 0},
+                "commit_statuses": {"total": 0, "success": 0},
+                "required_check_state": {"available": False, "collection_policy": "forbidden"},
+                "review": "pending",
+                "recommended_next_action": "wait",
+            }
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                scenario,
+                timeout_seconds=1,
+                poll_interval_seconds=1,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["ci"]["source_policy"] == "github_actions_only"
+        assert payload["ci"]["actions"]["workflow_runs"]["total"] == 1
+        assert payload["ci"]["actions"]["jobs_summary"]["total"] == 0
+        assert payload["normalized_status"] == "timeout"
+        assert "checks=0/0" not in result.stderr
+        assert "checks=0/1" in result.stderr
+
+    def test_issue_222_s03_wait_fingerprint_ignores_contradictory_legacy_ci_fields(
+        self,
+    ) -> None:
+        base = {
+            "ci": "passed",
+            "status": "passed",
+            "overall_status": "passed",
+            "normalized_status": "passed",
+            "observation_complete": True,
+            "source_policy": "github_actions_only",
+            "actions": self._issue_222_s03_actions_summary(status="passed"),
+            "commit_statuses": {"total": 1, "failure": 1, "aggregate_state": "failure"},
+            "required_check_state": {
+                "available": True,
+                "collection_policy": "legacy",
+                "merge_state_status": "DIRTY",
+                "status_check_rollup_total": 1,
+            },
+            "review": "approved",
+            "recommended_next_action": "merge_prepared",
+            "codex_review": {
+                "lifecycle": {
+                    "status": "completed",
+                    "completion_signal": "submitted_pull_request_review",
+                    "confidence": "high",
+                    "selected_review_ids": [201],
+                    "selected_review_comment_ids": [],
+                    "selected_review_thread_ids": [],
+                }
+            },
+        }
+        legacy_green = {
+            **base,
+            "check_runs": {"total": 1, "success": 1, "failed": 0, "running": 0},
+        }
+        legacy_failed = {
+            **base,
+            "check_runs": {"total": 3, "success": 0, "failed": 3, "running": 0},
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            first, _ = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir) / "first",
+                [legacy_green],
+                timeout_seconds=2,
+                poll_interval_seconds=1,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+            second, _ = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir) / "second",
+                [legacy_failed],
+                timeout_seconds=2,
+                poll_interval_seconds=1,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+        assert first.returncode == 0, first.stdout + first.stderr
+        assert second.returncode == 0, second.stdout + second.stderr
+        first_payload = json.loads(first.stdout)
+        second_payload = json.loads(second.stdout)
+        assert first_payload["normalized_status"] == "passed"
+        assert second_payload["normalized_status"] == "passed"
+        assert first_payload["fingerprint"] == second_payload["fingerprint"]
+
+    def test_issue_222_s03_snapshot_fingerprint_uses_actions_summary_not_legacy_fields(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        source_script = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
+        )
+
+        def run_snapshot(check_runs: dict[str, object], commit_statuses: dict[str, object]) -> dict:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                tmp_path = Path(tmp_dir)
+                script_dir = tmp_path / "scripts"
+                lib_dir = script_dir / "lib"
+                fake_bin = tmp_path / "bin"
+                script_dir.mkdir()
+                lib_dir.mkdir()
+                fake_bin.mkdir()
+                snapshot_script = script_dir / "fetch_pr_observation_snapshot.sh"
+                shutil.copy2(source_script, snapshot_script)
+                snapshot_script.chmod(0o755)
+                shutil.copy2(source_script.parent / "lib" / "pr_observation_snapshot.py", lib_dir)
+                checks_script = lib_dir / "fetch_pr_checks_snapshot.sh"
+                checks_payload = {
+                    "source_policy": "github_actions_only",
+                    "ci": {
+                        "status": "passed",
+                        "progress_status": "passed",
+                        "source_policy": "github_actions_only",
+                        "actions": self._issue_222_s03_actions_summary(status="passed"),
+                        "checks": [],
+                        "failures": [],
+                        "check_runs": check_runs,
+                        "commit_statuses": commit_statuses,
+                        "required_check_state": {
+                            "available": True,
+                            "collection_policy": "legacy",
+                            "merge_state_status": "DIRTY",
+                            "status_check_rollup_total": 3,
+                        },
+                    },
+                    "limitations": [],
+                    "decision": {
+                        "status": "passed",
+                        "recommended_next_action": "merge_prepared",
+                        "observation_complete": True,
+                    },
+                }
+                checks_script.write_text(
+                    "#!/usr/bin/env python3\n"
+                    "import json\n"
+                    f"print({json.dumps(json.dumps(checks_payload, separators=(',', ':')))})\n",
+                    encoding="utf-8",
+                )
+                checks_script.chmod(0o755)
+                review_script = lib_dir / "fetch_pr_review_snapshot.sh"
+                review_script.write_text(
+                    """#!/usr/bin/env bash
+cat <<'JSON'
+{"review":{"status":"approved","signals":[]},"decision":{"status":"passed","status_reason":"passed","recommended_next_action":"merge_prepared","observation_complete":true,"completion_signal":"submitted_pull_request_review"},"codex_review":{"lifecycle":{"status":"submitted","completion_signal":"submitted_pull_request_review"}}}
+JSON
+""",
+                    encoding="utf-8",
+                )
+                review_script.chmod(0o755)
+                fake_gh = fake_bin / "gh"
+                fake_gh.write_text(
+                    """#!/usr/bin/env bash
+case "$*" in
+  "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
+    cat <<'JSON'
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main/protection")
+    printf 'HTTP 404: branch protection not found\\n' >&2
+    exit 1
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                    encoding="utf-8",
+                )
+                fake_gh.chmod(0o755)
+                env = {
+                    **os.environ,
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                }
+
+                result = subprocess.run(
+                    [str(snapshot_script), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+
+                assert result.returncode == 0, result.stdout + result.stderr
+                return json.loads(result.stdout)
+
+        green_legacy = run_snapshot(
+            {"total": 1, "success": 1, "failed": 0},
+            {"total": 1, "success": 1, "failure": 0, "aggregate_state": "success"},
+        )
+        failed_legacy = run_snapshot(
+            {"total": 4, "success": 0, "failed": 4},
+            {"total": 1, "success": 0, "failure": 1, "aggregate_state": "failure"},
+        )
+
+        assert green_legacy["normalized_status"] == "passed"
+        assert failed_legacy["normalized_status"] == "passed"
+        assert green_legacy["ci"]["source_policy"] == "github_actions_only"
+        assert green_legacy["fingerprint"] == failed_legacy["fingerprint"]
 
     def test_issue_170_pr_observation_checks_collector_polls_unknown_merge_state(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -15703,9 +16508,9 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "pending"
-            assert payload["ci"]["progress_status"] == "pending"
-            assert payload["ci"]["required_check_state"]["merge_state_status"] == "UNKNOWN"
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["progress_status"] == "passed"
+            assert payload["ci"]["required_check_state"]["merge_state_status"] is None
             assert "pr_merge_state_blocking" not in [
                 item["code"] for item in payload["limitations"]
             ]
@@ -15774,12 +16579,12 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "unknown"
-            assert payload["ci"]["progress_status"] == "unknown"
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["progress_status"] == "passed"
             limitation_codes = [item["code"] for item in payload["limitations"]]
             assert "required_checks_missing_or_pending" not in limitation_codes
-            assert "pr_merge_state_blocking" in limitation_codes
-            assert payload["limitations"][0]["merge_state_status"] == "DIRTY"
+            assert "pr_merge_state_blocking" not in limitation_codes
+            assert payload["ci"]["required_check_state"]["merge_state_status"] is None
 
     def test_issue_170_pr_observation_checks_collector_surfaces_required_check_metadata_failure(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -15848,23 +16653,8 @@ esac
             assert payload["ci"]["status"] == "unknown"
             assert payload["ci"]["progress_status"] == "unknown"
             assert payload["ci"]["required_check_state"]["available"] is False
-            assert payload["limitations"] == [
-                {
-                    "api": "gh_pr_view.statusCheckRollup",
-                    "capability": "status_check_rollup_read",
-                    "code": "pr_required_check_state_unavailable",
-                    "exit_code": 44,
-                    "message": "fixed read-only PR required check state collection failed",
-                    "secret_redacted": True,
-                    "severity": "informational",
-                    "source": "gh_pr_view",
-                    "status": "unknown",
-                    "stderr_sha256": hashlib.sha256(
-                        b"required check metadata unavailable\n"
-                    ).hexdigest(),
-                    "token_source": "GH_TOKEN",
-                }
-            ]
+            assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+            assert payload["limitations"] == []
 
     def test_issue_187_actions_jobs_failure_blocks_green_supplemental_signals(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -15934,7 +16724,7 @@ esac
             assert payload["ci"]["actions"]["jobs_summary"]["collection"]["failed_runs"] == 1
             assert payload["limitations"][0]["source"] == "repos/owner/repo/actions/runs/202/jobs"
 
-    def test_issue_187_status_rollup_failure_blocks_actions_green(self) -> None:
+    def test_issue_187_status_rollup_failure_is_ignored_by_actions_only_collector(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -15998,18 +16788,12 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "failed"
-            assert payload["ci"]["status"] != "passed"
-            assert payload["ci"]["failures"] == [
-                {
-                    "kind": "status_check_rollup",
-                    "name": "required",
-                    "state": "COMPLETED",
-                    "conclusion": "FAILURE",
-                }
-            ]
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+            assert payload["ci"]["required_check_state"]["status_check_rollup_total"] == 0
+            assert payload["ci"]["failures"] == []
 
-    def test_issue_187_status_rollup_running_blocks_actions_green(self) -> None:
+    def test_issue_187_status_rollup_running_is_ignored_by_actions_only_collector(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -16073,8 +16857,9 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "running"
-            assert payload["ci"]["status"] != "passed"
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+            assert payload["ci"]["required_check_state"]["status_check_rollup_total"] == 0
 
     def test_issue_180_s02_checks_collector_maps_commit_status_permission_denied(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -16132,16 +16917,11 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             assert token_marker not in result.stdout
             payload = json.loads(result.stdout)
-            limitation = next(
-                item
+            assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+            assert not any(
+                item.get("capability") == "commit_statuses_read"
                 for item in payload["limitations"]
-                if item.get("code") == "github_token_permission_denied"
             )
-            assert limitation["capability"] == "commit_statuses_read"
-            assert limitation["api"] == "repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status"
-            assert limitation["status"] == "permission_denied"
-            assert limitation["secret_redacted"] is True
-            assert "stderr_sha256" in limitation
 
     def test_issue_180_s02_checks_collector_maps_integration_permission_denied(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -16200,15 +16980,11 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             assert token_marker not in result.stdout
             payload = json.loads(result.stdout)
-            limitation = next(
-                item
+            assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+            assert not any(
+                item.get("capability") == "check_runs_read"
                 for item in payload["limitations"]
-                if item.get("code") == "github_token_permission_denied"
             )
-            assert limitation["capability"] == "check_runs_read"
-            assert limitation["status"] == "permission_denied"
-            assert limitation["token_source"] == "GITHUB_TOKEN"
-            assert limitation["secret_redacted"] is True
 
     def test_issue_180_s02_checks_collector_maps_status_check_rollup_permission_denied(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -16266,17 +17042,11 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             assert token_marker not in result.stdout
             payload = json.loads(result.stdout)
-            limitation = next(
-                item
+            assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+            assert not any(
+                item.get("capability") == "status_check_rollup_read"
                 for item in payload["limitations"]
-                if item.get("code") == "github_token_permission_denied"
             )
-            assert limitation["capability"] == "status_check_rollup_read"
-            assert limitation["api"] == "gh_pr_view.statusCheckRollup"
-            assert limitation["source"] == "gh_pr_view"
-            assert limitation["status"] == "permission_denied"
-            assert limitation["secret_redacted"] is True
-            assert "stderr_sha256" in limitation
 
     def test_issue_187_actions_only_green_passes_with_coverage_limitation(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -16357,13 +17127,19 @@ esac
             ]
             assert payload["ci"]["actions"]["jobs_detail"] == payload["ci"]["actions"]["jobs"]
             limitations = payload["limitations"]
-            coverage = next(
-                item
+            assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+            assert "ci_coverage_limited_to_github_actions" not in [
+                item.get("code") for item in limitations
+            ]
+            assert not any(
+                item.get("capability")
+                in {
+                    "check_runs_read",
+                    "commit_statuses_read",
+                    "status_check_rollup_read",
+                }
                 for item in limitations
-                if item.get("code") == "ci_coverage_limited_to_github_actions"
             )
-            assert coverage["severity"] == "informational"
-            assert coverage.get("blocking") is False
             assert not any(
                 item.get("code") == "github_token_permission_denied"
                 and item.get("severity") == "blocking"
@@ -16848,10 +17624,17 @@ else:
                     "conclusion": "failure",
                 }
             ]
-            assert any(
-                item.get("code") == "ci_coverage_limited_to_github_actions"
-                and item.get("severity") == "informational"
-                and item.get("blocking") is False
+            assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+            assert "ci_coverage_limited_to_github_actions" not in [
+                item.get("code") for item in payload["limitations"]
+            ]
+            assert not any(
+                item.get("capability")
+                in {
+                    "check_runs_read",
+                    "commit_statuses_read",
+                    "status_check_rollup_read",
+                }
                 for item in payload["limitations"]
             )
             assert not any(
@@ -17132,7 +17915,8 @@ esac
                 and item.get("severity") == "blocking"
                 for item in payload["limitations"]
             )
-            assert "ci_coverage_limited_to_github_actions" in [
+            assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+            assert "ci_coverage_limited_to_github_actions" not in [
                 item.get("code") for item in payload["limitations"]
             ]
 
@@ -17486,13 +18270,19 @@ esac
                     "dedupe_key": "actions:202:303:2",
                 }
             ]
-            coverage_limitation = next(
-                item
+            assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+            assert "ci_coverage_limited_to_github_actions" not in [
+                item.get("code") for item in payload["limitations"]
+            ]
+            assert not any(
+                item.get("capability")
+                in {
+                    "check_runs_read",
+                    "commit_statuses_read",
+                    "status_check_rollup_read",
+                }
                 for item in payload["limitations"]
-                if item.get("code") == "ci_coverage_limited_to_github_actions"
             )
-            assert coverage_limitation["severity"] == "informational"
-            assert coverage_limitation["blocking"] is False
             assert not any(
                 item.get("code") == "github_token_permission_denied"
                 and item.get("severity") == "blocking"
@@ -18023,8 +18813,9 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["status"] == "none"
             assert payload["ci"]["actions"]["workflow_runs"]["total"] == 0
+            assert payload["ci"]["check_runs"]["success"] == 0
             assert "zero_actions_runs_non_success" in [
                 item.get("code") for item in payload["limitations"]
             ]
@@ -18090,10 +18881,10 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["status"] == "none"
             assert payload["ci"]["actions"]["workflow_runs"]["total"] == 0
-            assert payload["ci"]["commit_statuses"]["total"] == 1
-            assert payload["ci"]["commit_statuses"]["success"] == 1
+            assert payload["ci"]["commit_statuses"]["total"] == 0
+            assert payload["ci"]["commit_statuses"]["success"] == 0
             assert "zero_actions_runs_non_success" in [
                 item.get("code") for item in payload["limitations"]
             ]
@@ -18162,21 +18953,16 @@ esac
             assert token_marker not in result.stdout
             assert token_marker not in result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["status"] == "none"
             assert payload["ci"]["actions"]["workflow_runs"]["total"] == 0
-            assert payload["ci"]["commit_statuses"]["total"] == 1
-            assert payload["ci"]["commit_statuses"]["success"] == 1
+            assert payload["ci"]["commit_statuses"]["total"] == 0
+            assert payload["ci"]["commit_statuses"]["success"] == 0
             limitation = next(
                 item
                 for item in payload["limitations"]
-                if item.get("code") == "github_token_permission_denied"
+                if item.get("code") == "zero_checks_s03_non_success"
             )
-            assert limitation["capability"] == "check_runs_read"
-            assert limitation["severity"] == "informational"
-            assert limitation.get("blocking") is False
-            assert "zero_actions_runs_non_success" in [
-                item.get("code") for item in payload["limitations"]
-            ]
+            assert limitation["severity"] == "blocking"
             assert payload.get("decision", {}).get("recommended_next_action") != (
                 "fix_github_token_permissions"
             )
@@ -18245,17 +19031,15 @@ esac
             assert token_marker not in result.stdout
             assert token_marker not in result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "failed"
+            assert payload["ci"]["status"] == "none"
             assert payload["ci"]["status"] != "passed"
-            assert payload["ci"]["commit_statuses"]["failure"] == 1
+            assert payload["ci"]["commit_statuses"]["failure"] == 0
             limitation = next(
                 item
                 for item in payload["limitations"]
-                if item.get("code") == "github_token_permission_denied"
+                if item.get("code") == "zero_checks_s03_non_success"
             )
-            assert limitation["capability"] == "check_runs_read"
             assert limitation["severity"] == "blocking"
-            assert limitation.get("blocking") is not False
 
     def test_issue_187_u001_zero_actions_green_check_runs_passes_with_status_permission_denied(
         self,
@@ -18321,17 +19105,12 @@ esac
             assert token_marker not in result.stdout
             assert token_marker not in result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["status"] == "none"
             assert payload["ci"]["actions"]["workflow_runs"]["total"] == 0
-            assert payload["ci"]["check_runs"]["success"] == 1
-            limitation = next(
-                item
-                for item in payload["limitations"]
-                if item.get("code") == "github_token_permission_denied"
-            )
-            assert limitation["capability"] == "commit_statuses_read"
-            assert limitation["severity"] == "informational"
-            assert limitation.get("blocking") is False
+            assert payload["ci"]["check_runs"]["success"] == 0
+            assert "zero_checks_s03_non_success" in [
+                item.get("code") for item in payload["limitations"]
+            ]
             assert payload.get("decision", {}).get("recommended_next_action") != (
                 "fix_github_token_permissions"
             )
@@ -18400,36 +19179,26 @@ esac
             assert token_marker not in result.stdout
             assert token_marker not in result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "passed"
-            assert payload["ci"]["check_runs"]["success"] == 1
-            assert payload["ci"]["check_runs"]["skipped"] == 1
-            assert payload["ci"]["check_runs"]["neutral"] == 1
-            limitation = next(
-                item
-                for item in payload["limitations"]
-                if item.get("code") == "github_token_permission_denied"
-            )
-            assert limitation["capability"] == "commit_statuses_read"
-            assert limitation["severity"] == "informational"
-            assert limitation.get("blocking") is False
+            assert payload["ci"]["status"] == "none"
+            assert payload["ci"]["check_runs"]["success"] == 0
+            assert payload["ci"]["check_runs"]["skipped"] == 0
+            assert payload["ci"]["check_runs"]["neutral"] == 0
+            assert "zero_checks_s03_non_success" in [
+                item.get("code") for item in payload["limitations"]
+            ]
 
     @pytest.mark.parametrize(
-        ("case_name", "stderr_text", "expected_code"),
+        ("case_name", "stderr_text"),
         [
-            ("auth", "HTTP 401: Requires authentication", "github_auth_missing"),
-            ("rate", "API rate limit exceeded for user", "github_rate_limited"),
-            (
-                "transient",
-                "HTTP 502: upstream temporarily unavailable",
-                "github_transient_unknown",
-            ),
+            ("auth", "HTTP 401: Requires authentication"),
+            ("rate", "API rate limit exceeded for user"),
+            ("transient", "HTTP 502: upstream temporarily unavailable"),
         ],
     )
     def test_issue_187_s202_zero_actions_runs_with_green_check_runs_and_blocking_supplemental_error_is_non_pass(
         self,
         case_name: str,
         stderr_text: str,
-        expected_code: str,
     ) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -18497,16 +19266,24 @@ esac
 
                 assert result.returncode == 0, result.stdout + result.stderr
                 payload = json.loads(result.stdout)
-                assert payload["ci"]["status"] in {"unknown", "none"}
+                assert payload["ci"]["status"] == "none"
                 assert payload["ci"]["status"] != "passed"
+                assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
                 limitation = next(
                     item
                     for item in payload["limitations"]
-                    if item.get("code") == expected_code
+                    if item.get("code") == "zero_checks_s03_non_success"
                 )
                 assert limitation["severity"] == "blocking"
-                assert limitation["capability"] == "commit_statuses_read"
-                assert limitation["secret_redacted"] is True
+                assert not any(
+                    item.get("capability")
+                    in {
+                        "check_runs_read",
+                        "commit_statuses_read",
+                        "status_check_rollup_read",
+                    }
+                    for item in payload["limitations"]
+                )
 
     def test_issue_187_s202_zero_actions_runs_with_zero_external_evidence_stays_non_pass(
         self,
@@ -18576,19 +19353,17 @@ esac
             assert "zero_checks_s03_non_success" in limitation_codes
 
     @pytest.mark.parametrize(
-        ("case_name", "check_runs_json", "statuses_json", "expected_status"),
+        ("case_name", "check_runs_json", "statuses_json"),
         [
             (
                 "check-failure",
                 '{"total_count":1,"check_runs":[{"id":1,"name":"test","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"failure"}]}',
                 '{"state":"success","statuses":[]}',
-                "failed",
             ),
             (
                 "status-pending",
                 '{"total_count":0,"check_runs":[]}',
                 '{"state":"pending","statuses":[{"context":"legacy/status","state":"pending","target_url":"https://example.test/status"}]}',
-                "pending",
             ),
         ],
     )
@@ -18597,7 +19372,6 @@ esac
         case_name: str,
         check_runs_json: str,
         statuses_json: str,
-        expected_status: str,
     ) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -18666,7 +19440,13 @@ esac
 
                 assert result.returncode == 0, result.stdout + result.stderr
                 payload = json.loads(result.stdout)
-                assert payload["ci"]["status"] == expected_status
+                assert payload["ci"]["status"] == "none"
+                assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+                assert payload["ci"]["check_runs"]["total"] == 0
+                assert payload["ci"]["commit_statuses"]["total"] == 0
+                assert "zero_checks_s03_non_success" in [
+                    item.get("code") for item in payload["limitations"]
+                ]
                 assert payload["ci"]["status"] != "passed"
 
     def test_issue_187_snapshot_propagates_actions_pass_with_informational_supplemental_permission(
@@ -18694,7 +19474,7 @@ esac
             checks_script.write_text(
                 """#!/usr/bin/env bash
 cat <<'JSON'
-{"ci":{"status":"passed","progress_status":"passed","checks":[],"failures":[],"actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0}},"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303"}],"jobs_summary":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0},"collection":{"successful_runs":1,"failed_runs":0}},"jobs_detail":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303"}]}},"limitations":[{"code":"github_token_permission_denied","capability":"check_runs_read","api":"repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs","source":"gh_api","status":"permission_denied","severity":"informational","blocking":false,"recommended_next_action":"fix_github_token_permissions","secret_redacted":true,"stderr_sha256":"redacted"},{"code":"ci_coverage_limited_to_github_actions","source":"actions_collector","severity":"informational","blocking":false}],"decision":{"status":"passed","recommended_next_action":"merge_prepared","observation_complete":true}}
+{"ci":{"status":"passed","progress_status":"passed","checks":[],"failures":[],"required_check_state":{"available":false,"collection_policy":"forbidden"},"actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0}},"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303"}],"jobs_summary":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0},"collection":{"successful_runs":1,"failed_runs":0}},"jobs_detail":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303"}]}},"limitations":[],"decision":{"status":"passed","recommended_next_action":"merge_prepared","observation_complete":true}}
 JSON
 """,
                 encoding="utf-8",
@@ -18716,7 +19496,17 @@ JSON
 case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
 JSON
     ;;
   *)
@@ -18777,7 +19567,7 @@ esac
             snapshot_script.write_text(
                 """#!/usr/bin/env bash
 cat <<'JSON'
-{"script":"fetch_pr_observation_snapshot.sh","status":"running","overall_status":"running","normalized_status":"running","observation_complete":false,"repo":"owner/repo","pr":13,"expected_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","current_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","head_matches_expected":true,"fingerprint":"issue-187-running","summary":{"ci":"running","review":"pending","head":"matched"},"limitations":[{"code":"github_token_permission_denied","capability":"status_check_rollup_read","source":"gh_pr_view","status":"permission_denied","severity":"informational","blocking":false,"recommended_next_action":"fix_github_token_permissions","secret_redacted":true,"stderr_sha256":"redacted"}],"recommended_next_action":"wait","ci":{"status":"running","progress_status":"running","actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0}},"jobs":[{"id":303,"run_id":202,"name":"test","status":"in_progress","conclusion":null,"html_url":"https://example.test/job/303"}],"jobs_summary":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0},"collection":{"successful_runs":1,"failed_runs":0}},"jobs_detail":[{"id":303,"run_id":202,"name":"test","status":"in_progress","conclusion":null,"html_url":"https://example.test/job/303"}]}},"review":{"status":"pending","signals":[]},"decision":{"status":"running","status_reason":"ci_pending","recommended_next_action":"wait","observation_complete":false}}
+{"script":"fetch_pr_observation_snapshot.sh","status":"running","overall_status":"running","normalized_status":"running","observation_complete":false,"repo":"owner/repo","pr":13,"expected_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","current_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","head_matches_expected":true,"fingerprint":"issue-187-running","summary":{"ci":"running","review":"pending","head":"matched"},"limitations":[],"recommended_next_action":"wait","ci":{"status":"running","progress_status":"running","required_check_state":{"available":false,"collection_policy":"forbidden"},"actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0}},"jobs":[{"id":303,"run_id":202,"name":"test","status":"in_progress","conclusion":null,"html_url":"https://example.test/job/303"}],"jobs_summary":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0},"collection":{"successful_runs":1,"failed_runs":0}},"jobs_detail":[{"id":303,"run_id":202,"name":"test","status":"in_progress","conclusion":null,"html_url":"https://example.test/job/303"}]}},"review":{"status":"pending","signals":[]},"decision":{"status":"running","status_reason":"ci_pending","recommended_next_action":"wait","observation_complete":false}}
 JSON
 """,
                 encoding="utf-8",
@@ -18866,8 +19656,8 @@ JSON
 {{"total_count":1,"jobs":[{{"id":303,"run_id":202,"name":"test","status":"{job_status}","conclusion":null,"steps":[]}}]}}
 JSON
     ;;
-  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
-    printf 'permission denied while reading checks {token_marker}\\n' >&2
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    printf 'permission denied while reading actions {token_marker}\\n' >&2
     exit 1
     ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
@@ -18906,9 +19696,17 @@ esac
             assert token_marker not in result.stderr
             payload = json.loads(result.stdout)
             assert payload["ci"]["status"] == expected_status
-            assert any(
-                item.get("code") == "ci_coverage_limited_to_github_actions"
-                and item.get("severity") == "informational"
+            assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+            assert "ci_coverage_limited_to_github_actions" not in [
+                item.get("code") for item in payload["limitations"]
+            ]
+            assert not any(
+                item.get("capability")
+                in {
+                    "check_runs_read",
+                    "commit_statuses_read",
+                    "status_check_rollup_read",
+                }
                 for item in payload["limitations"]
             )
             assert not any(
@@ -18967,13 +19765,13 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "pending"
-            assert payload["normalized_status"] == "pending"
-            assert payload["recommended_next_action"] == "wait"
-            assert payload["observation_complete"] is False
-            assert "required_checks_missing_or_pending" in [
-                item["code"] for item in payload["limitations"]
-            ]
+        assert payload["ci"]["status"] == "passed"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["observation_complete"] is True
+        assert "required_checks_missing_or_pending" not in [
+            item["code"] for item in payload["limitations"]
+        ]
 
     def test_issue_170_pr_observation_wait_keeps_required_checks_pending_as_wait(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -19054,15 +19852,226 @@ esac
                 json.loads(line)
                 for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
             ]
-            assert events[0]["normalized_status"] == "pending"
-            assert events[0]["ci"] == "pending"
-            assert "phase=wait ci=pending" in result.stderr
+        assert events[0]["normalized_status"] == "passed"
+        assert events[0]["ci"] == "passed"
+        assert "phase=wait ci=passed" in result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["normalized_status"] == "timeout"
+        assert payload["recommended_next_action"] == "wait_or_resume"
+        assert "required_checks_missing_or_pending" not in [
+            item["code"] for item in payload["limitations"]
+        ]
+
+    def _issue_222_run_observation_snapshot_scenario(
+        self,
+        scenario: dict[str, object],
+        *,
+        extra_args: list[str] | None = None,
+        extra_env: dict[str, str] | None = None,
+    ) -> tuple[dict[str, object], str]:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            scenario_path = tmp_path / "scenario.json"
+            state_path = tmp_path / "state.txt"
+            gh_log = tmp_path / "gh.log"
+            scenario_path.write_text(json.dumps([scenario]), encoding="utf-8")
+            self._issue_75_write_pr_observation_wait_fake_gh(
+                fake_gh,
+                scenario_path=scenario_path,
+                state_path=state_path,
+                log_path=gh_log,
+            )
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_WAIT_SCENARIO": str(scenario_path),
+                "GH_FAKE_WAIT_STATE": str(state_path),
+                "GH_FAKE_LOG": str(gh_log),
+                **(extra_env or {}),
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    *(extra_args or []),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            return json.loads(result.stdout), gh_log.read_text(encoding="utf-8")
+
+    def test_issue_222_pr_observation_snapshot_does_not_call_mergeability_compare_or_protection(self) -> None:
+        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
+            {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "CONFLICTING",
+                "compare": {"status": "behind", "ahead_by": 0, "behind_by": 3},
+                "branch": {"name": "main", "protected": True},
+                "branch_protection": {
+                    "required_status_checks": {
+                        "strict": True,
+                        "contexts": ["external-ci"],
+                        "checks": [{"context": "external-ci", "app_id": 12345}],
+                    },
+                    "required_signatures": {"enabled": True},
+                },
+            }
+        )
+
+        limitation_codes = [item["code"] for item in payload["limitations"] if isinstance(item, dict)]
+        assert payload["ci"]["source_policy"] == "github_actions_only"
+        assert payload["ci"]["status"] == "passed"
+        assert payload["review"]["status"] == "approved"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+        assert "merge_blocker_metadata" not in payload
+        assert "required_actions_context_unobserved" not in limitation_codes
+        assert "required_non_actions_context_unprovable_by_actions" not in limitation_codes
+        assert "required_signatures_unverified" not in limitation_codes
+        assert "pr_mergeability_pending" not in limitation_codes
+        assert "headRefOid,url,state,isDraft,number" in gh_calls
+        assert "mergeable" not in gh_calls
+        assert "baseRefName" not in gh_calls
+        assert "headRefName" not in gh_calls
+        assert "headRepositoryOwner" not in gh_calls
+        assert "repos/owner/repo/compare/" not in gh_calls
+        assert "repos/owner/repo/branches/main" not in gh_calls
+        assert "repos/owner/repo/branches/main/protection" not in gh_calls
+        assert "statusCheckRollup" not in gh_calls
+        assert "/check-runs" not in gh_calls
+        assert "/status" not in gh_calls
+        assert "pr checks" not in gh_calls
+
+    def test_issue_222_pr_observation_wait_reaches_merge_prepared_without_final_merge_blocker_audit(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            scenario_path = tmp_path / "scenario.json"
+            state_path = tmp_path / "state.txt"
+            gh_log = tmp_path / "gh.log"
+            scenario_path.write_text(
+                json.dumps([
+                    {
+                        "head": "a" * 40,
+                        "ci": "passed",
+                        "review": "approved",
+                        "mergeable": "CONFLICTING",
+                        "branch": {"name": "main", "protected": True},
+                        "branch_protection": {
+                            "required_status_checks": {
+                                "strict": True,
+                                "contexts": ["external-ci"],
+                                "checks": [{"context": "external-ci", "app_id": 12345}],
+                            },
+                            "required_signatures": {"enabled": True},
+                        },
+                    },
+                    {
+                        "head": "a" * 40,
+                        "ci": "passed",
+                        "review": "approved",
+                        "mergeable": "CONFLICTING",
+                        "branch": {"name": "main", "protected": True},
+                        "branch_protection": {
+                            "required_status_checks": {
+                                "strict": True,
+                                "contexts": ["external-ci"],
+                                "checks": [{"context": "external-ci", "app_id": 12345}],
+                            },
+                            "required_signatures": {"enabled": True},
+                        },
+                    },
+                ]),
+                encoding="utf-8",
+            )
+            self._issue_75_write_pr_observation_wait_fake_gh(
+                fake_gh,
+                scenario_path=scenario_path,
+                state_path=state_path,
+                log_path=gh_log,
+            )
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_WAIT_SCENARIO": str(scenario_path),
+                "GH_FAKE_WAIT_STATE": str(state_path),
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                    "--timeout-seconds",
+                    "6",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "2",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["normalized_status"] == "timeout"
-            assert payload["recommended_next_action"] == "wait_or_resume"
-            assert "required_checks_missing_or_pending" in [
-                item["code"] for item in payload["limitations"]
-            ]
+            gh_calls = gh_log.read_text(encoding="utf-8")
+
+        assert payload["wait"]["polls"] >= 2
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+        assert "merge_blocker_metadata" not in payload
+        assert "OBS_SKIP_OPTIONAL_MERGE_BLOCKER_METADATA" not in result.stderr
+        assert "mergeable" not in gh_calls
+        assert "repos/owner/repo/compare/" not in gh_calls
+        assert "repos/owner/repo/branches/main" not in gh_calls
+        assert "repos/owner/repo/branches/main/protection" not in gh_calls
 
     def test_issue_75_pr_observation_wait_stdout_stderr_progress_and_out_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -19224,6 +20233,7 @@ if codex_review is None and review_status in {"approved", "commented", "changes_
     }
 payload = {
     "script": "fetch_pr_observation_snapshot.sh",
+    "source_policy": current.get("source_policy"),
     "status": current.get("status", ci_status),
     "overall_status": current.get("overall_status", ci_status),
     "normalized_status": current.get("normalized_status", ci_status),
@@ -19238,7 +20248,11 @@ payload = {
     "recommended_next_action": current.get("recommended_next_action", "wait"),
     "ci": {
         "status": ci_status,
+        "source_policy": current.get("ci_source_policy", current.get("source_policy")),
+        "actions": current.get("actions", {}),
         "check_runs": check_runs,
+        "commit_statuses": current.get("commit_statuses", {}),
+        "required_check_state": current.get("required_check_state", {}),
         "checks": current.get("checks", []),
         "failures": current.get("failures", []),
     },
@@ -19262,6 +20276,10 @@ payload = {
 }
 if "observed_at" in current:
     payload["observed_at"] = current["observed_at"]
+if payload["source_policy"] is None:
+    payload.pop("source_policy")
+if payload["ci"]["source_policy"] is None:
+    payload["ci"].pop("source_policy")
 if "decision" in current:
     payload["decision"] = current["decision"]
 if "decision_fingerprint" in current:
@@ -20423,6 +21441,77 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
         assert payload["recommended_next_action"] == "merge_prepared"
         assert payload["observation_complete"] is True
         assert payload["decision"]["fallback_pass_candidate"]["promotes_top_level_status"] is True
+
+    def test_issue_222_s03_wait_fallback_no_findings_with_actionable_unresolved_blocks_pass(self) -> None:
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "human_gate",
+            "status_reason": "fallback_issue_comment_low_confidence",
+            "recommended_next_action": "manual_review_required_non_retryable",
+            "observation_complete": False,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [],
+            "selected_review_thread_ids": [],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "carryover_unresolved_count": 0,
+            "carryover_unresolved_thread_ids": [],
+            "actionable_unresolved_count": 1,
+            "actionable_unresolved_thread_ids": ["RT_actionable"],
+            "selected_changes_requested_evidence": [],
+            "completion_signal": "fallback_issue_comment",
+            "confidence": "low",
+            "fallback_pass_candidate": {
+                "present": True,
+                "source": "issue_comment",
+                "source_ids": [100],
+                "reason": "current_boundary_no_major_issues_comment",
+                "promotes_top_level_status": True,
+            },
+            "fingerprint": "fallback-actionable-unresolved-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "human_gate",
+                        "overall_status": "human_gate",
+                        "normalized_status": "human_gate",
+                        "recommended_next_action": "manual_review_required_non_retryable",
+                        "decision": decision,
+                        "decision_fingerprint": "fallback-actionable-unresolved-s03",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "fallback",
+                                "completion_signal": "fallback_issue_comment",
+                                "confidence": "low",
+                                "fallback_pass_candidate": decision["fallback_pass_candidate"],
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_actionable"}]},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["overall_status"] == "human_gate"
+        assert payload["normalized_status"] == "human_gate"
+        assert payload["recommended_next_action"] == "address_review_feedback"
+        assert payload["observation_complete"] is False
+        assert payload["decision"]["status"] == "human_gate"
+        assert payload["decision"]["recommended_next_action"] == "address_review_feedback"
+        assert payload["decision"]["status_reason"] == "actionable_unresolved_thread"
+        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
 
     def test_issue_219_s01_wait_fallback_no_findings_with_unresolved_review_blocks_pass(self) -> None:
         decision = {
@@ -22435,7 +23524,7 @@ esac
             payload = json.loads(result.stdout)
             assert payload["ci"]["status"] == "failed"
             assert payload["ci"]["progress_status"] == "failed"
-            assert payload["ci"]["check_runs"]["failed"] == 1
+            assert payload["ci"]["check_runs"]["failed"] == 0
             assert payload["ci"]["commit_statuses"]["total"] == 0
             assert payload["ci"]["failures"][0]["kind"] == "github_actions_job"
             assert payload["ci"]["failures"][0]["workflow_name"] == "CI"
@@ -22525,32 +23614,8 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "failed"
-            assert payload["ci"]["failures"] == [
-                {
-                    "dedupe_key": "actions:202:302:1",
-                    "failed_steps": [
-                        {
-                            "number": 1,
-                            "name": "Run tests",
-                            "status": "completed",
-                            "conclusion": "failure",
-                        }
-                    ],
-                    "html_url": "https://example.test/job/302",
-                    "job_conclusion": "failure",
-                    "job_id": 302,
-                    "job_name": "test",
-                    "job_status": "completed",
-                    "kind": "github_actions_job",
-                    "source": "actions",
-                    "workflow_conclusion": "failure",
-                    "workflow_name": "CI",
-                    "workflow_run_id": 202,
-                    "workflow_run_attempt": 1,
-                    "workflow_status": "completed",
-                }
-            ]
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["failures"] == []
 
     def test_issue_75_pr_observation_checks_collector_accepts_abbreviated_head_sha_prefix(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -22625,7 +23690,7 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
             assert payload["ci"]["status"] == "passed"
-            assert payload["ci"]["check_runs"]["success"] == 1
+            assert payload["ci"]["check_runs"]["success"] == 0
             assert payload["ci"]["check_runs"]["stale"] == 0
             assert payload["expected_head_sha"] == "a" * 40
             gh_calls = gh_log.read_text(encoding="utf-8").splitlines()
@@ -22715,13 +23780,13 @@ esac
             assert limitation["source"] == "gh_pr_view"
             assert limitation["severity"] == "blocking"
 
-    def test_issue_180_s02_snapshot_maps_check_runs_permission_denied_to_unknown_limitation(self) -> None:
+    def test_issue_180_s02_snapshot_maps_actions_permission_denied_to_unknown_limitation(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
             / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"
         )
-        token_marker = "ghp_secret_marker_check_runs"
+        token_marker = "ghp_secret_marker_actions"
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
@@ -22733,11 +23798,11 @@ esac
 case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
-{{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}}
+{{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}}
 JSON
     ;;
-  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
-    printf 'permission denied while reading checks {token_marker}\\n' >&2
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
+    printf 'permission denied while reading actions {token_marker}\\n' >&2
     exit 1
     ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status --paginate")
@@ -22805,8 +23870,8 @@ esac
                 for item in payload["limitations"]
                 if item.get("code") == "github_token_permission_denied"
             )
-            assert limitation["capability"] == "check_runs_read"
-            assert limitation["api"] == "repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs"
+            assert limitation["capability"] == "actions_read"
+            assert limitation["api"] == "repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
             assert limitation["token_source"] == "GH_TOKEN"
             assert limitation["secret_redacted"] is True
             assert limitation["recommended_next_action"] == "fix_github_token_permissions"
@@ -22836,7 +23901,7 @@ esac
                     fake_gh.write_text(
                         f"""#!/usr/bin/env bash
 case "$*" in
-  "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
+  "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
     printf '{stderr_text}\\n' >&2
     exit 1
     ;;
@@ -22992,49 +24057,12 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "failed"
-            assert payload["ci"]["check_runs"]["total"] == 2
-            assert payload["ci"]["check_runs"]["success"] == 1
-            assert payload["ci"]["check_runs"]["failed"] == 1
-            assert payload["ci"]["commit_statuses"]["total"] == 2
-            assert payload["ci"]["commit_statuses"]["success"] == 1
-            assert payload["ci"]["commit_statuses"]["failure"] == 1
-            assert payload["ci"]["checks"][0]["name"] == "lint"
-            assert payload["ci"]["checks"][1]["name"] == "test"
-            assert payload["ci"]["statuses"][0]["context"] == "lint/status"
-            assert payload["ci"]["statuses"][1]["context"] == "deploy/status"
-            assert payload["ci"]["failures"] == [
-                {
-                    "kind": "commit_status",
-                    "context": "deploy/status",
-                    "status": "failure",
-                    "description": "deploy failed",
-                    "target_url": "https://example.test/status/2",
-                },
-                {
-                    "dedupe_key": "actions:202:302:1",
-                    "failed_steps": [
-                        {
-                            "number": 1,
-                            "name": "Run tests",
-                            "status": "completed",
-                            "conclusion": "failure",
-                        }
-                    ],
-                    "html_url": "https://example.test/job/302",
-                    "job_conclusion": "failure",
-                    "job_id": 302,
-                    "job_name": "test",
-                    "job_status": "completed",
-                    "kind": "github_actions_job",
-                    "source": "actions",
-                    "workflow_conclusion": "failure",
-                    "workflow_name": "CI",
-                    "workflow_run_id": 202,
-                    "workflow_run_attempt": 1,
-                    "workflow_status": "completed",
-                },
-            ]
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["check_runs"]["total"] == 0
+            assert payload["ci"]["commit_statuses"]["total"] == 0
+            assert payload["ci"]["checks"] == []
+            assert payload["ci"]["statuses"] == []
+            assert payload["ci"]["failures"] == []
 
     def test_issue_75_pr_observation_checks_collector_uses_check_run_fallback_when_jobs_unavailable(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -23100,19 +24128,9 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "failed"
-            assert payload["ci"]["failures"] == [
-                {
-                    "kind": "check_run",
-                    "name": "lint",
-                    "check_run_id": 101,
-                    "status": "completed",
-                    "conclusion": "failure",
-                    "html_url": "https://example.test/check/101",
-                    "details_url": "https://example.test/details/101",
-                    "limitation": "workflow_job_steps_unavailable",
-                }
-            ]
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["check_runs"]["failed"] == 0
+            assert payload["ci"]["failures"] == []
 
     def test_issue_75_pr_observation_checks_collector_keeps_failed_status_when_jobs_api_fails(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -23131,13 +24149,12 @@ esac
 case "$*" in
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
     cat <<'JSON'
-{"total_count":1,"workflow_runs":[{"id":203,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}
+{"total_count":1,"workflow_runs":[{"id":203,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"failure"}]}
 JSON
     ;;
   "api repos/owner/repo/actions/runs/203/jobs --paginate")
-    cat <<'JSON'
-{"total_count":1,"jobs":[{"id":304,"run_id":203,"name":"preflight","status":"completed","conclusion":"success","steps":[]}]}
-JSON
+    printf 'jobs endpoint unavailable\\n' >&2
+    exit 44
     ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
@@ -23184,23 +24201,29 @@ esac
             payload = json.loads(result.stdout)
             assert payload["ci"]["status"] == "failed"
             assert payload["ci"]["progress_status"] == "failed"
-            assert payload["ci"]["check_runs"]["failed"] == 1
+            assert payload["ci"]["check_runs"]["failed"] == 0
             assert payload["ci"]["failures"] == [
                 {
-                    "kind": "check_run",
-                    "name": "lint",
-                    "check_run_id": 101,
-                    "status": "completed",
-                    "conclusion": "failure",
-                    "html_url": "https://example.test/check/101",
-                    "details_url": "https://example.test/details/101",
-                    "limitation": "workflow_job_steps_unavailable",
+                    "dedupe_key": "actions:203:run",
+                    "failed_steps": [],
+                    "html_url": None,
+                    "job_conclusion": None,
+                    "job_id": None,
+                    "job_name": None,
+                    "job_status": None,
+                    "kind": "github_actions_job",
+                    "source": "actions",
+                    "workflow_conclusion": "failure",
+                    "workflow_name": "CI",
+                    "workflow_run_attempt": None,
+                    "workflow_run_id": 203,
+                    "workflow_status": "completed",
                 }
             ]
             assert [
                 item["code"] for item in payload["limitations"]
             ] == ["github_api_collection_failed"]
-            assert payload["limitations"][0]["source"] == "repos/owner/repo/actions/runs/202/jobs"
+            assert payload["limitations"][0]["source"] == "repos/owner/repo/actions/runs/203/jobs"
 
     def test_issue_75_pr_observation_checks_collector_ci_taxonomy(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -23221,8 +24244,8 @@ esac
                 "status-pending",
                 '{"total_count":0,"check_runs":[]}',
                 '{"state":"pending","statuses":[{"context":"required/path-filter","state":"pending","target_url":"https://example.test/pending"}]}',
-                "pending",
-                [],
+                "none",
+                ["zero_checks_s03_non_success"],
             ),
             (
                 "zero-checks",
@@ -23235,8 +24258,8 @@ esac
                 "stale-check-run",
                 '{"total_count":1,"check_runs":[{"id":4,"name":"old-green","head_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","status":"completed","conclusion":"success"}]}',
                 '{"state":"success","statuses":[]}',
-                "failed",
-                ["stale_head_check"],
+                "passed",
+                [],
             ),
         )
 
@@ -23379,8 +24402,8 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "pending"
-            assert payload["ci"]["required_check_state"]["merge_state_status"] == "UNKNOWN"
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["required_check_state"]["merge_state_status"] is None
             assert "pr_merge_state_blocking" not in [
                 item["code"] for item in payload["limitations"]
             ]
@@ -23449,9 +24472,9 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["ci"]["status"] == "failed"
-            assert payload["ci"]["commit_statuses"]["aggregate_state"] == "failure"
-            assert payload["ci"]["failures"][-1]["kind"] == "commit_status_aggregate"
+            assert payload["ci"]["status"] == "passed"
+            assert payload["ci"]["commit_statuses"]["aggregate_state"] is None
+            assert payload["ci"]["failures"] == []
 
     def test_issue_170_pr_observation_checks_collector_ignores_empty_aggregate_failure(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -23520,7 +24543,7 @@ esac
             assert payload["status"] == "passed"
             assert payload["ci"]["status"] == "passed"
             assert payload["ci"]["progress_status"] == "passed"
-            assert payload["ci"]["commit_statuses"]["aggregate_state"] == "failure"
+            assert payload["ci"]["commit_statuses"]["aggregate_state"] is None
             assert [
                 item["kind"]
                 for item in payload["ci"]["failures"]
@@ -23593,7 +24616,7 @@ esac
             assert payload["status"] == "passed"
             assert payload["ci"]["status"] == "passed"
             assert payload["ci"]["progress_status"] == "passed"
-            assert payload["ci"]["commit_statuses"]["aggregate_state"] == "pending"
+            assert payload["ci"]["commit_statuses"]["aggregate_state"] is None
 
     def test_issue_75_pr_observation_snapshot_includes_s03_ci_collector_result(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -23612,7 +24635,7 @@ esac
 case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
@@ -23668,7 +24691,7 @@ esac
             assert payload["observation_complete"] is False
             assert payload["summary"]["ci"] == "passed"
             assert payload["ci"]["status"] == "passed"
-            assert payload["ci"]["check_runs"]["success"] == 1
+            assert payload["ci"]["check_runs"]["success"] == 0
             assert payload["ci"]["collector"] == "s03"
             assert "ci_review_collectors_pending" not in [
                 item["code"] for item in payload["limitations"]
@@ -23702,7 +24725,7 @@ case "$*" in
     else
       head="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     fi
-    printf '{"headRefOid":"%s","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}\\n' "$head"
+    printf '{"headRefOid":"%s","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}\\n' "$head"
     ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
@@ -23797,7 +24820,7 @@ case "$*" in
     else
       head="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     fi
-    printf '{"headRefOid":"%s","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}\\n' "$head"
+    printf '{"headRefOid":"%s","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}\\n' "$head"
     ;;
   "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate")
     cat <<'JSON'
@@ -23886,7 +24909,7 @@ printf '%s\\n' "$*" >> "$GH_FAKE_LOG"
 case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
   "pr view 13 --repo owner/repo --json headRefOid")
@@ -23953,12 +24976,9 @@ esac
                 "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate"
                 in gh_calls
             )
-            assert (
-                "api repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs --paginate"
-                in gh_calls
-            )
+            assert not any("/check-runs" in call for call in gh_calls)
             assert "api repos/owner/repo/actions/runs?head_sha=aaaaaaa --paginate" not in gh_calls
-            assert "api repos/owner/repo/commits/aaaaaaa/check-runs --paginate" not in gh_calls
+            assert not any("commits/aaaaaaa" in call for call in gh_calls)
 
     def _issue_187_s410_run_review_inventory_snapshot(
         self,
@@ -24254,7 +25274,17 @@ JSON
 case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
+JSON
+    ;;
+  "api repos/owner/repo/compare/main...feature")
+    cat <<'JSON'
+{"status":"ahead","ahead_by":1,"behind_by":0}
+JSON
+    ;;
+  "api repos/owner/repo/branches/main")
+    cat <<'JSON'
+{"name":"main","protected":false}
 JSON
     ;;
   *)
@@ -25436,6 +26466,145 @@ esac
             assert "api repos/owner/repo/pulls/13/reviews --paginate" in gh_calls
             assert "api repos/owner/repo/pulls/13/comments --paginate" in gh_calls
             assert "api graphql " in gh_calls
+
+    def test_issue_222_s04_pr_review_snapshot_preserves_review_payload_without_ci_surfaces(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            gh_log = tmp_path / "gh.log"
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$GH_FAKE_LOG"
+if [[ "$*" == *statusCheckRollup* || "$*" == *"/check-runs"* || "$*" == *"/status"* || "$*" == "pr checks"* ]]; then
+  printf 'forbidden CI surface requested: %s\\n' "$*" >&2
+  exit 45
+fi
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"alice"},"created_at":"2026-06-08T01:02:00Z","body":"issue comment feedback"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"alice"},"state":"CHANGES_REQUESTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:03:00Z","body":"review feedback"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"alice"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:04:00Z","updated_at":"2026-06-08T01:05:00Z","path":"app.py","line":12,"body":"inline review comment"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[{"login":"bob"}],"requested_teams":[{"slug":"platform"}]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":"CHANGES_REQUESTED","reviewThreads":{"nodes":[{"id":"RT_unresolved","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T01:04:00Z","updatedAt":"2026-06-08T01:05:00Z","body":"thread feedback"}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            review = payload["review"]
+            assert review["status"] == "unresolved"
+            assert review["review_decision"] == "CHANGES_REQUESTED"
+            assert any(
+                item["kind"] == "issue_comment" and item["id"] == 100
+                for item in review["signals"]
+            )
+            assert any(
+                item["kind"] == "pull_review" and item["id"] == 201
+                for item in review["signals"]
+            )
+            assert any(
+                item["kind"] == "pull_review_comment" and item["id"] == 301
+                for item in review["signals"]
+            )
+            assert review["review_requests"] == [
+                {
+                    "kind": "review_request",
+                    "target_type": "user",
+                    "target": "bob",
+                    "codex_authored": False,
+                    "state": "requested",
+                },
+                {
+                    "kind": "review_request",
+                    "target_type": "team",
+                    "target": "platform",
+                    "codex_authored": False,
+                    "state": "requested",
+                },
+            ]
+            assert len(review["threads"]["items"]) == 1
+            thread = review["threads"]["items"][0]
+            assert thread["id"] == "RT_unresolved"
+            assert thread["state"] == "unresolved"
+            assert thread["is_resolved"] is False
+            assert thread["is_outdated"] is False
+            assert thread["comment_count"] == 1
+            assert thread["comment_ids"] == [301]
+            assert thread["first_comment_id"] == 301
+            assert thread["first_comment_created_at"] == "2026-06-08T01:04:00Z"
+            assert thread["latest_comment_created_at"] == "2026-06-08T01:04:00Z"
+            assert thread["latest_comment_updated_at"] == "2026-06-08T01:05:00Z"
+            assert thread["activity_at"] == "2026-06-08T01:05:00Z"
+            assert review["audit"]["non_outdated_unresolved_thread_ids"] == ["RT_unresolved"]
+            assert [item["code"] for item in payload["limitations"]] == []
+
+            gh_calls = gh_log.read_text(encoding="utf-8")
+            assert "api graphql " in gh_calls
+            assert "reviewThreads" in gh_calls
+            assert "reviewDecision" in gh_calls
+            assert "statusCheckRollup" not in gh_calls
+            assert "/check-runs" not in gh_calls
+            assert "/status" not in gh_calls
+            assert "pr checks" not in gh_calls
 
     def test_issue_176_s03_review_collector_returns_codex_review_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -27817,7 +28986,7 @@ esac
                     },
                 },
             },
-            metadata=metadata if metadata is not None else {"state": "OPEN", "isDraft": False},
+            metadata=metadata if metadata is not None else {"state": "OPEN", "isDraft": False, "mergeable": "MERGEABLE"},
             limitations=limitations if limitations is not None else [],
             head_matches_expected=head_matches_expected,
             normalized_status=normalized_status,
@@ -27945,6 +29114,59 @@ esac
                 assert complete is expected_complete
                 assert reason == expected_reason
                 assert action != "merge_prepared"
+
+    def test_issue_222_s03_snapshot_fallback_no_findings_with_actionable_unresolved_blocks_pass(self) -> None:
+        module = self._issue_218_s02_load_observation_snapshot_module()
+        fallback_pass_candidate = {
+            "present": True,
+            "source": "issue_comment",
+            "source_ids": [100],
+            "reason": "current_boundary_no_major_issues_comment",
+            "promotes_top_level_status": True,
+        }
+        decision = {
+            "status": "human_gate",
+            "status_reason": "fallback_issue_comment_low_confidence",
+            "recommended_next_action": "manual_review_required_non_retryable",
+            "observation_complete": False,
+            "completion_signal": "fallback_issue_comment",
+            "confidence": "low",
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "selected_unresolved_thread_ids": [],
+            "carryover_unresolved_count": 0,
+            "carryover_unresolved_thread_ids": [],
+            "actionable_unresolved_count": 1,
+            "actionable_unresolved_thread_ids": ["RT_actionable"],
+            "fallback_pass_candidate": fallback_pass_candidate,
+        }
+
+        status, action, complete, reason = module.classify_snapshot(
+            summary={"ci": "passed", "review": "approved", "head": "matched"},
+            ci_payload={"status": "passed"},
+            review_payload={"status": "approved"},
+            review_wrapper_payload={
+                "decision": decision,
+                "codex_review": {
+                    "lifecycle": {
+                        "completion_signal": "fallback_issue_comment",
+                        "fallback_pass_candidate": fallback_pass_candidate,
+                    },
+                },
+            },
+            metadata={"state": "OPEN", "isDraft": False, "mergeable": "MERGEABLE"},
+            limitations=[],
+            head_matches_expected=True,
+            normalized_status="unknown",
+            trigger_comment_id="99",
+            trigger_created_at="2026-06-08T01:00:00Z",
+        )
+
+        assert status == "human_gate"
+        assert action == "address_review_feedback"
+        assert complete is True
+        assert reason == "actionable_unresolved_thread"
+        assert action != "merge_prepared"
 
     def test_issue_170_pr_observation_review_collector_keeps_feedback_with_trigger_text(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -30926,7 +32148,7 @@ esac
 case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number")
     cat <<'JSON'
-{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13}
+{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}
 JSON
     ;;
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
