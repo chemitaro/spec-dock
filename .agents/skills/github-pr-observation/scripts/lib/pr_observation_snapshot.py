@@ -30,6 +30,7 @@ class Args:
     trigger_created_at: str | None
     body_mode: str
     out_dir: str | None
+    skip_optional_merge_blocker_metadata: bool
 
 
 def parse_args(argv: list[str]) -> Args:
@@ -41,6 +42,7 @@ def parse_args(argv: list[str]) -> Args:
         "trigger_created_at": None,
         "body_mode": "trigger-window-truncated",
         "out_dir": None,
+        "skip_optional_merge_blocker_metadata": False,
     }
     idx = 0
     while idx < len(argv):
@@ -53,8 +55,13 @@ def parse_args(argv: list[str]) -> Args:
             "--trigger-created-at",
             "--body-mode",
             "--out",
+            "--skip-optional-merge-blocker-metadata",
         }:
             raise SystemExit(64)
+        if flag == "--skip-optional-merge-blocker-metadata":
+            values["skip_optional_merge_blocker_metadata"] = True
+            idx += 1
+            continue
         if idx + 1 >= len(argv):
             raise SystemExit(64)
         value = argv[idx + 1]
@@ -83,6 +90,10 @@ def parse_args(argv: list[str]) -> Args:
         trigger_created_at=values["trigger_created_at"],
         body_mode=str(values["body_mode"]),
         out_dir=values["out_dir"],
+        skip_optional_merge_blocker_metadata=(
+            bool(values["skip_optional_merge_blocker_metadata"])
+            or os.environ.get("OBS_SKIP_OPTIONAL_MERGE_BLOCKER_METADATA") == "1"
+        ),
     )
 
 
@@ -1164,6 +1175,23 @@ def collect_merge_blocker_metadata(
     }, limitations
 
 
+def skipped_merge_blocker_metadata() -> dict[str, object]:
+    return {
+        "skipped": True,
+        "skip_reason": "optional_metadata_deferred_during_wait_poll",
+        "compare": {
+            "available": False,
+            "skipped": True,
+            "skip_reason": "optional_metadata_deferred_during_wait_poll",
+        },
+        "branch_protection": {
+            "available": False,
+            "skipped": True,
+            "skip_reason": "optional_metadata_deferred_during_wait_poll",
+        },
+    }
+
+
 def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
     checks_script = script_dir / "lib" / "fetch_pr_checks_snapshot.sh"
     review_script = script_dir / "lib" / "fetch_pr_review_snapshot.sh"
@@ -1376,13 +1404,16 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
                     "stderr_sha256": hashlib.sha256(read_text(review_stderr).encode()).hexdigest(),
                 }
             )
-        merge_blocker_metadata, merge_blocker_limitations = collect_merge_blocker_metadata(
-            repo=args.repo,
-            metadata=metadata,
-            ci_payload=ci_payload,
-            review_payload=review_payload,
-        )
-        limitations.extend(merge_blocker_limitations)
+        if args.skip_optional_merge_blocker_metadata:
+            merge_blocker_metadata = skipped_merge_blocker_metadata()
+        else:
+            merge_blocker_metadata, merge_blocker_limitations = collect_merge_blocker_metadata(
+                repo=args.repo,
+                metadata=metadata,
+                ci_payload=ci_payload,
+                review_payload=review_payload,
+            )
+            limitations.extend(merge_blocker_limitations)
     normalized_status, recommended_next_action, observation_complete, status_reason = classify_snapshot(
         summary=summary,
         ci_payload=ci_payload,
