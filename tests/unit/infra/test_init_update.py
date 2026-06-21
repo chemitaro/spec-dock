@@ -29780,6 +29780,56 @@ esac
                 assert reason == expected_reason
                 assert action != "merge_prepared"
 
+    def test_issue_222_pr_observation_snapshot_passed_ci_required_actions_context_pending_stays_waitable(self) -> None:
+        status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(
+            ci_status="passed",
+            limitations=[
+                {
+                    "code": "required_actions_context_pending",
+                    "source": "repos/owner/repo/branches/main/protection",
+                    "capability": "branch_protection_read",
+                    "severity": "info",
+                    "recommended_next_action": "wait",
+                    "missing_required_status_contexts": ["Required Actions Job"],
+                }
+            ],
+        )
+
+        assert status == "pending"
+        assert action == "wait"
+        assert complete is False
+        assert reason == "ci_pending"
+        assert action != "merge_prepared"
+
+    def test_issue_222_pr_observation_snapshot_blocking_limitation_precedes_pending_actions_context(self) -> None:
+        status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(
+            ci_status="passed",
+            limitations=[
+                {
+                    "code": "required_actions_context_pending",
+                    "source": "repos/owner/repo/branches/main/protection",
+                    "capability": "branch_protection_read",
+                    "severity": "info",
+                    "recommended_next_action": "wait",
+                    "missing_required_status_contexts": ["Required Actions Job"],
+                },
+                {
+                    "code": "required_non_actions_context_unprovable_by_actions",
+                    "source": "repos/owner/repo/branches/main/protection",
+                    "capability": "branch_protection_read",
+                    "severity": "blocking",
+                    "recommended_next_action": "human_gate",
+                    "unprovable_required_status_contexts": ["External Required Check"],
+                },
+            ],
+        )
+
+        assert status == "unknown"
+        assert action == "human_gate"
+        assert complete is False
+        assert reason == "blocking_limitation"
+        assert action != "merge_prepared"
+
     def test_issue_222_s03_snapshot_fallback_no_findings_with_actionable_unresolved_blocks_pass(self) -> None:
         module = self._issue_218_s02_load_observation_snapshot_module()
         fallback_pass_candidate = {
