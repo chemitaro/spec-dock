@@ -12352,7 +12352,10 @@ review_body = current.get("review_body")
 review_thread_state = current.get("review_thread_state", "RESOLVED")
 hang_seconds = current.get("hang_seconds")
 
-if hang_seconds is not None:
+if hang_seconds is not None and (
+    not current.get("hang_only_when_full_snapshot")
+    or os.environ.get("OBS_SKIP_OPTIONAL_MERGE_BLOCKER_METADATA") == "0"
+):
     time.sleep(float(hang_seconds))
 
 def emit(payload):
@@ -20042,6 +20045,97 @@ esac
         assert gh_calls.count("api repos/owner/repo/branches/main") == 1
         assert gh_calls.count("api repos/owner/repo/branches/main/protection") == 1
         assert gh_calls.count("api repos/owner/repo/compare/main...feature") == 0
+
+    def test_issue_222_pr_observation_wait_keeps_stable_result_when_final_metadata_snapshot_times_out(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            scenario_path = tmp_path / "scenario.json"
+            state_path = tmp_path / "state.txt"
+            gh_log = tmp_path / "gh.log"
+            stable_snapshot = {
+                "head": "a" * 40,
+                "ci": "passed",
+                "review": "approved",
+                "mergeable": "MERGEABLE",
+                "branch": {"name": "main", "protected": True},
+                "branch_protection": {
+                    "required_status_checks": {
+                        "contexts": [],
+                        "checks": [{"context": "test", "app_id": 15368}],
+                    },
+                    "required_signatures": {"enabled": True},
+                },
+            }
+            final_snapshot = dict(stable_snapshot)
+            final_snapshot["hang_seconds"] = 6
+            final_snapshot["hang_only_when_full_snapshot"] = True
+            scenario_path.write_text(
+                json.dumps([stable_snapshot, final_snapshot]),
+                encoding="utf-8",
+            )
+            self._issue_75_write_pr_observation_wait_fake_gh(
+                fake_gh,
+                scenario_path=scenario_path,
+                state_path=state_path,
+                log_path=gh_log,
+            )
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_WAIT_SCENARIO": str(scenario_path),
+                "GH_FAKE_WAIT_STATE": str(state_path),
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                    "--timeout-seconds",
+                    "6",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "2",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+
+        assert payload["wait"]["polls"] >= 2
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+        assert "snapshot_poll_timeout" in [
+            item.get("code") for item in payload["limitations"] if isinstance(item, dict)
+        ]
 
     def test_issue_222_pr_observation_snapshot_required_actions_context_missing_blocks_merge_prepared(self) -> None:
         payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(

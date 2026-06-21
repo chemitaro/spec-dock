@@ -649,8 +649,8 @@ class TestRuntimeDoctorS04:
                         {
                             "number": 123,
                             "headRefOid": "abcde12345",
-                            "baseRefName": "main",
-                            "headRefName": "feature",
+                            "baseRefName": "release/1.0",
+                            "headRefName": "feature/do-work",
                             "headRepositoryOwner": {"login": "example"},
                             "mergeable": "MERGEABLE",
                         }
@@ -682,6 +682,57 @@ class TestRuntimeDoctorS04:
         assert "repos/example/repo/compare/main...feature" not in rendered_commands
         assert "repos/example/repo/branches/main" not in rendered_commands
         assert "repos/example/repo/branches/main/protection" not in rendered_commands
+        assert "/check-runs" not in rendered_commands
+        assert "/status" not in rendered_commands
+        assert "statusCheckRollup" not in rendered_commands
+
+    def test_issue_222_s05_github_capability_cli_extended_probes_merge_blocker_metadata(
+        self, monkeypatch
+    ) -> None:
+        _runtime_app, app_contracts, _app_doctor, _app_ports, _infra_contracts = _runtime_modules()
+        github_capability_cli = _runtime_github_capability_cli()
+        commands: list[list[str]] = []
+
+        def record_command(command, **_kwargs):
+            commands.append(list(command))
+            if command[:3] == ["gh", "pr", "view"]:
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    json.dumps(
+                        {
+                            "number": 123,
+                            "headRefOid": "abcde12345",
+                            "baseRefName": "release/1.0",
+                            "headRefName": "feature/do-work",
+                            "headRepositoryOwner": {"login": "example"},
+                            "mergeable": "MERGEABLE",
+                        }
+                    ),
+                    "",
+                )
+            return subprocess.CompletedProcess(command, 0, "{}", "")
+
+        monkeypatch.setattr(github_capability_cli.subprocess, "run", record_command)
+
+        diagnostics = github_capability_cli.GitHubCapabilityCliGateway().probe(
+            app_contracts.GitHubCapabilityProbeRequest(
+                github_repo="example/repo",
+                github_pr=123,
+                github_head_sha="abcde12345",
+                include_extended=True,
+            )
+        )
+
+        assert [diagnostic.capability for diagnostic in diagnostics][-3:] == [
+            "compare_read",
+            "branch_metadata_read",
+            "branch_protection_read",
+        ]
+        rendered_commands = "\n".join(" ".join(command) for command in commands)
+        assert "repos/example/repo/compare/release%2F1.0...feature%2Fdo-work" in rendered_commands
+        assert "repos/example/repo/branches/release%2F1.0" in rendered_commands
+        assert "repos/example/repo/branches/release%2F1.0/protection" in rendered_commands
         assert "/check-runs" not in rendered_commands
         assert "/status" not in rendered_commands
         assert "statusCheckRollup" not in rendered_commands
