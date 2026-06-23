@@ -3,186 +3,148 @@
 ID: "iss-00230"
 タイトル: "Compile Step Assurance Agent Routing And Context Policy"
 関連GitHub: ["#230"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-23"
 依存: ["requirement.md"]
 親: ["epic-00224", "init-local-00003"]
 ---
 
-# iss-00230 Compile Step Assurance Agent Routing And Context Policy — 設計（どう実現するか）
-
-> このテンプレートは最小 scaffold です。プロジェクトの目的、作業内容、人間の理解しやすさ、エージェントの実行可能性に合わせて、項目は追加・削除・統合・並べ替えてよい。
-
-## 親図（Diagram）参照
-- Epic 図:
-  - ...
-- Initiative 図:
-  - ...
-- 再利用する決定:
-  - ...
+# iss-00230 Compile Step Assurance Agent Routing And Context Policy — 設計
 
 ## 目的・制約
 - 目的:
-  - ...
-- 必須 / 禁止:
-  - ...
+  - `workflow next issue-execution` が、active issue の current implementation step に必要な agent routing / context contract を compile できるようにする。
+  - worker continuity と reviewer independence を同じ policy surface で扱う。
 - 非交渉制約:
-  - ...
-- 前提:
-  - ...
+  - `assurance.json` の `authorized_profile` が obligation authority であり、`lite_candidate` は obligation reduction authority を持たない。
+  - Generated Runbook / context packet は ignored projection とし、canonical issue docs や provider source を runtime が上書きしない。
+  - Reviewer / consultant clean-room packet は fail-closed にする。
 
 ## 既存実装 / 規約の理解
-- 参照した実装 / docs:
-  - ...
-- 現状理解:
-  - ...
+- 既存:
+  - `domain/assurance.py` が Profile / Complexity / source binding の domain authority。
+  - `application/workflow.py` が active issue state と assurance validity を解決する。
+  - `domain/runbook.py` が workflow target ごとの Runbook を compile する。
+  - `infra/runbook_store.py` が generated projection を ignored paths へ atomic write する。
+  - `commands/workflow.py` と `presentation/workflow.py` が CLI JSON / Markdown を返す。
 - 採用するパターン:
-  - ...
+  - domain は filesystem / CLI に依存しない。
+  - policy source は provider-side tracked JSON とし、infra/application が読み込む。
+  - generated packet は runbook projection と同じ ignored state 配下へ書く。
 - 採用しないもの:
-  - ...
-- 影響範囲:
-  - ...
+  - Skill text に state-specific routing matrix を埋め込まない。
+  - PR review trigger と blocker semantics は変更しない。
 
-## 採用方針 / トレードオフ
-- 論点:
-  - ...
-- 選択肢:
-  - ...
-- 決定:
-  - ...
+## 採用方針
+- Step facts は plan markdown から best-effort で抽出する。
+  - 初期実装では `### 実装ステップ Sxx` heading と近傍テキストを対象に、`docs-only`、`runtime`、`migration`、`security` などの keyword facts を導出する。
+  - 将来の構造化 plan schema へ移行できるよう、domain input は `StepFacts` value object に閉じる。
+- Context policy は JSON source と domain default の二層にする。
+  - JSON が valid な場合は policy source を使う。
+  - JSON が missing / invalid の場合、reviewer は fail-closed、worker は strict bounded defaults に degrade する。
+- Runbook extension は backward compatible にする。
+  - 既存 top-level fields は維持し、`step_assurance` と `context_packets` を optional extension として追加する。
+- Invocation observability は event projection として扱う。
+  - `ContextPacketProjection` に invocation event を含め、role、reasoning effort、context mode、policy version、packet hash、source hashes、fork turn count、include / exclude categories、returned evidence refs を machine-readable に出す。
+  - Full logs や raw transcript は refs / hashes に留め、payload 本体には含めない。
 
-## 依存関係分析
-- module 依存:
-  - ...
-- class 依存（必要時）:
-  - ...
-- function 依存（必要時）:
-  - ...
-- file 依存:
-  - ...
-- 上流 / 前提:
-  - ...
-- 下流 / 依存先:
-  - ...
-- 実装起点:
-  - 依存の少ないもの / 先に固定すべき interface / 先に通すべき test を書く
-- 順序への影響:
-  - plan では upstream / prerequisite から順に step を組む
-
-## モジュール依存図（Module Dependency Diagram）
-- タイトル:
-  - ...
-- 答える問い:
-  - どの module / class / file / function の依存方向を固定し、どこから実装を始めるか
-- 範囲:
-  - ...
-- 含めない詳細:
-  - 網羅的な call graph / 全 method / 全 import は描かない
-- 更新条件:
-  - 依存方向、責務境界、実装起点、変更対象 module が変わるとき
-- 図:
-  - 下の `plantuml` block を更新する
-
-### 図表（UML / 原則: モジュール依存 / パッケージ依存差分）
+## モジュール依存図
 ```plantuml
 @startuml
 top to bottom direction
-' show module / class / file / function dependencies that affect implementation order
-' do not copy Initiative/Epic diagrams
+rectangle "commands.workflow" as C
+rectangle "presentation.workflow" as P
+rectangle "application.workflow" as A
+rectangle "application.context_packets" as CP
+rectangle "domain.runbook" as R
+rectangle "domain.context_routing" as CR
+rectangle "infra.context_policy_store" as IPS
+rectangle "infra.context_packet_store" as CPS
+rectangle "infra.assurance_store" as AS
+rectangle "infra.runbook_store" as RS
 
-rectangle "対象module-a" as A
-rectangle "対象module-b" as B
-A --> B : depends_on
+C --> A
+C --> P
+A --> R
+A --> CR
+A --> CP
+A --> AS
+A --> IPS
+CP --> CR
+CP --> CPS
+RS --> R
+P --> R
+P --> CR
 @enduml
 ```
 
-## ローカル図の差分（Local Diagram Delta / 必要時）
-- 変更する境界 / 責務 / 相互作用:
-  - N/A: 理由
-
 ## インターフェース契約
-- API / function / protocol / data boundary:
-  - ...
-
-## シーケンス差分（Sequence Delta / 必要時）
-- 変更する相互作用:
-  - N/A: 理由
-- retry / transaction / external API / queue:
-  - ...
-- UML:
-  - N/A: 理由
-
-## ドメインモデル差分（Domain Model Delta / 必要時）
-- 親 model 参照:
-  - ...
-- aggregate / entity / value object 変更:
-  - N/A: 理由
-- domain event / policy / specification 変更:
-  - ...
-- 不変条件の変更:
-  - ...
-- UML:
-  - N/A: 理由
-
-## クラス / インターフェース詳細設計（必要時）
-- Class / Interface:
-  - ...
-- 責務:
-  - ...
-- 連携:
-  - ...
-- UML:
-  - N/A: 理由
+- Domain:
+  - `StepFacts`: step id、title、task kind、risk tags、source binding hash、scope hash。
+  - `AgentRole`: `dev-coder`、`doc-writer`、`code-reviewer`、`qa-reviewer`、`spec-reviewer`、`consultant`。
+  - `ContextMode`: `recent_fork`、`bounded_packet`、`clean_room`、`minimal_packet`。
+  - `StepAssuranceDecision`: worker、reasoning effort、context mode、verification、reviewers、return contract、continuation decision。
+  - `ContinuationFacts`: source revision、source binding hash、goal hash、scope hash、allowed paths hash、risk fingerprint、current HEAD / worktree / file revalidation result。
+  - `InvocationEvent`: role、reasoning effort、context mode、policy version、packet hash、source hashes、fork turn count、include / exclude categories、returned evidence refs。
+- Application:
+  - `compile_step_assurance(issue, assurance, plan_text, policy) -> StepAssuranceProjection`。
+  - `compile_context_packets(projection, issue_artifacts) -> ContextPacketProjection`。
+- CLI:
+  - `workflow next issue-execution --format json` に optional `step_assurance` と `context_packets` を含める。
+  - Markdown 出力に "Step Assurance" section を含める。
 
 ## ディレクトリ / ファイル変更計画
 ```text
-.
-|-- src/
-|   |-- package/
-|   |   |-- new_module.py        # 追加: 目的; 依存: ...
-|   |   |-- existing_module.py   # 変更: 目的; 依存: ...
-|   |   `-- renamed_module.py    # 移動/rename 元: src/package/old_module.py; 目的
-|   `-- tests/
-|       `-- test_new_module.py   # 追加/変更: 目的; 依存: src/package/new_module.py
-|-- docs/
-|   `-- reference.md             # 読取のみ: 目的
-`-- legacy/
-    `-- obsolete_file.py         # 削除: 目的; 依存: 代替準備完了
+src/spec_dock/assets/spec_dock/
+|-- system/assurance/context-routing-policy.json
+|-- system/assurance/schemas/context-routing-policy.schema.json
+`-- scripts/spec_dock_runtime/
+    |-- domain/context_routing.py
+    |-- application/context_packets.py
+    |-- application/workflow.py
+    |-- domain/runbook.py
+    |-- infra/context_policy_store.py
+    |-- infra/context_packet_store.py
+    |-- presentation/workflow.py
+    `-- commands/workflow.py
+
+spec-dock/
+|-- system/assurance/context-routing-policy.json
+|-- system/assurance/schemas/context-routing-policy.schema.json
+`-- scripts/spec_dock_runtime/... # dogfooding mirror sync
+
+tests/
+|-- unit/domain/test_context_routing.py
+|-- unit/infra/test_context_packet_store.py
+|-- cli_runtime/test_workflow_context_routing.py
+`-- cli_runtime/test_workflow.py
 ```
 
 ## 要件 → 設計マッピング
-- AC-001 -> ...
-- EC-001 -> ...
-- constraint -> ...
+- AC-001 -> `domain/context_routing.py` routing matrix tests。
+- AC-002, AC-006, EC-004 -> continuation eligibility、freshness revalidation、fallback tests。
+- AC-003, AC-004, AC-005 -> reviewer / consultant clean-room packet tests。
+- AC-007 -> Runbook JSON / Markdown presentation tests。
+- AC-008 -> generated packet ignored-state and git-clean CLI test。
+- AC-009, AC-011 -> context packet evidence ref and invocation event schema tests。
+- AC-010, EC-001 -> existing workflow state precedence tests。
+- EC-002 -> invalid policy fail-closed / degrade tests。
 
 ## テスト戦略
-- 単体:
-  - ...
-- 統合:
-  - ...
-- E2E / manual:
-  - ...
-- migration / rollback / feature flag if needed:
-  - ...
+- Unit:
+  - context routing matrix、continuation invalidation、freshness revalidation、return contract、clean-room exclusion、invocation event schema。
+- Infra:
+  - context packet atomic write、ignored projection path、path traversal / symlink rejection。
+- CLI runtime:
+  - `workflow next issue-execution` JSON / Markdown extension、missing assurance precedence、tracked diff が出ないこと。
+- Integration:
+  - この Issue では live sub-agent invocation は行わず、runtime projection contract で閉じる。
 
-## 要件 / 例外 -> 検証マッピング
-- AC-001 -> ...
-- EC-001 -> ...
-- constraint -> ...
-
-## リスク / 移行 / ロールバック（必要時）
-- ...
+## リスク / 移行
+- 既存 Runbook consumers が未知 field を許容しない可能性があるため、既存 field は変更しない。
+- policy JSON が壊れた状態で reviewer を許可すると independence を破るため、reviewer は fail-closed を優先する。
+- plan markdown parse は暫定的 best-effort なので、構造化 step metadata は future follow-up とする。ただし本 Issue では heading / keyword based extraction を deterministic に固定する。
 
 ## 未確定事項
-- Q-001:
-  - 質問:
-  - 選択肢:
-    - A:
-      - ...
-    - B:
-      - ...
-  - 推奨案:
-    - ...
-  - 影響範囲:
-    - ...
+- なし。

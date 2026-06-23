@@ -3,268 +3,165 @@
 ID: "iss-00230"
 タイトル: "Compile Step Assurance Agent Routing And Context Policy"
 関連GitHub: ["#230"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-23"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00224", "init-local-00003"]
 ---
 
-# iss-00230 Compile Step Assurance Agent Routing And Context Policy — 実装計画（実行契約 / Execution Contract）
-
-> このテンプレートは executable scaffold です。`plan.md` は計画済み契約（planned contract）と、実装者が step を上から順に実行できる command queue を書く場所です。実行結果、逸脱、発見された tests、reviewer verdict、commit/no-op evidence は `report.md` の観測証跡台帳（observed evidence ledger）に記録する。workflow authority は skills / `workflow_issue.md` が持ち、Issue 計画の field semantics と詳しい書き方は `phase_plan_issue.md` と `docs/authoring/issue-plan.md` を detail-reference として参照する。
+# iss-00230 Compile Step Assurance Agent Routing And Context Policy — 実装計画
 
 ## この計画で満たす要件ID
 - AC:
-  - ...
+  - AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011
 - EC:
-  - ...
+  - EC-001, EC-002, EC-003, EC-004
 - 制約:
-  - ...
+  - `authorized_profile` authority、ignored projection、reviewer clean-room fail-closed、no raw transcript / private reasoning transfer。
 
 ## 依存関係から導く実装順序
-- 依存関係の参照元:
-  - `design.md` の依存関係、図、ファイル変更計画
-- 順序ルール:
-  - prerequisite / lower-dependency slice から先に閉じる
-  - downstream slice は前提が固定されてから置く
-- step 依存サマリー:
-  - S01:
-    - 依存:
-    - unblock:
-    - 対象ファイル:
-
-## ステップ一覧
 - S01:
-  - 観測可能な振る舞い:
-  - 依存:
-  - unblock:
-  - 対象ファイル:
-  - 閉じる要件:
-  - レビューゲート:
+  - domain policy と policy source を先に固定し、routing matrix と continuation semantics を red/green で閉じる。
 - S02:
-  - ...
+  - S01 の decision を Context Packet と Runbook projection へ接続する。
+- S90:
+  - Provider / dogfooding mirror と docs / schema 影響を同期する。
+- S99:
+  - Issue-wide validation、reviewer gates、final commit。
 
-## 要件 ↔ ステップ対応
-- AC-001 -> S01
-- EC-001 -> S02
-
-## 仕様固定クロージャ索引（Spec-Locked Closure Index）
-
-> これは Issue 全体のテスト一覧ではなく、仕様を縮小解釈・後付けテスト・過剰実装しないための coverage ledger です。実際の step-local obligation と concrete seeds は各 implementation step の `具体テストケース一覧` に置く。
-
-| 識別子（ID） | ステップ（step） | スライス（slice） | 種別（type） | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル（evidence level） | クロージャ証跡（closure evidence） |
+## 仕様固定クロージャ索引
+| ID | ステップ | スライス | 種別 | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル | クロージャ証跡 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | <behavior> | 受け入れ（acceptance） | AC-001 | ... | ... | 仕様 drift（spec drift） | yes | red-required | ステップ完了証跡（report step closure） |
-| tc-002 | S01 | <behavior> | 否定系（negative） | EC-001 | ... | ... | 沈黙失敗（silent failure） | yes | inspect-only | ステップ完了証跡（report step closure） |
+| tc-230-001 | S01 | routing-matrix | acceptance | AC-001 | docs/runtime/migration/security step で worker / effort / verification / reviewers が異なる | StepFacts + Assurance profile | one-size-fits-all workflow | yes | red-required | domain tests |
+| tc-230-002 | S01 | continuation | acceptance | AC-002, AC-006, EC-004 | same binding/revision/goal/scope/allowed paths/risk と current HEAD/worktree/file revalidation pass では continuation allowed、変更時または revalidation failure は rejected/fallback | previous invocation + current facts | stale context reuse | yes | red-required | domain tests |
+| tc-230-003 | S01 | clean-room | negative | AC-003, AC-004, AC-005 | reviewer / consultant は clean_room、禁止素材を含めない | role + candidate sources | review contamination | yes | red-required | domain tests |
+| tc-230-004 | S02 | runbook-extension | acceptance | AC-007 | workflow next JSON / Markdown が step assurance と context refs を返す | active issue + valid assurance | invisible routing decision | yes | red-required | CLI tests |
+| tc-230-005 | S02 | generated-state | acceptance | AC-008, AC-009 | packet projection が ignored state に書かれ、path/hash/missing reason を持つ | workflow next + git status | tracked projection pollution | yes | red-required | CLI / infra tests |
+| tc-230-006 | S02 | precedence | negative | AC-010, EC-001 | missing/invalid assurance では step assurance を生成しない | scaffold/missing/invalid issue | bypassed assurance gate | yes | covered-existing + red-required | CLI tests |
+| tc-230-007 | S02 | invalid-policy | negative | EC-002 | invalid policy は reviewer fail-closed / worker strict fallback | broken policy source | unsafe degraded mode | yes | red-required | infra/application tests |
+| tc-230-008 | S02 | invocation-observability | acceptance | AC-011 | role/effort/context mode/policy version/packet hash/source hashes/fork turn count/include-exclude categories/returned evidence refs が machine-readable event に残る | workflow next + packet projection | invisible or unverifiable delegation | yes | red-required | CLI / infra tests |
+| tc-230-009 | S90 | mirror-docs | structural | docs impact | provider source と dogfooding mirror が一致する | diff -ru | scaffold drift | yes | inspect-only | parity commands |
 
-- 証跡レベル（evidence level）:
-  - red-required: 実装前に失敗する新規 test / characterization を固定する。
-  - covered-existing: 既存 test が対象 behavior を検出できる根拠を固定する。
-  - inspect-only: docs / template / config などを inspection、structural assertion、review evidence で閉じる。
-  - manual-required: 自動化できない確認手順、期待結果、記録先を固定する。
-- 詳細化方針:
-  - 件数ではなく、AC、changed contract、failure mode、regression risk、invariant、manual / integration risk から必要な obligation を決める。
-  - private method、実装アルゴリズム、mock 構造、assert 細部は原則固定しない。
-
-## レビュー / QA ゲート方針
-- RG1 step review:
-  - 実施タイミング: 各 implementation step の commit 前
-  - reviewer: code-reviewer（code / runtime / tests / scaffold behavior）; spec-reviewer（docs-only / template-only / skill-text-only）
-  - pass 条件: review_status: pass
-- QG1 final QA:
-  - reviewer: qa-reviewer
-  - 範囲: Issue 全体の obligation coverage、missing high-value tests、manual / integration test 要否
-- SG1 final spec review:
-  - reviewer: spec-reviewer
-  - 範囲: requirement / design / plan / report / docs 整合
-
-## 実行ルール（全ステップ共通）
-- 各 implementation step は 1 behavior slice / 1 review scope / 1 commit boundary とする。例外が必要な場合は実装前に plan amendment と fresh re-review を通し、final review / final commit で per-step review / commit を代替しない。
-- `plan.md` には planned requirements、evidence destination、closure 条件だけを書く。observed result は `report.md` に書く。
-- docs-only / inspect-only / manual-required step は code test 前提にせず、代替 evidence path と rationale を implementation 前に固定する。
-- implementation 中に新しい仕様、bug class、外部 contract risk、未計画の closure が見つかった場合は、report 記録だけで足りるか、plan amendment と re-review が必要かを判断する。
-
-## 実装ステップ
-
-### 実装ステップ S01 — <観測可能な振る舞い>
-- 振る舞いの目標（behavior goal）:
-  - ...
-- design 参照:
-  - ...
-- 依存:
-  - ...
-- unblock:
-  - ...
+## 実装ステップ S01 — Step Assurance と Context Routing policy を固定する
+- 振る舞いの目標:
+  - StepFacts と Assurance authority から routing / context / verification / reviewer obligation を deterministic に決める。
 - 対象ファイル:
-  - ...
-- 計画済み契約（planned contract）:
-  - scope:
-    - 実装・文書化する範囲:
-  - テスト義務（test obligation）:
-    - closure id:
-      - tc-001
-    - coverage rationale:
-      - AC / changed contract / failure mode / regression risk / invariant / manual risk から必要性を書く:
-  - Red / 代替証跡の要件:
-    - red-required / covered-existing:
-      - 実装前に確認する failing test、characterization、または既存 test sensitivity:
-    - docs-only / inspect-only / manual-required:
-      - code test を置かない理由:
-      - 代替 evidence path:
-      - manual 手順と期待結果:
-  - 実装範囲（implementation scope）:
-    - allowed paths:
-      - ...
-    - forbidden changes:
-      - ...
-  - Green 検証:
-    - command / inspection / manual evidence:
-      - ...
-  - Refactor / cleanup ガードレール:
-    - 目的:
-    - 禁止する広がり:
-  - closure 証跡要件:
-    - Step Contract Closure:
-    - Test Contract Closure:
-    - Closure Coverage:
-  - report 証跡の記録先:
-    - `report.md` の対象 section / ledger:
-  - amendment trigger（plan amendment が必要になる契機）:
-    - plan amendment と re-review が必要になる発見:
+  - `src/spec_dock/assets/spec_dock/system/assurance/context-routing-policy.json`
+  - `src/spec_dock/assets/spec_dock/system/assurance/schemas/context-routing-policy.schema.json`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/context_routing.py`
+  - `tests/unit/domain/test_context_routing.py`
+- 閉じる要件:
+  - AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, EC-002
+- Red / 代替証跡:
+  - `uv run pytest tests/unit/domain/test_context_routing.py` が実装前に import / expectation failure になること。
+- Green 検証:
+  - `uv run pytest tests/unit/domain/test_context_routing.py`
+- Refactor / cleanup ガードレール:
+  - domain は filesystem / CLI に依存させない。routing matrix のために既存 Assurance classification を書き換えない。
+- report 証跡の記録先:
+  - `report.md` の S01 セッションログ、TDD evidence、Step Contract Closure、Reviewer Gate Status、Step Commit Gate。
+- amendment trigger:
+  - plan markdown 以外の canonical step metadata 形式、classifier profile semantics、live sub-agent invocation requirement が必要になった場合。
+- reviewer:
+  - code-reviewer
+- commit:
+  - S01 の runtime domain / policy / unit tests のみ。
 
-#### 委任契約（delegation contract）
-- 委任ロール（delegated role）:
-  - dev-coder / doc-writer / other named worker / N/A
-  - N/A は read-only / approved-no-op step、または `workflow_issue.md` に従う事前承認済み Parent Implementation Exception だけに使う。file mutation を伴う通常の implementation success path として使わない。
-- 入力 docs:
-  - `requirement.md`
-  - `design.md`
-  - `plan.md`
-  - workflow / authoring docs:
-  - current target files:
-- 許可 paths:
-  - ...
-- 禁止 changes:
-  - ...
-- 受け入れ条件:
-  - closure id / step close condition:
-- 必須 tests または docs-only verification:
-  - targeted command / inspection / docs diff / manual evidence:
-- reviewer focus:
-  - code-reviewer（code / runtime / tests / scaffold behavior）; spec-reviewer（docs-only / template-only / skill-text-only docs/spec alignment）
-- 必須出力（output required）:
-  - changed files:
-  - verification result:
-  - report evidence to update:
-  - unresolved risks:
-- 停止条件（stop conditions）:
-  - input docs conflict / path outside allowed scope / verification cannot run / acceptance cannot be met:
+## 実装ステップ S02 — Context Packet と Runbook projection へ接続する
+- 振る舞いの目標:
+  - `workflow next issue-execution` が active issue の selected step assurance と packet refs を JSON / Markdown に出し、generated packet を ignored state に書く。
+- 対象ファイル:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workflow.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/runbook.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/context_policy_store.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/context_packet_store.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/workflow.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/workflow.py`
+  - `tests/unit/infra/test_context_packet_store.py`
+  - `tests/cli_runtime/test_workflow_context_routing.py`
+  - existing workflow tests as needed
+- 閉じる要件:
+  - AC-007, AC-008, AC-009, AC-010, AC-011, EC-001, EC-002, EC-003
+- Red / 代替証跡:
+  - `uv run pytest tests/cli_runtime/test_workflow_context_routing.py tests/unit/infra/test_context_packet_store.py` が実装前に import / expectation failure になること。
+- Green 検証:
+  - `uv run pytest tests/cli_runtime/test_workflow_context_routing.py tests/unit/infra/test_context_packet_store.py tests/cli_runtime/test_workflow.py`
+- Refactor / cleanup ガードレール:
+  - 既存 Runbook top-level fields の互換性を維持する。generated packet / event は ignored state に限定する。
+- report 証跡の記録先:
+  - `report.md` の S02 セッションログ、TDD evidence、Step Contract Closure、Reviewer Gate Status、Step Commit Gate。
+- amendment trigger:
+  - existing workflow state precedence の変更、new CLI command 追加、tracked artifact mutation が必要になった場合。
+- reviewer:
+  - code-reviewer
+- commit:
+  - S02 の application / infra / presentation / CLI tests のみ。
 
-#### 具体テストケース一覧
-
-> この欄は full test inventory ではありません。step-local obligation と concrete red / characterization / inspect / manual seeds を、実装前に固定するための欄です。
-
-- `tc-s01-001` acceptance: <短い説明>
-  - 前提: ...
-  - 操作: ...
-  - 期待結果: ...
-  - 失敗検出: ...
-  - 検証方法: ...
-  - 関連 closure id: tc-001
-
-- `tc-s01-002` inspect-only / manual-required: <短い説明>
-  - テスト不要理由: <自動テスト不要の理由>
-  - 代替検証方法: <確認手順>
-  - 期待結果: <期待される状態>
-  - 記録先: <証跡の保存先>
-  - 関連 closure id: tc-002
-
-#### ステップ完了契約（step closure contract）
-- closure id:
-  - tc-001
-- close 条件:
-  - ...
-- 検証 evidence:
-  - targeted command / inspection / manual evidence:
-- report evidence:
-  - Step Contract Closure:
-  - Test Contract Closure:
-  - Closure Coverage:
-  - Closure Delta:
-- 残リスク:
-  - ...
-
-#### ステップゲート（step gate）
-- step reviewer gate:
-  - reviewer:
-  - review 範囲:
-  - pass 条件: review_status: pass
-  - re-review rule: 指摘を修正し pass まで再実行
-- commit / no-op gate:
-  - closure 状態: committed / approved-no-op
-  - commit 範囲:
-  - no-op の場合の確認対象、差分なし確認コマンド、read-only evidence:
-
-### 実装ステップ Sxx — <次に観測可能な振る舞い>
-- S01 の subsections を複製して記入する。
-- `planned contract`、`delegation contract`、`具体テストケース一覧`、`step closure contract`、`step gate` がない implementation step は implementation-ready ではない。
-
-### ドキュメント影響の解消ステップ S90（docs impact resolution / docs refresh）
+## ドキュメント影響の解消ステップ S90
+- step kind:
+  - docs impact gate / approved-no-op unless provider-to-mirror sync changes are required.
+- 閉じる closure:
+  - tc-230-009
 - 対象:
-  - docs / templates / README / workflow / skill / migration notes / none
+  - provider policy schema、dogfooding mirror、runtime docs / active issue report。
 - 対応:
-  - ...
-- doc update owner:
-  - doc-writer when updates are required
-- spec/doc review:
-  - reviewer: spec-reviewer
-  - pass 条件: docs が requirement / design / plan と整合し、未解決の必須 docs 影響が残っていない
+  - `src/spec_dock/assets/spec_dock/...` から `spec-dock/...` へ必要な mirror を同期する。
+  - policy JSON / schema が shipped asset として存在することを確認する。
+- Red / 代替証跡:
+  - inspect-only: code behavior を追加しない gate のため red test は要求しない。provider / mirror parity と shipped path inspection で閉じる。
+- 検証:
+  - `diff -ru -x __pycache__ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime spec-dock/scripts/spec_dock_runtime`
+  - `diff -ru src/spec_dock/assets/spec_dock/system/assurance spec-dock/system/assurance`
+- Refactor / cleanup ガードレール:
+  - S90 は implementation scope を広げず、S01/S02 で生じた docs / mirror drift のみ解消する。
+- report 証跡の記録先:
+  - `report.md` の S90 docs impact resolution、Closure Coverage、Reviewer Gate Status。
+- amendment trigger:
+  - shipped docs / templates / skills の behavioral text 変更が必要になった場合。
+- commit / no-op gate:
+  - provider / mirror sync 差分がある場合は S90 commit。差分がない場合は approved-no-op とし、parity command と `git status --short` を report に記録する。
+- reviewer:
+  - spec-reviewer
 
-### 最終品質ゲートステップ S99（final quality gate）
-- branch diff 範囲:
-  - ...
+## 最終品質ゲートステップ S99
+- step kind:
+  - final verification gate / no implementation mutation except final report ledger.
+- 閉じる closure:
+  - tc-230-001〜tc-230-009 の integrated closure。
 - 必須 validation:
-  - ...
+  - `uv run pytest tests/unit/domain/test_context_routing.py tests/unit/infra/test_context_packet_store.py tests/cli_runtime/test_workflow_context_routing.py tests/cli_runtime/test_workflow.py`
+  - `uv run pytest tests/unit`
+  - `uv run pytest tests/cli_runtime`
+  - `make lint`
+  - `./spec-dock/scripts/spec-dock validate`
+  - `./spec-dock/scripts/spec-dock workflow next issue-execution --format json`
 - final QA gate:
-  - reviewer: qa-reviewer
-  - 範囲: Issue 全体の obligation coverage と integration test 要否
-  - pass 条件: reviewer pass
-- final code review ゲート:
-  - reviewer: code-reviewer
-  - 範囲: issue-wide integrated diff、構造、責務境界、回帰リスク、保守性
-  - pass 条件: review_status: pass
-- final spec review ゲート:
-  - reviewer: spec-reviewer
-  - 範囲: requirement / design / plan / report / implementation / tests / docs 整合
-  - pass 条件: reviewer pass
+  - qa-reviewer pass
+- final code review gate:
+  - code-reviewer pass
+- final spec review gate:
+  - spec-reviewer pass
 - final commit gate:
-  - commit 範囲:
-  - final report ledger:
-  - post-commit external evidence destination:
-
-## 未確定事項
-- Q-001:
-  - 質問:
-  - 推奨案:
-  - 影響範囲:
+  - final report ledger と verification evidence を commit する。
+- Red / 代替証跡:
+  - final integration gate のため red test は要求しない。S01/S02/S90 の closure evidence と full validation を統合証跡にする。
+- Refactor / cleanup ガードレール:
+  - S99 で runtime behavior を変更しない。reviewer 指摘への修正が必要な場合は対象 step の closure delta と re-review を記録する。
+- report 証跡の記録先:
+  - `report.md` の S99 final quality gate、final reviewer verdicts、final commit gate。
+- amendment trigger:
+  - S99 で未計画の behavior change、new artifact contract、または acceptance criteria gap が見つかった場合。
 
 ## 最終完了条件
 - AC/EC 達成:
-  - ...
+  - tc-230-001〜tc-230-009 が pass / approved-no-op。
 - docs 影響解決:
-  - ...
+  - provider / mirror parity が pass。
 - 全 implementation step 完了:
-  - committed / approved-no-op:
+  - S01, S02, S90, S99 が committed / approved-no-op。
 - final quality gate pass:
-  - qa-reviewer:
-  - issue-wide code-reviewer:
-  - spec-reviewer:
-- final commit 完了:
-  - ...
-- 必須 closure id 完了:
-  - Step Contract Closure:
-  - Test Contract Closure:
-  - Closure Coverage:
+  - qa-reviewer、code-reviewer、spec-reviewer が fresh pass。
 - final clean state:
-  - no unintended staged / unstaged changes:
+  - no unintended staged / unstaged changes。
