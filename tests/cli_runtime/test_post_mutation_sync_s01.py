@@ -1,20 +1,12 @@
-import sys
 from pathlib import Path
+import sys
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import sync_state as app_sync_state
+        from spec_dock_runtime.application import contracts as app_contracts, sync_state as app_sync_state
         from spec_dock_runtime.domain import models as domain_models
     finally:
         sys.path.pop(0)
@@ -92,7 +84,7 @@ class TestPostMutationSyncS01:
         assert any("./spec-dock/scripts/spec-dock sync" in line for line in outcome.guidance)
 
     def test_tc_s01_003_artifact_failure_is_failed_and_guided(self) -> None:
-        app_contracts, app_sync_state, domain_models = _runtime_modules()
+        app_contracts, _app_sync_state, domain_models = _runtime_modules()
         failure = app_contracts.ArtifactWriteFailure(status="failed_partial_or_stale", reason="disk full")
         result = _sync_result(app_contracts, domain_models, artifact_failure=failure)
 

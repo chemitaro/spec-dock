@@ -1,25 +1,20 @@
 import ast
-import sys
 from pathlib import Path
+import sys
 
 import pytest
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        from spec_dock_runtime.domain import deps as domain_deps
-        from spec_dock_runtime.domain import models as domain_models
-        from spec_dock_runtime.domain import status as domain_status
-        from spec_dock_runtime.domain import tree as domain_tree
+        from spec_dock_runtime.domain import (
+            deps as domain_deps,
+            models as domain_models,
+            status as domain_status,
+            tree as domain_tree,
+        )
     finally:
         sys.path.pop(0)
 
@@ -27,14 +22,7 @@ def _runtime_modules():
 
 
 def _runtime_active_module():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.domain import active as domain_active
@@ -44,19 +32,14 @@ def _runtime_active_module():
 
 
 def _runtime_validation_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        from spec_dock_runtime.domain import models as domain_models
-        from spec_dock_runtime.domain import tree as domain_tree
-        from spec_dock_runtime.domain import validation as domain_validation
+        from spec_dock_runtime.domain import (
+            models as domain_models,
+            tree as domain_tree,
+            validation as domain_validation,
+        )
     finally:
         sys.path.pop(0)
     return domain_models, domain_tree, domain_validation
@@ -82,7 +65,9 @@ def _shared_graph(domain_models, domain_tree):
             title="JWT Auth",
             slug="jwt-auth",
             path=Path("/repo/spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth"),
-            meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/.meta.json"),
+            meta_path=Path(
+                "/repo/spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/.meta.json"
+            ),
             parent_id="init-local-00001",
             initiative_id="init-local-00001",
             epic_id=None,
@@ -171,22 +156,20 @@ def _issue_status_snapshot(
 class TestRuntimeDomainS03:
     def test_validate_graph_rejects_local_only_initiative_under_github_mandatory_contract(self) -> None:
         domain_models, domain_tree, domain_validation = _runtime_validation_modules()
-        graph = domain_tree.build_graph(
-            [
-                domain_models.SpecNodeSeed(
-                    kind="initiative",
-                    id="init-local-00001",
-                    title="Platform",
-                    slug="platform",
-                    path=Path("/repo/spec-dock/initiatives/init-local-00001-platform"),
-                    meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/.meta.json"),
-                    parent_id=None,
-                    initiative_id=None,
-                    epic_id=None,
-                    github_issue_number=None,
-                )
-            ]
-        )
+        graph = domain_tree.build_graph([
+            domain_models.SpecNodeSeed(
+                kind="initiative",
+                id="init-local-00001",
+                title="Platform",
+                slug="platform",
+                path=Path("/repo/spec-dock/initiatives/init-local-00001-platform"),
+                meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/.meta.json"),
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            )
+        ])
 
         report = domain_validation.validate_graph(graph, repo_root=Path("/repo"))
 
@@ -195,8 +178,71 @@ class TestRuntimeDomainS03:
 
     def test_validate_graph_rejects_legacy_unscoped_issue_linkage(self) -> None:
         domain_models, domain_tree, domain_validation = _runtime_validation_modules()
-        graph = domain_tree.build_graph(
-            [
+        graph = domain_tree.build_graph([
+            domain_models.SpecNodeSeed(
+                kind="initiative",
+                id="init-00001",
+                title="Platform",
+                slug="platform",
+                path=Path("/repo/spec-dock/initiatives/init-00001-platform"),
+                meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/.meta.json"),
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=1,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="epic",
+                id="epic-00002",
+                title="Delivery",
+                slug="delivery",
+                path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery"),
+                meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/.meta.json"),
+                parent_id="init-00001",
+                initiative_id="init-00001",
+                epic_id=None,
+                github_issue_number=2,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="issue",
+                id="iss-00003",
+                title="Current issue",
+                slug="current-issue",
+                path=Path(
+                    "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue"
+                ),
+                meta_path=Path(
+                    "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue/.meta.json"
+                ),
+                parent_id="epic-00002",
+                initiative_id="init-00001",
+                epic_id="epic-00002",
+                github_issue_number=3,
+            ),
+        ])
+
+        report = domain_validation.validate_graph(graph, repo_root=Path("/repo"))
+
+        assert report.errors
+        assert "legacy unscoped github linkage" in report.errors[0]
+
+    def test_validate_graph_rejects_partially_scoped_issue_linkage(self) -> None:
+        domain_models, domain_tree, domain_validation = _runtime_validation_modules()
+
+        for github_fields in (
+            {"github_repo_owner": "example", "github_repo_name": None},
+            {"github_repo_owner": None, "github_repo_name": "repo"},
+            {"github_repo_owner": "", "github_repo_name": "repo"},
+            {"github_repo_owner": "   ", "github_repo_name": "repo"},
+            {"github_repo_owner": "example", "github_repo_name": ""},
+            {"github_repo_owner": "example", "github_repo_name": "   "},
+        ):
+            case = f"github_fields={github_fields!r}"
+            graph = domain_tree.build_graph([
                 domain_models.SpecNodeSeed(
                     kind="initiative",
                     id="init-00001",
@@ -217,7 +263,9 @@ class TestRuntimeDomainS03:
                     title="Delivery",
                     slug="delivery",
                     path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery"),
-                    meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/.meta.json"),
+                    meta_path=Path(
+                        "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/.meta.json"
+                    ),
                     parent_id="init-00001",
                     initiative_id="init-00001",
                     epic_id=None,
@@ -240,76 +288,9 @@ class TestRuntimeDomainS03:
                     initiative_id="init-00001",
                     epic_id="epic-00002",
                     github_issue_number=3,
+                    **github_fields,
                 ),
-            ]
-        )
-
-        report = domain_validation.validate_graph(graph, repo_root=Path("/repo"))
-
-        assert report.errors
-        assert "legacy unscoped github linkage" in report.errors[0]
-
-    def test_validate_graph_rejects_partially_scoped_issue_linkage(self) -> None:
-        domain_models, domain_tree, domain_validation = _runtime_validation_modules()
-
-        for github_fields in (
-            {"github_repo_owner": "example", "github_repo_name": None},
-            {"github_repo_owner": None, "github_repo_name": "repo"},
-            {"github_repo_owner": "", "github_repo_name": "repo"},
-            {"github_repo_owner": "   ", "github_repo_name": "repo"},
-            {"github_repo_owner": "example", "github_repo_name": ""},
-            {"github_repo_owner": "example", "github_repo_name": "   "},
-        ):
-            case = f"github_fields={github_fields!r}"
-            graph = domain_tree.build_graph(
-                [
-                    domain_models.SpecNodeSeed(
-                        kind="initiative",
-                        id="init-00001",
-                        title="Platform",
-                        slug="platform",
-                        path=Path("/repo/spec-dock/initiatives/init-00001-platform"),
-                        meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/.meta.json"),
-                        parent_id=None,
-                        initiative_id=None,
-                        epic_id=None,
-                        github_issue_number=1,
-                        github_repo_owner="example",
-                        github_repo_name="repo",
-                    ),
-                    domain_models.SpecNodeSeed(
-                        kind="epic",
-                        id="epic-00002",
-                        title="Delivery",
-                        slug="delivery",
-                        path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery"),
-                        meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/.meta.json"),
-                        parent_id="init-00001",
-                        initiative_id="init-00001",
-                        epic_id=None,
-                        github_issue_number=2,
-                        github_repo_owner="example",
-                        github_repo_name="repo",
-                    ),
-                    domain_models.SpecNodeSeed(
-                        kind="issue",
-                        id="iss-00003",
-                        title="Current issue",
-                        slug="current-issue",
-                        path=Path(
-                            "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue"
-                        ),
-                        meta_path=Path(
-                            "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue/.meta.json"
-                        ),
-                        parent_id="epic-00002",
-                        initiative_id="init-00001",
-                        epic_id="epic-00002",
-                        github_issue_number=3,
-                        **github_fields,
-                    ),
-                ]
-            )
+            ])
 
             report = domain_validation.validate_graph(graph, repo_root=Path("/repo"))
 
@@ -325,70 +306,7 @@ class TestRuntimeDomainS03:
             {"github_repo_owner": "   ", "github_repo_name": "repo"},
         ):
             case = f"github_fields={github_fields!r}"
-            graph = domain_tree.build_graph(
-                [
-                    domain_models.SpecNodeSeed(
-                        kind="initiative",
-                        id="init-00001",
-                        title="Platform",
-                        slug="platform",
-                        path=Path("/repo/spec-dock/initiatives/init-00001-platform"),
-                        meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/.meta.json"),
-                        parent_id=None,
-                        initiative_id=None,
-                        epic_id=None,
-                        github_issue_number=1,
-                        github_repo_owner="example",
-                        github_repo_name="repo",
-                    ),
-                    domain_models.SpecNodeSeed(
-                        kind="epic",
-                        id="epic-00002",
-                        title="Delivery",
-                        slug="delivery",
-                        path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery"),
-                        meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/.meta.json"),
-                        parent_id="init-00001",
-                        initiative_id="init-00001",
-                        epic_id=None,
-                        github_issue_number=2,
-                        github_repo_owner="example",
-                        github_repo_name="repo",
-                    ),
-                    domain_models.SpecNodeSeed(
-                        kind="issue",
-                        id="iss-00003",
-                        title="Current issue",
-                        slug="current-issue",
-                        path=Path(
-                            "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue"
-                        ),
-                        meta_path=Path(
-                            "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue/.meta.json"
-                        ),
-                        parent_id="epic-00002",
-                        initiative_id="init-00001",
-                        epic_id="epic-00002",
-                        github_issue_number=3,
-                        **github_fields,
-                    ),
-                ]
-            )
-
-            report = domain_validation.validate_graph(
-                graph,
-                repo_root=Path("/repo"),
-                enforce_github_mandatory_linkage=False,
-            )
-
-            assert report.errors, case
-            assert "invalid github linkage" in report.errors[0], case
-            assert "github.repo_owner and github.repo_name must be provided together" in report.errors[0], case
-
-    def test_validate_graph_allows_explicit_foreign_issue_linkage(self) -> None:
-        domain_models, domain_tree, domain_validation = _runtime_validation_modules()
-        graph = domain_tree.build_graph(
-            [
+            graph = domain_tree.build_graph([
                 domain_models.SpecNodeSeed(
                     kind="initiative",
                     id="init-00001",
@@ -409,7 +327,9 @@ class TestRuntimeDomainS03:
                     title="Delivery",
                     slug="delivery",
                     path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery"),
-                    meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/.meta.json"),
+                    meta_path=Path(
+                        "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/.meta.json"
+                    ),
                     parent_id="init-00001",
                     initiative_id="init-00001",
                     epic_id=None,
@@ -419,24 +339,83 @@ class TestRuntimeDomainS03:
                 ),
                 domain_models.SpecNodeSeed(
                     kind="issue",
-                    id="iss-00123",
-                    title="Imported issue",
-                    slug="imported-issue",
+                    id="iss-00003",
+                    title="Current issue",
+                    slug="current-issue",
                     path=Path(
-                        "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00123-imported-issue"
+                        "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue"
                     ),
                     meta_path=Path(
-                        "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00123-imported-issue/.meta.json"
+                        "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-current-issue/.meta.json"
                     ),
                     parent_id="epic-00002",
                     initiative_id="init-00001",
                     epic_id="epic-00002",
-                    github_issue_number=123,
-                    github_repo_owner="other",
-                    github_repo_name="repo",
+                    github_issue_number=3,
+                    **github_fields,
                 ),
-            ]
-        )
+            ])
+
+            report = domain_validation.validate_graph(
+                graph,
+                repo_root=Path("/repo"),
+                enforce_github_mandatory_linkage=False,
+            )
+
+            assert report.errors, case
+            assert "invalid github linkage" in report.errors[0], case
+            assert "github.repo_owner and github.repo_name must be provided together" in report.errors[0], case
+
+    def test_validate_graph_allows_explicit_foreign_issue_linkage(self) -> None:
+        domain_models, domain_tree, domain_validation = _runtime_validation_modules()
+        graph = domain_tree.build_graph([
+            domain_models.SpecNodeSeed(
+                kind="initiative",
+                id="init-00001",
+                title="Platform",
+                slug="platform",
+                path=Path("/repo/spec-dock/initiatives/init-00001-platform"),
+                meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/.meta.json"),
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=1,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="epic",
+                id="epic-00002",
+                title="Delivery",
+                slug="delivery",
+                path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery"),
+                meta_path=Path("/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/.meta.json"),
+                parent_id="init-00001",
+                initiative_id="init-00001",
+                epic_id=None,
+                github_issue_number=2,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="issue",
+                id="iss-00123",
+                title="Imported issue",
+                slug="imported-issue",
+                path=Path(
+                    "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00123-imported-issue"
+                ),
+                meta_path=Path(
+                    "/repo/spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00123-imported-issue/.meta.json"
+                ),
+                parent_id="epic-00002",
+                initiative_id="init-00001",
+                epic_id="epic-00002",
+                github_issue_number=123,
+                github_repo_owner="other",
+                github_repo_name="repo",
+            ),
+        ])
 
         report = domain_validation.validate_graph(graph, repo_root=Path("/repo"))
 
@@ -804,52 +783,50 @@ class TestRuntimeDomainS03:
 
     def test_resolve_issue_statuses_local_only_is_deterministic_open(self) -> None:
         _domain_deps, domain_models, domain_status, domain_tree = _runtime_modules()
-        graph = domain_tree.build_graph(
-            [
-                domain_models.SpecNodeSeed(
-                    kind="initiative",
-                    id="init-local-00001",
-                    title="init",
-                    slug="init",
-                    path=Path("/repo/spec-dock/initiatives/init-local-00001-init"),
-                    meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-init/.meta.json"),
-                    parent_id=None,
-                    initiative_id=None,
-                    epic_id=None,
-                    github_issue_number=None,
+        graph = domain_tree.build_graph([
+            domain_models.SpecNodeSeed(
+                kind="initiative",
+                id="init-local-00001",
+                title="init",
+                slug="init",
+                path=Path("/repo/spec-dock/initiatives/init-local-00001-init"),
+                meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-init/.meta.json"),
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            domain_models.SpecNodeSeed(
+                kind="epic",
+                id="epic-local-00001",
+                title="epic",
+                slug="epic",
+                path=Path("/repo/spec-dock/initiatives/init-local-00001-init/epics/epic-local-00001-epic"),
+                meta_path=Path(
+                    "/repo/spec-dock/initiatives/init-local-00001-init/epics/epic-local-00001-epic/.meta.json"
                 ),
-                domain_models.SpecNodeSeed(
-                    kind="epic",
-                    id="epic-local-00001",
-                    title="epic",
-                    slug="epic",
-                    path=Path("/repo/spec-dock/initiatives/init-local-00001-init/epics/epic-local-00001-epic"),
-                    meta_path=Path(
-                        "/repo/spec-dock/initiatives/init-local-00001-init/epics/epic-local-00001-epic/.meta.json"
-                    ),
-                    parent_id="init-local-00001",
-                    initiative_id="init-local-00001",
-                    epic_id=None,
-                    github_issue_number=None,
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            domain_models.SpecNodeSeed(
+                kind="issue",
+                id="iss-local-00001",
+                title="issue",
+                slug="issue",
+                path=Path(
+                    "/repo/spec-dock/initiatives/init-local-00001-init/epics/epic-local-00001-epic/issues/iss-local-00001-issue"
                 ),
-                domain_models.SpecNodeSeed(
-                    kind="issue",
-                    id="iss-local-00001",
-                    title="issue",
-                    slug="issue",
-                    path=Path(
-                        "/repo/spec-dock/initiatives/init-local-00001-init/epics/epic-local-00001-epic/issues/iss-local-00001-issue"
-                    ),
-                    meta_path=Path(
-                        "/repo/spec-dock/initiatives/init-local-00001-init/epics/epic-local-00001-epic/issues/iss-local-00001-issue/.meta.json"
-                    ),
-                    parent_id="epic-local-00001",
-                    initiative_id="init-local-00001",
-                    epic_id="epic-local-00001",
-                    github_issue_number=None,
+                meta_path=Path(
+                    "/repo/spec-dock/initiatives/init-local-00001-init/epics/epic-local-00001-epic/issues/iss-local-00001-issue/.meta.json"
                 ),
-            ]
-        )
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=None,
+            ),
+        ])
 
         statuses = domain_status.resolve_issue_statuses(
             graph,
@@ -1022,12 +999,10 @@ class TestRuntimeDomainS03:
         graph = _shared_graph(domain_models, domain_tree)
 
         with pytest.raises(RuntimeError):
-            domain_deps.validate_deps_cycles(
-                {
-                    "iss-local-00001": ["iss-local-00002"],
-                    "iss-local-00002": ["iss-local-00001"],
-                }
-            )
+            domain_deps.validate_deps_cycles({
+                "iss-local-00001": ["iss-local-00002"],
+                "iss-local-00002": ["iss-local-00001"],
+            })
 
         issue_statuses = {
             "iss-local-00001": _issue_status_snapshot(

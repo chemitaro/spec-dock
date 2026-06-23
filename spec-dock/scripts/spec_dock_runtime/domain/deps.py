@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import TypeAlias
 
-from .ids import deps_node_sort_key
-from .models import (
+from spec_dock_runtime.domain.ids import deps_node_sort_key
+from spec_dock_runtime.domain.models import (
     ActiveSelection,
-    DepsDependencyDisposition,
     DepsDependencyContext,
+    DepsDependencyDisposition,
     DepsDispositionBasis,
     DepsEvaluation,
     DepsHighLevelStatus,
-    DepsNodeState,
     DepsNodeBlocker,
+    DepsNodeState,
     DepsState,
     IssueStatusSnapshot,
     NodeId,
@@ -22,7 +23,7 @@ from .models import (
 _BLOCKERS_TOP_LIMIT = 5
 _KNOWN_ISSUE_STATUSES = {"done", "open", "closed", "unknown"}
 
-DependencyContextInput = DepsDependencyContext | object
+DependencyContextInput: TypeAlias = DepsDependencyContext | dict[str, object]
 
 
 def _safe_sorted_node_ids(node_ids: set[str] | list[str]) -> list[str]:
@@ -62,21 +63,15 @@ def _issue_ids_for_target(graph: SpecGraph, target_id: NodeId) -> list[str]:
     if target.kind == "issue":
         return [target.id]
     if target.kind == "epic":
-        return _safe_sorted_node_ids(
-            [
-                node_id
-                for node_id, node in graph.nodes_by_id.items()
-                if node.kind == "issue" and node.epic_id == target.id
-            ]
-        )
+        return _safe_sorted_node_ids([
+            node_id for node_id, node in graph.nodes_by_id.items() if node.kind == "issue" and node.epic_id == target.id
+        ])
     if target.kind == "initiative":
-        return _safe_sorted_node_ids(
-            [
-                node_id
-                for node_id, node in graph.nodes_by_id.items()
-                if node.kind == "issue" and node.initiative_id == target.id
-            ]
-        )
+        return _safe_sorted_node_ids([
+            node_id
+            for node_id, node in graph.nodes_by_id.items()
+            if node.kind == "issue" and node.initiative_id == target.id
+        ])
     raise RuntimeError(f"Unsupported node type for deps check: {target.kind} ({target.id})")
 
 
@@ -98,9 +93,7 @@ def collect_reachable_issue_ids(issue_depends_on_map: dict[str, list[str]], star
 
 
 def build_effective_deps_map(graph: SpecGraph, issue_depends_on_map: dict[str, list[str]]) -> dict[str, list[str]]:
-    issue_ids = _safe_sorted_node_ids(
-        [node_id for node_id, node in graph.nodes_by_id.items() if node.kind == "issue"]
-    )
+    issue_ids = _safe_sorted_node_ids([node_id for node_id, node in graph.nodes_by_id.items() if node.kind == "issue"])
     issue_id_set = set(issue_ids)
 
     out: dict[str, list[str]] = {}
@@ -198,7 +191,7 @@ def _build_evaluation(
     for issue_id in target_issue_ids:
         issue_info = derived_issue_deps.get(issue_id) or {"ready": False, "depends_on": []}
         status = _issue_status(issue_id, issue_statuses)
-        issue_blockers: set[str] = set()
+        issue_blocker_set: set[str] = set()
         suppressed_blockers = _dependency_closure(
             derived_issue_deps,
             suppressed_issue_roots_by_issue_id.get(issue_id, set()),
@@ -214,19 +207,21 @@ def _build_evaluation(
         suppressed_blockers -= unresolved_blockers
         suppressed_blockers -= direct_blockers
 
-        for blocker in issue_info.get("depends_on") or []:
+        raw_depends_on = issue_info.get("depends_on")
+        depends_on = raw_depends_on if isinstance(raw_depends_on, list) else []
+        for blocker in depends_on:
             if isinstance(blocker, str):
                 if blocker in suppressed_blockers:
                     continue
-                issue_blockers.add(blocker)
+                issue_blocker_set.add(blocker)
 
         if _issue_status_is_satisfied(status):
             issue_ready = True
         else:
-            issue_ready = status != "unknown" and len(issue_blockers) == 0
+            issue_ready = status != "unknown" and len(issue_blocker_set) == 0
         target_ready = target_ready and issue_ready
-        filtered_depends_on_by_issue_id[issue_id] = _safe_sorted_node_ids(issue_blockers)
-        issue_blockers_set.update(issue_blockers)
+        filtered_depends_on_by_issue_id[issue_id] = _safe_sorted_node_ids(issue_blocker_set)
+        issue_blockers_set.update(issue_blocker_set)
     node_blocker_ids = [blocker.node_id for blocker in node_blockers]
     issue_blockers = _safe_sorted_node_ids(issue_blockers_set)
     blockers = _safe_sorted_node_ids(issue_blockers + node_blocker_ids)
@@ -238,12 +233,15 @@ def _build_evaluation(
         guard_reason = "ready"
     else:
         unknown_in_target = any(_issue_status(issue_id, issue_statuses) == "unknown" for issue_id in target_issue_ids)
-        unknown_in_issue_blockers = any(_issue_status(issue_id, issue_statuses) == "unknown" for issue_id in issue_blockers)
-        unknown_in_node_blockers = any(
-            blocker.reason in {"empty_unknown", "lifecycle_unknown"}
-            for blocker in node_blockers
+        unknown_in_issue_blockers = any(
+            _issue_status(issue_id, issue_statuses) == "unknown" for issue_id in issue_blockers
         )
-        guard_reason = "unknown" if unknown_in_target or unknown_in_issue_blockers or unknown_in_node_blockers else "blocked"
+        unknown_in_node_blockers = any(
+            blocker.reason in {"empty_unknown", "lifecycle_unknown"} for blocker in node_blockers
+        )
+        guard_reason = (
+            "unknown" if unknown_in_target or unknown_in_issue_blockers or unknown_in_node_blockers else "blocked"
+        )
 
     return DepsEvaluation(
         ready=target_ready,
@@ -307,7 +305,9 @@ def _dependency_closure(
             continue
         closed.add(issue_id)
         issue_info = derived_issue_deps.get(issue_id) or {"depends_on": []}
-        for dep_id in issue_info.get("depends_on") or []:
+        raw_depends_on = issue_info.get("depends_on")
+        depends_on = raw_depends_on if isinstance(raw_depends_on, list) else []
+        for dep_id in depends_on:
             if isinstance(dep_id, str) and dep_id not in closed:
                 stack.append(dep_id)
     return closed
@@ -419,9 +419,8 @@ def _evaluate_dependency_contexts(
 
             if state == "unknown":
                 unresolved_issue_roots_by_issue_id.setdefault(issue_id, set()).update(context.target_issue_ids)
-                if (
-                    context.expansion != "empty"
-                    and not _any_target_issue_unknown(context.target_issue_ids, issue_statuses)
+                if context.expansion != "empty" and not _any_target_issue_unknown(
+                    context.target_issue_ids, issue_statuses
                 ):
                     node_blockers_by_id[context.target_node_id] = DepsNodeBlocker(
                         node_id=context.target_node_id,
@@ -577,7 +576,7 @@ def validate_deps_cycles(issue_depends_on_map: dict[str, list[str]]) -> None:
                     start_index = path.index(dep_id)
                 except ValueError:
                     start_index = 0
-                cycle = path[start_index:] + [dep_id]
+                cycle = [*path[start_index:], dep_id]
                 raise RuntimeError("Dependency cycle detected: " + " -> ".join(cycle))
 
             if dep_id not in visited:
@@ -605,22 +604,14 @@ def _ancestor_node_ids(graph: SpecGraph, node_id: str) -> set[str]:
 def _descendant_node_ids(graph: SpecGraph, node_id: str) -> set[str]:
     _require_graph_node(graph, node_id)
     descendants: set[str] = set()
-    stack = [
-        child_id
-        for child_id, child in graph.nodes_by_id.items()
-        if child.parent_id == node_id
-    ]
+    stack = [child_id for child_id, child in graph.nodes_by_id.items() if child.parent_id == node_id]
     while stack:
         current_id = stack.pop()
         _require_graph_node(graph, current_id)
         if current_id in descendants:
             continue
         descendants.add(current_id)
-        stack.extend(
-            child_id
-            for child_id, child in graph.nodes_by_id.items()
-            if child.parent_id == current_id
-        )
+        stack.extend(child_id for child_id, child in graph.nodes_by_id.items() if child.parent_id == current_id)
     return descendants
 
 
@@ -667,8 +658,7 @@ def ensure_node_dependency_add_would_be_valid(
     candidate_issue_depends_on_map: dict[str, list[str]] | None = None,
 ) -> None:
     candidate_raw_map: dict[str, list[str]] = {
-        node_id: list(depends_on)
-        for node_id, depends_on in raw_node_depends_on_map.items()
+        node_id: list(depends_on) for node_id, depends_on in raw_node_depends_on_map.items()
     }
     candidate_raw_map.setdefault(from_node_id, [])
     candidate_raw_map.setdefault(to_node_id, [])
@@ -696,8 +686,7 @@ def ensure_issue_dependency_add_would_not_create_cycle(
     to_issue_id: str,
 ) -> None:
     candidate_map: dict[str, list[str]] = {
-        issue_id: list(depends_on)
-        for issue_id, depends_on in issue_depends_on_map.items()
+        issue_id: list(depends_on) for issue_id, depends_on in issue_depends_on_map.items()
     }
     candidate_map.setdefault(from_issue_id, [])
     candidate_map.setdefault(to_issue_id, [])
@@ -716,10 +705,7 @@ def evaluate_readiness(
     effective_deps_map = build_effective_deps_map(graph, issue_depends_on_map)
     target_issue_ids = _issue_ids_for_target(graph, target_id)
     reachable_issue_ids = collect_reachable_issue_ids(effective_deps_map, target_issue_ids)
-    reachable_depends_on = {
-        issue_id: list(effective_deps_map.get(issue_id, []))
-        for issue_id in reachable_issue_ids
-    }
+    reachable_depends_on = {issue_id: list(effective_deps_map.get(issue_id, [])) for issue_id in reachable_issue_ids}
     validate_deps_cycles(reachable_depends_on)
 
     derived_issue_deps = _derive_issue_depends_on_view(reachable_depends_on, issue_statuses)
@@ -763,10 +749,7 @@ def inspect_target_deps(
     effective_deps_map = build_effective_deps_map(graph, issue_depends_on_map)
     target_issue_ids = _issue_ids_for_target(graph, target_id)
     reachable_issue_ids = collect_reachable_issue_ids(effective_deps_map, target_issue_ids)
-    reachable_depends_on = {
-        issue_id: list(effective_deps_map.get(issue_id, []))
-        for issue_id in reachable_issue_ids
-    }
+    reachable_depends_on = {issue_id: list(effective_deps_map.get(issue_id, [])) for issue_id in reachable_issue_ids}
     validate_deps_cycles(reachable_depends_on)
 
     derived_issue_deps = _derive_issue_depends_on_view(reachable_depends_on, issue_statuses)
@@ -784,13 +767,15 @@ def inspect_target_deps(
     for issue_id in inspect_issue_ids:
         issue_view = derived_issue_deps.get(issue_id) or {"ready": False, "depends_on": [], "blockers_top": []}
         if isinstance(filtered_depends_by_issue, dict) and issue_id in filtered_depends_by_issue:
-            depends_on = [
-                dep
-                for dep in filtered_depends_by_issue.get(issue_id, [])
-                if isinstance(dep, str)
-            ]
+            raw_depends_on = filtered_depends_by_issue.get(issue_id, [])
+            depends_on = (
+                [dep for dep in raw_depends_on if isinstance(dep, str)] if isinstance(raw_depends_on, list) else []
+            )
         else:
-            depends_on = [dep for dep in issue_view.get("depends_on", []) if isinstance(dep, str)]
+            raw_depends_on = issue_view.get("depends_on", [])
+            depends_on = (
+                [dep for dep in raw_depends_on if isinstance(dep, str)] if isinstance(raw_depends_on, list) else []
+            )
         ready = _issue_is_satisfied(issue_id, issue_statuses) or (
             _issue_status(issue_id, issue_statuses) != "unknown" and len(depends_on) == 0
         )
@@ -811,10 +796,11 @@ def inspect_target_deps(
     target_effective_set: set[str] = set()
     for issue_id in target_issue_ids:
         if isinstance(filtered_depends_by_issue, dict) and issue_id in filtered_depends_by_issue:
-            depends_on = filtered_depends_by_issue.get(issue_id, [])
+            raw_depends_on = filtered_depends_by_issue.get(issue_id, [])
         else:
             issue_view = derived_issue_deps.get(issue_id) or {"depends_on": []}
-            depends_on = issue_view.get("depends_on", [])
+            raw_depends_on = issue_view.get("depends_on", [])
+        depends_on = raw_depends_on if isinstance(raw_depends_on, list) else []
         for dep_id in depends_on:
             if isinstance(dep_id, str):
                 target_effective_set.add(dep_id)
@@ -857,9 +843,7 @@ def build_deps_state(
 ) -> DepsState:
     validate_deps_cycles(effective_deps_map)
 
-    issue_ids = _safe_sorted_node_ids(
-        [node_id for node_id, node in graph.nodes_by_id.items() if node.kind == "issue"]
-    )
+    issue_ids = _safe_sorted_node_ids([node_id for node_id, node in graph.nodes_by_id.items() if node.kind == "issue"])
     active_issue_id = _active_leaf_id(active)
     nodes: list[DepsNodeState] = []
 

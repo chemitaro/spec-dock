@@ -1,12 +1,13 @@
 import json
 import os
-import tempfile
 from pathlib import Path
+import tempfile
+
+import pytest
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
-import pytest
 class TestCliClose(CliRuntimeHarness):
     def _make_gh_issue_close_stub(
         self,

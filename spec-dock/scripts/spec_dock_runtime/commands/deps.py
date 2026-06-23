@@ -1,25 +1,28 @@
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from ..application.contracts import (
+from spec_dock_runtime.application.contracts import (
     CheckDepsRequest,
     MutateDepsError,
     MutateDepsRequest,
     TargetRef,
     UseCases,
 )
-from ..presentation.cli_text import (
+from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.commands.node_id_normalizer import normalize_node_id
+from spec_dock_runtime.commands.targets import parse_explicit_target_flags
+from spec_dock_runtime.presentation.cli_text import (
     render_deps_check_text,
     render_deps_mutation_error_text,
     render_deps_mutation_text,
 )
-from ..presentation.contracts import CliText
-from ..presentation.json_state import render_deps_check_json
-from .contracts import CommandArgs, CommandOutcome, CommandSpec
-from .node_id_normalizer import normalize_node_id
-from .targets import parse_explicit_target_flags
+from spec_dock_runtime.presentation.contracts import CliText
+from spec_dock_runtime.presentation.json_state import render_deps_check_json
+
+if TYPE_CHECKING:
+    import argparse
 
 
 @dataclass(frozen=True)

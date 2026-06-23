@@ -1,23 +1,19 @@
-import sys
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 
-
 import pytest
+
+
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import ports as app_ports
-        from spec_dock_runtime.application import set_active as app_set_active
+        from spec_dock_runtime.application import (
+            contracts as app_contracts,
+            ports as app_ports,
+            set_active as app_set_active,
+        )
         from spec_dock_runtime.infra import contracts as infra_contracts
     finally:
         sys.path.pop(0)
@@ -321,11 +317,11 @@ class TestRuntimeActiveS06:
         assert "deps_blocked" in result.warnings[0]
         calls = [name for name, *_rest in ports.active_state_store.calls]
         assert calls[-4:] == [
-                "snapshot_current_state",
-                "write_active_manifest",
-                "apply_active_pointers",
-                "patch_agent_state_active_fields",
-            ]
+            "snapshot_current_state",
+            "write_active_manifest",
+            "apply_active_pointers",
+            "patch_agent_state_active_fields",
+        ]
         write_calls = [call for call in ports.active_state_store.calls if call[0] == "write_active_manifest"]
         assert len(write_calls) == 1
         written_manifest = write_calls[0][2]
@@ -618,7 +614,9 @@ class TestRuntimeActiveS06:
         assert issue_gateway.view_calls == [("/repo", 123, "current/repo")]
         assert "gh_fetch_failed" not in result.warnings
 
-    def test_set_active_falls_back_to_current_repo_view_for_unscoped_linked_initiative_when_index_missing_key(self) -> None:
+    def test_set_active_falls_back_to_current_repo_view_for_unscoped_linked_initiative_when_index_missing_key(
+        self,
+    ) -> None:
         app_contracts, _app_ports, app_set_active, infra_contracts = _runtime_modules()
         records = [
             _record(
@@ -750,7 +748,7 @@ class TestRuntimeActiveS06:
                     url="https://github.com/current/repo/issues/123",
                     repo_owner="current",
                     repo_name="repo",
-                )
+                ),
             ],
             foreign_snapshots={
                 ("upstream/product", 101): SimpleNamespace(
@@ -772,7 +770,7 @@ class TestRuntimeActiveS06:
                     url="https://github.com/other/repo/issues/123",
                     repo_owner="other",
                     repo_name="repo",
-                )
+                ),
             },
         )
         ports = self._ports(
@@ -794,21 +792,16 @@ class TestRuntimeActiveS06:
         assert result.selection.issue_id == "iss-local-00002"
         assert issue_gateway.calls == [("/repo", 10000)]
         assert issue_gateway.view_calls == [
-                ("/repo", 123, "other/repo"),
-                ("/repo", 101, "upstream/product"),
-            ]
+            ("/repo", 123, "other/repo"),
+            ("/repo", 101, "upstream/product"),
+        ]
         assert not any(w.startswith("deps_blocked:") for w in result.warnings)
         assert "gh_fetch_failed" not in result.warnings
 
     def test_sync_branch_inference_propagates_current_repo_slug(self) -> None:
         app_contracts, _app_ports, _app_set_active, infra_contracts = _runtime_modules()
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -911,8 +904,12 @@ class TestRuntimeActiveS06:
         active_store = _StubActiveStateStore(infra_contracts)
         active_store._loaded = infra_contracts.ActiveManifestLoadResult(
             manifest=infra_contracts.ActiveManifest(
-                initiative=infra_contracts.ActiveManifestEntry("init-local-00001", "spec-dock/initiatives/init-local-00001"),
-                epic=infra_contracts.ActiveManifestEntry("epic-local-00001", "spec-dock/initiatives/init-local-00001/epics/epic-local-00001"),
+                initiative=infra_contracts.ActiveManifestEntry(
+                    "init-local-00001", "spec-dock/initiatives/init-local-00001"
+                ),
+                epic=infra_contracts.ActiveManifestEntry(
+                    "epic-local-00001", "spec-dock/initiatives/init-local-00001/epics/epic-local-00001"
+                ),
                 issue=infra_contracts.ActiveManifestEntry(
                     "iss-local-00001",
                     "spec-dock/initiatives/init-local-00001/epics/epic-local-00001/issues/iss-local-00001",

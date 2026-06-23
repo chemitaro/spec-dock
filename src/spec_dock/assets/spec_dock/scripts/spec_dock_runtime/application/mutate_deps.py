@@ -1,24 +1,24 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
-from ..domain.deps import ensure_node_dependency_add_would_be_valid
-from ..domain.deps import validate_raw_node_dependency_graph
-from ..domain.models import SpecNodeSeed, SpecNodeKind
-from ..domain.tree import build_graph
-from ..domain.validation import ensure_current_graph_and_deps_valid
-from ..infra.contracts import DirectDependencyResolution
-from ..infra.contracts import StoredMetaRecord
-from .contracts import MutateDepsError, MutateDepsRequest, MutateDepsResult
-from .ports import Ports
-from .repo_context import resolve_current_repo_slug
-from .sync_state import post_mutation_sync, skipped_post_mutation_sync
+from spec_dock_runtime.application.contracts import MutateDepsError, MutateDepsRequest, MutateDepsResult
+from spec_dock_runtime.application.repo_context import resolve_current_repo_slug
+from spec_dock_runtime.application.sync_state import post_mutation_sync, skipped_post_mutation_sync
+from spec_dock_runtime.domain.deps import ensure_node_dependency_add_would_be_valid, validate_raw_node_dependency_graph
+from spec_dock_runtime.domain.models import SpecNodeKind, SpecNodeSeed
+from spec_dock_runtime.domain.tree import build_graph
+from spec_dock_runtime.domain.validation import ensure_current_graph_and_deps_valid
+
+if TYPE_CHECKING:
+    from spec_dock_runtime.application.ports import Ports
+    from spec_dock_runtime.infra.contracts import DirectDependencyResolution, StoredMetaRecord
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,
@@ -77,17 +77,13 @@ def _load_direct_matching_refs(
 
     try:
         resolutions = cast(
-            list[DirectDependencyResolution],
+            "list[DirectDependencyResolution]",
             load_direct_resolutions(_resolve_specdock_dir(ports), graph, from_node_id),
         )
     except RuntimeError as error:
         _raise_mutation_error(req, code="preflight_validate_failed", detail=_preflight_detail(error))
 
-    return [
-        item.raw_ref
-        for item in resolutions
-        if item.resolved_node_id == to_node_id
-    ]
+    return [item.raw_ref for item in resolutions if item.resolved_node_id == to_node_id]
 
 
 def _load_raw_node_depends_on_map(
@@ -100,7 +96,7 @@ def _load_raw_node_depends_on_map(
     if callable(load_node_resolutions):
         try:
             resolutions_by_source = cast(
-                dict[str, list[DirectDependencyResolution]],
+                "dict[str, list[DirectDependencyResolution]]",
                 load_node_resolutions(_resolve_specdock_dir(ports), graph),
             )
         except RuntimeError as error:
@@ -120,7 +116,7 @@ def _load_raw_node_depends_on_map(
             continue
         try:
             resolutions = cast(
-                list[DirectDependencyResolution],
+                "list[DirectDependencyResolution]",
                 load_direct_resolutions(_resolve_specdock_dir(ports), graph, source_id),
             )
         except RuntimeError as error:
@@ -142,8 +138,7 @@ def _build_candidate_issue_depends_on_map(
     if not callable(build_candidate):
         if graph.nodes_by_id[from_node_id].kind == "issue" and graph.nodes_by_id[to_node_id].kind == "issue":
             candidate_map: dict[str, list[str]] = {
-                issue_id: list(depends_on)
-                for issue_id, depends_on in issue_depends_on_map.items()
+                issue_id: list(depends_on) for issue_id, depends_on in issue_depends_on_map.items()
             }
             candidate_map.setdefault(from_node_id, [])
             candidate_map.setdefault(to_node_id, [])
@@ -153,7 +148,7 @@ def _build_candidate_issue_depends_on_map(
 
     try:
         return cast(
-            dict[str, list[str]],
+            "dict[str, list[str]]",
             build_candidate(
                 graph,
                 issue_depends_on_map,
@@ -163,6 +158,7 @@ def _build_candidate_issue_depends_on_map(
         )
     except RuntimeError as error:
         _raise_mutation_error(req, code="invalid_add_cycle", detail=str(error))
+        raise
 
 
 def mutate_deps(req: MutateDepsRequest, ports: Ports) -> MutateDepsResult:
@@ -199,7 +195,9 @@ def mutate_deps(req: MutateDepsRequest, ports: Ports) -> MutateDepsResult:
             _raise_mutation_error(req, code="invalid_add_unresolved", detail=f"Node not found: {req.to_id}")
     else:
         if from_node is None or to_node is None:
-            _raise_mutation_error(req, code="edge_not_found", detail=f"Dependency edge not found: {req.from_id} -> {req.to_id}")
+            _raise_mutation_error(
+                req, code="edge_not_found", detail=f"Dependency edge not found: {req.from_id} -> {req.to_id}"
+            )
 
     assert from_node is not None
     assert to_node is not None

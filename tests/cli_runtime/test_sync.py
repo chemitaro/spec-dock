@@ -1,21 +1,18 @@
 import json
 import os
+from pathlib import Path
 import shutil
 import subprocess
-import sys
 import tempfile
-from pathlib import Path
-from types import SimpleNamespace
+
+import pytest
 
 from tests.cli_runtime.harness import (
     CliRuntimeHarness,
-    _EXPECTED_MANAGED_SKILL_NAMES,
-    _expected_spec_dock_version,
     main,
 )
 
 
-import pytest
 class TestCliSync(CliRuntimeHarness):
     def _set_meta_depends_on(self, node_dir: Path, depends_on: object) -> None:
         meta_path = node_dir / ".meta.json"
@@ -63,10 +60,9 @@ class TestCliSync(CliRuntimeHarness):
             # Active pointers are set by a single target argument (node id or GitHub issue number).
             self._run_runtime(target, ["active", "set", "iss-00003", "--force"])
             assert (target / "spec-dock" / ".agent" / "active.json").is_file()
-            assert (
-                (target / "spec-dock" / "active" / "issue").exists()
-                or (target / "spec-dock" / "active" / "issue.path").is_file()
-            )
+            assert (target / "spec-dock" / "active" / "issue").exists() or (
+                target / "spec-dock" / "active" / "issue.path"
+            ).is_file()
             assert (target / "spec-dock" / "active" / "context-pack.md").is_file()
 
             self._run_runtime(target, ["sync"])
@@ -78,14 +74,17 @@ class TestCliSync(CliRuntimeHarness):
             assert "- default dependency view: `spec-dock/.agent/deps-issues.json`" in context_pack
             assert "- escalation only: `spec-dock/.agent/index-all.json`" in context_pack
             assert "- Start with `spec-dock/.agent/active.json`." in context_pack
-            assert "- For normal work, read `spec-dock/.agent/index.json` and `spec-dock/.agent/deps-issues.json`." in context_pack
+            assert (
+                "- For normal work, read `spec-dock/.agent/index.json` and `spec-dock/.agent/deps-issues.json`."
+                in context_pack
+            )
             assert "- Read `spec-dock/.agent/index-all.json` only when full-history context is needed." in context_pack
             assert "human guidance" in context_pack
 
             # Index: flat nodes (agent-friendly).
             state = (target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8")
-            assert "\"nodes\"" in state
-            assert "\"tree\"" not in state
+            assert '"nodes"' in state
+            assert '"tree"' not in state
 
             # Tree: nested layer view (human-friendly).
             tree_text = (target / "spec-dock" / ".agent" / "tree.json").read_text(encoding="utf-8")
@@ -124,18 +123,14 @@ class TestCliSync(CliRuntimeHarness):
                 pytest.skip("symlinks not supported in test environment")
 
             self._create_same_repo_linked_hierarchy(target)
-            self._run_runtime(target, ["new", "doc", "adr", "--initiative", "init-00001", "--title", "Initiative decision"])
+            self._run_runtime(
+                target, ["new", "doc", "adr", "--initiative", "init-00001", "--title", "Initiative decision"]
+            )
             self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Issue decision"])
 
             specdock_dir = target / "spec-dock"
             initiative_dir = specdock_dir / "initiatives" / "init-00001-auth-platform"
-            issue_dir = (
-                initiative_dir
-                / "epics"
-                / "epic-00002-jwt-auth"
-                / "issues"
-                / "iss-00003-add-refresh-token"
-            )
+            issue_dir = initiative_dir / "epics" / "epic-00002-jwt-auth" / "issues" / "iss-00003-add-refresh-token"
             initiative_doc = next((initiative_dir / "discussions").glob("*-adr-initiative-decision.md"))
             issue_doc = next((issue_dir / "discussions").glob("*-adr-issue-decision.md"))
 
@@ -147,10 +142,13 @@ class TestCliSync(CliRuntimeHarness):
             for source in (initiative_doc, issue_doc):
                 link_path = adrs_dir / source.name
                 assert link_path.is_symlink(), f"missing ADR mirror symlink: {link_path}"
-                assert not os.readlink(link_path).startswith("/"), os.readlink(link_path)
+                link_target = str(link_path.readlink())
+                assert not link_target.startswith("/"), link_target
                 assert link_path.resolve() == source.resolve()
 
-            renamed_issue_doc = issue_doc.with_name(issue_doc.name.replace("-issue-decision.md", "-issue-decision-renamed.md"))
+            renamed_issue_doc = issue_doc.with_name(
+                issue_doc.name.replace("-issue-decision.md", "-issue-decision-renamed.md")
+            )
             issue_doc.rename(renamed_issue_doc)
 
             self._run_runtime(target, ["sync"])
@@ -276,13 +274,23 @@ class TestCliSync(CliRuntimeHarness):
             self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Main init"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"])
-            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target issue"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target issue"]
+            )
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "102", "--title", "Deps init"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "Deps epic"])
-            self._run_runtime(target, ["new", "issue", "--epic", "202", "--github-issue", "401", "--title", "Dep issue 1"])
-            self._run_runtime(target, ["new", "issue", "--epic", "202", "--github-issue", "402", "--title", "Dep issue 2"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "Deps epic"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "202", "--github-issue", "401", "--title", "Dep issue 1"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "202", "--github-issue", "402", "--title", "Dep issue 2"]
+            )
 
             target_issue_dir = (
                 target
@@ -319,11 +327,17 @@ class TestCliSync(CliRuntimeHarness):
 
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Main init"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"])
-            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target issue"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target issue"]
+            )
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "102", "--title", "Empty init"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "Empty epic"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "Empty epic"]
+            )
 
             target_issue_dir = (
                 target
@@ -374,10 +388,7 @@ class TestCliSync(CliRuntimeHarness):
             ]
             assert deps_issues["nodes"]["init-00102"]["type"] == "initiative"
             assert deps_issues["nodes"]["epic-00202"]["type"] == "epic"
-            assert [
-                (edge["from"], edge["to"], edge["state"], edge["relation"])
-                for edge in deps_issues["edges"]
-            ] == [
+            assert [(edge["from"], edge["to"], edge["state"], edge["relation"]) for edge in deps_issues["edges"]] == [
                 ("iss-00301", "init-00102", "blocking", "raw_direct"),
                 ("iss-00301", "epic-00202", "blocking", "raw_direct"),
             ]
@@ -392,8 +403,12 @@ class TestCliSync(CliRuntimeHarness):
 
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Main init"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"])
-            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target issue"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target issue"]
+            )
             self._run_runtime(
                 target,
                 ["new", "epic", "--initiative", "101", "--github-issue", "202", "--title", "Closed dependency"],
@@ -418,8 +433,22 @@ class TestCliSync(CliRuntimeHarness):
                 issues=[
                     {"number": 101, "state": "OPEN", "title": "Main init", "labels": [], "updatedAt": "t", "url": "u"},
                     {"number": 201, "state": "OPEN", "title": "Main epic", "labels": [], "updatedAt": "t", "url": "u"},
-                    {"number": 202, "state": "CLOSED", "title": "Closed dependency", "labels": [], "updatedAt": "t", "url": "u"},
-                    {"number": 301, "state": "OPEN", "title": "Target issue", "labels": [], "updatedAt": "t", "url": "u"},
+                    {
+                        "number": 202,
+                        "state": "CLOSED",
+                        "title": "Closed dependency",
+                        "labels": [],
+                        "updatedAt": "t",
+                        "url": "u",
+                    },
+                    {
+                        "number": 301,
+                        "state": "OPEN",
+                        "title": "Target issue",
+                        "labels": [],
+                        "updatedAt": "t",
+                        "url": "u",
+                    },
                 ],
             )
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -427,17 +456,12 @@ class TestCliSync(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             assert p.returncode == 0, p.stdout + p.stderr
 
-            deps_issues = json.loads(
-                (target / "spec-dock" / ".agent" / "deps-issues.json").read_text(encoding="utf-8")
-            )
+            deps_issues = json.loads((target / "spec-dock" / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
             assert deps_issues["schema_version"] == 2
             assert deps_issues["nodes"]["iss-00301"]["ready"] is True
             assert deps_issues["nodes"]["iss-00301"]["node_blockers"] == []
             assert "epic-00202" not in deps_issues["nodes"]
-            assert [
-                (edge["from"], edge["to"], edge["state"], edge["relation"])
-                for edge in deps_issues["edges"]
-            ] == []
+            assert [(edge["from"], edge["to"], edge["state"], edge["relation"]) for edge in deps_issues["edges"]] == []
             assert deps_issues["dependency_contexts"] == [
                 {
                     "source_node_id": "iss-00301",
@@ -473,8 +497,7 @@ class TestCliSync(CliRuntimeHarness):
             assert cached_deps_issues["nodes"]["iss-00301"]["node_blockers"] == []
             assert "epic-00202" not in cached_deps_issues["nodes"]
             assert [
-                (edge["from"], edge["to"], edge["state"], edge["relation"])
-                for edge in cached_deps_issues["edges"]
+                (edge["from"], edge["to"], edge["state"], edge["relation"]) for edge in cached_deps_issues["edges"]
             ] == []
             assert cached_deps_issues["dependency_contexts"] == [
                 {
@@ -543,8 +566,12 @@ class TestCliSync(CliRuntimeHarness):
 
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Main init"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"])
-            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target issue"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target issue"]
+            )
             self._run_runtime(target, ["new", "initiative", "--github-issue", "102", "--title", "Dependency init"])
             self._run_runtime(
                 target,
@@ -574,10 +601,38 @@ class TestCliSync(CliRuntimeHarness):
                 issues=[
                     {"number": 101, "state": "OPEN", "title": "Main init", "labels": [], "updatedAt": "t", "url": "u"},
                     {"number": 201, "state": "OPEN", "title": "Main epic", "labels": [], "updatedAt": "t", "url": "u"},
-                    {"number": 301, "state": "OPEN", "title": "Target issue", "labels": [], "updatedAt": "t", "url": "u"},
-                    {"number": 102, "state": "OPEN", "title": "Dependency init", "labels": [], "updatedAt": "t", "url": "u"},
-                    {"number": 202, "state": "OPEN", "title": "Dependency epic", "labels": [], "updatedAt": "t", "url": "u"},
-                    {"number": 401, "state": "CLOSED", "title": "Done child", "labels": [], "updatedAt": "t", "url": "u"},
+                    {
+                        "number": 301,
+                        "state": "OPEN",
+                        "title": "Target issue",
+                        "labels": [],
+                        "updatedAt": "t",
+                        "url": "u",
+                    },
+                    {
+                        "number": 102,
+                        "state": "OPEN",
+                        "title": "Dependency init",
+                        "labels": [],
+                        "updatedAt": "t",
+                        "url": "u",
+                    },
+                    {
+                        "number": 202,
+                        "state": "OPEN",
+                        "title": "Dependency epic",
+                        "labels": [],
+                        "updatedAt": "t",
+                        "url": "u",
+                    },
+                    {
+                        "number": 401,
+                        "state": "CLOSED",
+                        "title": "Done child",
+                        "labels": [],
+                        "updatedAt": "t",
+                        "url": "u",
+                    },
                 ],
             )
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -585,9 +640,7 @@ class TestCliSync(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             assert p.returncode == 0, p.stdout + p.stderr
 
-            deps_issues = json.loads(
-                (target / "spec-dock" / ".agent" / "deps-issues.json").read_text(encoding="utf-8")
-            )
+            deps_issues = json.loads((target / "spec-dock" / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
             assert deps_issues["nodes"]["iss-00301"]["ready"] is True
             assert deps_issues["nodes"]["iss-00301"]["node_blockers"] == []
             assert "epic-00202" not in deps_issues["nodes"]
@@ -674,18 +727,17 @@ class TestCliSync(CliRuntimeHarness):
 
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Main init"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"])
-            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Issue one"])
-            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue two"])
-
-            epic_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00101-main-init"
-                / "epics"
-                / "epic-00201-main-epic"
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"]
             )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Issue one"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue two"]
+            )
+
+            epic_dir = target / "spec-dock" / "initiatives" / "init-00101-main-init" / "epics" / "epic-00201-main-epic"
             issue_one_dir = epic_dir / "issues" / "iss-00301-issue-one"
             issue_two_dir = epic_dir / "issues" / "iss-00302-issue-two"
             issue_one_deps_path = issue_one_dir / ".meta.json"
@@ -773,7 +825,14 @@ class TestCliSync(CliRuntimeHarness):
                     {"number": 201, "state": "OPEN", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
                     {"number": 301, "state": "CLOSED", "title": "Done dep", "labels": [], "updatedAt": "t", "url": "u"},
                     {"number": 302, "state": "OPEN", "title": "Open mid", "labels": [], "updatedAt": "t", "url": "u"},
-                    {"number": 303, "state": "OPEN", "title": "Open target", "labels": [], "updatedAt": "t", "url": "u"},
+                    {
+                        "number": 303,
+                        "state": "OPEN",
+                        "title": "Open target",
+                        "labels": [],
+                        "updatedAt": "t",
+                        "url": "u",
+                    },
                 ],
             )
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -786,10 +845,14 @@ class TestCliSync(CliRuntimeHarness):
             assert nodes["iss-00301"]["status"] == "done"
             assert nodes["iss-00301"]["deps"] == {"ready": True, "depends_on": [], "blockers_top": []}
             assert nodes["iss-00302"]["deps"] == {"ready": True, "depends_on": [], "blockers_top": []}
-            assert nodes["iss-00303"]["deps"] == {"ready": False, "depends_on": ["iss-00302"], "blockers_top": ["iss-00302"]}
+            assert nodes["iss-00303"]["deps"] == {
+                "ready": False,
+                "depends_on": ["iss-00302"],
+                "blockers_top": ["iss-00302"],
+            }
 
             tree = json.loads((target / "spec-dock" / ".agent" / "tree.json").read_text(encoding="utf-8"))
-            tree_issue = [i for i in tree["tree"][0]["epics"][0]["issues"] if i["id"] == "iss-00303"][0]
+            tree_issue = next(i for i in tree["tree"][0]["epics"][0]["issues"] if i["id"] == "iss-00303")
             assert tree_issue["deps"] == nodes["iss-00303"]["deps"]
 
     def test_local_only_issue_is_open_and_ready_without_deps(self) -> None:
@@ -826,11 +889,21 @@ class TestCliSync(CliRuntimeHarness):
 
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Issue one"])
-            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue two"])
-            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Issue three"])
-            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "304", "--title", "Issue target"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Issue one"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue two"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Issue three"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "201", "--github-issue", "304", "--title", "Issue target"]
+            )
 
             issues_root = (
                 target
@@ -854,11 +927,11 @@ class TestCliSync(CliRuntimeHarness):
             index2 = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
 
             assert index1["deps"]["issue_edges"] == [
-                    {"from": "iss-00302", "to": "iss-00301", "kind": "depends_on"},
-                    {"from": "iss-00303", "to": "iss-00302", "kind": "depends_on"},
-                    {"from": "iss-00304", "to": "iss-00301", "kind": "depends_on"},
-                    {"from": "iss-00304", "to": "iss-00303", "kind": "depends_on"},
-                ]
+                {"from": "iss-00302", "to": "iss-00301", "kind": "depends_on"},
+                {"from": "iss-00303", "to": "iss-00302", "kind": "depends_on"},
+                {"from": "iss-00304", "to": "iss-00301", "kind": "depends_on"},
+                {"from": "iss-00304", "to": "iss-00303", "kind": "depends_on"},
+            ]
             assert index2["deps"]["issue_edges"] == index1["deps"]["issue_edges"]
 
             deps1 = index1["nodes"]["iss-00304"]["deps"]
@@ -952,13 +1025,13 @@ class TestCliSync(CliRuntimeHarness):
             node_302 = deps_issues["nodes"]["iss-00302"]
             node_304 = deps_issues["nodes"]["iss-00304"]
             node_305 = deps_issues["nodes"]["iss-00305"]
-            assert node_302["ready"] == False
+            assert not node_302["ready"]
             assert node_302["depends_on"] == ["iss-00303"]
             assert node_302["state"] == "blocked"
-            assert node_304["ready"] == True
+            assert node_304["ready"]
             assert node_304["depends_on"] == []
             assert node_304["state"] == "ready"
-            assert node_305["ready"] == True
+            assert node_305["ready"]
             assert node_305["depends_on"] == []
             assert node_305["state"] == "ready"
 
@@ -1034,12 +1107,33 @@ class TestCliSync(CliRuntimeHarness):
                 issues=[
                     {"number": 101, "state": "OPEN", "title": "Init A", "labels": [], "updatedAt": "t", "url": "u"},
                     {"number": 201, "state": "OPEN", "title": "Epic A", "labels": [], "updatedAt": "t", "url": "u"},
-                    {"number": 301, "state": "CLOSED", "title": "Done prereq", "labels": [], "updatedAt": "t", "url": "u"},
-                    {"number": 302, "state": "OPEN", "title": "Open target", "labels": [], "updatedAt": "t", "url": "u"},
+                    {
+                        "number": 301,
+                        "state": "CLOSED",
+                        "title": "Done prereq",
+                        "labels": [],
+                        "updatedAt": "t",
+                        "url": "u",
+                    },
+                    {
+                        "number": 302,
+                        "state": "OPEN",
+                        "title": "Open target",
+                        "labels": [],
+                        "updatedAt": "t",
+                        "url": "u",
+                    },
                     {"number": 303, "state": "OPEN", "title": "Open mid", "labels": [], "updatedAt": "t", "url": "u"},
                     {"number": 102, "state": "OPEN", "title": "Init B", "labels": [], "updatedAt": "t", "url": "u"},
                     {"number": 202, "state": "OPEN", "title": "Epic B", "labels": [], "updatedAt": "t", "url": "u"},
-                    {"number": 401, "state": "CLOSED", "title": "Done legacy", "labels": [], "updatedAt": "t", "url": "u"},
+                    {
+                        "number": 401,
+                        "state": "CLOSED",
+                        "title": "Done legacy",
+                        "labels": [],
+                        "updatedAt": "t",
+                        "url": "u",
+                    },
                 ],
             )
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -1303,14 +1397,12 @@ class TestCliSync(CliRuntimeHarness):
             isolated_home.mkdir(parents=True, exist_ok=True)
             isolated_xdg.mkdir(parents=True, exist_ok=True)
             check_ignore_env = os.environ.copy()
-            check_ignore_env.update(
-                {
-                    "GIT_CONFIG_NOSYSTEM": "1",
-                    "GIT_CONFIG_GLOBAL": os.devnull,
-                    "HOME": str(isolated_home),
-                    "XDG_CONFIG_HOME": str(isolated_xdg),
-                }
-            )
+            check_ignore_env.update({
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_CONFIG_GLOBAL": os.devnull,
+                "HOME": str(isolated_home),
+                "XDG_CONFIG_HOME": str(isolated_xdg),
+            })
 
             def _run_check_ignore(path: str) -> subprocess.CompletedProcess[str]:
                 return subprocess.run(
@@ -1344,7 +1436,9 @@ class TestCliSync(CliRuntimeHarness):
             not_ignored_doc = _run_check_ignore("spec-dock/docs/README.md")
             assert not_ignored_doc.returncode == 1, not_ignored_doc.stdout + not_ignored_doc.stderr
             not_ignored_nested_adrs = _run_check_ignore("spec-dock/docs/adrs/example.md")
-            assert not_ignored_nested_adrs.returncode == 1, not_ignored_nested_adrs.stdout + not_ignored_nested_adrs.stderr
+            assert not_ignored_nested_adrs.returncode == 1, (
+                not_ignored_nested_adrs.stdout + not_ignored_nested_adrs.stderr
+            )
 
     def test_sync_force_does_not_update_active_from_branch(self) -> None:
         if shutil.which("git") is None:
@@ -1469,7 +1563,14 @@ class TestCliSync(CliRuntimeHarness):
                 issues=[
                     {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
                     {"number": 201, "state": "OPEN", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
-                    {"number": 301, "state": "CLOSED", "title": "Issue 301", "labels": [], "updatedAt": "t", "url": "u"},
+                    {
+                        "number": 301,
+                        "state": "CLOSED",
+                        "title": "Issue 301",
+                        "labels": [],
+                        "updatedAt": "t",
+                        "url": "u",
+                    },
                     {"number": 302, "state": "OPEN", "title": "Issue 302", "labels": [], "updatedAt": "t", "url": "u"},
                 ],
             )
@@ -1500,7 +1601,9 @@ class TestCliSync(CliRuntimeHarness):
             p_cache = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"], env=test_env)
             assert p_cache.returncode == 0, p_cache.stdout + p_cache.stderr
             assert not guard_log.exists(), "gh must not be invoked with sync --no-github"
-            index_all_cache = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            index_all_cache = json.loads(
+                (target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8")
+            )
             cache_nodes = index_all_cache["nodes"]
             assert cache_nodes["iss-00301"]["source"] == "cache"
             assert cache_nodes["iss-00301"]["stale"]
@@ -1581,9 +1684,9 @@ class TestCliSync(CliRuntimeHarness):
             assert index_all["deps"]["valid"]
             assert index_all["deps"]["error"] is None
             assert index_all["deps"]["issue_edges"] == [
-                    {"from": "iss-00301", "to": "iss-00303", "kind": "depends_on"},
-                    {"from": "iss-00302", "to": "iss-00301", "kind": "depends_on"},
-                ]
+                {"from": "iss-00301", "to": "iss-00303", "kind": "depends_on"},
+                {"from": "iss-00302", "to": "iss-00301", "kind": "depends_on"},
+            ]
             assert index_all["nodes"]["iss-00301"]["deps"]["depends_on"] == []
             assert index_all["nodes"]["iss-00301"]["deps"]["ready"]
 
@@ -1610,17 +1713,17 @@ class TestCliSync(CliRuntimeHarness):
             assert "iss-00302" in deps_issues["nodes"]
             assert "iss-00303" in deps_issues["nodes"]
             assert {
-                    "source_node_id": "iss-00302",
-                    "source_issue_id": "iss-00302",
-                    "target_node_id": "iss-00301",
-                    "target_node_kind": "issue",
-                    "target_issue_ids": ["iss-00301"],
-                    "expansion": "issue",
-                    "lifecycle_state": "done",
-                    "lifecycle_source": "github",
-                    "dependency_disposition": "satisfied",
-                    "disposition_basis": "local_done",
-                } in deps_issues["dependency_contexts"]
+                "source_node_id": "iss-00302",
+                "source_issue_id": "iss-00302",
+                "target_node_id": "iss-00301",
+                "target_node_kind": "issue",
+                "target_issue_ids": ["iss-00301"],
+                "expansion": "issue",
+                "lifecycle_state": "done",
+                "lifecycle_source": "github",
+                "dependency_disposition": "satisfied",
+                "disposition_basis": "local_done",
+            } in deps_issues["dependency_contexts"]
 
             deps_issues_puml = deps_issues_puml_path.read_text(encoding="utf-8")
             assert "iss-00302" in deps_issues_puml

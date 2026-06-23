@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from pathlib import Path
+import re
+from typing import TYPE_CHECKING
 
-from .contracts import (
+from spec_dock_runtime.application.contracts import (
     GitWorktreeRecord,
     WorktreeCommandError,
     WorktreeCreateRequest,
@@ -17,8 +18,9 @@ from .contracts import (
     WorktreeShowRequest,
     WorktreeShowResult,
 )
-from .ports import Ports
 
+if TYPE_CHECKING:
+    from spec_dock_runtime.application.ports import Ports
 
 _LABEL_RE = re.compile(r"^[a-z0-9-]+$")
 _MAX_ATTEMPTS = 10000
@@ -28,7 +30,7 @@ _RETRYABLE_GIT_WORKTREE_ERRORS = (
     "a branch named",
 )
 _WORKTREE_ROOT_ENV = "SPEC_DOCK_WORKTREE_ROOT"
-_WORKTREE_ROOT_EXAMPLE = "export SPEC_DOCK_WORKTREE_ROOT=\"$HOME/workspace/worktrees\""
+_WORKTREE_ROOT_EXAMPLE = 'export SPEC_DOCK_WORKTREE_ROOT="$HOME/workspace/worktrees"'
 
 
 @dataclass(frozen=True)
@@ -382,7 +384,7 @@ def _build_inventory_from_records(
         raw_ids.append(_raw_worktree_id(record, main_record=main_record, classification=classification))
     counts: dict[str, int] = {}
     views_by_index: dict[int, WorktreeRecordView] = {}
-    for (original_index, record), raw_id in zip(ordered, raw_ids):
+    for (original_index, record), raw_id in zip(ordered, raw_ids, strict=True):
         counts[raw_id] = counts.get(raw_id, 0) + 1
         stable_id = raw_id if counts[raw_id] == 1 else f"{raw_id}~{counts[raw_id]}"
         main = _canonical_path(record.path) == _canonical_path(main_record.path)
@@ -479,7 +481,7 @@ def _raw_worktree_id(
         and basename.startswith(repo_prefix)
         and len(basename) > len(repo_prefix)
     ):
-        return basename[len(repo_prefix):]
+        return basename[len(repo_prefix) :]
     return basename
 
 
@@ -654,9 +656,4 @@ def _artifact_state(
         branch_exists = "unknown"
     path_exists = worktree_path.exists()
     record_exists = _canonical_path(worktree_path) in record_paths
-    return (
-        "artifact_state="
-        f"path_exists:{path_exists},"
-        f"branch_exists:{branch_exists},"
-        f"record_exists:{record_exists}"
-    )
+    return f"artifact_state=path_exists:{path_exists},branch_exists:{branch_exists},record_exists:{record_exists}"

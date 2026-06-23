@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
 import os
-import subprocess
-from dataclasses import dataclass
 from pathlib import Path
+import subprocess
 
-from ..domain import delegated_authoring as domain
+from spec_dock_runtime.domain import delegated_authoring as domain
 
 
 @dataclass(frozen=True)
@@ -158,14 +158,18 @@ def run_delegated_authoring_diff_guard(
         baseline_only_entries = tuple(
             entry
             for entry in baseline.entries
-            if _entry_key(entry) not in current_keys and _repo_path(entry.path, req.repo_root) != baseline_path
+            if _entry_key(entry) not in current_keys
+            and _repo_path(entry.path, req.repo_root) != baseline_path
             and _entry_key(entry) not in existing_create_keys
         )
-        entries = tuple(
-            entry
-            for entry in entries
-            if _entry_key(entry) not in baseline_keys and _repo_path(entry.path, req.repo_root) != baseline_path
-        ) + baseline_only_entries
+        entries = (
+            tuple(
+                entry
+                for entry in entries
+                if _entry_key(entry) not in baseline_keys and _repo_path(entry.path, req.repo_root) != baseline_path
+            )
+            + baseline_only_entries
+        )
     entries = _attach_pre_change_text(req.repo_root, entries)
     return domain.evaluate_diff_guard(
         authorized_role=req.role,
@@ -223,7 +227,7 @@ class _StatusParseResult:
     ok: bool
     entries: tuple[domain.DiffGuardEntry, ...] = ()
     errors: tuple[str, ...] = ()
-    file_states: tuple["_BaselineFileState", ...] = ()
+    file_states: tuple[_BaselineFileState, ...] = ()
     head: str | None = None
 
 
@@ -373,9 +377,7 @@ def _create_entries_existing_at_baseline_keys(
     baseline_entries: tuple[domain.DiffGuardEntry, ...],
     baseline_file_states: dict[Path, tuple[str, str]],
 ) -> set[tuple[str, str, str | None]]:
-    baseline_create_keys = {
-        _entry_key(entry) for entry in baseline_entries if entry.status in ("!!", "??")
-    }
+    baseline_create_keys = {_entry_key(entry) for entry in baseline_entries if entry.status in ("!!", "??")}
     keys: set[tuple[str, str, str | None]] = set()
     for entry in entries:
         if not (entry.status == "!!" or entry.status == "??"):
@@ -529,7 +531,7 @@ def _file_sha256(path: Path) -> str | None:
 def _file_state(path: Path) -> tuple[str, str] | None:
     try:
         if path.is_symlink():
-            target = os.readlink(path)
+            target = os.readlink(path)  # noqa: PTH115 - diff guard hashes raw symlink payload bytes.
             return "symlink", hashlib.sha256(os.fsencode(target)).hexdigest()
         if path.is_dir():
             return _directory_state(path)
@@ -554,7 +556,7 @@ def _directory_state(path: Path) -> tuple[str, str] | None:
             digest.update(b"\0")
             if child.is_symlink():
                 digest.update(b"symlink\0")
-                digest.update(os.fsencode(os.readlink(child)))
+                digest.update(os.fsencode(os.readlink(child)))  # noqa: PTH115 - preserve raw symlink payload.
                 digest.update(b"\0")
                 continue
             if child.is_dir():
@@ -839,7 +841,9 @@ def _file_state_map(file_states: tuple[_BaselineFileState, ...]) -> dict[Path, t
     return {file_state.path: (file_state.mode, file_state.sha256) for file_state in file_states}
 
 
-def _file_states_for_entries(repo_root: Path, entries: tuple[domain.DiffGuardEntry, ...]) -> tuple[_BaselineFileState, ...]:
+def _file_states_for_entries(
+    repo_root: Path, entries: tuple[domain.DiffGuardEntry, ...]
+) -> tuple[_BaselineFileState, ...]:
     file_states: list[_BaselineFileState] = []
     for entry in entries:
         rel_path = _repo_path(entry.path, repo_root)

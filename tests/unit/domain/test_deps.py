@@ -1,23 +1,14 @@
-import sys
 from pathlib import Path
+import sys
 
 import pytest
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        from spec_dock_runtime.domain import deps as domain_deps
-        from spec_dock_runtime.domain import models as domain_models
-        from spec_dock_runtime.domain import tree as domain_tree
+        from spec_dock_runtime.domain import deps as domain_deps, models as domain_models, tree as domain_tree
     finally:
         sys.path.pop(0)
     return domain_deps, domain_models, domain_tree
@@ -39,90 +30,78 @@ class TestDepsDomain:
     def _graph(self):
         _domain_deps, domain_models, domain_tree = _runtime_modules()
         root = Path("/repo/spec-dock/initiatives/init-00001-platform")
-        return domain_tree.build_graph(
-            [
-                domain_models.SpecNodeSeed(
-                    kind="initiative",
-                    id="init-00001",
-                    title="Platform",
-                    slug="platform",
-                    path=root,
-                    meta_path=root / ".meta.json",
-                    parent_id=None,
-                    initiative_id=None,
-                    epic_id=None,
-                    github_issue_number=1,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="epic",
-                    id="epic-00002",
-                    title="Delivery",
-                    slug="delivery",
-                    path=root / "epics" / "epic-00002-delivery",
-                    meta_path=root / "epics" / "epic-00002-delivery" / ".meta.json",
-                    parent_id="init-00001",
-                    initiative_id="init-00001",
-                    epic_id=None,
-                    github_issue_number=2,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="issue",
-                    id="iss-00003",
-                    title="Target",
-                    slug="target",
-                    path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00003-target",
-                    meta_path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00003-target" / ".meta.json",
-                    parent_id="epic-00002",
-                    initiative_id="init-00001",
-                    epic_id="epic-00002",
-                    github_issue_number=3,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="issue",
-                    id="iss-00004",
-                    title="Open blocker",
-                    slug="open-blocker",
-                    path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00004-open-blocker",
-                    meta_path=root
-                    / "epics"
-                    / "epic-00002-delivery"
-                    / "issues"
-                    / "iss-00004-open-blocker"
-                    / ".meta.json",
-                    parent_id="epic-00002",
-                    initiative_id="init-00001",
-                    epic_id="epic-00002",
-                    github_issue_number=4,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="issue",
-                    id="iss-00005",
-                    title="Done blocker",
-                    slug="done-blocker",
-                    path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00005-done-blocker",
-                    meta_path=root
-                    / "epics"
-                    / "epic-00002-delivery"
-                    / "issues"
-                    / "iss-00005-done-blocker"
-                    / ".meta.json",
-                    parent_id="epic-00002",
-                    initiative_id="init-00001",
-                    epic_id="epic-00002",
-                    github_issue_number=5,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-            ]
-        )
+        return domain_tree.build_graph([
+            domain_models.SpecNodeSeed(
+                kind="initiative",
+                id="init-00001",
+                title="Platform",
+                slug="platform",
+                path=root,
+                meta_path=root / ".meta.json",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=1,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="epic",
+                id="epic-00002",
+                title="Delivery",
+                slug="delivery",
+                path=root / "epics" / "epic-00002-delivery",
+                meta_path=root / "epics" / "epic-00002-delivery" / ".meta.json",
+                parent_id="init-00001",
+                initiative_id="init-00001",
+                epic_id=None,
+                github_issue_number=2,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="issue",
+                id="iss-00003",
+                title="Target",
+                slug="target",
+                path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00003-target",
+                meta_path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00003-target" / ".meta.json",
+                parent_id="epic-00002",
+                initiative_id="init-00001",
+                epic_id="epic-00002",
+                github_issue_number=3,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="issue",
+                id="iss-00004",
+                title="Open blocker",
+                slug="open-blocker",
+                path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00004-open-blocker",
+                meta_path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00004-open-blocker" / ".meta.json",
+                parent_id="epic-00002",
+                initiative_id="init-00001",
+                epic_id="epic-00002",
+                github_issue_number=4,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="issue",
+                id="iss-00005",
+                title="Done blocker",
+                slug="done-blocker",
+                path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00005-done-blocker",
+                meta_path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00005-done-blocker" / ".meta.json",
+                parent_id="epic-00002",
+                initiative_id="init-00001",
+                epic_id="epic-00002",
+                github_issue_number=5,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+        ])
 
     def test_inspect_target_deps_classifies_ready_blocked_done_and_unknown_without_cli(self) -> None:
         domain_deps, domain_models, _domain_tree = _runtime_modules()
@@ -636,8 +615,7 @@ class TestDepsDomain:
             ("init-00001", "satisfied")
         ]
         assert [
-            (c.target_node_id, c.dependency_disposition, c.disposition_basis)
-            for c in result.dependency_contexts
+            (c.target_node_id, c.dependency_disposition, c.disposition_basis) for c in result.dependency_contexts
         ] == [
             ("init-00001", "satisfied", "lifecycle_closed"),
             ("epic-00002", "blocking", "descendant_issue_open"),
@@ -794,178 +772,165 @@ class TestDepsDomain:
     def _empty_epic_graph(self):
         _domain_deps, domain_models, domain_tree = _runtime_modules()
         root = Path("/repo/spec-dock/initiatives/init-00010-platform")
-        return domain_tree.build_graph(
-            [
-                domain_models.SpecNodeSeed(
-                    kind="initiative",
-                    id="init-00010",
-                    title="Platform",
-                    slug="platform",
-                    path=root,
-                    meta_path=root / ".meta.json",
-                    parent_id=None,
-                    initiative_id=None,
-                    epic_id=None,
-                    github_issue_number=10,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="epic",
-                    id="epic-00011",
-                    title="First",
-                    slug="first",
-                    path=root / "epics" / "epic-00011-first",
-                    meta_path=root / "epics" / "epic-00011-first" / ".meta.json",
-                    parent_id="init-00010",
-                    initiative_id="init-00010",
-                    epic_id=None,
-                    github_issue_number=11,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="epic",
-                    id="epic-00012",
-                    title="Second",
-                    slug="second",
-                    path=root / "epics" / "epic-00012-second",
-                    meta_path=root / "epics" / "epic-00012-second" / ".meta.json",
-                    parent_id="init-00010",
-                    initiative_id="init-00010",
-                    epic_id=None,
-                    github_issue_number=12,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-            ]
-        )
+        return domain_tree.build_graph([
+            domain_models.SpecNodeSeed(
+                kind="initiative",
+                id="init-00010",
+                title="Platform",
+                slug="platform",
+                path=root,
+                meta_path=root / ".meta.json",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=10,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="epic",
+                id="epic-00011",
+                title="First",
+                slug="first",
+                path=root / "epics" / "epic-00011-first",
+                meta_path=root / "epics" / "epic-00011-first" / ".meta.json",
+                parent_id="init-00010",
+                initiative_id="init-00010",
+                epic_id=None,
+                github_issue_number=11,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="epic",
+                id="epic-00012",
+                title="Second",
+                slug="second",
+                path=root / "epics" / "epic-00012-second",
+                meta_path=root / "epics" / "epic-00012-second" / ".meta.json",
+                parent_id="init-00010",
+                initiative_id="init-00010",
+                epic_id=None,
+                github_issue_number=12,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+        ])
 
     def _future_cycle_graph(self):
         _domain_deps, domain_models, domain_tree = _runtime_modules()
         root = Path("/repo/spec-dock/initiatives/init-00020-platform")
-        return domain_tree.build_graph(
-            [
-                domain_models.SpecNodeSeed(
-                    kind="initiative",
-                    id="init-00020",
-                    title="Platform",
-                    slug="platform",
-                    path=root,
-                    meta_path=root / ".meta.json",
-                    parent_id=None,
-                    initiative_id=None,
-                    epic_id=None,
-                    github_issue_number=20,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="epic",
-                    id="epic-00021",
-                    title="Empty source",
-                    slug="empty-source",
-                    path=root / "epics" / "epic-00021-empty-source",
-                    meta_path=root / "epics" / "epic-00021-empty-source" / ".meta.json",
-                    parent_id="init-00020",
-                    initiative_id="init-00020",
-                    epic_id=None,
-                    github_issue_number=21,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="epic",
-                    id="epic-00022",
-                    title="Target parent",
-                    slug="target-parent",
-                    path=root / "epics" / "epic-00022-target-parent",
-                    meta_path=root / "epics" / "epic-00022-target-parent" / ".meta.json",
-                    parent_id="init-00020",
-                    initiative_id="init-00020",
-                    epic_id=None,
-                    github_issue_number=22,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="issue",
-                    id="iss-00023",
-                    title="Target child",
-                    slug="target-child",
-                    path=root / "epics" / "epic-00022-target-parent" / "issues" / "iss-00023-target-child",
-                    meta_path=root
-                    / "epics"
-                    / "epic-00022-target-parent"
-                    / "issues"
-                    / "iss-00023-target-child"
-                    / ".meta.json",
-                    parent_id="epic-00022",
-                    initiative_id="init-00020",
-                    epic_id="epic-00022",
-                    github_issue_number=23,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-            ]
-        )
+        return domain_tree.build_graph([
+            domain_models.SpecNodeSeed(
+                kind="initiative",
+                id="init-00020",
+                title="Platform",
+                slug="platform",
+                path=root,
+                meta_path=root / ".meta.json",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=20,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="epic",
+                id="epic-00021",
+                title="Empty source",
+                slug="empty-source",
+                path=root / "epics" / "epic-00021-empty-source",
+                meta_path=root / "epics" / "epic-00021-empty-source" / ".meta.json",
+                parent_id="init-00020",
+                initiative_id="init-00020",
+                epic_id=None,
+                github_issue_number=21,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="epic",
+                id="epic-00022",
+                title="Target parent",
+                slug="target-parent",
+                path=root / "epics" / "epic-00022-target-parent",
+                meta_path=root / "epics" / "epic-00022-target-parent" / ".meta.json",
+                parent_id="init-00020",
+                initiative_id="init-00020",
+                epic_id=None,
+                github_issue_number=22,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="issue",
+                id="iss-00023",
+                title="Target child",
+                slug="target-child",
+                path=root / "epics" / "epic-00022-target-parent" / "issues" / "iss-00023-target-child",
+                meta_path=root
+                / "epics"
+                / "epic-00022-target-parent"
+                / "issues"
+                / "iss-00023-target-child"
+                / ".meta.json",
+                parent_id="epic-00022",
+                initiative_id="init-00020",
+                epic_id="epic-00022",
+                github_issue_number=23,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+        ])
 
     def _target_container_cycle_graph(self):
         _domain_deps, domain_models, domain_tree = _runtime_modules()
         root = Path("/repo/spec-dock/initiatives")
-        return domain_tree.build_graph(
-            [
-                domain_models.SpecNodeSeed(
-                    kind="initiative",
-                    id="init-00001",
-                    title="Future source",
-                    slug="future-source",
-                    path=root / "init-00001-future-source",
-                    meta_path=root / "init-00001-future-source" / ".meta.json",
-                    parent_id=None,
-                    initiative_id=None,
-                    epic_id=None,
-                    github_issue_number=1,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="initiative",
-                    id="init-00002",
-                    title="Target container",
-                    slug="target-container",
-                    path=root / "init-00002-target-container",
-                    meta_path=root / "init-00002-target-container" / ".meta.json",
-                    parent_id=None,
-                    initiative_id=None,
-                    epic_id=None,
-                    github_issue_number=2,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="issue",
-                    id="iss-00002",
-                    title="Target child",
-                    slug="target-child",
-                    path=root
-                    / "init-00002-target-container"
-                    / "issues"
-                    / "iss-00002-target-child",
-                    meta_path=root
-                    / "init-00002-target-container"
-                    / "issues"
-                    / "iss-00002-target-child"
-                    / ".meta.json",
-                    parent_id="init-00002",
-                    initiative_id="init-00002",
-                    epic_id=None,
-                    github_issue_number=20,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-            ]
-        )
+        return domain_tree.build_graph([
+            domain_models.SpecNodeSeed(
+                kind="initiative",
+                id="init-00001",
+                title="Future source",
+                slug="future-source",
+                path=root / "init-00001-future-source",
+                meta_path=root / "init-00001-future-source" / ".meta.json",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=1,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="initiative",
+                id="init-00002",
+                title="Target container",
+                slug="target-container",
+                path=root / "init-00002-target-container",
+                meta_path=root / "init-00002-target-container" / ".meta.json",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=2,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="issue",
+                id="iss-00002",
+                title="Target child",
+                slug="target-child",
+                path=root / "init-00002-target-container" / "issues" / "iss-00002-target-child",
+                meta_path=root / "init-00002-target-container" / "issues" / "iss-00002-target-child" / ".meta.json",
+                parent_id="init-00002",
+                initiative_id="init-00002",
+                epic_id=None,
+                github_issue_number=20,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+        ])
 
     def test_raw_node_dependency_cycle_between_empty_epics_is_rejected(self) -> None:
         domain_deps, _domain_models, _domain_tree = _runtime_modules()

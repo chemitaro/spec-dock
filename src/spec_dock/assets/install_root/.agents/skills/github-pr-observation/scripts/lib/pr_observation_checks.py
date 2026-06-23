@@ -1,8 +1,8 @@
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
 import subprocess
-from datetime import datetime, timezone
 
 repo = os.environ["OBS_REPO"]
 pr = int(os.environ["OBS_PR"])
@@ -315,17 +315,9 @@ def failed_action_steps(job):
 
 def actions_failure_entry(run, job=None):
     run_id = run.get("id")
-    run_attempt = (
-        (job or {}).get("run_attempt")
-        or run.get("run_attempt")
-        or run.get("run_number")
-    )
+    run_attempt = (job or {}).get("run_attempt") or run.get("run_attempt") or run.get("run_number")
     job_id = (job or {}).get("id")
-    dedupe_key = (
-        f"actions:{run_id}:{job_id}:{run_attempt}"
-        if job_id is not None
-        else f"actions:{run_id}:run"
-    )
+    dedupe_key = f"actions:{run_id}:{job_id}:{run_attempt}" if job_id is not None else f"actions:{run_id}:run"
     return {
         "kind": "github_actions_job",
         "source": "actions",
@@ -360,18 +352,14 @@ if len(expected_head_sha_lower) < 40:
         expected_head_sha = current_head_sha
         expected_head_sha_lower = current_head_sha
     else:
-        limitations.append(
-            {
-                "code": "pr_head_sha_resolution_failed",
-                "source": "gh_pr_view",
-                "severity": "blocking",
-                "message": "abbreviated PR head SHA could not be resolved to the current full head SHA",
-            }
-        )
+        limitations.append({
+            "code": "pr_head_sha_resolution_failed",
+            "source": "gh_pr_view",
+            "severity": "blocking",
+            "message": "abbreviated PR head SHA could not be resolved to the current full head SHA",
+        })
 
-actions_runs_payload, actions_limitation = gh_api(
-    f"repos/{repo}/actions/runs?head_sha={expected_head_sha}"
-)
+actions_runs_payload, actions_limitation = gh_api(f"repos/{repo}/actions/runs?head_sha={expected_head_sha}")
 actions_available = actions_limitation is None
 if actions_limitation:
     limitations.append(actions_limitation)
@@ -413,28 +401,24 @@ for run in workflow_runs:
     else:
         action_run_counts["unknown"] += 1
     run_id = run.get("id")
-    sanitized_action_runs.append(
-        {
-            "id": run_id,
-            "name": run.get("name"),
-            "status": run.get("status"),
-            "conclusion": run.get("conclusion"),
-            "head_sha": run.get("head_sha"),
-            "html_url": run.get("html_url"),
-        }
-    )
+    sanitized_action_runs.append({
+        "id": run_id,
+        "name": run.get("name"),
+        "status": run.get("status"),
+        "conclusion": run.get("conclusion"),
+        "head_sha": run.get("head_sha"),
+        "html_url": run.get("html_url"),
+    })
     if run_id is None:
         action_job_collection_failures += 1
         action_job_counts["unknown"] += 1
-        limitations.append(
-            {
-                "code": "github_actions_jobs_unavailable",
-                "source": "actions_collector",
-                "capability": "actions_read",
-                "severity": "blocking",
-                "message": "GitHub Actions workflow run did not include an id, so jobs could not be collected",
-            }
-        )
+        limitations.append({
+            "code": "github_actions_jobs_unavailable",
+            "source": "actions_collector",
+            "capability": "actions_read",
+            "severity": "blocking",
+            "message": "GitHub Actions workflow run did not include an id, so jobs could not be collected",
+        })
         if run_classification == "failed":
             failure = actions_failure_entry(run)
             if failure["dedupe_key"] not in actions_failure_dedupe_keys:
@@ -470,15 +454,13 @@ for run in workflow_runs:
     if not isinstance(jobs, list):
         action_job_collection_failures += 1
         action_job_counts["unknown"] += 1
-        limitations.append(
-            {
-                "code": "github_actions_jobs_unavailable",
-                "source": "actions_collector",
-                "capability": "actions_read",
-                "severity": "blocking",
-                "message": "GitHub Actions jobs response did not include a jobs list",
-            }
-        )
+        limitations.append({
+            "code": "github_actions_jobs_unavailable",
+            "source": "actions_collector",
+            "capability": "actions_read",
+            "severity": "blocking",
+            "message": "GitHub Actions jobs response did not include a jobs list",
+        })
         if run_classification == "failed":
             failure = actions_failure_entry(run)
             if failure["dedupe_key"] not in actions_failure_dedupe_keys:
@@ -492,16 +474,14 @@ for run in workflow_runs:
             action_job_counts[job_classification] += 1
         else:
             action_job_counts["unknown"] += 1
-        sanitized_action_jobs.append(
-            {
-                "id": job.get("id"),
-                "run_id": job.get("run_id") or run_id,
-                "name": job.get("name"),
-                "status": job.get("status"),
-                "conclusion": job.get("conclusion"),
-                "html_url": job.get("html_url"),
-            }
-        )
+        sanitized_action_jobs.append({
+            "id": job.get("id"),
+            "run_id": job.get("run_id") or run_id,
+            "name": job.get("name"),
+            "status": job.get("status"),
+            "conclusion": job.get("conclusion"),
+            "html_url": job.get("html_url"),
+        })
         if job_classification == "failed":
             run_failed_jobs.append(job)
             failure = actions_failure_entry(run, job)
@@ -515,51 +495,41 @@ for run in workflow_runs:
             actions_failures.append(failure)
 
 if actions_available and not workflow_runs:
-    limitations.append(
-        {
-            "code": "zero_actions_runs_non_success",
-            "source": "actions_collector",
-            "capability": "actions_read",
-            "severity": "informational",
-            "blocking": False,
-            "message": "no GitHub Actions workflow runs were observed for the expected PR head SHA",
-        }
-    )
-    limitations.append(
-        {
-            "code": "zero_checks_s03_non_success",
-            "source": "ci_collector",
-            "severity": "blocking",
-            "message": "no GitHub Actions workflow runs were observed; S03 keeps this non-success until wait compatibility is migrated",
-        }
-    )
+    limitations.append({
+        "code": "zero_actions_runs_non_success",
+        "source": "actions_collector",
+        "capability": "actions_read",
+        "severity": "informational",
+        "blocking": False,
+        "message": "no GitHub Actions workflow runs were observed for the expected PR head SHA",
+    })
+    limitations.append({
+        "code": "zero_checks_s03_non_success",
+        "source": "ci_collector",
+        "severity": "blocking",
+        "message": "no GitHub Actions workflow runs were observed; S03 keeps this non-success until wait compatibility is migrated",
+    })
 
 actions_jobs_collection = {
     "successful_runs": action_job_collection_successes,
     "failed_runs": action_job_collection_failures,
 }
 if action_job_collection_skipped_green_runs or action_job_collection_skipped_non_terminal_runs:
-    actions_jobs_collection.update(
-        {
-            "mode": "bounded",
-            "expanded_runs": action_job_collection_successes + action_job_collection_failures,
-        }
-    )
+    actions_jobs_collection.update({
+        "mode": "bounded",
+        "expanded_runs": action_job_collection_successes + action_job_collection_failures,
+    })
 if action_job_collection_skipped_green_runs:
-    actions_jobs_collection.update(
-        {
-            "skipped_green_runs": action_job_collection_skipped_green_runs,
-            "cap": TERMINAL_GREEN_JOB_EXPANSION_CAP,
-        }
-    )
+    actions_jobs_collection.update({
+        "skipped_green_runs": action_job_collection_skipped_green_runs,
+        "cap": TERMINAL_GREEN_JOB_EXPANSION_CAP,
+    })
 if action_job_collection_skipped_non_terminal_runs:
-    actions_jobs_collection.update(
-        {
-            "skipped_non_terminal_runs": action_job_collection_skipped_non_terminal_runs,
-            "non_terminal_cap": NON_TERMINAL_JOB_EXPANSION_CAP,
-            "non_terminal_attempts": action_job_collection_non_terminal_attempts,
-        }
-    )
+    actions_jobs_collection.update({
+        "skipped_non_terminal_runs": action_job_collection_skipped_non_terminal_runs,
+        "non_terminal_cap": NON_TERMINAL_JOB_EXPANSION_CAP,
+        "non_terminal_attempts": action_job_collection_non_terminal_attempts,
+    })
 actions_jobs_summary = {
     "total": len(sanitized_action_jobs),
     "counts": action_job_counts,
@@ -580,7 +550,8 @@ actions_decisive_green = (
     actions_available
     and actions_summary["workflow_runs"]["total"] > 0
     and (
-        action_job_collection_successes + action_job_collection_skipped_green_runs
+        action_job_collection_successes
+        + action_job_collection_skipped_green_runs
         + action_job_collection_skipped_non_terminal_runs
         == actions_summary["workflow_runs"]["total"]
     )
@@ -600,7 +571,8 @@ actions_decisive_non_terminal = (
     actions_available
     and actions_summary["workflow_runs"]["total"] > 0
     and (
-        action_job_collection_successes + action_job_collection_skipped_green_runs
+        action_job_collection_successes
+        + action_job_collection_skipped_green_runs
         + action_job_collection_skipped_non_terminal_runs
         == actions_summary["workflow_runs"]["total"]
     )
@@ -667,25 +639,21 @@ required_check_state = {
 for item in status_check_rollup:
     state = str(item.get("state") or item.get("status") or "").upper()
     conclusion = str(item.get("conclusion") or "").upper()
-    required_check_state["status_check_rollup_states"].append(
-        {
-            "name": item.get("name") or item.get("context"),
-            "state": state or None,
-            "conclusion": conclusion or None,
-        }
-    )
+    required_check_state["status_check_rollup_states"].append({
+        "name": item.get("name") or item.get("context"),
+        "state": state or None,
+        "conclusion": conclusion or None,
+    })
 
 failures = []
 failures.extend(actions_failures)
 
-actions_primary_unavailable = any(
-    item.get("capability") == "actions_read" and item.get("severity") == "blocking"
-    for item in limitations
-) and not actions_available
+actions_primary_unavailable = (
+    any(item.get("capability") == "actions_read" and item.get("severity") == "blocking" for item in limitations)
+    and not actions_available
+)
 head_sha_resolution_failed = any(
-    item.get("code") == "pr_head_sha_resolution_failed"
-    and item.get("severity") == "blocking"
-    for item in limitations
+    item.get("code") == "pr_head_sha_resolution_failed" and item.get("severity") == "blocking" for item in limitations
 )
 actions_zero_runs = actions_available and actions_summary["workflow_runs"]["total"] == 0
 actions_failed = bool(action_run_counts["failed"] or action_job_counts["failed"])
@@ -715,32 +683,28 @@ else:
 
 sanitized_checks = []
 for check in check_runs:
-    sanitized_checks.append(
-        {
-            "id": check.get("id"),
-            "name": check.get("name"),
-            "head_sha": check.get("head_sha"),
-            "status": check.get("status"),
-            "conclusion": check.get("conclusion"),
-            "html_url": check.get("html_url"),
-            "details_url": check.get("details_url"),
-            "workflow_name": check.get("workflow_name"),
-            "workflow_run_id": (check.get("workflow_run") or {}).get("id")
-            if isinstance(check.get("workflow_run"), dict)
-            else None,
-        }
-    )
+    sanitized_checks.append({
+        "id": check.get("id"),
+        "name": check.get("name"),
+        "head_sha": check.get("head_sha"),
+        "status": check.get("status"),
+        "conclusion": check.get("conclusion"),
+        "html_url": check.get("html_url"),
+        "details_url": check.get("details_url"),
+        "workflow_name": check.get("workflow_name"),
+        "workflow_run_id": (check.get("workflow_run") or {}).get("id")
+        if isinstance(check.get("workflow_run"), dict)
+        else None,
+    })
 
 sanitized_statuses = []
 for status in statuses:
-    sanitized_statuses.append(
-        {
-            "context": status.get("context"),
-            "state": status.get("state"),
-            "target_url": status.get("target_url"),
-            "description": status.get("description"),
-        }
-    )
+    sanitized_statuses.append({
+        "context": status.get("context"),
+        "state": status.get("state"),
+        "target_url": status.get("target_url"),
+        "description": status.get("description"),
+    })
 
 fingerprint_source = {
     "head_sha": expected_head_sha,

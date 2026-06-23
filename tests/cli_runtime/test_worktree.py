@@ -1,18 +1,16 @@
+import contextlib
 import json
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
+
+import pytest
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 
-
-
-
-import contextlib
-import pytest
 _MISSING = object()
 
 
@@ -46,6 +44,8 @@ def _patch_object(target, name, replacement=_MISSING, *, side_effect=_MISSING, r
         yield replacement
     finally:
         setattr(target, name, original)
+
+
 class TestCliWorktree(CliRuntimeHarness):
     def _worktree_env(self, root: Path | str) -> dict[str, str]:
         return {"SPEC_DOCK_WORKTREE_ROOT": str(root)}
@@ -53,7 +53,9 @@ class TestCliWorktree(CliRuntimeHarness):
     def _assert_no_sibling_container(self, target: Path) -> None:
         assert not (target.parent / f"{target.name}-worktrees").exists()
 
-    def _run_runtime_capture_exact_env(self, target: Path, args: list[str], env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    def _run_runtime_capture_exact_env(
+        self, target: Path, args: list[str], env: dict[str, str]
+    ) -> subprocess.CompletedProcess[str]:
         script = target / "spec-dock" / "scripts" / "spec-dock"
         assert script.is_file(), f"runtime script missing: {script}"
         return subprocess.run(
@@ -87,7 +89,9 @@ class TestCliWorktree(CliRuntimeHarness):
         assert item["origin"] == "classification_unavailable", case_label
 
     def test_worktree_record_payload_includes_classification_diagnostics(self) -> None:
-        runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
         sys_path_inserted = False
 
         if str(runtime_scripts_dir) not in sys.path:
@@ -216,7 +220,7 @@ class TestCliWorktree(CliRuntimeHarness):
             assert p.returncode == 0, p.stderr
             current_branch = self._run_git(target, ["branch", "--show-current"]).stdout.strip()
             expected_path = central_root / "sample-repo" / "sample-repo-wt1"
-            assert f"id=wt1" in p.stdout
+            assert "id=wt1" in p.stdout
             assert f"path={expected_path}" in p.stdout
             assert "bootstrap status=skipped" in p.stdout
             assert expected_path.is_dir()
@@ -232,8 +236,12 @@ class TestCliWorktree(CliRuntimeHarness):
             central_root = Path(tmp) / "central-worktrees"
             target.mkdir()
             self._prepare_git_repo(target)
-            first = self._run_runtime_capture(target, ["worktree", "create", "feature"], env=self._worktree_env(central_root))
-            second = self._run_runtime_capture(target, ["worktree", "create", "feature"], env=self._worktree_env(central_root))
+            first = self._run_runtime_capture(
+                target, ["worktree", "create", "feature"], env=self._worktree_env(central_root)
+            )
+            second = self._run_runtime_capture(
+                target, ["worktree", "create", "feature"], env=self._worktree_env(central_root)
+            )
 
             assert first.returncode == 0, first.stderr
             assert second.returncode == 0, second.stderr
@@ -295,7 +303,7 @@ class TestCliWorktree(CliRuntimeHarness):
             if not self._can_create_symlink(Path(tmp)):
                 pytest.skip("symlink not available")
             broken = Path(tmp) / "broken-root"
-            os.symlink(Path(tmp) / "missing-root", broken)
+            Path(broken).symlink_to(Path(tmp) / "missing-root")
 
             p = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env(broken))
 
@@ -314,7 +322,7 @@ class TestCliWorktree(CliRuntimeHarness):
             self._prepare_git_repo(target)
             if not self._can_create_symlink(Path(tmp)):
                 pytest.skip("symlink not available")
-            os.symlink(real_root, symlink_root)
+            Path(symlink_root).symlink_to(real_root)
 
             p = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env(symlink_root))
 
@@ -454,7 +462,10 @@ class TestCliWorktree(CliRuntimeHarness):
             assert "spec-dock: (warn) make init failed:" in p.stderr
             assert worktree_path.is_dir()
             current_branch = self._run_git(target, ["branch", "--show-current"]).stdout.strip()
-            assert f"branch refs/heads/{current_branch}-setup" in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
+            assert (
+                f"branch refs/heads/{current_branch}-setup"
+                in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
+            )
 
     def test_worktree_create_keeps_worktree_when_make_init_detection_fails(self) -> None:
         if shutil.which("make") is None:
@@ -466,7 +477,9 @@ class TestCliWorktree(CliRuntimeHarness):
             (target / "Makefile").write_text("include missing.mk\ninit:\n\t@true\n", encoding="utf-8")
             self._prepare_git_repo(target)
 
-            p = self._run_runtime_capture(target, ["worktree", "create", "detect"], env=self._worktree_env(central_root))
+            p = self._run_runtime_capture(
+                target, ["worktree", "create", "detect"], env=self._worktree_env(central_root)
+            )
 
             worktree_path = central_root / "sample-repo" / "sample-repo-detect"
             assert p.returncode == 0, p.stderr
@@ -520,16 +533,20 @@ class TestCliWorktree(CliRuntimeHarness):
 
     def test_worktree_create_treats_non_collision_git_add_failure_as_fatal(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -561,7 +578,9 @@ class TestCliWorktree(CliRuntimeHarness):
                     return True
 
                 def add_worktree_with_new_branch(self, repo_root, *, path, branch):
-                    raise RuntimeError("git failed: git worktree add\nfatal: cannot lock ref 'refs/heads/main-wt1': Permission denied")
+                    raise RuntimeError(
+                        "git failed: git worktree add\nfatal: cannot lock ref 'refs/heads/main-wt1': Permission denied"
+                    )
 
             class FakeBootstrapGateway:
                 def run_make_init_if_available(self, worktree_path):
@@ -590,16 +609,20 @@ class TestCliWorktree(CliRuntimeHarness):
 
     def test_worktree_create_retries_git_add_collision(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -652,9 +675,9 @@ class TestCliWorktree(CliRuntimeHarness):
             assert result.id == "wt2"
             assert [branch for _, branch in git_gateway.add_calls] == ["main-wt1", "main-wt2"]
             assert [path for path, _ in git_gateway.add_calls] == [
-                    Path(tmp) / "central-worktrees" / "repo" / "repo-wt1",
-                    Path(tmp) / "central-worktrees" / "repo" / "repo-wt2",
-                ]
+                Path(tmp) / "central-worktrees" / "repo" / "repo-wt1",
+                Path(tmp) / "central-worktrees" / "repo" / "repo-wt2",
+            ]
 
     def test_worktree_create_normalizes_container_from_linked_worktree(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -662,7 +685,9 @@ class TestCliWorktree(CliRuntimeHarness):
             central_root = Path(tmp) / "central-worktrees"
             target.mkdir()
             self._prepare_git_repo(target)
-            first = self._run_runtime_capture(target, ["worktree", "create", "outer"], env=self._worktree_env(central_root))
+            first = self._run_runtime_capture(
+                target, ["worktree", "create", "outer"], env=self._worktree_env(central_root)
+            )
             assert first.returncode == 0, first.stderr
             linked = central_root / "sample-repo" / "sample-repo-outer"
             env = os.environ.copy()
@@ -692,10 +717,14 @@ class TestCliWorktree(CliRuntimeHarness):
             target.mkdir()
             self._prepare_git_repo(target)
 
-            create = self._run_runtime_capture(target, ["worktree", "create", "alpha"], env=self._worktree_env(central_root))
+            create = self._run_runtime_capture(
+                target, ["worktree", "create", "alpha"], env=self._worktree_env(central_root)
+            )
             assert create.returncode == 0, create.stderr
 
-            listed = self._run_runtime_capture(target, ["worktree", "list", "--json"], env=self._worktree_env(central_root))
+            listed = self._run_runtime_capture(
+                target, ["worktree", "list", "--json"], env=self._worktree_env(central_root)
+            )
             assert listed.returncode == 0, listed.stderr
             payload = json.loads(listed.stdout)
             assert payload["status"] == "ok"
@@ -713,13 +742,17 @@ class TestCliWorktree(CliRuntimeHarness):
             assert "removable=true" in text_listed.stdout
 
             for selector in (alpha["id"], alpha["path"]):
-                shown = self._run_runtime_capture(target, ["worktree", "show", selector, "--json"], env=self._worktree_env(central_root))
+                shown = self._run_runtime_capture(
+                    target, ["worktree", "show", selector, "--json"], env=self._worktree_env(central_root)
+                )
                 case_label = f"selector={selector}"
                 assert shown.returncode == 0, f"{case_label}: {shown.stderr}"
                 shown_payload = json.loads(shown.stdout)
                 assert shown_payload["worktree"]["path"] == alpha["path"], case_label
 
-            text_shown = self._run_runtime_capture(target, ["worktree", "show", alpha["id"]], env=self._worktree_env(central_root))
+            text_shown = self._run_runtime_capture(
+                target, ["worktree", "show", alpha["id"]], env=self._worktree_env(central_root)
+            )
             assert text_shown.returncode == 0, text_shown.stderr
             assert "id=alpha" in text_shown.stdout
             assert "managed=true" in text_shown.stdout
@@ -802,7 +835,7 @@ class TestCliWorktree(CliRuntimeHarness):
                 pytest.skip("symlink unavailable")
             symlink_root = Path(tmp) / "symlink-root"
             symlink_root.mkdir()
-            os.symlink(Path(tmp) / "escaped-namespace", symlink_root / "sample-repo")
+            Path(symlink_root / "sample-repo").symlink_to(Path(tmp) / "escaped-namespace")
             cases: list[tuple[str, dict[str, str], str]] = [
                 ("blank", self._worktree_env("   "), "root_blank"),
                 ("relative", self._worktree_env("relative/worktrees"), "root_invalid"),
@@ -823,20 +856,28 @@ class TestCliWorktree(CliRuntimeHarness):
                 external_record = next(item for item in payload["worktrees"] if item["basename"] == external.name)
                 self._assert_unavailable_classification(external_record, expected_reason, case_label)
 
-                shown = self._run_runtime_capture_exact_env(target, ["worktree", "show", external.name, "--json"], env=env)
+                shown = self._run_runtime_capture_exact_env(
+                    target, ["worktree", "show", external.name, "--json"], env=env
+                )
                 assert shown.returncode == 0, f"{case_label}: {shown.stderr}"
-                self._assert_unavailable_classification(json.loads(shown.stdout)["worktree"], expected_reason, case_label)
+                self._assert_unavailable_classification(
+                    json.loads(shown.stdout)["worktree"], expected_reason, case_label
+                )
 
                 removable = Path(tmp) / f"manual-remove-{label}"
                 self._add_external_worktree(target, removable, branch=f"manual-remove-{label}")
-                removed = self._run_runtime_capture_exact_env(target, ["worktree", "remove", removable.name, "--json"], env=env)
+                removed = self._run_runtime_capture_exact_env(
+                    target, ["worktree", "remove", removable.name, "--json"], env=env
+                )
                 assert removed.returncode == 0, f"{case_label}: {removed.stderr}"
                 removed_payload = json.loads(removed.stdout)
                 assert removed_payload["status"] == "ok", case_label
                 assert removed_payload["removed_record"], case_label
                 assert not removed_payload["branch_deleted"], case_label
                 self._assert_unavailable_classification(removed_payload["resolved_target"], expected_reason, case_label)
-                assert str(removable) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout, case_label
+                assert str(removable) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout, (
+                    case_label
+                )
 
     def test_worktree_list_json_classifies_unmanaged_worktree(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -847,7 +888,9 @@ class TestCliWorktree(CliRuntimeHarness):
             self._prepare_git_repo(target)
             self._run_git(target, ["worktree", "add", "-b", "manual", str(unmanaged)])
 
-            listed = self._run_runtime_capture(target, ["worktree", "list", "--json"], env=self._worktree_env(central_root))
+            listed = self._run_runtime_capture(
+                target, ["worktree", "list", "--json"], env=self._worktree_env(central_root)
+            )
 
             assert listed.returncode == 0, listed.stderr
             payload = json.loads(listed.stdout)
@@ -870,7 +913,9 @@ class TestCliWorktree(CliRuntimeHarness):
             target.mkdir()
             self._prepare_git_repo(target)
 
-            created = self._run_runtime_capture(target, ["worktree", "create", "done"], env=self._worktree_env(central_root))
+            created = self._run_runtime_capture(
+                target, ["worktree", "create", "done"], env=self._worktree_env(central_root)
+            )
             assert created.returncode == 0, created.stderr
             worktree_path = central_root / "sample-repo" / "sample-repo-done"
             branch = self._run_git(target, ["branch", "--list", "*-done", "--format=%(refname:short)"]).stdout.strip()
@@ -891,9 +936,13 @@ class TestCliWorktree(CliRuntimeHarness):
             assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
             assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
 
-            created_again = self._run_runtime_capture(target, ["worktree", "create", "done2"], env=self._worktree_env(central_root))
+            created_again = self._run_runtime_capture(
+                target, ["worktree", "create", "done2"], env=self._worktree_env(central_root)
+            )
             assert created_again.returncode == 0, created_again.stderr
-            text_removed = self._run_runtime_capture(target, ["worktree", "remove", "done2"], env=self._worktree_env(central_root))
+            text_removed = self._run_runtime_capture(
+                target, ["worktree", "remove", "done2"], env=self._worktree_env(central_root)
+            )
             assert text_removed.returncode == 0, text_removed.stderr
             assert "managed=true" in text_removed.stdout
             assert "origin=spec_dock_managed" in text_removed.stdout
@@ -907,7 +956,9 @@ class TestCliWorktree(CliRuntimeHarness):
             target.mkdir()
             self._prepare_git_repo(target)
 
-            created = self._run_runtime_capture(target, ["worktree", "create", "dirty"], env=self._worktree_env(central_root))
+            created = self._run_runtime_capture(
+                target, ["worktree", "create", "dirty"], env=self._worktree_env(central_root)
+            )
             assert created.returncode == 0, created.stderr
             worktree_path = central_root / "sample-repo" / "sample-repo-dirty"
             branch = self._run_git(target, ["branch", "--list", "*-dirty", "--format=%(refname:short)"]).stdout.strip()
@@ -936,10 +987,14 @@ class TestCliWorktree(CliRuntimeHarness):
             target.mkdir()
             self._prepare_git_repo(target)
 
-            created = self._run_runtime_capture(target, ["worktree", "create", "modified"], env=self._worktree_env(central_root))
+            created = self._run_runtime_capture(
+                target, ["worktree", "create", "modified"], env=self._worktree_env(central_root)
+            )
             assert created.returncode == 0, created.stderr
             worktree_path = central_root / "sample-repo" / "sample-repo-modified"
-            branch = self._run_git(target, ["branch", "--list", "*-modified", "--format=%(refname:short)"]).stdout.strip()
+            branch = self._run_git(
+                target, ["branch", "--list", "*-modified", "--format=%(refname:short)"]
+            ).stdout.strip()
             assert branch
             tracked_file = worktree_path / "tracked.txt"
             tracked_file.write_text("tracked\n", encoding="utf-8")
@@ -972,7 +1027,9 @@ class TestCliWorktree(CliRuntimeHarness):
             target.mkdir()
             self._prepare_git_repo(target)
 
-            created = self._run_runtime_capture(target, ["worktree", "create", "dirty"], env=self._worktree_env(central_root))
+            created = self._run_runtime_capture(
+                target, ["worktree", "create", "dirty"], env=self._worktree_env(central_root)
+            )
             assert created.returncode == 0, created.stderr
             worktree_path = central_root / "sample-repo" / "sample-repo-dirty"
             branch = self._run_git(target, ["branch", "--list", "*-dirty", "--format=%(refname:short)"]).stdout.strip()
@@ -1005,21 +1062,27 @@ class TestCliWorktree(CliRuntimeHarness):
             results: list[tuple[str, Path, subprocess.CompletedProcess[str], dict[str, object]]] = []
             for label, extra_args in cases:
                 case_label = f"remove_case={label}"
-                created = self._run_runtime_capture(target, ["worktree", "create", label], env=self._worktree_env(central_root))
+                created = self._run_runtime_capture(
+                    target, ["worktree", "create", label], env=self._worktree_env(central_root)
+                )
                 assert created.returncode == 0, f"{case_label}: {created.stderr}"
                 worktree_path = central_root / "sample-repo" / f"sample-repo-{label}"
                 lock = self._run_git(target, ["worktree", "lock", str(worktree_path)], check=False)
                 if lock.returncode != 0:
                     pytest.skip(f"git worktree lock unavailable: {lock.stderr}")
 
-                listed = self._run_runtime_capture(target, ["worktree", "list", "--json"], env=self._worktree_env(central_root))
+                listed = self._run_runtime_capture(
+                    target, ["worktree", "list", "--json"], env=self._worktree_env(central_root)
+                )
                 assert listed.returncode == 0, f"{case_label}: {listed.stderr}"
                 listed_payload = json.loads(listed.stdout)
                 listed_record = next(item for item in listed_payload["worktrees"] if item["id"] == label)
                 assert listed_record["removable"], case_label
                 assert listed_record["remove_blockers"] == [], case_label
 
-                shown = self._run_runtime_capture(target, ["worktree", "show", label, "--json"], env=self._worktree_env(central_root))
+                shown = self._run_runtime_capture(
+                    target, ["worktree", "show", label, "--json"], env=self._worktree_env(central_root)
+                )
                 assert shown.returncode == 0, f"{case_label}: {shown.stderr}"
                 shown_record = json.loads(shown.stdout)["worktree"]
                 assert shown_record["removable"], case_label
@@ -1037,8 +1100,8 @@ class TestCliWorktree(CliRuntimeHarness):
             assert (default_result.returncode == 0) == (force_result.returncode == 0)
 
             if default_result.returncode == 0:
-                for _label, worktree_path, _removed, payload in results:
-                    case_label = f"remove_case={_label}"
+                for label_, worktree_path, _removed, payload in results:
+                    case_label = f"remove_case={label_}"
                     assert payload["status"] == "ok", case_label
                     assert payload["removed_record"], case_label
                     assert payload["removed_directory"], case_label
@@ -1046,8 +1109,8 @@ class TestCliWorktree(CliRuntimeHarness):
                     assert payload["resolved_target"]["remove_blockers"] == [], case_label
                     assert not worktree_path.exists(), case_label
             else:
-                for _label, worktree_path, _removed, payload in results:
-                    case_label = f"remove_case={_label}"
+                for label_, worktree_path, _removed, payload in results:
+                    case_label = f"remove_case={label_}"
                     assert worktree_path.exists(), case_label
                     assert payload["error"]["code"] == "git_worktree_remove_failed", case_label
 
@@ -1057,9 +1120,13 @@ class TestCliWorktree(CliRuntimeHarness):
             central_root = Path(tmp) / "central-worktrees"
             target.mkdir()
             self._prepare_git_repo(target)
-            created = self._run_runtime_capture(target, ["worktree", "create", "branchy"], env=self._worktree_env(central_root))
+            created = self._run_runtime_capture(
+                target, ["worktree", "create", "branchy"], env=self._worktree_env(central_root)
+            )
             assert created.returncode == 0, created.stderr
-            listed = self._run_runtime_capture(target, ["worktree", "list", "--json"], env=self._worktree_env(central_root))
+            listed = self._run_runtime_capture(
+                target, ["worktree", "list", "--json"], env=self._worktree_env(central_root)
+            )
             branchy = next(item for item in json.loads(listed.stdout)["worktrees"] if item["id"] == "branchy")
 
             branch_target = self._run_runtime_capture(
@@ -1091,7 +1158,9 @@ class TestCliWorktree(CliRuntimeHarness):
             assert "main_worktree" in payload["remove_blockers"]
             assert target.exists()
 
-            delete_alias = self._run_runtime_capture(target, ["worktree", "delete", "main"], env=self._worktree_env(central_root))
+            delete_alias = self._run_runtime_capture(
+                target, ["worktree", "delete", "main"], env=self._worktree_env(central_root)
+            )
             assert delete_alias.returncode != 0
             assert "invalid choice" in delete_alias.stderr
 
@@ -1106,12 +1175,21 @@ class TestCliWorktree(CliRuntimeHarness):
             duplicate_parent.mkdir()
             self._prepare_git_repo(target)
 
-            first = self._run_runtime_capture(target, ["worktree", "create", "current"], env=self._worktree_env(central_root))
+            first = self._run_runtime_capture(
+                target, ["worktree", "create", "current"], env=self._worktree_env(central_root)
+            )
             assert first.returncode == 0, first.stderr
             current_path = central_root / "sample-repo" / "sample-repo-current"
             env = self._worktree_env(central_root)
             current_remove = subprocess.run(
-                [str(current_path / "spec-dock" / "scripts" / "spec-dock"), "worktree", "remove", "current", "--force", "--json"],
+                [
+                    str(current_path / "spec-dock" / "scripts" / "spec-dock"),
+                    "worktree",
+                    "remove",
+                    "current",
+                    "--force",
+                    "--json",
+                ],
                 cwd=str(current_path),
                 env={**os.environ.copy(), **env},
                 capture_output=True,
@@ -1146,7 +1224,9 @@ class TestCliWorktree(CliRuntimeHarness):
             assert str(unmanaged) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
             assert "manual" in self._run_git(target, ["branch", "--list", "manual"]).stdout
 
-            dupe_created = self._run_runtime_capture(target, ["worktree", "create", "dupe"], env=self._worktree_env(central_root))
+            dupe_created = self._run_runtime_capture(
+                target, ["worktree", "create", "dupe"], env=self._worktree_env(central_root)
+            )
             assert dupe_created.returncode == 0, dupe_created.stderr
             self._run_git(target, ["worktree", "add", "-b", "dupe", str(duplicate)])
             stable_id_remove = self._run_runtime_capture(
@@ -1161,16 +1241,20 @@ class TestCliWorktree(CliRuntimeHarness):
 
     def test_worktree_remove_external_paths_are_not_blocked_by_managed_namespace_containment(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1185,7 +1269,7 @@ class TestCliWorktree(CliRuntimeHarness):
             if not self._can_create_symlink(Path(tmp)):
                 pytest.skip("symlink unavailable")
             symlink_path = namespace / "repo-escape"
-            os.symlink(escaped, symlink_path)
+            Path(symlink_path).symlink_to(escaped)
             central_sentinel = central_root / "sentinel"
             namespace_sentinel = namespace / "sentinel"
             central_sentinel.write_text("keep\n", encoding="utf-8")
@@ -1219,12 +1303,10 @@ class TestCliWorktree(CliRuntimeHarness):
                         return
                     raise AssertionError(f"remove_target must only be called for the external symlink target: {path}")
 
-            git_gateway = FakeGitGateway(
-                [
-                    app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                    app_contracts.GitWorktreeRecord(path=symlink_path, head="def", branch="main-escape"),
-                ]
-            )
+            git_gateway = FakeGitGateway([
+                app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
+                app_contracts.GitWorktreeRecord(path=symlink_path, head="def", branch="main-escape"),
+            ])
             ports = app_ports.Ports(
                 node_reader=object(),
                 repo_root=repo_root,
@@ -1252,12 +1334,10 @@ class TestCliWorktree(CliRuntimeHarness):
                 (str(namespace), namespace, True),
             ):
                 case_label = f"target={target}, force={force}"
-                git_gateway = FakeGitGateway(
-                    [
-                        app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                        app_contracts.GitWorktreeRecord(path=record_path, head="def", branch=f"main-{target}"),
-                    ]
-                )
+                git_gateway = FakeGitGateway([
+                    app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
+                    app_contracts.GitWorktreeRecord(path=record_path, head="def", branch=f"main-{target}"),
+                ])
                 ports = app_ports.Ports(
                     node_reader=object(),
                     repo_root=repo_root,
@@ -1283,12 +1363,10 @@ class TestCliWorktree(CliRuntimeHarness):
             nested_namespace.mkdir(parents=True)
             nested_sentinel = nested_namespace / "sentinel"
             nested_sentinel.write_text("keep\n", encoding="utf-8")
-            git_gateway = FakeGitGateway(
-                [
-                    app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                    app_contracts.GitWorktreeRecord(path=ancestor_worktree, head="def", branch="main-ancestor"),
-                ]
-            )
+            git_gateway = FakeGitGateway([
+                app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
+                app_contracts.GitWorktreeRecord(path=ancestor_worktree, head="def", branch="main-ancestor"),
+            ])
             ports = app_ports.Ports(
                 node_reader=object(),
                 repo_root=repo_root,
@@ -1313,15 +1391,13 @@ class TestCliWorktree(CliRuntimeHarness):
             symlink_root = Path(tmp) / "central-with-symlink-namespace"
             symlink_root.mkdir()
             namespace_symlink = symlink_root / "repo"
-            os.symlink(escaped, namespace_symlink)
+            Path(namespace_symlink).symlink_to(escaped)
             namespace_symlink_record = namespace_symlink / "repo-linked"
             namespace_symlink_record.touch()
-            git_gateway = FakeGitGateway(
-                [
-                    app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                    app_contracts.GitWorktreeRecord(path=namespace_symlink_record, head="def", branch="main-linked"),
-                ]
-            )
+            git_gateway = FakeGitGateway([
+                app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
+                app_contracts.GitWorktreeRecord(path=namespace_symlink_record, head="def", branch="main-linked"),
+            ])
             ports = app_ports.Ports(
                 node_reader=object(),
                 repo_root=repo_root,
@@ -1345,16 +1421,20 @@ class TestCliWorktree(CliRuntimeHarness):
 
     def test_worktree_remove_cleans_leftover_directory_and_reports_cleanup_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1431,16 +1511,20 @@ class TestCliWorktree(CliRuntimeHarness):
 
     def test_worktree_remove_git_failure_does_not_cleanup_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1493,16 +1577,20 @@ class TestCliWorktree(CliRuntimeHarness):
 
     def test_worktree_remove_locked_default_uses_force_equivalent_git_call(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1520,7 +1608,9 @@ class TestCliWorktree(CliRuntimeHarness):
                 def worktree_list(self, repo_root_arg):
                     return [
                         app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                        app_contracts.GitWorktreeRecord(path=worktree_path, head="def", branch="main-locked", locked=True),
+                        app_contracts.GitWorktreeRecord(
+                            path=worktree_path, head="def", branch="main-locked", locked=True
+                        ),
                     ]
 
                 def remove_worktree(self, repo_root_arg, *, path, force):
@@ -1555,16 +1645,20 @@ class TestCliWorktree(CliRuntimeHarness):
 
     def test_worktree_remove_uses_target_only_cleanup_for_remaining_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1632,16 +1726,20 @@ class TestCliWorktree(CliRuntimeHarness):
 
     def test_worktree_remove_reports_target_cleanup_failures(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1705,7 +1803,9 @@ class TestCliWorktree(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             if not self._can_create_symlink(Path(tmp)):
                 pytest.skip("symlink unavailable")
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
@@ -1723,9 +1823,9 @@ class TestCliWorktree(CliRuntimeHarness):
             target_sentinel = target_dir / "sentinel"
             target_sentinel.write_text("keep\n", encoding="utf-8")
             symlink_path = base / "target-link"
-            os.symlink(target_dir, symlink_path)
+            Path(symlink_path).symlink_to(target_dir)
             broken_symlink = base / "broken-link"
-            os.symlink(base / "missing-target", broken_symlink)
+            Path(broken_symlink).symlink_to(base / "missing-target")
             regular_file = base / "target-file"
             regular_file.write_text("remove\n", encoding="utf-8")
 
@@ -1744,7 +1844,9 @@ class TestCliWorktree(CliRuntimeHarness):
 
     def test_fs_remove_target_reports_lstat_unlink_rmtree_and_unsupported_failures(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
@@ -1763,16 +1865,20 @@ class TestCliWorktree(CliRuntimeHarness):
 
             regular_file = base / "target-file"
             regular_file.write_text("remove\n", encoding="utf-8")
-            with _patch_object(Path, "unlink", side_effect=OSError("denied")):
-                with pytest.raises(RuntimeError) as unlink_failed:
-                    fs_cli.remove_target(regular_file)
+            with (
+                _patch_object(Path, "unlink", side_effect=OSError("denied")),
+                pytest.raises(RuntimeError) as unlink_failed,
+            ):
+                fs_cli.remove_target(regular_file)
             assert "failed to remove target path" in str(unlink_failed.value)
 
             target_dir = base / "target-dir"
             target_dir.mkdir()
-            with _patch_object(fs_cli.shutil, "rmtree", side_effect=OSError("denied")):
-                with pytest.raises(RuntimeError) as rmtree_failed:
-                    fs_cli.remove_target(target_dir)
+            with (
+                _patch_object(fs_cli.shutil, "rmtree", side_effect=OSError("denied")),
+                pytest.raises(RuntimeError) as rmtree_failed,
+            ):
+                fs_cli.remove_target(target_dir)
             assert "failed to remove directory tree" in str(rmtree_failed.value)
 
             if not hasattr(os, "mkfifo"):
@@ -1788,16 +1894,20 @@ class TestCliWorktree(CliRuntimeHarness):
 
     def test_worktree_remove_ambiguous_basename_stops_before_git_remove(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1864,12 +1974,14 @@ class TestCliWorktree(CliRuntimeHarness):
                 filesystem_gateway=FakeFilesystemGateway(),
             )
 
-            with _patch_object(app_worktree, "_build_inventory", return_value=inventory):
-                with pytest.raises(app_contracts.WorktreeCommandError) as raised:
-                    app_worktree.worktree_remove(
-                        app_contracts.WorktreeRemoveRequest(target="repo-first", force=True),
-                        ports,
-                    )
+            with (
+                _patch_object(app_worktree, "_build_inventory", return_value=inventory),
+                pytest.raises(app_contracts.WorktreeCommandError) as raised,
+            ):
+                app_worktree.worktree_remove(
+                    app_contracts.WorktreeRemoveRequest(target="repo-first", force=True),
+                    ports,
+                )
 
             assert raised.value.code == "ambiguous_target"
             assert len(raised.value.candidates) == 2
@@ -1877,16 +1989,20 @@ class TestCliWorktree(CliRuntimeHarness):
 
     def test_worktree_remove_re_resolves_target_after_final_git_refresh(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1976,16 +2092,20 @@ class TestCliWorktree(CliRuntimeHarness):
 
     def test_worktree_remove_hard_blockers_stop_before_git_remove_even_with_force(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -2029,9 +2149,24 @@ class TestCliWorktree(CliRuntimeHarness):
             main_record = app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main")
             cases = (
                 ("main", "main", [[main_record]], "main_worktree"),
-                ("current", "managed", [[main_record, app_contracts.GitWorktreeRecord(path=managed, head="def", branch="managed")]], "current_worktree"),
-                ("bare", "bare", [[main_record, app_contracts.GitWorktreeRecord(path=bare, head="ghi", branch="bare", bare=True)]], "bare_worktree"),
-                ("path_missing", "stale", [[main_record, app_contracts.GitWorktreeRecord(path=stale, head="jkl", branch="stale")]], "path_missing"),
+                (
+                    "current",
+                    "managed",
+                    [[main_record, app_contracts.GitWorktreeRecord(path=managed, head="def", branch="managed")]],
+                    "current_worktree",
+                ),
+                (
+                    "bare",
+                    "bare",
+                    [[main_record, app_contracts.GitWorktreeRecord(path=bare, head="ghi", branch="bare", bare=True)]],
+                    "bare_worktree",
+                ),
+                (
+                    "path_missing",
+                    "stale",
+                    [[main_record, app_contracts.GitWorktreeRecord(path=stale, head="jkl", branch="stale")]],
+                    "path_missing",
+                ),
                 (
                     "record_missing",
                     "managed",
@@ -2069,16 +2204,20 @@ class TestCliWorktree(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             if not self._can_create_symlink(Path(tmp)):
                 pytest.skip("symlink unavailable")
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -2089,7 +2228,7 @@ class TestCliWorktree(CliRuntimeHarness):
             repo_root.mkdir()
             namespace.mkdir(parents=True)
             broken = namespace / "repo-broken"
-            os.symlink(Path(tmp) / "missing-target", broken)
+            Path(broken).symlink_to(Path(tmp) / "missing-target")
 
             class FakeGitGateway:
                 def __init__(self) -> None:
@@ -2134,16 +2273,20 @@ class TestCliWorktree(CliRuntimeHarness):
 
     def test_worktree_invalid_root_reads_git_records_before_classification(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -2219,16 +2362,20 @@ class TestCliWorktree(CliRuntimeHarness):
 
     def test_worktree_inventory_reports_stale_records_and_duplicate_ids(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
             sys_path_inserted = False
 
             if str(runtime_scripts_dir) not in sys.path:
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)

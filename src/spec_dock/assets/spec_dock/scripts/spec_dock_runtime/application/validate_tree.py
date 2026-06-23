@@ -1,27 +1,29 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
-from ..domain.authority import (
+from spec_dock_runtime.application.artifact_preflight import validate_required_artifacts_for_graph
+from spec_dock_runtime.application.contracts import ValidateTreeRequest, ValidationResult
+from spec_dock_runtime.application.repo_context import resolve_current_repo_slug
+from spec_dock_runtime.domain.authority import (
     evaluate_evidence_adoption_ledger_gate,
     load_evidence_adoption_ledger_entries,
     validate_delegated_authority_artifact,
 )
-from ..domain.deps import validate_raw_node_dependency_graph
-from ..domain.models import SpecNodeKind, SpecNodeSeed, ValidationReport
-from ..domain.tree import build_graph
-from ..domain.validation import validate_graph_and_deps
-from ..infra.contracts import DirectDependencyResolution, StoredMetaRecord
-from .artifact_preflight import validate_required_artifacts_for_graph
-from .contracts import ValidateTreeRequest, ValidationResult
-from .ports import Ports
-from .repo_context import resolve_current_repo_slug
+from spec_dock_runtime.domain.deps import validate_raw_node_dependency_graph
+from spec_dock_runtime.domain.models import SpecNodeKind, SpecNodeSeed, ValidationReport
+from spec_dock_runtime.domain.tree import build_graph
+from spec_dock_runtime.domain.validation import validate_graph_and_deps
+
+if TYPE_CHECKING:
+    from spec_dock_runtime.application.ports import Ports
+    from spec_dock_runtime.infra.contracts import DirectDependencyResolution, StoredMetaRecord
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,
@@ -72,9 +74,7 @@ def validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult:
             None,
         )
         if callable(load_node_dependency_resolutions):
-            raw_node_depends_on_map = _raw_node_depends_on_map(
-                load_node_dependency_resolutions(specdock_dir, graph)
-            )
+            raw_node_depends_on_map = _raw_node_depends_on_map(load_node_dependency_resolutions(specdock_dir, graph))
             try:
                 validate_raw_node_dependency_graph(graph, raw_node_depends_on_map)
             except RuntimeError as error:
@@ -119,8 +119,7 @@ def _validate_delegated_authority_artifacts(graph, *, repo_root: Path) -> list[s
             detail = " ".join(result.details)
             errors.append(
                 "Delegated draft authority incomplete/blocked: "
-                f"path={artifact_path.as_posix()} reason={result.reason}"
-                + (f" details={detail}" if detail else "")
+                f"path={artifact_path.as_posix()} reason={result.reason}" + (f" details={detail}" if detail else "")
             )
     return errors
 
@@ -137,7 +136,6 @@ def _validate_evidence_adoption_ledgers(graph, *, repo_root: Path) -> list[str]:
         errors.append(
             "Evidence Adoption Ledger incomplete/blocked: "
             f"path={report_path.as_posix()} reason={result.reason} "
-            f"blocking_entry_id={result.blocking_entry_id}"
-            + (f" details={detail}" if detail else "")
+            f"blocking_entry_id={result.blocking_entry_id}" + (f" details={detail}" if detail else "")
         )
     return errors
