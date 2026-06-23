@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "policy_version": "assurance-policy-v1",
+  "issue_id": "iss-00231",
+  "stage": "requirement",
+  "status": "provisional",
+  "mode": "adaptive",
+  "source_binding": {
+    "artifacts": [
+      {
+        "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00231-inject-trusted-base-branch-codex-review-policy/design.md",
+        "role": "design",
+        "sha256": "7d84c936b1d5208a69cade44c87d4fae38d8cac2e85a65762cb38e71cb94a87e",
+        "display_path": "spec-dock/active/issue/design.md"
+      },
+      {
+        "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00231-inject-trusted-base-branch-codex-review-policy/plan.md",
+        "role": "plan",
+        "sha256": "3887ec342ef6c5a4377beb7ed9ecf7e067b12e1acbce5ba648d037b2af589b5a",
+        "display_path": "spec-dock/active/issue/plan.md"
+      },
+      {
+        "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00231-inject-trusted-base-branch-codex-review-policy/requirement.md",
+        "role": "requirement",
+        "sha256": "a7134bea84513d8bea76dcee492dbddac4921a61c24fd2d6e110940e383f7f65",
+        "display_path": "spec-dock/active/issue/requirement.md"
+      }
+    ]
+  },
+  "classification": {
+    "authorized_profile": "strict",
+    "complexity_tier": "complex",
+    "lite_candidate": false,
+    "lite_authorized": false,
+    "reason_codes": [
+      "fact_issue_231_docs_only_change",
+      "fact_issue_231_explicit_lite_opt_in",
+      "fact_issue_231_lite_evidence_gate_passed",
+      "fact_issue_231_migration_or_persistence_change",
+      "fact_issue_231_public_contract_change",
+      "fact_issue_231_rollback_difficulty_high",
+      "fact_issue_231_runtime_behavior_change",
+      "fact_issue_231_security_or_privacy_sensitive",
+      "hard_trigger_migration_unknown",
+      "hard_trigger_public_contract_change",
+      "hard_trigger_rollback_difficulty_high",
+      "hard_trigger_security_unknown",
+      "lite_evidence_gate_missing_or_unknown",
+      "lite_opt_in_missing_or_unknown",
+      "lite_predicate_docs_only_unknown",
+      "lite_predicate_runtime_behavior_unknown",
+      "standard_default"
+    ],
+    "hard_triggers": [
+      "public_contract_change",
+      "rollback_difficulty_high"
+    ],
+    "unknown_facts": [
+      "migration_or_persistence_change",
+      "security_or_privacy_sensitive"
+    ]
+  },
+  "risk_facts": [
+    {
+      "key": "docs_only_change",
+      "value": "unknown",
+      "source": "requirement",
+      "reason_code": "fact_issue_231_docs_only_change"
+    },
+    {
+      "key": "explicit_lite_opt_in",
+      "value": "false",
+      "source": "requirement",
+      "reason_code": "fact_issue_231_explicit_lite_opt_in"
+    },
+    {
+      "key": "lite_evidence_gate_passed",
+      "value": "false",
+      "source": "requirement",
+      "reason_code": "fact_issue_231_lite_evidence_gate_passed"
+    },
+    {
+      "key": "migration_or_persistence_change",
+      "value": "unknown",
+      "source": "requirement",
+      "reason_code": "fact_issue_231_migration_or_persistence_change"
+    },
+    {
+      "key": "public_contract_change",
+      "value": "true",
+      "source": "requirement",
+      "reason_code": "fact_issue_231_public_contract_change"
+    },
+    {
+      "key": "rollback_difficulty_high",
+      "value": "true",
+      "source": "requirement",
+      "reason_code": "fact_issue_231_rollback_difficulty_high"
+    },
+    {
+      "key": "runtime_behavior_change",
+      "value": "unknown",
+      "source": "requirement",
+      "reason_code": "fact_issue_231_runtime_behavior_change"
+    },
+    {
+      "key": "security_or_privacy_sensitive",
+      "value": "unknown",
+      "source": "requirement",
+      "reason_code": "fact_issue_231_security_or_privacy_sensitive"
+    }
+  ],
+  "obligations": {
+    "profile_preset": "strict",
+    "notes": [
+      "Parent Epic I05 requires strict / complex assurance for trusted base-SHA review policy."
+    ]
+  }
+}
