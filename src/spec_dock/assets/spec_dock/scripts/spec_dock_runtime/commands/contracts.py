@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from ..application.contracts import UseCases
 from ..presentation.contracts import CliText

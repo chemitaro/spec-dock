@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import date, datetime, timezone
 import os
 from pathlib import Path
 import shlex
 import time
-from typing import Callable, Literal, cast
+from typing import Literal, cast
 import uuid
 
 from ..domain.discussion_docs import (

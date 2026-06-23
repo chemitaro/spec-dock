@@ -11,6 +11,7 @@ are handled by the repo-local runtime script installed at:
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterator
 from contextlib import contextmanager
 from importlib.resources import as_file, files
 import json
@@ -19,7 +20,7 @@ from pathlib import Path
 import re
 import shutil
 import sys
-from typing import Any, Iterator, NamedTuple
+from typing import Any, NamedTuple
 
 from spec_dock import __version__
 
@@ -1162,7 +1163,7 @@ def _build_scaffold_uninstall_sources(assets_dir: Path) -> tuple[tuple[Path, byt
     else:
         gitignore_bytes = _DEFAULT_SPEC_DOCK_GITIGNORE.encode("utf-8")
     sources.append((Path("spec-dock/.gitignore"), gitignore_bytes))
-    sources.append((Path("spec-dock/spec-dock.version"), f"{_tool_version()}\n".encode("utf-8")))
+    sources.append((Path("spec-dock/spec-dock.version"), f"{_tool_version()}\n".encode()))
     return tuple(sources)
 
 

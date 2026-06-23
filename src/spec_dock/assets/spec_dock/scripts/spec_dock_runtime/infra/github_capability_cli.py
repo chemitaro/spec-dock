@@ -148,8 +148,7 @@ def _run_fixed_gh(command: list[str]) -> subprocess.CompletedProcess[str]:
             command,
             check=False,
             text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
         )
     except FileNotFoundError:
         return subprocess.CompletedProcess(command, 127, "", "gh executable not found")

@@ -223,7 +223,7 @@ class _StatusParseResult:
     ok: bool
     entries: tuple[domain.DiffGuardEntry, ...] = ()
     errors: tuple[str, ...] = ()
-    file_states: tuple["_BaselineFileState", ...] = ()
+    file_states: tuple[_BaselineFileState, ...] = ()
     head: str | None = None
 
 
