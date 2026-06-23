@@ -79,7 +79,7 @@ ID: "iss-00229"
 | S01 | delegated | domain / template / tests slice | dev-coder | profile manifest and domain composer | `plan.md` S01 | domain composer, template manifest, unit tests | CLI wiring / workflow state / GitHub review | targeted pytest | marker safety cannot be guaranteed | changed files, tests, ledger note | pass |
 | S02 | delegated | CLI vertical slice | dev-coder | compose command and artifact store | `plan.md` S02 | assurance command/application/presentation/infra, parser/bootstrap registration, and CLI tests | step routing / GitHub review / auto Lite default / stale policy | targeted pytest | compose would overwrite substantive content | changed files, tests, ledger note | pass |
 | S03 | local execution | stale binding integration slice | orchestrator + reviewers | compose/verify/workflow blocking | `plan.md` S03 | assurance application/store/workflow/domain validation and compose/workflow tests | compose section content rules / GitHub review | targeted pytest | legacy compatibility breaks | changed files, tests, ledger note | pass |
-| S90 | planned local verification | provider/mirror sync | orchestrator | dogfooding update and parity checks | `plan.md` S90 | dogfooding mirror | provider source beyond sync | update / parity / validate | parity mismatch unresolved | evidence | pending |
+| S90 | local verification | provider/mirror sync | orchestrator | dogfooding update and parity checks | `plan.md` S90 | dogfooding mirror | provider source beyond sync | update / parity / validate | parity mismatch unresolved | evidence | pass |
 | S99 | planned final gate | issue-wide quality | orchestrator + reviewers | final validation and review | `plan.md` S99 | final report / reviewer fixes | new feature scope | full validation | final reviewer fail | final evidence | pending |
 
 ## レビューゲート状態（Reviewer Gate Status）
@@ -102,6 +102,8 @@ ID: "iss-00229"
 | S03 | step code re-review | code-reviewer | after partial binding fix | failed | no | fix required | P1 role/path mismatch bypass fixed |
 | S03 | step code re-review | code-reviewer | after role/path mismatch fix | failed | no | fix required | P1 nested same-basename bypass fixed |
 | S03 | step code final re-review | code-reviewer | after canonical path fix | passed | no | commit S03 | no findings |
+| S90 | docs impact review | spec-reviewer | after mirror update | failed | no | fix required | P1 AC-006/tc-007 traceability and P2 exact mirror status evidence fixed |
+| S90 | docs impact re-review | spec-reviewer | after traceability fix | passed | no | commit S90 | no findings |
 
 ## ステップ commit ゲート（Step Commit Gate）
 | ステップ | クロージャ状態 | コミット範囲 | コミットハッシュ / 最終台帳 | コミット後 clean 確認 | 差分なし根拠 | 差分なし確認済み契約 / ファイル | 差分なし diff-clean コマンド | 差分なし read-only 確認 |
@@ -110,7 +112,8 @@ ID: "iss-00229"
 | planning-assurance | committed | `assurance.json` and readiness evidence | `46345f81` | `git status --short` -> clean before S01 | N/A | N/A | N/A | N/A |
 | S01 | committed | domain composer, profile manifest, unit tests, report evidence | `3d67f781` | `git status --short` -> clean before S02 | N/A | N/A | N/A | N/A |
 | S02 | committed | compose CLI, artifact store, parser/bootstrap wiring, CLI runtime tests, report evidence | `23ae5ecb` | `git status --short` -> clean before S03 | N/A | N/A | N/A | N/A |
-| S03 | ready for commit | stale source binding verify/compose/workflow integration, domain contract validation, tests, report evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
+| S03 | committed | stale source binding verify/compose/workflow integration, domain contract validation, tests, report evidence | `b5e3140a` | `git status --short` -> clean before S90 | N/A | N/A | N/A | N/A |
+| S90 | ready for commit | dogfooding mirror runtime/template sync and report evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
 
 ## 実装記録（セッションログ）
 - Implementation not started during planning.
@@ -267,3 +270,69 @@ git diff --check
 | tc-s03-004 | S03 | partial legacy binding regression | pass | missing design/plan roles are `invalid_schema` |
 | tc-s03-005 | S03 | role/path mismatch regression | pass | wrong canonical filename binding is `invalid_schema` |
 | tc-s03-006 | S03 | nested same-name canonical path regression | pass | nested `design.md` binding is `invalid_schema` |
+
+### セッションログ（2026-06-23 S90）
+
+#### 対象
+- Step: S90
+- AC/EC: AC-006, EC-001, EC-003
+- Closure ids: tc-007, tc-s90-001, tc-s90-002
+
+#### 実施内容
+- provider 側の runtime / assurance template 変更を dogfooding mirror へ `spec-dock update` で反映した。
+- provider / mirror runtime parity と assurance template parity を確認した。
+- generated runbook / active projection が ignored のままで、tracked authority として混入していないことを確認した。
+- changed mirror files:
+  - `spec-dock/scripts/spec_dock_runtime/application/{assurance.py,contracts.py,workflow.py}`
+  - `spec-dock/scripts/spec_dock_runtime/cli/{bootstrap.py,parser.py}`
+  - `spec-dock/scripts/spec_dock_runtime/commands/assurance.py`
+  - `spec-dock/scripts/spec_dock_runtime/domain/{assurance.py,artifact_composer.py}`
+  - `spec-dock/scripts/spec_dock_runtime/infra/{assurance_store.py,artifact_store.py}`
+  - `spec-dock/scripts/spec_dock_runtime/presentation/assurance_text.py`
+  - `spec-dock/templates/assurance/profile-sections.json`
+- unresolved risks: none.
+
+#### 実行コマンド / 結果
+```bash
+uv run python -m spec_dock.cli update .
+# spec-dock: ok (update) -> ...
+
+diff -ru -x __pycache__ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime spec-dock/scripts/spec_dock_runtime
+# pass
+
+diff -ru src/spec_dock/assets/spec_dock/templates/assurance spec-dock/templates/assurance
+# pass
+
+git status --short --ignored spec-dock/.agent/runbooks spec-dock/active/current-runbook.json spec-dock/active/current-runbook.md spec-dock/scripts/spec_dock_runtime spec-dock/templates/assurance
+#  M spec-dock/scripts/spec_dock_runtime/application/assurance.py
+#  M spec-dock/scripts/spec_dock_runtime/application/contracts.py
+#  M spec-dock/scripts/spec_dock_runtime/application/workflow.py
+#  M spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py
+#  M spec-dock/scripts/spec_dock_runtime/cli/parser.py
+#  M spec-dock/scripts/spec_dock_runtime/commands/assurance.py
+#  M spec-dock/scripts/spec_dock_runtime/domain/assurance.py
+#  M spec-dock/scripts/spec_dock_runtime/infra/assurance_store.py
+#  M spec-dock/scripts/spec_dock_runtime/presentation/assurance_text.py
+# ?? spec-dock/scripts/spec_dock_runtime/domain/artifact_composer.py
+# ?? spec-dock/scripts/spec_dock_runtime/infra/artifact_store.py
+# ?? spec-dock/templates/assurance/
+# !! spec-dock/.agent/
+# !! spec-dock/active/
+# !! spec-dock/scripts/spec_dock_runtime/__pycache__/
+# !! spec-dock/scripts/spec_dock_runtime/application/__pycache__/
+# !! spec-dock/scripts/spec_dock_runtime/cli/__pycache__/
+# !! spec-dock/scripts/spec_dock_runtime/commands/__pycache__/
+# !! spec-dock/scripts/spec_dock_runtime/domain/__pycache__/
+# !! spec-dock/scripts/spec_dock_runtime/infra/__pycache__/
+# !! spec-dock/scripts/spec_dock_runtime/presentation/__pycache__/
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=148
+```
+
+#### Closure coverage
+| closure id | step | verification evidence | observed result | notes |
+|---|---|---|---|---|
+| tc-007 | S90 | provider/mirror runtime and template parity diff; generated artifact status check | pass | closes AC-006 provider/mirror parity |
+| tc-s90-001 | S90 | provider/mirror runtime and template parity diff | pass | `__pycache__` ignored from runtime diff |
+| tc-s90-002 | S90 | ignored generated artifact status check | pass | generated runbook / active projection remained ignored |
