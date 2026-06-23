@@ -52,6 +52,9 @@ Disposition ごとの必須証跡:
 | D-230-P01 | resolved | test-strategy | orchestrator | `assurance classify` currently defaults unknown risk facts to `standard`, while Epic I04 records strict/deep assurance intent | manually edit `assurance.json`; expand classifier in planning; keep Issue-local plan gates strict | Keep the generated contract valid and enforce strict reviewer / validation obligations through `plan.md`; classifier semantic expansion is not part of this Issue's approved scope. | `assurance.json` is validated by runtime schema and source binding; changing classifier behavior belongs to assurance core, not context routing. | applied | `./spec-dock/scripts/spec-dock assurance classify --stage requirement --format json`; `./spec-dock/scripts/spec-dock assurance verify --format json`; `plan.md` S01/S02/S99 | none |
 | D-230-P02 | resolved | scope | spec-reviewer | Planning docs omitted parent I04 invocation observability and full worker-continuation freshness criteria. | keep original narrower contract; adopt full parent I04 criteria | Adopt full parent criteria for invocation event observability and continuation freshness. | Parent Epic I04 explicitly closes E-RQ-016/E-RQ-021 and issue implementation would otherwise pass while missing those obligations. | applied | spec-reviewer finding P1; `requirement.md`; `design.md`; `plan.md` | none |
 | D-230-P03 | resolved | scope | spec-reviewer | Issue docs used `system/policies/...` for context routing policy while parent Epic uses `system/assurance/...`. | supersede parent path; align issue path with parent path | Adopt parent Epic path: provider `src/spec_dock/assets/spec_dock/system/assurance/context-routing-policy.json` and schema `src/spec_dock/assets/spec_dock/system/assurance/schemas/context-routing-policy.schema.json`; mirror under `spec-dock/system/assurance/...`. | Policy file location is a shipped scaffold API surface and should not diverge from Epic design during Issue execution. | applied | spec-reviewer finding P1; `design.md`; `plan.md` | none |
+| D-230-S01 | resolved | implementation | dev-coder | S01 policy needed concrete per-task defaults not fully enumerated in planning docs. | minimal distinct matrix; strict all-reviewer matrix; defer to S02 | Adopt minimal distinct matrix: docs-only/doc-writer/low/minimal/spec-reviewer; runtime/dev-coder/medium/recent_fork/code-reviewer; migration/dev-coder/high/bounded_packet/code+qa; security/dev-coder/max/bounded_packet/code+qa+spec. | Satisfies AC-001 with proportional obligations and keeps S02 projection deterministic. | applied | `context-routing-policy.json`; `test_context_routing.py` | none |
+| D-230-S01-R01 | resolved | implementation | code-reviewer | Unsupported context routing policy versions were accepted despite schema `const` and EC-002 fail-closed requirement. | accept any non-empty version; reject versions other than `context-routing-policy-v1` | Reject unsupported policy versions in `context_routing_policy_from_dict` and cover it with a unit test. | Keeps runtime parser behavior aligned with shipped schema and fail-closed policy. | applied | code-reviewer P1; `uv run pytest tests/unit/domain/test_context_routing.py` -> 4 passed | none |
+| D-230-S01-R02 | resolved | implementation | code-reviewer | Bounded return policy accepted supersets such as `raw_shell_transcript`, allowing policy JSON to broaden the return contract. | accept superset; reject any field outside the closed allowlist | Reject unsupported bounded return fields in parser and close the JSON schema allowlist with fixed size / enum / uniqueness. | Preserves S01 bounded return contract and EC-002 fail-closed behavior. | applied | code-reviewer P1; `uv run pytest tests/unit/domain/test_context_routing.py` -> 5 passed | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -66,6 +69,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
 | EAL-230-P01 | adopted | parent Epic design/plan and ADR discussions | issue planning artifacts | Epic I04 already fixes the scope for step assurance, context routing, clean-room reviewer packets, and bounded return contracts; the issue docs adopt that scope without adding PR review semantics. | `spec-dock/active/epic/design.md`; `spec-dock/active/epic/plan.md`; `requirement.md`; `design.md`; `plan.md` | spec-review |
+| EAL-230-S01 | adopted | dev-coder S01 implementation note | S01 runtime domain / policy / tests | Worker implemented only the approved S01 file set and returned material matrix defaults for orchestrator adoption. The matrix is the smallest distinct docs/runtime/migration/security routing set that satisfies AC-001 while preserving clean-room reviewer obligations. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/context_routing.py`; `tests/unit/domain/test_context_routing.py`; `uv run pytest tests/unit/domain/test_context_routing.py` | code-review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -228,6 +232,52 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - ...
 
 ---
+
+### セッションログ（2026-06-23 S01）
+
+#### 対象
+- Step: S01
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, EC-002, EC-004
+- 計画上の出典:
+  - `plan.md` 実装ステップ S01
+  - closure ids: tc-230-001, tc-230-002, tc-230-003
+
+#### 実施内容
+- `dev-coder` に S01 implementation を委任し、context routing policy source、domain model、unit tests を追加した。
+- Orchestrator が worker の matrix decision を採用し、targeted verification を再実行した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/domain/test_context_routing.py
+# 3 passed in 0.01s
+
+uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/context_routing.py tests/unit/domain/test_context_routing.py
+# All checks passed!
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ | フェーズ | 計画した証跡要件 | 観測した証跡 | 証跡手段 | 結果 | メモ |
+|---|---|---|---|---|---|---|
+| S01 | Red | red-required | 実装前は `tests/unit/domain/test_context_routing.py` が存在せず pytest exit 4 | worker evidence | pass | file missing による期待どおりの Red |
+| S01 | Green | targeted unit tests | initial `3 passed`; after code-reviewer P1 fixes `5 passed in 0.02s` | `uv run pytest tests/unit/domain/test_context_routing.py` | pass | tc-230-001〜003 plus unsupported policy version / bounded return superset regressions |
+| S01 | Refactor | targeted lint / domain boundary | ruff pass; imports are `__future__`, `dataclasses`, `enum`, `typing` only | `uv run ruff check ...`; AST import inspection | pass | filesystem / CLI import なし |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ | クロージャID | 計画上の close 条件 | 観測した証跡 | 結果 | メモ |
+|---|---|---|---|---|---|
+| S01 | tc-230-001 | routing matrix が task kind ごとに異なる | docs/runtime/migration/security expected tuple tests | pass | policy JSON と domain parser で検証 |
+| S01 | tc-230-002 | continuation freshness / fallback | same context allowed、変更/revalidation failure は bounded_packet fallback | pass | source binding/revision/goal/scope/paths/risk/head/worktree/files |
+| S01 | tc-230-003 | clean-room exclusions | reviewer/consultant clean_room、forbidden source exclusion、bounded return contract | pass | consultant first-pass exclusions も検証 |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ | ゲート名 | レビュアーロール | 鮮度 | 状態 | リスク受容 | 昇格 / 完了判断 | メモ |
+|---|---|---|---|---|---|---|---|
+| S01 | step reviewer | code-reviewer | fresh | passed | no | proceed to commit | P1 unsupported policy version and P1 bounded return superset fixed; no remaining P0/P1 findings |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ | 委任ロール | 委任 worker 要約 | 変更ファイル | 実行 tests または docs-only 検証 | レビュアー判定 | 未解決リスク | 親統合判断 |
+|---|---|---|---|---|---|---|---|
+| S01 | dev-coder | context routing matrix、continuation freshness、clean-room exclusions、bounded return contract を実装 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/context_routing.py`; `src/spec_dock/assets/spec_dock/system/assurance/context-routing-policy.json`; `src/spec_dock/assets/spec_dock/system/assurance/schemas/context-routing-policy.schema.json`; `tests/unit/domain/test_context_routing.py` | `uv run pytest tests/unit/domain/test_context_routing.py` -> pass; `uv run ruff check ...` -> pass | pending | S02 projection integration は未実装 | accepted |
 
 ### セッションログ（2026-06-23 HH:MM - HH:MM）
 
