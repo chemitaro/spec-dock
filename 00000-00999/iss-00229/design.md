@@ -77,6 +77,8 @@ ID: "iss-00229"
   - Provider runtime:
     - `application/contracts.py`
     - `application/assurance.py`
+    - `cli/bootstrap.py`
+    - `cli/parser.py`
     - `commands/assurance.py`
     - `domain/artifact_composer.py`
     - `infra/artifact_store.py`
@@ -182,6 +184,9 @@ ArtifactStore --> Composer : managed section write
 |       |-- application/
 |       |   |-- assurance.py                 # 変更: compose use case
 |       |   `-- contracts.py                 # 変更: compose request/result contracts
+|       |-- cli/
+|       |   |-- bootstrap.py                 # 変更: compose use case wiring
+|       |   `-- parser.py                    # 変更: compose subcommand registration
 |       |-- commands/
 |       |   `-- assurance.py                 # 変更: compose subcommand
 |       |-- domain/

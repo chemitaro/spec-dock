@@ -22,6 +22,7 @@ ID: "iss-00229"
 | D-005 | resolved | plan | spec-reviewer | step-local delegation contract and concrete test cards were missing from implementation plan | A: keep compact plan; B: add required per-step schema sections | B を採用 | `docs/authoring/issue-plan.md` requires delegation contract and concrete test cards for implementation readiness | applied | `plan.md` S01-S03/S90/S99 delegation contracts and concrete tests | none |
 | D-006 | resolved | test-strategy | spec-reviewer | stale source binding coverage did not explicitly include compose failure or design/plan stale hashes | A: requirement-only stale verify/workflow tests; B: compose/verify/workflow tests across requirement/design/plan stale cases | B を採用 | Requirement/design/plan stale authority must not produce planning sections or execution handoff | applied | `requirement.md` AC-004 / `design.md` Source binding / `plan.md` tc-s02-003 and tc-s03-001..004 | none |
 | D-007 | resolved | plan | spec-reviewer | S02 and S03 both appeared to own stale compose blocking while S02 forbade stale policy changes | A: let S02 implement stale checker; B: keep S02 to compose vertical slice and assign stale compose/verify/workflow blocking to S03 | B を採用 | S03 is the explicit stale source binding integration step and can include compose command wiring without changing section content rules | applied | `plan.md` S02/S03 ownership and allowed paths | none |
+| D-008 | resolved | plan | dev-coder | S02 allowed paths omitted CLI parser/bootstrap registration surfaces required for `assurance compose` | A: keep S02 limited and fail targeted CLI tests; B: amend S02 allowed paths to include `cli/parser.py` and `cli/bootstrap.py` | B を採用 | The requested user-facing CLI subcommand cannot be reachable without parser registration and UseCases wiring | promoted_to_plan | `plan.md` S02 allowed paths / amendment trigger | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger）
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
@@ -69,7 +70,7 @@ ID: "iss-00229"
 | ステップ | 判断 | 必須理由 | 委任ロール | 委任範囲 | 正本 | 許可変更 | 禁止変更 | 必須検証 | 停止条件 | 必須出力 | 観測結果 |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | domain / template / tests slice | dev-coder | profile manifest and domain composer | `plan.md` S01 | domain composer, template manifest, unit tests | CLI wiring / workflow state / GitHub review | targeted pytest | marker safety cannot be guaranteed | changed files, tests, ledger note | pass |
-| S02 | planned delegated | CLI vertical slice | dev-coder | compose command and artifact store | `plan.md` S02 | assurance command/application/presentation/infra and CLI tests | step routing / GitHub review / auto Lite default / stale policy | targeted pytest | compose would overwrite substantive content | changed files, tests, ledger note | pending |
+| S02 | delegated | CLI vertical slice | dev-coder | compose command and artifact store | `plan.md` S02 | assurance command/application/presentation/infra, parser/bootstrap registration, and CLI tests | step routing / GitHub review / auto Lite default / stale policy | targeted pytest | compose would overwrite substantive content | changed files, tests, ledger note | pass |
 | S03 | planned delegated | stale binding integration slice | dev-coder | compose/verify/workflow blocking | `plan.md` S03 | assurance command/application/store/workflow and compose/workflow tests | compose section content rules / GitHub review | targeted pytest | legacy compatibility breaks | changed files, tests, ledger note | pending |
 | S90 | planned local verification | provider/mirror sync | orchestrator | dogfooding update and parity checks | `plan.md` S90 | dogfooding mirror | provider source beyond sync | update / parity / validate | parity mismatch unresolved | evidence | pending |
 | S99 | planned final gate | issue-wide quality | orchestrator + reviewers | final validation and review | `plan.md` S99 | final report / reviewer fixes | new feature scope | full validation | final reviewer fail | final evidence | pending |
@@ -86,6 +87,9 @@ ID: "iss-00229"
 | S01 | step code review | code-reviewer | initial S01 diff | failed | no | fix required | P1 malformed managed marker detection fixed |
 | S01 | step code re-review | code-reviewer | after malformed marker fix | passed with P2 | no | P2 fix applied before commit | marker token outside HTML comments false positive fixed |
 | S01 | step code final re-review | code-reviewer | after P2 fix | passed | no | commit S01 | no findings |
+| S02 | plan amendment | spec-reviewer | during S02 implementation | passed with P2 | no | P2 traceability fixes applied | command registration requires `cli/parser.py` and `cli/bootstrap.py` |
+| S02 | step code review | code-reviewer | initial S02 diff | failed | no | fix required | P1 symlink artifact write safety fixed; P2 report evidence fixed |
+| S02 | step code re-review | code-reviewer | after P1/P2 fixes | passed | no | commit S02 | no findings |
 
 ## ステップ commit ゲート（Step Commit Gate）
 | ステップ | クロージャ状態 | コミット範囲 | コミットハッシュ / 最終台帳 | コミット後 clean 確認 | 差分なし根拠 | 差分なし確認済み契約 / ファイル | 差分なし diff-clean コマンド | 差分なし read-only 確認 |
@@ -93,6 +97,7 @@ ID: "iss-00229"
 | planning | committed | requirement/design/plan/report authoring evidence | `1eb09f9a` | `git status --short` -> clean before assurance classification | N/A | N/A | N/A | N/A |
 | planning-assurance | committed | `assurance.json` and readiness evidence | `46345f81` | `git status --short` -> clean before S01 | N/A | N/A | N/A | N/A |
 | S01 | ready for commit | domain composer, profile manifest, unit tests, report evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
+| S02 | ready for commit | compose CLI, artifact store, parser/bootstrap wiring, CLI runtime tests, report evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
 
 ## 実装記録（セッションログ）
 - Implementation not started during planning.
@@ -158,3 +163,47 @@ git diff --check
 | tc-002 | S01 | compose twice idempotence test | pass | second compose has no changed output |
 | tc-003 | S01 | existing managed section preservation and downgrade test | pass | stronger sections are not deleted |
 | tc-005 | S01 | duplicated / unclosed / mismatched / malformed marker tests | pass | conflict returns `output_text=None` |
+
+### セッションログ（2026-06-23 S02）
+
+#### 対象
+- Step: S02
+- AC/EC: AC-001, AC-002, AC-003, AC-005, EC-001, EC-003
+- Closure ids: tc-002, tc-003, tc-004, tc-005
+
+#### 実施内容
+- `assurance compose --artifact {design,plan,report,all}` を CLI に追加した。
+- `ArtifactStore` を追加し、issue-local planning artifacts の read/write と profile manifest loading を実装した。
+- compose result の text / JSON 出力、dry-run、missing/schema-invalid assurance fail-closed、marker conflict fail-closed を実装した。
+- S02 plan amendment として `cli/parser.py` / `cli/bootstrap.py` を allowed paths に追加し、design/report traceability を更新した。
+- code-reviewer P1 を受け、symlinked planning artifact を read/write 前に拒否する guard と regression test を追加した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime/test_assurance_compose.py
+# 6 passed
+
+uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/assurance.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/assurance.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/artifact_store.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/assurance_text.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py tests/cli_runtime/test_assurance_compose.py
+# All checks passed!
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=148
+
+git diff --check
+# pass
+```
+
+#### TDD / review evidence
+| step | phase | planned evidence | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S02 | Red / alternative | red-required | initial targeted CLI tests failed with `invalid choice: 'compose'`; plan amended to include parser/bootstrap registration | pass | D-008 |
+| S02 | Green | CLI runtime tests | `uv run pytest tests/cli_runtime/test_assurance_compose.py` -> 6 passed | pass | includes symlink write-safety regression |
+| S02 | Refactor | guardrail | targeted `ruff check`, `validate`, and `git diff --check` passed | pass | no further refactor needed |
+
+#### Closure coverage
+| closure id | step | verification evidence | observed result | notes |
+|---|---|---|---|---|
+| tc-002 | S02 | second compose returns unchanged and no changed paths | pass | idempotent CLI behavior |
+| tc-003 | S02 | compose preserves existing artifact text and rejects unsafe symlink artifact | pass | non-destructive write safety |
+| tc-004 | S02 | compose all materializes sections; missing/invalid assurance fail closed | pass | JSON output includes changed paths and artifacts |
+| tc-005 | S02 | marker conflict test keeps artifacts unchanged | pass | `reason=marker_conflict` |
