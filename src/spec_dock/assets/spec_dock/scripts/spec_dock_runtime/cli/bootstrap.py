@@ -4,6 +4,11 @@ from dataclasses import dataclass
 import os
 from typing import TYPE_CHECKING
 
+from spec_dock_runtime.application.assurance import (
+    classify_assurance as application_classify_assurance,
+    show_assurance as application_show_assurance,
+    verify_assurance as application_verify_assurance,
+)
 from spec_dock_runtime.application.check_deps import check_deps as application_check_deps
 from spec_dock_runtime.application.close_node import close_node as application_close_node
 from spec_dock_runtime.application.contracts import UseCases
@@ -42,6 +47,7 @@ from spec_dock_runtime.application.worktree import (
 from spec_dock_runtime.infra import (
     active_store as infra_active_store,
     artifact_writer as infra_artifact_writer,
+    assurance_store as infra_assurance_store,
     clock as infra_clock,
     deps_reader as infra_deps_reader,
     derived_state_reader as infra_derived_state_reader,
@@ -295,9 +301,10 @@ class _ArtifactWriter:
 
 
 def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> BootstrapContext:
+    resolved_repo_root = repo_root if repo_root is not None else specdock_dir.parent
     ports = Ports(
         node_reader=_NodeReader(specdock_dir=specdock_dir),
-        repo_root=repo_root if repo_root is not None else specdock_dir.parent,
+        repo_root=resolved_repo_root,
         specdock_dir=specdock_dir,
         node_repo=_NodeRepository(),
         template_scaffolder=_TemplateScaffolder(),
@@ -314,6 +321,7 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         clock=_Clock(),
         artifact_writer=_ArtifactWriter(),
     )
+    assurance_store = infra_assurance_store.AssuranceStore(resolved_repo_root)
     use_cases = UseCases(
         create_initiative=lambda req: application_create_initiative(req, ports),
         create_epic=lambda req: application_create_epic(req, ports),
@@ -333,6 +341,9 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         issue_start=lambda req: application_issue_start(req, ports),
         issue_finish=lambda req: application_issue_finish(req, ports),
         validate_tree=lambda req: application_validate_tree(req, ports),
+        show_assurance=lambda req: application_show_assurance(req, store=assurance_store),
+        classify_assurance=lambda req: application_classify_assurance(req, store=assurance_store),
+        verify_assurance=lambda req: application_verify_assurance(req, store=assurance_store),
         doctor=lambda req: application_doctor(req, ports),
         worktree_create=lambda req: application_worktree_create(req, ports),
         worktree_list=lambda req: application_worktree_list(req, ports),
