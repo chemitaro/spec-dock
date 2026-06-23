@@ -66,6 +66,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-021 | `adopted` | spec-reviewer findings | `requirement.md`, draft plan discussion | ADR authority correction review の P1/P2 指摘を受け、Auto-Lite adoption surface を別 accepted ADR + policy version bump + rollout Issue の 3 点必須に固定し、旧 draft plan の T0 tranche を superseded と明記した。 | spec-reviewer review result 2026-06-23: P1 Auto-Lite stale choice, P2 old T0 draft tranche | fresh re-review |
 | EAL-022 | `adopted` | spec-reviewer | ADR authority correction handoff | Fresh re-review は findings なしで `review_status: pass`。Auto-Lite adoption surface、T0 supersession、ADR authority correction、dependency graph、implementation handoff readiness が妥当と判定された。 | spec-reviewer re-review result 2026-06-23, confidence 0.91 | downstream Issue planning may proceed from `iss-00227` |
 | EAL-023 | `adopted` | iss-00231 spec-reviewer finding | `plan.md`, `report.md`, `issues/iss-00231-*/{design.md,plan.md,report.md}` | I05 の `Policy schema / validator / max size` は Markdown policy の fixed path + base SHA + UTF-8 + 32 KiB runtime validation として回収し、dedicated `doctor` capability は I07 rollout / operationalization へ defer する。 | iss-00231 spec review P1: parent I05 scope contract contradicted Issue closure contract | fresh iss-00231 spec re-review |
+| EAL-024 | `adopted` | iss-00232 implementation + spec-reviewer finding | `plan.md`, `report.md`, `issues/iss-00232-*/{design.md,plan.md,report.md}` | I06 の blocker-centric repair は priority disposition / promoted P2 / blocker fingerprint evidence をこの Issue で閉じ、E-AC-013 と dedicated automation-stalled operator surfacing は I07 rollout / telemetry へ defer する。 | iss-00232 blocker policy payload and focused tests; spec review P1: E-AC-013 closure contradicted I07 defer | fresh iss-00232 spec re-review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -172,6 +173,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ## フォローアップ（別Issue化） (必須)
 - iss-00233:
   - I05 で defer した dedicated review-policy doctor surfacing を rollout / operationalization 観点で扱う。
+  - I06 で defer した dedicated automation-stalled operator surfacing を rollout / telemetry 観点で扱う。
 
 ## 省略/例外メモ (必須)
 - 該当なし

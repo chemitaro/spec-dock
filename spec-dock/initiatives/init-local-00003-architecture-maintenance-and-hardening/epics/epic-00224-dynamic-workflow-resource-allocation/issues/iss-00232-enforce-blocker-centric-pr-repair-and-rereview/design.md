@@ -3,186 +3,68 @@
 ID: "iss-00232"
 タイトル: "Enforce Blocker Centric PR Repair And Rereview"
 関連GitHub: ["#232"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-23"
 依存: ["requirement.md"]
 親: ["epic-00224", "init-local-00003"]
 ---
 
-# iss-00232 Enforce Blocker Centric PR Repair And Rereview — 設計（どう実現するか）
+# iss-00232 Enforce Blocker Centric PR Repair And Rereview — 設計
 
-> このテンプレートは最小 scaffold です。プロジェクトの目的、作業内容、人間の理解しやすさ、エージェントの実行可能性に合わせて、項目は追加・削除・統合・並べ替えてよい。
+## 全体像
+- `pr_review_snapshot.py` の current Codex issue comment 解析に `blocker_policy` payload を追加する。
+- Existing selected unresolved thread / changes requested の blocker 判定は維持し、priority comment policy はその前後に薄く追加する。
+- Wait / merge-prepared 側は既存 `decision` payload を読むため、`decision.status` / `status_reason` / `recommended_next_action` の互換を保つ。
 
-## 親図（Diagram）参照
-- Epic 図:
-  - ...
-- Initiative 図:
-  - ...
-- 再利用する決定:
-  - ...
+## 変更対象
+- Provider source:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py`
+- Dogfooding mirror:
+  - `.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py`
+- Tests:
+  - `tests/unit/infra/test_init_update.py`
 
-## 目的・制約
-- 目的:
-  - ...
-- 必須 / 禁止:
-  - ...
-- 非交渉制約:
-  - ...
-- 前提:
-  - ...
+## Blocker policy model
+- Input:
+  - current trigger boundary 内の Codex-authored issue comments。
+- Priority extraction:
+  - `P0`, `P1`, `P2`, `P3` token を本文から抽出する。
+- Protected domain:
+  - security / privacy / data loss / permission / auth / migration / billing / financial / token / secret。
+- Machine evidence:
+  - `Test:`, `Repro:`, `Trace:`, `Error:`, `Assertion:`, `Command:`, `failing test`, `deterministic` などの deterministic evidence token。
+- Disposition:
+  - `P0` / `P1`: `blocker`
+  - `P2` + protected domain + machine evidence: `promoted_blocker`
+  - `P2` / `P3`: `non_blocking_followup`
 
-## 既存実装 / 規約の理解
-- 参照した実装 / docs:
-  - ...
-- 現状理解:
-  - ...
-- 採用するパターン:
-  - ...
-- 採用しないもの:
-  - ...
-- 影響範囲:
-  - ...
+## Payload contract
+- `decision.blocker_policy`:
+  - `status`: `blocker_present`, `non_blocking_only`, or `none`
+  - `blocker_count`
+  - `non_blocking_count`
+  - `findings[]`
+  - `blocker_fingerprints[]`
+- `review.current.blocker_policy` mirrors the same policy payload.
+- `decision.status_reason` additions:
+  - `blocker_policy_validated_blocker`
+  - `blocker_policy_no_action`
 
-## 採用方針 / トレードオフ
-- 論点:
-  - ...
-- 選択肢:
-  - ...
-- 決定:
-  - ...
+## Decision behavior
+- Blocker present:
+  - `decision.status=human_gate`
+  - `recommended_next_action=address_review_feedback`
+- Non-blocking only:
+  - `decision.status=passed`
+  - `recommended_next_action=merge_prepared`
+- No priority token:
+  - existing fallback behavior remains.
 
-## 依存関係分析
-- module 依存:
-  - ...
-- class 依存（必要時）:
-  - ...
-- function 依存（必要時）:
-  - ...
-- file 依存:
-  - ...
-- 上流 / 前提:
-  - ...
-- 下流 / 依存先:
-  - ...
-- 実装起点:
-  - 依存の少ないもの / 先に固定すべき interface / 先に通すべき test を書く
-- 順序への影響:
-  - plan では upstream / prerequisite から順に step を組む
+## Stagnation support
+- This Issue records deterministic finding fingerprints in `blocker_policy.blocker_fingerprints`.
+- Wait / repair orchestration can use stable fingerprints to detect automation-stalled without treating loop count alone as risk acceptance.
+- Full operator-facing rollout of stagnation reporting is completed by I07.
 
-## モジュール依存図（Module Dependency Diagram）
-- タイトル:
-  - ...
-- 答える問い:
-  - どの module / class / file / function の依存方向を固定し、どこから実装を始めるか
-- 範囲:
-  - ...
-- 含めない詳細:
-  - 網羅的な call graph / 全 method / 全 import は描かない
-- 更新条件:
-  - 依存方向、責務境界、実装起点、変更対象 module が変わるとき
-- 図:
-  - 下の `plantuml` block を更新する
-
-### 図表（UML / 原則: モジュール依存 / パッケージ依存差分）
-```plantuml
-@startuml
-top to bottom direction
-' show module / class / file / function dependencies that affect implementation order
-' do not copy Initiative/Epic diagrams
-
-rectangle "対象module-a" as A
-rectangle "対象module-b" as B
-A --> B : depends_on
-@enduml
-```
-
-## ローカル図の差分（Local Diagram Delta / 必要時）
-- 変更する境界 / 責務 / 相互作用:
-  - N/A: 理由
-
-## インターフェース契約
-- API / function / protocol / data boundary:
-  - ...
-
-## シーケンス差分（Sequence Delta / 必要時）
-- 変更する相互作用:
-  - N/A: 理由
-- retry / transaction / external API / queue:
-  - ...
-- UML:
-  - N/A: 理由
-
-## ドメインモデル差分（Domain Model Delta / 必要時）
-- 親 model 参照:
-  - ...
-- aggregate / entity / value object 変更:
-  - N/A: 理由
-- domain event / policy / specification 変更:
-  - ...
-- 不変条件の変更:
-  - ...
-- UML:
-  - N/A: 理由
-
-## クラス / インターフェース詳細設計（必要時）
-- Class / Interface:
-  - ...
-- 責務:
-  - ...
-- 連携:
-  - ...
-- UML:
-  - N/A: 理由
-
-## ディレクトリ / ファイル変更計画
-```text
-.
-|-- src/
-|   |-- package/
-|   |   |-- new_module.py        # 追加: 目的; 依存: ...
-|   |   |-- existing_module.py   # 変更: 目的; 依存: ...
-|   |   `-- renamed_module.py    # 移動/rename 元: src/package/old_module.py; 目的
-|   `-- tests/
-|       `-- test_new_module.py   # 追加/変更: 目的; 依存: src/package/new_module.py
-|-- docs/
-|   `-- reference.md             # 読取のみ: 目的
-`-- legacy/
-    `-- obsolete_file.py         # 削除: 目的; 依存: 代替準備完了
-```
-
-## 要件 → 設計マッピング
-- AC-001 -> ...
-- EC-001 -> ...
-- constraint -> ...
-
-## テスト戦略
-- 単体:
-  - ...
-- 統合:
-  - ...
-- E2E / manual:
-  - ...
-- migration / rollback / feature flag if needed:
-  - ...
-
-## 要件 / 例外 -> 検証マッピング
-- AC-001 -> ...
-- EC-001 -> ...
-- constraint -> ...
-
-## リスク / 移行 / ロールバック（必要時）
-- ...
-
-## 未確定事項
-- Q-001:
-  - 質問:
-  - 選択肢:
-    - A:
-      - ...
-    - B:
-      - ...
-  - 推奨案:
-    - ...
-  - 影響範囲:
-    - ...
+## Compatibility
+- Existing review thread, changes requested, pending review, no findings, fallback issue comment, and CI classification contracts remain unchanged unless a priority-bearing Codex issue comment is in the current trigger boundary.
