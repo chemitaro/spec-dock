@@ -131,8 +131,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー
-- まだ実装未開始。現在の記録は issue planning / authoring handoff の証跡である。
-- 実装結果、step closure、worker evidence、final quality gate は `plan.md` の S01 / S02 / S03 / S90 / S99 実行時に追記する。
+- S01 / S02 / S03 / S90 は完了し、各 step closure / worker evidence / reviewer gate / commit gate を本 report に記録済みである。
+- S99 final quality gate は実行済みで、最終 validation と reviewer gate の結果を本 report に追記する。
 
 ## 実装記録（セッションログ）
 
@@ -214,6 +214,7 @@ spec-dock: ok (validate) nodes=148
 | ステップ | 委任不可 / 不可能理由 | ユーザー承認 / risk acceptance | 許可ファイル | 許可操作 | ロールバック計画 | 変更後検証 | レビューゲート | 利用不可 / 拒否 / host conflict / waiver 対応 |
 |---|---|---|---|---|---|---|---|---|
 | S01〜S03 | none | N/A | N/A | N/A | N/A | N/A | required per step | N/A |
+| S99 | final quality gate surfaced bounded integration fixes after delegated steps were already committed | user requested end-to-end epic execution; changes limited to reviewer/test/lint findings before final reviewers | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workflow.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/runbook_store.py`; provider/mirror issue-execution Skill; `tests/cli_runtime/test_workflow.py`; `tests/unit/infra/test_runbook_store.py` | move projection result contract out of concrete infra dependency; restore concise durable Skill markers; format/type-only test fixes; mirror sync | revert S99 diff and rerun S99 validation | `make lint`; `uv run pytest tests/unit`; `uv run pytest tests/cli_runtime`; `./spec-dock/scripts/spec-dock validate`; parity diff; `git diff --check` | final qa-reviewer / code-reviewer / spec-reviewer required | no waiver; direct fix is bounded final-gate repair |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ | ゲート名 | レビュアーロール | 鮮度 | 状態 | リスク受容 | 昇格 / 完了判断 | メモ |
@@ -317,7 +318,7 @@ uv run pytest tests/cli_runtime/test_runtime_shell_s11.py
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ | クロージャ状態 | コミット範囲 | コミットハッシュ / 最終台帳 | コミット後 clean 確認 | 差分なし根拠 | 差分なし確認済み契約 / ファイル | 差分なし diff-clean コマンド | 差分なし read-only 確認 |
 |---|---|---|---|---|---|---|---|---|
-| S01 | ready to commit | S01 runtime/tests/report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S01 | committed | S01 runtime/tests/report evidence | `7d7e0302` | clean before S02 | N/A | N/A | `git status --short` | no output before S02 |
 
 ### セッションログ（2026-06-24 S02）
 
@@ -399,7 +400,7 @@ Success: no issues found in 7 source files
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ | クロージャ状態 | コミット範囲 | コミットハッシュ / 最終台帳 | コミット後 clean 確認 | 差分なし根拠 | 差分なし確認済み契約 / ファイル | 差分なし diff-clean コマンド | 差分なし read-only 確認 |
 |---|---|---|---|---|---|---|---|---|
-| S02 | ready to commit | S02 runtime/tests/report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S02 | committed | S02 runtime/tests/report evidence | `3ea2f3ea` | clean before S03 | N/A | N/A | `git status --short` | no output before S03 |
 
 ### セッションログ（2026-06-24 S03）
 
@@ -499,25 +500,39 @@ All checks passed!
 |---|---|---|---|---|
 | S90 | mirror 同期後、active issue に `assurance.json` がないため `workflow next issue-execution` が `classification-required` を返した | Runbook の guidance に従い `assurance classify --stage requirement --format json` を実行し、`assurance verify --format json` が `ok=true` / `status=valid` を返すことを確認した | `authorized_profile=standard`, `lite_candidate=false`, `obligation_source=authorized_profile`; 再実行した `workflow next issue-execution` は `state=ready` | no; new runtime contract の dogfooding evidence として記録 |
 
+### S99 最終品質ゲート実行証跡（Final Quality Gate Evidence）
+| クロージャID | ステップ | 証跡 | 観測結果 | メモ |
+|---|---|---|---|---|
+| tc-007 | S99 | first `make lint` | failed, then fixed | Ruff format in workflow tests and Mypy typing in runbook store test were corrected |
+| tc-007 | S99 | first `uv run pytest tests/unit` | failed, then fixed | fixed kernel shrink removed durable issue-execution Skill markers expected by shipped-asset contract tests |
+| tc-007 | S99 | first `uv run pytest tests/cli_runtime` | failed, then fixed | application contract imported concrete infra `runbook_store`; moved projection result to application contract |
+| tc-007 | S99 | QA P2 follow-up for EC-003 | pass | unknown target CLI test now asserts current Runbook projection paths remain absent |
+| tc-007 | S99 | `make lint` | pass | Ruff check / format and Mypy pass |
+| tc-007 | S99 | `uv run pytest tests/unit` | pass; 792 passed | full unit suite after S99 fixes |
+| tc-007 | S99 | `uv run pytest tests/cli_runtime` | pass; 649 passed, 76 skipped | full CLI runtime suite after S99 fixes |
+| tc-007 | S99 | `./spec-dock/scripts/spec-dock validate` | pass; nodes=148 | SpecDock graph validation |
+| tc-007 | S99 | `diff -qr --exclude='__pycache__' src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime spec-dock/scripts/spec_dock_runtime`; relevant Skill diff | pass / no output | provider and dogfooding mirror remain aligned |
+| tc-007 | S99 | `git diff --check` | pass | whitespace diff clean |
+
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー | 範囲 | 統合テスト判断 | 証跡 | 結果 |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | pending | pending S99 | pending |
+| qa-reviewer | whole issue obligation coverage | no blocking missing tests; QA P2 EC-003 projection-untouched assertion addressed | final QA pass; `uv run pytest tests/cli_runtime/test_workflow.py::TestCliWorkflow::test_workflow_next_unknown_target_is_rejected -q` pass after follow-up | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー | 範囲 | 指摘 / 修正 | 再 review 回数 | 結果 |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | pending | 0 | pending |
+| code-reviewer | issue-wide integrated diff | no blocking findings; stale report note P2 addressed | 0 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー | 範囲 | 指摘 / 修正 | 再 review 回数 | 結果 |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | planning artifacts passed; implementation/docs alignment still pending S99 | 1 planning re-review | planning pass / S99 pending |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | initial final review failed on stale report ledger; stale implementation summary and S01/S02 commit gates corrected; final re-review passed with no findings | 1 planning re-review / 1 final re-review | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳 | 最終 commit 範囲 | コミット後の外部証跡送付先 | 結果 |
 |---|---|---|---|
-| pending S99 | pending | final response / Epic PR evidence | pending |
+| S99 final ledger complete | S99 reviewer-fix / test-follow-up / final report evidence | final response / Epic PR evidence | ready for final commit |
 
 ## 遭遇した問題と解決
 - 問題: Issue draft は projection write failure を warning として扱っていたが、parent Epic design は blocked としていた。
@@ -526,7 +541,7 @@ All checks passed!
   - 解決: `tc-s01-002` に `workflow status` と `workflow next issue-planning` の両方を明示した。
 
 ## 今後の推奨事項
-- 実装中に Runbook schema の field 追加が必要になった場合は、report の decision ledger と plan amendment trigger に従って処理する。
+- 後続 issue で Runbook schema の field 追加が必要になった場合は、report の decision ledger と plan amendment trigger に従って処理する。
 
 ## 省略/例外メモ
-- 実装 step の Red / Green / reviewer / commit evidence は未実施であり、execution phase で追記する。
+- S99 時点で未実施の implementation step はない。Final PR / Epic delivery evidence は全 issue 完了後の Epic-level PR に記録する。
