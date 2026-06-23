@@ -1186,14 +1186,13 @@ def _allocate_discussion_doc_filename(
         effective_sleep_fn(sleep_seconds)
         remaining_seconds -= sleep_seconds
         next_timestamp = _format_discussion_timestamp(now_iso_provider())
-        if next_timestamp > timestamp:
-            if _discussion_standard_slot_is_free(discussions_dir, next_timestamp):
-                return _allocate_discussion_doc_filename_for_timestamp(
-                    discussions_dir,
-                    timestamp=next_timestamp,
-                    doc_type=doc_type,
-                    slug=slug,
-                )
+        if next_timestamp > timestamp and _discussion_standard_slot_is_free(discussions_dir, next_timestamp):
+            return _allocate_discussion_doc_filename_for_timestamp(
+                discussions_dir,
+                timestamp=next_timestamp,
+                doc_type=doc_type,
+                slug=slug,
+            )
 
     return _allocate_discussion_doc_filename_for_timestamp(
         discussions_dir,
@@ -1392,9 +1391,8 @@ def _validate_pre_github_create_inputs(
 
     owner = (req.github_repo_owner or "").strip()
     repo = (req.github_repo_name or "").strip()
-    if owner or repo:
-        if not owner or not repo:
-            raise RuntimeError("github_repo_owner and github_repo_name must be provided together")
+    if (owner or repo) and (not owner or not repo):
+        raise RuntimeError("github_repo_owner and github_repo_name must be provided together")
 
 
 def _precheck_pre_github_create_parent(

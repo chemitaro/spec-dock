@@ -1779,16 +1779,16 @@ class TestCliWorktree(CliRuntimeHarness):
 
             regular_file = base / "target-file"
             regular_file.write_text("remove\n", encoding="utf-8")
-            with _patch_object(Path, "unlink", side_effect=OSError("denied")):
-                with pytest.raises(RuntimeError) as unlink_failed:
-                    fs_cli.remove_target(regular_file)
+            with _patch_object(Path, "unlink", side_effect=OSError("denied")), pytest.raises(RuntimeError) as unlink_failed:
+                fs_cli.remove_target(regular_file)
             assert "failed to remove target path" in str(unlink_failed.value)
 
             target_dir = base / "target-dir"
             target_dir.mkdir()
-            with _patch_object(fs_cli.shutil, "rmtree", side_effect=OSError("denied")):
-                with pytest.raises(RuntimeError) as rmtree_failed:
-                    fs_cli.remove_target(target_dir)
+            with _patch_object(fs_cli.shutil, "rmtree", side_effect=OSError("denied")), pytest.raises(
+                RuntimeError
+            ) as rmtree_failed:
+                fs_cli.remove_target(target_dir)
             assert "failed to remove directory tree" in str(rmtree_failed.value)
 
             if not hasattr(os, "mkfifo"):
@@ -1882,12 +1882,13 @@ class TestCliWorktree(CliRuntimeHarness):
                 filesystem_gateway=FakeFilesystemGateway(),
             )
 
-            with _patch_object(app_worktree, "_build_inventory", return_value=inventory):
-                with pytest.raises(app_contracts.WorktreeCommandError) as raised:
-                    app_worktree.worktree_remove(
-                        app_contracts.WorktreeRemoveRequest(target="repo-first", force=True),
-                        ports,
-                    )
+            with _patch_object(app_worktree, "_build_inventory", return_value=inventory), pytest.raises(
+                app_contracts.WorktreeCommandError
+            ) as raised:
+                app_worktree.worktree_remove(
+                    app_contracts.WorktreeRemoveRequest(target="repo-first", force=True),
+                    ports,
+                )
 
             assert raised.value.code == "ambiguous_target"
             assert len(raised.value.candidates) == 2

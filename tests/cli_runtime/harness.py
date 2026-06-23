@@ -1,3 +1,4 @@
+import contextlib
 from importlib.metadata import PackageNotFoundError, version
 import json
 import os
@@ -166,10 +167,8 @@ class CliRuntimeHarness:
         except OSError:
             return False
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 shutil.rmtree(tmp)
-            except Exception:
-                pass
 
     def _run_runtime(self, target: Path, args: list[str], *, env: dict[str, str] | None = None) -> None:
         script = target / "spec-dock" / "scripts" / "spec-dock"
@@ -467,10 +466,8 @@ class CliRuntimeHarness:
 
     def _write_text_force(self, path: Path, text: str) -> None:
         if path.exists():
-            try:
+            with contextlib.suppress(OSError):
                 path.chmod(path.stat().st_mode | 0o200)
-            except OSError:
-                pass
         path.write_text(text, encoding="utf-8")
 
     def _write_json_force(self, path: Path, data: object) -> None:
@@ -524,10 +521,7 @@ class CliRuntimeHarness:
             assert node_dir.name == node_id or node_dir.name.startswith(old_prefix), (
                 f"unexpected node dir name for {node_id}: {node_dir}"
             )
-            if node_dir.name == node_id:
-                new_name = local_id
-            else:
-                new_name = node_dir.name.replace(old_prefix, f"{local_id}-", 1)
+            new_name = local_id if node_dir.name == node_id else node_dir.name.replace(old_prefix, f"{local_id}-", 1)
             renames.append((node_dir, node_dir.with_name(new_name)))
 
         for meta_path in meta_paths:

@@ -1,5 +1,5 @@
 import ast
-from contextlib import contextmanager, redirect_stderr, redirect_stdout
+from contextlib import contextmanager, redirect_stderr, redirect_stdout, suppress
 from datetime import datetime, timedelta, timezone
 import importlib.util
 import io
@@ -356,10 +356,8 @@ class TestInitUpdate(CliRuntimeHarness):
             finally:
                 for cache_file in cache_files:
                     cache_file.unlink(missing_ok=True)
-                    try:
+                    with suppress(OSError):
                         cache_file.parent.rmdir()
-                    except OSError:
-                        pass
 
     def _assert_no_generated_python_caches(self, root: Path) -> None:
         copied = sorted(
@@ -4391,8 +4389,8 @@ class TestInitUpdate(CliRuntimeHarness):
         ):
             assert "N/A: 理由" in optional_issue_section
             assert "```plantuml" not in optional_issue_section
-        assert 1 == \
-            issue_design.count("```plantuml"), \
+        assert issue_design.count("```plantuml") == \
+            1, \
             "issue design scaffold should only ship the standard module dependency UML placeholder"
         assert "必要な場合だけ追加する" not in issue_design
         assert "## ディレクトリ / ファイル変更計画" in issue_design
@@ -10684,7 +10682,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     if term in text:
                         offenders.append(f"{path.relative_to(repo_root)}: {term}")
 
-        assert [] == offenders
+        assert offenders == []
 
     def test_bundled_skill_routing_contract(self) -> None:
         import spec_dock.cli as cli
@@ -10985,36 +10983,35 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             ("non_list_obsolete_exact_file_paths", "invalid managed_assets.obsolete_exact_file_paths"),
         )
         for case_name, expected_error in cases:
-            with _case(case_name=case_name):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    assert main(["init", str(target)]) == 0
-                    before = self._seed_managed_contract_guard_snapshot(target)
-                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            with _case(case_name=case_name), tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                before = self._seed_managed_contract_guard_snapshot(target)
+                malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
 
-                    if case_name == "missing_managed_assets":
-                        malformed_manifest.pop("managed_assets")
-                    elif case_name == "null_managed_assets":
-                        malformed_manifest["managed_assets"] = None
-                    elif case_name == "missing_obsolete_exact_file_paths":
-                        malformed_manifest["managed_assets"].pop("obsolete_exact_file_paths")
-                    elif case_name == "null_obsolete_exact_file_paths":
-                        malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = None
-                    elif case_name == "non_list_obsolete_exact_file_paths":
-                        malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = (
-                            ".codex/agents/spec-dock-codex-adapter.toml"
-                        )
-                    else:
-                        raise AssertionError(f"unknown case_name: {case_name}")
-
-                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
-                        target,
-                        malformed_manifest,
+                if case_name == "missing_managed_assets":
+                    malformed_manifest.pop("managed_assets")
+                elif case_name == "null_managed_assets":
+                    malformed_manifest["managed_assets"] = None
+                elif case_name == "missing_obsolete_exact_file_paths":
+                    malformed_manifest["managed_assets"].pop("obsolete_exact_file_paths")
+                elif case_name == "null_obsolete_exact_file_paths":
+                    malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = None
+                elif case_name == "non_list_obsolete_exact_file_paths":
+                    malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = (
+                        ".codex/agents/spec-dock-codex-adapter.toml"
                     )
+                else:
+                    raise AssertionError(f"unknown case_name: {case_name}")
 
-                    assert exit_code == 1
-                    assert expected_error in stderr
-                    self._assert_managed_contract_guard_unchanged(target, before)
+                exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                    target,
+                    malformed_manifest,
+                )
+
+                assert exit_code == 1
+                assert expected_error in stderr
+                self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_issue_70_update_rejects_current_obsolete_overlap_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -18465,14 +18462,13 @@ esac
             ("pending", "pending", "", "pending", "", "pending"),
         )
         for name, run_status, run_conclusion, job_status, job_conclusion, expected in cases:
-            with _case(name=name):
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    tmp_path = Path(tmp_dir)
-                    fake_bin = tmp_path / "bin"
-                    fake_bin.mkdir()
-                    fake_gh = fake_bin / "gh"
-                    fake_gh.write_text(
-                        f"""#!/usr/bin/env bash
+            with _case(name=name), tempfile.TemporaryDirectory() as tmp_dir:
+                tmp_path = Path(tmp_dir)
+                fake_bin = tmp_path / "bin"
+                fake_bin.mkdir()
+                fake_gh = fake_bin / "gh"
+                fake_gh.write_text(
+                    f"""#!/usr/bin/env bash
 case "$*" in
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
     cat <<'JSON'
@@ -18505,34 +18501,34 @@ JSON
     ;;
 esac
 """,
-                        encoding="utf-8",
-                    )
-                    fake_gh.chmod(0o755)
-                    env = {
-                        **os.environ,
-                        "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
-                    }
+                    encoding="utf-8",
+                )
+                fake_gh.chmod(0o755)
+                env = {
+                    **os.environ,
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                }
 
-                    result = subprocess.run(
-                        [
-                            str(script_path),
-                            "--repo",
-                            "owner/repo",
-                            "--pr",
-                            "13",
-                            "--head-sha",
-                            "a" * 40,
-                        ],
-                        env=env,
-                        capture_output=True,
-                        text=True,
-                        check=False,
-                    )
+                result = subprocess.run(
+                    [
+                        str(script_path),
+                        "--repo",
+                        "owner/repo",
+                        "--pr",
+                        "13",
+                        "--head-sha",
+                        "a" * 40,
+                    ],
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
 
-                    assert result.returncode == 0, result.stdout + result.stderr
-                    payload = json.loads(result.stdout)
-                    assert payload["ci"]["status"] == expected
-                    assert payload["ci"]["status"] != "passed"
+                assert result.returncode == 0, result.stdout + result.stderr
+                payload = json.loads(result.stdout)
+                assert payload["ci"]["status"] == expected
+                assert payload["ci"]["status"] != "passed"
 
     def test_issue_187_actions_primary_api_failure_is_blocking_unknown_and_redacted(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -19206,14 +19202,13 @@ esac
             / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
         )
 
-        with _case(name=case_name):
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                tmp_path = Path(tmp_dir)
-                fake_bin = tmp_path / "bin"
-                fake_bin.mkdir()
-                fake_gh = fake_bin / "gh"
-                fake_gh.write_text(
-                    f"""#!/usr/bin/env bash
+        with _case(name=case_name), tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
 case "$*" in
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
     cat <<'JSON'
@@ -19240,50 +19235,50 @@ JSON
     ;;
 esac
 """,
-                    encoding="utf-8",
-                )
-                fake_gh.chmod(0o755)
-                env = {
-                    **os.environ,
-                    "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "none"
+            assert payload["ci"]["status"] != "passed"
+            assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+            limitation = next(
+                item
+                for item in payload["limitations"]
+                if item.get("code") == "zero_checks_s03_non_success"
+            )
+            assert limitation["severity"] == "blocking"
+            assert not any(
+                item.get("capability")
+                in {
+                    "check_runs_read",
+                    "commit_statuses_read",
+                    "status_check_rollup_read",
                 }
-
-                result = subprocess.run(
-                    [
-                        str(script_path),
-                        "--repo",
-                        "owner/repo",
-                        "--pr",
-                        "13",
-                        "--head-sha",
-                        "a" * 40,
-                    ],
-                    env=env,
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-
-                assert result.returncode == 0, result.stdout + result.stderr
-                payload = json.loads(result.stdout)
-                assert payload["ci"]["status"] == "none"
-                assert payload["ci"]["status"] != "passed"
-                assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
-                limitation = next(
-                    item
-                    for item in payload["limitations"]
-                    if item.get("code") == "zero_checks_s03_non_success"
-                )
-                assert limitation["severity"] == "blocking"
-                assert not any(
-                    item.get("capability")
-                    in {
-                        "check_runs_read",
-                        "commit_statuses_read",
-                        "status_check_rollup_read",
-                    }
-                    for item in payload["limitations"]
-                )
+                for item in payload["limitations"]
+            )
 
     def test_issue_187_s202_zero_actions_runs_with_zero_external_evidence_stays_non_pass(
         self,
@@ -19379,14 +19374,13 @@ esac
             / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh"
         )
 
-        with _case(name=case_name):
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                tmp_path = Path(tmp_dir)
-                fake_bin = tmp_path / "bin"
-                fake_bin.mkdir()
-                fake_gh = fake_bin / "gh"
-                fake_gh.write_text(
-                    f"""#!/usr/bin/env bash
+        with _case(name=case_name), tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
 case "$*" in
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
     cat <<'JSON'
@@ -19414,40 +19408,40 @@ JSON
     ;;
 esac
 """,
-                    encoding="utf-8",
-                )
-                fake_gh.chmod(0o755)
-                env = {
-                    **os.environ,
-                    "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
-                }
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
 
-                result = subprocess.run(
-                    [
-                        str(script_path),
-                        "--repo",
-                        "owner/repo",
-                        "--pr",
-                        "13",
-                        "--head-sha",
-                        "a" * 40,
-                    ],
-                    env=env,
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
 
-                assert result.returncode == 0, result.stdout + result.stderr
-                payload = json.loads(result.stdout)
-                assert payload["ci"]["status"] == "none"
-                assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
-                assert payload["ci"]["check_runs"]["total"] == 0
-                assert payload["ci"]["commit_statuses"]["total"] == 0
-                assert "zero_checks_s03_non_success" in [
-                    item.get("code") for item in payload["limitations"]
-                ]
-                assert payload["ci"]["status"] != "passed"
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ci"]["status"] == "none"
+            assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
+            assert payload["ci"]["check_runs"]["total"] == 0
+            assert payload["ci"]["commit_statuses"]["total"] == 0
+            assert "zero_checks_s03_non_success" in [
+                item.get("code") for item in payload["limitations"]
+            ]
+            assert payload["ci"]["status"] != "passed"
 
     def test_issue_187_snapshot_propagates_actions_pass_with_informational_supplemental_permission(
         self,
@@ -21757,53 +21751,52 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             "created_at": "2999-01-01T00:00:00Z",
         }
         for review_status in ("approved", "passed"):
-            with _case(review_status=review_status):
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    result, _out_dir = self._issue_174_run_wait_fake_snapshots(
-                        Path(tmp_dir),
-                        [
-                            {
-                                "ci": "passed",
-                                "review": review_status,
-                                "status": "pending",
-                                "overall_status": "pending",
-                                "normalized_status": "pending",
-                                "recommended_next_action": "wait_or_resume",
-                                "decision": decision,
-                                "decision_fingerprint": "no-completion-s204-young-trigger",
-                                "codex_review": {
-                                    "lifecycle": {
-                                        "status": "none",
-                                        "completion_signal": "none",
-                                        "confidence": "medium",
-                                        "no_completion_evidence": evidence,
-                                    },
-                                    "collection_summary": {
-                                        "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
-                                    },
+            with _case(review_status=review_status), tempfile.TemporaryDirectory() as tmp_dir:
+                result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                    Path(tmp_dir),
+                    [
+                        {
+                            "ci": "passed",
+                            "review": review_status,
+                            "status": "pending",
+                            "overall_status": "pending",
+                            "normalized_status": "pending",
+                            "recommended_next_action": "wait_or_resume",
+                            "decision": decision,
+                            "decision_fingerprint": "no-completion-s204-young-trigger",
+                            "codex_review": {
+                                "lifecycle": {
+                                    "status": "none",
+                                    "completion_signal": "none",
+                                    "confidence": "medium",
+                                    "no_completion_evidence": evidence,
                                 },
-                                "observed_at": "2000-01-01T00:00:00Z",
-                                "trigger": trigger,
-                                "check_runs": {"total": 1, "success": 1},
-                                "threads": {"total": 0, "unresolved": 0, "items": []},
-                            }
-                        ],
-                        timeout_seconds=3,
-                        quiet_seconds=1,
-                        same_fingerprint_count=2,
-                        progress="stderr-summary",
-                        trigger_created_at=trigger["created_at"],
-                    )
+                                "collection_summary": {
+                                    "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
+                                },
+                            },
+                            "observed_at": "2000-01-01T00:00:00Z",
+                            "trigger": trigger,
+                            "check_runs": {"total": 1, "success": 1},
+                            "threads": {"total": 0, "unresolved": 0, "items": []},
+                        }
+                    ],
+                    timeout_seconds=3,
+                    quiet_seconds=1,
+                    same_fingerprint_count=2,
+                    progress="stderr-summary",
+                    trigger_created_at=trigger["created_at"],
+                )
 
-                    assert result.returncode == 0, result.stdout + result.stderr
-                    payload = json.loads(result.stdout)
-                    assert payload["normalized_status"] != "human_gate"
-                    assert payload["decision"]["status_reason"] != "review_completion_unknown"
-                    assert payload["recommended_next_action"] == "wait_or_resume"
-                    assert payload["observation_complete"] is False
-                    assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
-                    assert payload["wait"]["review_trigger_age_seconds"] < 300
-                    assert "phase=wait ci=passed review=pending_signal" in result.stderr
+                assert result.returncode == 0, result.stdout + result.stderr
+                payload = json.loads(result.stdout)
+                assert payload["normalized_status"] != "human_gate"
+                assert payload["decision"]["status_reason"] != "review_completion_unknown"
+                assert payload["recommended_next_action"] == "wait_or_resume"
+                assert payload["observation_complete"] is False
+                assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
+                assert payload["wait"]["review_trigger_age_seconds"] < 300
+                assert "phase=wait ci=passed review=pending_signal" in result.stderr
 
     def test_issue_187_s204_wait_does_not_promote_unknown_before_ci_passed_age(self) -> None:
         evidence = {
@@ -23892,14 +23885,13 @@ esac
         )
 
         for name, stderr_text, expected_code in cases:
-            with _case(name=name):
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    tmp_path = Path(tmp_dir)
-                    fake_bin = tmp_path / "bin"
-                    fake_bin.mkdir()
-                    fake_gh = fake_bin / "gh"
-                    fake_gh.write_text(
-                        f"""#!/usr/bin/env bash
+            with _case(name=name), tempfile.TemporaryDirectory() as tmp_dir:
+                tmp_path = Path(tmp_dir)
+                fake_bin = tmp_path / "bin"
+                fake_bin.mkdir()
+                fake_gh = fake_bin / "gh"
+                fake_gh.write_text(
+                    f"""#!/usr/bin/env bash
 case "$*" in
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
     printf '{stderr_text}\\n' >&2
@@ -23921,27 +23913,27 @@ JSON
     ;;
 esac
 """,
-                        encoding="utf-8",
-                    )
-                    fake_gh.chmod(0o755)
-                    env = {
-                        **os.environ,
-                        "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
-                    }
+                    encoding="utf-8",
+                )
+                fake_gh.chmod(0o755)
+                env = {
+                    **os.environ,
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                }
 
-                    result = subprocess.run(
-                        [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
-                        env=env,
-                        capture_output=True,
-                        text=True,
-                        check=False,
-                    )
+                result = subprocess.run(
+                    [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
 
-                    assert result.returncode == 0, result.stdout + result.stderr
-                    payload = json.loads(result.stdout)
-                    codes = [item.get("code") for item in payload["limitations"]]
-                    assert expected_code in codes
-                    assert "github_token_permission_denied" not in codes
+                assert result.returncode == 0, result.stdout + result.stderr
+                payload = json.loads(result.stdout)
+                codes = [item.get("code") for item in payload["limitations"]]
+                assert expected_code in codes
+                assert "github_token_permission_denied" not in codes
 
     def test_issue_187_s201_actions_checks_wrapper_validation_rejects_invalid_args_before_gh(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -23957,38 +23949,37 @@ esac
         )
 
         for name, args in cases:
-            with _case(name=name):
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    tmp_path = Path(tmp_dir)
-                    fake_bin = tmp_path / "bin"
-                    fake_bin.mkdir()
-                    gh_log = tmp_path / "gh-calls.log"
-                    fake_gh = fake_bin / "gh"
-                    fake_gh.write_text(
-                        f"""#!/usr/bin/env bash
+            with _case(name=name), tempfile.TemporaryDirectory() as tmp_dir:
+                tmp_path = Path(tmp_dir)
+                fake_bin = tmp_path / "bin"
+                fake_bin.mkdir()
+                gh_log = tmp_path / "gh-calls.log"
+                fake_gh = fake_bin / "gh"
+                fake_gh.write_text(
+                    f"""#!/usr/bin/env bash
 printf '%s\\n' "$*" >> {shlex.quote(str(gh_log))}
 exit 44
 """,
-                        encoding="utf-8",
-                    )
-                    fake_gh.chmod(0o755)
-                    env = {
-                        **os.environ,
-                        "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
-                    }
+                    encoding="utf-8",
+                )
+                fake_gh.chmod(0o755)
+                env = {
+                    **os.environ,
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                }
 
-                    result = subprocess.run(
-                        [str(script_path), *args],
-                        env=env,
-                        capture_output=True,
-                        text=True,
-                        check=False,
-                    )
+                result = subprocess.run(
+                    [str(script_path), *args],
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
 
-                    assert result.returncode == 64
-                    assert not gh_log.exists(), "invalid wrapper args must be rejected before gh is called"
-                    assert "github_token_permission_denied" not in result.stdout
-                    assert "github_token_permission_denied" not in result.stderr
+                assert result.returncode == 64
+                assert not gh_log.exists(), "invalid wrapper args must be rejected before gh is called"
+                assert "github_token_permission_denied" not in result.stdout
+                assert "github_token_permission_denied" not in result.stderr
 
     def test_issue_75_pr_observation_checks_collector_merges_paginated_json_objects(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -24264,29 +24255,28 @@ esac
         )
 
         for name, check_runs_json, statuses_json, expected_status, expected_limitations in cases:
-            with _case(name=name):
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    tmp_path = Path(tmp_dir)
-                    fake_bin = tmp_path / "bin"
-                    fake_bin.mkdir()
-                    fake_gh = fake_bin / "gh"
-                    actions_runs_json = (
-                        '{"total_count":0,"workflow_runs":[]}'
-                        if name in {"status-pending", "zero-checks"}
-                        else '{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}'
-                    )
-                    actions_jobs_case = (
-                        ""
-                        if name in {"status-pending", "zero-checks"}
-                        else """  "api repos/owner/repo/actions/runs/202/jobs --paginate")
+            with _case(name=name), tempfile.TemporaryDirectory() as tmp_dir:
+                tmp_path = Path(tmp_dir)
+                fake_bin = tmp_path / "bin"
+                fake_bin.mkdir()
+                fake_gh = fake_bin / "gh"
+                actions_runs_json = (
+                    '{"total_count":0,"workflow_runs":[]}'
+                    if name in {"status-pending", "zero-checks"}
+                    else '{"total_count":1,"workflow_runs":[{"id":202,"name":"CI","head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"completed","conclusion":"success"}]}'
+                )
+                actions_jobs_case = (
+                    ""
+                    if name in {"status-pending", "zero-checks"}
+                    else """  "api repos/owner/repo/actions/runs/202/jobs --paginate")
     cat <<'JSON'
 {"total_count":1,"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","steps":[]}]}
 JSON
     ;;
 """
-                    )
-                    fake_gh.write_text(
-                        f"""#!/usr/bin/env bash
+                )
+                fake_gh.write_text(
+                    f"""#!/usr/bin/env bash
 case "$*" in
   "api repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --paginate")
     cat <<'JSON'
@@ -24314,29 +24304,29 @@ JSON
     ;;
 esac
 """,
-                        encoding="utf-8",
-                    )
-                    fake_gh.chmod(0o755)
-                    env = {
-                        **os.environ,
-                        "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
-                    }
+                    encoding="utf-8",
+                )
+                fake_gh.chmod(0o755)
+                env = {
+                    **os.environ,
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                }
 
-                    result = subprocess.run(
-                        [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
-                        env=env,
-                        capture_output=True,
-                        text=True,
-                        check=False,
-                    )
+                result = subprocess.run(
+                    [str(script_path), "--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40],
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
 
-                    assert result.returncode == 0, result.stdout + result.stderr
-                    payload = json.loads(result.stdout)
-                    assert payload["ci"]["status"] == expected_status
-                    assert payload["ci"]["failures"] == []
-                    limitation_codes = [item["code"] for item in payload["limitations"]]
-                    for code in expected_limitations:
-                        assert code in limitation_codes
+                assert result.returncode == 0, result.stdout + result.stderr
+                payload = json.loads(result.stdout)
+                assert payload["ci"]["status"] == expected_status
+                assert payload["ci"]["failures"] == []
+                limitation_codes = [item["code"] for item in payload["limitations"]]
+                for code in expected_limitations:
+                    assert code in limitation_codes
 
     def test_issue_170_pr_observation_checks_collector_waits_on_unknown_merge_state(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -32864,22 +32854,21 @@ esac
 
     def test_update_rejects_non_boolean_native_shim_managed_values(self) -> None:
         for invalid_managed in ("true", 1):
-            with _case(invalid_managed=invalid_managed):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    assert main(["init", str(target)]) == 0
-                    before = self._seed_managed_contract_guard_snapshot(target)
-                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                    malformed_manifest["targets"]["codex"]["native_shim"]["managed"] = invalid_managed
+            with _case(invalid_managed=invalid_managed), tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                before = self._seed_managed_contract_guard_snapshot(target)
+                malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+                malformed_manifest["targets"]["codex"]["native_shim"]["managed"] = invalid_managed
 
-                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
-                        target,
-                        malformed_manifest,
-                    )
+                exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                    target,
+                    malformed_manifest,
+                )
 
-                    assert exit_code == 1
-                    assert "invalid native_shim.managed for host 'codex'" in stderr
-                    self._assert_managed_contract_guard_unchanged(target, before)
+                assert exit_code == 1
+                assert "invalid native_shim.managed for host 'codex'" in stderr
+                self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_manifest_missing_required_native_shim_host(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -32900,25 +32889,24 @@ esac
 
     def test_update_rejects_missing_or_null_required_host_native_shim_contract(self) -> None:
         for mode in ("missing", "null"):
-            with _case(mode=mode):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    assert main(["init", str(target)]) == 0
-                    before = self._seed_managed_contract_guard_snapshot(target)
-                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                    if mode == "missing":
-                        malformed_manifest["targets"]["codex"].pop("native_shim")
-                    else:
-                        malformed_manifest["targets"]["codex"]["native_shim"] = None
+            with _case(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                before = self._seed_managed_contract_guard_snapshot(target)
+                malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+                if mode == "missing":
+                    malformed_manifest["targets"]["codex"].pop("native_shim")
+                else:
+                    malformed_manifest["targets"]["codex"]["native_shim"] = None
 
-                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
-                        target,
-                        malformed_manifest,
-                    )
+                exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                    target,
+                    malformed_manifest,
+                )
 
-                    assert exit_code == 1
-                    assert "missing required native_shim contract for host 'codex'" in stderr
-                    self._assert_managed_contract_guard_unchanged(target, before)
+                assert exit_code == 1
+                assert "missing required native_shim contract for host 'codex'" in stderr
+                self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_required_host_native_shim_managed_disabled(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -33002,30 +32990,29 @@ esac
 
     def test_update_preflight_rejects_missing_or_non_directory_later_managed_asset_before_mutation(self) -> None:
         for mode in ("missing", "non_directory"):
-            with _case(mode=mode):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    assert main(["init", str(target)]) == 0
-                    before = self._seed_managed_contract_guard_snapshot(target)
+            with _case(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                before = self._seed_managed_contract_guard_snapshot(target)
 
-                    def _mutate_assets(patched_assets_root: Path, *, mode=mode) -> None:
-                        scripts_dir = patched_assets_root / "spec_dock" / "scripts"
-                        shutil.rmtree(scripts_dir)
-                        if mode == "non_directory":
-                            scripts_dir.write_text("invalid scaffold asset directory replacement\n", encoding="utf-8")
+                def _mutate_assets(patched_assets_root: Path, *, mode=mode) -> None:
+                    scripts_dir = patched_assets_root / "spec_dock" / "scripts"
+                    shutil.rmtree(scripts_dir)
+                    if mode == "non_directory":
+                        scripts_dir.write_text("invalid scaffold asset directory replacement\n", encoding="utf-8")
 
-                    exit_code, stderr = self._run_command_with_assets_override(
-                        "update",
-                        target,
-                        _mutate_assets,
-                    )
+                exit_code, stderr = self._run_command_with_assets_override(
+                    "update",
+                    target,
+                    _mutate_assets,
+                )
 
-                    assert exit_code == 1
-                    if mode == "missing":
-                        assert "Missing asset directory" in stderr
-                    else:
-                        assert "Invalid asset directory" in stderr
-                    self._assert_managed_contract_guard_unchanged(target, before)
+                assert exit_code == 1
+                if mode == "missing":
+                    assert "Missing asset directory" in stderr
+                else:
+                    assert "Invalid asset directory" in stderr
+                self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_required_host_entry_file_drift_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -33061,37 +33048,36 @@ esac
             ),
         )
         for case_name, expected_error in cases:
-            with _case(case_name=case_name):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    assert main(["init", str(target)]) == 0
-                    before = self._seed_managed_contract_guard_snapshot(target)
-                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                    native_shim = malformed_manifest["targets"]["codex"]["native_shim"]
+            with _case(case_name=case_name), tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                before = self._seed_managed_contract_guard_snapshot(target)
+                malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+                native_shim = malformed_manifest["targets"]["codex"]["native_shim"]
 
-                    if case_name == "owner_missing":
-                        native_shim.pop("owner")
-                    elif case_name == "owner_non_string":
-                        native_shim["owner"] = 1
-                    elif case_name == "owner_drift":
-                        native_shim["owner"] = "external-owner"
-                    elif case_name == "delegates_missing":
-                        native_shim.pop("delegates_to")
-                    elif case_name == "delegates_non_string":
-                        native_shim["delegates_to"] = 1
-                    elif case_name == "delegates_drift":
-                        native_shim["delegates_to"] = ".agents/skills/spec-dock-copilot-adapter/SKILL.md"
-                    else:
-                        raise AssertionError(f"unknown case_name: {case_name}")
+                if case_name == "owner_missing":
+                    native_shim.pop("owner")
+                elif case_name == "owner_non_string":
+                    native_shim["owner"] = 1
+                elif case_name == "owner_drift":
+                    native_shim["owner"] = "external-owner"
+                elif case_name == "delegates_missing":
+                    native_shim.pop("delegates_to")
+                elif case_name == "delegates_non_string":
+                    native_shim["delegates_to"] = 1
+                elif case_name == "delegates_drift":
+                    native_shim["delegates_to"] = ".agents/skills/spec-dock-copilot-adapter/SKILL.md"
+                else:
+                    raise AssertionError(f"unknown case_name: {case_name}")
 
-                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
-                        target,
-                        malformed_manifest,
-                    )
+                exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                    target,
+                    malformed_manifest,
+                )
 
-                    assert exit_code == 1
-                    assert expected_error in stderr
-                    self._assert_managed_contract_guard_unchanged(target, before)
+                assert exit_code == 1
+                assert expected_error in stderr
+                self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_non_mapping_host_target_entries(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -33112,24 +33098,23 @@ esac
 
     def test_update_rejects_current_dir_obsolete_exact_file_paths(self) -> None:
         for invalid_obsolete_path in (".", "./"):
-            with _case(invalid_obsolete_path=invalid_obsolete_path):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    assert main(["init", str(target)]) == 0
-                    before = self._seed_managed_contract_guard_snapshot(target)
-                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                    malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
-                        invalid_obsolete_path,
-                    ]
+            with _case(invalid_obsolete_path=invalid_obsolete_path), tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                before = self._seed_managed_contract_guard_snapshot(target)
+                malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+                malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
+                    invalid_obsolete_path,
+                ]
 
-                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
-                        target,
-                        malformed_manifest,
-                    )
+                exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                    target,
+                    malformed_manifest,
+                )
 
-                    assert exit_code == 1
-                    assert "invalid managed_assets.obsolete_exact_file_paths item" in stderr
-                    self._assert_managed_contract_guard_unchanged(target, before)
+                assert exit_code == 1
+                assert "invalid managed_assets.obsolete_exact_file_paths item" in stderr
+                self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_directory_like_obsolete_exact_file_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -33171,8 +33156,35 @@ esac
             ),
         )
         for field, invalid_path, expected_error in cases:
-            with _case(field=field, invalid_path=invalid_path):
-                with tempfile.TemporaryDirectory() as tmp:
+            with _case(field=field, invalid_path=invalid_path), tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                before = self._seed_managed_contract_guard_snapshot(target)
+                malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+                if field == "obsolete_exact_file_paths":
+                    malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [invalid_path]
+                else:
+                    malformed_manifest["targets"]["codex"]["native_shim"][field] = invalid_path
+
+                exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                    target,
+                    malformed_manifest,
+                )
+
+                assert exit_code == 1
+                assert expected_error in stderr
+                self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_windows_drive_relative_native_shim_paths(self) -> None:
+        cases: tuple[tuple[str, str], ...] = (
+            ("source_of_truth_asset", "invalid native_shim.source_of_truth_asset path for host 'codex'"),
+            ("target_file", "invalid native_shim.target_file path for host 'codex'"),
+            ("obsolete_exact_file_paths", "invalid managed_assets.obsolete_exact_file_paths item"),
+        )
+        invalid_paths = ("C:foo", "/foo", "\\foo")
+        for field, expected_error in cases:
+            for invalid_path in invalid_paths:
+                with _case(field=field, invalid_path=invalid_path), tempfile.TemporaryDirectory() as tmp:
                     target = Path(tmp)
                     assert main(["init", str(target)]) == 0
                     before = self._seed_managed_contract_guard_snapshot(target)
@@ -33191,74 +33203,43 @@ esac
                     assert expected_error in stderr
                     self._assert_managed_contract_guard_unchanged(target, before)
 
-    def test_update_rejects_windows_drive_relative_native_shim_paths(self) -> None:
-        cases: tuple[tuple[str, str], ...] = (
-            ("source_of_truth_asset", "invalid native_shim.source_of_truth_asset path for host 'codex'"),
-            ("target_file", "invalid native_shim.target_file path for host 'codex'"),
-            ("obsolete_exact_file_paths", "invalid managed_assets.obsolete_exact_file_paths item"),
-        )
-        invalid_paths = ("C:foo", "/foo", "\\foo")
-        for field, expected_error in cases:
-            for invalid_path in invalid_paths:
-                with _case(field=field, invalid_path=invalid_path):
-                    with tempfile.TemporaryDirectory() as tmp:
-                        target = Path(tmp)
-                        assert main(["init", str(target)]) == 0
-                        before = self._seed_managed_contract_guard_snapshot(target)
-                        malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                        if field == "obsolete_exact_file_paths":
-                            malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [invalid_path]
-                        else:
-                            malformed_manifest["targets"]["codex"]["native_shim"][field] = invalid_path
-
-                        exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
-                            target,
-                            malformed_manifest,
-                        )
-
-                        assert exit_code == 1
-                        assert expected_error in stderr
-                        self._assert_managed_contract_guard_unchanged(target, before)
-
     def test_update_rejects_native_shim_target_file_outside_managed_prefixes(self) -> None:
         for invalid_target in ("README.md", ".agents/skills/spec-dock-codex-adapter/SKILL.md"):
-            with _case(invalid_target=invalid_target):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    assert main(["init", str(target)]) == 0
-                    before = self._seed_managed_contract_guard_snapshot(target)
-                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                    malformed_manifest["targets"]["codex"]["native_shim"]["target_file"] = invalid_target
+            with _case(invalid_target=invalid_target), tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                before = self._seed_managed_contract_guard_snapshot(target)
+                malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+                malformed_manifest["targets"]["codex"]["native_shim"]["target_file"] = invalid_target
 
-                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
-                        target,
-                        malformed_manifest,
-                    )
+                exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                    target,
+                    malformed_manifest,
+                )
 
-                    assert exit_code == 1
-                    assert "invalid native_shim.target_file path for host 'codex'" in stderr
-                    self._assert_managed_contract_guard_unchanged(target, before)
+                assert exit_code == 1
+                assert "invalid native_shim.target_file path for host 'codex'" in stderr
+                self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_obsolete_exact_file_paths_outside_managed_prefixes(self) -> None:
         for invalid_obsolete in ("README.md", ".agents/spec-dock-codex-adapter/SKILL.md"):
-            with _case(invalid_obsolete=invalid_obsolete):
-                with tempfile.TemporaryDirectory() as tmp:
-                    target = Path(tmp)
-                    assert main(["init", str(target)]) == 0
-                    before = self._seed_managed_contract_guard_snapshot(target)
-                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                    malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
-                        invalid_obsolete
-                    ]
+            with _case(invalid_obsolete=invalid_obsolete), tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                before = self._seed_managed_contract_guard_snapshot(target)
+                malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+                malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
+                    invalid_obsolete
+                ]
 
-                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
-                        target,
-                        malformed_manifest,
-                    )
+                exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                    target,
+                    malformed_manifest,
+                )
 
-                    assert exit_code == 1
-                    assert "invalid managed_assets.obsolete_exact_file_paths item" in stderr
-                    self._assert_managed_contract_guard_unchanged(target, before)
+                assert exit_code == 1
+                assert "invalid managed_assets.obsolete_exact_file_paths item" in stderr
+                self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_reference_sync_doc_matches_bundled_asset(self) -> None:
         import spec_dock.cli as cli

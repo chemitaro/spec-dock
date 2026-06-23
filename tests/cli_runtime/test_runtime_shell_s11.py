@@ -97,16 +97,14 @@ class TestRuntimeShellS11:
         parser = cli_parser.build_parser(registry)
 
         stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
-            with pytest.raises(SystemExit) as cm:
-                parser.parse_args(["new", "--help"])
+        with contextlib.redirect_stdout(stdout), pytest.raises(SystemExit) as cm:
+            parser.parse_args(["new", "--help"])
         assert cm.value.code == 0
         assert "Create a new initiative" in stdout.getvalue()
 
         stderr = io.StringIO()
-        with contextlib.redirect_stderr(stderr):
-            with pytest.raises(SystemExit) as cm:
-                parser.parse_args(["active", "set", "--initiative", "1"])
+        with contextlib.redirect_stderr(stderr), pytest.raises(SystemExit) as cm:
+            parser.parse_args(["active", "set", "--initiative", "1"])
         assert cm.value.code == 2
         error_text = stderr.getvalue()
         assert "unrecognized arguments: --initiative" in error_text
@@ -620,8 +618,8 @@ class TestRuntimeShellS11:
         assert "application_sync(req, ports)" in bootstrap_source
         assert "application_check_deps(req, ports)" in bootstrap_source
         assert "application_validate_tree(req, ports)" in bootstrap_source
-        assert "from ..application.create_node import create_initiative as application_create_initiative" in bootstrap_source
-        assert "from ..application.import_node import import_issue as application_import_issue" in bootstrap_source
+        assert "create_initiative as application_create_initiative" in bootstrap_source
+        assert "import_issue as application_import_issue" in bootstrap_source
         assert "from .. import app as runtime_app" not in bootstrap_source
         assert "runtime_app._application_" not in bootstrap_source
         assert "runtime_app._new_" not in bootstrap_source

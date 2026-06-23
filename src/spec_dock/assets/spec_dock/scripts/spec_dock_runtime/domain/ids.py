@@ -106,7 +106,7 @@ def normalize_id_input(value: str, *, prefix: str, field: str) -> str:
 
 def find_existing_id_by_num(nodes: dict[str, Any], *, prefix: str, num: int, local: bool) -> str | None:
     """Find an existing node id by `(prefix, num, local)` in `nodes`."""
-    for node_id in nodes.keys():
+    for node_id in nodes:
         try:
             p, is_local, n = parse_id(str(node_id))
         except RuntimeError:

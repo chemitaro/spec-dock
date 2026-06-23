@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 import shutil
 
@@ -53,10 +54,8 @@ def copy_scaffolded_tree(src_dir: Path, dest_dir: Path, replacements: dict[str, 
         else:
             target_path.write_text(render_text(text, replacements), encoding="utf-8")
             if text.startswith("#!"):
-                try:
+                with contextlib.suppress(OSError):
                     target_path.chmod(target_path.stat().st_mode | 0o111)
-                except OSError:
-                    pass
         created_paths.append(target_path)
     return created_paths
 

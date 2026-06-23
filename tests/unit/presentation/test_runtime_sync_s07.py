@@ -4033,9 +4033,8 @@ class TestRuntimeSyncS07:
         help_by_command: dict[tuple[str, ...], str] = {}
         for argv in help_commands:
             stdout = io.StringIO()
-            with contextlib.redirect_stdout(stdout):
-                with pytest.raises(SystemExit) as cm:
-                    parser.parse_args(argv)
+            with contextlib.redirect_stdout(stdout), pytest.raises(SystemExit) as cm:
+                parser.parse_args(argv)
             assert cm.value.code == 0
             help_by_command[tuple(argv)] = stdout.getvalue()
 

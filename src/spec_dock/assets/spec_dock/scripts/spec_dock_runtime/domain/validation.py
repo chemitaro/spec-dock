@@ -334,7 +334,7 @@ def _validate_graph_or_raise(
     enforce_github_mandatory_linkage: bool = True,
 ) -> None:
     numeric_ids: dict[tuple[str, bool, int], list[str]] = {}
-    for node_id in graph.nodes_by_id.keys():
+    for node_id in graph.nodes_by_id:
         prefix, is_local, num = parse_id(str(node_id))
         numeric_ids.setdefault((prefix, is_local, num), []).append(str(node_id))
 

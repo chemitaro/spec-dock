@@ -423,9 +423,7 @@ def _is_forbidden_root_path(rel_path: Path) -> bool:
         return False
     if parts[0] in FORBIDDEN_ROOT_NAMES:
         return True
-    if parts[0].startswith(".env"):
-        return True
-    return False
+    return bool(parts[0].startswith(".env"))
 
 
 def _is_direct_child_of(path: Path, parent: Path) -> bool:

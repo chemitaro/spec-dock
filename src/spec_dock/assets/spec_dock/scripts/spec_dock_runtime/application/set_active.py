@@ -84,7 +84,7 @@ def _to_repo_relative_specdock_path(path: Path, *, repo_root: Path) -> str:
 
 
 def _find_existing_id_by_num(graph: SpecGraph, *, prefix: str, num: int, local: bool) -> str | None:
-    for node_id in graph.nodes_by_id.keys():
+    for node_id in graph.nodes_by_id:
         try:
             parsed_prefix, is_local, parsed_num = parse_id(str(node_id))
         except RuntimeError:

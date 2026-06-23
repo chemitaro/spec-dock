@@ -693,9 +693,10 @@ class TestRuntimeNewS08:
                 current_repo_slug="example/repo",
             )
 
-            with _patch_object(app_create_node.os, "symlink", side_effect=OSError("operation not permitted")):
-                with pytest.raises(RuntimeError, match='Symlink creation preflight failed'):
-                    app_create_node.execute_create_plan(plan, ports)
+            with _patch_object(app_create_node.os, "symlink", side_effect=OSError("operation not permitted")), pytest.raises(
+                RuntimeError, match='Symlink creation preflight failed'
+            ):
+                app_create_node.execute_create_plan(plan, ports)
 
             assert events == []
             assert not (plan.dest_dir / 'README.md').exists()
@@ -1375,18 +1376,17 @@ class TestRuntimeNewS08:
                     app_create_node._ENV_CREATE_LOCK_STALE_SECONDS: "3600",
                 },
                 clear=False,
-            ):
-                with pytest.raises(RuntimeError, match='GitHub issue was created: #703') as raised:
-                    app_create_node.create_issue(
-                        app_contracts.CreateNodeRequest(
-                            title="Refresh token",
-                            slug=None,
-                            parent_id="epic-local-00001",
-                            github_mode="create",
-                            github_issue_number=None,
-                        ),
-                        ports,
-                    )
+            ), pytest.raises(RuntimeError, match='GitHub issue was created: #703') as raised:
+                app_create_node.create_issue(
+                    app_contracts.CreateNodeRequest(
+                        title="Refresh token",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
 
             message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
@@ -1445,18 +1445,19 @@ class TestRuntimeNewS08:
                 issue_gateway=issue_gateway,
             )
 
-            with _patch_object(app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated write failure")):
-                with pytest.raises(RuntimeError, match='GitHub issue was created: #704') as raised:
-                    app_create_node.create_issue(
-                        app_contracts.CreateNodeRequest(
-                            title="Refresh token",
-                            slug=None,
-                            parent_id="epic-local-00001",
-                            github_mode="create",
-                            github_issue_number=None,
-                        ),
-                        ports,
-                    )
+            with _patch_object(
+                app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated write failure")
+            ), pytest.raises(RuntimeError, match='GitHub issue was created: #704') as raised:
+                app_create_node.create_issue(
+                    app_contracts.CreateNodeRequest(
+                        title="Refresh token",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
 
             message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
@@ -1682,17 +1683,16 @@ class TestRuntimeNewS08:
                     phase="scaffold_copied",
                     message="simulated import partial write",
                 ),
-            ):
-                with pytest.raises(RuntimeError, match='Outcome: import_local_write_fail') as raised:
-                    app_import_node.import_issue(
-                        app_contracts.ImportNodeRequest(
-                            issue_number=714,
-                            title="Refresh token",
-                            slug=None,
-                            parent_id="epic-local-00001",
-                        ),
-                        ports,
-                    )
+            ), pytest.raises(RuntimeError, match='Outcome: import_local_write_fail') as raised:
+                app_import_node.import_issue(
+                    app_contracts.ImportNodeRequest(
+                        issue_number=714,
+                        title="Refresh token",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                    ),
+                    ports,
+                )
 
             message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
@@ -1753,21 +1753,20 @@ class TestRuntimeNewS08:
                     raise OSError("permission denied")
                 return original_unlink(path_self, *args, **kwargs)
 
-            with _patch_object(app_create_node.Path, "unlink", new=_unlink_with_failure):
-                with pytest.raises(
-                    RuntimeError,
-                    match="Outcome: post_github_local_write_success_cleanup_fail",
-                ) as raised:
-                    app_create_node.create_issue(
-                        app_contracts.CreateNodeRequest(
-                            title="Refresh token",
-                            slug=None,
-                            parent_id="epic-local-00001",
-                            github_mode="create",
-                            github_issue_number=None,
-                        ),
-                        ports,
-                    )
+            with _patch_object(app_create_node.Path, "unlink", new=_unlink_with_failure), pytest.raises(
+                RuntimeError,
+                match="Outcome: post_github_local_write_success_cleanup_fail",
+            ) as raised:
+                app_create_node.create_issue(
+                    app_contracts.CreateNodeRequest(
+                        title="Refresh token",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
 
             message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
@@ -1832,19 +1831,21 @@ class TestRuntimeNewS08:
                     raise OSError("permission denied")
                 return original_unlink(path_self, *args, **kwargs)
 
-            with _patch_object(app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated write failure")):
-                with _patch_object(app_create_node.Path, "unlink", new=_unlink_with_failure):
-                    with pytest.raises(RuntimeError, match='Outcome: post_github_body_and_cleanup_fail') as raised:
-                        app_create_node.create_issue(
-                            app_contracts.CreateNodeRequest(
-                                title="Refresh token",
-                                slug=None,
-                                parent_id="epic-local-00001",
-                                github_mode="create",
-                                github_issue_number=None,
-                            ),
-                            ports,
-                        )
+            with _patch_object(
+                app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated write failure")
+            ), _patch_object(app_create_node.Path, "unlink", new=_unlink_with_failure), pytest.raises(
+                RuntimeError, match='Outcome: post_github_body_and_cleanup_fail'
+            ) as raised:
+                app_create_node.create_issue(
+                    app_contracts.CreateNodeRequest(
+                        title="Refresh token",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
 
             message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
@@ -1906,18 +1907,17 @@ class TestRuntimeNewS08:
                 app_create_node,
                 "_post_write_duplicate_guard",
                 side_effect=RuntimeError("simulated post-write duplicate guard failure"),
-            ):
-                with pytest.raises(RuntimeError, match='Outcome: post_github_local_write_fail') as raised:
-                    app_create_node.create_issue(
-                        app_contracts.CreateNodeRequest(
-                            title="Refresh token",
-                            slug=None,
-                            parent_id="epic-local-00001",
-                            github_mode="create",
-                            github_issue_number=None,
-                        ),
-                        ports,
-                    )
+            ), pytest.raises(RuntimeError, match='Outcome: post_github_local_write_fail') as raised:
+                app_create_node.create_issue(
+                    app_contracts.CreateNodeRequest(
+                        title="Refresh token",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
 
             message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
@@ -1987,19 +1987,19 @@ class TestRuntimeNewS08:
                 app_create_node,
                 "_post_write_duplicate_guard",
                 side_effect=RuntimeError("simulated post-write duplicate guard failure"),
-            ):
-                with _patch_object(app_create_node.Path, "unlink", new=_unlink_with_failure):
-                    with pytest.raises(RuntimeError, match='Outcome: post_github_body_and_cleanup_fail') as raised:
-                        app_create_node.create_issue(
-                            app_contracts.CreateNodeRequest(
-                                title="Refresh token",
-                                slug=None,
-                                parent_id="epic-local-00001",
-                                github_mode="create",
-                                github_issue_number=None,
-                            ),
-                            ports,
-                        )
+            ), _patch_object(app_create_node.Path, "unlink", new=_unlink_with_failure), pytest.raises(
+                RuntimeError, match='Outcome: post_github_body_and_cleanup_fail'
+            ) as raised:
+                app_create_node.create_issue(
+                    app_contracts.CreateNodeRequest(
+                        title="Refresh token",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
 
             message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
@@ -2833,9 +2833,10 @@ class TestRuntimeNewS08:
                         issue_gateway=issue_gateway,
                     )
 
-                    with _patch_object(app_create_node.os, "symlink", side_effect=OSError("operation not permitted")):
-                        with pytest.raises(RuntimeError, match='Symlink creation preflight failed') as raised:
-                            create_fn(app_contracts.CreateNodeRequest(**request_kwargs), ports)
+                    with _patch_object(
+                        app_create_node.os, "symlink", side_effect=OSError("operation not permitted")
+                    ), pytest.raises(RuntimeError, match='Symlink creation preflight failed') as raised:
+                        create_fn(app_contracts.CreateNodeRequest(**request_kwargs), ports)
 
                     assert 'Outcome: pre_github_fail' in str(raised.value)
                     assert 'GitHub issue was created:' not in str(raised.value)
@@ -2932,18 +2933,17 @@ class TestRuntimeNewS08:
                     app_create_node._ENV_CREATE_LOCK_STALE_SECONDS: "3600",
                 },
                 clear=False,
-            ):
-                with pytest.raises(RuntimeError, match='GitHub issue was created: #706') as raised:
-                    app_create_node.create_initiative(
-                        app_contracts.CreateNodeRequest(
-                            title="Auth platform",
-                            slug=None,
-                            parent_id=None,
-                            github_mode="create",
-                            github_issue_number=None,
-                        ),
-                        ports,
-                    )
+            ), pytest.raises(RuntimeError, match='GitHub issue was created: #706') as raised:
+                app_create_node.create_initiative(
+                    app_contracts.CreateNodeRequest(
+                        title="Auth platform",
+                        slug=None,
+                        parent_id=None,
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
 
             message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
@@ -2983,18 +2983,19 @@ class TestRuntimeNewS08:
                 issue_gateway=issue_gateway,
             )
 
-            with _patch_object(app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated epic write failure")):
-                with pytest.raises(RuntimeError, match='GitHub issue was created: #707') as raised:
-                    app_create_node.create_epic(
-                        app_contracts.CreateNodeRequest(
-                            title="JWT auth",
-                            slug=None,
-                            parent_id="init-local-00001",
-                            github_mode="create",
-                            github_issue_number=None,
-                        ),
-                        ports,
-                    )
+            with _patch_object(
+                app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated epic write failure")
+            ), pytest.raises(RuntimeError, match='GitHub issue was created: #707') as raised:
+                app_create_node.create_epic(
+                    app_contracts.CreateNodeRequest(
+                        title="JWT auth",
+                        slug=None,
+                        parent_id="init-local-00001",
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
 
             message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
@@ -3030,18 +3031,17 @@ class TestRuntimeNewS08:
                     app_create_node._ENV_CREATE_LOCK_STALE_SECONDS: "3600",
                 },
                 clear=False,
-            ):
-                with pytest.raises(RuntimeError, match='create lock acquisition failed') as raised:
-                    app_create_node.create_initiative(
-                        app_contracts.CreateNodeRequest(
-                            title="Auth platform",
-                            slug=None,
-                            parent_id=None,
-                            github_mode="link_existing",
-                            github_issue_number=701,
-                        ),
-                        ports,
-                    )
+            ), pytest.raises(RuntimeError, match='create lock acquisition failed') as raised:
+                app_create_node.create_initiative(
+                    app_contracts.CreateNodeRequest(
+                        title="Auth platform",
+                        slug=None,
+                        parent_id=None,
+                        github_mode="link_existing",
+                        github_issue_number=701,
+                    ),
+                    ports,
+                )
 
             message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
@@ -3076,18 +3076,17 @@ class TestRuntimeNewS08:
                     app_create_node._ENV_CREATE_LOCK_STALE_SECONDS: "0",
                 },
                 clear=False,
-            ):
-                with pytest.raises(RuntimeError, match='create lock acquisition failed') as raised:
-                    app_create_node.create_initiative(
-                        app_contracts.CreateNodeRequest(
-                            title="Auth platform",
-                            slug=None,
-                            parent_id=None,
-                            github_mode="link_existing",
-                            github_issue_number=701,
-                        ),
-                        ports,
-                    )
+            ), pytest.raises(RuntimeError, match='create lock acquisition failed') as raised:
+                app_create_node.create_initiative(
+                    app_contracts.CreateNodeRequest(
+                        title="Auth platform",
+                        slug=None,
+                        parent_id=None,
+                        github_mode="link_existing",
+                        github_issue_number=701,
+                    ),
+                    ports,
+                )
 
             message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
@@ -3109,9 +3108,10 @@ class TestRuntimeNewS08:
                 os.close(fd)
                 raise OSError("disk full")
 
-            with _patch_object(app_create_node, "_write_create_lock_payload", side_effect=_raise_write_failure):
-                with pytest.raises(RuntimeError, match='create lock metadata write failed') as raised:
-                    app_create_node._acquire_create_lock(specdock_dir)
+            with _patch_object(
+                app_create_node, "_write_create_lock_payload", side_effect=_raise_write_failure
+            ), pytest.raises(RuntimeError, match='create lock metadata write failed') as raised:
+                app_create_node._acquire_create_lock(specdock_dir)
 
             message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
@@ -3135,18 +3135,19 @@ class TestRuntimeNewS08:
                     raise OSError("permission denied")
                 return original_unlink(path_self, missing_ok=missing_ok)
 
-            with _patch_object(app_create_node.Path, "unlink", new=_unlink_with_failure):
-                with pytest.raises(RuntimeError, match='create lock release failed') as raised:
-                    app_create_node.create_initiative(
-                        app_contracts.CreateNodeRequest(
-                            title="Auth platform",
-                            slug=None,
-                            parent_id=None,
-                            github_mode="link_existing",
-                            github_issue_number=701,
-                        ),
-                        ports,
-                    )
+            with _patch_object(app_create_node.Path, "unlink", new=_unlink_with_failure), pytest.raises(
+                RuntimeError, match='create lock release failed'
+            ) as raised:
+                app_create_node.create_initiative(
+                    app_contracts.CreateNodeRequest(
+                        title="Auth platform",
+                        slug=None,
+                        parent_id=None,
+                        github_mode="link_existing",
+                        github_issue_number=701,
+                    ),
+                    ports,
+                )
 
             message = str(raised.value)
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)

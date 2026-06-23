@@ -907,7 +907,7 @@ uv run pytest tests/cli_runtime/test_runtime_deps_s04.py tests/cli_runtime/test_
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S07 | ready to commit | S07 implementation files plus `report.md` S07 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S07 | committed | S07 implementation files plus `report.md` S07 evidence | `f1d64301` `build(static-analysis): Ruff C4違反を解消する` | `git status --short` -> clean; post-commit `make lint` -> pass; `spec-dock validate` -> pass | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `pyproject.toml` - Ruff `C4` selection.
@@ -916,10 +916,118 @@ uv run pytest tests/cli_runtime/test_runtime_deps_s04.py tests/cli_runtime/test_
 - `report.md` - S06 commit correction and S07 observed evidence.
 
 #### コミット
-- pending S07 step commit.
+- `f1d64301` `build(static-analysis): Ruff C4違反を解消する`
 
 #### メモ
 - No material implementation decisions beyond the approved plan.
+
+---
+
+### セッションログ（2026-06-23 HH:MM - HH:MM）
+
+#### 対象
+- Step: S08 — Ruff SIM
+- AC/EC: AC-005, AC-009, EC-002
+
+#### 実施内容
+- `dev-coder` に S08 を委任し、許可 path を `pyproject.toml`, `src/spec_dock/**/*.py`, `tests/**/*.py` に限定した。
+- `pyproject.toml` の Ruff `select` を `["F", "E", "I", "UP", "B", "C4", "SIM"]` に変更した。
+- `SIM108` は plan 上の ignore として global `ignore = ["E501", "SIM108"]` に追加した。
+- explicit CLI `--select SIM108` で再選択される Ruff 0.15.18 の挙動に対応するため、S03 `E501` と同様に target-scoped per-file ignore にも `SIM108` を追加した。
+- 初回 inventory は total 84 件だった。
+  - `SIM117`: 41 件。代表: `tests/unit/infra/test_init_update.py`
+  - `SIM105`: 14 件。代表: `src/spec_dock/cli.py`
+  - `SIM118`: 11 件。代表: runtime `app.py`
+  - `SIM108`: 5 件。代表: `domain/deps.py`
+  - `SIM102`: 4 件。代表: `application/check_deps.py`
+  - `SIM114`: 4 件。代表: `pr_review_snapshot.py`
+  - `SIM103`: 3 件。代表: `domain/delegated_authoring.py`
+  - `SIM300`: 2 件。代表: provider/runtime files and tests
+- `contextlib.suppress`, `.keys()` removal, nested `with` merge, branch merge, simple bool cleanup, `SIM300` cleanup を適用した。
+- 読みやすさを下げる `SIM108` 三項式化は戻し、ignore で扱う方針に合わせた。
+
+#### 実行コマンド / 結果
+```bash
+uv run ruff check --select F,E,I,UP,B,C4,SIM src/spec_dock tests
+# All checks passed!
+
+uv run ruff check --select SIM108 src/spec_dock tests
+# All checks passed!
+
+git diff --check
+# pass
+
+uv run pytest tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::test_app_no_command_wrapper_regression
+# 1 passed
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S08 | Red / inventory | `tc-s08-001`: `SIM` violation inventory と `SIM108` ignore rationale | total 84; `SIM108` 5 は ignore 対象として扱う | worker command: `uv run ruff check --select F,E,I,UP,B,C4,SIM --statistics src/spec_dock tests` | pass | `SIM108` は config と per-file ignore で扱う |
+| S08 | Green | `F,E,I,UP,B,C4,SIM` violation 0 件 | `uv run ruff check --select F,E,I,UP,B,C4,SIM src/spec_dock tests` -> All checks passed | command | pass | 親側でも再実行済み |
+| S08 | Regression | CLI wrapper regression を維持 | focused pytest 1 passed | command | pass | broader run の failures は accepted closure evidence にしない |
+| S08 | Refactor | guardrail satisfied / no unrelated refactor | S09 以降 rule は追加せず、`spec-dock/` direct target なし | diff inspection + code-reviewer | pass | broad suppression なし; planned `SIM108` ignore only |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S08 | `SIM108` は global ignore だけでは explicit `--select SIM108` で再選択され得る | dev-coder / orchestrator | target-scoped per-file ignore に `SIM108` を追加 | tc-s08-001 | no | `uv run ruff check --select SIM108 src/spec_dock tests` -> pass |
+| S08 | `SIM108` の三項式化は読みやすさを下げる可能性がある | orchestrator | `domain/deps.py` の三項式化を if/else に戻した | tc-s08-001 | no | code-reviewer pass |
+| S08 | broader focused pytest で out-of-scope dogfooding mirror drift / generated cache 起因 failure が出た | dev-coder | accepted closure evidence から除外し、S90/S99 で扱う | tc-s90-001 | no | worker report; no direct `spec-dock/` edit in S08 |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S08 | tc-s08-001 | Ruff `SIM` と `SIM108` ignore を追加し violation を 0 件にする | `pyproject.toml` select includes `SIM`; global and target-scoped `SIM108` ignore; `uv run ruff check --select F,E,I,UP,B,C4,SIM src/spec_dock tests` -> pass | pass | readability-degrading SIM108 rewrite reverted |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s08-001 / tc-s08-case-001 | S08 | yes | command | initial `SIM` inventory total 84 | `uv run ruff check --select F,E,I,UP,B,C4,SIM src/spec_dock tests` | pass | `SIM` violation 0 件 |
+| tc-s08-001 / tc-s08-ignore-001 | S08 | yes | command + inspection | `SIM108` should be ignored without readability-degrading rewrite | `uv run ruff check --select SIM108 src/spec_dock tests`; diff inspection | pass | per-file ignore supports explicit select |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s08-001 | S08 | `uv run ruff check --select F,E,I,UP,B,C4,SIM src/spec_dock tests`; `uv run ruff check --select SIM108 src/spec_dock tests`; `git diff --check`; focused pytest; code-reviewer pass | pass | AC-005/009 S08 closed pending commit |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s08-001 | tc-s08-case-001 | tc-s08-001 | planned closure unchanged; concrete command case recorded | no | yes |
+| added | tc-s08-001 | tc-s08-ignore-001 | tc-s08-001 | `SIM108` ignore requires explicit evidence under CLI select | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S08 | delegated | simplify lint rule adoption step | dev-coder | Ruff `SIM` enablement and simplify fixes | requirement/design/plan S08 | `pyproject.toml`; `src/spec_dock/**/*.py`; `tests/**/*.py` | report edits; commit; S09+ rules; dogfooding `spec-dock/`; broad suppression beyond planned `SIM108` | `uv run ruff check --select F,E,I,UP,B,C4,SIM src/spec_dock tests`; `SIM108` ignore evidence; focused pytest as needed | readability-degrading rewrite; direct dogfooding edit needed | changed files; inventory; command results; SIM108 rationale | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S08 | dev-coder | Ruff `SIM` enabled; simplify fixes applied; `SIM108` global/per-file ignore added; readability-degrading SIM108 rewrite reverted | `pyproject.toml`; allowed `src/spec_dock/**/*.py`; allowed `tests/**/*.py` touched by SIM fixes | `uv run ruff check --select F,E,I,UP,B,C4,SIM src/spec_dock tests` -> pass; `uv run ruff check --select SIM108 src/spec_dock tests` -> pass; focused pytest -> 1 passed | pass: code-reviewer `019ef302-40ae-7602-b5b8-d2c0c6fadd01` | broader pytest failures from out-of-scope dogfooding mirror drift remain for S90/S99 | accepted for S08 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S08 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit | pass: code-reviewer `019ef302-40ae-7602-b5b8-d2c0c6fadd01`; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S08 | ready to commit | S08 implementation files plus `report.md` S08 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `pyproject.toml` - Ruff `SIM` selection and `SIM108` ignore.
+- `src/spec_dock/**/*.py`, `tests/**/*.py` - SIM cleanup within S08 scope.
+- `report.md` - S07 commit correction and S08 observed evidence.
+
+#### コミット
+- pending S08 step commit.
+
+#### メモ
+- `SIM108` stays intentionally ignored because the project values readability over forced ternary expressions in these contexts.
 
 ---
 
