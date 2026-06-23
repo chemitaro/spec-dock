@@ -657,7 +657,6 @@ class TestDelegatedAuthoringRuntimeDomain:
             assert not result.ok
             assert "reason=discussion_symlink" in "\n".join(result.details)
 
-
     def test_diff_guard_rejects_forbidden_paths(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:

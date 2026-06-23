@@ -14,6 +14,8 @@ from tests.cli_runtime.harness import (
 
 import pytest
 import re
+
+
 class TestCliNew(CliRuntimeHarness):
     def _init_origin_repo(self, target: Path, *, owner: str = "example", repo: str = "repo") -> None:
         if shutil.which("git") is None:

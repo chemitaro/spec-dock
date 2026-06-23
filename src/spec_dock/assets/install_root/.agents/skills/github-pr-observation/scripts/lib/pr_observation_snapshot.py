@@ -581,7 +581,6 @@ def load_metadata(path: Path) -> tuple[dict[str, object], str]:
     return payload, head if isinstance(head, str) else ""
 
 
-
 def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
     checks_script = script_dir / "lib" / "fetch_pr_checks_snapshot.sh"
     review_script = script_dir / "lib" / "fetch_pr_review_snapshot.sh"

@@ -861,6 +861,7 @@ thread_counts = {
     "items": threads,
 }
 
+
 def is_current_status_signal(item):
     if item.get("kind") == "issue_comment" and item.get("trigger_command"):
         return False
@@ -949,6 +950,7 @@ actionable_unresolved_thread_ids = list(selected_unresolved_thread_ids)
 for thread_id in carryover_unresolved_thread_ids:
     if thread_id not in actionable_unresolved_thread_ids:
         actionable_unresolved_thread_ids.append(thread_id)
+
 
 def selected_review_item(item):
     raw_body = str(item.get("_selected_full_body", "") or "")
@@ -1270,6 +1272,7 @@ elif any(item.get("state") == "unknown" for item in status_signals):
     status = "unknown"
 else:
     status = "none"
+
 
 def fingerprint_signal(item):
     return {

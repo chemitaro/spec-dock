@@ -9,6 +9,8 @@ from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
 import pytest
+
+
 def _runtime_modules():
     runtime_scripts_dir = (
         Path(__file__).resolve().parents[2]

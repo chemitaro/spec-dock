@@ -9,8 +9,6 @@ from pathlib import Path
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
-
-
 import contextlib
 import pytest
 _MISSING = object()
@@ -46,6 +44,8 @@ def _patch_object(target, name, replacement=_MISSING, *, side_effect=_MISSING, r
         yield replacement
     finally:
         setattr(target, name, original)
+
+
 class TestCliWorktree(CliRuntimeHarness):
     def _worktree_env(self, root: Path | str) -> dict[str, str]:
         return {"SPEC_DOCK_WORKTREE_ROOT": str(root)}

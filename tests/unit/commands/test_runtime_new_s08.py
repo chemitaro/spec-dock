@@ -57,6 +57,7 @@ def _runtime_modules_import():
 def _quoted_runtime_entrypoint(specdock_dir: Path) -> str:
     return shlex.quote(str((specdock_dir / "scripts" / "spec-dock").resolve()))
 
+
 @contextmanager
 def _case_label(**labels):
     try:
@@ -100,7 +101,6 @@ def _patch_dict(mapping, values, *, clear=False):
                 mapping.pop(key, None)
             else:
                 mapping[key] = value
-
 
 
 def _record(

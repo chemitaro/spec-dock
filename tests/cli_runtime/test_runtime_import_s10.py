@@ -583,8 +583,8 @@ class TestRuntimeImportS10:
 
             assert result.node.parent_id == "epic-local-00001"
             assert captured["child_kind"] == "issue"
-            assert captured["active"].initiative_id == None
-            assert captured["active"].epic_id == None
+            assert captured["active"].initiative_id is None
+            assert captured["active"].epic_id is None
             assert captured["active"].issue_id == "iss-local-00009"
             active_manifest_calls = [name for name, _path in ports.active_state_store.calls]
             # S01H contract: 1st read is a cheap precheck, 2nd read is lock-side final parent re-resolution.

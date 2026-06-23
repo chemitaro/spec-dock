@@ -9,6 +9,8 @@ from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
 import pytest
+
+
 class TestDelegatedAuthoringCli(CliRuntimeHarness):
     def teardown_method(self) -> None:
         for tmp in getattr(self, "_tmpdir", []):

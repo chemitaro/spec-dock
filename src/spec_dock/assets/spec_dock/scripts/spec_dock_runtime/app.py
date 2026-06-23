@@ -266,6 +266,7 @@ def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
         )
     return nodes
 
+
 def _write_meta(
     dest_dir: Path,
     *,

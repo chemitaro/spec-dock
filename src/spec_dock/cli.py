@@ -2108,6 +2108,7 @@ def _install_skill(target_root: Path, *, plan: _ManagedSkillInstallPlan | None =
             plan=install_plan,
         )
 
+
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse CLI arguments (installer commands only)."""
     parser = argparse.ArgumentParser(prog="spec-dock")
