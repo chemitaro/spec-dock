@@ -445,7 +445,7 @@ def load_issue_depends_on_map(specdock_dir: Path, graph: SpecGraph) -> DepsTopol
                     issue_depends_on[src_issue_id].add(dep_issue_id)
 
     compiled = {
-        issue_id: sorted(list(issue_depends_on.get(issue_id, set())), key=deps_node_sort_key)
+        issue_id: sorted(issue_depends_on.get(issue_id, set()), key=deps_node_sort_key)
         for issue_id in issue_ids
     }
     return DepsTopologyLoadResult(

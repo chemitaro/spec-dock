@@ -37,7 +37,7 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["F", "E", "I", "UP", "B"]
+select = ["F", "E", "I", "UP", "B", "C4"]
 extend-ignore = ["E501"]
 
 [tool.ruff.lint.isort]
