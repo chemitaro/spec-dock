@@ -68,6 +68,7 @@ TRIGGER_PR="$pr" \
 TRIGGER_HEAD_SHA="$head_sha" \
 python3 - <<'PY'
 import json
+import base64
 import hashlib
 import os
 import subprocess
@@ -80,6 +81,8 @@ pr = os.environ["TRIGGER_PR"]
 expected_head_sha = os.environ["TRIGGER_HEAD_SHA"]
 endpoint = f"repos/{owner}/{name}/issues/{pr}/comments"
 fixed_body = "@codex review"
+policy_path = ".github/codex/review-policy.md"
+policy_max_bytes = 32768
 
 
 def now_iso():
@@ -205,9 +208,18 @@ def base_payload():
         "expected_head_sha": expected_head_sha,
         "current_head_sha": None,
         "final_head_sha": None,
+        "base_sha": None,
         "head_matches_expected": False,
         "success": False,
         "overall_status": "unknown",
+        "review_policy": {
+            "source": "fixed_default",
+            "path": policy_path,
+            "base_sha": None,
+            "hash": None,
+            "bytes": 0,
+            "status": "not_requested",
+        },
         "trigger": {
             "action": "none",
             "body": fixed_body,
@@ -231,11 +243,13 @@ def base_payload():
 payload = base_payload()
 
 metadata_exit, metadata_stdout, metadata_stderr = run_gh(
-    ["pr", "view", pr, "--repo", repo, "--json", "headRefOid,url,state,isDraft,number"]
+    ["pr", "view", pr, "--repo", repo, "--json", "headRefOid,baseRefOid,url,state,isDraft,number"]
 )
 metadata = load_json(metadata_stdout, {}) if metadata_exit == 0 else {}
 current_head_sha = metadata.get("headRefOid") or ""
+base_sha = metadata.get("baseRefOid") or ""
 payload["current_head_sha"] = current_head_sha or None
+payload["base_sha"] = base_sha or None
 payload["head_matches_expected"] = head_matches(current_head_sha, expected_head_sha)
 
 if metadata_exit != 0 or not current_head_sha:
@@ -291,6 +305,90 @@ if pr_state and pr_state != "OPEN":
     )
     emit(payload)
     raise SystemExit(0)
+
+if not base_sha:
+    payload["review_policy"].update({"source": "fixed_default", "status": "base_sha_missing"})
+    payload["limitations"].append(
+        limitation(
+            "review_policy_base_sha_missing",
+            "PR metadata did not include baseRefOid; fixed default trigger body will be used",
+            severity="warning",
+        )
+    )
+elif base_sha:
+    policy_endpoint = f"repos/{owner}/{name}/contents/{policy_path}?ref={base_sha}"
+    policy_exit, policy_stdout, policy_stderr = run_gh(["api", policy_endpoint])
+    policy_payload = load_json(policy_stdout, {}) if policy_exit == 0 else {}
+    encoded_content = policy_payload.get("content") if isinstance(policy_payload, dict) else None
+    if policy_exit == 0 and isinstance(encoded_content, str):
+        try:
+            policy_text = base64.b64decode("".join(encoded_content.split()), validate=False).decode("utf-8")
+        except Exception:
+            policy_text = ""
+        policy_bytes = policy_text.encode("utf-8") if policy_text else b""
+        if policy_bytes and len(policy_bytes) <= policy_max_bytes:
+            policy_hash = hashlib.sha256(policy_bytes).hexdigest()
+            fixed_body = "\n".join(
+                (
+                    "@codex review",
+                    "",
+                    "Trusted review policy:",
+                    f"- source: {repo}@{base_sha}:{policy_path}",
+                    f"- policy_sha256: {policy_hash}",
+                    f"- reviewed_head_sha: {expected_head_sha}",
+                    "",
+                    policy_text.rstrip(),
+                )
+            )
+            payload["review_policy"].update(
+                {
+                    "source": "base_sha",
+                    "base_sha": base_sha,
+                    "hash": policy_hash,
+                    "bytes": len(policy_bytes),
+                    "status": "loaded",
+                }
+            )
+            payload["trigger"]["body"] = fixed_body
+        elif policy_bytes:
+            payload["review_policy"].update(
+                {
+                    "source": "base_sha",
+                    "base_sha": base_sha,
+                    "bytes": len(policy_bytes),
+                    "status": "too_large",
+                }
+            )
+            payload["limitations"].append(
+                limitation(
+                    "review_policy_too_large",
+                    "trusted base review policy exceeds the maximum accepted size; fixed default trigger body will be used",
+                    api=policy_endpoint,
+                    max_bytes=policy_max_bytes,
+                    severity="warning",
+                )
+            )
+        else:
+            payload["review_policy"].update({"source": "base_sha", "base_sha": base_sha, "status": "invalid"})
+            payload["limitations"].append(
+                limitation(
+                    "review_policy_invalid",
+                    "trusted base review policy could not be decoded as non-empty UTF-8 text",
+                    api=policy_endpoint,
+                )
+            )
+    else:
+        payload["review_policy"].update({"source": "base_sha", "base_sha": base_sha, "status": "missing"})
+        payload["limitations"].append(
+            limitation(
+                "review_policy_missing",
+                "trusted base review policy could not be loaded; fixed default trigger body will be used",
+                api=policy_endpoint,
+                gh_exit=policy_exit,
+                gh_stderr=policy_stderr.strip(),
+                severity="warning",
+            )
+        )
 
 before_exit, before_stdout, before_stderr = run_gh(["api", endpoint, "--paginate"])
 before_comments_raw = load_json(before_stdout, None) if before_exit == 0 else None
@@ -400,7 +498,7 @@ else:
         )
 
 final_exit, final_stdout, final_stderr = run_gh(
-    ["pr", "view", pr, "--repo", repo, "--json", "headRefOid,url,state,isDraft,number"]
+    ["pr", "view", pr, "--repo", repo, "--json", "headRefOid,baseRefOid,url,state,isDraft,number"]
 )
 final_metadata = load_json(final_stdout, {}) if final_exit == 0 else {}
 final_head_sha = final_metadata.get("headRefOid") or ""
