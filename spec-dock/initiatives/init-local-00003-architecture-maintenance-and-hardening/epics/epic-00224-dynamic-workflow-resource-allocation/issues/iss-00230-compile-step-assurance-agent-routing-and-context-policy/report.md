@@ -335,6 +335,41 @@ uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/appli
 |---|---|---|---|---|---|---|---|
 | S02 | dev-coder | workflow next に step assurance / context packet projection / invocation event を接続 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`; `application/workflow.py`; `domain/runbook.py`; `infra/context_policy_store.py`; `infra/context_packet_store.py`; `presentation/workflow.py`; `tests/cli_runtime/test_workflow_context_routing.py`; `tests/unit/infra/test_context_packet_store.py` | `uv run pytest ...` -> pass; `uv run ruff check ...` -> pass | pending | dogfooding mirror sync は S90 範囲 | accepted |
 
+### セッションログ（2026-06-23 S90）
+
+#### 対象
+- Step: S90
+- AC/EC: docs impact / mirror parity
+- 計画上の出典:
+  - `plan.md` ドキュメント影響の解消ステップ S90
+  - closure id: tc-230-009
+
+#### 実施内容
+- Provider runtime / assurance policy source を dogfooding mirror へ同期した。
+- Local dogfooding runtime で `workflow next issue-execution --format json` が `step_assurance` / `context_packets` を返すことを確認した。
+
+#### 実行コマンド / 結果
+```bash
+diff -ru -x __pycache__ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime spec-dock/scripts/spec_dock_runtime
+# pass
+
+diff -ru src/spec_dock/assets/spec_dock/system/assurance spec-dock/system/assurance
+# pass
+
+./spec-dock/scripts/spec-dock workflow next issue-execution --format json
+# state=ready; step_assurance and context_packets present
+```
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ | クロージャID | 計画上の close 条件 | 観測した証跡 | 結果 | メモ |
+|---|---|---|---|---|---|
+| S90 | tc-230-009 | provider source と dogfooding mirror が一致する | runtime parity diff pass; assurance policy parity diff pass | pass | local projection 出力も確認 |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ | ゲート名 | レビュアーロール | 鮮度 | 状態 | リスク受容 | 昇格 / 完了判断 | メモ |
+|---|---|---|---|---|---|---|---|
+| S90 | docs impact reviewer | spec-reviewer | fresh | passed | no | proceed to commit | P2 final gate placeholders deferred to S99 |
+
 ### セッションログ（2026-06-23 HH:MM - HH:MM）
 
 #### 対象
@@ -351,7 +386,9 @@ uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/appli
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| provider runtime mirror | yes | orchestrator | `diff -ru -x __pycache__ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime spec-dock/scripts/spec_dock_runtime` -> pass | pass |
+| assurance policy mirror | yes | orchestrator | `diff -ru src/spec_dock/assets/spec_dock/system/assurance spec-dock/system/assurance` -> pass | pass |
+| README / workflow / skill / migration notes | no | N/A | S02 changes add runtime projection and shipped policy source without changing human-facing workflow text beyond existing issue docs; no separate persistent docs update required for this slice. | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
