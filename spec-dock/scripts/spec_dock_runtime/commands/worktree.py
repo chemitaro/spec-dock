@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from ..application.contracts import (
+from spec_dock_runtime.application.contracts import (
     UseCases,
     WorktreeCommandError,
     WorktreeCreateRequest,
@@ -11,7 +11,8 @@ from ..application.contracts import (
     WorktreeRemoveRequest,
     WorktreeShowRequest,
 )
-from ..presentation.cli_text import (
+from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.presentation.cli_text import (
     render_worktree_create_text,
     render_worktree_error_json,
     render_worktree_error_text,
@@ -22,7 +23,9 @@ from ..presentation.cli_text import (
     render_worktree_show_json,
     render_worktree_show_text,
 )
-from .contracts import CommandArgs, CommandOutcome, CommandSpec
+
+if TYPE_CHECKING:
+    import argparse
 
 
 @dataclass(frozen=True)
@@ -109,12 +112,12 @@ def _worktree_list_args(ns: argparse.Namespace) -> CommandArgs:
 
 
 def _worktree_show_args(ns: argparse.Namespace) -> CommandArgs:
-    return WorktreeShowArgs(target=str(getattr(ns, "target")), json=bool(getattr(ns, "json", False)))
+    return WorktreeShowArgs(target=str(ns.target), json=bool(getattr(ns, "json", False)))
 
 
 def _worktree_remove_args(ns: argparse.Namespace) -> CommandArgs:
     return WorktreeRemoveArgs(
-        target=str(getattr(ns, "target")),
+        target=str(ns.target),
         force=bool(getattr(ns, "force", False)),
         json=bool(getattr(ns, "json", False)),
     )

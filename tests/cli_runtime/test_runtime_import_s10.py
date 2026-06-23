@@ -1,31 +1,26 @@
 import json
 import os
+from pathlib import Path
 import sys
 import tempfile
-from pathlib import Path
 
 import pytest
+
 _UNSET = object()
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime import app as runtime_app
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import import_node as app_import_node
-        from spec_dock_runtime.application import ports as app_ports
+        from spec_dock_runtime.application import (
+            contracts as app_contracts,
+            import_node as app_import_node,
+            ports as app_ports,
+        )
         from spec_dock_runtime.domain import models as domain_models
-        from spec_dock_runtime.infra import artifact_writer as infra_artifact_writer
-        from spec_dock_runtime.infra import contracts as infra_contracts
+        from spec_dock_runtime.infra import artifact_writer as infra_artifact_writer, contracts as infra_contracts
         from spec_dock_runtime.presentation import cli_text as presentation_cli_text
     finally:
         sys.path.pop(0)
@@ -294,10 +289,7 @@ class TestRuntimeImportS10:
             encoding="utf-8",
         )
         (issue_dir / "README.md").write_text(
-            (
-                "issue=<ISS_ID> epic=<EPIC_ID> init=<INIT_ID> "
-                "title=<ISS_TITLE> github=<GITHUB_ISSUE_NUMBER_OR_URL>\n"
-            ),
+            ("issue=<ISS_ID> epic=<EPIC_ID> init=<INIT_ID> title=<ISS_TITLE> github=<GITHUB_ISSUE_NUMBER_OR_URL>\n"),
             encoding="utf-8",
         )
         for template_dir, token in (
@@ -410,10 +402,7 @@ class TestRuntimeImportS10:
         git_gateway=_UNSET,
     ):
         self._materialize_required_artifacts(store.load())
-        if git_gateway is _UNSET:
-            resolved_git_gateway = _StubGitGateway("current/repo")
-        else:
-            resolved_git_gateway = git_gateway
+        resolved_git_gateway = _StubGitGateway("current/repo") if git_gateway is _UNSET else git_gateway
         return app_ports.Ports(
             node_reader=_StubNodeReader(store),
             node_repo=_StubNodeRepo(store, events=events),
@@ -445,11 +434,7 @@ class TestRuntimeImportS10:
             lock_path = specdock_dir / "system" / ".runtime" / "create.lock"
             lock_path.parent.mkdir(parents=True, exist_ok=True)
             lock_payload = (
-                "token=holder\n"
-                "pid=222\n"
-                "user=lock-holder\n"
-                "created_unix=9999999999\n"
-                "created_iso=2099-01-01T00:00:00Z\n"
+                "token=holder\npid=222\nuser=lock-holder\ncreated_unix=9999999999\ncreated_iso=2099-01-01T00:00:00Z\n"
             )
             lock_path.write_text(lock_payload, encoding="utf-8")
 
@@ -583,8 +568,8 @@ class TestRuntimeImportS10:
 
             assert result.node.parent_id == "epic-local-00001"
             assert captured["child_kind"] == "issue"
-            assert captured["active"].initiative_id == None
-            assert captured["active"].epic_id == None
+            assert captured["active"].initiative_id is None
+            assert captured["active"].epic_id is None
             assert captured["active"].issue_id == "iss-local-00009"
             active_manifest_calls = [name for name, _path in ports.active_state_store.calls]
             # S01H contract: 1st read is a cheap precheck, 2nd read is lock-side final parent re-resolution.
@@ -667,7 +652,10 @@ class TestRuntimeImportS10:
             assert result.node.parent_id == "epic-local-00002"
             assert result.node.initiative_id == "init-local-00001"
             assert "/epic-local-00002-session-rotation/" in result.node.path.as_posix()
-            assert [name for name, _path in ports.active_state_store.calls] == ["load_active_manifest_no_migrate", "load_active_manifest_no_migrate"]
+            assert [name for name, _path in ports.active_state_store.calls] == [
+                "load_active_manifest_no_migrate",
+                "load_active_manifest_no_migrate",
+            ]
             assert ports.issue_gateway.view_calls == [(str(specdock_dir.parent), 777, "current/repo")]
 
     def test_duplicate_guard_no_write_regression(self) -> None:
@@ -920,7 +908,7 @@ class TestRuntimeImportS10:
             ),
         )
 
-        for kind, runner, request in cases:
+        for _kind, runner, request in cases:
             with tempfile.TemporaryDirectory() as tmp:
                 specdock_dir = Path(tmp) / "spec-dock"
                 self._prepare_templates(specdock_dir)
@@ -1005,7 +993,7 @@ class TestRuntimeImportS10:
             ),
         )
 
-        for kind, runner, request, expected_node_id in cases:
+        for _kind, runner, request, expected_node_id in cases:
             with tempfile.TemporaryDirectory() as tmp:
                 specdock_dir = Path(tmp) / "spec-dock"
                 self._prepare_templates(specdock_dir)
@@ -1032,27 +1020,23 @@ class TestRuntimeImportS10:
 
                 def _unexpected_resolve_parent_for_import(*args, **kwargs):
                     del args, kwargs
-                    raise AssertionError(
-                        "resolve_parent_for_import should not run before numeric repo-scope guard"
-                    )
+                    raise AssertionError("resolve_parent_for_import should not run before numeric repo-scope guard")
 
                 def _unexpected_build_linked_create_request(*args, **kwargs):
                     del args, kwargs
-                    raise AssertionError(
-                        "build_linked_create_request should not run before numeric repo-scope guard"
-                    )
+                    raise AssertionError("build_linked_create_request should not run before numeric repo-scope guard")
 
                 def _unexpected_plan_node_creation(*args, **kwargs):
                     del args, kwargs
-                    raise AssertionError(
-                        "plan_node_creation should not run before numeric repo-scope guard"
-                    )
+                    raise AssertionError("plan_node_creation should not run before numeric repo-scope guard")
 
                 app_import_node.resolve_parent_for_import = _unexpected_resolve_parent_for_import
                 app_import_node.build_linked_create_request = _unexpected_build_linked_create_request
                 app_import_node.plan_node_creation = _unexpected_plan_node_creation
                 try:
-                    with pytest.raises(RuntimeError, match="Current GitHub repo scope could not be resolved from origin"):
+                    with pytest.raises(
+                        RuntimeError, match="Current GitHub repo scope could not be resolved from origin"
+                    ):
                         runner(request, ports)
                 finally:
                     app_import_node.resolve_parent_for_import = original_resolve_parent_for_import
@@ -1092,9 +1076,7 @@ class TestRuntimeImportS10:
                 events=events,
             )
 
-            collision = (
-                Path(records[1].path) / "issues" / "iss-00124-add-refresh-token" / "README.md"
-            )
+            collision = Path(records[1].path) / "issues" / "iss-00124-add-refresh-token" / "README.md"
             collision.parent.mkdir(parents=True, exist_ok=True)
             collision.write_text("existing", encoding="utf-8")
 
@@ -1146,9 +1128,7 @@ class TestRuntimeImportS10:
                 events=events,
             )
 
-            collision = (
-                Path(records[1].path) / "issues" / "iss-00124-add-refresh-token" / "README.md"
-            )
+            collision = Path(records[1].path) / "issues" / "iss-00124-add-refresh-token" / "README.md"
             collision.parent.mkdir(parents=True, exist_ok=True)
             collision.write_text("existing", encoding="utf-8")
 
@@ -1224,7 +1204,7 @@ class TestRuntimeImportS10:
             ),
         )
 
-        for kind, runner, request, issue_number in cases:
+        for _kind, runner, request, issue_number in cases:
             with tempfile.TemporaryDirectory() as tmp:
                 specdock_dir = Path(tmp) / "spec-dock"
                 self._prepare_templates(specdock_dir)
@@ -1502,7 +1482,7 @@ class TestRuntimeImportS10:
             rules_target = specdock_dir / "docs" / "rules" / "issue" / "discussions.md"
             assert rules_link.is_symlink(), f"missing imported rules symlink: {rules_link}"
             assert rules_link.resolve() == rules_target.resolve()
-            assert os.readlink(rules_link) == os.path.relpath(rules_target, start=rules_link.parent)
+            assert str(rules_link.readlink()) == os.path.relpath(rules_target, start=rules_link.parent)
             assert list(result.node.path.rglob("new-*")) == []
 
     def test_renderer_text_regression(self) -> None:
@@ -1563,13 +1543,13 @@ class TestRuntimeImportS10:
         )
         text = presentation_cli_text.render_import_text(result)
         assert text.stdout_lines == [
-                (
-                    "spec-dock: ok (import issue) "
-                    "id=iss-00123 epic=epic-local-00001 initiative=init-local-00001 "
-                    "path=spec-dock/initiatives/init-local-00001-auth/epics/epic-local-00001-jwt/"
-                    "issues/iss-00123-imported-issue github=#123"
-                )
-            ]
+            (
+                "spec-dock: ok (import issue) "
+                "id=iss-00123 epic=epic-local-00001 initiative=init-local-00001 "
+                "path=spec-dock/initiatives/init-local-00001-auth/epics/epic-local-00001-jwt/"
+                "issues/iss-00123-imported-issue github=#123"
+            )
+        ]
         assert text.warnings == ["gh_index_incomplete"]
 
     def test_command_import_issue_smoke(self) -> None:
@@ -1585,12 +1565,7 @@ class TestRuntimeImportS10:
         ) = _runtime_modules()
 
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -1670,12 +1645,7 @@ class TestRuntimeImportS10:
 
     def test_import_command_returns_nonzero_when_post_sync_artifact_failure_exists(self) -> None:
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -1710,7 +1680,9 @@ class TestRuntimeImportS10:
                 id="iss-00123",
                 title="Imported issue",
                 slug="imported-issue",
-                path=Path("/repo/spec-dock/initiatives/init-local-00001/epics/epic-local-00001/issues/iss-00123-imported-issue"),
+                path=Path(
+                    "/repo/spec-dock/initiatives/init-local-00001/epics/epic-local-00001/issues/iss-00123-imported-issue"
+                ),
                 meta_path=Path(
                     "/repo/spec-dock/initiatives/init-local-00001/epics/epic-local-00001/issues/iss-00123-imported-issue/.meta.json"
                 ),

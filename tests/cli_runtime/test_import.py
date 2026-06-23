@@ -1,21 +1,17 @@
 import json
 import os
-import shutil
-import subprocess
-import sys
-import tempfile
 from pathlib import Path
-from types import SimpleNamespace
+import shutil
+import tempfile
+
+import pytest
 
 from tests.cli_runtime.harness import (
     CliRuntimeHarness,
-    _EXPECTED_MANAGED_SKILL_NAMES,
-    _expected_spec_dock_version,
     main,
 )
 
 
-import pytest
 class TestCliImport(CliRuntimeHarness):
     _STANDARD_INITIATIVE_ID = "init-00001"
     _STANDARD_INITIATIVE_DIRNAME = "init-00001-auth-platform"
@@ -234,7 +230,9 @@ class TestCliImport(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             self._run_runtime(target, ["import", "initiative", "10", "--title", "Auth platform"], env=test_env)
-            self._run_runtime(target, ["import", "epic", "11", "--title", "JWT auth", "--initiative", "10"], env=test_env)
+            self._run_runtime(
+                target, ["import", "epic", "11", "--title", "JWT auth", "--initiative", "10"], env=test_env
+            )
 
             init_dir = target / "spec-dock" / "initiatives" / "init-00010-auth-platform"
             epic_dir = init_dir / "epics" / "epic-00011-jwt-auth"
@@ -260,12 +258,17 @@ class TestCliImport(CliRuntimeHarness):
                     target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
                 ),
                 epic_dir / "issues" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md",
-                epic_dir / "discussions" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md",
+                epic_dir / "discussions" / "rules.md": target
+                / "spec-dock"
+                / "docs"
+                / "rules"
+                / "epic"
+                / "discussions.md",
             }
             for link_path, target_path in expected_rules_links.items():
                 assert link_path.is_symlink(), f"missing imported rules symlink: {link_path}"
                 assert link_path.resolve() == target_path.resolve()
-                assert os.readlink(link_path) == os.path.relpath(target_path, start=link_path.parent)
+                assert str(link_path.readlink()) == os.path.relpath(target_path, start=link_path.parent)
 
             for scope_dir in (
                 init_dir / "epics",
@@ -694,12 +697,7 @@ class TestCliImport(CliRuntimeHarness):
 
             self._run_runtime(target, ["import", "epic", "124", "--title", "JWT auth"], env=test_env)
             epic_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / "epics"
-                / "epic-00124-jwt-auth"
+                target / "spec-dock" / "initiatives" / "init-00001-auth-platform" / "epics" / "epic-00124-jwt-auth"
             )
             assert epic_dir.is_dir()
 
@@ -717,7 +715,9 @@ class TestCliImport(CliRuntimeHarness):
             self._make_gh_issue_view_stub(bin_dir)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-            p = self._run_runtime_capture(target, ["import", "issue", "123", "--title", "Add refresh token"], env=test_env)
+            p = self._run_runtime_capture(
+                target, ["import", "issue", "123", "--title", "Add refresh token"], env=test_env
+            )
             assert p.returncode != 0, p.stdout + p.stderr
             assert "--epic" in p.stderr
 
@@ -734,7 +734,10 @@ class TestCliImport(CliRuntimeHarness):
                 "schema_version": 2,
                 "updated_at": "2026-01-01T00:00:00+00:00",
                 "initiative": {"id": "init-local-99999", "path": "spec-dock/initiatives/init-local-99999-x"},
-                "epic": {"id": "epic-local-99999", "path": "spec-dock/initiatives/init-local-99999-x/epics/epic-local-99999-y"},
+                "epic": {
+                    "id": "epic-local-99999",
+                    "path": "spec-dock/initiatives/init-local-99999-x/epics/epic-local-99999-y",
+                },
                 "issue": None,
             }
             (target / "spec-dock" / ".agent" / "active.json").write_text(
@@ -747,7 +750,9 @@ class TestCliImport(CliRuntimeHarness):
             self._make_gh_issue_view_stub(bin_dir)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-            p = self._run_runtime_capture(target, ["import", "issue", "123", "--title", "Add refresh token"], env=test_env)
+            p = self._run_runtime_capture(
+                target, ["import", "issue", "123", "--title", "Add refresh token"], env=test_env
+            )
             assert p.returncode != 0, p.stdout + p.stderr
             assert "--epic" in p.stderr
 
@@ -1197,7 +1202,17 @@ class TestCliImport(CliRuntimeHarness):
 
             p1 = self._run_runtime_capture(
                 target,
-                ["import", "issue", "123", "--title", "Add refresh token", "--epic", "epic-00002", "--slug", "Bad!Slug"],
+                [
+                    "import",
+                    "issue",
+                    "123",
+                    "--title",
+                    "Add refresh token",
+                    "--epic",
+                    "epic-00002",
+                    "--slug",
+                    "Bad!Slug",
+                ],
                 env=test_env,
             )
             assert p1.returncode != 0, p1.stdout + p1.stderr
@@ -1256,13 +1271,7 @@ class TestCliImport(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._create_linked_parents(target)
 
-            init_meta = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / ".meta.json"
-            )
+            init_meta = target / "spec-dock" / "initiatives" / "init-00001-auth-platform" / ".meta.json"
             data = json.loads(init_meta.read_text(encoding="utf-8"))
             data["slug"] = "BrokenSlug"
             self._write_json_force(init_meta, data)
@@ -1440,11 +1449,11 @@ class TestCliImport(CliRuntimeHarness):
             gh_path.write_text(
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
-                'if [[ \"$1\" == \"issue\" && \"$2\" == \"view\" ]]; then\n'
-                "  echo \"NOT_JSON\"\n"
+                'if [[ "$1" == "issue" && "$2" == "view" ]]; then\n'
+                '  echo "NOT_JSON"\n'
                 "  exit 0\n"
                 "fi\n"
-                "echo \"unexpected gh args: $@\" >&2\n"
+                'echo "unexpected gh args: $@" >&2\n'
                 "exit 99\n",
                 encoding="utf-8",
             )

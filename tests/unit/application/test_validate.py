@@ -1,25 +1,22 @@
+from pathlib import Path
 import sys
 import tempfile
-from pathlib import Path
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import ports as app_ports
-        from spec_dock_runtime.application import validate_tree as app_validate_tree
-        from spec_dock_runtime.domain import models as domain_models
-        from spec_dock_runtime.domain import tree as domain_tree
-        from spec_dock_runtime.domain import validation as domain_validation
+        from spec_dock_runtime.application import (
+            contracts as app_contracts,
+            ports as app_ports,
+            validate_tree as app_validate_tree,
+        )
+        from spec_dock_runtime.domain import (
+            models as domain_models,
+            tree as domain_tree,
+            validation as domain_validation,
+        )
         from spec_dock_runtime.infra import contracts as infra_contracts
     finally:
         sys.path.pop(0)
@@ -45,12 +42,7 @@ class _StubNodeReader:
 class TestValidateApplication:
     def test_discussion_doc_parser_catalog_handles_hyphenated_and_existing_types(self) -> None:
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[3]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -65,9 +57,7 @@ class TestValidateApplication:
         assert parsed.doc_type == "draft-requirement"
         assert parsed.doc_id == "20260329t123456z-draft-requirement"
 
-        suffixed = discussion_docs.parse_timestamp_discussion_doc_filename(
-            "20260329t123456z-09-draft-plan-plan.md"
-        )
+        suffixed = discussion_docs.parse_timestamp_discussion_doc_filename("20260329t123456z-09-draft-plan-plan.md")
         assert suffixed is not None
         assert suffixed.doc_type == "draft-plan"
         assert suffixed.doc_id == "20260329t123456z-09-draft-plan"
@@ -85,12 +75,7 @@ class TestValidateApplication:
 
     def test_discussion_doc_malformed_candidates_remain_fail_closed(self) -> None:
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[3]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -197,7 +182,9 @@ class TestValidateApplication:
                 assert "Missing required artifact" in result.report.errors[0], case
                 assert f"kind={node_kind} id={target.id}" in result.report.errors[0], case
                 assert artifact_name in result.report.errors[0], case
-                assert (Path(target.path) / artifact_name).relative_to(repo_root).as_posix() in result.report.errors[0], case
+                assert (Path(target.path) / artifact_name).relative_to(repo_root).as_posix() in result.report.errors[
+                    0
+                ], case
 
     def test_validate_tree_reports_missing_required_meta_without_cli(self) -> None:
         (
@@ -242,100 +229,96 @@ class TestValidateApplication:
         ) = _runtime_modules()
         root = Path("/repo/spec-dock/initiatives/init-00001-platform")
 
-        graph = domain_tree.build_graph(
-            [
-                domain_models.SpecNodeSeed(
-                    kind="initiative",
-                    id="init-00001",
-                    title="Platform",
-                    slug="platform",
-                    path=root,
-                    meta_path=root / ".meta.json",
-                    parent_id=None,
-                    initiative_id=None,
-                    epic_id=None,
-                    github_issue_number=1,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="epic",
-                    id="epic-00002",
-                    title="Delivery",
-                    slug="delivery",
-                    path=root / "epics" / "epic-00002-delivery",
-                    meta_path=root / "epics" / "epic-00002-delivery" / ".meta.json",
-                    parent_id="init-00001",
-                    initiative_id="init-00001",
-                    epic_id=None,
-                    github_issue_number=2,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="issue",
-                    id="iss-00003",
-                    title="Target",
-                    slug="target",
-                    path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00003-target",
-                    meta_path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00003-target" / ".meta.json",
-                    parent_id="epic-99999",
-                    initiative_id="init-00001",
-                    epic_id="epic-00002",
-                    github_issue_number=3,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-            ]
-        )
+        graph = domain_tree.build_graph([
+            domain_models.SpecNodeSeed(
+                kind="initiative",
+                id="init-00001",
+                title="Platform",
+                slug="platform",
+                path=root,
+                meta_path=root / ".meta.json",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=1,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="epic",
+                id="epic-00002",
+                title="Delivery",
+                slug="delivery",
+                path=root / "epics" / "epic-00002-delivery",
+                meta_path=root / "epics" / "epic-00002-delivery" / ".meta.json",
+                parent_id="init-00001",
+                initiative_id="init-00001",
+                epic_id=None,
+                github_issue_number=2,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="issue",
+                id="iss-00003",
+                title="Target",
+                slug="target",
+                path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00003-target",
+                meta_path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00003-target" / ".meta.json",
+                parent_id="epic-99999",
+                initiative_id="init-00001",
+                epic_id="epic-00002",
+                github_issue_number=3,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+        ])
         broken_parent = domain_validation.validate_graph(graph, repo_root=Path("/repo"))
         assert broken_parent.errors
         assert "issue parent_id mismatch" in broken_parent.errors[0]
 
-        unscoped = domain_tree.build_graph(
-            [
-                domain_models.SpecNodeSeed(
-                    kind="initiative",
-                    id="init-00001",
-                    title="Platform",
-                    slug="platform",
-                    path=root,
-                    meta_path=root / ".meta.json",
-                    parent_id=None,
-                    initiative_id=None,
-                    epic_id=None,
-                    github_issue_number=1,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="epic",
-                    id="epic-00002",
-                    title="Delivery",
-                    slug="delivery",
-                    path=root / "epics" / "epic-00002-delivery",
-                    meta_path=root / "epics" / "epic-00002-delivery" / ".meta.json",
-                    parent_id="init-00001",
-                    initiative_id="init-00001",
-                    epic_id=None,
-                    github_issue_number=2,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="issue",
-                    id="iss-00003",
-                    title="Target",
-                    slug="target",
-                    path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00003-target",
-                    meta_path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00003-target" / ".meta.json",
-                    parent_id="epic-00002",
-                    initiative_id="init-00001",
-                    epic_id="epic-00002",
-                    github_issue_number=3,
-                ),
-            ]
-        )
+        unscoped = domain_tree.build_graph([
+            domain_models.SpecNodeSeed(
+                kind="initiative",
+                id="init-00001",
+                title="Platform",
+                slug="platform",
+                path=root,
+                meta_path=root / ".meta.json",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=1,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="epic",
+                id="epic-00002",
+                title="Delivery",
+                slug="delivery",
+                path=root / "epics" / "epic-00002-delivery",
+                meta_path=root / "epics" / "epic-00002-delivery" / ".meta.json",
+                parent_id="init-00001",
+                initiative_id="init-00001",
+                epic_id=None,
+                github_issue_number=2,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="issue",
+                id="iss-00003",
+                title="Target",
+                slug="target",
+                path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00003-target",
+                meta_path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00003-target" / ".meta.json",
+                parent_id="epic-00002",
+                initiative_id="init-00001",
+                epic_id="epic-00002",
+                github_issue_number=3,
+            ),
+        ])
         legacy = domain_validation.validate_graph(unscoped, repo_root=Path("/repo"))
         assert legacy.errors
         assert "legacy unscoped github linkage" in legacy.errors[0]

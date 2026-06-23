@@ -1,32 +1,24 @@
 import argparse
 import ast
+import contextlib
 import io
 import json
-import sys
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 
-import contextlib
 import pytest
+
 _LEGACY_HELPER_MODULES = {"io_json", "github", "render_md", "render_puml", "active", "nodes", "ids"}
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime import app as runtime_app
         from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.cli import dispatch as cli_dispatch
-        from spec_dock_runtime.cli import parser as cli_parser
-        from spec_dock_runtime.cli import registry as cli_registry
+        from spec_dock_runtime.cli import dispatch as cli_dispatch, parser as cli_parser, registry as cli_registry
         from spec_dock_runtime.commands import contracts as cmd_contracts
         from spec_dock_runtime.domain import models as domain_models
     finally:
@@ -68,9 +60,7 @@ def _import_root(imported: str) -> str:
 class TestRuntimeShellS11:
     def test_import_scan_detects_legacy_helper_import_styles(self) -> None:
         tree = ast.parse(
-            "import spec_dock_runtime.io_json\n"
-            "from spec_dock_runtime import io_json\n"
-            "from .. import io_json\n"
+            "import spec_dock_runtime.io_json\nfrom spec_dock_runtime import io_json\nfrom .. import io_json\n"
         )
         imported = _iter_import_modules(tree)
         assert "spec_dock_runtime.io_json" in imported
@@ -80,10 +70,7 @@ class TestRuntimeShellS11:
         assert "io_json" in roots & _LEGACY_HELPER_MODULES
 
     def test_import_root_normalizes_fully_qualified_layer_modules(self) -> None:
-        tree = ast.parse(
-            "import spec_dock_runtime.domain.ids\n"
-            "from spec_dock_runtime import infra\n"
-        )
+        tree = ast.parse("import spec_dock_runtime.domain.ids\nfrom spec_dock_runtime import infra\n")
         imported = _iter_import_modules(tree)
         roots = {_import_root(module) for module in imported}
         assert "domain" in roots
@@ -98,16 +85,14 @@ class TestRuntimeShellS11:
         parser = cli_parser.build_parser(registry)
 
         stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
-            with pytest.raises(SystemExit) as cm:
-                parser.parse_args(["new", "--help"])
+        with contextlib.redirect_stdout(stdout), pytest.raises(SystemExit) as cm:
+            parser.parse_args(["new", "--help"])
         assert cm.value.code == 0
         assert "Create a new initiative" in stdout.getvalue()
 
         stderr = io.StringIO()
-        with contextlib.redirect_stderr(stderr):
-            with pytest.raises(SystemExit) as cm:
-                parser.parse_args(["active", "set", "--initiative", "1"])
+        with contextlib.redirect_stderr(stderr), pytest.raises(SystemExit) as cm:
+            parser.parse_args(["active", "set", "--initiative", "1"])
         assert cm.value.code == 2
         error_text = stderr.getvalue()
         assert "unrecognized arguments: --initiative" in error_text
@@ -155,9 +140,9 @@ class TestRuntimeShellS11:
         assert exit_code == 3
         assert stdout.getvalue() == ""
         assert stderr.getvalue().splitlines() == [
-                "spec-dock: (warn) deps_topology_external_ref:iss-local-99999",
-                "spec-dock: blocked (deps check) target=iss-local-00001 ready=false blockers=1",
-            ]
+            "spec-dock: (warn) deps_topology_external_ref:iss-local-99999",
+            "spec-dock: blocked (deps check) target=iss-local-00001 ready=false blockers=1",
+        ]
 
     def test_representative_command_wrapper_smoke(self) -> None:
         (_runtime_app, app_contracts, cli_dispatch, cli_parser, cli_registry, _cmd_contracts, domain_models) = (
@@ -435,9 +420,9 @@ class TestRuntimeShellS11:
 
         assert exit_code == 17
         assert calls == [
-                ("parse_args", ["validate"]),
-                ("dispatch", "validate", "registry", "use_cases"),
-            ]
+            ("parse_args", ["validate"]),
+            ("dispatch", "validate", "registry", "use_cases"),
+        ]
 
     def test_rollback_ready_wrapper_swap_smoke(self) -> None:
         (_runtime_app, app_contracts, cli_dispatch, cli_parser, cli_registry, cmd_contracts, _domain_models) = (
@@ -496,11 +481,7 @@ class TestRuntimeShellS11:
         app_source = app_source_path.read_text(encoding="utf-8")
         app_tree = ast.parse(app_source)
         main_node = next(
-            (
-                node
-                for node in app_tree.body
-                if isinstance(node, ast.FunctionDef) and node.name == "main"
-            ),
+            (node for node in app_tree.body if isinstance(node, ast.FunctionDef) and node.name == "main"),
             None,
         )
         assert main_node is not None, "main() not found in app.py"
@@ -545,7 +526,9 @@ class TestRuntimeShellS11:
                 tree = ast.parse(module_path.read_text(encoding="utf-8"))
                 for imported in _iter_import_modules(tree):
                     root = _import_root(imported)
-                    assert root not in _LEGACY_HELPER_MODULES, f"legacy helper direct import in {module_path}: {imported}"
+                    assert root not in _LEGACY_HELPER_MODULES, (
+                        f"legacy helper direct import in {module_path}: {imported}"
+                    )
 
         # commands/* must stay as thin shell layer: no direct domain/infra/app imports.
         commands_dir = app_source_path.parent / "commands"
@@ -567,7 +550,9 @@ class TestRuntimeShellS11:
                 root = _import_root(imported)
                 if root != "infra":
                     continue
-                assert _normalize_import_module(imported) == "infra.contracts", f"application layer must not import infra concrete module: {module_path}: {imported}"
+                assert _normalize_import_module(imported) == "infra.contracts", (
+                    f"application layer must not import infra concrete module: {module_path}: {imported}"
+                )
 
         # infra/* must not depend on shell/entrypoint layers.
         infra_dir = app_source_path.parent / "infra"
@@ -578,7 +563,9 @@ class TestRuntimeShellS11:
             tree = ast.parse(module_path.read_text(encoding="utf-8"))
             for imported in _iter_import_modules(tree):
                 root = _import_root(imported)
-                assert root not in forbidden_infra_roots, f"infra layer must not depend on shell layers: {module_path}: {imported}"
+                assert root not in forbidden_infra_roots, (
+                    f"infra layer must not depend on shell layers: {module_path}: {imported}"
+                )
 
     def test_app_no_command_wrapper_regression(self) -> None:
         (runtime_app, _app_contracts, _cli_dispatch, _cli_parser, _cli_registry, _cmd_contracts, _domain_models) = (
@@ -587,11 +574,7 @@ class TestRuntimeShellS11:
 
         app_source_path = Path(runtime_app.__file__)
         app_tree = ast.parse(app_source_path.read_text(encoding="utf-8"))
-        function_names = {
-            node.name
-            for node in app_tree.body
-            if isinstance(node, ast.FunctionDef)
-        }
+        function_names = {node.name for node in app_tree.body if isinstance(node, ast.FunctionDef)}
         forbidden_wrappers = {
             "_new_initiative",
             "_new_epic",
@@ -611,7 +594,9 @@ class TestRuntimeShellS11:
             "_run_new_doc",
             "_run_import_node",
         }
-        assert function_names.isdisjoint(forbidden_wrappers), f"forbidden command wrappers remain in app.py: {sorted(function_names & forbidden_wrappers)}"
+        assert function_names.isdisjoint(forbidden_wrappers), (
+            f"forbidden command wrappers remain in app.py: {sorted(function_names & forbidden_wrappers)}"
+        )
 
         bootstrap_source_path = app_source_path.parent / "cli" / "bootstrap.py"
         bootstrap_source = bootstrap_source_path.read_text(encoding="utf-8")
@@ -621,8 +606,8 @@ class TestRuntimeShellS11:
         assert "application_sync(req, ports)" in bootstrap_source
         assert "application_check_deps(req, ports)" in bootstrap_source
         assert "application_validate_tree(req, ports)" in bootstrap_source
-        assert "from ..application.create_node import create_initiative as application_create_initiative" in bootstrap_source
-        assert "from ..application.import_node import import_issue as application_import_issue" in bootstrap_source
+        assert "create_initiative as application_create_initiative" in bootstrap_source
+        assert "import_issue as application_import_issue" in bootstrap_source
         assert "from .. import app as runtime_app" not in bootstrap_source
         assert "runtime_app._application_" not in bootstrap_source
         assert "runtime_app._new_" not in bootstrap_source

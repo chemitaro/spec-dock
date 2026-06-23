@@ -1,12 +1,10 @@
+import contextlib
+from pathlib import Path
 import sys
 import tempfile
-from pathlib import Path
 
-
-
-
-import contextlib
 import pytest
+
 _MISSING = object()
 
 
@@ -40,24 +38,20 @@ def _patch_object(target, name, replacement=_MISSING, *, side_effect=_MISSING, r
         yield replacement
     finally:
         setattr(target, name, original)
+
+
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        from spec_dock_runtime.application import close_node as app_close_node
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import ports as app_ports
+        from spec_dock_runtime.application import (
+            close_node as app_close_node,
+            contracts as app_contracts,
+            ports as app_ports,
+        )
         from spec_dock_runtime.cli import bootstrap as cli_bootstrap
         from spec_dock_runtime.domain import models as domain_models
-        from spec_dock_runtime.infra import github_cli as infra_github_cli
-        from spec_dock_runtime.infra import contracts as infra_contracts
+        from spec_dock_runtime.infra import contracts as infra_contracts, github_cli as infra_github_cli
     finally:
         sys.path.pop(0)
     return app_close_node, app_contracts, app_ports, cli_bootstrap, domain_models, infra_github_cli, infra_contracts
@@ -81,12 +75,7 @@ def _record(
         node_dir = repo_root / "spec-dock" / "initiatives" / f"{node_id}-{slug}"
     elif kind == "epic":
         node_dir = (
-            repo_root
-            / "spec-dock"
-            / "initiatives"
-            / "init-local-00001-auth-platform"
-            / "epics"
-            / f"{node_id}-{slug}"
+            repo_root / "spec-dock" / "initiatives" / "init-local-00001-auth-platform" / "epics" / f"{node_id}-{slug}"
         )
     else:
         node_dir = (
@@ -225,7 +214,15 @@ class TestRuntimeCloseS12:
         active_issue_grants=None,
         active_promotion_record=None,
     ):
-        _app_close_node, _app_contracts, app_ports, _cli_bootstrap, _domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        (
+            _app_close_node,
+            _app_contracts,
+            app_ports,
+            _cli_bootstrap,
+            _domain_models,
+            _infra_github_cli,
+            infra_contracts,
+        ) = _runtime_modules()
         return app_ports.Ports(
             node_reader=_StubNodeReader(records),
             repo_root=repo_root,
@@ -241,7 +238,15 @@ class TestRuntimeCloseS12:
         )
 
     def test_close_node_fails_when_target_has_no_linked_github_issue(self) -> None:
-        app_close_node, app_contracts, _app_ports, _cli_bootstrap, _domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        (
+            app_close_node,
+            app_contracts,
+            _app_ports,
+            _cli_bootstrap,
+            _domain_models,
+            _infra_github_cli,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = Path("/repo")
         records = [
             _record(
@@ -293,7 +298,9 @@ class TestRuntimeCloseS12:
         assert issue_gateway.close_calls == []
 
     def test_close_node_allows_explicit_issue_target_when_authority_is_proposed(self) -> None:
-        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = (
+            _runtime_modules()
+        )
         repo_root = Path("/repo")
         records = [
             _record(
@@ -334,7 +341,9 @@ class TestRuntimeCloseS12:
         assert issue_gateway.close_calls == [(str(repo_root), 301, "example/repo")]
 
     def test_close_node_allows_explicit_issue_target_when_promotion_record_is_stale(self) -> None:
-        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = (
+            _runtime_modules()
+        )
         repo_root = Path("/repo")
         stale_record = {
             "status": "approved",
@@ -384,7 +393,9 @@ class TestRuntimeCloseS12:
         assert issue_gateway.close_calls == [(str(repo_root), 301, "example/repo")]
 
     def test_close_node_allows_explicit_issue_target_when_target_is_not_active(self) -> None:
-        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = (
+            _runtime_modules()
+        )
         repo_root = Path("/repo")
         records = [
             _record(
@@ -425,7 +436,9 @@ class TestRuntimeCloseS12:
         assert issue_gateway.close_calls == [(str(repo_root), 301, "example/repo")]
 
     def test_close_node_gh_failure_leaves_local_tree_unchanged(self) -> None:
-        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = (
+            _runtime_modules()
+        )
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir)
             issue_record = _record(
@@ -481,7 +494,9 @@ class TestRuntimeCloseS12:
             with pytest.raises(RuntimeError, match="gh issue close failed"):
                 app_close_node.close_node(
                     app_contracts.CloseNodeRequest(
-                        target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None)
+                        target=app_contracts.TargetRef(
+                            kind="node_id", node_id="iss-local-00001", github_issue_number=None
+                        )
                     ),
                     ports,
                 )
@@ -491,7 +506,9 @@ class TestRuntimeCloseS12:
             assert issue_gateway.close_calls == [(str(repo_root), 301, "example/repo")]
 
     def test_close_node_already_closed_returns_success_noop(self) -> None:
-        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = (
+            _runtime_modules()
+        )
         repo_root = Path("/repo")
         records = [
             _record(
@@ -530,9 +547,7 @@ class TestRuntimeCloseS12:
                 github_repo_name="repo",
             ),
         ]
-        issue_gateway = _StubIssueGateway(
-            view_snapshots=[_snapshot(domain_models, issue_number=301, state="CLOSED")]
-        )
+        issue_gateway = _StubIssueGateway(view_snapshots=[_snapshot(domain_models, issue_number=301, state="CLOSED")])
         ports = self._ports(repo_root=repo_root, records=records, issue_gateway=issue_gateway)
 
         result = app_close_node.close_node(
@@ -550,7 +565,9 @@ class TestRuntimeCloseS12:
         assert issue_gateway.close_calls == []
 
     def test_close_node_read_after_close_race_returns_success_noop(self) -> None:
-        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = (
+            _runtime_modules()
+        )
         repo_root = Path("/repo")
         records = [
             _record(
@@ -611,7 +628,9 @@ class TestRuntimeCloseS12:
         assert issue_gateway.close_calls == [(str(repo_root), 301, "example/repo")]
 
     def test_close_node_non_cascade_for_epic_target(self) -> None:
-        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = (
+            _runtime_modules()
+        )
         repo_root = Path("/repo")
         records = [
             _record(
@@ -673,7 +692,9 @@ class TestRuntimeCloseS12:
         assert issue_gateway.close_calls == [(str(repo_root), 201, "example/repo")]
 
     def test_close_node_non_cascade_for_initiative_target(self) -> None:
-        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = (
+            _runtime_modules()
+        )
         repo_root = Path("/repo")
         records = [
             _record(
@@ -735,7 +756,15 @@ class TestRuntimeCloseS12:
         assert issue_gateway.close_calls == [(str(repo_root), 101, "example/repo")]
 
     def test_close_node_unlinked_parent_fails_without_touching_linked_child(self) -> None:
-        app_close_node, app_contracts, _app_ports, _cli_bootstrap, _domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        (
+            app_close_node,
+            app_contracts,
+            _app_ports,
+            _cli_bootstrap,
+            _domain_models,
+            _infra_github_cli,
+            infra_contracts,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir)
             init_record = _record(
@@ -787,7 +816,9 @@ class TestRuntimeCloseS12:
             with pytest.raises(RuntimeError, match="not linked to a GitHub issue"):
                 app_close_node.close_node(
                     app_contracts.CloseNodeRequest(
-                        target=app_contracts.TargetRef(kind="node_id", node_id="init-local-00001", github_issue_number=None)
+                        target=app_contracts.TargetRef(
+                            kind="node_id", node_id="init-local-00001", github_issue_number=None
+                        )
                     ),
                     ports,
                 )
@@ -797,7 +828,9 @@ class TestRuntimeCloseS12:
             assert issue_gateway.close_calls == []
 
     def test_close_node_github_issue_target_resolves_current_unscoped_node_with_repo_scope(self) -> None:
-        app_close_node, app_contracts, app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        app_close_node, app_contracts, app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = (
+            _runtime_modules()
+        )
         repo_root = Path("/repo")
         records = [
             _record(
@@ -847,9 +880,7 @@ class TestRuntimeCloseS12:
                 github_repo_name="repo",
             ),
         ]
-        issue_gateway = _StubIssueGateway(
-            view_snapshots=[_snapshot(domain_models, issue_number=301, state="CLOSED")]
-        )
+        issue_gateway = _StubIssueGateway(view_snapshots=[_snapshot(domain_models, issue_number=301, state="CLOSED")])
         ports = app_ports.Ports(
             node_reader=_StubNodeReader(records),
             repo_root=repo_root,
@@ -876,7 +907,15 @@ class TestRuntimeCloseS12:
         assert issue_gateway.view_calls == [(str(repo_root), 301, "example/repo")]
 
     def test_close_node_github_issue_target_raises_for_ambiguous_unscoped_match(self) -> None:
-        app_close_node, app_contracts, _app_ports, _cli_bootstrap, _domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        (
+            app_close_node,
+            app_contracts,
+            _app_ports,
+            _cli_bootstrap,
+            _domain_models,
+            _infra_github_cli,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = Path("/repo")
         records = [
             _record(
@@ -926,7 +965,7 @@ class TestRuntimeCloseS12:
         ]
         ports = self._ports(repo_root=repo_root, records=records, issue_gateway=_StubIssueGateway())
 
-        with pytest.raises(RuntimeError, match="Ambiguous github.issue_number=301"):
+        with pytest.raises(RuntimeError, match=r"Ambiguous github\.issue_number=301"):
             app_close_node.close_node(
                 app_contracts.CloseNodeRequest(
                     target=app_contracts.TargetRef(kind="github_issue", node_id=None, github_issue_number=301)
@@ -935,7 +974,15 @@ class TestRuntimeCloseS12:
             )
 
     def test_close_node_github_issue_target_raises_when_repo_scope_does_not_match(self) -> None:
-        app_close_node, app_contracts, _app_ports, _cli_bootstrap, _domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        (
+            app_close_node,
+            app_contracts,
+            _app_ports,
+            _cli_bootstrap,
+            _domain_models,
+            _infra_github_cli,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = Path("/repo")
         records = [
             _record(
@@ -976,7 +1023,7 @@ class TestRuntimeCloseS12:
         ]
         ports = self._ports(repo_root=repo_root, records=records, issue_gateway=_StubIssueGateway())
 
-        with pytest.raises(RuntimeError, match="No node found for github.issue_number=301 in repo scope"):
+        with pytest.raises(RuntimeError, match=r"No node found for github\.issue_number=301 in repo scope"):
             app_close_node.close_node(
                 app_contracts.CloseNodeRequest(
                     target=app_contracts.TargetRef(
@@ -991,7 +1038,15 @@ class TestRuntimeCloseS12:
             )
 
     def test_bootstrap_registers_close_node_use_case(self) -> None:
-        _app_close_node, app_contracts, _app_ports, cli_bootstrap, _domain_models, _infra_github_cli, _infra_contracts = _runtime_modules()
+        (
+            _app_close_node,
+            app_contracts,
+            _app_ports,
+            cli_bootstrap,
+            _domain_models,
+            _infra_github_cli,
+            _infra_contracts,
+        ) = _runtime_modules()
         runtime = cli_bootstrap.build_runtime(Path("/repo/spec-dock"))
         assert callable(runtime.use_cases.close_node)
         with pytest.raises(RuntimeError, match="No nodes found"):
@@ -1002,7 +1057,15 @@ class TestRuntimeCloseS12:
             )
 
     def test_bootstrap_issue_gateway_forwards_issue_close(self) -> None:
-        _app_close_node, _app_contracts, _app_ports, cli_bootstrap, _domain_models, _infra_github_cli, _infra_contracts = _runtime_modules()
+        (
+            _app_close_node,
+            _app_contracts,
+            _app_ports,
+            cli_bootstrap,
+            _domain_models,
+            _infra_github_cli,
+            _infra_contracts,
+        ) = _runtime_modules()
         gateway = cli_bootstrap._IssueGateway()
         with _patch_object(cli_bootstrap.infra_github_cli, "issue_close", return_value="closed") as issue_close:
             result = gateway.issue_close(Path("/repo"), 301, repo_slug="example/repo")
@@ -1011,7 +1074,15 @@ class TestRuntimeCloseS12:
         issue_close.assert_called_once_with(Path("/repo"), issue_number=301, repo_slug="example/repo")
 
     def test_issue_close_raw_adds_repo_scope_and_reloads_snapshot(self) -> None:
-        _app_close_node, _app_contracts, _app_ports, _cli_bootstrap, _domain_models, infra_github_cli, _infra_contracts = _runtime_modules()
+        (
+            _app_close_node,
+            _app_contracts,
+            _app_ports,
+            _cli_bootstrap,
+            _domain_models,
+            infra_github_cli,
+            _infra_contracts,
+        ) = _runtime_modules()
         repo_root = Path("/repo")
 
         class _Completed:
@@ -1026,9 +1097,22 @@ class TestRuntimeCloseS12:
             calls.append((list(cmd), cwd))
             return _Completed()
 
-        with _patch_object(infra_github_cli, "ensure_gh_available"), _patch_object(
-            infra_github_cli, "issue_view_snapshot_raw", return_value={"number": 301, "state": "CLOSED", "title": "Issue 301", "labels": [], "updatedAt": "t", "url": "https://github.com/example/repo/issues/301"}
-        ) as issue_view_snapshot_raw, _patch_object(infra_github_cli.subprocess, "run", side_effect=_fake_run):
+        with (
+            _patch_object(infra_github_cli, "ensure_gh_available"),
+            _patch_object(
+                infra_github_cli,
+                "issue_view_snapshot_raw",
+                return_value={
+                    "number": 301,
+                    "state": "CLOSED",
+                    "title": "Issue 301",
+                    "labels": [],
+                    "updatedAt": "t",
+                    "url": "https://github.com/example/repo/issues/301",
+                },
+            ) as issue_view_snapshot_raw,
+            _patch_object(infra_github_cli.subprocess, "run", side_effect=_fake_run),
+        ):
             raw = infra_github_cli.issue_close_raw(repo_root, issue_number=301, repo_slug="example/repo")
 
         assert raw["state"] == "CLOSED"
@@ -1036,23 +1120,36 @@ class TestRuntimeCloseS12:
         issue_view_snapshot_raw.assert_called_once_with(repo_root, issue_number=301, repo_slug="example/repo")
 
     def test_issue_close_raw_raises_with_close_command_context(self) -> None:
-        _app_close_node, _app_contracts, _app_ports, _cli_bootstrap, _domain_models, infra_github_cli, _infra_contracts = _runtime_modules()
+        (
+            _app_close_node,
+            _app_contracts,
+            _app_ports,
+            _cli_bootstrap,
+            _domain_models,
+            infra_github_cli,
+            _infra_contracts,
+        ) = _runtime_modules()
         repo_root = Path("/repo")
 
-        with _patch_object(infra_github_cli, "ensure_gh_available"), _patch_object(
-            infra_github_cli.subprocess,
-            "run",
-            side_effect=infra_github_cli.subprocess.CalledProcessError(
-                returncode=1,
-                cmd=["gh", "issue", "close", "301"],
-                stderr="boom",
+        with (
+            _patch_object(infra_github_cli, "ensure_gh_available"),
+            _patch_object(
+                infra_github_cli.subprocess,
+                "run",
+                side_effect=infra_github_cli.subprocess.CalledProcessError(
+                    returncode=1,
+                    cmd=["gh", "issue", "close", "301"],
+                    stderr="boom",
+                ),
             ),
+            pytest.raises(RuntimeError, match="gh failed: gh issue close 301"),
         ):
-            with pytest.raises(RuntimeError, match="gh failed: gh issue close 301"):
-                infra_github_cli.issue_close_raw(repo_root, issue_number=301)
+            infra_github_cli.issue_close_raw(repo_root, issue_number=301)
 
     def test_close_node_raises_when_close_and_fallback_view_both_fail(self) -> None:
-        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = (
+            _runtime_modules()
+        )
         repo_root = Path("/repo")
         records = [
             _record(
