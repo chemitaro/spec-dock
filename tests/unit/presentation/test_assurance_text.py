@@ -159,4 +159,3 @@ def test_renders_invalid_result_with_machine_reason_and_details() -> None:
         "reason": "invalid_schema",
         "details": ["missing_policy_version"],
     }
-

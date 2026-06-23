@@ -120,6 +120,8 @@ def test_invalid_json_and_invalid_schema_have_distinct_machine_reasons(tmp_path:
     schema_dir = _make_issue(tmp_path, issue_id="iss-00228", github_issue_number=228)
     semantic_dir = _make_issue(tmp_path, issue_id="iss-00229", github_issue_number=229)
     obligations_dir = _make_issue(tmp_path, issue_id="iss-00230", github_issue_number=230)
+    malformed_fact_source_dir = _make_issue(tmp_path, issue_id="iss-00231", github_issue_number=231)
+    malformed_fact_reason_dir = _make_issue(tmp_path, issue_id="iss-00232", github_issue_number=232)
     store = AssuranceStore(tmp_path)
 
     (malformed_dir / "assurance.json").write_text("{not json\n", encoding="utf-8")
@@ -139,11 +141,27 @@ def test_invalid_json_and_invalid_schema_have_distinct_machine_reasons(tmp_path:
     ).to_dict()
     obligations_payload["obligations"] = {"profile_preset": "lite", "notes": []}
     _write_json(obligations_dir / "assurance.json", obligations_payload)
+    malformed_fact_source_payload = assurance.build_assurance_contract(
+        issue_id="iss-00231",
+        stage=assurance.ClassificationStage.REQUIREMENT,
+        source_binding=store.build_requirement_source_binding(store.resolve_issue_target("iss-00231")),
+    ).to_dict()
+    malformed_fact_source_payload["risk_facts"][0]["source"] = "design"
+    _write_json(malformed_fact_source_dir / "assurance.json", malformed_fact_source_payload)
+    malformed_fact_reason_payload = assurance.build_assurance_contract(
+        issue_id="iss-00232",
+        stage=assurance.ClassificationStage.REQUIREMENT,
+        source_binding=store.build_requirement_source_binding(store.resolve_issue_target("iss-00232")),
+    ).to_dict()
+    malformed_fact_reason_payload["risk_facts"][0]["reason_code"] = ""
+    _write_json(malformed_fact_reason_dir / "assurance.json", malformed_fact_reason_payload)
 
     malformed = store.verify_contract(store.resolve_issue_target("#227"))
     schema_invalid = store.verify_contract(store.resolve_issue_target("228"))
     semantic_invalid = store.verify_contract(store.resolve_issue_target("229"))
     obligations_invalid = store.verify_contract(store.resolve_issue_target("230"))
+    malformed_fact_source_invalid = store.verify_contract(store.resolve_issue_target("231"))
+    malformed_fact_reason_invalid = store.verify_contract(store.resolve_issue_target("232"))
 
     assert malformed.status == "invalid"
     assert malformed.reason == "invalid_json"
@@ -157,6 +175,12 @@ def test_invalid_json_and_invalid_schema_have_distinct_machine_reasons(tmp_path:
     assert obligations_invalid.status == "invalid"
     assert obligations_invalid.reason == "invalid_schema"
     assert "obligations_profile_mismatch" in obligations_invalid.details
+    assert malformed_fact_source_invalid.status == "invalid"
+    assert malformed_fact_source_invalid.reason == "invalid_schema"
+    assert "invalid_risk_facts" in malformed_fact_source_invalid.details
+    assert malformed_fact_reason_invalid.status == "invalid"
+    assert malformed_fact_reason_invalid.reason == "invalid_schema"
+    assert "invalid_risk_facts" in malformed_fact_reason_invalid.details
 
 
 def test_schema_validation_rejects_invalid_issue_id_and_non_issue_local_source_paths(tmp_path: Path) -> None:

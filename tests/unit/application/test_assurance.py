@@ -21,7 +21,7 @@ class _StoreFake:
         self.target = None
         self.binding = None
         self.read_result = read_result
-        self.writes = []
+        self.writes: list[tuple[object, object]] = []
 
     def resolve_issue_target(self, issue):
         self.resolved_issue_arg = issue

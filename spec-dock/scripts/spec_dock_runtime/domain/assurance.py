@@ -80,7 +80,9 @@ class SourceBinding:
         return {
             "artifacts": [
                 artifact.to_dict()
-                for artifact in sorted(self.artifacts, key=lambda artifact: (artifact.path, artifact.role, artifact.sha256))
+                for artifact in sorted(
+                    self.artifacts, key=lambda artifact: (artifact.path, artifact.role, artifact.sha256)
+                )
             ],
         }
 
@@ -235,7 +237,7 @@ def classify_risk_facts(risk_facts: tuple[RiskFact, ...]) -> AssuranceClassifica
     reason_codes.add("standard_default")
 
     lite_candidate = _is_lite_candidate(values)
-    for key, expected in _LITE_PREDICATE_EXPECTATIONS.items():
+    for key, _expected in _LITE_PREDICATE_EXPECTATIONS.items():
         if values[key] == "unknown" and key in _LITE_PREDICATE_UNKNOWN_REASON:
             reason_codes.add(_LITE_PREDICATE_UNKNOWN_REASON[key])
 
@@ -286,7 +288,9 @@ def build_assurance_contract(
     source_binding: SourceBinding,
     risk_facts: tuple[RiskFact, ...] | None = None,
 ) -> AssuranceContract:
-    effective_facts = default_risk_facts() if risk_facts is None else tuple(sorted(risk_facts, key=lambda fact: fact.key))
+    effective_facts = (
+        default_risk_facts() if risk_facts is None else tuple(sorted(risk_facts, key=lambda fact: fact.key))
+    )
     classification = classify_risk_facts(effective_facts)
     return AssuranceContract(
         schema_version=SCHEMA_VERSION,
