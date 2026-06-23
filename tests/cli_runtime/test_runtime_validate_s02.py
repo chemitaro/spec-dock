@@ -410,8 +410,8 @@ class TestRuntimeValidateS02:
         ports = calls.get("ports")
         assert isinstance(req, app_contracts.ValidateTreeRequest)
         assert ports is not None
-        assert getattr(ports, "repo_root") == Path("/repo")
-        assert getattr(ports, "specdock_dir") == Path("/repo/spec-dock")
+        assert ports.repo_root == Path("/repo")
+        assert ports.specdock_dir == Path("/repo/spec-dock")
 
     def test_issue_78_validate_uses_current_specdock_even_when_legacy_hidden_workspace_exists(self) -> None:
         cli_bootstrap = _runtime_cli_bootstrap_module()

@@ -4126,7 +4126,7 @@ class TestRuntimeSyncS07:
                 if had_attr:
                     app_sync_state.collect_safe_current_repo_backfill_node_ids = original_collector
                 else:
-                    delattr(app_sync_state, "collect_safe_current_repo_backfill_node_ids")
+                    del app_sync_state.collect_safe_current_repo_backfill_node_ids
 
             assert "iss-local-00001" in state.graph.nodes_by_id
             assert len(issue_gateway.index_calls) == 1

@@ -922,7 +922,7 @@ class TestRuntimeImportS10:
             ),
         )
 
-        for kind, runner, request in cases:
+        for _kind, runner, request in cases:
             with tempfile.TemporaryDirectory() as tmp:
                 specdock_dir = Path(tmp) / "spec-dock"
                 self._prepare_templates(specdock_dir)
@@ -1007,7 +1007,7 @@ class TestRuntimeImportS10:
             ),
         )
 
-        for kind, runner, request, expected_node_id in cases:
+        for _kind, runner, request, expected_node_id in cases:
             with tempfile.TemporaryDirectory() as tmp:
                 specdock_dir = Path(tmp) / "spec-dock"
                 self._prepare_templates(specdock_dir)
@@ -1226,7 +1226,7 @@ class TestRuntimeImportS10:
             ),
         )
 
-        for kind, runner, request, issue_number in cases:
+        for _kind, runner, request, issue_number in cases:
             with tempfile.TemporaryDirectory() as tmp:
                 specdock_dir = Path(tmp) / "spec-dock"
                 self._prepare_templates(specdock_dir)

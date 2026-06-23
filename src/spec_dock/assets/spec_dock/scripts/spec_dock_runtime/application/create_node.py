@@ -235,7 +235,7 @@ def _acquire_create_lock(specdock_dir: Path) -> tuple[Path, str]:
                         stale=True,
                         lock_meta_summary=summary,
                     )
-                )
+                ) from None
             if elapsed >= wait_seconds:
                 raise RuntimeError(
                     _lock_failure_message(
@@ -246,7 +246,7 @@ def _acquire_create_lock(specdock_dir: Path) -> tuple[Path, str]:
                         stale=False,
                         lock_meta_summary=summary,
                     )
-                )
+                ) from None
             remaining = max(0.0, deadline - time.monotonic())
             if remaining <= 0:
                 continue

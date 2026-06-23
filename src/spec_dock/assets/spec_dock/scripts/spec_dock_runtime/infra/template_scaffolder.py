@@ -44,7 +44,7 @@ def copy_scaffolded_tree(src_dir: Path, dest_dir: Path, replacements: dict[str, 
     _preflight_no_collision(target_paths)
 
     created_paths: list[Path] = []
-    for src_path, target_path in zip(template_files, target_paths):
+    for src_path, target_path in zip(template_files, target_paths, strict=True):
         target_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             text = src_path.read_text(encoding="utf-8")

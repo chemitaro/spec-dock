@@ -109,12 +109,12 @@ def _worktree_list_args(ns: argparse.Namespace) -> CommandArgs:
 
 
 def _worktree_show_args(ns: argparse.Namespace) -> CommandArgs:
-    return WorktreeShowArgs(target=str(getattr(ns, "target")), json=bool(getattr(ns, "json", False)))
+    return WorktreeShowArgs(target=str(ns.target), json=bool(getattr(ns, "json", False)))
 
 
 def _worktree_remove_args(ns: argparse.Namespace) -> CommandArgs:
     return WorktreeRemoveArgs(
-        target=str(getattr(ns, "target")),
+        target=str(ns.target),
         force=bool(getattr(ns, "force", False)),
         json=bool(getattr(ns, "json", False)),
     )

@@ -1016,11 +1016,16 @@ class TestRuntimeNewDocS09:
                 scan_snapshots: list[list[str]] = []
                 original_scan = app_create_node._scan_discussion_timestamp_duplicate_state
 
-                def _wrapped_scan(target_dir):
+                def _wrapped_scan(target_dir, *, scan_snapshots=scan_snapshots, original_scan=original_scan):
                     scan_snapshots.append(sorted(path.name for path in target_dir.glob("*.md")))
                     return original_scan(target_dir)
 
-                def _release_and_corrupt() -> None:
+                def _release_and_corrupt(
+                    *,
+                    discussions_dir=discussions_dir,
+                    malformed_name=malformed_name,
+                    lock_path=lock_path,
+                ) -> None:
                     time.sleep(0.1)
                     (discussions_dir / malformed_name).write_text("broken\n", encoding="utf-8")
                     lock_path.unlink()

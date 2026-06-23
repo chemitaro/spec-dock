@@ -100,12 +100,12 @@ def _patch_dict(mapping, values, *, clear=False):
         if clear:
             mapping.clear()
             mapping.update(original)
-            return
-        for key, value in original.items():
-            if key in missing:
-                mapping.pop(key, None)
-            else:
-                mapping[key] = value
+        else:
+            for key, value in original.items():
+                if key in missing:
+                    mapping.pop(key, None)
+                else:
+                    mapping[key] = value
 
 
 def _record(

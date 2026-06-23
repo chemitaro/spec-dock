@@ -27,7 +27,7 @@ def _expected_spec_dock_version() -> str:
         )
         match = re.search(r'(?m)^version\s*=\s*"([^"]+)"\s*$', text)
         if not match:
-            raise AssertionError("failed to read version from pyproject.toml")
+            raise AssertionError("failed to read version from pyproject.toml") from None
         return match.group(1)
 
 

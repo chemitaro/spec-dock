@@ -579,7 +579,7 @@ class TestIssueLifecycleApplication:
                 close_calls = []
                 sync_calls = []
 
-                def fake_close_node(req, ports):
+                def fake_close_node(req, ports, *, close_calls=close_calls, already_closed=already_closed):
                     close_calls.append((req, ports))
                     assert not req.run_post_sync
                     return app_contracts.CloseNodeResult(
@@ -602,7 +602,7 @@ class TestIssueLifecycleApplication:
                     del req, ports
                     raise RuntimeError("clear active failed")
 
-                def fake_post_mutation_sync(ports):
+                def fake_post_mutation_sync(ports, *, sync_calls=sync_calls):
                     sync_calls.append(ports)
                     return app_contracts.PostMutationSyncOutcome.skipped("test")
 

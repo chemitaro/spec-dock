@@ -381,7 +381,7 @@ def _build_inventory_from_records(
         raw_ids.append(_raw_worktree_id(record, main_record=main_record, classification=classification))
     counts: dict[str, int] = {}
     views_by_index: dict[int, WorktreeRecordView] = {}
-    for (original_index, record), raw_id in zip(ordered, raw_ids):
+    for (original_index, record), raw_id in zip(ordered, raw_ids, strict=True):
         counts[raw_id] = counts.get(raw_id, 0) + 1
         stable_id = raw_id if counts[raw_id] == 1 else f"{raw_id}~{counts[raw_id]}"
         main = _canonical_path(record.path) == _canonical_path(main_record.path)
