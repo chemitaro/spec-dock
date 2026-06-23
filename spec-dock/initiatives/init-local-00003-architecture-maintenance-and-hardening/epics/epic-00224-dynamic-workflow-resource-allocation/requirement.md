@@ -92,7 +92,7 @@ ID: "epic-00224"
   - Standard を新規 adaptive Issue の authoritative default とする。
   - Lite classification は shadow measurement 用の `lite_candidate` と、obligation reduction に使える `lite_authorized` を分離する。
   - Runtime は required Lite predicate が false または unknown、hard trigger present、source binding stale、required telemetry / policy evaluation unavailable の場合、Lite を authorize してはならない。
-  - 初期 rollout では automatic Lite default を有効化しない。automatic Lite default は、shadow / opt-in telemetry gate を通過した後の別 Issue、ADR、または policy version bump による evidence-backed adoption を必要とする。
+  - 初期 rollout では automatic Lite default を有効化しない。automatic Lite default は、shadow / opt-in telemetry gate を通過した後の別 accepted ADR、policy version bump、rollout Issue による evidence-backed adoption を必要とする。
 
 - E-RQ-004: Fixed Skill kernel
   - Issue 状態ごとに `.agents/skills/**` を差し替えない。
@@ -374,7 +374,7 @@ ID: "epic-00224"
   - Repo ごとの hard trigger 拡張をどの config surface で許可するか。
   - Review policy の最大サイズと additive focus allow-list。
   - Metrics の保持期間と report 投影粒度。
-  - Automatic Lite default を別 Issue / ADR / policy version bump のどれで有効化するか。
+  - Automatic Lite default の将来 rollout threshold / telemetry threshold / rollback threshold。採用 surface は別 accepted ADR、policy version bump、rollout Issue の 3 点を必須とすることで固定済み。
 - 行わない:
   - Model の confidence だけで Profile を下げない。
   - Review priority label だけで protected-domain risk を破棄しない。

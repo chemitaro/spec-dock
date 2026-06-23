@@ -945,7 +945,8 @@ P2 + non-protected
 ### Future: Auto-Lite experimental
 
 - この Epic の初期完了条件には含めない。
-- `auto-lite-readiness report` の evidence をもとに、別 Issue、ADR、または policy version bump で採用する。
+- `auto-lite-readiness report` の evidence をもとに、別 accepted ADR、policy version bump、rollout Issue の 3 点が揃った場合だけ採用できる。
+- Policy version bump だけでは automatic Lite default を有効化できない。
 
 ### Rollback
 
@@ -1071,19 +1072,50 @@ ChildResultReturned
   - bootstrap-only review policy ownership
   - validate / sync
 
+## Issue Realization Map
+
+| Slice | Issue | GitHub | Design responsibility | Primary closure |
+|---|---|---:|---|---|
+| I01 | `iss-00227-introduce-assurance-contract-and-classification-runtime` | `#227` | Assurance Contract, deterministic classification, strict-legacy detection prerequisite | E-RQ-002, E-RQ-003, E-AC-002, E-AC-003 |
+| I02 | `iss-00228-compile-state-aware-workflow-runbooks-and-fixed-skill-kernels` | `#228` | Workflow State Resolver, fixed Skill kernel, generated Runbook projection | E-RQ-001, E-RQ-004, E-RQ-005, E-AC-001, E-AC-004, E-AC-005 |
+| I03 | `iss-00229-compose-profile-aware-planning-artifacts` | `#229` | Profile-aware artifact composition and stale source binding | E-RQ-006, E-AC-006, E-AC-008 |
+| I04 | `iss-00230-compile-step-assurance-agent-routing-and-context-policy` | `#230` | Step Assurance, context routing policy, clean-room packets, bounded return contract | E-RQ-007, E-RQ-008, E-RQ-015〜021, E-AC-007, E-AC-017〜021 |
+| I05 | `iss-00231-inject-trusted-base-branch-codex-review-policy` | `#231` | Trusted base-SHA review policy and deterministic review trigger | E-RQ-009, E-AC-009, E-AC-010 |
+| I06 | `iss-00232-enforce-blocker-centric-pr-repair-and-rereview` | `#232` | PR Blocker Engine, P2 suppression, re-review / stagnation policy | E-RQ-010, E-RQ-011, E-AC-011〜013 |
+| I07 | `iss-00233-roll-out-adaptive-workflow-with-legacy-compatibility-and-telemetry` | `#233` | Rollout, strict-legacy compatibility, metrics, Auto-Lite readiness | E-RQ-012〜014, E-AC-014〜016 |
+
+Dependency direction:
+
+```text
+iss-00227
+  -> iss-00228
+  -> iss-00231
+  -> iss-00229
+       -> iss-00230
+            -> iss-00232
+iss-00233 depends on iss-00228, iss-00229, iss-00230, iss-00231, iss-00232
+```
+
+The Issue-local draft requirement / draft design artifacts are discussion evidence only. Canonical Issue `requirement.md` / `design.md` / `plan.md` remain owned by each downstream Issue planning workflow.
+
 ## 関連 ADR
 
-- ADR 分離判断:
-  - 次の 5 件は長期 workflow authority に効くため、Epic design / report の decision log だけで完了扱いにしない。
-  - plan phase では、実装 Issue より前に ADR 作成 / 承認 Issue を置く。
-  - 該当 ADR が承認されるまで、runtime authority、Assurance Contract authority、GitHub review policy authority、PR blocker closure の実装 Issue は execution-ready にしない。
-  - plan phase へ進む前に個別 ADR 本文を作成することは必須にしない。理由は、ここでは ADR の必要性と blocking order を固定し、ADR 本文の作成順序と依存関係は Epic plan が所有するため。
-- Required ADR before implementation:
-  - Fixed Skill Kernel And Compiled Runbook Authority
-  - Adaptive Assurance Contract And Monotonic Escalation
-  - Tracked Agent Context Routing Policy And Clean-Room Evaluation
-  - Trusted Base-SHA GitHub Review Policy
-  - Blocker-Centric PR Risk Closure
+- ADR authority correction:
+  - `iss-00226 / #226` は decision-only Issue として作成されたが、decision-only Issue を execution-ready prerequisite にするのは routing 誤りだったため closed / superseded historical evidence とする。
+  - 次の 5 件は、この Epic の accepted ADR として implementation Issue 開始前に固定済みである。
+  - Downstream implementation Issue は `iss-00226` へ依存せず、accepted ADR とこの Epic design / plan を architecture baseline として参照する。
+- Accepted ADR before implementation:
+  - `discussions/20260623t074441z-adr-fixed-skill-kernel-compiled-runbook-authority.md`
+  - `discussions/20260623t074443z-adr-adaptive-assurance-lite-authorization-monotonic-escalation.md`
+  - `discussions/20260623t074442z-adr-step-assurance-resource-allocation-agent-context-routing.md`
+  - `discussions/20260623t074444z-adr-trusted-base-sha-github-review-policy.md`
+  - `discussions/20260623t074447z-adr-blocker-centric-pr-risk-closure-rereview.md`
+- Accepted ADR summary:
+  - Fixed Skill Kernel / Compiled Runbook: Skill は固定 kernel、current workflow obligation は runtime compiled Runbook が返す。
+  - Adaptive Assurance / Lite Authorization: `lite_candidate` は telemetry、`lite_authorized` だけが obligation を減らす。初期 automatic Lite default は無効。
+  - Step Assurance / Context Routing: Profile、Complexity、Context Policy を分離し、worker efficiency と reviewer / consultant clean-room を両立する。
+  - Trusted Base-SHA Review: review policy は PR base SHA の fixed path から読み、runtime が deterministic trigger body を作る。
+  - Blocker-Centric PR Closure: merge preparedness は comment zero ではなく verified blocker zero、required CI、review coverage で判断する。
 - 前提 ADR:
   - `epic-00158` 配下の skill / docs / template context surface ownership ADR。
 
@@ -1095,4 +1127,4 @@ ChildResultReturned
   - Review policy maximum size の初期値。
   - Metrics retention の初期値。
   - Repository-specific hard trigger extension surface。
-  - Future automatic Lite default の adoption surface。
+  - Future automatic Lite default の具体 rollout 条件。採用 surface は別 accepted ADR、policy version bump、rollout Issue に固定済み。
