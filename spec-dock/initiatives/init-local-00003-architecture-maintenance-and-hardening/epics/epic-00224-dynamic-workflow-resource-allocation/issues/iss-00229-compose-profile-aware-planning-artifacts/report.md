@@ -56,8 +56,8 @@ ID: "iss-00229"
 | orchestrator/imported draft | iss-00229 | `discussions/20260623t033605z-draft-design-draft-design.md` | Epic plan / ADRs / runtime inspection | `design.md`, `plan.md` | adopted | `design.md`, `plan.md` | manual diff guard | integrated | none | none | pending | promoted to canonical candidate |
 
 ## 実装サマリー
-- 現時点では issue planning / authoring phase のみ完了候補であり、implementation step は未開始。
-- S01-S03 / S90 / S99 の実行結果、worker evidence、reviewer evidence、commit gates は実装時に追記する。
+- S01 で profile manifest と pure domain composer を追加した。
+- S02-S03 / S90 / S99 の実行結果、worker evidence、reviewer evidence、commit gates は後続ステップで追記する。
 - 実装前の Assurance classification は `authorized_profile=standard` / `status=provisional` / `verify=valid` で作成済み。
 
 ## ワークフロー委任同意の証跡（Workflow Delegation Consent）
@@ -68,7 +68,7 @@ ID: "iss-00229"
 ## 実装委任ゲート（Implementation Delegation Gate）
 | ステップ | 判断 | 必須理由 | 委任ロール | 委任範囲 | 正本 | 許可変更 | 禁止変更 | 必須検証 | 停止条件 | 必須出力 | 観測結果 |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | planned delegated | domain / template / tests slice | dev-coder | profile manifest and domain composer | `plan.md` S01 | domain composer, template manifest, unit tests | CLI wiring / workflow state / GitHub review | targeted pytest | marker safety cannot be guaranteed | changed files, tests, ledger note | pending |
+| S01 | delegated | domain / template / tests slice | dev-coder | profile manifest and domain composer | `plan.md` S01 | domain composer, template manifest, unit tests | CLI wiring / workflow state / GitHub review | targeted pytest | marker safety cannot be guaranteed | changed files, tests, ledger note | pass |
 | S02 | planned delegated | CLI vertical slice | dev-coder | compose command and artifact store | `plan.md` S02 | assurance command/application/presentation/infra and CLI tests | step routing / GitHub review / auto Lite default / stale policy | targeted pytest | compose would overwrite substantive content | changed files, tests, ledger note | pending |
 | S03 | planned delegated | stale binding integration slice | dev-coder | compose/verify/workflow blocking | `plan.md` S03 | assurance command/application/store/workflow and compose/workflow tests | compose section content rules / GitHub review | targeted pytest | legacy compatibility breaks | changed files, tests, ledger note | pending |
 | S90 | planned local verification | provider/mirror sync | orchestrator | dogfooding update and parity checks | `plan.md` S90 | dogfooding mirror | provider source beyond sync | update / parity / validate | parity mismatch unresolved | evidence | pending |
@@ -83,12 +83,16 @@ ID: "iss-00229"
 | planning | spec authoring re-review | spec-reviewer | fourth candidate | failed | no | re-review required | P1 stale compose ownership between S02 and S03 fixed |
 | planning | spec authoring re-review | spec-reviewer | fifth candidate | passed | no | proceed to implementation | no findings; S02/S03 ownership conflict resolved |
 | planning | assurance readiness | local command | after planning commit | passed | no | proceed to implementation | `assurance classify --stage requirement`, `assurance verify`, `workflow next issue-execution` succeeded |
+| S01 | step code review | code-reviewer | initial S01 diff | failed | no | fix required | P1 malformed managed marker detection fixed |
+| S01 | step code re-review | code-reviewer | after malformed marker fix | passed with P2 | no | P2 fix applied before commit | marker token outside HTML comments false positive fixed |
+| S01 | step code final re-review | code-reviewer | after P2 fix | passed | no | commit S01 | no findings |
 
 ## ステップ commit ゲート（Step Commit Gate）
 | ステップ | クロージャ状態 | コミット範囲 | コミットハッシュ / 最終台帳 | コミット後 clean 確認 | 差分なし根拠 | 差分なし確認済み契約 / ファイル | 差分なし diff-clean コマンド | 差分なし read-only 確認 |
 |---|---|---|---|---|---|---|---|---|
 | planning | committed | requirement/design/plan/report authoring evidence | `1eb09f9a` | `git status --short` -> clean before assurance classification | N/A | N/A | N/A | N/A |
-| planning-assurance | ready for commit | `assurance.json` and readiness evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
+| planning-assurance | committed | `assurance.json` and readiness evidence | `46345f81` | `git status --short` -> clean before S01 | N/A | N/A | N/A | N/A |
+| S01 | ready for commit | domain composer, profile manifest, unit tests, report evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
 
 ## 実装記録（セッションログ）
 - Implementation not started during planning.
@@ -115,3 +119,42 @@ ID: "iss-00229"
 ./spec-dock/scripts/spec-dock workflow next issue-execution --format json
 # state=ready next_action=execution-ready reason_code=assurance-valid
 ```
+
+### セッションログ（2026-06-23 S01）
+
+#### 対象
+- Step: S01
+- AC/EC: AC-001, AC-002, AC-003, AC-005, EC-003
+- Closure ids: tc-001, tc-002, tc-003, tc-005
+
+#### 実施内容
+- `profile-sections.json` に Lite / Standard / Strict / Critical の profile section manifest を追加した。
+- `domain/artifact_composer.py` に pure composer、manifest loader、managed marker scanner、compose result model を追加した。
+- `tests/unit/domain/test_artifact_composer.py` に profile selection、explicit Lite、idempotence、no-overwrite、downgrade no deletion、marker conflict、plain prose token の unit tests を追加した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/domain/test_artifact_composer.py
+# 7 passed
+
+uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/artifact_composer.py tests/unit/domain/test_artifact_composer.py
+# All checks passed!
+
+git diff --check
+# pass
+```
+
+#### TDD / review evidence
+| step | phase | planned evidence | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S01 | Red / alternative | red-required | target test file absent before implementation (`pytest` file-not-found) | approved-no-op | new pure domain slice |
+| S01 | Green | domain unit tests | `uv run pytest tests/unit/domain/test_artifact_composer.py` -> 7 passed | pass | includes P1/P2 reviewer fixes |
+| S01 | Refactor | guardrail | targeted `ruff check` and `git diff --check` passed | pass | no further refactor needed |
+
+#### Closure coverage
+| closure id | step | verification evidence | observed result | notes |
+|---|---|---|---|---|
+| tc-001 | S01 | profile selection tests for Lite / Standard / Strict / Critical | pass | `authorized_profile` only; `lite_candidate` does not select Lite |
+| tc-002 | S01 | compose twice idempotence test | pass | second compose has no changed output |
+| tc-003 | S01 | existing managed section preservation and downgrade test | pass | stronger sections are not deleted |
+| tc-005 | S01 | duplicated / unclosed / mismatched / malformed marker tests | pass | conflict returns `output_text=None` |
