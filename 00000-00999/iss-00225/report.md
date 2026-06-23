@@ -49,7 +49,9 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | orchestrator | 初回 Ruff/mypy 導入で対象範囲が曖昧だった | Option A provider-first; Option B provider + shipped runtime explicit; Option C full dogfooding | Option B を採用し、dogfooding `spec-dock/` copy は direct target から除外する | source-of-truth discipline と shipped runtime coverage を両立する | applied | `discussions/20260623t024210z-interview-static-analysis-target-boundary.md`; `requirement.md`; `design.md`; `plan.md` | none |
+| D-002 | resolved | operation | orchestrator | static analysis を command-only にするか CI/local gate にするか | command-only; CI-enforced; local quality gate + CI | CI は scope に含め、pre-commit は scope 外。local grouped script と `make lint` は scope に含める | ユーザー回答により enforcement boundary が確定した | applied | `discussions/20260623t025015z-interview-static-analysis-enforcement-entrypoint.md`; `requirement.md`; `design.md`; `plan.md` | pre-commit は別 issue 候補 |
+| D-003 | resolved | test-strategy | orchestrator | 一括導入と段階導入のどちらで進めるか | 最終設定を一括投入; rule を小刻みに追加して各段階で 0 件化 | 小刻みな rule adoption を採用する | 大量違反と review scope の混在を避け、step closure を明確にする | promoted_to_plan | `discussions/20260623t030652z-disc-static-analysis-final-configuration-proposal.md`; `plan.md` | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +65,10 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | research | `requirement.md`, `design.md`, `plan.md` | reference project の Ruff/mypy/Makefile/script 先例を SpecDock 向けに翻訳する根拠として採用した | `discussions/20260623t024024z-research-ruff-mypy-preference-source-analysis.md` | fresh spec-reviewer review |
+| EAL-002 | adopted | interview | `requirement.md`, `design.md`, `plan.md` | ユーザーが Option B target を明示採用したため、target boundary と non-scope に反映した | `discussions/20260623t024210z-interview-static-analysis-target-boundary.md` | fresh spec-reviewer review |
+| EAL-003 | adopted | interview | `requirement.md`, `design.md`, `plan.md` | CI enforcement、pre-commit out-of-scope、local script + Makefile in-scope のユーザー回答を反映した | `discussions/20260623t025015z-interview-static-analysis-enforcement-entrypoint.md` | fresh spec-reviewer review |
+| EAL-004 | adopted | discussion | `requirement.md`, `design.md`, `plan.md` | 最終設定案と段階導入方針を canonical docs へ採用した | `discussions/20260623t030652z-disc-static-analysis-final-configuration-proposal.md` | fresh spec-reviewer review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +76,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | Ruff/mypy を導入し、既存違反をすべて解消して CI/local gate を green にする | Makefile/script 追加、段階的 rule adoption、pre-commit deferred | low: plan は command wiring だけでなく違反 0 件化を primary closure にしている | pending: fresh spec-reviewer 未実施 |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +84,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | `pyproject.toml`, `.github/workflows/provider-ci.yml`, `AGENTS.md`, issue discussions | target boundary: Option B adopted; enforcement: CI + local script/Makefile adopted; pre-commit deferred | adopted | not_run | yes for execution handoff | Run fresh spec-reviewer before treating requirement as approved |
+| design | `requirement.md`, final configuration proposal, repository layout | no open design question; EC-002 triggers future amendment if discovered | adopted | not_run | yes for execution handoff | Run fresh spec-reviewer before treating design as approved |
+| plan | `requirement.md`, `design.md`, staged adoption discussion | user requested fine-grained rule-by-rule steps | adopted | not_run | yes for execution handoff | Run fresh spec-reviewer before issue execution |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
