@@ -32,6 +32,15 @@ def render_assurance_text(result: AssuranceResult) -> CliText:
     if result.details:
         lines.append("details:")
         lines.extend(f"- {detail}" for detail in result.details)
+    if result.changed_paths:
+        lines.append("changed_paths:")
+        lines.extend(f"- {path}" for path in result.changed_paths)
+    if result.warnings:
+        lines.append("warnings:")
+        lines.extend(f"- {warning}" for warning in result.warnings)
+    if result.errors:
+        lines.append("errors:")
+        lines.extend(f"- {error}" for error in result.errors)
     return CliText(stdout_lines=lines, stderr_lines=[], warnings=[])
 
 
@@ -55,6 +64,36 @@ def _result_payload(result: AssuranceResult) -> dict[str, Any]:
         payload["dry_run"] = True
     if result.written_path is not None:
         payload["written_path"] = str(result.written_path)
+    if result.authorized_profile is not None:
+        payload["authorized_profile"] = result.authorized_profile
+    if result.lite_candidate is not None:
+        payload["lite_candidate"] = result.lite_candidate
+    if result.changed_paths:
+        payload["changed_paths"] = list(result.changed_paths)
+    elif result.operation == "compose":
+        payload["changed_paths"] = []
+    if result.artifacts:
+        payload["artifacts"] = {
+            artifact.artifact: {
+                "path": artifact.path,
+                "changed": artifact.changed,
+                "added_section_ids": list(artifact.added_section_ids),
+                "preserved_section_ids": list(artifact.preserved_section_ids),
+                "warnings": list(artifact.warnings),
+                "errors": list(artifact.errors),
+            }
+            for artifact in result.artifacts
+        }
+    elif result.operation == "compose":
+        payload["artifacts"] = {}
+    if result.warnings:
+        payload["warnings"] = list(result.warnings)
+    elif result.operation == "compose":
+        payload["warnings"] = []
+    if result.errors:
+        payload["errors"] = list(result.errors)
+    elif result.operation == "compose":
+        payload["errors"] = []
     classification = _classification_payload(result)
     if classification is not None:
         payload["classification"] = classification

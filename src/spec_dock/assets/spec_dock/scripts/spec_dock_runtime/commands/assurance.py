@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Literal
 
 from spec_dock_runtime.application.contracts import (
     ClassifyAssuranceRequest,
+    ComposeArtifactSelection,
+    ComposeAssuranceRequest,
     ShowAssuranceRequest,
     UseCases,
     VerifyAssuranceRequest,
@@ -40,6 +42,14 @@ class AssuranceVerifyArgs(CommandArgs):
     output_format: OutputFormat
 
 
+@dataclass(frozen=True)
+class AssuranceComposeArgs(CommandArgs):
+    artifact: ComposeArtifactSelection
+    issue: str | None
+    output_format: OutputFormat
+    dry_run: bool
+
+
 def command_specs() -> dict[str, CommandSpec]:
     return {
         "assurance_show": CommandSpec(
@@ -56,6 +66,11 @@ def command_specs() -> dict[str, CommandSpec]:
             add_arguments=_add_verify_arguments,
             args_factory=_verify_args,
             run=_run_verify,
+        ),
+        "assurance_compose": CommandSpec(
+            add_arguments=_add_compose_arguments,
+            args_factory=_compose_args,
+            run=_run_compose,
         ),
     }
 
@@ -77,6 +92,17 @@ def _add_classify_arguments(parser: argparse.ArgumentParser) -> None:
 
 def _add_verify_arguments(parser: argparse.ArgumentParser) -> None:
     _add_common_arguments(parser)
+
+
+def _add_compose_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--artifact",
+        choices=("design", "plan", "report", "all"),
+        required=True,
+        help="Planning artifact to compose",
+    )
+    _add_common_arguments(parser)
+    parser.add_argument("--dry-run", action="store_true", help="Return compose result without writing artifacts")
 
 
 def _show_args(ns: argparse.Namespace) -> CommandArgs:
@@ -102,6 +128,15 @@ def _verify_args(ns: argparse.Namespace) -> CommandArgs:
     )
 
 
+def _compose_args(ns: argparse.Namespace) -> CommandArgs:
+    return AssuranceComposeArgs(
+        artifact=_artifact_selection(ns),
+        issue=_optional_text(getattr(ns, "issue", None)),
+        output_format=_output_format(ns),
+        dry_run=bool(getattr(ns, "dry_run", False)),
+    )
+
+
 def _run_show(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     typed = _expect_show_args(args)
     result = use_cases.show_assurance(ShowAssuranceRequest(issue=typed.issue))
@@ -122,6 +157,14 @@ def _run_verify(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     return _outcome(result=result, output_format=typed.output_format)
 
 
+def _run_compose(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    typed = _expect_compose_args(args)
+    result = use_cases.compose_assurance(
+        ComposeAssuranceRequest(artifact=typed.artifact, issue=typed.issue, dry_run=typed.dry_run)
+    )
+    return _outcome(result=result, output_format=typed.output_format)
+
+
 def _outcome(*, result, output_format: OutputFormat) -> CommandOutcome:
     if output_format == "json":
         text = CliText(stdout_lines=[render_assurance_json(result)], stderr_lines=[], warnings=[])
@@ -135,6 +178,13 @@ def _output_format(ns: argparse.Namespace) -> OutputFormat:
     if value == "json":
         return "json"
     return "text"
+
+
+def _artifact_selection(ns: argparse.Namespace) -> ComposeArtifactSelection:
+    value = str(getattr(ns, "artifact", ""))
+    if value in ("design", "plan", "report", "all"):
+        return value
+    raise RuntimeError(f"Invalid artifact selection: {value}")
 
 
 def _optional_text(value: object) -> str | None:
@@ -159,4 +209,10 @@ def _expect_classify_args(args: CommandArgs) -> AssuranceClassifyArgs:
 def _expect_verify_args(args: CommandArgs) -> AssuranceVerifyArgs:
     if not isinstance(args, AssuranceVerifyArgs):
         raise RuntimeError("Invalid command args for assurance verify")
+    return args
+
+
+def _expect_compose_args(args: CommandArgs) -> AssuranceComposeArgs:
+    if not isinstance(args, AssuranceComposeArgs):
+        raise RuntimeError("Invalid command args for assurance compose")
     return args

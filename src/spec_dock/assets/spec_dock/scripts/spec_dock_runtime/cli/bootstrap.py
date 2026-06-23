@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from spec_dock_runtime.application.assurance import (
     classify_assurance as application_classify_assurance,
+    compose_assurance as application_compose_assurance,
     show_assurance as application_show_assurance,
     verify_assurance as application_verify_assurance,
 )
@@ -50,6 +51,7 @@ from spec_dock_runtime.application.worktree import (
 )
 from spec_dock_runtime.infra import (
     active_store as infra_active_store,
+    artifact_store as infra_artifact_store,
     artifact_writer as infra_artifact_writer,
     assurance_store as infra_assurance_store,
     clock as infra_clock,
@@ -327,6 +329,7 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         artifact_writer=_ArtifactWriter(),
     )
     assurance_store = infra_assurance_store.AssuranceStore(resolved_repo_root)
+    artifact_store = infra_artifact_store.ArtifactStore(resolved_repo_root)
     runbook_store = infra_runbook_store.RunbookStore(resolved_repo_root)
     use_cases = UseCases(
         create_initiative=lambda req: application_create_initiative(req, ports),
@@ -350,6 +353,11 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         show_assurance=lambda req: application_show_assurance(req, store=assurance_store),
         classify_assurance=lambda req: application_classify_assurance(req, store=assurance_store),
         verify_assurance=lambda req: application_verify_assurance(req, store=assurance_store),
+        compose_assurance=lambda req: application_compose_assurance(
+            req,
+            store=assurance_store,
+            artifact_store=artifact_store,
+        ),
         workflow_status=lambda req: application_workflow_status(req, store=assurance_store),
         workflow_next=lambda req: application_workflow_next(req, store=assurance_store, runbook_store=runbook_store),
         doctor=lambda req: application_doctor(req, ports),

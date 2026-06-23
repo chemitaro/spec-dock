@@ -195,6 +195,8 @@ ID: "iss-00229"
 - allowed paths:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/assurance.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/assurance.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/artifact_store.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/assurance_text.py`
@@ -214,7 +216,7 @@ ID: "iss-00229"
   - S02 は code-reviewer pass 後に S02 scope のみで commit する。
   - no-op は、CLI vertical slice が既存 command で全 closure を満たす場合に限り、checked contracts と diff-clean evidence を report に記録して approved-no-op とする。
 - amendment trigger:
-  - CLI command name / arguments / exit semantics、artifact write safety、missing/invalid assurance policy を変更する必要が出た場合は plan amendment と fresh spec-reviewer re-review を行う。
+  - CLI command name / arguments / exit semantics、artifact write safety、missing/invalid assurance policy、または command registration surface を変更する必要が出た場合は plan amendment と fresh spec-reviewer re-review を行う。
 
 #### 委任契約（delegation contract）
 - 委任ロール:
