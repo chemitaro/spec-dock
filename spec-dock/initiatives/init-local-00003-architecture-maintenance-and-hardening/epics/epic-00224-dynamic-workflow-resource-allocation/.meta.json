@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "epic",
+  "id": "epic-00224",
+  "title": "Dynamic Workflow Resource Allocation",
+  "slug": "dynamic-workflow-resource-allocation",
+  "created_at": "2026-06-23T09:54:28+09:00",
+  "updated_at": "2026-06-23T09:54:28+09:00",
+  "parent_id": "init-local-00003",
+  "initiative_id": "init-local-00003",
+  "epic_id": null,
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 224,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}
