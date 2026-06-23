@@ -60,6 +60,9 @@ Disposition ごとの必須証跡:
 | D-009 | resolved | test-strategy | dev-coder / orchestrator | S14 で mypy を `make lint` に追加すると、初回 inventory 段階では local gate が fail する | S14 では script に入れない; script に入れて expected fail として inventory 化; S14 で全修正まで行う | S14 で script に mypy を入れ、`make lint` fail を expected inventory evidence として扱う。0 件化は S15 に分離する | local command surface を早期に固定しつつ、大量 mypy error 修正を S15 に隔離する plan の意図を守る | applied | S14 session log; `scripts/static_analysis/run.sh`; `uv run mypy src/spec_dock tests` -> 362 errors; `make lint` -> expected fail | S15 cleanup |
 | D-010 | resolved | implementation | dev-coder / orchestrator / code-reviewer | S15 で source mypy errors は実修正できた一方、tests は dynamic JSON payload、runtime stubs、monkeypatch、fixture state に由来する test-only errors が大量に残った。初回 reviewer は `tests.*` 全体 override が広すぎると P2 指摘した | tests helper を広範囲に型付けし直す; `tests.*` 全体 override; module-local error-code override | source は実修正して full check し、tests override は観測済み 16 module と module-local error code のみに限定する | source error を suppression で隠さず、tests を command target に残したまま S15 を閉じる最小の移行策。`tests.*` 全体 override は reviewer P2 により撤去した | applied | S15 session log; code-reviewer `019ef38c-46c3-7760-835c-b36894e8304c` P2; P2 follow-up; code-reviewer `019ef392-411d-7eb2-95e8-aef6fbf65ce4` pass; `uv run mypy src/spec_dock tests` -> pass; `make lint` -> pass | none |
 | D-011 | resolved | implementation-contract | spec-reviewer / orchestrator | S90 diff included `.agents/**` installed asset refresh, but S90 executable contract only named `spec-dock/**` generated copy refresh | drop `.agents/**` refresh; keep refresh and update contract; handoff follow-up | Keep `.agents/**` refresh because provider `install_root/.agents` assets changed and `spec-dock update .` intentionally refreshes installed asset copies; update requirement/design/plan to authorize installed-copy refresh explicitly | `.agents/**` is generated/installed consumer copy, not provider source. Excluding it would leave dogfooding installed assets stale after provider-side install_root changes | applied | spec-reviewer `019ef3a9-1326-7a13-934f-dd7aa0f5790b` P1; updated `requirement.md`, `design.md`, `plan.md`; S90 session log | fresh spec-reviewer rerun |
+| D-012 | resolved | test-strategy | dev-coder / orchestrator / code-reviewer | S99 full `uv run pytest` で generated Python cache と dogfooding `.meta.json` snapshot drift による 4 failures が発生した | cache を削除だけする; inventory parity tests で generated cache を除外する; strict dogfooding snapshot を緩める; strict snapshot に現 checkout の metadata を追加する | inventory parity では `__pycache__` / `*.pyc` を一貫除外し、dogfooding snapshot は strict equality のまま `iss-00225` と現 checkout に存在する `epic-00224` を追加する | generated cache は package/install_root asset parity の意味対象ではなく、strict snapshot を弱めず現 repo state に合わせるのが最小修正 | applied | S99 full pytest red -> 4 failed; focused repair -> 4 passed; code-reviewer `019ef3c2-3034-7440-aaf1-13f226a51151` pass; final full pytest -> 1407 passed, 76 skipped | none |
+| D-013 | resolved | test-strategy | qa-reviewer / orchestrator | final QA で static-analysis grouped script の failure aggregation が inspection + green path のみで、negative automation が不足していると P2 指摘された | P2 として記録のみ; shell-level negative test を追加; broader integration test を追加 | shell-level negative test を追加し、stubbed `uv` で `ruff check` のみ fail しても後続 phase が走り、summary と non-zero exit が維持されることを固定する | AC-003 の grouped-script contract に近く、小さい test-only 変更で regression protection を上げられる | applied | qa-reviewer `019ef3d0-a232-7d50-aaf4-7444cc84def5` P2; `tests/unit/test_static_analysis_script.py`; focused test -> 1 passed | none |
+| D-014 | resolved | follow-up | qa-reviewer / orchestrator | final QA で `tests.unit.infra.test_init_update` の module-local mypy override が大きい P2 residual risk として指摘された | 今回さらに細分化する; follow-up に回す; suppressions を broad に戻す | 今回は pass 条件を満たす module-local override として残し、将来の test split / override narrowing 候補として report に残す | `test_init_update.py` は巨大な dynamic fixture module で、今回さらに分割すると静的解析導入 scope を超える。既に `tests.*` 全体 override は撤去済みで、module-local error-code override まで狭めている | deferred | qa-reviewer `019ef3d0-a232-7d50-aaf4-7444cc84def5` P2; `pyproject.toml` mypy overrides; code-reviewer final pass | follow-up candidate: split dynamic `test_init_update` helpers or narrow overrides further |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -145,7 +148,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - Issue authoring phase completed. `requirement.md`, `design.md`, and `plan.md` have fresh spec-reviewer passes and are marked `approved`.
 - Implementation execution can start from `plan.md` S01, with report evidence recorded per step.
 - S01 completed: Ruff dependency/config skeleton, root `Makefile` `lint`, and `scripts/static_analysis/run.sh` were added. Direct command target is `src/spec_dock tests`; dogfooding `spec-dock/` remains excluded from direct Ruff/mypy targets.
-- S02 in progress: Ruff `F` was enabled and Pyflakes violations were reduced to 0. A first code-reviewer pass found removed runtime app-level renderer aliases; the aliases were restored and the deps runtime test passed. Final S02 code-reviewer gate is pending after report evidence update.
+- S02-S18 completed: Ruff rule adoption, mypy setup/cleanup, format gate, local `make lint`, and provider CI workflow wiring were implemented step-by-step with reviewer gates and commits.
+- S90 completed: README docs and dogfooding generated / installed asset copies were updated and committed.
+- S99 in progress: final quality gate evidence is green; final QA/code/spec review and final commit are pending.
 
 ## 実装記録（セッションログ） (必須)
 
@@ -2037,7 +2042,7 @@ git diff --check
 ### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-s90-001 | S90 | README diff; requirement/design/plan P1 correction; generated-copy / installed-copy changed path categories; validate pass; spec-manager cmp mismatchなし; `git diff --check`; spec-reviewer pass | pass | docs/dogfooding/installed-copy impact closed pending commit |
+| tc-s90-001 | S90 | README diff; requirement/design/plan P1 correction; generated-copy / installed-copy changed path categories; validate pass; spec-manager cmp mismatchなし; `git diff --check`; spec-reviewer pass | pass | docs/dogfooding/installed-copy impact closed by commit `0bdfdf16` |
 
 ### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -2066,7 +2071,7 @@ git diff --check
 ### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S90 | ready to commit | README, issue requirement/design/plan/report contract evidence, dogfooding generated copy, and installed asset copy refresh | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S90 | committed | README, issue requirement/design/plan/report contract evidence, dogfooding generated copy, and installed asset copy refresh | `0bdfdf16` `docs(static-analysis): lint導線とdogfooding copyを更新する` | `git status --short` -> clean after commit; later S99 introduced test repair diff | N/A | N/A | N/A | N/A |
 
 ### 変更したファイル
 - `README.md` - document `make lint` local static-analysis gate.
@@ -2076,47 +2081,132 @@ git diff --check
 - `report.md` - S18 commit gate correction, D-011, S90 observed evidence, and P2 evidence alignment fix.
 
 ### コミット
-- pending S90 step commit.
+- `0bdfdf16` `docs(static-analysis): lint導線とdogfooding copyを更新する`
 
 ---
+
+## 実装セッションログ S99 — Final Full-Test Repair / Quality Gate
+
+### 実施概要
+- Step: S99 — Final Quality Gate
+- Delegated workers: dev-coder `019ef3be-00a7-7ff3-8b88-0f3efb44aa16`; code-reviewer `019ef3c2-3034-7440-aaf1-13f226a51151`
+- Scope: S90 後の full `uv run pytest` で発見した failure を最小修正し、最終 quality gate を green にする。
+- Parent decision: generated Python cache は install_root inventory parity の意味対象から除外し、dogfooding `.meta.json` snapshot は strict equality のまま現 checkout の metadata を追加する。
+
+### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S99 | Red | final full suite detects remaining integration drift | `uv run pytest` -> 4 failed, 1402 passed, 76 skipped | command | pass | failures were inventory parity cache drift x3 and dogfooding metadata snapshot drift x1 |
+| S99 | Green | focused failing tests pass after minimal repair | focused 4 tests -> `4 passed in 3.04s` | command | pass | orchestrator rerun after dev-coder repair |
+| S99 | Green | final local static-analysis gate remains green | `make lint` -> Ruff check pass; Ruff format check pass; mypy pass | command | pass | 142 mypy source files checked |
+| S99 | Green | final full suite passes | `uv run pytest` -> `1407 passed, 76 skipped in 707.10s (0:11:47)` | command | pass | no remaining failures |
+| S99 | Green | SpecDock dogfooding workspace remains valid | `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=140` | command | pass | after S99 repair |
+| S99 | Green | grouped script failure aggregation is covered by negative test | `uv run pytest tests/unit/test_static_analysis_script.py` -> `1 passed in 0.16s` | command | pass | added after QA P2 |
+| S99 | Refactor | no whitespace / patch hygiene issues | `git diff --check` -> pass | command | pass | no whitespace errors |
+
+### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S99 | install_root inventory parity tests can observe generated `.pyc` files created during local runs | full pytest | `tests/unit/infra/test_init_update.py` に generated Python cache path helper を追加し、source/wheel/sdist/installed/parity inventory で一貫除外 | tc-s99-001 | no | focused 4 tests pass; full pytest pass |
+| S99 | dogfooding `.meta.json` strict snapshot did not include current `iss-00225` and existing `epic-00224` metadata | full pytest / dev-coder follow-up | strict snapshot と empty `depends_on` baseline に現 checkout の metadata を追加 | tc-s99-001 | no | focused 4 tests pass; full pytest pass |
+| S99 | grouped static-analysis script had no automated negative coverage for failure aggregation | qa-reviewer | `tests/unit/test_static_analysis_script.py` を追加し、stubbed `uv` で first phase fail / later phases pass / summary / non-zero exit を検証 | tc-s99-002 | no | focused new test pass |
+| S99 | `tests.unit.infra.test_init_update` mypy override remains relatively broad | qa-reviewer | 今回は residual P2 として記録し、別 issue 候補にする | follow-up-candidate | no | D-014 |
+
+### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S99 | tc-s99-001, tc-s99-002 | final local gates and full test suite are green; any remaining drift is repaired or recorded | `make lint` pass; focused 4 tests pass; new negative test pass; `uv run pytest` pass; `spec-dock validate` pass; `git diff --check` pass; S99 code-reviewer pass | pass | external CI remains PR-preparation evidence |
+
+### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s99-001 | S99 | yes | command + reviewer | full pytest red: 4 failures | focused 4 tests; `make lint`; `uv run pytest`; `./spec-dock/scripts/spec-dock validate`; `git diff --check`; code-reviewer | pass | full suite final result: 1407 passed, 76 skipped |
+| tc-s99-002 | S99 | yes | command + reviewer | QA P2: failure aggregation covered only by inspection / green path | `uv run pytest tests/unit/test_static_analysis_script.py`; `make lint` | pass | focused result: 1 passed in 0.16s |
+
+### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s99-001 | S99 | `make lint`; focused 4 tests; full pytest; validate; diff-check; code-reviewer pass | pass | issue-local final quality gate green |
+| tc-s99-002 | S99 | focused negative test; `make lint`; QA P2 disposition | pass | AC-003 failure aggregation regression covered |
+
+### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added discovered repair | tc-s99-001 | full-pytest-repair | tc-s99-001 | final full suite found cache/snapshot drift that was not visible in narrow step checks | no | yes: code-reviewer pass obtained |
+| added QA P2 test | tc-s99-002 | static-analysis-script-negative | tc-s99-002 | final QA found failure aggregation automation gap | no | yes: final QA rerun required |
+
+### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S99-repair | delegated | source/test repair required after full-test failure | dev-coder | repair the four observed full-test failures | final quality gate + observed pytest failures | `tests/unit/infra/test_init_update.py` only | source/config/workflow/docs/report edits; broad snapshot weakening; commit | focused failing tests; `make lint` | failure cause outside issue scope or ambiguous destructive fix | changed files; test results; residual risk | pass |
+| S99-negative-test | delegated | final QA P2 test coverage improvement | dev-coder | add static-analysis script failure aggregation negative test | final QA finding + AC-003 | test-only change | source/config/workflow/docs/report edits; unrelated cleanup; commit | focused new test; `make lint` | test requires real Ruff/mypy or large harness | changed file; test results; residual risk | pass |
+
+### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S99-repair | dev-coder | generated Python cache を inventory parity から除外し、dogfooding metadata / depends_on snapshot を現 checkout に更新 | `tests/unit/infra/test_init_update.py` | focused 4 tests -> 4 passed; `make lint` -> pass | pass: code-reviewer `019ef3c2-3034-7440-aaf1-13f226a51151` | full pytest was not run by worker; parent reran and passed | accepted for final quality gate |
+| S99-negative-test | dev-coder | `run.sh` が first phase failure 後も later phases を実行し summary/non-zero exit を返す negative test を追加 | `tests/unit/test_static_analysis_script.py` | focused new test -> 1 passed; `make lint` -> pass | pass: qa-reviewer `019ef3e2-cae0-75c3-a2e5-09c134e57cb0`; code-reviewer `019ef3e2-ff3f-7c23-beaa-700e3b7dcddc`; spec-reviewer `019ef3e6-6963-7b31-bad5-505ec70e7fd1` | stubbed `uv` test; real Ruff/mypy は `make lint` で別途 green | accepted for final commit |
+
+### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S99 | repair code review | code-reviewer | fresh | passed | N/A | proceed to final integrated reviews | pass: code-reviewer `019ef3c2-3034-7440-aaf1-13f226a51151`; no findings |
+| S99 | final QA first pass | qa-reviewer | fresh | passed with P2 | P2-1 fixed; P2-2 deferred as follow-up candidate | rerun final QA after negative test | qa-reviewer `019ef3d0-a232-7d50-aaf4-7444cc84def5` |
+| S99 | final code review first pass | code-reviewer | fresh | passed | N/A | rerun final code review after negative test | code-reviewer `019ef3d0-c34b-7b42-86bf-d14238aa7cf4`; no findings |
+| S99 | final QA rerun | qa-reviewer | fresh | passed with P2 | D-014 accepted as non-blocking follow-up candidate | proceed to final spec review | qa-reviewer `019ef3e2-cae0-75c3-a2e5-09c134e57cb0` |
+| S99 | final code review rerun | code-reviewer | fresh | passed with P2 | D-014 accepted as non-blocking follow-up candidate | proceed to final spec review | code-reviewer `019ef3e2-ff3f-7c23-beaa-700e3b7dcddc` |
+| S99 | final spec review rerun | spec-reviewer | fresh | passed with P2 | D-014 accepted as non-blocking follow-up candidate | proceed to final commit | spec-reviewer `019ef3e6-6963-7b31-bad5-505ec70e7fd1` |
+
+### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S99 | committed | `tests/unit/infra/test_init_update.py`; `tests/unit/test_static_analysis_script.py`; `report.md` S99 evidence | final S99 commit: `test(static-analysis): 最終品質ゲートの回帰証跡を追加` | `git status --short` -> clean; `./spec-dock/scripts/spec-dock validate` -> ok nodes=140 | N/A | N/A | N/A | N/A |
+
+### 変更したファイル
+- `tests/unit/infra/test_init_update.py` - generated Python cache inventory filtering and dogfooding metadata snapshot update.
+- `tests/unit/test_static_analysis_script.py` - static-analysis script failure aggregation negative test.
+- `report.md` - S90 commit correction, D-012, and S99 observed evidence.
+
+### コミット
+- final S99 commit: `test(static-analysis): 最終品質ゲートの回帰証跡を追加`
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| README Testing | yes | doc-writer | `README.md` adds `make lint` local static-analysis gate | pending |
-| dogfooding generated runtime / installed agent assets | yes | spec-manager | `uvx --from . spec-dock update .`; `.agents/skills/...` and `spec-dock/scripts/spec_dock_runtime/...` refreshed; validate pass; provider/generated cmp mismatchなし | pending |
+| README Testing | yes | doc-writer | `README.md` adds `make lint` local static-analysis gate | pass: spec-reviewer `019ef3ad-271c-7243-8015-4bd253094331` |
+| dogfooding generated runtime / installed agent assets | yes | spec-manager | `uvx --from . spec-dock update .`; `.agents/skills/...` and `spec-dock/scripts/spec_dock_runtime/...` refreshed; validate pass; provider/generated cmp mismatchなし | pass: spec-reviewer `019ef3ad-271c-7243-8015-4bd253094331` |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | sufficient; remaining mypy override granularity is P2 follow-up candidate D-014 | `make lint` -> pass; focused 5 tests -> pass; full `uv run pytest` -> 1407 passed, 76 skipped; validate -> pass; report evidence | pass: qa-reviewer `019ef3e2-cae0-75c3-a2e5-09c134e57cb0` |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | P2 mypy override granularity recorded as D-014 follow-up candidate; no blocking correctness findings | 1 | pass: code-reviewer `019ef3e2-ff3f-7c23-beaa-700e3b7dcddc` |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | first pass failed on pending final-gate ledger and missing new test in final commit scope; fixed in report. Rerun P2 D-014 only | 1 | pass: spec-reviewer `019ef3e6-6963-7b31-bad5-505ec70e7fd1` |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S99 report and final quality evidence updated through QA/code/spec-review finding fixes | `tests/unit/infra/test_init_update.py`; `tests/unit/test_static_analysis_script.py`; `report.md` | PR preparation / external CI observation | committed; external CI pending PR observation |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: final full `uv run pytest` で generated `.pyc` と dogfooding metadata snapshot drift による 4 failures が発生した。
+  - 解決: generated Python cache を inventory parity から除外し、strict dogfooding snapshot を現 checkout の metadata に更新した。
 
 ## 学んだこと (任意)
-- ...
+- `make lint` は静的解析の主ゲートとして green だったが、full pytest は dogfooding snapshot と packaging inventory の drift を検出するため、final gate で別途実行する必要がある。
 
 ## 今後の推奨事項 (任意)
-- ...
+- pre-commit 導入は本 issue の scope 外。別 issue で `make lint` を commit 前に実行する導線を設計する。
 
 ## 省略/例外メモ (必須)
 - 該当なし

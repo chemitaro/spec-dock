@@ -353,6 +353,11 @@ class TestInitUpdate(CliRuntimeHarness):
         )
         assert copied == []
 
+    @staticmethod
+    def _is_generated_python_cache_path(path: Path | str) -> bool:
+        normalized_path = Path(path)
+        return "__pycache__" in normalized_path.parts or normalized_path.name.endswith(".pyc")
+
     def _uninstall_json_actions(self, target: Path, *args: str) -> dict[str, dict[str, object]]:
         exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json", *args])
         assert exit_code == 0, stderr
@@ -1081,6 +1086,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00137-worktree-list-show-delete-commands/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00143-manage-external-git-worktrees/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00153-worktree-remove-default-full-delete/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00225-configure-ruff-mypy-static-analysis/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00001-multilayer-specification-foundation/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00001-multilayer-specification-foundation/issues/iss-00007-child-node-scripts-and-supplements/.meta.json",
@@ -1187,6 +1193,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00218-codex-review-fallback-signal-semantics/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00219-carryover-unresolved-threads-stop-observation/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00222-forbid-checks-api-pr-observation/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH: ClassVar[dict[str, object]] = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1223,6 +1230,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00137-worktree-list-show-delete-commands/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00143-manage-external-git-worktrees/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00153-worktree-remove-default-full-delete/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00225-configure-ruff-mypy-static-analysis/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00001-multilayer-specification-foundation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00001-multilayer-specification-foundation/issues/iss-00007-child-node-scripts-and-supplements/.meta.json": [],
@@ -1403,6 +1411,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00218-codex-review-fallback-signal-semantics/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00219-carryover-unresolved-threads-stop-observation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00222-forbid-checks-api-pr-observation/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
         "iss-00035": ["iss-00036"],
@@ -2791,7 +2800,7 @@ class TestInitUpdate(CliRuntimeHarness):
         return {
             candidate.relative_to(source_root).as_posix()
             for candidate in install_root.rglob("*")
-            if candidate.is_file()
+            if candidate.is_file() and not self._is_generated_python_cache_path(candidate)
         }
 
     def _issue_69_collect_wheel_install_root_inventory(self, wheel_path: Path) -> set[str]:
@@ -2799,7 +2808,9 @@ class TestInitUpdate(CliRuntimeHarness):
             return {
                 member
                 for member in wheel_zip.namelist()
-                if member.startswith("spec_dock/assets/install_root/") and not member.endswith("/")
+                if member.startswith("spec_dock/assets/install_root/")
+                and not member.endswith("/")
+                and not self._is_generated_python_cache_path(member)
             }
 
     def _issue_69_collect_sdist_install_root_inventory(self, sdist_path: Path) -> set[str]:
@@ -2814,7 +2825,9 @@ class TestInitUpdate(CliRuntimeHarness):
                 if not relative_member.startswith("src/"):
                     continue
                 artifact_relative = relative_member.removeprefix("src/")
-                if artifact_relative.startswith("spec_dock/assets/install_root/"):
+                if artifact_relative.startswith(
+                    "spec_dock/assets/install_root/"
+                ) and not self._is_generated_python_cache_path(artifact_relative):
                     sdist_inventory.add(artifact_relative)
         return sdist_inventory
 
@@ -2825,7 +2838,7 @@ class TestInitUpdate(CliRuntimeHarness):
         return {
             f"spec_dock/{candidate.relative_to(package_root).as_posix()}"
             for candidate in install_root.rglob("*")
-            if candidate.is_file() and "__pycache__" not in candidate.parts and not candidate.name.endswith(".pyc")
+            if candidate.is_file() and not self._is_generated_python_cache_path(candidate)
         }
 
     def _issue_69_collect_install_root_artifact_surfaces(self) -> dict[str, set[str]]:
@@ -10722,7 +10735,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             expected_inventory = {
                 candidate.relative_to(install_root).as_posix()
                 for candidate in install_root.rglob("*")
-                if candidate.is_file()
+                if candidate.is_file() and not self._is_generated_python_cache_path(candidate)
             }
 
         managed_targets = {mapping.target_rel.as_posix() for mapping in plan.current_file_mappings}
@@ -11518,7 +11531,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 provider_rel_paths.update(
                     path.relative_to(install_root).as_posix()
                     for path in provider_prefix_path.rglob("*")
-                    if path.is_file()
+                    if path.is_file() and not self._is_generated_python_cache_path(path)
                 )
 
             if checked_in_prefix_path.is_file():
@@ -11530,7 +11543,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 checked_in_rel_paths.update(
                     path.relative_to(repo_root).as_posix()
                     for path in checked_in_prefix_path.rglob("*")
-                    if path.is_file()
+                    if path.is_file() and not self._is_generated_python_cache_path(path)
                 )
 
         assert checked_in_rel_paths == provider_rel_paths, (
