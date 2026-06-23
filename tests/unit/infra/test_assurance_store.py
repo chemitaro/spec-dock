@@ -127,7 +127,30 @@ def test_missing_contract_is_strict_legacy_not_invalid(tmp_path: Path) -> None:
     assert result.contract is None
 
 
-@pytest.mark.parametrize(("role", "filename"), [("requirement", "requirement.md"), ("design", "design.md"), ("plan", "plan.md")])
+def test_write_contract_rejects_symlinked_assurance_contract_without_touching_target(tmp_path: Path) -> None:
+    assurance, AssuranceStore, AssuranceStoreError = _runtime_modules()
+    issue_dir = _make_issue(tmp_path)
+    store = AssuranceStore(tmp_path)
+    target = store.resolve_issue_target("iss-00227")
+    external = tmp_path / "external-assurance.json"
+    external.write_text('{"keep": true}\n', encoding="utf-8")
+    (issue_dir / "assurance.json").symlink_to(external)
+    contract = assurance.build_assurance_contract(
+        issue_id=target.issue_id,
+        stage=assurance.ClassificationStage.REQUIREMENT,
+        source_binding=store.build_requirement_source_binding(target),
+    )
+
+    with pytest.raises(AssuranceStoreError) as excinfo:
+        store.write_contract(target, contract)
+
+    assert excinfo.value.reason == "contract_path_symlink"
+    assert external.read_text(encoding="utf-8") == '{"keep": true}\n'
+
+
+@pytest.mark.parametrize(
+    ("role", "filename"), [("requirement", "requirement.md"), ("design", "design.md"), ("plan", "plan.md")]
+)
 def test_verify_contract_rejects_stale_planning_source_binding(
     tmp_path: Path,
     role: str,

@@ -179,12 +179,32 @@ class AssuranceStore:
             )
         return result
 
+    def ensure_contract_writable(self, target: ResolvedIssueTarget) -> None:
+        self._contract_write_path(target)
+
     def write_contract(self, target: ResolvedIssueTarget, contract: AssuranceContract) -> Path:
         errors = validate_assurance_contract(contract)
         if errors:
             raise AssuranceStoreError("invalid_contract", ", ".join(errors))
-        path = target.issue_dir / "assurance.json"
+        path = self._contract_write_path(target)
         path.write_bytes(canonical_json_bytes(contract))
+        return path
+
+    def _contract_write_path(self, target: ResolvedIssueTarget) -> Path:
+        path = target.issue_dir / "assurance.json"
+        if path.is_symlink():
+            raise AssuranceStoreError(
+                "contract_path_symlink",
+                f"Refusing to write symlinked assurance contract: {path.relative_to(self.repo_root)}",
+            )
+        resolved_parent = path.parent.resolve()
+        if not _is_relative_to(resolved_parent, self.repo_root) or not _is_relative_to(
+            resolved_parent, target.issue_dir
+        ):
+            raise AssuranceStoreError(
+                "contract_path_outside_issue",
+                f"Refusing to write assurance contract outside target issue: {path.relative_to(self.repo_root)}",
+            )
         return path
 
     def _resolve_active_issue_target(self) -> ResolvedIssueTarget:

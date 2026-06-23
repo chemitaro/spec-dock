@@ -25,19 +25,39 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             assert payload["ok"] is True
             assert payload["status"] == "applied"
             assert payload["classification"]["authorized_profile"] == "standard"
-            assert sorted(payload["changed_paths"]) == sorted(
-                [
-                    (issue_dir / "design.md").relative_to(target).as_posix(),
-                    (issue_dir / "plan.md").relative_to(target).as_posix(),
-                    (issue_dir / "report.md").relative_to(target).as_posix(),
-                ]
-            )
+            assert sorted(payload["changed_paths"]) == sorted([
+                (issue_dir / "design.md").relative_to(target).as_posix(),
+                (issue_dir / "plan.md").relative_to(target).as_posix(),
+                (issue_dir / "report.md").relative_to(target).as_posix(),
+            ])
             for artifact in ("design", "plan", "report"):
                 text = (issue_dir / f"{artifact}.md").read_text(encoding="utf-8")
                 assert "spec-dock:managed-section begin" in text
-                assert f"artifact\": \"{artifact}\"" not in text
+                assert f'artifact": "{artifact}"' not in text
                 assert payload["artifacts"][artifact]["changed"] is True
                 assert payload["artifacts"][artifact]["added_section_ids"]
+
+    def test_assurance_compose_single_artifact_only_changes_selected_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_classified_fixture(target)
+            before = self._artifact_texts(issue_dir)
+
+            result = self._run_runtime_capture(
+                target,
+                ["assurance", "compose", "--artifact", "design", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ok"] is True
+            assert payload["status"] == "applied"
+            assert payload["changed_paths"] == [(issue_dir / "design.md").relative_to(target).as_posix()]
+            assert tuple(payload["artifacts"]) == ("design",)
+            assert (issue_dir / "design.md").read_text(encoding="utf-8") != before["design"]
+            assert (issue_dir / "plan.md").read_text(encoding="utf-8") == before["plan"]
+            assert (issue_dir / "report.md").read_text(encoding="utf-8") == before["report"]
 
     def test_assurance_compose_second_run_is_unchanged(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -46,7 +66,9 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             self._create_classified_fixture(target)
 
             first = self._run_runtime_capture(target, ["assurance", "compose", "--artifact", "all", "--format", "json"])
-            second = self._run_runtime_capture(target, ["assurance", "compose", "--artifact", "all", "--format", "json"])
+            second = self._run_runtime_capture(
+                target, ["assurance", "compose", "--artifact", "all", "--format", "json"]
+            )
 
             assert first.returncode == 0, first.stdout + first.stderr
             assert second.returncode == 0, second.stdout + second.stderr
@@ -181,6 +203,31 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             assert payload["reason"] == "invalid_schema"
             assert "source_binding_path_not_issue_local" in " ".join(payload["details"])
             assert external.read_text(encoding="utf-8") == "# External\n"
+
+    def test_assurance_compose_rejects_symlinked_contract_before_artifact_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_classified_fixture(target)
+            external = target / "external-assurance.json"
+            contract_path = issue_dir / "assurance.json"
+            contract_text = contract_path.read_text(encoding="utf-8")
+            external.write_text(contract_text, encoding="utf-8")
+            contract_path.unlink()
+            contract_path.symlink_to(external)
+            before = self._artifact_texts(issue_dir)
+
+            result = self._run_runtime_capture(
+                target,
+                ["assurance", "compose", "--artifact", "all", "--format", "json"],
+            )
+
+            assert result.returncode == 1
+            assert "Refusing to write symlinked assurance contract" in result.stderr
+            assert self._artifact_texts(issue_dir) == before
+            assert external.read_text(encoding="utf-8") == contract_text
+            contract_path.unlink()
+            contract_path.write_text(contract_text, encoding="utf-8")
 
     def test_assurance_compose_dry_run_does_not_write_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

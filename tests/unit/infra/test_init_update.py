@@ -19582,6 +19582,157 @@ esac
         assert payload["recommended_next_action"] == "wait_or_resume"
         assert "required_checks_missing_or_pending" not in [item["code"] for item in payload["limitations"]]
 
+    def test_issue_170_pr_observation_wait_maps_failed_required_rollup_to_fix_ci(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            out_dir = tmp_path / "out"
+            scenario_path = tmp_path / "scenario.json"
+            state_path = tmp_path / "state.txt"
+            scenario_path.write_text(
+                json.dumps([
+                    {
+                        "head": "a" * 40,
+                        "ci": "passed",
+                        "review": "approved",
+                        "merge_state_status": "BLOCKED",
+                        "status_check_rollup": [{"name": "test", "status": "COMPLETED", "conclusion": "FAILURE"}],
+                    },
+                ]),
+                encoding="utf-8",
+            )
+            self._issue_75_write_pr_observation_wait_fake_gh(
+                fake_gh,
+                scenario_path=scenario_path,
+                state_path=state_path,
+            )
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_WAIT_SCENARIO": str(scenario_path),
+                "GH_FAKE_WAIT_STATE": str(state_path),
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                    "--timeout-seconds",
+                    "2",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "1",
+                    "--out",
+                    str(out_dir),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=6,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+        assert payload["normalized_status"] == "failed"
+        assert payload["recommended_next_action"] == "fix_ci"
+
+    def test_issue_170_pr_observation_wait_maps_failed_required_status_state_to_fix_ci(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            scenario_path = tmp_path / "scenario.json"
+            state_path = tmp_path / "state.txt"
+            scenario_path.write_text(
+                json.dumps([
+                    {
+                        "head": "a" * 40,
+                        "ci": "passed",
+                        "review": "approved",
+                        "merge_state_status": "BLOCKED",
+                        "status_check_rollup": [{"name": "legacy-status", "state": "FAILURE", "conclusion": None}],
+                    },
+                ]),
+                encoding="utf-8",
+            )
+            self._issue_75_write_pr_observation_wait_fake_gh(
+                fake_gh,
+                scenario_path=scenario_path,
+                state_path=state_path,
+            )
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_WAIT_SCENARIO": str(scenario_path),
+                "GH_FAKE_WAIT_STATE": str(state_path),
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-mode",
+                    "resume",
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                    "--timeout-seconds",
+                    "2",
+                    "--poll-interval-seconds",
+                    "1",
+                    "--quiet-seconds",
+                    "1",
+                    "--same-fingerprint-count",
+                    "1",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=6,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+        assert payload["normalized_status"] == "failed"
+        assert payload["recommended_next_action"] == "fix_ci"
+
     def _issue_222_run_observation_snapshot_scenario(
         self,
         scenario: dict[str, object],

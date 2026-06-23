@@ -38,6 +38,8 @@ class AssuranceStoreLike(Protocol):
 
     def verify_contract(self, target: Any) -> Any: ...
 
+    def ensure_contract_writable(self, target: Any) -> None: ...
+
 
 class ArtifactStoreLike(Protocol):
     def artifact_kinds(self, selection: str) -> tuple[Any, ...]: ...
@@ -97,7 +99,9 @@ def compose_assurance(
 
     contract = store_result.contract
     manifest = artifact_store.load_profile_section_manifest()
-    artifacts = [artifact_store.read_artifact(target, artifact) for artifact in artifact_store.artifact_kinds(request.artifact)]
+    artifacts = [
+        artifact_store.read_artifact(target, artifact) for artifact in artifact_store.artifact_kinds(request.artifact)
+    ]
     composed = [
         (
             artifact,
@@ -131,6 +135,8 @@ def compose_assurance(
 
     changed = [(artifact, result) for artifact, result in composed if result.changed]
     if not request.dry_run:
+        if changed:
+            store.ensure_contract_writable(target)
         for artifact, result in changed:
             if result.output_text is not None:
                 artifact_store.write_artifact(artifact, result.output_text)

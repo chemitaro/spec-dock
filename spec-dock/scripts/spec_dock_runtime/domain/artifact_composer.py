@@ -306,10 +306,10 @@ def _malformed_marker_errors(text: str) -> list[MarkerConflict]:
 def _render_section(section: ManagedSection) -> str:
     body = section.body.rstrip()
     return (
-        f"<!-- spec-dock:managed-section begin id=\"{section.section_id}\" -->\n"
+        f'<!-- spec-dock:managed-section begin id="{section.section_id}" -->\n'
         f"{section.heading}\n"
         f"{body}\n"
-        f"<!-- spec-dock:managed-section end id=\"{section.section_id}\" -->"
+        f'<!-- spec-dock:managed-section end id="{section.section_id}" -->'
     )
 
 

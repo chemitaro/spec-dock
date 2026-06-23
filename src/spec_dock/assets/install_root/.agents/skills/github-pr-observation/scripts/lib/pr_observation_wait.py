@@ -114,6 +114,47 @@ def has_waitable_required_actions_context_limitation(payload: dict) -> bool:
     )
 
 
+def required_check_rollup_status(repo: str, pr: str, timeout_seconds: float) -> str | None:
+    try:
+        proc = subprocess.run(
+            ["gh", "pr", "view", pr, "--repo", repo, "--json", "mergeStateStatus,statusCheckRollup"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=max(0.1, timeout_seconds),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        payload = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return None
+    rollup = payload.get("statusCheckRollup")
+    if not isinstance(rollup, list):
+        return None
+    merge_state = str(payload.get("mergeStateStatus") or "").upper()
+    for item in rollup:
+        if not isinstance(item, dict):
+            continue
+        state = str(item.get("state") or item.get("status") or "").upper()
+        conclusion = str(item.get("conclusion") or "").upper()
+        if state in {"FAILURE", "FAILED", "ERROR"}:
+            return "failed"
+        if conclusion in {"FAILURE", "FAILED", "ERROR", "TIMED_OUT", "CANCELLED"}:
+            return "failed"
+        if state and state not in {"COMPLETED", "SUCCESS"}:
+            return "pending"
+        if state == "COMPLETED" and conclusion and conclusion not in {"SUCCESS", "SKIPPED", "NEUTRAL"}:
+            return "failed"
+        if state == "COMPLETED":
+            continue
+        if not conclusion:
+            return "pending" if merge_state in {"BLOCKED", "DIRTY", "UNKNOWN"} else None
+    return None
+
+
 def sanitized_review_signals(payload: dict) -> list:
     review = payload.get("review")
     if not isinstance(review, dict):
@@ -1617,6 +1658,26 @@ while True:
         poll,
         zero_check_grace_polls,
     )
+    event_normalized_status = normalized_status
+    required_rollup_status = None
+    if normalized_status == "passed":
+        required_rollup_status = required_check_rollup_status(
+            repo,
+            pr,
+            timeout_seconds=max(0.1, min(2.0, deadline - time.monotonic())),
+        )
+        if required_rollup_status == "failed":
+            normalized_status = "failed"
+            overall_status = "failed"
+            next_action = "fix_ci"
+            can_complete_when_stable = False
+            terminal_now = True
+        elif required_rollup_status == "pending":
+            normalized_status = "pending"
+            overall_status = "pending"
+            next_action = "wait"
+            can_complete_when_stable = False
+            terminal_now = False
     stable = same_count >= same_fingerprint_count and quiet_elapsed >= quiet_seconds
     review_completion_unknown_candidate = is_review_completion_unknown_candidate(payload)
     review_trigger_age_seconds = age_seconds_from_timestamp(trigger_created_at_for_latency(payload, trigger_created_at))
@@ -1747,7 +1808,7 @@ while True:
         "poll": poll,
         "fingerprint": fingerprint,
         "changed": changed,
-        "normalized_status": normalized_status,
+        "normalized_status": event_normalized_status,
         "observation_complete": observation_complete,
         "ci": payload.get("summary", {}).get("ci"),
         "review": payload.get("summary", {}).get("review"),
