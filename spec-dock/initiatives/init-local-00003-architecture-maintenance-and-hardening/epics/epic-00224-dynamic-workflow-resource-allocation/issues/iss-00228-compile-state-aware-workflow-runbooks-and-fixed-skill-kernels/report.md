@@ -474,14 +474,30 @@ All checks passed!
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ | クロージャ状態 | コミット範囲 | コミットハッシュ / 最終台帳 | コミット後 clean 確認 | 差分なし根拠 | 差分なし確認済み契約 / ファイル | 差分なし diff-clean コマンド | 差分なし read-only 確認 |
 |---|---|---|---|---|---|---|---|---|
-| S03 | ready for review | S03 skill/tests/report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S03 | committed | S03 skill/tests/report evidence | `6ff5df36` | clean before S90 | N/A | N/A | `git status --short` | no output before S90 update |
 
 ## 最終品質ゲート（Final Quality Gate）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当 | 証跡 | 仕様レビュアー結果 |
 |---|---|---|---|---|
-| dogfooding mirror / fixed skill / workflow runtime docs impact | yes during execution | doc-writer / orchestrator | pending S90 | pending |
+| dogfooding mirror / fixed skill / workflow runtime docs impact | yes during execution | orchestrator | `uv run python -m spec_dock.cli update .`; provider/mirror runtime diff empty; relevant Skill diff empty; `workflow next issue-execution` wrote ignored projections and returned `state=ready` after assurance classification; targeted validation passed | spec-reviewer pass, no findings |
+
+#### S90 実行証跡（Docs Impact Resolution Evidence）
+| クロージャID | ステップ | 証跡 | 観測結果 | メモ |
+|---|---|---|---|---|
+| tc-006 | S90 | `uv run python -m spec_dock.cli update .` | pass | provider assets were synced into the dogfooding workspace |
+| tc-006 | S90 | `diff -qr --exclude='__pycache__' src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime spec-dock/scripts/spec_dock_runtime` | pass / no output | provider runtime and dogfooding runtime match |
+| tc-006 | S90 | `diff -u src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md .agents/skills/spec-dock-issue-planning/SKILL.md` | pass / no output | planning Skill provider and installed mirror match |
+| tc-006 | S90 | `diff -u src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md .agents/skills/spec-dock-issue-execution/SKILL.md` | pass / no output | execution Skill provider and installed mirror match |
+| tc-006 | S90 | `./spec-dock/scripts/spec-dock workflow next issue-execution --format json` | pass; `projection.written=true`; `state=ready` | mirror runtime exposes workflow command and writes current Runbook projection |
+| tc-006 | S90 | `git status --short --ignored spec-dock/.agent/runbooks/current-runbook.json spec-dock/.agent/runbooks/current-runbook.md spec-dock/active/current-runbook.json spec-dock/active/current-runbook.md` | pass; `!! spec-dock/.agent/`; `!! spec-dock/active/` | generated current Runbook projection remains ignored |
+| tc-006 | S90 | `./spec-dock/scripts/spec-dock validate`; `uv run pytest tests/cli_runtime/test_workflow.py -q`; `uv run pytest tests/unit/infra/test_runbook_store.py -q`; `git diff --check` | pass | targeted validation after mirror sync |
+
+#### S90 発見事項（Discovered Runtime Dogfooding Evidence）
+| ステップ | 発見事項 | 対応 | 証跡 | 計画修正要否 |
+|---|---|---|---|---|
+| S90 | mirror 同期後、active issue に `assurance.json` がないため `workflow next issue-execution` が `classification-required` を返した | Runbook の guidance に従い `assurance classify --stage requirement --format json` を実行し、`assurance verify --format json` が `ok=true` / `status=valid` を返すことを確認した | `authorized_profile=standard`, `lite_candidate=false`, `obligation_source=authorized_profile`; 再実行した `workflow next issue-execution` は `state=ready` | no; new runtime contract の dogfooding evidence として記録 |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー | 範囲 | 統合テスト判断 | 証跡 | 結果 |
