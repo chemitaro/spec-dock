@@ -198,6 +198,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S02 | `cl-ac001-classify-contract-write`, `cl-ac004-strict-legacy-missing`, `cl-ac005-invalid-contract`, `cl-dc008-target-resolution`, `cl-ac006-layer-boundary` | S02 infra source binding, store read/write/verify, missing/invalid distinction, and target safety tests pass; code-reviewer pass required before commit | `uv run pytest tests/unit/infra/test_assurance_store.py` -> 5 passed; `uv run pytest tests/unit/domain/test_assurance.py tests/unit/infra/test_assurance_store.py` -> 14 passed; fresh code-reviewer pass | pass | Red evidence observed by worker: initial focused tests failed before `infra.assurance_store` existed; follow-up red tests reproduced semantic invalid schema crash and target-local schema gaps before validation fixes |
 | S03 | `cl-ac001-classify-contract-write`, `cl-ac004-strict-legacy-missing`, `cl-ac005-invalid-contract`, `cl-ac006-layer-boundary`, `cl-dc010-default-facts` | S03 application/presentation tests pass, related S01/S02 tests remain green, code-reviewer pass required before commit | `uv run pytest tests/unit/application/test_assurance.py tests/unit/presentation/test_assurance_text.py` -> 5 passed; `uv run pytest tests/unit/domain/test_assurance.py tests/unit/infra/test_assurance_store.py tests/unit/application/test_assurance.py tests/unit/presentation/test_assurance_text.py` -> 19 passed; fresh code-reviewer pass | pass | Red evidence observed by worker: S03 tests failed before application/presentation modules existed |
 | S04 | `cl-ac001-classify-contract-write`, `cl-ac004-strict-legacy-missing`, `cl-ac005-invalid-contract`, `cl-dc008-target-resolution`, `cl-ac006-layer-boundary` | S04 CLI assurance command tests pass, related S01-S04 tests remain green, broad CLI runtime boundary suite passes, code-reviewer pass required before commit | `uv run pytest tests/cli_runtime/test_assurance.py` -> 4 passed; related S01-S04 suite -> 23 passed; `uv run pytest tests/cli_runtime` -> 641 passed, 76 skipped; fresh code-reviewer pass | pass | Red evidence observed by worker: CLI tests failed before `assurance` argparse registration existed |
+| S90 | `cl-s90-provider-mirror-docs` | dogfooding mirror impact is resolved, docs/templates impact is updated or no-op justified, spec-reviewer pass required before commit | `uvx --from . spec-dock update .` -> ok; provider/mirror diff excluding `__pycache__` -> no output; `./spec-dock/scripts/spec-dock validate` -> ok nodes=148; mirror `assurance show` -> exit 0; fresh spec-reviewer pass | pass | Docs/templates inspected and no public command-reference update was required for iss-00227 |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -220,6 +221,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | `cl-ac005-invalid-contract` | S04 | yes | red-required | worker observed CLI tests failing before `assurance` parser registration | `uv run pytest tests/cli_runtime/test_assurance.py` | pass | invalid persisted JSON maps to `invalid`, exit 1, and machine-readable `reason` / `details` |
 | `cl-dc008-target-resolution` | S04 | yes | red-required | worker observed CLI tests failing before `assurance` parser registration | `uv run pytest tests/cli_runtime/test_assurance.py` | pass | explicit `--issue` id, GitHub number, and path take precedence over active issue |
 | `cl-ac006-layer-boundary` | S04 | yes | inspect/test | broad CLI runtime initially failed on S03 type-only infra import | `uv run pytest tests/cli_runtime`; S04 ruff command | pass | parser/registry/bootstrap remain additive command wiring; application store protocol avoids infra imports inspected by runtime shell boundary test |
+| `cl-s90-provider-mirror-docs` | S90 | yes | inspect-only | mirror lacked assurance runtime before local provider update | `uvx --from . spec-dock update .`; provider/mirror `diff -qr --exclude=__pycache__`; `./spec-dock/scripts/spec-dock validate`; mirror `assurance show` | pass | dogfooding mirror now matches provider runtime; docs/templates inspected with no-op rationale |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -246,6 +248,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | `cl-ac005-invalid-contract` | S04 | `uv run pytest tests/cli_runtime/test_assurance.py` | pass | CLI verify invalid persisted contract exits 1 with stable reason/details |
 | `cl-dc008-target-resolution` | S04 | `uv run pytest tests/cli_runtime/test_assurance.py` | pass | explicit CLI issue id/GitHub number/path target precedence covered |
 | `cl-ac006-layer-boundary` | S04 | `uv run pytest tests/cli_runtime`; S04 ruff command | pass | broad CLI runtime AST boundary suite passed after removing application type-only infra import |
+| `cl-s90-provider-mirror-docs` | S90 | `uvx --from . spec-dock update .`; `diff -qr --exclude=__pycache__ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime spec-dock/scripts/spec_dock_runtime`; `./spec-dock/scripts/spec-dock validate`; `./spec-dock/scripts/spec-dock assurance show --format json` | pass | dogfooding mirror synced from local provider and docs/templates no-op was reviewed |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -306,6 +309,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S02 | committed | `infra/assurance_store.py`, `tests/unit/infra/test_assurance_store.py`, S02 report evidence | `7c369295` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 | S03 | committed | `application/assurance.py`, `application/contracts.py`, `presentation/assurance_text.py`, S03 tests, S03 report evidence | `3b2ea12d` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 | S04 | committed | `commands/assurance.py`, CLI parser/registry/bootstrap wiring, `application/assurance.py` boundary cleanup, CLI runtime tests, S04 report evidence | S04 commit in git history: `feat(assurance): Assurance ContractのCLIを追加` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
+| S90 | ready-to-commit | dogfooding mirror runtime sync and S90 report evidence | pending | pending | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/assurance.py` - Assurance Contract v1 domain model, deterministic policy, serializer, validation helpers
@@ -322,6 +326,15 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/registry.py` - S04 command registry wiring
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - S04 assurance use case and store bootstrap wiring
 - `tests/cli_runtime/test_assurance.py` - S04 CLI runtime tests for write, strict-legacy missing, invalid contract, and explicit target precedence
+- `spec-dock/scripts/spec_dock_runtime/domain/assurance.py` - S90 dogfooding mirror sync of S01 provider runtime
+- `spec-dock/scripts/spec_dock_runtime/infra/assurance_store.py` - S90 dogfooding mirror sync of S02 provider runtime
+- `spec-dock/scripts/spec_dock_runtime/application/assurance.py` - S90 dogfooding mirror sync of S03 provider runtime
+- `spec-dock/scripts/spec_dock_runtime/application/contracts.py` - S90 dogfooding mirror sync of assurance request/result contracts
+- `spec-dock/scripts/spec_dock_runtime/presentation/assurance_text.py` - S90 dogfooding mirror sync of assurance presentation
+- `spec-dock/scripts/spec_dock_runtime/commands/assurance.py` - S90 dogfooding mirror sync of S04 CLI command
+- `spec-dock/scripts/spec_dock_runtime/cli/parser.py` - S90 dogfooding mirror sync of S04 parser wiring
+- `spec-dock/scripts/spec_dock_runtime/cli/registry.py` - S90 dogfooding mirror sync of S04 registry wiring
+- `spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py` - S90 dogfooding mirror sync of S04 bootstrap wiring
 
 #### コミット
 - `9a5f694f` `feat(assurance): Assurance Contractのドメイン分類を追加`
@@ -350,7 +363,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| dogfooding mirror `spec-dock/scripts/spec_dock_runtime/` | yes | main orchestrator | `uvx --from . spec-dock update .` -> ok; `diff -qr --exclude=__pycache__ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime spec-dock/scripts/spec_dock_runtime` -> no output; `./spec-dock/scripts/spec-dock validate` -> ok nodes=148; `./spec-dock/scripts/spec-dock assurance show --format json` -> exit 0 strict-legacy JSON for active `iss-00227` | pass |
+| docs / templates / README / workflow / skill / migration notes | no | N/A | inspected `src/spec_dock/assets/spec_dock/docs/`, `src/spec_dock/assets/spec_dock/templates/`, and `spec-dock/docs/`; no existing public command reference or template contract requires Assurance CLI text in iss-00227, and workflow docs already cover S90/S99 mechanics | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
