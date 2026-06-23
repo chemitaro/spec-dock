@@ -493,7 +493,7 @@ make lint
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S03 | ready to commit | S03 implementation files plus `report.md` S03 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S03 | committed | S03 implementation files plus `report.md` S03 evidence | `6073d741` `build(static-analysis): Ruff E違反を解消する` | `git status --short` -> clean; post-commit `make lint` -> pass; `spec-dock validate` -> pass | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `pyproject.toml` - Ruff `E` selection and planned `E501` ignore.
@@ -501,10 +501,113 @@ make lint
 - `report.md` - S02 commit correction and S03 observed evidence.
 
 #### コミット
-- pending S03 step commit.
+- `6073d741` `build(static-analysis): Ruff E違反を解消する`
 
 #### メモ
 - `E501` remains intentionally out of the semantic lint gate and will be handled by the dedicated format phase / final gate path.
+
+---
+
+### セッションログ（2026-06-23 HH:MM - HH:MM）
+
+#### 対象
+- Step: S04 — Ruff I / Isort
+- AC/EC: AC-005, EC-001
+
+#### 実施内容
+- `dev-coder` に S04 を委任し、許可 path を `pyproject.toml`, `src/spec_dock/**/*.py`, `tests/**/*.py` に限定した。
+- `pyproject.toml` の Ruff `select` を `["F", "E", "I"]` に変更した。
+- `[tool.ruff.lint.isort]` に `force-sort-within-sections = true` と `combine-as-imports = true` を追加した。
+- 初回 inventory は `I001 unsorted-imports` 125 件だった。`F` / `E` は 0 件。
+- 代表ファイルは `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py`, runtime `app.py`, `application/create_node.py`, `tests/unit/infra/test_init_update.py`, `tests/cli_runtime/test_worktree.py`。
+- `uv run ruff check --select F,E,I --fix src/spec_dock tests` で import order のみを修正した。
+- 変更範囲は 85 files。code-reviewer は非 import AST 変更なしと確認した。
+
+#### 実行コマンド / 結果
+```bash
+uv run ruff check --select F,E,I src/spec_dock tests
+# All checks passed!
+
+uv run ruff check --select F,E,I --statistics src/spec_dock tests
+# exit 0
+
+make lint
+# ==> ruff check
+# All checks passed!
+# Summary:
+# - ruff check: pass
+
+git diff --check
+# pass
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=140
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | Red / inventory | `tc-s04-001`: import order violation inventory | `I001` 125 件。`F` / `E` は 0 件 | worker command: `uv run ruff check --select F,E,I --statistics src/spec_dock tests` | pass | 全件 fixable |
+| S04 | Green | `F,E,I` violation 0 件 | `uv run ruff check --select F,E,I src/spec_dock tests` -> All checks passed | command | pass | 親側でも再実行済み |
+| S04 | Regression | import reorder が behavior を変えないこと | code-reviewer が import reordering only / no non-import AST changes と確認 | code-reviewer inspection | pass | pytest 未実行は reviewer が許容 |
+| S04 | Refactor | guardrail satisfied / no unrelated refactor | S05 以降 rule は追加せず、`spec-dock/` direct target なし | diff inspection | pass | formatter-only phase は S16 に残す |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | import reorder が runtime path injection / conditional import / monkeypatch 前提を壊す可能性 | orchestrator / code-reviewer | code-reviewer に重点確認を依頼 | tc-s04-001 | no | code-reviewer `019ef2d7-55da-7fa1-9963-ec6354fe2bd0` pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | tc-s04-001 | Ruff `I` と isort settings を追加し violation を 0 件にする | `pyproject.toml` select `["F", "E", "I"]`; isort settings added; `uv run ruff check --select F,E,I src/spec_dock tests` -> pass | pass | import reorder only |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s04-001 / tc-s04-case-001 | S04 | yes | command | initial `I001` inventory total 125 | `uv run ruff check --select F,E,I src/spec_dock tests` | pass | `F,E,I` violation 0 件 |
+| tc-s04-001 / tc-s04-inspection-001 | S04 | yes | inspection | import reorder affects 85 files | code-reviewer inspection | pass | no non-import AST changes detected |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s04-001 | S04 | `uv run ruff check --select F,E,I src/spec_dock tests`; `make lint`; `git diff --check`; `spec-dock validate`; code-reviewer pass | pass | AC-005 S04 closed pending commit |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s04-001 | tc-s04-case-001 | tc-s04-001 | planned closure unchanged; concrete command case recorded | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | delegated | import sorting implementation step | dev-coder | Ruff `I` enablement and import order fixes | requirement/design/plan S04 | `pyproject.toml`; `src/spec_dock/**/*.py`; `tests/**/*.py` | report edits; commit; S05+ rules; dogfooding `spec-dock/`; broad suppression | `uv run ruff check --select F,E,I src/spec_dock tests`; `make lint`; `git diff --check` | non-import semantic change; direct dogfooding edit needed | changed files; inventory; command results; ledger note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 | dev-coder | Ruff `I` enabled; isort settings added; 125 `I001` violations fixed via Ruff safe fix | `pyproject.toml`; 84 Python files under `src/spec_dock` and `tests` | `uv run ruff check --select F,E,I src/spec_dock tests` -> pass; `make lint` -> pass; `git diff --check` -> pass | pass: code-reviewer `019ef2d7-55da-7fa1-9963-ec6354fe2bd0` | none | accepted for S04 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit | pass: code-reviewer `019ef2d7-55da-7fa1-9963-ec6354fe2bd0`; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | ready to commit | S04 implementation files plus `report.md` S04 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `pyproject.toml` - Ruff `I` selection and isort settings.
+- `src/spec_dock/**/*.py`, `tests/**/*.py` - import order fixes from Ruff safe fix.
+- `report.md` - S03 commit correction and S04 observed evidence.
+
+#### コミット
+- pending S04 step commit.
+
+#### メモ
+- pytest was not run for S04 because the diff is import sorting only and code-reviewer accepted Ruff/lint/validate evidence as sufficient.
 
 ---
 
