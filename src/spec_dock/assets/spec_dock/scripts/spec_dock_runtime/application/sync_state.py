@@ -34,8 +34,8 @@ from ..domain.models import (
 )
 from ..domain.status import build_progress_map, resolve_issue_snapshot_by_issue_id
 from ..domain.tree import build_graph, select_active_chain
+from ..domain.discussion_docs import DISCUSSION_DOC_TIMESTAMP_FILENAME_RE as _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE
 from ..domain.validation import (
-    _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE,
     find_github_repo_scope_pairing_error,
     validate_graph_and_deps,
 )

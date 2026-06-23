@@ -15,7 +15,6 @@ import zipfile
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from types import SimpleNamespace
 
 try:
     import tomllib
@@ -12712,7 +12711,6 @@ exit 44
             tmp_path = Path(tmp_dir)
             fake_bin = tmp_path / "bin"
             fake_bin.mkdir()
-            out_dir = tmp_path / "out"
             fake_gh = fake_bin / "gh"
             gh_log = tmp_path / "gh.log"
             fake_gh.write_text(

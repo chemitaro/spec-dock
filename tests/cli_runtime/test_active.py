@@ -1,16 +1,11 @@
 import json
 import os
 import shutil
-import subprocess
-import sys
 import tempfile
 from pathlib import Path
-from types import SimpleNamespace
 
 from tests.cli_runtime.harness import (
     CliRuntimeHarness,
-    _EXPECTED_MANAGED_SKILL_NAMES,
-    _expected_spec_dock_version,
     main,
 )
 

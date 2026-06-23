@@ -4,7 +4,6 @@ from pathlib import Path
 
 from .deps import validate_deps_cycles
 from .discussion_docs import (
-    DISCUSSION_DOC_TIMESTAMP_FILENAME_RE as _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE,
     discussion_filename_expectation,
     is_malformed_discussion_doc_candidate,
     parse_legacy_discussion_doc_filename,
