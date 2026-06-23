@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "artifact_kinds": ["design", "plan", "report"],
+  "sections": {
+    "design.assurance-profile": {
+      "artifact": "design",
+      "heading": "## Assurance Profile",
+      "body": "- Record the authorized Assurance Profile and the planning obligations it adds.\n- Treat `authorized_profile` as the only profile authority."
+    },
+    "design.assurance-risks": {
+      "artifact": "design",
+      "heading": "## Assurance Risk Notes",
+      "body": "- Capture strict or critical risks that affect design review depth.\n- Keep source-binding assumptions explicit before execution handoff."
+    },
+    "design.critical-assurance": {
+      "artifact": "design",
+      "heading": "## Critical Assurance Controls",
+      "body": "- Identify safety, security, privacy, or rollback controls required before execution.\n- Preserve reviewer-visible escalation evidence."
+    },
+    "plan.lite-contract": {
+      "artifact": "plan",
+      "heading": "## Lite Assurance Contract",
+      "body": "- Use this only when `authorized_profile=lite` is explicitly present.\n- Do not infer Lite from `lite_candidate=true`."
+    },
+    "plan.step-contract": {
+      "artifact": "plan",
+      "heading": "## Step Assurance Contract",
+      "body": "- List step closure ids, required evidence level, and the expected verification command.\n- Keep execution one approved step at a time."
+    },
+    "plan.strict-review": {
+      "artifact": "plan",
+      "heading": "## Strict Review Gate",
+      "body": "- Require reviewer-visible evidence for changed contracts and failure modes.\n- Include regression and invariant coverage before step closure."
+    },
+    "plan.critical-review": {
+      "artifact": "plan",
+      "heading": "## Critical Review Gate",
+      "body": "- Require explicit escalation handling, rollback notes, and final gate evidence.\n- Do not proceed on stale or missing source authority."
+    },
+    "report.lite-evidence": {
+      "artifact": "report",
+      "heading": "## Lite Evidence",
+      "body": "- Record explicit Lite authorization and the evidence gate used to justify it."
+    },
+    "report.step-evidence": {
+      "artifact": "report",
+      "heading": "## Step Evidence",
+      "body": "- Record Red, Green, and refactor evidence for each executed step.\n- Link each closure id to its observed verification result."
+    },
+    "report.strict-evidence": {
+      "artifact": "report",
+      "heading": "## Strict Evidence",
+      "body": "- Record reviewer gate status, discovered tests, and unresolved risks.\n- Preserve stale authority or marker conflict observations."
+    },
+    "report.critical-evidence": {
+      "artifact": "report",
+      "heading": "## Critical Evidence",
+      "body": "- Record critical controls, rollback/revisit notes, and final quality gate disposition."
+    }
+  },
+  "profiles": {
+    "lite": {
+      "design": ["design.assurance-profile"],
+      "plan": ["plan.lite-contract"],
+      "report": ["report.lite-evidence"]
+    },
+    "standard": {
+      "design": ["design.assurance-profile"],
+      "plan": ["plan.step-contract"],
+      "report": ["report.step-evidence"]
+    },
+    "strict": {
+      "design": ["design.assurance-profile", "design.assurance-risks"],
+      "plan": ["plan.step-contract", "plan.strict-review"],
+      "report": ["report.step-evidence", "report.strict-evidence"]
+    },
+    "critical": {
+      "design": ["design.assurance-profile", "design.assurance-risks", "design.critical-assurance"],
+      "plan": ["plan.step-contract", "plan.strict-review", "plan.critical-review"],
+      "report": ["report.step-evidence", "report.strict-evidence", "report.critical-evidence"]
+    }
+  }
+}

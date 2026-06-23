@@ -65,6 +65,11 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         registry,
         "assurance_verify",
     )
+    _bind_leaf(
+        assurance_sub.add_parser("compose", help="Compose profile-aware planning artifact sections"),
+        registry,
+        "assurance_compose",
+    )
 
     p_workflow = sub.add_parser("workflow", help="Show state-aware workflow status and next runbooks")
     workflow_sub = p_workflow.add_subparsers(dest="workflow_cmd", required=True)

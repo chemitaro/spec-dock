@@ -63,8 +63,9 @@ class ValidationResult:
     checked_node_count: int
 
 
-AssuranceOperation = Literal["show", "classify", "verify"]
-AssuranceResultStatus = Literal["valid", "missing", "invalid"]
+AssuranceOperation = Literal["show", "classify", "verify", "compose"]
+AssuranceResultStatus = Literal["valid", "missing", "invalid", "applied", "unchanged", "dry-run"]
+ComposeArtifactSelection = Literal["design", "plan", "report", "all"]
 
 
 @dataclass(frozen=True)
@@ -85,9 +86,27 @@ class VerifyAssuranceRequest:
 
 
 @dataclass(frozen=True)
+class ComposeAssuranceRequest:
+    artifact: ComposeArtifactSelection
+    issue: str | Path | None = None
+    dry_run: bool = False
+
+
+@dataclass(frozen=True)
 class AssuranceTargetView:
     issue_id: str
     repo_relative_path: str
+
+
+@dataclass(frozen=True)
+class ComposeArtifactView:
+    artifact: str
+    path: str
+    changed: bool
+    added_section_ids: tuple[str, ...] = ()
+    preserved_section_ids: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -102,6 +121,12 @@ class AssuranceResult:
     contract: AssuranceContract | None
     dry_run: bool = False
     written_path: Path | None = None
+    authorized_profile: str | None = None
+    lite_candidate: bool | None = None
+    changed_paths: tuple[str, ...] = ()
+    artifacts: tuple[ComposeArtifactView, ...] = ()
+    warnings: tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()
 
     @property
     def has_contract(self) -> bool:
@@ -817,6 +842,9 @@ class UseCases:
     )
     verify_assurance: Callable[[VerifyAssuranceRequest], AssuranceResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("verify_assurance is not configured")
+    )
+    compose_assurance: Callable[[ComposeAssuranceRequest], AssuranceResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("compose_assurance is not configured")
     )
     workflow_status: Callable[[WorkflowStatusRequest], WorkflowResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("workflow_status is not configured")
