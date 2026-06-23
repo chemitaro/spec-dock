@@ -19,8 +19,8 @@ from spec_dock_runtime.domain.context_routing import (
     role_context_contract,
 )
 
-_STEP_HEADING_RE = re.compile(r"^##\s+実装ステップ\s+(S\d+)\s+—\s+(.+)$", re.MULTILINE)
-_ANY_HEADING_RE = re.compile(r"^##\s+", re.MULTILINE)
+_STEP_HEADING_RE = re.compile(r"^#{2,3}\s+実装ステップ\s+(S\d+)\s+[—-]\s+(.+)$", re.MULTILINE)
+_ANY_HEADING_RE = re.compile(r"^#{2,3}\s+", re.MULTILINE)
 
 
 @dataclass(frozen=True)
@@ -302,15 +302,59 @@ def _select_step(plan_text: str, report_text: str) -> dict[str, Any]:
 
 def _completed_step_ids(report_text: str) -> set[str]:
     completed_ids: set[str] = set()
-    session_matches = list(re.finditer(r"^###\s+セッションログ（[^\n]*(S\d+)[^\n]*$", report_text, re.MULTILINE))
+    session_matches = list(re.finditer(r"^###\s+セッションログ（[^\n]*$", report_text, re.MULTILINE))
     heading_starts = [heading.start() for heading in re.finditer(r"^###\s+", report_text, re.MULTILINE)]
     for match in session_matches:
-        step_id = match.group(1)
         block_end = next((start for start in heading_starts if start > match.start()), len(report_text))
         block = report_text[match.start() : block_end]
-        if _block_has_completed_step_row(block, step_id):
-            completed_ids.add(step_id)
+        for step_id in _session_step_ids(match.group(0), block):
+            if _block_has_completed_step_row(block, step_id):
+                completed_ids.add(step_id)
+        completed_ids.update(_completed_step_rows(block))
     return completed_ids
+
+
+def _session_step_ids(heading: str, block: str) -> set[str]:
+    step_ids = set(re.findall(r"\bS\d+\b", heading))
+    target_match = re.search(r"^####\s+対象\s*$", block, re.MULTILINE)
+    if target_match is None:
+        return step_ids
+    next_section = re.search(r"^####\s+", block[target_match.end() :], re.MULTILINE)
+    target_end = target_match.end() + next_section.start() if next_section is not None else len(block)
+    step_ids.update(re.findall(r"\bS\d+\b", block[target_match.end() : target_end]))
+    return step_ids
+
+
+def _completed_step_rows(block: str) -> set[str]:
+    completed_ids: set[str] = set()
+    completed_values = {"pass", "passed", "committed", "approved-no-op"}
+    incomplete_values = {"fail", "failed", "blocked"}
+    in_completion_section = False
+    for line in block.splitlines():
+        stripped = line.strip()
+        lowered = stripped.lower()
+        if lowered.startswith("####"):
+            in_completion_section = _is_completion_section(stripped, lowered)
+            continue
+        if not in_completion_section or not stripped.startswith("|") or not stripped.endswith("|"):
+            continue
+        cells = [cell.strip().lower() for cell in stripped.strip("|").split("|")]
+        if not cells or not re.fullmatch(r"s\d+", cells[0]):
+            continue
+        if any(cell in incomplete_values for cell in cells):
+            continue
+        if any(cell in completed_values for cell in cells):
+            completed_ids.add(cells[0].upper())
+    return completed_ids
+
+
+def _is_completion_section(stripped: str, lowered: str) -> bool:
+    return (
+        "ステップ契約の完了証跡" in stripped
+        or "step contract closure" in lowered
+        or "ステップ commit" in lowered
+        or "step commit gate" in lowered
+    )
 
 
 def _block_has_completed_step_row(block: str, step_id: str) -> bool:
@@ -322,12 +366,7 @@ def _block_has_completed_step_row(block: str, step_id: str) -> bool:
         stripped = line.strip()
         lowered = stripped.lower()
         if lowered.startswith("####"):
-            in_completion_section = (
-                "ステップ契約の完了証跡" in stripped
-                or "step contract closure" in lowered
-                or "ステップ commit" in lowered
-                or "step commit gate" in lowered
-            )
+            in_completion_section = _is_completion_section(stripped, lowered)
             continue
         if not in_completion_section:
             continue

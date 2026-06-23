@@ -185,9 +185,9 @@ def _resolve_state(store: WorkflowAssuranceStoreLike) -> WorkflowState:
             details=tuple(assurance.details),
         )
     return WorkflowState(
-        kind="classification-required",
+        kind="ready",
         active_issue_id=target.issue_id,
-        reason_code="assurance-missing",
+        reason_code="strict-legacy-missing-assurance",
         artifact_readiness="substantive",
         authority=STRICT_LEGACY_AUTHORITY,
     )
