@@ -58,6 +58,7 @@ Disposition ごとの必須証跡:
 | D-007 | resolved | implementation | dev-coder / orchestrator | S12 `RUF001` が日本語文言・全角句読点・期待文字列に大量発生した | 全置換する; top-level ignore のみ; target-scoped ignore; file-by-file ignore | `RUF001/RUF002/RUF003/RUF010` は `src/spec_dock/**/*.py` と `tests/**/*.py` の target-scoped ignore として扱い、`RUF067` は `src/spec_dock/__init__.py` のみ例外にする | 日本語文言と fullwidth 表記の可読性・意味を保ちつつ、explicit `--select RUF` 実行でも closure を満たす。`RUF012` など実バグ寄りの項目は修正した | applied | S12 session log; `pyproject.toml`; `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF src/spec_dock tests` -> pass | final reviewer gate |
 | D-008 | resolved | implementation | dev-coder / code-reviewer / orchestrator | S13 absolute import 化により `spec_dock_runtime` を Ruff の first-party import root として扱う必要が出た | relative import を suppress する; targeted `noqa` を追加する; Ruff `src` に provider package と shipped runtime scripts root を設定する | Ruff `src = ["src", "src/spec_dock/assets/spec_dock/scripts"]` を追加し、copied scaffold runtime の実行モデルと first-party 判定を一致させる | shipped entrypoint は consumer repo の `spec-dock/scripts` を `sys.path` に入れて `spec_dock_runtime.app` を import するため、provider 側でも同じ root を明示するのが最小で suppression 不要 | applied | S13 session log; code-reviewer `019ef36e-5f8c-7bb3-b2c1-3165a0c5d447`; `pyproject.toml`; `uv run pytest tests/cli_runtime` -> 637 passed, 76 skipped | none |
 | D-009 | resolved | test-strategy | dev-coder / orchestrator | S14 で mypy を `make lint` に追加すると、初回 inventory 段階では local gate が fail する | S14 では script に入れない; script に入れて expected fail として inventory 化; S14 で全修正まで行う | S14 で script に mypy を入れ、`make lint` fail を expected inventory evidence として扱う。0 件化は S15 に分離する | local command surface を早期に固定しつつ、大量 mypy error 修正を S15 に隔離する plan の意図を守る | applied | S14 session log; `scripts/static_analysis/run.sh`; `uv run mypy src/spec_dock tests` -> 362 errors; `make lint` -> expected fail | S15 cleanup |
+| D-010 | resolved | implementation | dev-coder / orchestrator / code-reviewer | S15 で source mypy errors は実修正できた一方、tests は dynamic JSON payload、runtime stubs、monkeypatch、fixture state に由来する test-only errors が大量に残った。初回 reviewer は `tests.*` 全体 override が広すぎると P2 指摘した | tests helper を広範囲に型付けし直す; `tests.*` 全体 override; module-local error-code override | source は実修正して full check し、tests override は観測済み 16 module と module-local error code のみに限定する | source error を suppression で隠さず、tests を command target に残したまま S15 を閉じる最小の移行策。`tests.*` 全体 override は reviewer P2 により撤去した | applied | S15 session log; code-reviewer `019ef38c-46c3-7760-835c-b36894e8304c` P2; P2 follow-up; code-reviewer `019ef392-411d-7eb2-95e8-aef6fbf65ce4` pass; `uv run mypy src/spec_dock tests` -> pass; `make lint` -> pass | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -1709,6 +1710,80 @@ git diff --check
 
 #### メモ
 - `make lint` is expected to fail after S14 until S15 resolves mypy errors. This is intentionally recorded as inventory evidence, not a final quality gate result.
+
+---
+
+## 実装セッションログ S15 — Mypy Error Cleanup
+
+### 実施概要
+- Step: S15 — Mypy Error Cleanup
+- Delegated worker: dev-coder `019ef37d-138e-7112-91e6-886e2b377ac0`
+- Scope: S14 inventory の mypy errors を 0 件化し、必要な targeted config を確定する。
+- Parent decision: source 側は型 narrowing / 変数名分離 / return contract 補強で実修正し、tests 側は dynamic test harness 特性に限定した module-local error-code override を D-010 として採用する。初回 code-reviewer の P2 により `tests.*` 全体 override は撤去した。
+
+### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S15 | Red / inventory replay | S14 inventory を再現する | `uv run mypy src/spec_dock tests` -> 362 errors in 28 files | command | pass | S14 と同じ baseline を確認 |
+| S15 | Green | `tc-s15-001`: mypy error 0 件 | `uv run mypy src/spec_dock tests` -> Success: no issues found in 142 source files | command | pass | AC-006 |
+| S15 | Local grouped gate | `make lint` が Ruff + mypy を通す | Ruff pass; mypy pass; summary pass | command | pass | S14 expected fail 解消 |
+| S15 | Refactor | broad source suppression なし | source に `disable_error_code` override なし; tests override は観測済み 16 module と module-local error code に限定 | diff inspection + P2 follow-up | pass | D-010 |
+
+### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S15 | `tests.*` 全体 override は test-only typing regressions を広く隠しうる | code-reviewer | `tests.*` override を撤去し、override なしで観測された 315 errors / 16 files に基づく module-local error-code override へ縮小 | tc-s15-001 | no | `pyproject.toml`; `uv run mypy src/spec_dock tests` -> pass; `make lint` -> pass |
+| S15 | S15 source fixes touched shipped runtime assets | dev-coder | `tests/cli_runtime` を focused regression として採用 | tc-s15-regression-001 | no | `uv run pytest tests/cli_runtime` -> 637 passed, 76 skipped |
+
+### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S15 | tc-s15-001 | mypy error 0 件、targeted config rationale 記録済み | `uv run mypy src/spec_dock tests` pass; `make lint` pass; D-010 recorded; `tests.*` broad override removed after P2 | pass | code-reviewer pass |
+
+### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s15-001 | S15 | yes | command + inspection | 362 mypy errors / 28 files; P2 follow-up showed no-override test state at 315 errors / 16 files | `uv run mypy src/spec_dock tests`; `make lint`; Ruff explicit command; `git diff --check`; validate | pass | module-local override rationale: D-010 |
+| tc-s15-regression-001 | S15 | conditional | command | shipped runtime source touched | `uv run pytest tests/cli_runtime`; targeted `tests/unit/infra/test_init_update.py -k ...` | pass | worker verification |
+
+### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s15-001 | S15 | `uv run mypy src/spec_dock tests`; `make lint`; Ruff explicit command; `git diff --check`; `./spec-dock/scripts/spec-dock validate`; code-reviewer pass | pass | AC-006/009 S15 closed pending commit |
+
+### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | tc-s15-001 | tc-s15-regression-001 | tc-s15-001 | source/runtime files touched by mypy cleanup required regression evidence | no | yes |
+
+### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S15 | delegated | mypy error cleanup step | dev-coder | source/test type cleanup and targeted config | requirement/design/plan S15 | `pyproject.toml`; `src/spec_dock/**/*.py`; `tests/**/*.py` as needed | S16 formatting; CI/pre-commit; dogfooding generated-copy source edits; commit; broad source suppression | mypy pass; Ruff pass; focused pytest; diff check | inability to reach mypy 0 without broad source suppression | changed files; green output; override rationale; risks | pass |
+
+### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S15 | dev-coder | source mypy errors fixed; S15 mypy strong settings added; broad `tests.*` override narrowed to observed module-local error-code overrides after P2; no report/commit edits | `pyproject.toml`; `src/spec_dock/cli.py`; 11 shipped runtime files | mypy pass; Ruff pass; `make lint` pass; `tests/cli_runtime` -> 637 passed, 76 skipped; targeted infra pytest -> 15 passed; `git diff --check` -> pass | pass: code-reviewer `019ef392-411d-7eb2-95e8-aef6fbf65ce4` | some large dynamic test modules still have local overrides | accepted for S15 step commit |
+
+### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S15 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit | first pass: `019ef38c-46c3-7760-835c-b36894e8304c` P2 on broad `tests.*`; rerun pass: `019ef392-411d-7eb2-95e8-aef6fbf65ce4` |
+
+### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S15 | ready to commit | S15 mypy cleanup files plus `report.md` S15 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+### 変更したファイル
+- `pyproject.toml` - mypy strong settings and tests-only error-code override.
+- `src/spec_dock/cli.py` - mypy narrowing for active fallback target resolution.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/**/*.py` - mypy cleanup for shipped runtime source.
+- `report.md` - D-010 and S15 observed evidence.
+
+### コミット
+- pending S15 step commit.
 
 ---
 
