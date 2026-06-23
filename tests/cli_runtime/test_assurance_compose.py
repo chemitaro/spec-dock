@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 import tempfile
 
+import pytest
+
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
@@ -114,6 +116,11 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
                 + '\n<!-- spec-dock:managed-section begin id="standard.design.assurance-gates" -->\n',
                 encoding="utf-8",
             )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
             before = self._artifact_texts(issue_dir)
 
             result = self._run_runtime_capture(
@@ -127,6 +134,28 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             assert payload["status"] == "invalid"
             assert payload["reason"] == "marker_conflict"
             assert payload["artifacts"]["design"]["errors"]
+            assert self._artifact_texts(issue_dir) == before
+
+    @pytest.mark.parametrize("filename", ["requirement.md", "design.md", "plan.md"])
+    def test_assurance_compose_stale_source_binding_fails_closed(self, filename: str) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_classified_fixture(target)
+            (issue_dir / filename).write_text(f"# Changed {filename}\n", encoding="utf-8")
+            before = self._artifact_texts(issue_dir)
+
+            result = self._run_runtime_capture(
+                target,
+                ["assurance", "compose", "--artifact", "all", "--format", "json"],
+            )
+
+            assert result.returncode == 1
+            payload = json.loads(result.stdout)
+            assert payload["ok"] is False
+            assert payload["status"] == "invalid"
+            assert payload["reason"] == "stale_source_binding"
+            assert filename.removesuffix(".md") in " ".join(payload["details"])
             assert self._artifact_texts(issue_dir) == before
 
     def test_assurance_compose_rejects_symlinked_artifact_without_touching_target(self) -> None:
@@ -146,7 +175,11 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             )
 
             assert result.returncode == 1
-            assert "Refusing to use symlinked planning artifact" in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ok"] is False
+            assert payload["status"] == "invalid"
+            assert payload["reason"] == "invalid_schema"
+            assert "source_binding_path_not_issue_local" in " ".join(payload["details"])
             assert external.read_text(encoding="utf-8") == "# External\n"
 
     def test_assurance_compose_dry_run_does_not_write_artifacts(self) -> None:

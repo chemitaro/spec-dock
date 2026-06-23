@@ -321,13 +321,24 @@ def validate_assurance_contract(contract: AssuranceContract) -> tuple[str, ...]:
         errors.append("unsupported_stage")
     if not contract.source_binding.artifacts:
         errors.append("missing_source_binding_artifacts")
+    expected_source_filenames = {
+        "requirement": "requirement.md",
+        "design": "design.md",
+        "plan": "plan.md",
+    }
+    expected_source_roles = set(expected_source_filenames)
+    actual_source_roles = {artifact.role for artifact in contract.source_binding.artifacts}
+    for role in sorted(expected_source_roles - actual_source_roles):
+        errors.append(f"missing_source_binding_role:{role}")
     for artifact in contract.source_binding.artifacts:
         if not artifact.path:
             errors.append("missing_source_binding_path")
         elif artifact.path.startswith("/") or artifact.path.startswith("spec-dock/active/"):
             errors.append("non_durable_source_binding_path")
-        if artifact.role != "requirement":
+        if artifact.role not in ("requirement", "design", "plan"):
             errors.append("unsupported_source_binding_role")
+        elif not artifact.path.endswith(f"/{expected_source_filenames[artifact.role]}"):
+            errors.append(f"source_binding_role_path_mismatch:{artifact.role}")
         if not _is_lowercase_sha256(artifact.sha256):
             errors.append("invalid_source_binding_sha256")
     expected_classification = classify_risk_facts(contract.risk_facts)

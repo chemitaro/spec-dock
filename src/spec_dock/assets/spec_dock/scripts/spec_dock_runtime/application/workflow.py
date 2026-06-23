@@ -25,6 +25,8 @@ class WorkflowAssuranceStoreLike(Protocol):
 
     def read_contract(self, target: Any) -> Any: ...
 
+    def verify_contract(self, target: Any) -> Any: ...
+
     def read_requirement_text(self, target: Any) -> str | None: ...
 
 
@@ -119,7 +121,7 @@ def _resolve_state(store: WorkflowAssuranceStoreLike) -> WorkflowState:
             authority=STRICT_LEGACY_AUTHORITY,
         )
 
-    assurance = store.read_contract(target)
+    assurance = store.verify_contract(target)
     if assurance.status == "valid" and assurance.contract is not None:
         classification = assurance.contract.classification
         return WorkflowState(

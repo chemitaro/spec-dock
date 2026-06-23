@@ -3,6 +3,8 @@ from pathlib import Path
 import subprocess
 import tempfile
 
+import pytest
+
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
@@ -133,8 +135,51 @@ class TestCliWorkflow(CliRuntimeHarness):
             payload = json.loads(result.stdout)
             assert payload["state"] == "ready"
             assert payload["reason_code"] == "assurance-valid"
-            assert payload["authority"]["authorized_profile"] == "standard"
-            assert payload["authority"]["obligation_source"] == "authorized_profile"
+        assert payload["authority"]["authorized_profile"] == "standard"
+        assert payload["authority"]["obligation_source"] == "authorized_profile"
+
+    @pytest.mark.parametrize("filename", ["requirement.md", "design.md", "plan.md"])
+    def test_workflow_next_blocks_stale_source_binding(self, filename: str) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Stale issue")
+            self._write_substantive_requirement(issue_dir)
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+            if filename == "requirement.md":
+                (issue_dir / filename).write_text(
+                    "---\n"
+                    "種別: 要件定義書（Issue）\n"
+                    'ID: "iss-00301"\n'
+                    '状態: "approved"\n'
+                    "---\n\n"
+                    "# Requirement\n\n"
+                    "This requirement was changed after assurance classification.\n\n"
+                    "## Acceptance Criteria\n\n"
+                    "- Updated acceptance criteria remains substantive.\n",
+                    encoding="utf-8",
+                )
+            else:
+                (issue_dir / filename).write_text(
+                    f"# Changed {filename}\n\nThis planning artifact changed after assurance classification.\n",
+                    encoding="utf-8",
+                )
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-execution", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["state"] == "classification-required"
+            assert payload["reason_code"] == "authority-invalid"
+            assert payload["next_action"] == "assurance-classification-required"
+            assert filename.removesuffix(".md") in " ".join(payload["details"])
 
     def test_workflow_next_writes_ignored_runbook_projection_without_tracked_diff(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

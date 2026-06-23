@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any, Protocol
 
 from spec_dock_runtime.application.contracts import (
@@ -28,6 +29,8 @@ class AssuranceStoreLike(Protocol):
     def resolve_issue_target(self, target: str | Path | None) -> Any: ...
 
     def build_requirement_source_binding(self, target: Any) -> SourceBinding: ...
+
+    def build_planning_source_binding(self, target: Any) -> SourceBinding: ...
 
     def write_contract(self, target: Any, contract: AssuranceContract) -> Path: ...
 
@@ -88,7 +91,7 @@ def compose_assurance(
     artifact_store: ArtifactStoreLike,
 ) -> AssuranceResult:
     target = store.resolve_issue_target(request.issue)
-    store_result = store.read_contract(target)
+    store_result = store.verify_contract(target)
     if store_result.status != "valid" or store_result.contract is None:
         return _compose_invalid_result(store_result)
 
@@ -131,6 +134,9 @@ def compose_assurance(
         for artifact, result in changed:
             if result.output_text is not None:
                 artifact_store.write_artifact(artifact, result.output_text)
+        if changed:
+            contract = replace(contract, source_binding=store.build_planning_source_binding(target))
+            store.write_contract(target, contract)
 
     return AssuranceResult(
         operation="compose",
