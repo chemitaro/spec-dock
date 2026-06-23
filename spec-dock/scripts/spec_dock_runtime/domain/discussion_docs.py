@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
-from pathlib import Path
+import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 DRAFT_DISCUSSION_DOC_TYPES = ("draft-requirement", "draft-design", "draft-plan")
 CREATABLE_DISCUSSION_DOC_TYPES = (
@@ -73,10 +76,7 @@ def parse_timestamp_discussion_doc_filename(name: str) -> TimestampDiscussionDoc
     suffix = int(suffix_raw) if suffix_raw is not None else None
     doc_type = str(matched.group("doc_type"))
     slug = str(matched.group("slug"))
-    if suffix is None:
-        doc_id = f"{timestamp}-{doc_type}"
-    else:
-        doc_id = f"{timestamp}-{suffix:02d}-{doc_type}"
+    doc_id = f"{timestamp}-{doc_type}" if suffix is None else f"{timestamp}-{suffix:02d}-{doc_type}"
     return TimestampDiscussionDocFilename(
         timestamp=timestamp,
         suffix=suffix,
@@ -105,10 +105,7 @@ def discussion_doc_id_from_path(path: Path) -> str:
 
 
 def discussion_filename_expectation() -> str:
-    return (
-        "Expected `<ts>-<kind>-<slug>.md`, `<ts>-<nn>-<kind>-<slug>.md`, "
-        "or grandfathered `<nnn>-<kind>-<slug>.md`."
-    )
+    return "Expected `<ts>-<kind>-<slug>.md`, `<ts>-<nn>-<kind>-<slug>.md`, or grandfathered `<nnn>-<kind>-<slug>.md`."
 
 
 def _is_discussion_doc_type_candidate(token: str) -> bool:
@@ -149,6 +146,4 @@ def is_malformed_discussion_doc_candidate(path: Path) -> bool:
             return True
     if _DISCUSSION_DOC_TIMESTAMP_INTENT_TOKEN_RE.fullmatch(first) is not None:
         return True
-    if _DISCUSSION_DOC_TIMESTAMP_INTENT_PREFIX_RE.fullmatch(stem) is not None:
-        return True
-    return False
+    return _DISCUSSION_DOC_TIMESTAMP_INTENT_PREFIX_RE.fullmatch(stem) is not None

@@ -1,25 +1,19 @@
 import ast
-import sys
 from pathlib import Path
+import sys
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        from spec_dock_runtime import app as runtime_app
-        from spec_dock_runtime import ids as legacy_ids
-        from spec_dock_runtime.domain import ids as domain_ids
-        from spec_dock_runtime.domain import models as domain_models
-        from spec_dock_runtime.domain import tree as domain_tree
-        from spec_dock_runtime.domain import validation as domain_validation
+        from spec_dock_runtime import app as runtime_app, ids as legacy_ids
+        from spec_dock_runtime.domain import (
+            ids as domain_ids,
+            models as domain_models,
+            tree as domain_tree,
+            validation as domain_validation,
+        )
     finally:
         sys.path.pop(0)
 
@@ -93,7 +87,9 @@ class TestRuntimeDomainS01:
                 title="JWT Auth",
                 slug="jwt-auth",
                 path=Path("/repo/spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth"),
-                meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/.meta.json"),
+                meta_path=Path(
+                    "/repo/spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/.meta.json"
+                ),
                 parent_id="init-local-00001",
                 initiative_id="init-local-00001",
                 epic_id=None,

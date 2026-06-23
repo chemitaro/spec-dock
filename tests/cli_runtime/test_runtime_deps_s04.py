@@ -1,38 +1,36 @@
+import contextlib
 from dataclasses import replace
 import io
 import json
 import os
+from pathlib import Path
 import stat
 import sys
 import tempfile
-from pathlib import Path
 
-import contextlib
 import pytest
+
 _REQUIRED_NODE_DOCS = ("requirement.md", "design.md", "plan.md", "report.md")
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime import app as runtime_app
-        from spec_dock_runtime.application import check_deps as app_check_deps
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import ports as app_ports
-        from spec_dock_runtime.application import status_context as app_status_context
-        from spec_dock_runtime.application import validate_tree as app_validate_tree
+        from spec_dock_runtime.application import (
+            check_deps as app_check_deps,
+            contracts as app_contracts,
+            ports as app_ports,
+            status_context as app_status_context,
+            validate_tree as app_validate_tree,
+        )
         from spec_dock_runtime.domain import models as domain_models
         from spec_dock_runtime.infra import contracts as infra_contracts
-        from spec_dock_runtime.presentation import cli_text as presentation_cli_text
-        from spec_dock_runtime.presentation import json_state as presentation_json_state
+        from spec_dock_runtime.presentation import (
+            cli_text as presentation_cli_text,
+            json_state as presentation_json_state,
+        )
     finally:
         sys.path.pop(0)
 
@@ -63,9 +61,7 @@ def _sample_records(infra_contracts, *, repo_root: Path = Path("/repo")):
             initiative_id=None,
             epic_id=None,
             github_issue_number=101,
-            meta_path=(
-                specdock_dir / "initiatives" / "init-local-00001-auth-platform" / ".meta.json"
-            ).as_posix(),
+            meta_path=(specdock_dir / "initiatives" / "init-local-00001-auth-platform" / ".meta.json").as_posix(),
         ),
         infra_contracts.StoredMetaRecord(
             kind="epic",
@@ -73,11 +69,7 @@ def _sample_records(infra_contracts, *, repo_root: Path = Path("/repo")):
             title="JWT Auth",
             slug="jwt-auth",
             path=(
-                specdock_dir
-                / "initiatives"
-                / "init-local-00001-auth-platform"
-                / "epics"
-                / "epic-local-00001-jwt-auth"
+                specdock_dir / "initiatives" / "init-local-00001-auth-platform" / "epics" / "epic-local-00001-jwt-auth"
             ).as_posix(),
             parent_id="init-local-00001",
             initiative_id="init-local-00001",
@@ -207,8 +199,7 @@ class _StubDepsTopologyReader:
         self.issue_depends_on_map = dict(issue_depends_on_map)
         self.warnings = list(warnings or [])
         self.raw_node_depends_on_map = {
-            node_id: list(depends_on)
-            for node_id, depends_on in dict(raw_node_depends_on_map or {}).items()
+            node_id: list(depends_on) for node_id, depends_on in dict(raw_node_depends_on_map or {}).items()
         }
         self.calls = 0
         self.raw_calls = 0
@@ -304,12 +295,7 @@ class TestRuntimeDepsS04:
             _presentation_json_state,
         ) = _runtime_modules()
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -328,19 +314,15 @@ class TestRuntimeDepsS04:
                 for record in _sample_records(infra_contracts, repo_root=repo_root)
             ]
             _materialize_required_artifacts(records)
-            deps_reader = _StubDepsTopologyReader(
-                {
-                    "iss-local-00001": [],
-                    "iss-local-00002": ["iss-local-00001"],
-                }
-            )
+            deps_reader = _StubDepsTopologyReader({
+                "iss-local-00001": [],
+                "iss-local-00002": ["iss-local-00001"],
+            })
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(records),
                 repo_root=repo_root,
                 specdock_dir=repo_root / "spec-dock",
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "open"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "open"}),
                 issue_gateway=_StubIssueGateway([]),
                 deps_topology_reader=deps_reader,
             )
@@ -358,9 +340,9 @@ class TestRuntimeDepsS04:
         assert deps_reader.calls == 1
         assert state.issue_depends_on_map.get("iss-local-00002") == ["iss-local-00001"]
         assert any(
-                node.node_id == "iss-local-00002" and node.effective_depends_on == ["iss-local-00001"]
-                for node in state.deps_state.nodes
-            )
+            node.node_id == "iss-local-00002" and node.effective_depends_on == ["iss-local-00001"]
+            for node in state.deps_state.nodes
+        )
         assert state.deps_preflight_error is None
 
     def test_collect_sync_state_carries_raw_direct_dependencies(self) -> None:
@@ -377,12 +359,7 @@ class TestRuntimeDepsS04:
             _presentation_json_state,
         ) = _runtime_modules()
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -408,9 +385,7 @@ class TestRuntimeDepsS04:
                 node_reader=_StubNodeReader(records),
                 repo_root=repo_root,
                 specdock_dir=repo_root / "spec-dock",
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "open"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "open"}),
                 issue_gateway=_StubIssueGateway([]),
                 deps_topology_reader=deps_reader,
             )
@@ -432,12 +407,7 @@ class TestRuntimeDepsS04:
 
     def test_artifact_bundle_requires_explicit_deps_raw_artifact(self) -> None:
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -478,12 +448,7 @@ class TestRuntimeDepsS04:
             _presentation_json_state,
         ) = _runtime_modules()
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -537,9 +502,7 @@ class TestRuntimeDepsS04:
                 node_reader=_StubNodeReader(records),
                 repo_root=repo_root,
                 specdock_dir=repo_root / "spec-dock",
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "open"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "open"}),
                 issue_gateway=_StubIssueGateway([]),
                 deps_topology_reader=deps_reader,
             )
@@ -630,14 +593,13 @@ class TestRuntimeDepsS04:
             node_reader=_StubNodeReader(records),
             repo_root=Path("/repo"),
             specdock_dir=Path("/repo/spec-dock"),
-            derived_state_reader=_StubDerivedStateReader(
-                {"iss-local-00001": "open", "iss-local-00002": "open"}
-            ),
+            derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "open"}),
             issue_gateway=_StubIssueGateway([]),
             active_state_store=_StubActiveStateStore("iss-local-00002"),
-            deps_topology_reader=_StubDepsTopologyReader(
-                {"iss-local-00001": [], "iss-local-00002": ["iss-local-00001"]}
-            ),
+            deps_topology_reader=_StubDepsTopologyReader({
+                "iss-local-00001": [],
+                "iss-local-00002": ["iss-local-00001"],
+            }),
         )
         result = app_check_deps.check_deps(
             app_contracts.CheckDepsRequest(
@@ -658,12 +620,10 @@ class TestRuntimeDepsS04:
             derived_state_reader=_StubDerivedStateReader({}),
             issue_gateway=_StubIssueGateway([]),
             active_state_store=_StubActiveStateStore(None),
-            deps_topology_reader=_StubDepsTopologyReader(
-                {
-                    "iss-local-00001": ["iss-local-00002"],
-                    "iss-local-00002": ["iss-local-00001"],
-                }
-            ),
+            deps_topology_reader=_StubDepsTopologyReader({
+                "iss-local-00001": ["iss-local-00002"],
+                "iss-local-00002": ["iss-local-00001"],
+            }),
         )
         with pytest.raises(RuntimeError):
             app_check_deps.check_deps(
@@ -1087,7 +1047,9 @@ class TestRuntimeDepsS04:
         assert "gh_fetch_failed" not in result.warnings
         assert "gh_index_incomplete" not in result.warnings
 
-    def test_check_deps_github_uses_current_repo_slug_for_unscoped_current_issue_and_keeps_foreign_same_number(self) -> None:
+    def test_check_deps_github_uses_current_repo_slug_for_unscoped_current_issue_and_keeps_foreign_same_number(
+        self,
+    ) -> None:
         (
             _runtime_app,
             app_check_deps,
@@ -1215,13 +1177,11 @@ class TestRuntimeDepsS04:
             derived_state_reader=_StubDerivedStateReader({}),
             issue_gateway=issue_gateway,
             active_state_store=_StubActiveStateStore(None),
-            deps_topology_reader=_StubDepsTopologyReader(
-                {
-                    "iss-local-00001": [],
-                    "iss-local-00002": [],
-                    "iss-local-00003": ["iss-local-00001", "iss-local-00002"],
-                }
-            ),
+            deps_topology_reader=_StubDepsTopologyReader({
+                "iss-local-00001": [],
+                "iss-local-00002": [],
+                "iss-local-00003": ["iss-local-00001", "iss-local-00002"],
+            }),
             git_gateway=_StubGitGateway("current/repo"),
         )
         result = app_check_deps.check_deps(
@@ -1272,9 +1232,10 @@ class TestRuntimeDepsS04:
                 for record in _sample_records(infra_contracts, repo_root=repo_root)
             ]
             _materialize_required_artifacts(records)
-            deps_reader = _StubDepsTopologyReader(
-                {"iss-local-00001": ["iss-local-00002"], "iss-local-00002": ["iss-local-00001"]}
-            )
+            deps_reader = _StubDepsTopologyReader({
+                "iss-local-00001": ["iss-local-00002"],
+                "iss-local-00002": ["iss-local-00001"],
+            })
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(records),
                 repo_root=repo_root,
@@ -1365,7 +1326,7 @@ class TestRuntimeDepsS04:
     def test_legacy_deps_path_delegates_and_exit_codes(self) -> None:
         (
             runtime_app,
-            app_check_deps,
+            _app_check_deps,
             app_contracts,
             _app_ports,
             _app_status_context,
@@ -1598,13 +1559,14 @@ class TestRuntimeDepsS04:
             stdout = io.StringIO()
             stderr = io.StringIO()
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-                exit_code = runtime_app.main(
-                    ["deps", "add", "--from", "iss-local-00001", "--to", "iss-local-00002"]
-                )
+                exit_code = runtime_app.main(["deps", "add", "--from", "iss-local-00001", "--to", "iss-local-00002"])
 
             assert exit_code == 0
             assert stderr.getvalue().strip() == ""
-            assert stdout.getvalue().strip() == "spec-dock: ok (deps add) from=iss-local-00001 to=iss-local-00002 result=updated"
+            assert (
+                stdout.getvalue().strip()
+                == "spec-dock: ok (deps add) from=iss-local-00001 to=iss-local-00002 result=updated"
+            )
             req = calls["req"]
             assert req.action == "add"
             assert req.from_id == "iss-local-00001"
@@ -1648,13 +1610,14 @@ class TestRuntimeDepsS04:
             stdout = io.StringIO()
             stderr = io.StringIO()
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-                exit_code = runtime_app.main(
-                    ["deps", "add", "--from", "iss-local-00001", "--to", "iss-local-00002"]
-                )
+                exit_code = runtime_app.main(["deps", "add", "--from", "iss-local-00001", "--to", "iss-local-00002"])
 
             assert exit_code == 0
             assert stderr.getvalue().strip() == ""
-            assert stdout.getvalue().strip() == "spec-dock: ok (deps add) from=iss-local-00001 to=iss-local-00002 result=unchanged"
+            assert (
+                stdout.getvalue().strip()
+                == "spec-dock: ok (deps add) from=iss-local-00001 to=iss-local-00002 result=unchanged"
+            )
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             cli_bootstrap.application_mutate_deps = original_application_mutate_deps
@@ -1696,13 +1659,14 @@ class TestRuntimeDepsS04:
             stdout = io.StringIO()
             stderr = io.StringIO()
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-                exit_code = runtime_app.main(
-                    ["deps", "remove", "--from", "iss-local-00001", "--to", "iss-local-00002"]
-                )
+                exit_code = runtime_app.main(["deps", "remove", "--from", "iss-local-00001", "--to", "iss-local-00002"])
 
             assert exit_code == 0
             assert stderr.getvalue().strip() == ""
-            assert stdout.getvalue().strip() == "spec-dock: ok (deps remove) from=iss-local-00001 to=iss-local-00002 result=updated"
+            assert (
+                stdout.getvalue().strip()
+                == "spec-dock: ok (deps remove) from=iss-local-00001 to=iss-local-00002 result=updated"
+            )
             req = calls["req"]
             assert req.action == "remove"
             assert req.from_id == "iss-local-00001"
@@ -1746,13 +1710,14 @@ class TestRuntimeDepsS04:
             stdout = io.StringIO()
             stderr = io.StringIO()
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-                exit_code = runtime_app.main(
-                    ["deps", "add", "--from", "iss-local-00001", "--to", "iss-local-00002"]
-                )
+                exit_code = runtime_app.main(["deps", "add", "--from", "iss-local-00001", "--to", "iss-local-00002"])
 
             assert exit_code == 1
             assert stdout.getvalue().strip() == ""
-            assert "spec-dock: error (deps add) from=iss-local-00001 to=iss-local-00002 code=write_failed" in stderr.getvalue()
+            assert (
+                "spec-dock: error (deps add) from=iss-local-00001 to=iss-local-00002 code=write_failed"
+                in stderr.getvalue()
+            )
             assert "- write_failed[replace]: simulated replace failure" in stderr.getvalue()
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
@@ -1760,12 +1725,7 @@ class TestRuntimeDepsS04:
 
     def test_fs_repo_atomic_replace_failure_preserves_original_meta_json(self) -> None:
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -1774,7 +1734,16 @@ class TestRuntimeDepsS04:
             sys.path.pop(0)
 
         with tempfile.TemporaryDirectory() as tmp:
-            node_dir = Path(tmp) / "spec-dock" / "initiatives" / "init-local-00001-auth" / "epics" / "epic-local-00001-main" / "issues" / "iss-local-00001-target"
+            node_dir = (
+                Path(tmp)
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth"
+                / "epics"
+                / "epic-local-00001-main"
+                / "issues"
+                / "iss-local-00001-target"
+            )
             node_dir.mkdir(parents=True, exist_ok=True)
             meta_path = node_dir / ".meta.json"
             meta_path.write_text(
@@ -1786,6 +1755,7 @@ class TestRuntimeDepsS04:
 
             original_replace = fs_repo.os.replace
             try:
+
                 def _failing_replace(src, dst):
                     del src, dst
                     raise OSError("simulated replace failure")
@@ -1803,12 +1773,7 @@ class TestRuntimeDepsS04:
 
     def test_fs_repo_atomic_replace_failure_preserves_original_meta_json_on_remove(self) -> None:
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -1817,7 +1782,16 @@ class TestRuntimeDepsS04:
             sys.path.pop(0)
 
         with tempfile.TemporaryDirectory() as tmp:
-            node_dir = Path(tmp) / "spec-dock" / "initiatives" / "init-local-00001-auth" / "epics" / "epic-local-00001-main" / "issues" / "iss-local-00001-target"
+            node_dir = (
+                Path(tmp)
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth"
+                / "epics"
+                / "epic-local-00001-main"
+                / "issues"
+                / "iss-local-00001-target"
+            )
             node_dir.mkdir(parents=True, exist_ok=True)
             meta_path = node_dir / ".meta.json"
             meta_path.write_text(
@@ -1837,6 +1811,7 @@ class TestRuntimeDepsS04:
 
             original_replace = fs_repo.os.replace
             try:
+
                 def _failing_replace(src, dst):
                     del src, dst
                     raise OSError("simulated replace failure")
@@ -1854,12 +1829,7 @@ class TestRuntimeDepsS04:
 
     def test_fs_repo_remove_issue_dependency_supports_shorthand_matching_refs(self) -> None:
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -1868,7 +1838,16 @@ class TestRuntimeDepsS04:
             sys.path.pop(0)
 
         with tempfile.TemporaryDirectory() as tmp:
-            node_dir = Path(tmp) / "spec-dock" / "initiatives" / "init-local-00001-auth" / "epics" / "epic-local-00001-main" / "issues" / "iss-local-00001-target"
+            node_dir = (
+                Path(tmp)
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth"
+                / "epics"
+                / "epic-local-00001-main"
+                / "issues"
+                / "iss-local-00001-target"
+            )
             node_dir.mkdir(parents=True, exist_ok=True)
             meta_path = node_dir / ".meta.json"
             meta_path.write_text(
@@ -1911,12 +1890,7 @@ class TestRuntimeDepsS04:
             pytest.skip("POSIX permission bits are required for this test")
 
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -1925,7 +1899,16 @@ class TestRuntimeDepsS04:
             sys.path.pop(0)
 
         with tempfile.TemporaryDirectory() as tmp:
-            node_dir = Path(tmp) / "spec-dock" / "initiatives" / "init-local-00001-auth" / "epics" / "epic-local-00001-main" / "issues" / "iss-local-00001-target"
+            node_dir = (
+                Path(tmp)
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth"
+                / "epics"
+                / "epic-local-00001-main"
+                / "issues"
+                / "iss-local-00001-target"
+            )
             node_dir.mkdir(parents=True, exist_ok=True)
             meta_path = node_dir / ".meta.json"
             meta_path.write_text(
@@ -1947,12 +1930,7 @@ class TestRuntimeDepsS04:
             pytest.skip("POSIX permission bits are required for this test")
 
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -1961,7 +1939,16 @@ class TestRuntimeDepsS04:
             sys.path.pop(0)
 
         with tempfile.TemporaryDirectory() as tmp:
-            node_dir = Path(tmp) / "spec-dock" / "initiatives" / "init-local-00001-auth" / "epics" / "epic-local-00001-main" / "issues" / "iss-local-00001-target"
+            node_dir = (
+                Path(tmp)
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth"
+                / "epics"
+                / "epic-local-00001-main"
+                / "issues"
+                / "iss-local-00001-target"
+            )
             node_dir.mkdir(parents=True, exist_ok=True)
             meta_path = node_dir / ".meta.json"
             meta_path.write_text(
@@ -1974,6 +1961,7 @@ class TestRuntimeDepsS04:
 
             original_chmod = fs_repo.Path.chmod
             try:
+
                 def _failing_chmod(self, mode, *args, **kwargs):
                     if self == meta_path and (mode & 0o200):
                         raise OSError("simulated unlock failure")
@@ -1993,12 +1981,7 @@ class TestRuntimeDepsS04:
             pytest.skip("POSIX permission bits are required for this test")
 
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -2007,7 +1990,16 @@ class TestRuntimeDepsS04:
             sys.path.pop(0)
 
         with tempfile.TemporaryDirectory() as tmp:
-            node_dir = Path(tmp) / "spec-dock" / "initiatives" / "init-local-00001-auth" / "epics" / "epic-local-00001-main" / "issues" / "iss-local-00001-target"
+            node_dir = (
+                Path(tmp)
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth"
+                / "epics"
+                / "epic-local-00001-main"
+                / "issues"
+                / "iss-local-00001-target"
+            )
             node_dir.mkdir(parents=True, exist_ok=True)
             meta_path = node_dir / ".meta.json"
             meta_path.write_text(
@@ -2021,12 +2013,9 @@ class TestRuntimeDepsS04:
 
             original_write_json = fs_repo.write_json
             try:
+
                 def _failing_write_json(path, payload):
-                    if (
-                        path != meta_path
-                        and path.parent == meta_path.parent
-                        and ".meta.json.tmp-" in path.name
-                    ):
+                    if path != meta_path and path.parent == meta_path.parent and ".meta.json.tmp-" in path.name:
                         raise TypeError("simulated non-oserror write failure")
                     return original_write_json(path, payload)
 
@@ -2048,12 +2037,7 @@ class TestRuntimeDepsS04:
             pytest.skip("POSIX permission bits are required for this test")
 
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -2062,7 +2046,16 @@ class TestRuntimeDepsS04:
             sys.path.pop(0)
 
         with tempfile.TemporaryDirectory() as tmp:
-            node_dir = Path(tmp) / "spec-dock" / "initiatives" / "init-local-00001-auth" / "epics" / "epic-local-00001-main" / "issues" / "iss-local-00001-target"
+            node_dir = (
+                Path(tmp)
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth"
+                / "epics"
+                / "epic-local-00001-main"
+                / "issues"
+                / "iss-local-00001-target"
+            )
             node_dir.mkdir(parents=True, exist_ok=True)
             meta_path = node_dir / ".meta.json"
             meta_path.write_text(
@@ -2074,6 +2067,7 @@ class TestRuntimeDepsS04:
 
             original_chmod = fs_repo.Path.chmod
             try:
+
                 def _failing_chmod(self, mode, *args, **kwargs):
                     if (
                         self != meta_path
@@ -2097,12 +2091,7 @@ class TestRuntimeDepsS04:
 
     def test_fs_repo_atomic_mkstemp_failure_maps_to_write_failed_write_temp(self) -> None:
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -2111,7 +2100,16 @@ class TestRuntimeDepsS04:
             sys.path.pop(0)
 
         with tempfile.TemporaryDirectory() as tmp:
-            node_dir = Path(tmp) / "spec-dock" / "initiatives" / "init-local-00001-auth" / "epics" / "epic-local-00001-main" / "issues" / "iss-local-00001-target"
+            node_dir = (
+                Path(tmp)
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth"
+                / "epics"
+                / "epic-local-00001-main"
+                / "issues"
+                / "iss-local-00001-target"
+            )
             node_dir.mkdir(parents=True, exist_ok=True)
             meta_path = node_dir / ".meta.json"
             meta_path.write_text(
@@ -2123,6 +2121,7 @@ class TestRuntimeDepsS04:
 
             original_mkstemp = fs_repo.tempfile.mkstemp
             try:
+
                 def _failing_mkstemp(*args, **kwargs):
                     del args, kwargs
                     raise OSError("simulated mkstemp failure")
@@ -2140,12 +2139,7 @@ class TestRuntimeDepsS04:
 
     def test_fs_repo_atomic_stat_failure_maps_to_write_failed(self) -> None:
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -2154,7 +2148,16 @@ class TestRuntimeDepsS04:
             sys.path.pop(0)
 
         with tempfile.TemporaryDirectory() as tmp:
-            node_dir = Path(tmp) / "spec-dock" / "initiatives" / "init-local-00001-auth" / "epics" / "epic-local-00001-main" / "issues" / "iss-local-00001-target"
+            node_dir = (
+                Path(tmp)
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth"
+                / "epics"
+                / "epic-local-00001-main"
+                / "issues"
+                / "iss-local-00001-target"
+            )
             node_dir.mkdir(parents=True, exist_ok=True)
             meta_path = node_dir / ".meta.json"
             meta_path.write_text(
@@ -2167,6 +2170,7 @@ class TestRuntimeDepsS04:
             original_exists = fs_repo.Path.exists
             original_stat = fs_repo.Path.stat
             try:
+
                 def _forced_exists(self):
                     if self == meta_path:
                         return True

@@ -16,5 +16,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install uv
+      - name: Run provider static analysis
+        run: make lint
       - name: Run provider pytest suite
         run: uv run pytest

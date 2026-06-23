@@ -1,28 +1,24 @@
 import json
 import os
+from pathlib import Path
 import shutil
 import sys
 import tempfile
-from pathlib import Path
+
+import pytest
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
-import pytest
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import issue_lifecycle as app_issue_lifecycle
-        from spec_dock_runtime.application import ports as app_ports
+        from spec_dock_runtime.application import (
+            contracts as app_contracts,
+            issue_lifecycle as app_issue_lifecycle,
+            ports as app_ports,
+        )
         from spec_dock_runtime.domain import models as domain_models
         from spec_dock_runtime.infra import contracts as infra_contracts
     finally:
@@ -130,6 +126,7 @@ class TestIssueLifecycleApplication:
         original_close_node = app_issue_lifecycle.close_node
         close_calls = []
         try:
+
             def fake_close_node(req, ports):
                 close_calls.append((req, ports))
                 raise AssertionError("close_node must not run when authority gate fails")
@@ -189,6 +186,7 @@ class TestIssueLifecycleApplication:
         original_close_node = app_issue_lifecycle.close_node
         close_calls = []
         try:
+
             def fake_close_node(req, ports):
                 close_calls.append((req, ports))
                 raise AssertionError("close_node must not run when promotion record is stale")
@@ -239,6 +237,7 @@ class TestIssueLifecycleApplication:
             "promotion_decision": "runtime_active_selection",
         }
         try:
+
             def fake_close_node(req, ports):
                 close_calls.append((req, ports))
                 raise AssertionError("close_node must not run when EAL gate fails")
@@ -246,20 +245,27 @@ class TestIssueLifecycleApplication:
             app_issue_lifecycle.close_node = fake_close_node
             with tempfile.TemporaryDirectory() as tmp:
                 repo_root = Path(tmp)
-                issue_dir = repo_root / "spec-dock" / "initiatives" / "init-00001" / "epics" / "epic-00002" / "issues" / "iss-00101"
+                issue_dir = (
+                    repo_root
+                    / "spec-dock"
+                    / "initiatives"
+                    / "init-00001"
+                    / "epics"
+                    / "epic-00002"
+                    / "issues"
+                    / "iss-00101"
+                )
                 issue_dir.mkdir(parents=True)
                 (issue_dir / "report.md").write_text(
-                    "\n".join(
-                        [
-                            "## 証跡採用台帳（Evidence Adoption Ledger）",
-                            "",
-                            "| ID | adoption_status | target_artifact | next_action |",
-                            "|---|---|---|---|",
-                            "| EAL-009 | blocked | design.md | resolve reviewer evidence |",
-                            "",
-                            "## Other",
-                        ]
-                    )
+                    "\n".join([
+                        "## 証跡採用台帳（Evidence Adoption Ledger）",
+                        "",
+                        "| ID | adoption_status | target_artifact | next_action |",
+                        "|---|---|---|---|",
+                        "| EAL-009 | blocked | design.md | resolve reviewer evidence |",
+                        "",
+                        "## Other",
+                    ])
                     + "\n",
                     encoding="utf-8",
                 )
@@ -288,6 +294,7 @@ class TestIssueLifecycleApplication:
         original_close_node = app_issue_lifecycle.close_node
         close_calls = []
         try:
+
             def fake_close_node(req, ports):
                 close_calls.append((req, ports))
                 raise AssertionError("close_node must not run when localized EAL gate fails")
@@ -295,20 +302,27 @@ class TestIssueLifecycleApplication:
             app_issue_lifecycle.close_node = fake_close_node
             with tempfile.TemporaryDirectory() as tmp:
                 repo_root = Path(tmp)
-                issue_dir = repo_root / "spec-dock" / "initiatives" / "init-00001" / "epics" / "epic-00002" / "issues" / "iss-00101"
+                issue_dir = (
+                    repo_root
+                    / "spec-dock"
+                    / "initiatives"
+                    / "init-00001"
+                    / "epics"
+                    / "epic-00002"
+                    / "issues"
+                    / "iss-00101"
+                )
                 issue_dir.mkdir(parents=True)
                 (issue_dir / "report.md").write_text(
-                    "\n".join(
-                        [
-                            "## 証跡採用台帳（Evidence Adoption Ledger）",
-                            "",
-                            "| ID | 採用状態（adoption_status） | 対象（target） | 次アクション（next_action） |",
-                            "|---|---|---|---|",
-                            "| EAL-011 | stale | plan.md | refresh localized evidence |",
-                            "",
-                            "## Other",
-                        ]
-                    )
+                    "\n".join([
+                        "## 証跡採用台帳（Evidence Adoption Ledger）",
+                        "",
+                        "| ID | 採用状態（adoption_status） | 対象（target） | 次アクション（next_action） |",
+                        "|---|---|---|---|",
+                        "| EAL-011 | stale | plan.md | refresh localized evidence |",
+                        "",
+                        "## Other",
+                    ])
                     + "\n",
                     encoding="utf-8",
                 )
@@ -344,6 +358,7 @@ class TestIssueLifecycleApplication:
             "promotion_decision": "runtime_active_selection",
         }
         try:
+
             def fake_close_node(req, ports):
                 close_calls.append((req, ports))
                 raise AssertionError("close_node must not run when delegated artifact gate fails")
@@ -381,7 +396,16 @@ class TestIssueLifecycleApplication:
                 close_calls.clear()
                 with tempfile.TemporaryDirectory() as tmp:
                     repo_root = Path(tmp)
-                    issue_dir = repo_root / "spec-dock" / "initiatives" / "init-00001" / "epics" / "epic-00002" / "issues" / "iss-00101"
+                    issue_dir = (
+                        repo_root
+                        / "spec-dock"
+                        / "initiatives"
+                        / "init-00001"
+                        / "epics"
+                        / "epic-00002"
+                        / "issues"
+                        / "iss-00101"
+                    )
                     issue_dir.mkdir(parents=True)
                     (issue_dir / "design.md").write_text(artifact_text, encoding="utf-8")
                     store = _StubActiveStateStore(infra_contracts, promotion_record=runtime_record)
@@ -408,20 +432,20 @@ class TestIssueLifecycleApplication:
         _app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
-            issue_dir = repo_root / "spec-dock" / "initiatives" / "init-00001" / "epics" / "epic-00002" / "issues" / "iss-00101"
+            issue_dir = (
+                repo_root / "spec-dock" / "initiatives" / "init-00001" / "epics" / "epic-00002" / "issues" / "iss-00101"
+            )
             issue_dir.mkdir(parents=True)
             (issue_dir / "report.md").write_text(
-                "\n".join(
-                    [
-                        "## Evidence Adoption Ledger",
-                        "",
-                        "| id | adoption_status | target_artifact | next_action |",
-                        "|---|---|---|---|",
-                        "| EAL-010 | stale | plan.md | refresh adopted evidence |",
-                        "",
-                        "## Other",
-                    ]
-                )
+                "\n".join([
+                    "## Evidence Adoption Ledger",
+                    "",
+                    "| id | adoption_status | target_artifact | next_action |",
+                    "|---|---|---|---|",
+                    "| EAL-010 | stale | plan.md | refresh adopted evidence |",
+                    "",
+                    "## Other",
+                ])
                 + "\n",
                 encoding="utf-8",
             )
@@ -464,6 +488,7 @@ class TestIssueLifecycleApplication:
             "promotion_decision": "runtime_active_selection",
         }
         try:
+
             def fake_close_node(req, ports):
                 close_calls.append((req, ports))
                 raise AssertionError("close_node must not run when transition persistence fails")
@@ -576,7 +601,7 @@ class TestIssueLifecycleApplication:
                 close_calls = []
                 sync_calls = []
 
-                def fake_close_node(req, ports):
+                def fake_close_node(req, ports, *, close_calls=close_calls, already_closed=already_closed):
                     close_calls.append((req, ports))
                     assert not req.run_post_sync
                     return app_contracts.CloseNodeResult(
@@ -599,7 +624,7 @@ class TestIssueLifecycleApplication:
                     del req, ports
                     raise RuntimeError("clear active failed")
 
-                def fake_post_mutation_sync(ports):
+                def fake_post_mutation_sync(ports, *, sync_calls=sync_calls):
                     sync_calls.append(ports)
                     return app_contracts.PostMutationSyncOutcome.skipped("test")
 
@@ -646,6 +671,7 @@ class TestIssueLifecycleApplication:
         sync_calls = []
         post_sync = app_contracts.PostMutationSyncOutcome.skipped("test lifecycle sync")
         try:
+
             def fake_close_node(req, ports):
                 close_calls.append((req, ports))
                 assert not req.run_post_sync
@@ -796,7 +822,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
     def _active_issue_pointer_text(self, target: Path) -> str:
         issue_pointer = target / "spec-dock" / "active" / "issue"
         if issue_pointer.is_symlink():
-            return os.readlink(issue_pointer)
+            return str(issue_pointer.readlink())
         path_file = issue_pointer.with_name("issue.path")
         if path_file.is_file():
             return path_file.read_text(encoding="utf-8").strip()

@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
-from ..domain.deps import inspect_target_deps, validate_deps_cycles, validate_raw_node_dependency_graph
-from ..domain.ids import format_id, parse_id
-from ..domain.models import (
+from spec_dock_runtime.application.contracts import CheckDepsRequest, DepsCheckResult, TargetRef
+from spec_dock_runtime.application.github_issue_targets import (
+    collect_repo_scoped_issue_view_targets,
+    normalize_repo_slug,
+)
+from spec_dock_runtime.application.repo_context import resolve_current_repo_slug
+from spec_dock_runtime.application.status_context import resolve_issue_status_context
+from spec_dock_runtime.domain.deps import inspect_target_deps, validate_deps_cycles, validate_raw_node_dependency_graph
+from spec_dock_runtime.domain.ids import format_id, parse_id
+from spec_dock_runtime.domain.models import (
     DepsHighLevelStatus,
     IssueSnapshot,
     IssueStatusSnapshot,
@@ -15,18 +22,16 @@ from ..domain.models import (
     SpecNodeKind,
     SpecNodeSeed,
 )
-from ..domain.tree import build_graph
-from ..infra.contracts import StoredMetaRecord
-from .contracts import CheckDepsRequest, DepsCheckResult, TargetRef
-from .github_issue_targets import collect_repo_scoped_issue_view_targets, normalize_repo_slug
-from .ports import Ports
-from .repo_context import resolve_current_repo_slug
-from .status_context import resolve_issue_status_context
+from spec_dock_runtime.domain.tree import build_graph
+
+if TYPE_CHECKING:
+    from spec_dock_runtime.application.ports import Ports
+    from spec_dock_runtime.infra.contracts import StoredMetaRecord
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,
@@ -50,7 +55,7 @@ def _resolve_specdock_dir(ports: Ports) -> Path:
 
 
 def _find_existing_id_by_num(graph: SpecGraph, *, prefix: str, num: int, local: bool) -> str | None:
-    for node_id in graph.nodes_by_id.keys():
+    for node_id in graph.nodes_by_id:
         try:
             parsed_prefix, is_local, parsed_num = parse_id(str(node_id))
         except RuntimeError:
@@ -67,7 +72,8 @@ def _resolve_target_node_id(graph: SpecGraph, target: TargetRef, *, current_repo
         matches = [
             node
             for node in graph.nodes_by_id.values()
-            if node.github_issue_number == int(target.github_issue_number) and node.kind in ("initiative", "epic", "issue")
+            if node.github_issue_number == int(target.github_issue_number)
+            and node.kind in ("initiative", "epic", "issue")
         ]
         target_repo_slug = normalize_repo_slug(target.github_repo_owner, target.github_repo_name)
         if target_repo_slug is not None:
@@ -201,9 +207,8 @@ def _status_state_from_snapshot(status: IssueStatusSnapshot) -> tuple[str, str] 
         if effective_status == "open":
             return ("open", "github")
         return None
-    if status.source == "cache":
-        if effective_status in {"done", "open"}:
-            return (effective_status, status.source)
+    if status.source == "cache" and effective_status in {"done", "open"}:
+        return (effective_status, status.source)
     return None
 
 
@@ -330,15 +335,13 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
             _append_unique(warnings, "gh_fetch_failed")
         else:
             issue_snapshots.extend(issue_index_snapshots)
-            linked_numbers = sorted(
-                {
-                    int(node.github_issue_number)
-                    for node in graph.nodes_by_id.values()
-                    if node.kind == "issue"
-                    and node.github_issue_number is not None
-                    and normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
-                }
-            )
+            linked_numbers = sorted({
+                int(node.github_issue_number)
+                for node in graph.nodes_by_id.values()
+                if node.kind == "issue"
+                and node.github_issue_number is not None
+                and normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
+            })
             indexed = {int(snapshot.issue_number) for snapshot in issue_index_snapshots}
             missing = [n for n in linked_numbers if n not in indexed]
             if missing:

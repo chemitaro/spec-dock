@@ -1,22 +1,16 @@
 import json
 import os
+from pathlib import Path
 import shutil
 import stat
-import subprocess
-import sys
 import tempfile
-from pathlib import Path
-from types import SimpleNamespace
+
+import pytest
 
 from tests.cli_runtime.harness import (
     CliRuntimeHarness,
-    _EXPECTED_MANAGED_SKILL_NAMES,
-    _expected_spec_dock_version,
     main,
 )
-
-
-import pytest
 
 
 class TestCliDeps(CliRuntimeHarness):
@@ -285,9 +279,7 @@ class TestCliDeps(CliRuntimeHarness):
             item = dict(issue)
             number = item.get("number")
             url = item.get("url")
-            if isinstance(number, int) and not (
-                isinstance(url, str) and url.startswith("https://github.com/")
-            ):
+            if isinstance(number, int) and not (isinstance(url, str) and url.startswith("https://github.com/")):
                 item["url"] = f"https://github.com/example/repo/issues/{number}"
             normalized.append(item)
 
@@ -311,7 +303,7 @@ class TestCliDeps(CliRuntimeHarness):
                 "    number = int(args[2])\n"
                 "    item = ISSUES_BY_NUMBER.get(number)\n"
                 "    if item is None:\n"
-                "        print(f'issue not found: {number}', file=sys.stderr)\n"
+                "        print('issue not found: ' + str(number), file=sys.stderr)\n"
                 "        raise SystemExit(1)\n"
                 "    print(json.dumps({'number': number, 'url': item['url']}))\n"
                 "    raise SystemExit(0)\n"
@@ -608,9 +600,7 @@ class TestCliDeps(CliRuntimeHarness):
                 epic_issue_number=201,
             )
 
-            p = self._run_runtime_capture(
-                target, ["deps", "check", "--id", local_ids["iss-00301"], "--json"]
-            )
+            p = self._run_runtime_capture(target, ["deps", "check", "--id", local_ids["iss-00301"], "--json"])
             assert p.returncode == 0, p.stdout + p.stderr
             assert f'"target": "{local_ids["iss-00301"]}"' in p.stdout
 
@@ -629,7 +619,9 @@ class TestCliDeps(CliRuntimeHarness):
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "124"])
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "124"]
+            )
 
             foreign_issue_meta = (
                 target
@@ -659,7 +651,9 @@ class TestCliDeps(CliRuntimeHarness):
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "124"])
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "124"]
+            )
 
             foreign_issue_meta = (
                 target
@@ -680,7 +674,9 @@ class TestCliDeps(CliRuntimeHarness):
             assert ambiguous.returncode != 0, ambiguous.stdout + ambiguous.stderr
             assert "Ambiguous github.issue_number=123" in ambiguous.stderr
 
-            by_url = self._run_runtime_capture(target, ["deps", "check", "https://github.com/other/repo/issues/123", "--json"])
+            by_url = self._run_runtime_capture(
+                target, ["deps", "check", "https://github.com/other/repo/issues/123", "--json"]
+            )
             assert by_url.returncode in (0, 3), by_url.stdout + by_url.stderr
             assert '"target": "iss-00124"' in by_url.stdout
 
@@ -709,7 +705,9 @@ class TestCliDeps(CliRuntimeHarness):
                 issue_issue_number=123,
                 issue_title="Current issue",
             )
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "124"])
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "124"]
+            )
 
             foreign_issue_meta = (
                 target
@@ -745,8 +743,12 @@ class TestCliDeps(CliRuntimeHarness):
                 issue_issue_number=123,
                 issue_title="Current blocker",
             )
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "125"])
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Target issue", "--github-issue", "124"])
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "125"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Target issue", "--github-issue", "124"]
+            )
 
             foreign_issue_meta = (
                 target
@@ -789,7 +791,9 @@ class TestCliDeps(CliRuntimeHarness):
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=124, issue_title="Target issue")
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "125"])
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "125"]
+            )
 
             foreign_issue_meta = (
                 target
@@ -828,8 +832,12 @@ class TestCliDeps(CliRuntimeHarness):
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=123, issue_title="Current blocker")
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "125"])
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Target issue", "--github-issue", "124"])
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "125"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Target issue", "--github-issue", "124"]
+            )
             self._drop_github_repo_scope(
                 target
                 / "spec-dock"
@@ -887,8 +895,12 @@ class TestCliDeps(CliRuntimeHarness):
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=123, issue_title="Current blocker")
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "125"])
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Target issue", "--github-issue", "124"])
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "125"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Target issue", "--github-issue", "124"]
+            )
 
             foreign_issue_meta = (
                 target
@@ -935,7 +947,9 @@ class TestCliDeps(CliRuntimeHarness):
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=124, issue_title="Target issue")
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "125"])
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "125"]
+            )
 
             foreign_issue_meta = (
                 target
@@ -990,8 +1004,12 @@ class TestCliDeps(CliRuntimeHarness):
                 issue_issue_number=123,
                 issue_title="Current blocker",
             )
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "125"])
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Target issue", "--github-issue", "124"])
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "125"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Target issue", "--github-issue", "124"]
+            )
             self._drop_github_repo_scope(
                 target
                 / "spec-dock"
@@ -1134,19 +1152,19 @@ class TestCliDeps(CliRuntimeHarness):
             assert p.returncode == 3, p.stdout + p.stderr
             data = json.loads(p.stdout)
             assert list(data.keys()) == [
-                    "schema_version",
-                    "target",
-                    "target_status",
-                    "ready",
-                    "effective_depends_on",
-                    "blockers",
-                    "issue_blockers",
-                    "node_blockers",
-                    "satisfied_dependencies",
-                    "dependency_contexts",
-                    "nodes",
-                    "warnings",
-                ]
+                "schema_version",
+                "target",
+                "target_status",
+                "ready",
+                "effective_depends_on",
+                "blockers",
+                "issue_blockers",
+                "node_blockers",
+                "satisfied_dependencies",
+                "dependency_contexts",
+                "nodes",
+                "warnings",
+            ]
             assert data["schema_version"] == 2
             assert data["target"] == "iss-00301"
             assert not data["ready"]
@@ -1212,7 +1230,14 @@ class TestCliDeps(CliRuntimeHarness):
                 issues=[
                     {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
                     {"number": 201, "state": "OPEN", "title": "Main epic", "labels": [], "updatedAt": "t", "url": "u"},
-                    {"number": 202, "state": "OPEN", "title": "Empty blocker", "labels": [], "updatedAt": "t", "url": "u"},
+                    {
+                        "number": 202,
+                        "state": "OPEN",
+                        "title": "Empty blocker",
+                        "labels": [],
+                        "updatedAt": "t",
+                        "url": "u",
+                    },
                     {"number": 301, "state": "OPEN", "title": "Target", "labels": [], "updatedAt": "t", "url": "u"},
                 ],
             )
@@ -1280,7 +1305,14 @@ class TestCliDeps(CliRuntimeHarness):
                 issues=[
                     {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
                     {"number": 201, "state": "OPEN", "title": "Main epic", "labels": [], "updatedAt": "t", "url": "u"},
-                    {"number": 202, "state": "CLOSED", "title": "Closed dep", "labels": [], "updatedAt": "t", "url": "u"},
+                    {
+                        "number": 202,
+                        "state": "CLOSED",
+                        "title": "Closed dep",
+                        "labels": [],
+                        "updatedAt": "t",
+                        "url": "u",
+                    },
                     {"number": 301, "state": "OPEN", "title": "Target", "labels": [], "updatedAt": "t", "url": "u"},
                 ],
             )
@@ -1308,7 +1340,9 @@ class TestCliDeps(CliRuntimeHarness):
                 }
             ]
 
-    @pytest.mark.skip(reason="S04: covered by TestCheckDepsApplication.test_no_github_uses_cached_status_and_last_sync_without_fetching_github")
+    @pytest.mark.skip(
+        reason="S04: covered by TestCheckDepsApplication.test_no_github_uses_cached_status_and_last_sync_without_fetching_github"
+    )
     def test_deps_check_without_github_uses_index_snapshot_when_present(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -1385,7 +1419,9 @@ class TestCliDeps(CliRuntimeHarness):
             assert data["target_status"]["last_sync_at"] == "t"
             assert data["nodes"]["iss-00302"]["source"] == "cache"
 
-    @pytest.mark.skip(reason="S04: covered by TestCheckDepsApplication.test_no_github_missing_cache_defaults_to_unknown_and_blocks")
+    @pytest.mark.skip(
+        reason="S04: covered by TestCheckDepsApplication.test_no_github_missing_cache_defaults_to_unknown_and_blocks"
+    )
     def test_deps_check_no_github_falls_back_to_unknown_when_snapshot_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -1483,7 +1519,9 @@ class TestCliDeps(CliRuntimeHarness):
             assert data["target"] == "iss-00301"
             assert data["ready"]
 
-    @pytest.mark.skip(reason="S04: covered by TestCheckDepsApplication.test_github_snapshots_drive_ready_and_blocked_states_without_cli")
+    @pytest.mark.skip(
+        reason="S04: covered by TestCheckDepsApplication.test_github_snapshots_drive_ready_and_blocked_states_without_cli"
+    )
     def test_deps_check_default_github_ready_when_deps_closed(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -1540,7 +1578,9 @@ class TestCliDeps(CliRuntimeHarness):
             assert data["blockers"] == []
             assert data["nodes"]["iss-00301"]["state"] == "done"
 
-    @pytest.mark.skip(reason="S04: covered by TestCheckDepsApplication.test_no_github_uses_cached_status_and_last_sync_without_fetching_github")
+    @pytest.mark.skip(
+        reason="S04: covered by TestCheckDepsApplication.test_no_github_uses_cached_status_and_last_sync_without_fetching_github"
+    )
     def test_deps_check_no_github_uses_synced_index_status(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -1605,7 +1645,9 @@ class TestCliDeps(CliRuntimeHarness):
             assert data["blockers"] == []
             assert data["nodes"]["iss-00301"]["state"] == "done"
 
-    @pytest.mark.skip(reason="S04: covered by TestCheckDepsApplication.test_no_github_missing_cache_defaults_to_unknown_and_blocks")
+    @pytest.mark.skip(
+        reason="S04: covered by TestCheckDepsApplication.test_no_github_missing_cache_defaults_to_unknown_and_blocks"
+    )
     def test_deps_check_no_github_missing_index_defaults_unknown(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -1648,7 +1690,9 @@ class TestCliDeps(CliRuntimeHarness):
             assert data["blockers"] == ["iss-00301"]
             assert data["nodes"]["iss-00301"]["state"] == "unknown"
 
-    @pytest.mark.skip(reason="S04: covered by TestCheckDepsApplication.test_github_snapshots_drive_ready_and_blocked_states_without_cli")
+    @pytest.mark.skip(
+        reason="S04: covered by TestCheckDepsApplication.test_github_snapshots_drive_ready_and_blocked_states_without_cli"
+    )
     def test_deps_check_github_blocked_when_dep_open(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -1704,7 +1748,9 @@ class TestCliDeps(CliRuntimeHarness):
             assert data["effective_depends_on"] == ["iss-00301"]
             assert data["blockers"] == ["iss-00301"]
 
-    @pytest.mark.skip(reason="S04: covered by TestCheckDepsApplication.test_github_index_incomplete_warns_and_leaves_missing_dependency_unknown")
+    @pytest.mark.skip(
+        reason="S04: covered by TestCheckDepsApplication.test_github_index_incomplete_warns_and_leaves_missing_dependency_unknown"
+    )
     def test_deps_check_github_index_incomplete_warns_and_blocks(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -1760,7 +1806,9 @@ class TestCliDeps(CliRuntimeHarness):
             assert "gh_fetch_failed" in data["warnings"]
             assert data["blockers"] == ["iss-00301"]
 
-    @pytest.mark.skip(reason="S04: covered by TestCheckDepsApplication.test_github_fetch_failure_warns_and_blocks_on_unknown_dependency")
+    @pytest.mark.skip(
+        reason="S04: covered by TestCheckDepsApplication.test_github_fetch_failure_warns_and_blocks_on_unknown_dependency"
+    )
     def test_deps_check_github_fetch_failure_warns_and_blocks(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -1906,11 +1954,11 @@ class TestCliDeps(CliRuntimeHarness):
             )
 
             assert local_ids == {
-                    "init-00101": "init-local-00001",
-                    "epic-00201": "epic-local-00001",
-                    "iss-00301": "iss-local-00001",
-                    "iss-00407": "iss-local-00002",
-                }
+                "init-00101": "init-local-00001",
+                "epic-00201": "epic-local-00001",
+                "iss-00301": "iss-local-00001",
+                "iss-00407": "iss-local-00002",
+            }
 
             spec_root = target / "spec-dock" / "initiatives"
             init_dir = spec_root / "init-local-00001-auth-platform"
@@ -2215,9 +2263,15 @@ class TestCliDeps(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Issue one"])
-            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue two"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Issue one"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue two"]
+            )
             self._remove_all_github_links(target)
 
             issue_two_dir = (
@@ -2267,20 +2321,28 @@ class TestCliDeps(CliRuntimeHarness):
             assert "123" in p.stderr
             assert ".meta.json" in p.stderr
 
-    @pytest.mark.skip(reason="S04: covered by TestCheckDepsApplication.test_effective_depends_on_merges_parents_and_dedups_without_cli")
+    @pytest.mark.skip(
+        reason="S04: covered by TestCheckDepsApplication.test_effective_depends_on_merges_parents_and_dedups_without_cli"
+    )
     def test_deps_effective_depends_on_merges_parents_and_dedups(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"]
+            )
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Dep one"])
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Dep two"])
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Target"])
             self._run_runtime(target, ["new", "initiative", "--github-issue", "102", "--title", "External deps"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "External epic"])
-            self._run_runtime(target, ["new", "issue", "--epic", "202", "--github-issue", "401", "--title", "External issue"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "External epic"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "202", "--github-issue", "401", "--title", "External issue"]
+            )
             self._remove_all_github_links(target)
 
             init_dir = target / "spec-dock" / "initiatives" / "init-00101-auth-platform"
@@ -2297,20 +2359,30 @@ class TestCliDeps(CliRuntimeHarness):
             data = json.loads(p.stdout)
             assert data["effective_depends_on"] == ["iss-00302", "iss-00401"]
 
-    @pytest.mark.skip(reason="S04: covered by TestCheckDepsApplication.test_effective_depends_on_merges_epic_and_initiative_without_cli")
+    @pytest.mark.skip(
+        reason="S04: covered by TestCheckDepsApplication.test_effective_depends_on_merges_epic_and_initiative_without_cli"
+    )
     def test_deps_effective_depends_on_merges_epic_and_initiative(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"]
+            )
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Dep one"])
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Dep two"])
             self._run_runtime(target, ["new", "initiative", "--github-issue", "102", "--title", "External deps"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "External epic"])
-            self._run_runtime(target, ["new", "issue", "--epic", "202", "--github-issue", "401", "--title", "External issue one"])
-            self._run_runtime(target, ["new", "issue", "--epic", "202", "--github-issue", "402", "--title", "External issue two"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "External epic"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "202", "--github-issue", "401", "--title", "External issue one"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "202", "--github-issue", "402", "--title", "External issue two"]
+            )
             self._remove_all_github_links(target)
 
             init_dir = target / "spec-dock" / "initiatives" / "init-00101-auth-platform"
@@ -2469,16 +2541,17 @@ class TestCliDeps(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Issue one"])
-            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue two"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Issue one"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue two"]
+            )
             epic_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00101-auth-platform"
-                / "epics"
-                / "epic-00201-jwt-auth"
+                target / "spec-dock" / "initiatives" / "init-00101-auth-platform" / "epics" / "epic-00201-jwt-auth"
             )
             issue_one_dir = epic_dir / "issues" / "iss-00301-issue-one"
             issue_two_dir = epic_dir / "issues" / "iss-00302-issue-two"
@@ -2498,17 +2571,14 @@ class TestCliDeps(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"]
+            )
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target"])
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Cycle a"])
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Cycle b"])
             epic_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00101-auth-platform"
-                / "epics"
-                / "epic-00201-jwt-auth"
+                target / "spec-dock" / "initiatives" / "init-00101-auth-platform" / "epics" / "epic-00201-jwt-auth"
             )
             cycle_a_dir = epic_dir / "issues" / "iss-00302-cycle-a"
             cycle_b_dir = epic_dir / "issues" / "iss-00303-cycle-b"
@@ -2527,17 +2597,14 @@ class TestCliDeps(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"]
+            )
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target"])
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Cycle a"])
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Cycle b"])
             epic_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00101-auth-platform"
-                / "epics"
-                / "epic-00201-jwt-auth"
+                target / "spec-dock" / "initiatives" / "init-00101-auth-platform" / "epics" / "epic-00201-jwt-auth"
             )
             cycle_a_dir = epic_dir / "issues" / "iss-00302-cycle-a"
             cycle_b_dir = epic_dir / "issues" / "iss-00303-cycle-b"
@@ -2556,8 +2623,12 @@ class TestCliDeps(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Empty a"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "202", "--title", "Empty b"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Empty a"]
+            )
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "202", "--title", "Empty b"]
+            )
             init_dir = target / "spec-dock" / "initiatives" / "init-00101-auth-platform"
             epic_a_dir = init_dir / "epics" / "epic-00201-empty-a"
             epic_b_dir = init_dir / "epics" / "epic-00202-empty-b"
@@ -2576,8 +2647,12 @@ class TestCliDeps(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Empty a"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "202", "--title", "Empty b"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Empty a"]
+            )
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "202", "--title", "Empty b"]
+            )
             init_dir = target / "spec-dock" / "initiatives" / "init-00101-auth-platform"
             epic_a_dir = init_dir / "epics" / "epic-00201-empty-a"
             epic_b_dir = init_dir / "epics" / "epic-00202-empty-b"
@@ -2596,7 +2671,9 @@ class TestCliDeps(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"]
+            )
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target"])
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Cycle a"])
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Cycle b"])
@@ -2608,12 +2685,7 @@ class TestCliDeps(CliRuntimeHarness):
             assert baseline_index["deps"]["error"] is None
 
             epic_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00101-auth-platform"
-                / "epics"
-                / "epic-00201-jwt-auth"
+                target / "spec-dock" / "initiatives" / "init-00101-auth-platform" / "epics" / "epic-00201-jwt-auth"
             )
             cycle_a_dir = epic_dir / "issues" / "iss-00302-cycle-a"
             cycle_b_dir = epic_dir / "issues" / "iss-00303-cycle-b"
@@ -2624,7 +2696,7 @@ class TestCliDeps(CliRuntimeHarness):
             (agent_dir / "tree.json").unlink(missing_ok=True)
             deps_raw_puml_path = target / "spec-dock" / "deps-raw.puml"
             deps_raw_puml_path.write_text(
-                "@startuml\nrectangle \"stale edge\" as STALE\n@enduml\n",
+                '@startuml\nrectangle "stale edge" as STALE\n@enduml\n',
                 encoding="utf-8",
             )
 
@@ -2717,7 +2789,7 @@ class TestCliDeps(CliRuntimeHarness):
             )
             agent_dir = target / "spec-dock" / ".agent"
             agent_dir.mkdir(parents=True, exist_ok=True)
-            (agent_dir / "deps.json").write_text("{\"stale\": true}\n", encoding="utf-8")
+            (agent_dir / "deps.json").write_text('{"stale": true}\n', encoding="utf-8")
             (agent_dir / "deps.puml").write_text("@startuml\n@enduml\n", encoding="utf-8")
             (agent_dir / "deps.todo.puml").write_text("@startuml\n@enduml\n", encoding="utf-8")
 
@@ -2772,12 +2844,10 @@ class TestCliDeps(CliRuntimeHarness):
             )
             assert p.returncode == 0, p.stdout + p.stderr
             assert p.stderr.strip() == ""
-            assert p.stdout.strip() == "\n".join(
-                    [
-                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
-                        "spec-dock: ok (deps add auto-sync)",
-                    ]
-                )
+            assert p.stdout.strip() == "\n".join([
+                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                "spec-dock: ok (deps add auto-sync)",
+            ])
 
             from_meta: dict[str, object] | None = None
             for meta_path in sorted((target / "spec-dock" / "initiatives").glob("**/.meta.json")):
@@ -2844,12 +2914,10 @@ class TestCliDeps(CliRuntimeHarness):
             )
             assert second.returncode == 0, second.stdout + second.stderr
             assert second.stderr.strip() == ""
-            assert second.stdout.strip() == "\n".join(
-                    [
-                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=unchanged",
-                        "spec-dock: skipped (deps add auto-sync) reason=unchanged",
-                    ]
-                )
+            assert second.stdout.strip() == "\n".join([
+                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=unchanged",
+                "spec-dock: skipped (deps add auto-sync) reason=unchanged",
+            ])
 
             after_second = from_meta_path.read_text(encoding="utf-8")
             assert after_second == before_second
@@ -2943,12 +3011,10 @@ class TestCliDeps(CliRuntimeHarness):
 
                 assert p.returncode == 0, f"{case_label}: {p.stdout}{p.stderr}"
                 assert p.stderr.strip() == "", case_label
-                assert p.stdout.strip() == "\n".join(
-                    [
-                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=unchanged",
-                        "spec-dock: skipped (deps add auto-sync) reason=unchanged",
-                    ]
-                ), case_label
+                assert p.stdout.strip() == "\n".join([
+                    f"spec-dock: ok (deps add) from={from_id} to={to_id} result=unchanged",
+                    "spec-dock: skipped (deps add auto-sync) reason=unchanged",
+                ]), case_label
                 assert from_meta_path.read_text(encoding="utf-8") == before, case_label
                 after = json.loads(from_meta_path.read_text(encoding="utf-8"))
                 assert after.get("depends_on") == [shorthand_ref], case_label
@@ -2972,12 +3038,10 @@ class TestCliDeps(CliRuntimeHarness):
             )
             assert p.returncode == 0, p.stdout + p.stderr
             assert p.stderr.strip() == ""
-            assert p.stdout.strip() == "\n".join(
-                    [
-                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
-                        "spec-dock: ok (deps add auto-sync)",
-                    ]
-                )
+            assert p.stdout.strip() == "\n".join([
+                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                "spec-dock: ok (deps add auto-sync)",
+            ])
 
             after = json.loads(from_meta_path.read_text(encoding="utf-8"))
             assert after.get("depends_on") == [to_id]
@@ -3009,12 +3073,10 @@ class TestCliDeps(CliRuntimeHarness):
             )
             assert p.returncode == 0, p.stdout + p.stderr
             assert p.stderr.strip() == ""
-            assert p.stdout.strip() == "\n".join(
-                [
-                    f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
-                    "spec-dock: ok (deps add auto-sync)",
-                ]
-            )
+            assert p.stdout.strip() == "\n".join([
+                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                "spec-dock: ok (deps add auto-sync)",
+            ])
 
             after = json.loads(from_meta_path.read_text(encoding="utf-8"))
             assert after.get("depends_on") == [to_id]
@@ -3042,12 +3104,10 @@ class TestCliDeps(CliRuntimeHarness):
             )
             assert removed.returncode == 0, removed.stdout + removed.stderr
             assert removed.stderr.strip() == ""
-            assert removed.stdout.strip() == "\n".join(
-                    [
-                        f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
-                        "spec-dock: ok (deps remove auto-sync)",
-                    ]
-                )
+            assert removed.stdout.strip() == "\n".join([
+                f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                "spec-dock: ok (deps remove auto-sync)",
+            ])
 
             from_meta: dict[str, object] | None = None
             for meta_path in sorted((target / "spec-dock" / "initiatives").glob("**/.meta.json")):
@@ -3087,12 +3147,10 @@ class TestCliDeps(CliRuntimeHarness):
             )
             assert p.returncode == 0, p.stdout + p.stderr
             assert p.stderr.strip() == ""
-            assert p.stdout.strip() == "\n".join(
-                [
-                    f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
-                    "spec-dock: ok (deps remove auto-sync)",
-                ]
-            )
+            assert p.stdout.strip() == "\n".join([
+                f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                "spec-dock: ok (deps remove auto-sync)",
+            ])
 
             after = json.loads(from_meta_path.read_text(encoding="utf-8"))
             assert after.get("depends_on") == []
@@ -3184,12 +3242,10 @@ class TestCliDeps(CliRuntimeHarness):
                 )
                 assert p.returncode == 0, f"{case_label}: {p.stdout}{p.stderr}"
                 assert p.stderr.strip() == "", case_label
-                assert p.stdout.strip() == "\n".join(
-                        [
-                            f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
-                            "spec-dock: ok (deps remove auto-sync)",
-                        ]
-                    ), case_label
+                assert p.stdout.strip() == "\n".join([
+                    f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                    "spec-dock: ok (deps remove auto-sync)",
+                ]), case_label
                 after = json.loads(from_meta_path.read_text(encoding="utf-8"))
                 assert after.get("depends_on") == [], case_label
 
@@ -3246,12 +3302,10 @@ class TestCliDeps(CliRuntimeHarness):
                 )
                 assert p.returncode == 0, f"{case_label}: {p.stdout}{p.stderr}"
                 assert p.stderr.strip() == "", case_label
-                assert p.stdout.strip() == "\n".join(
-                    [
-                        f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
-                        "spec-dock: ok (deps remove auto-sync)",
-                    ]
-                ), case_label
+                assert p.stdout.strip() == "\n".join([
+                    f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                    "spec-dock: ok (deps remove auto-sync)",
+                ]), case_label
                 after = json.loads(from_meta_path.read_text(encoding="utf-8"))
                 assert after.get("depends_on") == [], case_label
 
@@ -3416,12 +3470,10 @@ class TestCliDeps(CliRuntimeHarness):
             )
             assert p.returncode == 0, p.stdout + p.stderr
             assert p.stderr.strip() == ""
-            assert p.stdout.strip() == "\n".join(
-                    [
-                        f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
-                        "spec-dock: ok (deps remove auto-sync)",
-                    ]
-                )
+            assert p.stdout.strip() == "\n".join([
+                f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                "spec-dock: ok (deps remove auto-sync)",
+            ])
 
             after = json.loads(from_meta_path.read_text(encoding="utf-8"))
             assert after.get("depends_on") == []
@@ -3463,12 +3515,10 @@ class TestCliDeps(CliRuntimeHarness):
             )
             assert p.returncode == 0, p.stdout + p.stderr
             assert p.stderr.strip() == ""
-            assert p.stdout.strip() == "\n".join(
-                    [
-                        f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
-                        "spec-dock: ok (deps remove auto-sync)",
-                    ]
-                )
+            assert p.stdout.strip() == "\n".join([
+                f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                "spec-dock: ok (deps remove auto-sync)",
+            ])
 
             after = json.loads(from_meta_path.read_text(encoding="utf-8"))
             assert after.get("depends_on") == []
@@ -3660,12 +3710,10 @@ class TestCliDeps(CliRuntimeHarness):
             )
             assert p.returncode == 0, p.stdout + p.stderr
             assert p.stderr.strip() == ""
-            assert p.stdout.strip() == "\n".join(
-                    [
-                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
-                        "spec-dock: ok (deps add auto-sync)",
-                    ]
-                )
+            assert p.stdout.strip() == "\n".join([
+                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                "spec-dock: ok (deps add auto-sync)",
+            ])
 
             after = json.loads(from_meta_path.read_text(encoding="utf-8"))
             assert after.get("depends_on") == [to_id]
@@ -3706,12 +3754,10 @@ class TestCliDeps(CliRuntimeHarness):
             )
             assert p.returncode == 0, p.stdout + p.stderr
             assert "deps_ref_expanded_to_empty" in p.stderr
-            assert p.stdout.strip() == "\n".join(
-                    [
-                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
-                        "spec-dock: ok (deps add auto-sync)",
-                    ]
-                )
+            assert p.stdout.strip() == "\n".join([
+                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                "spec-dock: ok (deps add auto-sync)",
+            ])
 
             after = json.loads(from_meta_path.read_text(encoding="utf-8"))
             assert after.get("depends_on") == [to_id]

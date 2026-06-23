@@ -1,29 +1,26 @@
+import contextlib
 import io
+from pathlib import Path
 import sys
 import tempfile
-from pathlib import Path
 
 
-import contextlib
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime import app as runtime_app
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import ports as app_ports
-        from spec_dock_runtime.application import validate_tree as app_validate_tree
+        from spec_dock_runtime.application import (
+            contracts as app_contracts,
+            ports as app_ports,
+            validate_tree as app_validate_tree,
+        )
         from spec_dock_runtime.domain import models as domain_models
         from spec_dock_runtime.infra import contracts as infra_contracts
-        from spec_dock_runtime.presentation import cli_text as presentation_cli_text
-        from spec_dock_runtime.presentation import contracts as presentation_contracts
+        from spec_dock_runtime.presentation import (
+            cli_text as presentation_cli_text,
+            contracts as presentation_contracts,
+        )
     finally:
         sys.path.pop(0)
 
@@ -40,14 +37,7 @@ def _runtime_modules():
 
 
 def _runtime_cli_bootstrap_module():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.cli import bootstrap as cli_bootstrap
@@ -87,24 +77,22 @@ class TestRuntimeValidateS02:
             for name in ("requirement.md", "design.md", "plan.md", "report.md"):
                 (initiative_dir / name).write_text(f"{name}\n", encoding="utf-8")
 
-            reader = _StubReader(
-                [
-                    infra_contracts.StoredMetaRecord(
-                        kind="initiative",
-                        id="init-00001",
-                        title="Auth Platform",
-                        slug="auth-platform",
-                        path=initiative_dir.as_posix(),
-                        parent_id=None,
-                        initiative_id=None,
-                        epic_id=None,
-                        github_issue_number=1,
-                        meta_path=(initiative_dir / ".meta.json").as_posix(),
-                        github_repo_owner="example",
-                        github_repo_name="repo",
-                    )
-                ]
-            )
+            reader = _StubReader([
+                infra_contracts.StoredMetaRecord(
+                    kind="initiative",
+                    id="init-00001",
+                    title="Auth Platform",
+                    slug="auth-platform",
+                    path=initiative_dir.as_posix(),
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=1,
+                    meta_path=(initiative_dir / ".meta.json").as_posix(),
+                    github_repo_owner="example",
+                    github_repo_name="repo",
+                )
+            ])
             ports = app_ports.Ports(node_reader=reader, repo_root=repo_root)
             result = app_validate_tree.validate_tree(app_contracts.ValidateTreeRequest(), ports)
 
@@ -142,24 +130,22 @@ class TestRuntimeValidateS02:
             for name in ("requirement.md", "design.md", "plan.md", "report.md"):
                 (issue_dir / name).write_text(f"{name}\n", encoding="utf-8")
 
-            reader = _StubReader(
-                [
-                    infra_contracts.StoredMetaRecord(
-                        kind="issue",
-                        id="iss-00003",
-                        title="Add Refresh Token",
-                        slug="add-refresh-token",
-                        path=issue_dir.as_posix(),
-                        parent_id=None,
-                        initiative_id="init-00001",
-                        epic_id="epic-00002",
-                        github_issue_number=3,
-                        meta_path=(issue_dir / ".meta.json").as_posix(),
-                        github_repo_owner="example",
-                        github_repo_name="repo",
-                    )
-                ]
-            )
+            reader = _StubReader([
+                infra_contracts.StoredMetaRecord(
+                    kind="issue",
+                    id="iss-00003",
+                    title="Add Refresh Token",
+                    slug="add-refresh-token",
+                    path=issue_dir.as_posix(),
+                    parent_id=None,
+                    initiative_id="init-00001",
+                    epic_id="epic-00002",
+                    github_issue_number=3,
+                    meta_path=(issue_dir / ".meta.json").as_posix(),
+                    github_repo_owner="example",
+                    github_repo_name="repo",
+                )
+            ])
             ports = app_ports.Ports(node_reader=reader, repo_root=repo_root)
             result = app_validate_tree.validate_tree(app_contracts.ValidateTreeRequest(), ports)
 
@@ -187,22 +173,20 @@ class TestRuntimeValidateS02:
             for name in ("requirement.md", "design.md", "plan.md", "report.md"):
                 (initiative_dir / name).write_text(f"{name}\n", encoding="utf-8")
 
-            reader = _StubReader(
-                [
-                    infra_contracts.StoredMetaRecord(
-                        kind="initiative",
-                        id="init-local-00001",
-                        title="Auth Platform",
-                        slug="auth-platform",
-                        path=initiative_dir.as_posix(),
-                        parent_id=None,
-                        initiative_id=None,
-                        epic_id=None,
-                        github_issue_number=None,
-                        meta_path=(initiative_dir / ".meta.json").as_posix(),
-                    )
-                ]
-            )
+            reader = _StubReader([
+                infra_contracts.StoredMetaRecord(
+                    kind="initiative",
+                    id="init-local-00001",
+                    title="Auth Platform",
+                    slug="auth-platform",
+                    path=initiative_dir.as_posix(),
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                    meta_path=(initiative_dir / ".meta.json").as_posix(),
+                )
+            ])
             ports = app_ports.Ports(node_reader=reader, repo_root=repo_root)
             result = app_validate_tree.validate_tree(app_contracts.ValidateTreeRequest(), ports)
 
@@ -369,7 +353,7 @@ class TestRuntimeValidateS02:
             domain_models,
             _infra_contracts,
             _presentation_cli_text,
-            presentation_contracts,
+            _presentation_contracts,
         ) = _runtime_modules()
         from spec_dock_runtime.cli import bootstrap as cli_bootstrap
 
@@ -406,8 +390,8 @@ class TestRuntimeValidateS02:
         ports = calls.get("ports")
         assert isinstance(req, app_contracts.ValidateTreeRequest)
         assert ports is not None
-        assert getattr(ports, "repo_root") == Path("/repo")
-        assert getattr(ports, "specdock_dir") == Path("/repo/spec-dock")
+        assert ports.repo_root == Path("/repo")
+        assert ports.specdock_dir == Path("/repo/spec-dock")
 
     def test_issue_78_validate_uses_current_specdock_even_when_legacy_hidden_workspace_exists(self) -> None:
         cli_bootstrap = _runtime_cli_bootstrap_module()

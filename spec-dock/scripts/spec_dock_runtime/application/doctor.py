@@ -1,24 +1,31 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
-from ..domain.deps import validate_raw_node_dependency_graph
-from ..domain.models import SpecGraph, SpecNodeKind, SpecNodeSeed
-from ..domain.tree import build_graph
-from ..domain.validation import validate_graph_and_deps
-from ..infra.contracts import ActiveManifestEntry, DirectDependencyResolution, StoredMetaRecord
-from . import create_node as app_create_node
-from .artifact_preflight import validate_required_artifacts_for_graph
-from .contracts import DoctorFinding, DoctorRequest, DoctorResult
-from .contracts import GitHubCapabilityDiagnostic, GitHubCapabilityProbeRequest
-from .ports import Ports
-from .repo_context import resolve_current_repo_slug
+from spec_dock_runtime.application import create_node as app_create_node
+from spec_dock_runtime.application.artifact_preflight import validate_required_artifacts_for_graph
+from spec_dock_runtime.application.contracts import (
+    DoctorFinding,
+    DoctorRequest,
+    DoctorResult,
+    GitHubCapabilityDiagnostic,
+    GitHubCapabilityProbeRequest,
+)
+from spec_dock_runtime.application.repo_context import resolve_current_repo_slug
+from spec_dock_runtime.domain.deps import validate_raw_node_dependency_graph
+from spec_dock_runtime.domain.models import SpecGraph, SpecNodeKind, SpecNodeSeed
+from spec_dock_runtime.domain.tree import build_graph
+from spec_dock_runtime.domain.validation import validate_graph_and_deps
+
+if TYPE_CHECKING:
+    from spec_dock_runtime.application.ports import Ports
+    from spec_dock_runtime.infra.contracts import ActiveManifestEntry, DirectDependencyResolution, StoredMetaRecord
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,
@@ -58,10 +65,7 @@ def _raw_node_depends_on_map(
 def _legacy_only_workspace_finding(*, legacy_dir: Path) -> DoctorFinding:
     return DoctorFinding(
         code="legacy_only_workspace",
-        message=(
-            "legacy workspace is present but current workspace is missing: "
-            f"path={legacy_dir}"
-        ),
+        message=(f"legacy workspace is present but current workspace is missing: path={legacy_dir}"),
         guidance=[
             "Do not rename '.spec-dock' to 'spec-dock' (formats are incompatible).",
             "Run `spec-dock init` to install a new `spec-dock/` workspace.",
@@ -130,10 +134,7 @@ def _finding_from_error(error_message: str) -> DoctorFinding:
                 "復元後に `spec-dock/scripts/spec-dock validate` を再実行してください。",
             ],
         )
-    if (
-        "Unsupported legacy meta.json detected" in error_message
-        or ".meta.json" in error_message
-    ):
+    if "Unsupported legacy meta.json detected" in error_message or ".meta.json" in error_message:
         return DoctorFinding(
             code="broken_meta",
             message=error_message,
@@ -216,8 +217,7 @@ def _stale_active_pointer_finding(
     invalid_manifest_warnings = [
         warning
         for warning in load_result.warnings
-        if warning.startswith("active_manifest_invalid_json:")
-        or warning.startswith("active_manifest_invalid_shape:")
+        if warning.startswith("active_manifest_invalid_json:") or warning.startswith("active_manifest_invalid_shape:")
     ]
     if manifest is None:
         if invalid_manifest_warnings:

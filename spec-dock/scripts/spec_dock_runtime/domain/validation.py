@@ -1,17 +1,19 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from .deps import validate_deps_cycles
-from .discussion_docs import (
-    DISCUSSION_DOC_TIMESTAMP_FILENAME_RE as _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE,
+from spec_dock_runtime.domain.deps import validate_deps_cycles
+from spec_dock_runtime.domain.discussion_docs import (
     discussion_filename_expectation,
     is_malformed_discussion_doc_candidate,
     parse_legacy_discussion_doc_filename,
     parse_timestamp_discussion_doc_filename,
 )
-from .ids import parse_id, validate_lowercase, validate_slug
-from .models import SpecGraph, SpecNode, ValidationReport
+from spec_dock_runtime.domain.ids import parse_id, validate_lowercase, validate_slug
+from spec_dock_runtime.domain.models import SpecGraph, SpecNode, ValidationReport
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _meta_json_path_for_output(node: SpecNode, *, repo_root: Path | None = None) -> str:
@@ -34,10 +36,7 @@ def _normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:
 
 
 def _format_linked_github_nodes(linked: list[SpecNode], *, repo_root: Path | None = None) -> str:
-    return ", ".join(
-        f"{n.kind}:{n.id} ({_meta_json_path_for_output(n, repo_root=repo_root)})"
-        for n in linked
-    )
+    return ", ".join(f"{n.kind}:{n.id} ({_meta_json_path_for_output(n, repo_root=repo_root)})" for n in linked)
 
 
 def _path_for_output(path: Path, *, repo_root: Path | None = None) -> str:
@@ -186,7 +185,7 @@ def _validate_discussion_filenames(graph: SpecGraph, *, repo_root: Path | None =
         if duplicate_suffix_slots:
             dup_timestamp, dup_suffix = duplicate_suffix_slots[0]
             files = ", ".join(
-                path.name for path in sorted(by_suffix_slot[(dup_timestamp, dup_suffix)], key=lambda p: p.as_posix())
+                path.name for path in sorted(by_suffix_slot[dup_timestamp, dup_suffix], key=lambda p: p.as_posix())
             )
             raise RuntimeError(
                 "Duplicate discussion timestamp suffix detected under "
@@ -196,9 +195,7 @@ def _validate_discussion_filenames(graph: SpecGraph, *, repo_root: Path | None =
         duplicate_doc_ids = sorted(doc_id for doc_id, paths in by_doc_id.items() if len(paths) > 1)
         if duplicate_doc_ids:
             duplicate_doc_id = duplicate_doc_ids[0]
-            files = ", ".join(
-                path.name for path in sorted(by_doc_id[duplicate_doc_id], key=lambda p: p.as_posix())
-            )
+            files = ", ".join(path.name for path in sorted(by_doc_id[duplicate_doc_id], key=lambda p: p.as_posix()))
             raise RuntimeError(
                 "Duplicate discussion doc_id detected under "
                 f"{_path_for_output(discussions_dir, repo_root=repo_root)}: "
@@ -222,8 +219,8 @@ def validate_github_issue_numbers_unique(
         if key is None:
             continue
         by_linkage.setdefault(key, []).append(node)
-        _repo_slug, issue_number = key
-        by_issue_number.setdefault(issue_number, []).append((node, explicit_repo_slug, _repo_slug))
+        repo_slug_, issue_number = key
+        by_issue_number.setdefault(issue_number, []).append((node, explicit_repo_slug, repo_slug_))
 
     # Fail closed: when current repo is unknown, mixing scoped and unscoped linkage for
     # the same issue number can represent duplicate logical linkage.
@@ -248,7 +245,7 @@ def validate_github_issue_numbers_unique(
 
     for repo_slug, issue_number in sorted(by_linkage.keys(), key=lambda item: (item[0] or "", item[1])):
         linked = sorted(
-            by_linkage[(repo_slug, issue_number)],
+            by_linkage[repo_slug, issue_number],
             key=lambda n: (n.kind, n.id, _meta_json_path_for_output(n, repo_root=repo_root)),
         )
         if len(linked) <= 1:
@@ -335,7 +332,7 @@ def _validate_graph_or_raise(
     enforce_github_mandatory_linkage: bool = True,
 ) -> None:
     numeric_ids: dict[tuple[str, bool, int], list[str]] = {}
-    for node_id in graph.nodes_by_id.keys():
+    for node_id in graph.nodes_by_id:
         prefix, is_local, num = parse_id(str(node_id))
         numeric_ids.setdefault((prefix, is_local, num), []).append(str(node_id))
 

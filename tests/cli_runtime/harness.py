@@ -1,12 +1,12 @@
+import contextlib
+from importlib.metadata import PackageNotFoundError, version
 import json
 import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
-import tempfile
-from importlib.metadata import PackageNotFoundError, version
-from pathlib import Path
 
 import pytest
 
@@ -16,17 +16,17 @@ except ModuleNotFoundError:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
     from spec_dock.cli import main
 
+__all__ = ["main"]
+
 
 def _expected_spec_dock_version() -> str:
     try:
         return version("spec-dock")
     except PackageNotFoundError:
-        text = (Path(__file__).resolve().parents[2] / "pyproject.toml").read_text(
-            encoding="utf-8"
-        )
+        text = (Path(__file__).resolve().parents[2] / "pyproject.toml").read_text(encoding="utf-8")
         match = re.search(r'(?m)^version\s*=\s*"([^"]+)"\s*$', text)
         if not match:
-            raise AssertionError("failed to read version from pyproject.toml")
+            raise AssertionError("failed to read version from pyproject.toml") from None
         return match.group(1)
 
 
@@ -160,15 +160,13 @@ class CliRuntimeHarness:
             src = tmp / "src.txt"
             dst = tmp / "dst.txt"
             src.write_text("x\n", encoding="utf-8")
-            os.symlink("src.txt", dst)
+            Path(dst).symlink_to("src.txt")
             return dst.is_symlink()
         except OSError:
             return False
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 shutil.rmtree(tmp)
-            except Exception:
-                pass
 
     def _run_runtime(self, target: Path, args: list[str], *, env: dict[str, str] | None = None) -> None:
         script = target / "spec-dock" / "scripts" / "spec-dock"
@@ -185,10 +183,7 @@ class CliRuntimeHarness:
         )
         if p.returncode != 0:
             raise AssertionError(
-                "runtime command failed:\n"
-                f"- cmd: {args}\n"
-                f"- stdout:\n{p.stdout}\n"
-                f"- stderr:\n{p.stderr}\n"
+                f"runtime command failed:\n- cmd: {args}\n- stdout:\n{p.stdout}\n- stderr:\n{p.stderr}\n"
             )
 
     def _run_runtime_expect_fail(self, target: Path, args: list[str], *, env: dict[str, str] | None = None) -> None:
@@ -249,9 +244,9 @@ class CliRuntimeHarness:
             'if [[ "$1" == "issue" && "$2" == "list" ]]; then\n'
             "  cat <<'JSON'\n"
             "[\n"
-            "  {\"number\": 1, \"state\": \"OPEN\", \"title\": \"Issue 1\", \"labels\": [], \"updatedAt\": \"2026-05-13T00:00:01Z\", \"url\": \"https://github.com/example/repo/issues/1\"},\n"
-            "  {\"number\": 2, \"state\": \"CLOSED\", \"title\": \"Issue 2\", \"labels\": [], \"updatedAt\": \"2026-05-13T00:00:02Z\", \"url\": \"https://github.com/example/repo/issues/2\"},\n"
-            "  {\"number\": 3, \"state\": \"UNKNOWN\", \"title\": \"Issue 3\", \"labels\": [], \"updatedAt\": \"2026-05-13T00:00:03Z\", \"url\": \"https://github.com/example/repo/issues/3\"}\n"
+            '  {"number": 1, "state": "OPEN", "title": "Issue 1", "labels": [], "updatedAt": "2026-05-13T00:00:01Z", "url": "https://github.com/example/repo/issues/1"},\n'
+            '  {"number": 2, "state": "CLOSED", "title": "Issue 2", "labels": [], "updatedAt": "2026-05-13T00:00:02Z", "url": "https://github.com/example/repo/issues/2"},\n'
+            '  {"number": 3, "state": "UNKNOWN", "title": "Issue 3", "labels": [], "updatedAt": "2026-05-13T00:00:03Z", "url": "https://github.com/example/repo/issues/3"}\n'
             "]\n"
             "JSON\n"
             "  exit 0\n"
@@ -333,12 +328,7 @@ class CliRuntimeHarness:
             text=True,
         )
         if check and p.returncode != 0:
-            raise AssertionError(
-                "git command failed:\n"
-                f"- cmd: {args}\n"
-                f"- stdout:\n{p.stdout}\n"
-                f"- stderr:\n{p.stderr}\n"
-            )
+            raise AssertionError(f"git command failed:\n- cmd: {args}\n- stdout:\n{p.stdout}\n- stderr:\n{p.stderr}\n")
         return p
 
     def _make_gh_issue_view_stub(
@@ -361,7 +351,7 @@ class CliRuntimeHarness:
             'if [[ "$1" == "issue" && "$2" == "view" ]]; then\n'
             '  n="$3"\n'
             f"{log_line}"
-            '  for f in $fail_nums; do\n'
+            "  for f in $fail_nums; do\n"
             '    if [[ "$n" == "$f" ]]; then\n'
             '      echo "issue not found: $n" >&2\n'
             "      exit 1\n"
@@ -393,9 +383,7 @@ class CliRuntimeHarness:
             item = dict(issue)
             number = item.get("number")
             url = item.get("url")
-            if isinstance(number, int) and not (
-                isinstance(url, str) and url.startswith("https://github.com/")
-            ):
+            if isinstance(number, int) and not (isinstance(url, str) and url.startswith("https://github.com/")):
                 item["url"] = f"https://github.com/example/repo/issues/{number}"
             normalized.append(item)
 
@@ -420,7 +408,7 @@ class CliRuntimeHarness:
             "set -euo pipefail\n"
             'if [[ "$1" == "issue" && "$2" == "list" ]]; then\n'
             f"{log_line}"
-            + ("  echo \"gh stub: simulated failure\" >&2\n  exit 1\n" if fail else "")
+            + ('  echo "gh stub: simulated failure" >&2\n  exit 1\n' if fail else "")
             + "  cat <<'JSON'\n"
             + f"{payload}\n"
             + "JSON\n"
@@ -429,7 +417,7 @@ class CliRuntimeHarness:
             'if [[ "$1" == "issue" && "$2" == "view" ]]; then\n'
             f"{log_line}"
             '  n="$3"\n'
-            "  case \"$n\" in\n"
+            '  case "$n" in\n'
             f"{view_cases}"
             "  esac\n"
             '  echo "issue not found: $n" >&2\n'
@@ -466,10 +454,8 @@ class CliRuntimeHarness:
 
     def _write_text_force(self, path: Path, text: str) -> None:
         if path.exists():
-            try:
+            with contextlib.suppress(OSError):
                 path.chmod(path.stat().st_mode | 0o200)
-            except OSError:
-                pass
         path.write_text(text, encoding="utf-8")
 
     def _write_json_force(self, path: Path, data: object) -> None:
@@ -523,10 +509,7 @@ class CliRuntimeHarness:
             assert node_dir.name == node_id or node_dir.name.startswith(old_prefix), (
                 f"unexpected node dir name for {node_id}: {node_dir}"
             )
-            if node_dir.name == node_id:
-                new_name = local_id
-            else:
-                new_name = node_dir.name.replace(old_prefix, f"{local_id}-", 1)
+            new_name = local_id if node_dir.name == node_id else node_dir.name.replace(old_prefix, f"{local_id}-", 1)
             renames.append((node_dir, node_dir.with_name(new_name)))
 
         for meta_path in meta_paths:
@@ -570,9 +553,7 @@ class CliRuntimeHarness:
             installed_managed,
             sorted(f"{name}/SKILL.md" for name in _EXPECTED_MANAGED_SKILL_NAMES),
         )
-        installed_skill_names = {
-            skill_file.split("/", 1)[0] for skill_file in self._installed_skill_files(target)
-        }
+        installed_skill_names = {skill_file.split("/", 1)[0] for skill_file in self._installed_skill_files(target)}
         for deleted_skill_name in _DELETED_ROLE_SKILL_NAMES:
             _assert_equal(
                 deleted_skill_name not in installed_skill_names,

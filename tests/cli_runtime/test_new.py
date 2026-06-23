@@ -1,22 +1,20 @@
 import json
 import os
+from pathlib import Path
+import re
 import shutil
-import subprocess
 import sys
 import tempfile
-from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 from tests.cli_runtime.harness import (
     CliRuntimeHarness,
-    _EXPECTED_MANAGED_SKILL_NAMES,
-    _expected_spec_dock_version,
     main,
 )
 
 
-import pytest
-import re
 class TestCliNew(CliRuntimeHarness):
     def _init_origin_repo(self, target: Path, *, owner: str = "example", repo: str = "repo") -> None:
         if shutil.which("git") is None:
@@ -321,9 +319,7 @@ class TestCliNew(CliRuntimeHarness):
                 p = self._run_runtime_capture(target, argv, env=test_env)
 
                 assert p.returncode != 0, f"{case_label}: {p.stdout}{p.stderr}"
-                assert before_artifacts == self._read_create_auto_sync_artifacts(target), (
-                    f"{case_label}: argv={argv!r}"
-                )
+                assert before_artifacts == self._read_create_auto_sync_artifacts(target), f"{case_label}: argv={argv!r}"
                 assert log_path.read_text(encoding="utf-8") == "", f"{case_label}: argv={argv!r}"
 
     def test_new_node_id_option_is_parser_error(self) -> None:
@@ -381,7 +377,9 @@ class TestCliNew(CliRuntimeHarness):
 
             self._run_runtime(target, ["new", "initiative", "--title", "Linked initiative", "--github-issue", "1"])
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "2"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "2", "--title", "JWT auth", "--github-issue", "3"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "2", "--title", "JWT auth", "--github-issue", "3"]
+            )
 
             p = self._run_runtime_capture(
                 target,
@@ -408,8 +406,12 @@ class TestCliNew(CliRuntimeHarness):
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
 
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"])
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Current issue", "--github-issue", "123"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Current issue", "--github-issue", "123"]
+            )
 
             issue_meta_path = (
                 target
@@ -483,9 +485,7 @@ class TestCliNew(CliRuntimeHarness):
             assert meta["slug"] == "add-refresh-token"
 
     def test_new_rejects_invalid_slug_before_gh_issue_create(self) -> None:
-        pytest.skip(
-            "S06 replacement: tests.unit.commands.test_runtime_new_s08 covers pre-GitHub input validation."
-        )
+        pytest.skip("S06 replacement: tests.unit.commands.test_runtime_new_s08 covers pre-GitHub input validation.")
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
@@ -601,13 +601,23 @@ class TestCliNew(CliRuntimeHarness):
                     target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
                 ),
                 epic_dir / "issues" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md",
-                epic_dir / "discussions" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md",
-                issue_dir / "discussions" / "rules.md": target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md",
+                epic_dir / "discussions" / "rules.md": target
+                / "spec-dock"
+                / "docs"
+                / "rules"
+                / "epic"
+                / "discussions.md",
+                issue_dir / "discussions" / "rules.md": target
+                / "spec-dock"
+                / "docs"
+                / "rules"
+                / "issue"
+                / "discussions.md",
             }
             for link_path, target_path in expected_rules_links.items():
                 assert link_path.is_symlink(), f"missing rules symlink: {link_path}"
                 assert link_path.resolve() == target_path.resolve()
-                assert os.readlink(link_path) == os.path.relpath(target_path, start=link_path.parent)
+                assert str(link_path.readlink()) == os.path.relpath(target_path, start=link_path.parent)
 
             assert not (init_dir / "epics" / "new-epic").exists()
             assert not (epic_dir / "issues" / "new-issue").exists()
@@ -767,10 +777,12 @@ class TestCliNew(CliRuntimeHarness):
                 assert f"type={doc_type}" in p.stdout
                 created = sorted(discussions_dir.glob(f"*-{doc_type}-*.md"))
                 assert len(created) == 1
-                assert re.search(rf"^[0-9]{{8}}t[0-9]{{6}}z(?:-[0-9]{{2}})?-{doc_type}-[a-z0-9-]+\.md$", created[0].name)
+                assert re.search(
+                    rf"^[0-9]{{8}}t[0-9]{{6}}z(?:-[0-9]{{2}})?-{doc_type}-[a-z0-9-]+\.md$", created[0].name
+                )
                 content = created[0].read_text(encoding="utf-8")
                 frontmatter = content.split("---", 2)[1]
-                assert "状態: \"draft | approved\"" in frontmatter
+                assert '状態: "draft | approved"' in frontmatter
                 assert "adoption_status" not in frontmatter
                 assert "template_source" not in frontmatter
                 assert "created_by_role" not in frontmatter
@@ -822,12 +834,15 @@ class TestCliNew(CliRuntimeHarness):
             )
             assert p.returncode == 0, p.stdout + p.stderr
 
-            assert re.search((
+            assert re.search(
+                (
                     r"spec-dock: ok \(new doc\) type=disc "
                     r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc "
                     r"scope=iss-00003 "
                     r"path=spec-dock/.*/discussions/[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-discussion-one\.md"
-                ), p.stdout)
+                ),
+                p.stdout,
+            )
             assert "discussion-one" not in re.search(r"id=([^\s]+)", p.stdout).group(1)
 
     def test_new_doc_creates_pr_repair_batch_with_generated_identity_and_template(self) -> None:
@@ -872,7 +887,7 @@ class TestCliNew(CliRuntimeHarness):
             )
             assert created.is_file()
             content = created.read_text(encoding="utf-8")
-            assert '種別: pr-repair-batch' in content
+            assert "種別: pr-repair-batch" in content
             assert 'ID: "20260312t010203z-pr-repair-batch"' in content
             assert 'タイトル: "PR Repair Batch"' in content
             assert '親: ["iss-00003"]' in content
@@ -931,7 +946,9 @@ class TestCliNew(CliRuntimeHarness):
             discussions_dir = issue_dir / "discussions"
             (discussions_dir / "foo.md").write_text("nonconforming\n", encoding="utf-8")
             (discussions_dir / "009-disc-migrated.md").write_text("existing new format\n", encoding="utf-8")
-            (discussions_dir / "1000-adr-legacy-overflow.md").write_text("4-digit should be ignored\n", encoding="utf-8")
+            (discussions_dir / "1000-adr-legacy-overflow.md").write_text(
+                "4-digit should be ignored\n", encoding="utf-8"
+            )
 
             self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"])
 
@@ -1023,7 +1040,9 @@ class TestCliNew(CliRuntimeHarness):
             (discussions_dir / "001-adr-first.md").write_text("first\n", encoding="utf-8")
             (discussions_dir / "001-disc-second.md").write_text("second\n", encoding="utf-8")
 
-            p = self._run_runtime_capture(target, ["new", "doc", "scratch", "--issue", "iss-00003", "--title", "Note one"])
+            p = self._run_runtime_capture(
+                target, ["new", "doc", "scratch", "--issue", "iss-00003", "--title", "Note one"]
+            )
             assert p.returncode == 0, p.stdout + p.stderr
             assert re.search(r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-scratch\b", p.stdout)
             assert len(sorted(discussions_dir.glob("*-scratch-note-one.md"))) == 1
@@ -1164,12 +1183,7 @@ class TestCliNew(CliRuntimeHarness):
 
     def test_internal_issue_status_resolution_marks_cached_source(self) -> None:
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -1234,7 +1248,7 @@ class TestCliNew(CliRuntimeHarness):
             gh_path.write_text(
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
-                "echo \"gh should not be invoked in --no-github mode\" >&2\n"
+                'echo "gh should not be invoked in --no-github mode" >&2\n'
                 "exit 1\n",
                 encoding="utf-8",
             )
@@ -1332,7 +1346,7 @@ class TestCliNew(CliRuntimeHarness):
                 f'echo "$@" >> "{called_path.as_posix()}"\n'
                 'if [[ "$1" == "issue" && "$2" == "create" ]]; then\n'
                 f'  count=$(cat "{count_path.as_posix()}" 2>/dev/null || echo 0)\n'
-                '  count=$((count + 1))\n'
+                "  count=$((count + 1))\n"
                 f'  printf "%s" "$count" > "{count_path.as_posix()}"\n'
                 '  if [[ "$count" == "1" ]]; then\n'
                 '    echo "https://github.com/example/repo/issues/123"\n'
@@ -1345,7 +1359,7 @@ class TestCliNew(CliRuntimeHarness):
                 '  echo "[{\\"number\\":123,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 123\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:03Z\\",\\"url\\":\\"https://github.com/example/repo/issues/123\\"},{\\"number\\":124,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 124\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:04Z\\",\\"url\\":\\"https://github.com/example/repo/issues/124\\"}]"\n'
                 "  exit 0\n"
                 "fi\n"
-                "echo \"unexpected gh args: $@\" >&2\n"
+                'echo "unexpected gh args: $@" >&2\n'
                 "exit 1\n",
                 encoding="utf-8",
             )
@@ -1353,7 +1367,9 @@ class TestCliNew(CliRuntimeHarness):
 
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform"], env=test_env)
-            self._run_runtime(target, ["new", "epic", "--initiative", "init-00123", "--title", "JWT auth"], env=test_env)
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "init-00123", "--title", "JWT auth"], env=test_env
+            )
 
             init_dir = target / "spec-dock" / "initiatives" / "init-00123-auth-platform"
             epic_dir = init_dir / "epics" / "epic-00124-jwt-auth"
@@ -1377,9 +1393,7 @@ class TestCliNew(CliRuntimeHarness):
             self._assert_readonly_on_posix(epic_dir / ".meta.json")
 
     def test_new_initiative_warns_and_continues_when_readonly_lock_fails(self) -> None:
-        pytest.skip(
-            "S06 replacement: tests.unit.commands.test_runtime_new_s08 covers create-lock failure guidance."
-        )
+        pytest.skip("S06 replacement: tests.unit.commands.test_runtime_new_s08 covers create-lock failure guidance.")
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
 
@@ -1394,23 +1408,21 @@ class TestCliNew(CliRuntimeHarness):
             gh_path.write_text(
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
-                'if [[ \"$1\" == \"issue\" && \"$2\" == \"create\" ]]; then\n'
-                "  echo \"https://github.com/example/repo/issues/123\"\n"
+                'if [[ "$1" == "issue" && "$2" == "create" ]]; then\n'
+                '  echo "https://github.com/example/repo/issues/123"\n'
                 "  exit 0\n"
                 "fi\n"
-                'if [[ \"$1\" == \"issue\" && \"$2\" == \"list\" ]]; then\n'
+                'if [[ "$1" == "issue" && "$2" == "list" ]]; then\n'
                 '  echo "[{\\"number\\":123,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 123\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:03Z\\",\\"url\\":\\"https://github.com/example/repo/issues/123\\"}]"\n'
                 "  exit 0\n"
                 "fi\n"
-                "echo \"unexpected gh args: $@\" >&2\n"
+                'echo "unexpected gh args: $@" >&2\n'
                 "exit 1\n",
                 encoding="utf-8",
             )
             gh_path.chmod(0o755)
 
-            runtime_fs_repo = (
-                target / "spec-dock" / "scripts" / "spec_dock_runtime" / "infra" / "fs_repo.py"
-            )
+            runtime_fs_repo = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "infra" / "fs_repo.py"
             assert runtime_fs_repo.is_file()
             runtime_fs_repo.write_text(
                 runtime_fs_repo.read_text(encoding="utf-8")
@@ -1545,7 +1557,9 @@ class TestCliNew(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"]
+            )
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1553,15 +1567,15 @@ class TestCliNew(CliRuntimeHarness):
             gh_path.write_text(
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
-                'if [[ \"$1\" == \"issue\" && \"$2\" == \"create\" ]]; then\n'
-                "  echo \"https://github.com/example/repo/issues/123\"\n"
+                'if [[ "$1" == "issue" && "$2" == "create" ]]; then\n'
+                '  echo "https://github.com/example/repo/issues/123"\n'
                 "  exit 0\n"
                 "fi\n"
-                'if [[ \"$1\" == \"issue\" && \"$2\" == \"list\" ]]; then\n'
+                'if [[ "$1" == "issue" && "$2" == "list" ]]; then\n'
                 '  echo "[{\\"number\\":1,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 1\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:01Z\\",\\"url\\":\\"https://github.com/example/repo/issues/1\\"},{\\"number\\":2,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 2\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:02Z\\",\\"url\\":\\"https://github.com/example/repo/issues/2\\"},{\\"number\\":123,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 123\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:03Z\\",\\"url\\":\\"https://github.com/example/repo/issues/123\\"}]"\n'
                 "  exit 0\n"
                 "fi\n"
-                "echo \"unexpected gh args: $@\" >&2\n"
+                'echo "unexpected gh args: $@" >&2\n'
                 "exit 1\n",
                 encoding="utf-8",
             )
@@ -1596,7 +1610,9 @@ class TestCliNew(CliRuntimeHarness):
 
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"]
+            )
 
             # Provide a fake `gh` binary so the test doesn't require network/auth.
             bin_dir = target / ".bin"
@@ -1605,15 +1621,15 @@ class TestCliNew(CliRuntimeHarness):
             gh_path.write_text(
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
-                'if [[ \"$1\" == \"issue\" && \"$2\" == \"create\" ]]; then\n'
-                "  echo \"https://github.com/example/repo/issues/123\"\n"
+                'if [[ "$1" == "issue" && "$2" == "create" ]]; then\n'
+                '  echo "https://github.com/example/repo/issues/123"\n'
                 "  exit 0\n"
                 "fi\n"
-                'if [[ \"$1\" == \"issue\" && \"$2\" == \"list\" ]]; then\n'
+                'if [[ "$1" == "issue" && "$2" == "list" ]]; then\n'
                 '  echo "[{\\"number\\":1,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 1\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:01Z\\",\\"url\\":\\"https://github.com/example/repo/issues/1\\"},{\\"number\\":2,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 2\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:02Z\\",\\"url\\":\\"https://github.com/example/repo/issues/2\\"},{\\"number\\":123,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 123\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:03Z\\",\\"url\\":\\"https://github.com/example/repo/issues/123\\"}]"\n'
                 "  exit 0\n"
                 "fi\n"
-                "echo \"unexpected gh args: $@\" >&2\n"
+                'echo "unexpected gh args: $@" >&2\n'
                 "exit 1\n",
                 encoding="utf-8",
             )
@@ -1649,7 +1665,9 @@ class TestCliNew(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--title", "Parent initiative", "--github-issue", "1"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "Parent epic", "--github-issue", "2"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "1", "--title", "Parent epic", "--github-issue", "2"]
+            )
             self._run_runtime(target, ["new", "initiative", "--title", "Legacy holder", "--github-issue", "3"])
 
             initiatives_root = target / "spec-dock" / "initiatives"
