@@ -89,21 +89,38 @@
 
 ---
 
-## I04 Compile Step Assurance And Agent Routing
+## I04 Compile Step Assurance, Agent Routing, And Context Policy
 
 ### Requirement seed
 
 - 目的:
-  - Step内容に応じたworker / reasoning / context / verification / reviewをcompileする。
+  - Plan step facts、Issue-wide Assurance、agent role、task kindから、worker、reasoning effort、context mode、verification、reviewerを含むcurrent execution Runbookを生成する。
+  - 実行系agentへの必要なcontext継承と、reviewer / consultantのclean-room independenceを同時に実現する。
+  - Main orchestratorへ返るcontextを圧縮し、subagentの再調査とmain context pollutionを削減する。
 - 必須:
   - semantic batch。
   - global + local + discovered obligations。
-  - worker context affinity。
-  - reviewer clean-room。
+  - tracked `context-routing-policy.json`。
+  - `recent_fork / bounded_packet / clean_room / minimal_packet`。
+  - role別default context policy。
+  - worker context affinity / continuation。
+  - reviewer clean-room / consultant first-pass independence。
+  - context source binding / stale invalidation。
+  - bounded child return contract。
+  - invocation evidence and context observability。
   - escalation。
 - AC:
   - docs-only / code / migration / security fixtureのroutingが異なる。
   - current stepだけがRunbookに出る。
+  - `dev-coder`は同一semantic batch内で`recent_fork`または`bounded_packet`を利用できる。
+  - `code-reviewer`、`qa-reviewer`、`spec-reviewer`は常に`clean_room` packetを使用する。
+  - Reviewer packetへauthor self-assessment、implementation transcript、previous reviewer verdictが含まれない。
+  - Consultant first passへmain / architectの推奨案が含まれない。
+  - Same source bindingとscopeではworker threadを継続できる。
+  - Source binding、scope、riskの変更後はworker continuationを拒否する。
+  - Fork機能が利用できない場合、workerは`bounded_packet`へfallbackできる。
+  - Clean-roomを提供できない場合、reviewを実行せずfail-closedになる。
+  - Raw shell transcript、full test log、private reasoningがmain agentのreturn payloadへ混入しない。
   - new riskでnext stepへ進まずreapprovalを要求。
 
 ### Design seed
@@ -111,6 +128,12 @@
 - Step facts schema。
 - Obligation lattice。
 - ContextPolicy VO。
+- Context Routing Policy schema。
+- Context Policy Resolver。
+- Context Packet / Reviewer Evidence Packet compiler。
+- Consultant first-pass / arbitration context contract。
+- Context source binding and packet stale invalidation。
+- bounded return contract。
 - Review invalidation matrix。
 - worker thread reuse条件。
 
@@ -184,12 +207,16 @@
 - 必須:
   - shadow、opt-in、Standard default。
   - legacy strict。
+  - `auto-lite-readiness report`。
+  - future automatic Lite default の adoption / rollback 条件。
   - metrics。
   - rollback。
   - provider/mirror/installer/docs。
 - AC:
   - existing fixtures unchanged。
   - new fixture Standard。
+  - automatic Lite default は有効化されない。
+  - auto-lite-readiness report に false positive candidates、escalation rate、P0/P1 escape、post-review blocker、wall-clock/token delta、missing metrics が出る。
   - generated state clean。
   - benchmarkでinvocation / review loop低下。
   - rollbackでlegacy execution可能。

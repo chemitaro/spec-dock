@@ -15,11 +15,17 @@ ID: "epic-00224"
 
 ## 進捗サマリー (必須)
 - 現在地（何が完了し、何が未完か）:
-  - ...
+  - Epic discussion artifacts と deep-consultant analysis をもとに canonical `requirement.md` を初稿化した。
+  - Fresh `spec-reviewer` が requirement を pass したため、requirement phase は design phase へ昇格可能。
+  - Requirement pass 済み input、draft design、source-grounding、deep-consultant analysis をもとに canonical `design.md` を初稿化した。
+  - Fresh `spec-reviewer` re-review が findings なしで design を pass したため、design phase は plan phase へ昇格可能。
+  - 追加提供された Agent Context Routing 情報を canonical `requirement.md` / `design.md` と draft Issue / plan seed へ反映し、fresh `spec-reviewer` が pass した。
+  - Requirement / design pass 済み input と更新済み draft plan / issue slice seed をもとに canonical `plan.md` を初稿化した。
+  - Fresh plan re-review が `review_status: pass` を返し、残った P2 は E-RQ-012 の formal owner を I07 に一本化する修正として反映済み。
 - 次のマイルストーン:
-  - ...
+  - 後続 turn で Issue 実体作成 / dependency mutation へ進める。
 - ブロッカー:
-  - ...
+  - 現時点でユーザー確認が必要な blocking question はなし。
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -33,7 +39,19 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | `adopted` | discussion / draft package | `requirement.md` | User-provided draft requirement の WHAT / WHY / scope / AC を canonical Epic requirement 初稿へ採用した。 | `discussions/20260623t010733z-draft-requirement-adaptive-assurance-draft-requirement.md` | fresh `spec-reviewer` |
+| EAL-002 | `adopted` | discussion / decision | `requirement.md` | 新規 Epic + 複数 Issue、前提 Epic `epic-00158`、Strict / Deep の判断を requirement の前提・scope・依存へ採用した。 | `discussions/20260623t010748z-disc-epic-issue-selection-decision.md` | fresh `spec-reviewer` |
+| EAL-003 | `adopted` | deep-consultant | `requirement.md` | Lite rollout は Option C 強化版を採用し、initial automatic Lite default は対象外、candidate / authorized separation と auto-lite-readiness を requirement へ反映した。 | `discussions/20260623t012043z-research-deep-consultant-lite-rollout-report.md` | fresh `spec-reviewer` |
+| EAL-004 | `adopted` | discussion / draft package | `design.md` | User-provided draft design の adaptive assurance / compiled runbook / PR review policy / metrics / rollout structure を Epic-level shared design として再構成して採用した。 | `discussions/20260623t010737z-draft-design-adaptive-assurance-draft-design.md` | fresh `spec-reviewer` |
+| EAL-005 | `adopted` | discussion / synthesis | `design.md` | 提供 draft 群の読み取り結果から、canonical / generated / ignored の配置、Issue slice へ渡す shared vocabulary、provider / dogfooding mirror 境界を design へ反映した。 | `discussions/20260623t010846z-disc-provided-draft-package-synthesis.md` | fresh `spec-reviewer` |
+| EAL-006 | `adopted` | deep-consultant | `design.md` | Lite は `lite_candidate` と `lite_authorized` を分離し、initial automatic Lite default を Stage 3 でも有効化せず future experimental 扱いにする設計判断として採用した。 | `discussions/20260623t012043z-research-deep-consultant-lite-rollout-report.md` | fresh `spec-reviewer` |
+| EAL-007 | `adopted` | spec-reviewer finding | `design.md`, `report.md` | 長期 architecture decision を候補のまま残さず、当初 4 件、Agent Context Routing 追加後は 5 件の ADR を implementation 前の required ADR として扱い、plan で実装 Issue より前に配置する設計判断へ修正した。 | design review 1 finding: ADR必須判断を候補のまま残さない; context routing update added fifth ADR | fresh re-review |
+| EAL-008 | `adopted` | user-provided supplemental draft | `requirement.md`, `design.md`, draft plan / issue slice discussions | Agent Context Routing を Assurance Profile / reasoning effort とは独立した tracked policy として扱い、execution context affinity、reviewer / consultant clean-room、context minimization、freshness、observability を requirement / design / I04 seed へ反映した。 | `discussions/20260623t024533z-research-agent-context-routing-supplemental-draft.md` | fresh requirement / design re-review |
+| EAL-009 | `adopted` | spec-reviewer findings | `design.md`, draft plan / issue slice discussions, `report.md` | Context returned evidence refs の観測契約、draft plan の Auto-Lite trace、pending gate の扱いを P2 指摘として受け、design / draft seed / report を補正した。 | requirement/design update review: 3 P2 findings, `review_status: pass` | no further review required before plan authoring |
+| EAL-010 | `adopted` | discussion / draft plan | `plan.md` | Updated draft plan の I01〜I07 slice、dependency order、checkpoint、quality gate、rollout、final exit contract を canonical Epic plan 初稿へ採用した。Issue 実体作成と dependency mutation はまだ行っていない。 | `discussions/20260623t010749z-draft-plan-adaptive-assurance-draft-plan.md` | fresh `spec-reviewer` |
+| EAL-011 | `adopted` | spec-reviewer findings | `plan.md`, `report.md` | Plan review の P1/P2 指摘を受け、E-AC-008 を stale source binding owner の I03 へ移し、PR review 系は E-AC-009〜010、PR blocker 系は E-AC-011〜013、rollout 系は E-AC-014〜016 に再整列した。Required ADR 記録も 5 件へ揃えた。 | plan review 1 findings: E-AC-008 trace mismatch, required ADR count mismatch | fresh plan re-review |
+| EAL-012 | `adopted` | spec-reviewer finding | `plan.md` | Plan re-review の P1 指摘を受け、E-AC-005 を fixed Skill / clean Git owner の I02、E-AC-006 を profile-specific planning owner の I03、E-AC-007 を step routing owner の I04 へ再整列した。 | plan re-review finding: E-AC-005〜007 slice ownership mismatch | fresh plan re-review |
+| EAL-013 | `adopted` | spec-reviewer finding | `plan.md`, `report.md` | Fresh plan re-review は `review_status: pass`。残った P2 を受け、E-RQ-012 の formal close を I07 に一本化し、I01 は strict-legacy detection prerequisite としてだけ記録した。 | plan re-review pass with P2: E-RQ-012 owner clarification | no further review required before Issue creation |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -41,7 +59,9 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | 軽量タスクにも重い gate がかかる token / wall-clock waste を、runtime compiled Runbook と Assurance Profile で減らす。 | Review safety、legacy compatibility、trusted GitHub review policy、observability。 | low: automatic Lite default を初期 scope から外し、Standard default と candidate / authorized separation を採用した。 | pass: requirement review found no blocking gap. |
+| OAL-002 | Static Skill kernel + dynamic runtime Runbook により、軽量 / 重量 Issue の workflow cost を Issue facts に合わせて配分する。 | Canonical contract、source hash binding、monotonic escalation、base-SHA review policy、strict-legacy fallback。 | low: `authorized_profile` だけを実行 authority とし、`lite_candidate` は telemetry に限定した。 | pass: design re-review found no findings and confirmed ADR routing fix. |
+| OAL-003 | Agent Context Routing により、実行系 agent は必要な context を継承し、評価系 agent は clean-room independence を保つ。 | Tracked policy、source binding、bounded return contract、returned evidence refs observability。 | low: context mode は Runbook / policy authority とし、agent の都度判断で弱めない。 | pass: requirement/design update review returned `review_status: pass`; P2 fixes applied. |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -49,13 +69,17 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | `workflow_epic.md`, `workflow_spec_authoring.md`, `phase_requirement.md`, `epic-00158` docs, active Epic scaffold, draft package discussions, source search, deep-consultant Lite rollout report | blocking question なし。Lite rollout は UX preference ではなく system-design best practice として deep-consultant に reroute 済み。 | draft requirement / decision / synthesis / deep-consultant report を canonical `requirement.md` へ採用。 | passed: fresh `spec-reviewer` returned no findings and `review_status: pass` with confidence 0.88. | no | promote to design phase. |
+| design | reviewer-pass 済み `requirement.md`, `workflow_epic.md`, `workflow_spec_authoring.md`, `phase_design.md`, draft design, draft package synthesis, issue slice draft, deep-consultant Lite rollout report, provider / dogfooding runtime layout | blocking design question なし。Implementation parameter（review policy size, metrics retention, repo-specific hard trigger extension, future Auto-Lite adoption surface）は plan / later Issue で扱う non-blocking item とした。初回 design review で ADR 必須判断の曖昧さが P1 指摘となったため、当初 4 件、Agent Context Routing 追加後は 5 件の ADR を implementation 前 required として設計に明記した。 | adaptive assurance contract、compiled Runbook、candidate / authorized separation、trusted review policy、blocker-centric PR closure、tracked canonical vs ignored projection、migration / rollback / observability、required ADR before implementation を canonical `design.md` へ採用。 | passed: fresh re-review returned no findings and `review_status: pass` with confidence 0.91. | no | promote to plan phase. |
+| requirement/design update | supplemental Agent Context Routing draft, existing passed requirement/design, draft issue slice I04, draft plan I04 | blocking question なし。既存 E-RQ-008 の短い context policy 要件だけでは tracked policy / packet / reviewer independence / return boundary / observability が不足していた。Fresh review の P2 指摘により returned evidence refs observability、Auto-Lite trace、pending gate 記録を補正した。 | E-RQ-015〜021、E-AC-017〜021、Agent Context Routing Architecture、Context Policy Resolver / Packet Compiler、I04 seed update、required ADR update、Auto-Lite trace update を採用。 | passed: fresh `spec-reviewer` returned `review_status: pass` with confidence 0.88; 3 P2 findings fixed. | no | promote updated requirement/design inputs to plan authoring. |
+| plan | reviewer-pass 済み `requirement.md`, reviewer-pass 済み `design.md`, `workflow_epic.md`, `workflow_spec_authoring.md`, `phase_plan.md`, `phase_plan_epic.md`, updated draft plan, updated issue slice seed | blocking question なし。ユーザー指示により Issue 実体作成 / dependency mutation はこの phase では行わない。初回 plan review で E-AC-008 trace mismatch が P1、ADR 件数の古い記録が P2 として指摘され、修正済み。再レビューで E-AC-005〜007 owner mismatch が P1 として指摘され、修正済み。Fresh re-review pass 後の P2 として E-RQ-012 owner clarification があり、formal close を I07 に一本化した。 | T0 ADR prerequisite、I01〜I07 provisional slices、E-RQ / E-AC closure matrix、dependency order、integration checkpoints、quality gates、rollout/docs impact、Issue readiness criteria、final exit contract を canonical `plan.md` へ採用。 | passed: fresh plan re-review returned `review_status: pass` with confidence 0.86; remaining P2 fixed. | no | promote to Issue decomposition / creation in a later turn; no Issue creation performed in this turn. |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
   - used / not used
 - 未使用の場合:
   - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
+  - この design phase では system-architect による discussion direct-write draft は使っていない。理由は、user-provided draft design / draft package synthesis / deep-consultant report が設計証跡として十分であり、追加の delegated draft cycle は同じ論点を重複させるだけだったため。Canonical `design.md` は main orchestrator が統合し、fresh `spec-reviewer` gate は省略しない。
 - lifecycle state（契約値）:
   - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
 - 昇格不可 state:
@@ -94,8 +118,14 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（reviewer gate evidence） | ineligible |
 
 ## 決定事項（ADRリンク） (必須)
-- adr-xxxx-...: <1行要約>
-- ...
+- Required before implementation, to be created / approved by plan-ordered ADR Issue:
+  - Fixed Skill Kernel And Compiled Runbook Authority
+  - Adaptive Assurance Contract And Monotonic Escalation
+  - Tracked Agent Context Routing Policy And Clean-Room Evaluation
+  - Trusted Base-SHA GitHub Review Policy
+  - Blocker-Centric PR Risk Closure
+- Not required before plan phase promotion:
+  - 個別 ADR 本文の作成。理由は、design gate では ADR の必要性と implementation 前の blocking order を固定し、作成順序と依存関係を plan phase が所有するため。
 
 ## 完了した Issue / PR / Release (必須)
 - iss-xxxx-...: Done（PR: ...）

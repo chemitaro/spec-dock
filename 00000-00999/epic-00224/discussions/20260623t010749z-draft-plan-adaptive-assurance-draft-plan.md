@@ -17,15 +17,15 @@ ID: "<EPIC_ID>"
 | Requirement / AC | 閉じ方 | 主な完了証跡 |
 |---|---|---|
 | E-RQ-001〜005 | Assurance core、workflow state、fixed Skill kernel、Runbook compiler | CLI contract tests、golden Runbook、clean Git evidence |
-| E-RQ-006〜008 | Planning composer、Step Assurance、agent context routing | artifact golden tests、step matrix、clean-room review evidence |
+| E-RQ-006〜008, E-RQ-015〜021 | Planning composer、Step Assurance、agent context routing | artifact golden tests、step matrix、clean-room review evidence、context packet golden tests、return contract tests |
 | E-RQ-009 | trusted base-SHA review policy compiler | trigger JSON、base/head tests、doctor |
 | E-RQ-010〜011 | blocker-centric repair / re-review / stagnation | finding matrix、repair loop tests、merge predicate |
-| E-RQ-012〜013 | legacy rollout、metrics、provider/mirror | migration fixtures、benchmark、validate / sync |
+| E-RQ-012〜014 | legacy rollout、metrics、provider/mirror、Auto-Lite readiness | migration fixtures、benchmark、auto-lite-readiness report、validate / sync |
 | E-AC-001〜004 | Issue 1〜2 | state / classification / clean Git tests |
 | E-AC-005〜007 | Issue 3〜4 | composer / routing / stale invalidation tests |
 | E-AC-008〜009 | Issue 5 | trusted trigger integration tests |
 | E-AC-010〜012 | Issue 6 | PR blocker policy tests |
-| E-AC-013〜014 | Issue 7 | legacy / rollout / efficiency report |
+| E-AC-013〜016 | Issue 7 | legacy / rollout / auto-lite-readiness / efficiency report |
 
 ## 課題分割方針（Issue slicing policy）
 
@@ -117,29 +117,70 @@ ID: "<EPIC_ID>"
   - Step worker routing。
   - GitHub review。
 
-### I04 — Compile Step Assurance And Agent Routing
+### I04 — Compile Step Assurance, Agent Routing, And Context Policy
 
 - provisional slug:
-  - `compile-step-assurance-and-agent-routing`
+  - `compile-step-assurance-agent-routing-and-context-policy`
 - 目的:
-  - plan step factsからeffective obligationsを計算し、worker、reasoning、context、verification、reviewerを含むcurrent execution Runbookを生成する。
+  - Plan step facts、Issue-wide Assurance、agent role、task kindから、worker、reasoning effort、context mode、verification、reviewerを含むcurrent execution Runbookを生成する。
+  - 実行系agentへの必要なcontext継承と、reviewer / consultantのclean-room independenceを同時に実現する。
+  - Main orchestratorへ返るcontextを圧縮し、subagentの再調査とmain context pollutionを削減する。
 - 成果物:
   - Step Assurance schema / compiler。
   - issue global ∪ step local ∪ discovered risk。
   - semantic batch closure。
-  - recent-fork / packet / clean-room routing。
-  - worker continuation / reviewer fresh policy。
+  - `context-routing-policy.json`。
+  - `context-routing-policy.schema.json`。
+  - Context Policy Resolver。
+  - `recent_fork / bounded_packet / clean_room / minimal_packet`。
+  - Role別default context policy。
+  - Step kind / risk別override。
+  - Context Packet compiler。
+  - Reviewer Evidence Packet compiler。
+  - Consultant first-pass / arbitration context contract。
+  - worker continuation / reviewer clean-room policy。
+  - context source bindingとstale invalidation。
+  - Mainへのbounded return contract。
+  - Current Runbookへのcontext contract展開。
+  - Invocation evidenceとtoken / payload observability。
   - execution escalation。
 - Assurance:
   - strict / deep
 - closes:
   - E-RQ-007, E-RQ-008
+  - E-RQ-015, E-RQ-016, E-RQ-017, E-RQ-018, E-RQ-019, E-RQ-020, E-RQ-021
   - E-AC-006, E-AC-007
+  - E-AC-017, E-AC-018, E-AC-019, E-AC-020, E-AC-021
 - 依存:
   - I03
+- 受け入れ条件:
+  - docs-only、runtime behavior、migration、security-sensitiveの各Stepで、worker、reasoning、context、verification、reviewersがpolicyどおりに異なる。
+  - `dev-coder`は同一semantic batch内で`recent_fork`または`bounded_packet`を利用できる。
+  - `code-reviewer`、`qa-reviewer`、`spec-reviewer`は常にclean-room packetを使用する。
+  - Reviewer packetへauthor self-assessment、implementation transcript、previous reviewer verdictが含まれない。
+  - Consultant first passへmain / architectの推奨案が含まれない。
+  - Same source bindingとscopeではworker threadを継続できる。
+  - Source binding、scope、riskの変更後はworker continuationを拒否する。
+  - Fork機能が利用できない場合、workerはbounded packetへfallbackできる。
+  - Clean-roomを提供できない場合、reviewを実行せずfail-closedになる。
+  - Raw shell transcript、full test log、private reasoningがmain agentのreturn payloadへ混入しない。
+- 主なテスト:
+  - context policy schema tests
+  - role routing table tests
+  - context precedence tests
+  - reviewer clean-room exclusion tests
+  - consultant blind-first-pass tests
+  - worker continuation tests
+  - source binding invalidation tests
+  - recent-fork fallback tests
+  - bounded return contract tests
+  - golden Runbook / context packet tests
+  - provider / mirror parity tests
 - 非対象:
   - GitHub PR review trigger。
   - review finding policy。
+  - Cross-provider agent context transfer。
+  - Private reasoningの保存または転送。
 
 ### I05 — Inject Trusted Base-Branch Codex Review Policy
 
@@ -206,6 +247,8 @@ ID: "<EPIC_ID>"
   - adaptive opt-in config。
   - new Issue Standard default。
   - Lite manual / evidence-gated activation。
+  - `auto-lite-readiness report`。
+  - false positive candidates / escalation rate / P0/P1 escape / post-review blocker / wall-clock-token delta / missing metrics summary。
   - strict-legacy adapter。
   - event / metrics projection。
   - benchmark / review-quality corpus。
@@ -214,13 +257,14 @@ ID: "<EPIC_ID>"
 - Assurance:
   - strict / complex
 - closes:
-  - E-RQ-012, E-RQ-013
-  - E-AC-013, E-AC-014
+  - E-RQ-012, E-RQ-013, E-RQ-014
+  - E-AC-013, E-AC-014, E-AC-015, E-AC-016
 - 依存:
   - I02, I03, I04, I05, I06
 - 非対象:
   - Codex Action production migration。
   - Existing Issue全量backfill。
+  - Automatic Lite default の有効化。
 
 ## Tranche / 依存順
 
@@ -387,7 +431,7 @@ T6 I07 Rollout / telemetry / default switch
 
 ## 最終完了条件
 
-- E-AC-001〜014にevidenceがある。
+- E-AC-001〜021にevidenceがある。
 - 7 Issueが完了または明示的にsuperseded / deferredされている。
 - New IssueのStandard default pathがdogfoodingで成功している。
 - Existing Issueのstrict-legacy pathが壊れていない。
@@ -395,6 +439,8 @@ T6 I07 Rollout / telemetry / default switch
 - Profile / Complexity / Step Assuranceがmachine-readable。
 - Generated stateがGit差分を生まない。
 - Trusted base-SHA policyでreview triggerが動作する。
+- Auto-Lite readiness report が future automatic Lite default の adoption / rollback 条件を示し、初期 rollout では automatic Lite default が無効のままである。
+- Context routing policy、context packet、clean-room reviewer packet、bounded return contract が evidence 付きで動作する。
 - P2-only reviewでrepair / re-review loopが開始されない。
 - P0 / P1 / promoted blockerが閉じるまでmerge-preparedにならない。
 - Automation-stalledがrisk acceptanceにならない。
