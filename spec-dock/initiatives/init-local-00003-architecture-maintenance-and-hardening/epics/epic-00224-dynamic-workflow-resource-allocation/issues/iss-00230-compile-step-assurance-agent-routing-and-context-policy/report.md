@@ -55,6 +55,12 @@ Disposition ごとの必須証跡:
 | D-230-S01 | resolved | implementation | dev-coder | S01 policy needed concrete per-task defaults not fully enumerated in planning docs. | minimal distinct matrix; strict all-reviewer matrix; defer to S02 | Adopt minimal distinct matrix: docs-only/doc-writer/low/minimal/spec-reviewer; runtime/dev-coder/medium/recent_fork/code-reviewer; migration/dev-coder/high/bounded_packet/code+qa; security/dev-coder/max/bounded_packet/code+qa+spec. | Satisfies AC-001 with proportional obligations and keeps S02 projection deterministic. | applied | `context-routing-policy.json`; `test_context_routing.py` | none |
 | D-230-S01-R01 | resolved | implementation | code-reviewer | Unsupported context routing policy versions were accepted despite schema `const` and EC-002 fail-closed requirement. | accept any non-empty version; reject versions other than `context-routing-policy-v1` | Reject unsupported policy versions in `context_routing_policy_from_dict` and cover it with a unit test. | Keeps runtime parser behavior aligned with shipped schema and fail-closed policy. | applied | code-reviewer P1; `uv run pytest tests/unit/domain/test_context_routing.py` -> 4 passed | none |
 | D-230-S01-R02 | resolved | implementation | code-reviewer | Bounded return policy accepted supersets such as `raw_shell_transcript`, allowing policy JSON to broaden the return contract. | accept superset; reject any field outside the closed allowlist | Reject unsupported bounded return fields in parser and close the JSON schema allowlist with fixed size / enum / uniqueness. | Preserves S01 bounded return contract and EC-002 fail-closed behavior. | applied | code-reviewer P1; `uv run pytest tests/unit/domain/test_context_routing.py` -> 5 passed | none |
+| D-230-S02 | resolved | implementation | dev-coder | S02 needed packet/policy stores connected without editing bootstrap files outside allowed scope. | edit bootstrap; inject stores through existing runbook store; resolve stores inside `workflow_next` from `store.repo_root` | Resolve `ContextPolicyStore` and `ContextPacketStore` inside `workflow_next` using the existing `AssuranceStore.repo_root`. | Keeps S02 inside approved file scope and preserves existing command wiring; future bootstrap DI can be a refactor if needed. | applied | `application/workflow.py`; `tests/cli_runtime/test_workflow_context_routing.py` | none |
+| D-230-S02-R01 | resolved | implementation | orchestrator | Initial `ContextPacketStore` wrote multiple packet files without restoring prior projection set on partial replace failure. | leave as best-effort; add rollback backups like `RunbookStore` | Add backup/restore around packet projection replacement and test partial replace failure. | S02 requires atomic generated projection behavior and no tracked-state pollution. | applied | `tests/unit/infra/test_context_packet_store.py`; `uv run pytest ...` -> 17 passed | none |
+| D-230-S02-R02 | resolved | implementation | code-reviewer | RunbookStore projection omitted `step_assurance` / `context_packets` even though CLI stdout included them. | keep stdout-only; persist optional fields in runbook projection | Persist optional context fields in `RunbookStore` JSON / Markdown and test generated `current-runbook` files. | AC-007 requires current Runbook projection to carry routing decision and packet refs. | applied | code-reviewer P1; `tests/cli_runtime/test_workflow_context_routing.py` | none |
+| D-230-S02-R03 | resolved | implementation | code-reviewer | Stale role packet files remained after later projections omitted those roles. | leave stale files; remove stale role packet files with backup/restore | Delete role packet files not present in the new write set and preserve previous set on failure. | EC-002 fail-closed must not leave obsolete reviewer packet files available. | applied | code-reviewer P1; `tests/unit/infra/test_context_packet_store.py` | none |
+| D-230-S02-R04 | resolved | implementation | code-reviewer | Unselectable step fell back to runtime implementation packet. | keep runtime default; return issue-wide non-invocation default | Return `issue-wide` with no worker/reviewers/invocation events when no uncompleted implementation step can be selected. | EC-003 requires indeterminate selection not to prompt implementation start. | applied | code-reviewer P2; `tests/cli_runtime/test_workflow_context_routing.py` | none |
+| D-230-S02-R05 | resolved | implementation | code-reviewer | Packet assembly used default role context contracts instead of loaded valid policy exclusions. | leave default role contracts; pass loaded policy into role context contracts | Apply loaded policy to role packet / invocation event contracts and cover custom reviewer exclusion. | Keeps valid policy changes reflected in generated context packets. | applied | code-reviewer P2; `uv run pytest ...` -> 24 passed | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -70,6 +76,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 |---|---|---|---|---|---|---|
 | EAL-230-P01 | adopted | parent Epic design/plan and ADR discussions | issue planning artifacts | Epic I04 already fixes the scope for step assurance, context routing, clean-room reviewer packets, and bounded return contracts; the issue docs adopt that scope without adding PR review semantics. | `spec-dock/active/epic/design.md`; `spec-dock/active/epic/plan.md`; `requirement.md`; `design.md`; `plan.md` | spec-review |
 | EAL-230-S01 | adopted | dev-coder S01 implementation note | S01 runtime domain / policy / tests | Worker implemented only the approved S01 file set and returned material matrix defaults for orchestrator adoption. The matrix is the smallest distinct docs/runtime/migration/security routing set that satisfies AC-001 while preserving clean-room reviewer obligations. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/context_routing.py`; `tests/unit/domain/test_context_routing.py`; `uv run pytest tests/unit/domain/test_context_routing.py` | code-review |
+| EAL-230-S02 | adopted | dev-coder S02 implementation note | S02 workflow / packet projection / CLI tests | Worker connected S01 domain decisions to Runbook JSON/Markdown and ignored context packet projection, then orchestrator added atomic rollback coverage for projection writes. | `tests/cli_runtime/test_workflow_context_routing.py`; `tests/unit/infra/test_context_packet_store.py`; `uv run pytest tests/cli_runtime/test_workflow_context_routing.py tests/unit/infra/test_context_packet_store.py tests/cli_runtime/test_workflow.py` | code-review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -278,6 +285,55 @@ uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domai
 | ステップ | 委任ロール | 委任 worker 要約 | 変更ファイル | 実行 tests または docs-only 検証 | レビュアー判定 | 未解決リスク | 親統合判断 |
 |---|---|---|---|---|---|---|---|
 | S01 | dev-coder | context routing matrix、continuation freshness、clean-room exclusions、bounded return contract を実装 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/context_routing.py`; `src/spec_dock/assets/spec_dock/system/assurance/context-routing-policy.json`; `src/spec_dock/assets/spec_dock/system/assurance/schemas/context-routing-policy.schema.json`; `tests/unit/domain/test_context_routing.py` | `uv run pytest tests/unit/domain/test_context_routing.py` -> pass; `uv run ruff check ...` -> pass | pending | S02 projection integration は未実装 | accepted |
+
+### セッションログ（2026-06-23 S02）
+
+#### 対象
+- Step: S02
+- AC/EC: AC-007, AC-008, AC-009, AC-010, AC-011, EC-001, EC-002, EC-003
+- 計画上の出典:
+  - `plan.md` 実装ステップ S02
+  - closure ids: tc-230-004, tc-230-005, tc-230-006, tc-230-007, tc-230-008
+
+#### 実施内容
+- `dev-coder` に S02 implementation を委任し、S01 の context routing decision を `workflow next issue-execution` の optional `step_assurance` / `context_packets` へ接続した。
+- Context packet projection を `spec-dock/.agent/context-packets/` 配下の ignored generated state として書き出す store を追加した。
+- Orchestrator が atomic projection requirement に合わせて packet store の backup / restore を補強した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime/test_workflow_context_routing.py tests/unit/infra/test_context_packet_store.py tests/cli_runtime/test_workflow.py
+# 17 passed in 15.54s
+
+uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workflow.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/runbook.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/context_policy_store.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/context_packet_store.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/workflow.py tests/cli_runtime/test_workflow_context_routing.py tests/unit/infra/test_context_packet_store.py
+# All checks passed!
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ | フェーズ | 計画した証跡要件 | 観測した証跡 | 証跡手段 | 結果 | メモ |
+|---|---|---|---|---|---|---|
+| S02 | Red | red-required | 実装前は provider runtime Runbook に `step_assurance` / `context_packets` がなく、new CLI test file も存在しなかった | worker evidence | pass | pytest exit 4 / missing field 相当 |
+| S02 | Green | targeted CLI / infra tests | initial `17 passed`; after code-reviewer fixes `24 passed in 17.78s` | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py tests/unit/infra/test_context_packet_store.py tests/unit/infra/test_runbook_store.py tests/cli_runtime/test_workflow.py` | pass | tc-230-004〜008 plus projection persistence / stale packet / issue-wide default / loaded policy exclusion regressions |
+| S02 | Refactor | targeted lint / atomicity guard | ruff pass; packet store partial replace rollback test added | `uv run ruff check ...`; unit test | pass | generated state remains ignored |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ | クロージャID | 計画上の close 条件 | 観測した証跡 | 結果 | メモ |
+|---|---|---|---|---|---|
+| S02 | tc-230-004 | Runbook JSON / Markdown が step assurance と packet refs を返す | CLI runtime JSON / Markdown tests | pass | existing top-level fields preserved |
+| S02 | tc-230-005 | packet projection が ignored state に書かれ refs hash を持つ | CLI git-clean test; infra hash / symlink / rollback tests | pass | `.agent/context-packets/` |
+| S02 | tc-230-006 | missing / invalid assurance precedence | missing assurance CLI test | pass | step fields omitted |
+| S02 | tc-230-007 | invalid policy degrade / fail-closed | invalid JSON policy CLI test | pass | worker bounded_packet, reviewer missing_reason |
+| S02 | tc-230-008 | invocation observability | role / effort / context / policy / packet hash / source hashes / fork turn / include-exclude / refs assertions | pass | machine-readable event |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ | ゲート名 | レビュアーロール | 鮮度 | 状態 | リスク受容 | 昇格 / 完了判断 | メモ |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | passed | no | proceed to commit | P1 findings fixed; P2 loaded policy exclusion fixed locally after reviewer pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ | 委任ロール | 委任 worker 要約 | 変更ファイル | 実行 tests または docs-only 検証 | レビュアー判定 | 未解決リスク | 親統合判断 |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | workflow next に step assurance / context packet projection / invocation event を接続 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`; `application/workflow.py`; `domain/runbook.py`; `infra/context_policy_store.py`; `infra/context_packet_store.py`; `presentation/workflow.py`; `tests/cli_runtime/test_workflow_context_routing.py`; `tests/unit/infra/test_context_packet_store.py` | `uv run pytest ...` -> pass; `uv run ruff check ...` -> pass | pending | dogfooding mirror sync は S90 範囲 | accepted |
 
 ### セッションログ（2026-06-23 HH:MM - HH:MM）
 

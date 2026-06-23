@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from spec_dock_runtime.domain.workflow_state import RunbookAuthority, WorkflowState
@@ -23,9 +23,17 @@ class Runbook:
     stop_conditions: tuple[str, ...]
     details: tuple[str, ...]
     active_issue_id: str | None
+    step_assurance: dict[str, Any] | None = None
+    context_packets: dict[str, Any] | None = None
 
 
-def compile_runbook(target: WorkflowTarget, state: WorkflowState) -> Runbook:
+def compile_runbook(
+    target: WorkflowTarget,
+    state: WorkflowState,
+    *,
+    step_assurance: dict[str, Any] | None = None,
+    context_packets: dict[str, Any] | None = None,
+) -> Runbook:
     if state.kind == "no-active":
         return _runbook(
             target,
@@ -83,6 +91,8 @@ def compile_runbook(target: WorkflowTarget, state: WorkflowState) -> Runbook:
             "lite_candidate is telemetry only unless authorized_profile is lite.",
         ),
         stop_conditions=("Do not reduce obligations based only on lite_candidate.",),
+        step_assurance=step_assurance,
+        context_packets=context_packets,
     )
 
 
@@ -94,6 +104,8 @@ def _runbook(
     commands: tuple[str, ...],
     notes: tuple[str, ...],
     stop_conditions: tuple[str, ...],
+    step_assurance: dict[str, Any] | None = None,
+    context_packets: dict[str, Any] | None = None,
 ) -> Runbook:
     return Runbook(
         schema_version=WORKFLOW_RUNBOOK_SCHEMA_VERSION,
@@ -107,4 +119,6 @@ def _runbook(
         stop_conditions=stop_conditions,
         details=state.details,
         active_issue_id=state.active_issue_id,
+        step_assurance=step_assurance,
+        context_packets=context_packets,
     )
