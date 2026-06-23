@@ -37,16 +37,19 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["F", "E", "I", "UP", "B", "C4", "SIM", "PTH", "TC"]
+select = ["F", "E", "I", "UP", "B", "C4", "SIM", "PTH", "TC", "ARG"]
 ignore = ["E501", "SIM108"]
 
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
 combine-as-imports = true
 
+[tool.ruff.lint.flake8-unused-arguments]
+ignore-variadic-names = true
+
 [tool.ruff.lint.per-file-ignores]
 "src/spec_dock/**/*.py" = ["E501", "SIM108"]
-"tests/**/*.py" = ["E501", "SIM108"]
+"tests/**/*.py" = ["E501", "SIM108", "ARG"]
 
 [project.scripts]
 spec-dock = "spec_dock.cli:main"

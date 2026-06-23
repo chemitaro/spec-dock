@@ -1239,7 +1239,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S10 | ready to commit | S10 implementation files plus `report.md` S10 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S10 | committed | S10 implementation files plus `report.md` S10 evidence | `de010dad` `build(static-analysis): Ruff TC違反を解消する` | `git status --short` -> clean; post-commit `make lint` -> pass; `./spec-dock/scripts/spec-dock validate` -> pass | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `pyproject.toml` - Ruff `TC` selection.
@@ -1247,10 +1247,114 @@ git diff --check
 - `report.md` - S09 commit correction and S10 observed evidence.
 
 #### コミット
-- pending S10 step commit.
+- `de010dad` `build(static-analysis): Ruff TC違反を解消する`
 
 #### メモ
 - `application.contracts.SpecNode` is intentionally kept as a runtime import with `# noqa: TC001` because existing CLI/runtime callers access it as a module attribute.
+
+---
+
+### セッションログ（2026-06-23 HH:MM - HH:MM）
+
+#### 対象
+- Step: S11 — Ruff ARG
+- AC/EC: AC-005, AC-009
+- 計画上の出典（Planned source）:
+  - `plan.md` S11 executable contract
+  - closure id: `tc-s11-001`
+
+#### 実施内容
+- `dev-coder` に S11 を委任し、許可 path を `pyproject.toml`, `src/spec_dock/**/*.py`, `tests/**/*.py` に限定した。
+- `pyproject.toml` の Ruff `select` を `["F", "E", "I", "UP", "B", "C4", "SIM", "PTH", "TC", "ARG"]` に変更した。
+- `flake8-unused-arguments.ignore-variadic-names = true` を追加した。
+- tests-only per-file ignore として `tests/**/*.py = ["E501", "SIM108", "ARG"]` を追加した。
+- source 側の 5 件は signature / contract を維持し、未使用パラメータを explicit `del ...` で表現した。
+- dogfooding `spec-dock/` は direct target / direct edit していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG --statistics src/spec_dock tests
+# 208 ARG005, 111 ARG002, 5 ARG001; total 324
+
+uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG src/spec_dock tests
+# All checks passed!
+
+uv run pytest tests/unit/commands/test_runtime_new_s08.py tests/cli_runtime/test_runtime_new_doc_s09.py tests/unit/domain/test_delegated_authoring.py tests/cli_runtime/test_delegated_authoring.py
+# 122 passed, 31 skipped
+
+git diff --check
+# pass
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=140
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S11 | Red / inventory | `tc-s11-001`: `ARG` violation inventory | total 324; `ARG005` 208, `ARG002` 111, `ARG001` 5 | parent command: `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG --statistics src/spec_dock tests` | pass | source 5 件、tests 319 件 |
+| S11 | Green | `F,E,I,UP,B,C4,SIM,PTH,TC,ARG` violation 0 件 | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG src/spec_dock tests` -> All checks passed | command | pass | tests-only ARG ignore を含む |
+| S11 | Regression | source side contract-preserving `del` が new-doc / delegated-authoring behavior を壊さない | focused pytest 122 passed, 31 skipped | command | pass | touched paths に対応 |
+| S11 | Refactor | guardrail satisfied / no unrelated refactor | S12 以降 rule は追加せず、`spec-dock/` direct target なし | diff inspection + code-reviewer | pass | code-reviewer pass |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S11 | tests の fixture/callback/lambda/method signature 由来の ARG noise が 319 件ある | dev-coder / parent inventory | tests-only `ARG` per-file ignore を追加し、source 側は ignore しない | tc-s11-001 | no | `pyproject.toml`; Ruff S11 command pass |
+| S11 | source 側の unused arguments は public/helper signature を変えずに明示する必要がある | dev-coder | `_resolve_github_mode`, `plan_discussion_doc`, `_validate_pre_github_create_inputs`, `_classify_entry` に explicit `del ...` を追加 | tc-s11-001 | no | focused pytest pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S11 | tc-s11-001 | Ruff `ARG` を追加し violation を 0 件にする。tests ignore は限定的にする | `pyproject.toml` select includes `ARG`; source side has no `ARG` ignore; tests-only `ARG` ignore; Ruff S11 command pass; focused pytest pass | pass | code-reviewer pass |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s11-001 / tc-s11-case-001 | S11 | yes | command | initial `ARG` inventory total 324 | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG src/spec_dock tests` | pass | `ARG` violation 0 件 |
+| tc-s11-001 / tc-s11-tests-ignore-001 | S11 | yes | inspection + command | tests fixture/callback ARG noise | `pyproject.toml` inspection; focused pytest | pass | ignore scope is `tests/**/*.py` only |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s11-001 | S11 | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG src/spec_dock tests`; focused pytest; `git diff --check`; `./spec-dock/scripts/spec-dock validate`; code-reviewer pass | pass | AC-005/009 S11 closed pending commit |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s11-001 | tc-s11-case-001 | tc-s11-001 | planned closure unchanged; concrete command case recorded | no | yes |
+| added | tc-s11-001 | tc-s11-tests-ignore-001 | tc-s11-001 | tests per-file ignore requires explicit scope/rationale evidence | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S11 | delegated | unused-argument lint rule adoption step | dev-coder | Ruff `ARG` enablement and unused-argument fixes | requirement/design/plan S11 | `pyproject.toml`; `src/spec_dock/**/*.py`; `tests/**/*.py` | report edits; commit; S12+ rules; dogfooding `spec-dock/`; broad suppression outside tests | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG src/spec_dock tests`; focused pytest as needed | fixture/callback signature break; direct dogfooding edit needed | changed files; inventory; tests ignore rationale | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S11 | dev-coder | Ruff `ARG` enabled; tests-only `ARG` per-file ignore added; source unused contract args preserved with explicit `del` | `pyproject.toml`; `create_node.py`; `domain/delegated_authoring.py` | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG src/spec_dock tests` -> pass; focused pytest -> 122 passed, 31 skipped; `git diff --check` -> pass | pass: code-reviewer `019ef341-d3a6-72b2-b2dc-d8ebccf1fc25` | explicit `del` preserves currently-unused API parameters | accepted for S11 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S11 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit | pass: code-reviewer `019ef341-d3a6-72b2-b2dc-d8ebccf1fc25`; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S11 | ready to commit | S11 implementation files plus `report.md` S11 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `pyproject.toml` - Ruff `ARG` selection, unused-arguments settings, tests-only `ARG` ignore.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/delegated_authoring.py` - source-side ARG cleanup.
+- `report.md` - S10 commit correction and S11 observed evidence.
+
+#### コミット
+- pending S11 step commit.
+
+#### メモ
+- tests-only `ARG` ignore is intentional because pytest fixtures, callbacks, fake methods, and lambda signatures are contract surfaces in tests.
 
 ---
 

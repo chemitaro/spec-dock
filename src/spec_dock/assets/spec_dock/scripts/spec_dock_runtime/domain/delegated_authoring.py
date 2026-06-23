@@ -201,6 +201,8 @@ def _classify_entry(
     discussions_dir: Path,
     allowed_updates: set[Path],
 ) -> str | None:
+    del scope_dir, allowed_updates
+
     rel_path = _normalize_repo_path(entry.path, repo_root)
     abs_path = repo_root / rel_path
     status = entry.status
