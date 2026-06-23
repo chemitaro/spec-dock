@@ -48,7 +48,7 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert next_payload["state"] == "requirement-capture"
             assert next_payload["next_action"] == "requirement-capture-required"
 
-    def test_workflow_next_missing_assurance_requires_classification_before_execution(self) -> None:
+    def test_workflow_next_missing_assurance_uses_strict_legacy_execution_authority(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -61,10 +61,10 @@ class TestCliWorkflow(CliRuntimeHarness):
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            assert "state: classification-required" in result.stdout
-            assert "./spec-dock/scripts/spec-dock assurance classify --stage requirement" in result.stdout
-            assert "./spec-dock/scripts/spec-dock assurance verify" in result.stdout
-            assert "Do not start implementation" in result.stdout
+            assert "state: ready" in result.stdout
+            assert "reason_code: strict-legacy-missing-assurance" in result.stdout
+            assert "authorized_profile=strict" in result.stdout
+            assert "execution-ready" in result.stdout
 
     def test_workflow_next_malformed_assurance_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

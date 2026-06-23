@@ -32091,6 +32091,69 @@ esac
                 "blocker_fingerprints": [],
             }
 
+    def test_issue_233_pr_observation_wait_exposes_automation_stalled_operator_surface(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        provider_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py"
+        )
+        mirror_path = repo_root / ".agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py"
+
+        provider_text = provider_path.read_text(encoding="utf-8")
+        mirror_text = mirror_path.read_text(encoding="utf-8")
+
+        assert provider_text == mirror_text
+        assert 'if normalized_status == "human_gate" and mark_automation_stalled(' in provider_text
+        assert 'elif normalized_status == "human_gate" and blocker_fingerprints(payload)' in provider_text
+        module = ast.parse(provider_text)
+        selected = [
+            node
+            for node in module.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name
+            in {"decision_payload", "refresh_decision_fingerprint", "blocker_fingerprints", "mark_automation_stalled"}
+        ]
+        namespace = {"hashlib": hashlib, "json": json}
+        exec(compile(ast.Module(body=selected, type_ignores=[]), str(provider_path), "exec"), namespace)
+        payload = {
+            "decision": {
+                "status": "human_gate",
+                "status_reason": "blocker_policy_validated_blocker",
+                "recommended_next_action": "address_review_feedback",
+                "blocker_policy": {
+                    "status": "blocker_present",
+                    "blocker_fingerprints": ["abc123"],
+                },
+            },
+        }
+
+        stalled = namespace["mark_automation_stalled"](payload, same_count=2, same_required=2)
+
+        assert stalled is True
+        assert payload["automation_stalled"] == {
+            "present": True,
+            "reason": "same_blocker_fingerprint_repeated",
+            "blocker_fingerprints": ["abc123"],
+            "same_fingerprint_observed": 2,
+            "same_fingerprint_required": 2,
+            "recommended_next_action": "human_gate",
+        }
+        assert payload["decision"]["status"] == "human_gate"
+        assert payload["decision"]["status_reason"] == "automation_stalled"
+        assert payload["decision"]["recommended_next_action"] == "human_gate"
+        assert payload["decision"]["recommended_next_action"] != "merge_prepared"
+        assert payload["decision"]["fingerprint"] == payload["decision_fingerprint"]
+
+        merge_payload = {
+            "decision": {
+                "status": "human_gate",
+                "recommended_next_action": "merge_prepared",
+                "blocker_policy": {"blocker_fingerprints": ["abc123"]},
+            },
+        }
+        assert namespace["mark_automation_stalled"](merge_payload, same_count=2, same_required=2) is False
+        assert "automation_stalled" not in merge_payload
+
     def test_issue_182_s01_review_collector_does_not_promote_global_changes_requested_decision(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (

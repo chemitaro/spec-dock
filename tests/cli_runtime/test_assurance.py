@@ -30,6 +30,14 @@ class TestCliAssurance(CliRuntimeHarness):
             assert payload["classification"]["complexity_tier"] == "normal"
             assert payload["classification"]["lite_candidate"] is False
             assert payload["classification"]["lite_authorized"] is False
+            assert payload["auto_lite_readiness"]["automatic_lite_default_enabled"] is False
+            assert payload["auto_lite_readiness"]["future_adoption_requires"] == [
+                "accepted_adr",
+                "policy_version_bump",
+                "rollout_issue",
+                "telemetry_gate",
+            ]
+            assert payload["auto_lite_readiness"]["rollback_mode"] == "strict-legacy"
             assert persisted == payload["contract"]
             assert persisted["issue_id"] == "iss-00301"
             assert persisted["stage"] == "requirement"
@@ -72,6 +80,9 @@ class TestCliAssurance(CliRuntimeHarness):
                 assert payload["mode"] == "strict-legacy"
                 assert payload["has_contract"] is False
                 assert payload["classification"]["authorized_profile"] == "strict"
+                assert payload["auto_lite_readiness"]["automatic_lite_default_enabled"] is False
+                assert payload["auto_lite_readiness"]["adoption_blockers"][0] == "assurance_contract_missing"
+                assert payload["auto_lite_readiness"]["rollback_mode"] == "strict-legacy"
 
     def test_assurance_verify_invalid_contract_exits_one_with_reason(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
