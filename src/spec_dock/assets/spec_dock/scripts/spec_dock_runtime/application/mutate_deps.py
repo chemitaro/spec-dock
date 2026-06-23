@@ -163,6 +163,7 @@ def _build_candidate_issue_depends_on_map(
         )
     except RuntimeError as error:
         _raise_mutation_error(req, code="invalid_add_cycle", detail=str(error))
+        raise
 
 
 def mutate_deps(req: MutateDepsRequest, ports: Ports) -> MutateDepsResult:

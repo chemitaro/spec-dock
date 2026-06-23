@@ -93,10 +93,13 @@ def issue_view_minimal_raw(repo_root: Path, *, issue_number: int, repo_slug: str
     if not isinstance(data, dict):
         raise RuntimeError(f"Invalid gh issue view payload for issue #{issue_number}")
 
+    raw_number = data.get("number")
+    if raw_number is None:
+        raise RuntimeError("Invalid gh issue view payload: number=None")
     try:
-        number = int(data.get("number"))
+        number = int(raw_number)
     except (TypeError, ValueError) as e:
-        raise RuntimeError(f"Invalid gh issue view payload: number={data.get('number')}") from e
+        raise RuntimeError(f"Invalid gh issue view payload: number={raw_number}") from e
     if number != issue_number:
         raise RuntimeError(f"gh issue view returned mismatched number: expected {issue_number}, got {number}")
     return data
@@ -127,10 +130,13 @@ def issue_view_snapshot_raw(repo_root: Path, *, issue_number: int, repo_slug: st
     if not isinstance(data, dict):
         raise RuntimeError(f"Invalid gh issue view payload for issue #{issue_number}")
 
+    raw_number = data.get("number")
+    if raw_number is None:
+        raise RuntimeError("Invalid gh issue view payload: number=None")
     try:
-        number = int(data.get("number"))
+        number = int(raw_number)
     except (TypeError, ValueError) as e:
-        raise RuntimeError(f"Invalid gh issue view payload: number={data.get('number')}") from e
+        raise RuntimeError(f"Invalid gh issue view payload: number={raw_number}") from e
     if number != issue_number:
         raise RuntimeError(f"gh issue view returned mismatched number: expected {issue_number}, got {number}")
     return data
@@ -172,8 +178,15 @@ def _issue_snapshot_from_raw(item: dict[str, Any], *, repo_slug: str | None = No
             if sep and slug_owner and slug_repo:
                 owner = slug_owner
                 repo = slug_repo
+    raw_number = item.get("number")
+    if raw_number is None:
+        raise RuntimeError("Invalid gh issue snapshot payload: number=None")
+    try:
+        issue_number = int(raw_number)
+    except (TypeError, ValueError) as e:
+        raise RuntimeError(f"Invalid gh issue snapshot payload: number={raw_number}") from e
     return IssueSnapshot(
-        issue_number=int(item.get("number")),
+        issue_number=issue_number,
         state=str(item.get("state", "")),
         title=str(item.get("title", "")),
         labels=[

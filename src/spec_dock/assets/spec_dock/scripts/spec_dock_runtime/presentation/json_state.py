@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 from spec_dock_runtime.domain.ids import deps_node_sort_key
 from spec_dock_runtime.presentation.contracts import DepsIssuesArtifact, DepsRawArtifact, IndexArtifact, TreeArtifact
@@ -18,6 +18,8 @@ from spec_dock_runtime.presentation.puml import (
 if TYPE_CHECKING:
     from spec_dock_runtime.application.contracts import DepsCheckResult, SyncStateResult
     from spec_dock_runtime.domain.models import ActiveSelection, DepsNodeState, SpecNode
+
+StatePayloads: TypeAlias = tuple[dict[str, object], dict[str, object], dict[str, object], dict[str, object]]
 
 CURRENT_FUTURE_PROJECTION = "current-future"
 FULL_HISTORY_PROJECTION = "full-history"
@@ -40,12 +42,14 @@ def _deps_node_blocker_payload(blocker: object) -> dict[str, object]:
 
 
 def _deps_dependency_context_payload(context: object) -> dict[str, object]:
+    raw_target_issue_ids = _object_value(context, "target_issue_ids", ())
+    target_issue_ids = raw_target_issue_ids if isinstance(raw_target_issue_ids, (list, tuple)) else ()
     return {
         "source_node_id": _object_value(context, "source_node_id", ""),
         "source_issue_id": _object_value(context, "source_issue_id", ""),
         "target_node_id": _object_value(context, "target_node_id", ""),
         "target_node_kind": _object_value(context, "target_node_kind", ""),
-        "target_issue_ids": list(_object_value(context, "target_issue_ids", ())),
+        "target_issue_ids": list(target_issue_ids),
         "expansion": _object_value(context, "expansion", ""),
         "lifecycle_state": _object_value(context, "lifecycle_state", None),
         "lifecycle_source": _object_value(context, "lifecycle_source", None),
@@ -205,13 +209,13 @@ def _build_issue_edges_from_deps_state(
         edges.sort(key=lambda item: (_sort_key(item["from"]), _sort_key(item["to"])))
         return edges
 
-    edges: list[dict[str, str]] = []
+    fallback_edges: list[dict[str, str]] = []
     for issue_id in _sort_ids(list(deps_state_by_issue_id.keys())):
         node_state = deps_state_by_issue_id[issue_id]
         for dep_id in node_state.effective_depends_on:
-            edges.append({"from": issue_id, "to": dep_id, "kind": "depends_on"})
-    edges.sort(key=lambda item: (_sort_key(item["from"]), _sort_key(item["to"])))
-    return edges
+            fallback_edges.append({"from": issue_id, "to": dep_id, "kind": "depends_on"})
+    fallback_edges.sort(key=lambda item: (_sort_key(item["from"]), _sort_key(item["to"])))
+    return fallback_edges
 
 
 def _issue_raw_state(result: SyncStateResult, issue_id: str) -> str:
@@ -423,7 +427,7 @@ def _build_deps_raw_payload(result: SyncStateResult) -> dict[str, object]:
     }
 
 
-def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], dict[str, object]]:
+def _build_state_payloads(result: SyncStateResult) -> StatePayloads:
     graph_nodes = result.graph.nodes_by_id
     children = _build_children(graph_nodes)
     deps_state_by_issue_id = _deps_state_by_issue_id(result)
@@ -528,23 +532,23 @@ def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], d
         if not isinstance(init_base, dict):
             continue
         init_item = dict(init_base)
-        epics: list[dict[str, object]] = []
+        epics_all: list[dict[str, object]] = []
         for epic_id in _sort_ids(children.get(initiative_id, [])):
             epic_node = graph_nodes.get(epic_id)
             epic_base = nodes_all.get(epic_id)
             if epic_node is None or epic_node.kind != "epic" or not isinstance(epic_base, dict):
                 continue
             epic_item = dict(epic_base)
-            issues: list[dict[str, object]] = []
+            issues_all: list[dict[str, object]] = []
             for issue_id in _sort_ids(children.get(epic_id, [])):
                 issue_node = graph_nodes.get(issue_id)
                 issue_base = nodes_all.get(issue_id)
                 if issue_node is None or issue_node.kind != "issue" or not isinstance(issue_base, dict):
                     continue
-                issues.append(dict(issue_base))
-            epic_item["issues"] = issues
-            epics.append(epic_item)
-        init_item["epics"] = epics
+                issues_all.append(dict(issue_base))
+            epic_item["issues"] = issues_all
+            epics_all.append(epic_item)
+        init_item["epics"] = epics_all
         tree_all.append(init_item)
 
     todo_issue_ids = _sort_ids(
@@ -590,20 +594,20 @@ def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], d
         if not isinstance(init_base, dict):
             continue
         init_item = dict(init_base)
-        epics: list[dict[str, object]] = []
+        epics_todo: list[dict[str, object]] = []
         for epic_id in _sort_ids([child_id for child_id in children.get(initiative_id, []) if child_id in todo_epic_set]):
             epic_base = nodes_todo.get(epic_id)
             if not isinstance(epic_base, dict):
                 continue
             epic_item = dict(epic_base)
-            issues: list[dict[str, object]] = []
+            issues_todo: list[dict[str, object]] = []
             for issue_id in _sort_ids([child_id for child_id in children.get(epic_id, []) if child_id in todo_issue_set]):
                 issue_base = nodes_todo.get(issue_id)
                 if isinstance(issue_base, dict):
-                    issues.append(dict(issue_base))
-            epic_item["issues"] = issues
-            epics.append(epic_item)
-        init_item["epics"] = epics
+                    issues_todo.append(dict(issue_base))
+            epic_item["issues"] = issues_todo
+            epics_todo.append(epic_item)
+        init_item["epics"] = epics_todo
         tree_todo.append(init_item)
 
     deps_top_all = {

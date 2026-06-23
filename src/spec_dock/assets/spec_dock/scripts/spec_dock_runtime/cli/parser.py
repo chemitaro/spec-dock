@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import argparse
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
 if TYPE_CHECKING:
     from spec_dock_runtime.commands.contracts import CommandRegistry, CommandSpec
 
 
 class _RuntimeArgumentParser(argparse.ArgumentParser):
-    def error(self, message: str) -> None:
+    def error(self, message: str) -> NoReturn:
         legacy_flags = ("--initiative", "--epic", "--issue")
         hint = ""
         if "unrecognized arguments" in message and any(flag in message for flag in legacy_flags):

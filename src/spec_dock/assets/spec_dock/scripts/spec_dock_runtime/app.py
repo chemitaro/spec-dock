@@ -122,6 +122,8 @@ class _Node:
     initiative_id: str | None
     epic_id: str | None
     github_issue_number: int | None
+    github_repo_owner: str | None = None
+    github_repo_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -247,12 +249,20 @@ def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
         epic_id = meta.get("epic_id") or None
 
         github_issue_number: int | None = None
+        github_repo_owner: str | None = None
+        github_repo_name: str | None = None
         github = meta.get("github")
-        if isinstance(github, dict) and github.get("issue_number") is not None:
-            try:
-                github_issue_number = int(github.get("issue_number"))
-            except (TypeError, ValueError) as e:
-                raise RuntimeError(f"Invalid github.issue_number in {meta_path}: {github.get('issue_number')}") from e
+        if isinstance(github, dict):
+            raw_issue_number = github.get("issue_number")
+            if raw_issue_number is not None:
+                try:
+                    github_issue_number = int(raw_issue_number)
+                except (TypeError, ValueError) as e:
+                    raise RuntimeError(f"Invalid github.issue_number in {meta_path}: {raw_issue_number}") from e
+            raw_repo_owner = github.get("repo_owner")
+            raw_repo_name = github.get("repo_name")
+            github_repo_owner = raw_repo_owner if isinstance(raw_repo_owner, str) else None
+            github_repo_name = raw_repo_name if isinstance(raw_repo_name, str) else None
 
         # Note: `path` points to the directory that contains this node's meta file.
         nodes[node_id] = _Node(
@@ -266,6 +276,8 @@ def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
             initiative_id=str(initiative_id) if initiative_id else None,
             epic_id=str(epic_id) if epic_id else None,
             github_issue_number=github_issue_number,
+            github_repo_owner=github_repo_owner,
+            github_repo_name=github_repo_name,
         )
     return nodes
 
@@ -1074,10 +1086,10 @@ def _infer_active_node_from_branch(nodes: dict[str, _Node], *, branch: str) -> t
             nums.add(int(m.group("num")))
         except (TypeError, ValueError):
             continue
-    m = _LEADING_NUMBER_IN_TEXT_RE.match(leaf)
-    if m:
+    leading_number_match = _LEADING_NUMBER_IN_TEXT_RE.match(leaf)
+    if leading_number_match:
         with contextlib.suppress(TypeError, ValueError):
-            nums.add(int(m.group("num")))
+            nums.add(int(leading_number_match.group("num")))
 
     if not nums:
         # No signal: keep active unchanged silently (common on `main`, `develop`, etc.).
@@ -1492,10 +1504,10 @@ def _deps_evaluate(
 
     out_nodes: dict[str, Any] = {}
     for node_id in sorted(deps_map.keys()):
-        item: dict[str, Any] = {"state": derived_state(node_id), "ready": ready_by_id.get(node_id, False)}
+        node_item: dict[str, Any] = {"state": derived_state(node_id), "ready": ready_by_id.get(node_id, False)}
         if node_id in progress:
-            item["progress"] = dict(progress[node_id])
-        out_nodes[node_id] = item
+            node_item["progress"] = dict(progress[node_id])
+        out_nodes[node_id] = node_item
 
     return {
         "target": target_id,
@@ -1633,14 +1645,14 @@ def _build_deps_state(
 
     out_nodes: dict[str, Any] = {}
     for node_id in sorted(effective_deps_map.keys(), key=sort_key):
-        n = nodes.get(node_id)
-        if not n:
+        node = nodes.get(node_id)
+        if not node:
             continue
         out_nodes[node_id] = {
-            "type": n.type,
-            "id": n.id,
-            "title": n.title,
-            "path": n.path.relative_to(repo_root).as_posix(),
+            "type": node.type,
+            "id": node.id,
+            "title": node.title,
+            "path": node.path.relative_to(repo_root).as_posix(),
             "state": derived_state(node_id),
             "ready": ready_by_id.get(node_id, False),
             "effective_depends_on": list(effective_deps_map.get(node_id, [])),

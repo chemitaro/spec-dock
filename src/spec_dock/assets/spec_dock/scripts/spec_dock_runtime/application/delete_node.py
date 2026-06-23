@@ -1263,11 +1263,11 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
                 target_id=target.id,
                 message=message,
             )
-        for survivor_id, deleted_node_ids in surviving_node_to_deleted_node_ids.items():
-            if deleted_node_ids:
+        for survivor_id, conflicted_deleted_node_ids in surviving_node_to_deleted_node_ids.items():
+            if conflicted_deleted_node_ids:
                 dep_conflicts.add(survivor_id)
-                dep_conflicts.update(deleted_node_ids)
-                surviving_node_to_deleted_issue_ids.setdefault(survivor_id, set()).update(deleted_node_ids)
+                dep_conflicts.update(conflicted_deleted_node_ids)
+                surviving_node_to_deleted_issue_ids.setdefault(survivor_id, set()).update(conflicted_deleted_node_ids)
         for deleted_source_id, surviving_node_ids in deleted_node_to_surviving_node_ids.items():
             if surviving_node_ids:
                 dep_conflicts.add(deleted_source_id)
@@ -1326,7 +1326,7 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
         ports=ports,
     )
     if not local_delete_succeeded:
-        warnings = ["local_delete_failed"]
+        local_delete_warnings = ["local_delete_failed"]
         active_restore_result: Literal["cleared", "restored", "restore_failed", "not_needed"] = "not_needed"
         restore_guidance = "active restore was not needed because local delete did not remove target nodes"
         if needs_active_repair and deleted_node_ids:
@@ -1336,8 +1336,8 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
                 deleted_node_ids=set(deleted_node_ids),
             )
             for warning in restore_warnings:
-                if warning not in warnings:
-                    warnings.append(warning)
+                if warning not in local_delete_warnings:
+                    local_delete_warnings.append(warning)
         elif deleted_node_ids:
             restore_guidance = "active restore was not needed for the partially deleted target"
         return _local_delete_partial_failure_result(
@@ -1354,7 +1354,7 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
                 remaining_node_ids=remaining_node_ids,
             ),
             dependency_scrub_failures=[],
-            warnings=warnings,
+            warnings=local_delete_warnings,
         )
 
     active_restore_result = "not_needed"

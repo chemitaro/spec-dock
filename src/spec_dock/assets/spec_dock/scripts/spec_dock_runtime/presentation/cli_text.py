@@ -741,12 +741,12 @@ def render_sync_text(result: SyncCommandResult) -> CliText:
         if result.write_result is not None
         else "spec-dock: ok (sync)"
     )
-    stderr_lines: list[str] = []
+    sync_stderr_lines: list[str] = []
     if result.state.deps_preflight_error:
-        stderr_lines.append(result.state.deps_preflight_error)
+        sync_stderr_lines.append(result.state.deps_preflight_error)
     if result.active_update is not None:
         if result.active_update.applied:
-            stderr_lines.append(f"spec-dock: sync: active updated ({result.active_update.reason or 'updated'})")
+            sync_stderr_lines.append(f"spec-dock: sync: active updated ({result.active_update.reason or 'updated'})")
         else:
-            stderr_lines.append(f"spec-dock: sync: active unchanged ({result.active_update.reason or 'unchanged'})")
-    return CliText(stdout_lines=[line], stderr_lines=stderr_lines, warnings=list(result.state.warnings))
+            sync_stderr_lines.append(f"spec-dock: sync: active unchanged ({result.active_update.reason or 'unchanged'})")
+    return CliText(stdout_lines=[line], stderr_lines=sync_stderr_lines, warnings=list(result.state.warnings))
