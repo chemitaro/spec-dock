@@ -3,22 +3,22 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from ..domain.authority import (
+from spec_dock_runtime.application.artifact_preflight import validate_required_artifacts_for_graph
+from spec_dock_runtime.application.contracts import ValidateTreeRequest, ValidationResult
+from spec_dock_runtime.application.repo_context import resolve_current_repo_slug
+from spec_dock_runtime.domain.authority import (
     evaluate_evidence_adoption_ledger_gate,
     load_evidence_adoption_ledger_entries,
     validate_delegated_authority_artifact,
 )
-from ..domain.deps import validate_raw_node_dependency_graph
-from ..domain.models import SpecNodeKind, SpecNodeSeed, ValidationReport
-from ..domain.tree import build_graph
-from ..domain.validation import validate_graph_and_deps
-from .artifact_preflight import validate_required_artifacts_for_graph
-from .contracts import ValidateTreeRequest, ValidationResult
-from .repo_context import resolve_current_repo_slug
+from spec_dock_runtime.domain.deps import validate_raw_node_dependency_graph
+from spec_dock_runtime.domain.models import SpecNodeKind, SpecNodeSeed, ValidationReport
+from spec_dock_runtime.domain.tree import build_graph
+from spec_dock_runtime.domain.validation import validate_graph_and_deps
 
 if TYPE_CHECKING:
-    from ..infra.contracts import DirectDependencyResolution, StoredMetaRecord
-    from .ports import Ports
+    from spec_dock_runtime.application.ports import Ports
+    from spec_dock_runtime.infra.contracts import DirectDependencyResolution, StoredMetaRecord
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:

@@ -3,8 +3,28 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from ..domain.active import resolve_branch_decision
-from ..domain.authority import (
+from spec_dock_runtime.application.check_deps import (
+    load_cached_high_level_github_state_by_id,
+    resolve_high_level_status_context,
+)
+from spec_dock_runtime.application.contracts import (
+    ActiveClearResult,
+    ActiveSetResult,
+    ActiveViewEntry,
+    ActiveViewResult,
+    ClearActiveRequest,
+    SetActiveRequest,
+    ShowActiveRequest,
+    TargetRef,
+)
+from spec_dock_runtime.application.github_issue_targets import (
+    collect_repo_scoped_issue_view_targets,
+    normalize_repo_slug,
+)
+from spec_dock_runtime.application.repo_context import resolve_current_repo_slug
+from spec_dock_runtime.application.status_context import resolve_issue_status_context
+from spec_dock_runtime.domain.active import resolve_branch_decision
+from spec_dock_runtime.domain.authority import (
     AUTHORITY_APPROVED,
     GRANT_IMPLEMENTATION_START,
     GRANT_ISSUE_FINISH,
@@ -15,28 +35,21 @@ from ..domain.authority import (
     load_evidence_adoption_ledger_entries,
     validate_delegated_authority_artifact,
 )
-from ..domain.deps import evaluate_readiness, validate_deps_cycles, validate_raw_node_dependency_graph
-from ..domain.ids import format_id, parse_id
-from ..domain.models import ActiveSelection, BranchDecision, NodeId, SpecGraph, SpecNodeKind, SpecNodeSeed
-from ..domain.tree import build_graph, select_active_chain
-from ..infra.contracts import ActiveManifest, ActiveManifestEntry, StoredMetaRecord
-from .check_deps import load_cached_high_level_github_state_by_id, resolve_high_level_status_context
-from .contracts import (
-    ActiveClearResult,
-    ActiveSetResult,
-    ActiveViewEntry,
-    ActiveViewResult,
-    ClearActiveRequest,
-    SetActiveRequest,
-    ShowActiveRequest,
-    TargetRef,
+from spec_dock_runtime.domain.deps import evaluate_readiness, validate_deps_cycles, validate_raw_node_dependency_graph
+from spec_dock_runtime.domain.ids import format_id, parse_id
+from spec_dock_runtime.domain.models import (
+    ActiveSelection,
+    BranchDecision,
+    NodeId,
+    SpecGraph,
+    SpecNodeKind,
+    SpecNodeSeed,
 )
-from .github_issue_targets import collect_repo_scoped_issue_view_targets, normalize_repo_slug
-from .repo_context import resolve_current_repo_slug
-from .status_context import resolve_issue_status_context
+from spec_dock_runtime.domain.tree import build_graph, select_active_chain
+from spec_dock_runtime.infra.contracts import ActiveManifest, ActiveManifestEntry, StoredMetaRecord
 
 if TYPE_CHECKING:
-    from .ports import Ports
+    from spec_dock_runtime.application.ports import Ports
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:

@@ -7,8 +7,8 @@ if TYPE_CHECKING:
     import argparse
     from collections.abc import Callable
 
-    from ..application.contracts import UseCases
-    from ..presentation.contracts import CliText
+    from spec_dock_runtime.application.contracts import UseCases
+    from spec_dock_runtime.presentation.contracts import CliText
 
 
 @dataclass(frozen=True)

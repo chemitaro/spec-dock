@@ -30,30 +30,30 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING, Any
 
-from .cli.bootstrap import build_runtime as _cli_build_runtime
-from .cli.dispatch import dispatch as _cli_dispatch
-from .cli.parser import build_parser as _cli_build_parser
-from .cli.registry import build_registry as _cli_build_registry
-from .domain.models import SpecGraph, SpecNodeSeed
-from .domain.tree import build_graph as _domain_build_graph
-from .domain.validation import (
+from spec_dock_runtime.cli.bootstrap import build_runtime as _cli_build_runtime
+from spec_dock_runtime.cli.dispatch import dispatch as _cli_dispatch
+from spec_dock_runtime.cli.parser import build_parser as _cli_build_parser
+from spec_dock_runtime.cli.registry import build_registry as _cli_build_registry
+from spec_dock_runtime.domain.models import SpecGraph, SpecNodeSeed
+from spec_dock_runtime.domain.tree import build_graph as _domain_build_graph
+from spec_dock_runtime.domain.validation import (
     validate_github_issue_numbers_unique as _domain_validate_github_issue_numbers_unique,
     validate_graph_and_deps as _domain_validate_graph_and_deps,
 )
-from .github import (
+from spec_dock_runtime.github import (
     _ensure_gh_available,
     _gh_issue_index,
 )
-from .ids import (
+from spec_dock_runtime.ids import (
     _deps_node_sort_key,
     _find_existing_id_by_num,
     _parse_id,
 )
-from .infra.git_cli import origin_github_repo_slug as _origin_github_repo_slug
-from .io_json import _load_json, _now_iso, _try_make_readonly, _warn, _write_json
-from .presentation.cli_text import render_deps_check_text as _render_deps_check_text
-from .presentation.json_state import render_deps_check_json as _render_deps_check_json
-from .render_puml import (
+from spec_dock_runtime.infra.git_cli import origin_github_repo_slug as _origin_github_repo_slug
+from spec_dock_runtime.io_json import _load_json, _now_iso, _try_make_readonly, _warn, _write_json
+from spec_dock_runtime.presentation.cli_text import render_deps_check_text as _render_deps_check_text
+from spec_dock_runtime.presentation.json_state import render_deps_check_json as _render_deps_check_json
+from spec_dock_runtime.render_puml import (
     _deps_disabled_error_text,
 )
 

@@ -6,17 +6,7 @@ from typing import TYPE_CHECKING, Literal, Protocol
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from ..domain.models import IssueSnapshot, SpecGraph
-    from ..infra.contracts import (
-        ActiveManifest,
-        ActiveManifestLoadResult,
-        ActiveStateSnapshot,
-        DepsTopologyLoadResult,
-        DirectDependencyResolution,
-        StoredMetaRecord,
-    )
-    from ..presentation.contracts import ArtifactBundle
-    from .contracts import (
+    from spec_dock_runtime.application.contracts import (
         ArtifactWriteResult,
         BootstrapResult,
         GitHubCapabilityDiagnostic,
@@ -25,6 +15,16 @@ if TYPE_CHECKING:
         SyncCommandResult,
         SyncRequest,
     )
+    from spec_dock_runtime.domain.models import IssueSnapshot, SpecGraph
+    from spec_dock_runtime.infra.contracts import (
+        ActiveManifest,
+        ActiveManifestLoadResult,
+        ActiveStateSnapshot,
+        DepsTopologyLoadResult,
+        DirectDependencyResolution,
+        StoredMetaRecord,
+    )
+    from spec_dock_runtime.presentation.contracts import ArtifactBundle
 
 
 class ValidateNodeReader(Protocol):

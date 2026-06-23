@@ -6,7 +6,7 @@ import shutil
 import subprocess
 from typing import TYPE_CHECKING, Any
 
-from ..domain.models import IssueSnapshot
+from spec_dock_runtime.domain.models import IssueSnapshot
 
 if TYPE_CHECKING:
     from pathlib import Path

@@ -5,13 +5,13 @@ from pathlib import Path
 import subprocess
 from typing import TYPE_CHECKING
 
-from ..presentation.contracts import CliText
-from .contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.presentation.contracts import CliText
 
 if TYPE_CHECKING:
     import argparse
 
-    from ..application.contracts import UseCases
+    from spec_dock_runtime.application.contracts import UseCases
 
 UPSTREAM_SOURCE = "git+https://github.com/chemitaro/spec-dock"
 

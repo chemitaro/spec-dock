@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..commands import (
+from spec_dock_runtime.commands import (
     active as active_commands,
     close as close_commands,
     delegated_authoring as delegated_authoring_commands,
@@ -16,7 +16,7 @@ from ..commands import (
     validate as validate_commands,
     worktree as worktree_commands,
 )
-from ..commands.contracts import CommandRegistry, CommandSpec
+from spec_dock_runtime.commands.contracts import CommandRegistry, CommandSpec
 
 
 def build_registry() -> CommandRegistry:

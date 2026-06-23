@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 
-from ..domain import delegated_authoring as domain
+from spec_dock_runtime.domain import delegated_authoring as domain
 
 
 @dataclass(frozen=True)

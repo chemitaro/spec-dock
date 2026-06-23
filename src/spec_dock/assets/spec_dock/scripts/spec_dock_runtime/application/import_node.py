@@ -6,13 +6,9 @@ from pathlib import Path
 import shlex
 from typing import TYPE_CHECKING, Literal, cast
 
-from ..domain.ids import resolve_id_input, resolve_input_title_and_slug
-from ..domain.models import ActiveSelection, SpecGraph, SpecNode, SpecNodeKind
-from ..domain.tree import resolve_parent_from_active
-from ..domain.validation import validate_graph_and_deps
-from .artifact_preflight import validate_required_artifacts_for_graph
-from .contracts import CreateNodeRequest, ImportNodeRequest, ImportNodeResult
-from .create_node import (
+from spec_dock_runtime.application.artifact_preflight import validate_required_artifacts_for_graph
+from spec_dock_runtime.application.contracts import CreateNodeRequest, ImportNodeRequest, ImportNodeResult
+from spec_dock_runtime.application.create_node import (
     CreateWritePhase,
     _acquire_create_lock,
     _doctor_guidance_message,
@@ -26,12 +22,16 @@ from .create_node import (
     plan_node_creation,
     resolve_create_write_phase,
 )
-from .repo_context import resolve_current_repo_slug, split_repo_slug
-from .sync_state import sync_after_import
+from spec_dock_runtime.application.repo_context import resolve_current_repo_slug, split_repo_slug
+from spec_dock_runtime.application.sync_state import sync_after_import
+from spec_dock_runtime.domain.ids import resolve_id_input, resolve_input_title_and_slug
+from spec_dock_runtime.domain.models import ActiveSelection, SpecGraph, SpecNode, SpecNodeKind
+from spec_dock_runtime.domain.tree import resolve_parent_from_active
+from spec_dock_runtime.domain.validation import validate_graph_and_deps
 
 if TYPE_CHECKING:
-    from ..infra.contracts import ActiveManifest, StoredMetaRecord
-    from .ports import Ports
+    from spec_dock_runtime.application.ports import Ports
+    from spec_dock_runtime.infra.contracts import ActiveManifest, StoredMetaRecord
 
 
 def _resolve_specdock_dir(ports: Ports) -> Path:

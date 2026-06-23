@@ -7,11 +7,7 @@ import re
 import shutil
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-from ..domain.ids import format_id, parse_id
-from ..domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
-from ..domain.tree import build_graph
-from ..infra.contracts import ActiveManifest, ActiveStateSnapshot, StoredMetaRecord
-from .contracts import (
+from spec_dock_runtime.application.contracts import (
     ClearActiveRequest,
     DeleteDependencyScrubFailure,
     DeleteNodeRequest,
@@ -20,11 +16,15 @@ from .contracts import (
     DeleteTerminalStatus,
     DeleteValidationReason,
 )
-from .github_issue_targets import normalize_repo_slug
-from .sync_state import post_mutation_sync
+from spec_dock_runtime.application.github_issue_targets import normalize_repo_slug
+from spec_dock_runtime.application.sync_state import post_mutation_sync
+from spec_dock_runtime.domain.ids import format_id, parse_id
+from spec_dock_runtime.domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
+from spec_dock_runtime.domain.tree import build_graph
+from spec_dock_runtime.infra.contracts import ActiveManifest, ActiveStateSnapshot, StoredMetaRecord
 
 if TYPE_CHECKING:
-    from .ports import Ports
+    from spec_dock_runtime.application.ports import Ports
 
 _NUM_RE = re.compile(r"^[0-9]+$")
 _SCOPED_ISSUE_REF_RE = re.compile(
@@ -1125,7 +1125,7 @@ def _repair_active_after_clear_failure(
     repaired_manifest = _drop_deleted_nodes_from_manifest(active_snapshot.manifest, deleted_node_ids=deleted_node_ids)
     try:
         if _manifest_has_entries(repaired_manifest):
-            from .set_active import _build_context_pack_text, commit_active_state
+            from spec_dock_runtime.application.set_active import _build_context_pack_text, commit_active_state
 
             assert repaired_manifest is not None
             context_pack_text = _build_context_pack_text(repaired_manifest, repo_root=ports.repo_root)
@@ -1141,7 +1141,7 @@ def _repair_active_after_clear_failure(
                 "active clear failed after local delete; best-effort active repair was applied",
             )
 
-        from .set_active import clear_active as clear_active_use_case
+        from spec_dock_runtime.application.set_active import clear_active as clear_active_use_case
 
         clear_active_use_case(ClearActiveRequest(), ports)
         return (
@@ -1373,7 +1373,7 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
             warnings.append("dependency_scrub_failed")
 
     if needs_active_repair:
-        from .set_active import clear_active as clear_active_use_case
+        from spec_dock_runtime.application.set_active import clear_active as clear_active_use_case
 
         try:
             clear_active_use_case(ClearActiveRequest(), ports)

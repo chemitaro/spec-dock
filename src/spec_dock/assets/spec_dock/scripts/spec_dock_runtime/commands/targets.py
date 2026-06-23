@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 
-from ..application.contracts import TargetRef
+from spec_dock_runtime.application.contracts import TargetRef
 
 _num_re = re.compile(r"^[0-9]+$")
 _gh_issue_url_full_re = re.compile(

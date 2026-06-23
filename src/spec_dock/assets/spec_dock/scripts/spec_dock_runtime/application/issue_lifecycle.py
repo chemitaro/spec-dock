@@ -4,8 +4,28 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from ..domain.active import infer_active_node_from_branch
-from ..domain.authority import (
+from spec_dock_runtime.application.close_node import close_node
+from spec_dock_runtime.application.contracts import (
+    ClearActiveRequest,
+    CloseNodeRequest,
+    IssueFinishRequest,
+    IssueFinishResult,
+    IssueStartRequest,
+    IssueStartResult,
+    SetActiveRequest,
+    TargetRef,
+)
+from spec_dock_runtime.application.github_issue_targets import normalize_repo_slug
+from spec_dock_runtime.application.repo_context import resolve_current_repo_slug
+from spec_dock_runtime.application.set_active import (
+    build_context_pack_text,
+    clear_active,
+    commit_active_state,
+    set_active,
+)
+from spec_dock_runtime.application.sync_state import post_mutation_sync
+from spec_dock_runtime.domain.active import infer_active_node_from_branch
+from spec_dock_runtime.domain.authority import (
     GRANT_ISSUE_FINISH,
     GRANT_REVIEW_INPUT,
     PROMOTION_DECISION_RUNTIME_ACTIVE_SELECTION,
@@ -16,28 +36,13 @@ from ..domain.authority import (
     load_evidence_adoption_ledger_entries,
     validate_delegated_authority_artifact,
 )
-from ..domain.ids import format_id, parse_id
-from ..domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
-from ..domain.tree import build_graph
-from .close_node import close_node
-from .contracts import (
-    ClearActiveRequest,
-    CloseNodeRequest,
-    IssueFinishRequest,
-    IssueFinishResult,
-    IssueStartRequest,
-    IssueStartResult,
-    SetActiveRequest,
-    TargetRef,
-)
-from .github_issue_targets import normalize_repo_slug
-from .repo_context import resolve_current_repo_slug
-from .set_active import build_context_pack_text, clear_active, commit_active_state, set_active
-from .sync_state import post_mutation_sync
+from spec_dock_runtime.domain.ids import format_id, parse_id
+from spec_dock_runtime.domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
+from spec_dock_runtime.domain.tree import build_graph
 
 if TYPE_CHECKING:
-    from ..infra.contracts import ActiveManifest, StoredMetaRecord
-    from .ports import Ports
+    from spec_dock_runtime.application.ports import Ports
+    from spec_dock_runtime.infra.contracts import ActiveManifest, StoredMetaRecord
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:

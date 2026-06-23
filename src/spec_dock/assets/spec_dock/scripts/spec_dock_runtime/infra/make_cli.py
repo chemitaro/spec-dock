@@ -4,7 +4,7 @@ import shutil
 import subprocess
 from typing import TYPE_CHECKING
 
-from ..application.contracts import BootstrapResult
+from spec_dock_runtime.application.contracts import BootstrapResult
 
 if TYPE_CHECKING:
     from pathlib import Path

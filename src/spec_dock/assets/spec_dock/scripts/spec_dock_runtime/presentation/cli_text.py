@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from .contracts import CliText
+from spec_dock_runtime.presentation.contracts import CliText
 
 if TYPE_CHECKING:
-    from ..application.contracts import (
+    from spec_dock_runtime.application.contracts import (
         ActiveClearResult,
         ActiveSetResult,
         ActiveViewResult,

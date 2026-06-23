@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 from typing import Any
 
-from ..domain.authority import (
+from spec_dock_runtime.domain.authority import (
     GRANT_IMPLEMENTATION_START,
     GRANT_ISSUE_FINISH,
     evaluate_authority_gate,
@@ -13,14 +13,14 @@ from ..domain.authority import (
     load_evidence_adoption_ledger_entries,
     validate_delegated_authority_artifact,
 )
-from .clock import now_iso
-from .contracts import (
+from spec_dock_runtime.infra.clock import now_iso
+from spec_dock_runtime.infra.contracts import (
     ActiveManifest,
     ActiveManifestEntry,
     ActiveManifestLoadResult,
     ActiveStateSnapshot,
 )
-from .json_store import load_json, write_json
+from spec_dock_runtime.infra.json_store import load_json, write_json
 
 _AGENT_DIRNAME = ".agent"
 _LEGACY_WORK_DIRNAME = ".work"

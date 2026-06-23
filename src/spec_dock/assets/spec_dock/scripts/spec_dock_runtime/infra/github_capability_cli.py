@@ -5,7 +5,7 @@ import hashlib
 import os
 import subprocess
 
-from ..application.contracts import (
+from spec_dock_runtime.application.contracts import (
     GitHubCapability,
     GitHubCapabilityDiagnostic,
     GitHubCapabilityDiagnosticCode,

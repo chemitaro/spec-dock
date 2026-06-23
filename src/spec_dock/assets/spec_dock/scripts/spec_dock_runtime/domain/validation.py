@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .deps import validate_deps_cycles
-from .discussion_docs import (
+from spec_dock_runtime.domain.deps import validate_deps_cycles
+from spec_dock_runtime.domain.discussion_docs import (
     discussion_filename_expectation,
     is_malformed_discussion_doc_candidate,
     parse_legacy_discussion_doc_filename,
     parse_timestamp_discussion_doc_filename,
 )
-from .ids import parse_id, validate_lowercase, validate_slug
-from .models import SpecGraph, SpecNode, ValidationReport
+from spec_dock_runtime.domain.ids import parse_id, validate_lowercase, validate_slug
+from spec_dock_runtime.domain.models import SpecGraph, SpecNode, ValidationReport
 
 if TYPE_CHECKING:
     from pathlib import Path

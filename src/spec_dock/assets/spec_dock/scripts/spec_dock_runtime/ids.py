@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .domain import ids as _domain_ids
+from spec_dock_runtime.domain import ids as _domain_ids
 
 _DEFAULT_ID_WIDTH = _domain_ids.DEFAULT_ID_WIDTH
 _ID_RE = _domain_ids.ID_RE

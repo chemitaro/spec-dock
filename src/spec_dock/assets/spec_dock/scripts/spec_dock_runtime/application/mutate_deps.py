@@ -3,17 +3,17 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from ..domain.deps import ensure_node_dependency_add_would_be_valid, validate_raw_node_dependency_graph
-from ..domain.models import SpecNodeKind, SpecNodeSeed
-from ..domain.tree import build_graph
-from ..domain.validation import ensure_current_graph_and_deps_valid
-from .contracts import MutateDepsError, MutateDepsRequest, MutateDepsResult
-from .repo_context import resolve_current_repo_slug
-from .sync_state import post_mutation_sync, skipped_post_mutation_sync
+from spec_dock_runtime.application.contracts import MutateDepsError, MutateDepsRequest, MutateDepsResult
+from spec_dock_runtime.application.repo_context import resolve_current_repo_slug
+from spec_dock_runtime.application.sync_state import post_mutation_sync, skipped_post_mutation_sync
+from spec_dock_runtime.domain.deps import ensure_node_dependency_add_would_be_valid, validate_raw_node_dependency_graph
+from spec_dock_runtime.domain.models import SpecNodeKind, SpecNodeSeed
+from spec_dock_runtime.domain.tree import build_graph
+from spec_dock_runtime.domain.validation import ensure_current_graph_and_deps_valid
 
 if TYPE_CHECKING:
-    from ..infra.contracts import DirectDependencyResolution, StoredMetaRecord
-    from .ports import Ports
+    from spec_dock_runtime.application.ports import Ports
+    from spec_dock_runtime.infra.contracts import DirectDependencyResolution, StoredMetaRecord
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:

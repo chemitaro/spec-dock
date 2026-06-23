@@ -11,9 +11,9 @@ import tempfile
 import time
 from typing import Any, Literal
 
-from .clock import now_iso
-from .contracts import StoredMetaRecord
-from .json_store import load_json, write_json
+from spec_dock_runtime.infra.clock import now_iso
+from spec_dock_runtime.infra.contracts import StoredMetaRecord
+from spec_dock_runtime.infra.json_store import load_json, write_json
 
 _INITIATIVES_DIRNAME = "initiatives"
 _META_FILENAME = ".meta.json"

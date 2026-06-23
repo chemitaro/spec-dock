@@ -4,9 +4,9 @@ import argparse
 from dataclasses import dataclass
 import re
 
-from ..application.contracts import DoctorRequest, UseCases
-from ..presentation.cli_text import render_doctor_text
-from .contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.application.contracts import DoctorRequest, UseCases
+from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.presentation.cli_text import render_doctor_text
 
 
 @dataclass(frozen=True)

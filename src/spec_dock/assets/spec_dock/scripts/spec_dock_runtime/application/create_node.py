@@ -9,14 +9,27 @@ import time
 from typing import TYPE_CHECKING, Literal, cast
 import uuid
 
-from ..domain.discussion_docs import (
+from spec_dock_runtime.application.contracts import (
+    CreateDiscussionDocRequest,
+    CreateDiscussionDocResult,
+    CreateNodeRequest,
+    CreateNodeResult,
+    CreatePlan,
+)
+from spec_dock_runtime.application.repo_context import (
+    require_current_repo_slug,
+    resolve_current_repo_slug,
+    split_repo_slug,
+)
+from spec_dock_runtime.application.sync_state import post_mutation_sync
+from spec_dock_runtime.domain.discussion_docs import (
     CREATABLE_DISCUSSION_DOC_TYPES as _CREATABLE_DISCUSSION_DOC_TYPES,
     DRAFT_DISCUSSION_DOC_TYPES as _DRAFT_DISCUSSION_DOC_TYPES,
     RETIRED_DISCUSSION_DOC_TYPES as _RETIRED_DISCUSSION_DOC_TYPES,
     discussion_doc_id_from_path,
     parse_timestamp_discussion_doc_filename,
 )
-from ..domain.ids import (
+from spec_dock_runtime.domain.ids import (
     find_existing_id_by_num,
     format_id,
     parse_id,
@@ -25,24 +38,15 @@ from ..domain.ids import (
     slugify,
     validate_input_slug_kebab,
 )
-from ..domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
-from ..domain.tree import build_graph
-from ..domain.validation import find_malformed_discussion_doc_filename_error, validate_graph_and_deps
-from ..infra.contracts import StoredMetaRecord
-from .contracts import (
-    CreateDiscussionDocRequest,
-    CreateDiscussionDocResult,
-    CreateNodeRequest,
-    CreateNodeResult,
-    CreatePlan,
-)
-from .repo_context import require_current_repo_slug, resolve_current_repo_slug, split_repo_slug
-from .sync_state import post_mutation_sync
+from spec_dock_runtime.domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
+from spec_dock_runtime.domain.tree import build_graph
+from spec_dock_runtime.domain.validation import find_malformed_discussion_doc_filename_error, validate_graph_and_deps
+from spec_dock_runtime.infra.contracts import StoredMetaRecord
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from .ports import Ports
+    from spec_dock_runtime.application.ports import Ports
 
 _META_FILENAME = ".meta.json"
 _DRAFT_TARGET_BY_DOC_TYPE = {

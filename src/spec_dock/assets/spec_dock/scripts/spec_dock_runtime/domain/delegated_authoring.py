@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import re
 from typing import TYPE_CHECKING
 
-from .discussion_docs import (
+from spec_dock_runtime.domain.discussion_docs import (
     is_creatable_discussion_doc_type,
     parse_timestamp_discussion_doc_filename,
 )

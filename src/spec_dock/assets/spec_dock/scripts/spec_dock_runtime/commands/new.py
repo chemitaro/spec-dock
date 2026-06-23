@@ -3,15 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
-from ..application.contracts import (
+from spec_dock_runtime.application.contracts import (
     CreateDiscussionDocRequest,
     CreateNodeRequest,
     CreateNodeResult,
     UseCases,
 )
-from ..presentation.cli_text import render_new_doc_text, render_new_node_text
-from ..presentation.contracts import CliText
-from .contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.presentation.cli_text import render_new_doc_text, render_new_node_text
+from spec_dock_runtime.presentation.contracts import CliText
 
 if TYPE_CHECKING:
     import argparse
