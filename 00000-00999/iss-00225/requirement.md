@@ -55,7 +55,7 @@ ID: "iss-00225"
   - repository root の `Makefile` に、grouped script を呼ぶ `make lint` を追加する。
   - provider CI に static-analysis gate を追加する。
   - 段階ごとに検出違反を inventory 化し、当該段階の違反を 0 件にしてから次の検査項目を追加する。
-  - shipped runtime asset を修正した場合は、dogfooding workspace への影響を inspection し、必要なら `spec-dock update .` 相当の refresh 要否を判断して証跡化する。
+  - shipped runtime asset または installed agent asset を修正した場合は、dogfooding workspace / installed asset copy への影響を inspection し、必要なら `spec-dock update .` 相当の refresh 要否を判断して証跡化する。
   - 最終的に `make lint`、個別の `ruff check`、`ruff format --check`、`mypy`、既存 pytest、`spec-dock validate` が成功する。
 - 禁止:
   - dogfooding workspace `spec-dock/` を Ruff / mypy の直接 target に含めない。
@@ -176,9 +176,9 @@ ID: "iss-00225"
   - 条件: Ruff format が大量の非意味差分を出す。
   - 期待: format-only step として隔離し、semantic/type fixes と混ぜない。
   - 観測点: git diff, step closure
-- EC-006 dogfooding generated-copy drift:
-  - 条件: shipped runtime asset `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/` に lint/type/format 修正が入る。
-  - 期待: dogfooding `spec-dock/` copy は直接静的解析 target にしないが、refresh が必要か、または provider-side 変更だけでよいかを inspection し、判断を `report.md` に残す。
+- EC-006 dogfooding / installed-copy drift:
+  - 条件: shipped runtime asset `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/` または installed agent asset `src/spec_dock/assets/install_root/.agents/` に lint/type/format 修正が入る。
+  - 期待: dogfooding `spec-dock/` copy と installed `.agents/` copy は直接静的解析 target にしないが、refresh が必要か、または provider-side 変更だけでよいかを inspection し、判断を `report.md` に残す。
   - 観測点: `git diff`, `spec-dock validate`, `report.md`
 
 ## 用語

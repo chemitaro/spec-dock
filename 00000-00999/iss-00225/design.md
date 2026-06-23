@@ -306,19 +306,19 @@ Tests --> Report : violation inventory
   - refresh 実施/非実施の判断と理由を `report.md` に残す。
 - final gate:
   - `./spec-dock/scripts/spec-dock validate` を実行する。
-  - shipped runtime asset 変更がある場合は、dogfooding refresh/inspection evidence が `report.md` に存在することを final review 対象にする。
+- shipped runtime asset または installed agent asset 変更がある場合は、dogfooding / installed-copy refresh/inspection evidence が `report.md` に存在することを final review 対象にする。
 
 ## リスク / 移行 / ロールバック
 - リスク:
   - Ruff rule step が予想以上に大きくなる。
   - mypy が shipped runtime asset に対して package/path noise を出す。
   - format-only churn が review を難しくする。
-  - shipped runtime asset 修正後に dogfooding generated copy の stale risk を見落とす。
+- shipped runtime asset / installed agent asset 修正後に dogfooding generated copy / installed asset copy の stale risk を見落とす。
 - 緩和:
   - rule を一つずつ有効化する。
   - format-only step を隔離する。
   - broad suppression は禁止し、必要な suppression は reason と scope を記録する。
-  - shipped runtime asset 差分がある step では dogfooding impact inspection を必須にする。
+- shipped runtime asset / installed agent asset 差分がある step では dogfooding / installed-copy impact inspection を必須にする。
 - ロールバック:
   - 各 step は小さく commit できる単位にする。
   - 問題のある rule は plan amendment / follow-up 化を検討し、最終設定から外す場合は requirement/design へ戻す。
