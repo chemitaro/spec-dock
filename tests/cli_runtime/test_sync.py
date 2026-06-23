@@ -144,7 +144,8 @@ class TestCliSync(CliRuntimeHarness):
             for source in (initiative_doc, issue_doc):
                 link_path = adrs_dir / source.name
                 assert link_path.is_symlink(), f"missing ADR mirror symlink: {link_path}"
-                assert not os.readlink(link_path).startswith("/"), os.readlink(link_path)
+                link_target = str(link_path.readlink())
+                assert not link_target.startswith("/"), link_target
                 assert link_path.resolve() == source.resolve()
 
             renamed_issue_doc = issue_doc.with_name(issue_doc.name.replace("-issue-decision.md", "-issue-decision-renamed.md"))

@@ -322,7 +322,7 @@ class TestInitUpdate(CliRuntimeHarness):
             if path.is_file() or path.is_symlink():
                 rel = path.relative_to(root).as_posix()
                 if path.is_symlink():
-                    snapshot[rel] = f"symlink:{os.readlink(path)}"
+                    snapshot[rel] = f"symlink:{os.readlink(path)}"  # noqa: PTH115
                 else:
                     snapshot[rel] = path.read_text(encoding="utf-8")
         return snapshot
@@ -11079,7 +11079,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             workflows_parent = target / ".github" / "workflows"
             workflows_parent.parent.mkdir(parents=True, exist_ok=True)
             (target / "symlink-workflows-container").mkdir(parents=True, exist_ok=True)
-            os.symlink("../symlink-workflows-container", workflows_parent)
+            Path(workflows_parent).symlink_to("../symlink-workflows-container")
 
             err = io.StringIO()
             with redirect_stderr(err):
@@ -11105,7 +11105,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             symlink_target = target / "symlink-ci-target.yml"
             symlink_target.write_text("managed-workflow-symlink-target\n", encoding="utf-8")
-            os.symlink("../../symlink-ci-target.yml", managed_workflow_path)
+            Path(managed_workflow_path).symlink_to("../../symlink-ci-target.yml")
 
             err = io.StringIO()
             with redirect_stderr(err):
@@ -11155,7 +11155,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             elif workflows_parent.exists():
                 shutil.rmtree(workflows_parent)
             (target / "symlink-workflows-container").mkdir(parents=True, exist_ok=True)
-            os.symlink("../symlink-workflows-container", workflows_parent)
+            Path(workflows_parent).symlink_to("../symlink-workflows-container")
 
             err = io.StringIO()
             with redirect_stderr(err):
@@ -11181,7 +11181,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             managed_workflow_path.unlink(missing_ok=True)
             symlink_target = target / "symlink-ci-target.yml"
             symlink_target.write_text("managed-workflow-symlink-target\n", encoding="utf-8")
-            os.symlink("../../symlink-ci-target.yml", managed_workflow_path)
+            Path(managed_workflow_path).symlink_to("../../symlink-ci-target.yml")
 
             err = io.StringIO()
             with redirect_stderr(err):
@@ -11206,7 +11206,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             bootstrap_path.parent.mkdir(parents=True, exist_ok=True)
             symlink_target = target / "bootstrap-config-target.toml"
             symlink_target.write_text("# bootstrap symlink target\n", encoding="utf-8")
-            os.symlink("../bootstrap-config-target.toml", bootstrap_path)
+            Path(bootstrap_path).symlink_to("../bootstrap-config-target.toml")
 
             exit_code = main(["init", str(target)])
 
@@ -11228,7 +11228,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             bootstrap_path.unlink(missing_ok=True)
             symlink_target = target / "bootstrap-config-update-target.toml"
             symlink_target.write_text("# bootstrap update symlink target\n", encoding="utf-8")
-            os.symlink("../bootstrap-config-update-target.toml", bootstrap_path)
+            Path(bootstrap_path).symlink_to("../bootstrap-config-update-target.toml")
 
             exit_code = main(["update", str(target)])
 
@@ -11250,7 +11250,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             symlink_target = target / "bootstrap-config-update-target.toml"
             stale_guidance = "PR 作成後の checks / statuses / Codex review 監視は pr-monitor"
             symlink_target.write_text(stale_guidance + "\n# user edit\n", encoding="utf-8")
-            os.symlink("../bootstrap-config-update-target.toml", bootstrap_path)
+            Path(bootstrap_path).symlink_to("../bootstrap-config-update-target.toml")
 
             exit_code = main(["update", str(target)])
 
@@ -11267,7 +11267,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             (target / "README.md").write_text("preflight-marker\n", encoding="utf-8")
             bootstrap_path = target / ".codex" / "config.toml"
             bootstrap_path.parent.mkdir(parents=True, exist_ok=True)
-            os.symlink("../missing-bootstrap-config.toml", bootstrap_path)
+            Path(bootstrap_path).symlink_to("../missing-bootstrap-config.toml")
 
             err = io.StringIO()
             with redirect_stderr(err):
@@ -11293,7 +11293,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             bootstrap_path.parent.mkdir(parents=True, exist_ok=True)
             symlink_target_dir = target / "bootstrap-config-dir"
             symlink_target_dir.mkdir(parents=True, exist_ok=True)
-            os.symlink("../bootstrap-config-dir", bootstrap_path)
+            Path(bootstrap_path).symlink_to("../bootstrap-config-dir")
 
             err = io.StringIO()
             with redirect_stderr(err):
@@ -11344,7 +11344,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             obsolete_target.parent.mkdir(parents=True, exist_ok=True)
             symlink_target = target / "obsolete-managed-symlink-target.toml"
             symlink_target.write_text("obsolete symlink target\n", encoding="utf-8")
-            os.symlink("../../obsolete-managed-symlink-target.toml", obsolete_target)
+            Path(obsolete_target).symlink_to("../../obsolete-managed-symlink-target.toml")
             assert obsolete_target.is_symlink()
 
             err = io.StringIO()
@@ -11372,7 +11372,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             symlink_target_dir.mkdir(parents=True, exist_ok=True)
             symlink_target_file = symlink_target_dir / "keep.txt"
             symlink_target_file.write_text("keep me\n", encoding="utf-8")
-            os.symlink("../../obsolete-managed-symlink-dir", obsolete_target)
+            Path(obsolete_target).symlink_to("../../obsolete-managed-symlink-dir")
             assert obsolete_target.is_symlink()
 
             err = io.StringIO()
@@ -33310,7 +33310,7 @@ esac
             created_symlink = False
             try:
                 # v1 style link target (so v2 can safely prune without deleting v2-generated shortcuts).
-                os.symlink("initiative/current", legacy_symlink)
+                Path(legacy_symlink).symlink_to("initiative/current")
                 created_symlink = True
             except OSError:
                 # Some environments may restrict symlinks; workflow pruning is still validated.
@@ -33413,7 +33413,7 @@ esac
             outside_specdock.parent.mkdir()
             shutil.move(str(target / "spec-dock"), outside_specdock)
             try:
-                os.symlink("../outside/spec-dock", target / "spec-dock")
+                Path(target / "spec-dock").symlink_to("../outside/spec-dock")
             except OSError:
                 pytest.skip("symlink creation is unavailable")
             outside_script = outside_specdock / "scripts" / "spec-dock"
@@ -33441,7 +33441,7 @@ esac
             outside_file.write_text("outside\n", encoding="utf-8")
             retry_marker = target / "spec-dock" / ".uninstall-retry.json"
             try:
-                os.symlink(outside_file, retry_marker)
+                Path(retry_marker).symlink_to(outside_file)
             except OSError:
                 pytest.skip("symlink creation is unavailable")
 
@@ -33940,7 +33940,7 @@ esac
             workflow.unlink()
             symlink_created = False
             try:
-                os.symlink("../product-ci.yml", workflow)
+                Path(workflow).symlink_to("../product-ci.yml")
                 symlink_created = True
             except OSError:
                 workflow.mkdir()
@@ -33955,7 +33955,7 @@ esac
                     assert "comparison error" in action["reason"]
                     assert "manual review" in action["reason"]
             if symlink_created:
-                assert os.readlink(workflow) == "../product-ci.yml"
+                assert str(workflow.readlink()) == "../product-ci.yml"
             assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_scaffold_managed_exact_match_removes_and_mismatch_preserves(self) -> None:
@@ -33998,6 +33998,7 @@ esac
         with tempfile.TemporaryDirectory() as tmp:
             cases = (
                 ("matching", "symlink", "spec-dock/scripts/spec-dock", "would_remove"),
+                ("raw-normalizes-to-matching", "symlink", "spec-dock//scripts/spec-dock", "preserved"),
                 ("nonmatching", "symlink", "scripts/spec", "preserved"),
                 ("file", "file", None, "preserved"),
                 ("directory", "directory", None, "preserved"),
@@ -34015,7 +34016,7 @@ esac
 
                     if kind == "symlink":
                         try:
-                            os.symlink(link_target, shortcut)
+                            Path(shortcut).symlink_to(link_target)
                         except OSError:
                             pytest.skip("symlink creation is unavailable")
                     elif kind == "file":
@@ -35006,7 +35007,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                     shutil.rmtree(link)
                 pathfile.unlink(missing_ok=True)
                 rel_placeholder = os.path.relpath(placeholder_root / layer, start=active_dir)
-                os.symlink(rel_placeholder, link)
+                Path(link).symlink_to(rel_placeholder)
                 assert link.is_symlink()
 
             self._write_json_force(
@@ -35774,19 +35775,18 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             assert list(active_dir.iterdir()) == []
 
-            original_symlink = cli.os.symlink
+            original_symlink_to = cli.Path.symlink_to
 
-            def _fail_active_symlink(src: str | bytes, dst: str | bytes, *args, **kwargs) -> None:
-                dst_path = Path(dst)
-                if dst_path.parent.resolve() == active_dir.resolve() and dst_path.name in {"initiative", "epic", "issue"}:
+            def _fail_active_symlink(self: Path, target: str | Path, *args, **kwargs) -> None:
+                if self.parent.resolve() == active_dir.resolve() and self.name in {"initiative", "epic", "issue"}:
                     raise OSError("simulated active symlink failure")
-                original_symlink(src, dst, *args, **kwargs)
+                original_symlink_to(self, target, *args, **kwargs)
 
-            cli.os.symlink = _fail_active_symlink
+            cli.Path.symlink_to = _fail_active_symlink
             try:
                 assert main(["update", str(target)]) == 0
             finally:
-                cli.os.symlink = original_symlink
+                cli.Path.symlink_to = original_symlink_to
 
             placeholder_root = target / "spec-dock" / "system" / "active-none"
             for layer in ("initiative", "epic", "issue"):
@@ -35829,19 +35829,18 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            original_symlink = cli.os.symlink
+            original_symlink_to = cli.Path.symlink_to
 
-            def _fail_active_symlink(src: str | bytes, dst: str | bytes, *args, **kwargs) -> None:
-                dst_path = Path(dst)
-                if dst_path.parent.resolve() == active_dir.resolve() and dst_path.name in {"initiative", "epic", "issue"}:
+            def _fail_active_symlink(self: Path, target: str | Path, *args, **kwargs) -> None:
+                if self.parent.resolve() == active_dir.resolve() and self.name in {"initiative", "epic", "issue"}:
                     raise OSError("simulated active symlink failure")
-                original_symlink(src, dst, *args, **kwargs)
+                original_symlink_to(self, target, *args, **kwargs)
 
-            cli.os.symlink = _fail_active_symlink
+            cli.Path.symlink_to = _fail_active_symlink
             try:
                 assert main(["update", str(target)]) == 0
             finally:
-                cli.os.symlink = original_symlink
+                cli.Path.symlink_to = original_symlink_to
 
             expected_paths = {
                 "initiative": initiative_dir,
@@ -35903,19 +35902,18 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            original_symlink = cli.os.symlink
+            original_symlink_to = cli.Path.symlink_to
 
-            def _fail_active_symlink(src: str | bytes, dst: str | bytes, *args, **kwargs) -> None:
-                dst_path = Path(dst)
-                if dst_path.parent.resolve() == active_dir.resolve() and dst_path.name in {"initiative", "epic", "issue"}:
+            def _fail_active_symlink(self: Path, target: str | Path, *args, **kwargs) -> None:
+                if self.parent.resolve() == active_dir.resolve() and self.name in {"initiative", "epic", "issue"}:
                     raise OSError("simulated active symlink failure")
-                original_symlink(src, dst, *args, **kwargs)
+                original_symlink_to(self, target, *args, **kwargs)
 
-            cli.os.symlink = _fail_active_symlink
+            cli.Path.symlink_to = _fail_active_symlink
             try:
                 assert main(["update", str(target)]) == 0
             finally:
-                cli.os.symlink = original_symlink
+                cli.Path.symlink_to = original_symlink_to
 
             expected_paths = {
                 "initiative": initiative_dir,
@@ -35972,19 +35970,18 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            original_symlink = cli.os.symlink
+            original_symlink_to = cli.Path.symlink_to
 
-            def _fail_active_symlink(src: str | bytes, dst: str | bytes, *args, **kwargs) -> None:
-                dst_path = Path(dst)
-                if dst_path.parent.resolve() == active_dir.resolve() and dst_path.name in {"initiative", "epic", "issue"}:
+            def _fail_active_symlink(self: Path, target: str | Path, *args, **kwargs) -> None:
+                if self.parent.resolve() == active_dir.resolve() and self.name in {"initiative", "epic", "issue"}:
                     raise OSError("simulated active symlink failure")
-                original_symlink(src, dst, *args, **kwargs)
+                original_symlink_to(self, target, *args, **kwargs)
 
-            cli.os.symlink = _fail_active_symlink
+            cli.Path.symlink_to = _fail_active_symlink
             try:
                 assert main(["update", str(target)]) == 0
             finally:
-                cli.os.symlink = original_symlink
+                cli.Path.symlink_to = original_symlink_to
 
             placeholder_root = target / "spec-dock" / "system" / "active-none"
             for layer in ("initiative", "epic", "issue"):
@@ -36084,7 +36081,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                     elif link.is_dir():
                         shutil.rmtree(link)
                     rel_placeholder = os.path.relpath(placeholder_root / layer, start=active_dir)
-                    os.symlink(rel_placeholder, link)
+                    Path(link).symlink_to(rel_placeholder)
                     rel_real = os.path.relpath(target_dir, start=active_dir)
                     (active_dir / f"{layer}.path").write_text(rel_real + "\n", encoding="utf-8")
 
@@ -36294,7 +36291,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             active_dir = target / "spec-dock" / "active"
             pointer = active_dir / "initiative"
             pointer.unlink(missing_ok=True)
-            os.symlink("../system/active-none/missing-initiative", pointer)
+            Path(pointer).symlink_to("../system/active-none/missing-initiative")
             assert pointer.is_symlink()
             assert not pointer.exists()
 

@@ -799,7 +799,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
     def _active_issue_pointer_text(self, target: Path) -> str:
         issue_pointer = target / "spec-dock" / "active" / "issue"
         if issue_pointer.is_symlink():
-            return os.readlink(issue_pointer)
+            return str(issue_pointer.readlink())
         path_file = issue_pointer.with_name("issue.path")
         if path_file.is_file():
             return path_file.read_text(encoding="utf-8").strip()

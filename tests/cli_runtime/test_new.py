@@ -605,7 +605,7 @@ class TestCliNew(CliRuntimeHarness):
             for link_path, target_path in expected_rules_links.items():
                 assert link_path.is_symlink(), f"missing rules symlink: {link_path}"
                 assert link_path.resolve() == target_path.resolve()
-                assert os.readlink(link_path) == os.path.relpath(target_path, start=link_path.parent)
+                assert str(link_path.readlink()) == os.path.relpath(target_path, start=link_path.parent)
 
             assert not (init_dir / "epics" / "new-epic").exists()
             assert not (epic_dir / "issues" / "new-issue").exists()

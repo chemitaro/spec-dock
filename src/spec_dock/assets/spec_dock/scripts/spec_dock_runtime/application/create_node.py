@@ -671,7 +671,7 @@ def _create_relative_symlink(link_path: Path, target_path: Path) -> None:
     _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
     link_path.parent.mkdir(parents=True, exist_ok=True)
     rel_target = os.path.relpath(target_path, start=link_path.parent)
-    os.symlink(rel_target, link_path)
+    Path(link_path).symlink_to(rel_target)
 
 
 def _validate_parent_dir_preflight(parent_dir: Path) -> None:
@@ -714,7 +714,7 @@ def _preflight_symlink_creation_capability(*, link_path: Path) -> None:
     probe_path = probe_dir / f".spec-dock-symlink-probe-{os.getpid()}-{uuid.uuid4().hex}"
     probe_target = f".spec-dock-symlink-target-{uuid.uuid4().hex}"
     try:
-        os.symlink(probe_target, probe_path)
+        Path(probe_path).symlink_to(probe_target)
     except OSError as exc:
         raise RuntimeError(f"Symlink creation preflight failed at {link_path.parent}: {exc}") from exc
     try:

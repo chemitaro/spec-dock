@@ -587,7 +587,7 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
 
         rel_target = os.path.relpath(desired_target, start=active_dir)
         try:
-            os.symlink(rel_target, link)
+            Path(link).symlink_to(rel_target)
         except OSError:
             _write_active_pathfile(active_dir, layer, desired_target)
 
@@ -630,7 +630,7 @@ def _install_repo_root_shortcut(target_root: Path) -> None:
 
     target = f"{_SPEC_DOCK_DIRNAME}/scripts/spec-dock"
     try:
-        os.symlink(target, dest)
+        Path(dest).symlink_to(target)
     except OSError as e:
         print(f"spec-dock: (warn) failed to create repo-root shortcut symlink: {dest}: {e}", file=sys.stderr)
 
@@ -1085,7 +1085,10 @@ def _add_shortcut_uninstall_action(actions: list[_UninstallAction], target_root:
     shortcut = target_root / "spec"
     if not _path_exists_for_uninstall(shortcut):
         return
-    if shortcut.is_symlink() and os.readlink(shortcut) == f"{_SPEC_DOCK_DIRNAME}/scripts/spec-dock":
+    if (
+        shortcut.is_symlink()
+        and os.readlink(shortcut) == f"{_SPEC_DOCK_DIRNAME}/scripts/spec-dock"  # noqa: PTH115 - raw exact target.
+    ):
         actions.append(
             _UninstallAction(
                 rel_path="spec",

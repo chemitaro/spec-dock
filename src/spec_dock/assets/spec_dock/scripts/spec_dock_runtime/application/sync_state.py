@@ -350,7 +350,7 @@ def _preflight_adr_mirror_symlink_support(specdock_dir: Path) -> bool:
             probe_path = _build_adr_mirror_probe_path(probe_location.probe_dir)
             probe_created = False
             try:
-                os.symlink(".spec-dock-adr-mirror-probe-target", probe_path)
+                Path(probe_path).symlink_to(".spec-dock-adr-mirror-probe-target")
                 probe_created = True
                 return True
             except FileExistsError:
@@ -387,7 +387,7 @@ def _rebuild_adr_mirror(
     for source in sorted(sources, key=lambda item: item.basename):
         link_path = adrs_dir / source.basename
         rel_target = os.path.relpath(source.source_path, start=adrs_dir)
-        os.symlink(rel_target, link_path)
+        Path(link_path).symlink_to(rel_target)
     return True
 
 

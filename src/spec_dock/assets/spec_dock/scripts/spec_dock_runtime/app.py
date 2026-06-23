@@ -514,7 +514,7 @@ def _apply_active_pointers(specdock_dir: Path, current: dict[str, Any] | None) -
         rel_target = os.path.relpath(target, start=active_dir)
         try:
             # Prefer symlinks: fixed entry points for both humans and agents.
-            os.symlink(rel_target, link)
+            Path(link).symlink_to(rel_target)
         except OSError:
             # Fallback: keep it readable even in environments where symlinks are restricted.
             _write_pathfile(active_dir, name, target)

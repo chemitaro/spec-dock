@@ -90,6 +90,41 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "# file-state-sha256\t" in baseline_text
         assert "design.md" in baseline_text
 
+    def test_diff_guard_rejects_raw_symlink_payload_change_after_baseline(self) -> None:
+        target = self._make_target_repo_with_scope()
+        if not self._can_create_symlink(target):
+            pytest.skip("symlink creation is unavailable")
+        (target / ".gitignore").write_text("manual-tests/*\n", encoding="utf-8")
+        manual_tests = target / "manual-tests"
+        manual_tests.mkdir()
+        delegated_link = manual_tests / "delegated-link"
+        delegated_link.symlink_to("payload//target")
+        _commit_all(target)
+        baseline = _write_delegated_authoring_baseline(self, target)
+        delegated_link.unlink()
+        delegated_link.symlink_to("payload/target")
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--role",
+                "system-architect",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        assert p.returncode != 0, p.stdout + p.stderr
+        assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
+        assert "manual-tests/delegated-link" in p.stdout
+        assert "reason=symlink" in p.stdout
+
     def test_baseline_status_rejects_repo_local_output(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)

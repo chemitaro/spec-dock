@@ -529,7 +529,7 @@ def _file_sha256(path: Path) -> str | None:
 def _file_state(path: Path) -> tuple[str, str] | None:
     try:
         if path.is_symlink():
-            target = os.readlink(path)
+            target = os.readlink(path)  # noqa: PTH115 - diff guard hashes raw symlink payload bytes.
             return "symlink", hashlib.sha256(os.fsencode(target)).hexdigest()
         if path.is_dir():
             return _directory_state(path)
@@ -554,7 +554,7 @@ def _directory_state(path: Path) -> tuple[str, str] | None:
             digest.update(b"\0")
             if child.is_symlink():
                 digest.update(b"symlink\0")
-                digest.update(os.fsencode(os.readlink(child)))
+                digest.update(os.fsencode(os.readlink(child)))  # noqa: PTH115 - preserve raw symlink payload.
                 digest.update(b"\0")
                 continue
             if child.is_dir():

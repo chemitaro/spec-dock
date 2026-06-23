@@ -295,7 +295,7 @@ class TestCliWorktree(CliRuntimeHarness):
             if not self._can_create_symlink(Path(tmp)):
                 pytest.skip("symlink not available")
             broken = Path(tmp) / "broken-root"
-            os.symlink(Path(tmp) / "missing-root", broken)
+            Path(broken).symlink_to(Path(tmp) / "missing-root")
 
             p = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env(broken))
 
@@ -314,7 +314,7 @@ class TestCliWorktree(CliRuntimeHarness):
             self._prepare_git_repo(target)
             if not self._can_create_symlink(Path(tmp)):
                 pytest.skip("symlink not available")
-            os.symlink(real_root, symlink_root)
+            Path(symlink_root).symlink_to(real_root)
 
             p = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env(symlink_root))
 
@@ -806,7 +806,7 @@ class TestCliWorktree(CliRuntimeHarness):
                 pytest.skip("symlink unavailable")
             symlink_root = Path(tmp) / "symlink-root"
             symlink_root.mkdir()
-            os.symlink(Path(tmp) / "escaped-namespace", symlink_root / "sample-repo")
+            Path(symlink_root / "sample-repo").symlink_to(Path(tmp) / "escaped-namespace")
             cases: list[tuple[str, dict[str, str], str]] = [
                 ("blank", self._worktree_env("   "), "root_blank"),
                 ("relative", self._worktree_env("relative/worktrees"), "root_invalid"),
@@ -1191,7 +1191,7 @@ class TestCliWorktree(CliRuntimeHarness):
             if not self._can_create_symlink(Path(tmp)):
                 pytest.skip("symlink unavailable")
             symlink_path = namespace / "repo-escape"
-            os.symlink(escaped, symlink_path)
+            Path(symlink_path).symlink_to(escaped)
             central_sentinel = central_root / "sentinel"
             namespace_sentinel = namespace / "sentinel"
             central_sentinel.write_text("keep\n", encoding="utf-8")
@@ -1319,7 +1319,7 @@ class TestCliWorktree(CliRuntimeHarness):
             symlink_root = Path(tmp) / "central-with-symlink-namespace"
             symlink_root.mkdir()
             namespace_symlink = symlink_root / "repo"
-            os.symlink(escaped, namespace_symlink)
+            Path(namespace_symlink).symlink_to(escaped)
             namespace_symlink_record = namespace_symlink / "repo-linked"
             namespace_symlink_record.touch()
             git_gateway = FakeGitGateway(
@@ -1739,9 +1739,9 @@ class TestCliWorktree(CliRuntimeHarness):
             target_sentinel = target_dir / "sentinel"
             target_sentinel.write_text("keep\n", encoding="utf-8")
             symlink_path = base / "target-link"
-            os.symlink(target_dir, symlink_path)
+            Path(symlink_path).symlink_to(target_dir)
             broken_symlink = base / "broken-link"
-            os.symlink(base / "missing-target", broken_symlink)
+            Path(broken_symlink).symlink_to(base / "missing-target")
             regular_file = base / "target-file"
             regular_file.write_text("remove\n", encoding="utf-8")
 
@@ -2114,7 +2114,7 @@ class TestCliWorktree(CliRuntimeHarness):
             repo_root.mkdir()
             namespace.mkdir(parents=True)
             broken = namespace / "repo-broken"
-            os.symlink(Path(tmp) / "missing-target", broken)
+            Path(broken).symlink_to(Path(tmp) / "missing-target")
 
             class FakeGitGateway:
                 def __init__(self) -> None:
