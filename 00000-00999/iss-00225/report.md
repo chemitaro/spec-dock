@@ -704,7 +704,7 @@ make lint
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S05 | ready to commit | S05 implementation files plus `report.md` S05 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S05 | committed | S05 implementation files plus `report.md` S05 evidence | `c1de2dd2` `build(static-analysis): Ruff UP違反を解消する` | `git status --short` -> clean; post-commit `make lint` -> pass; `spec-dock validate` -> pass | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `pyproject.toml` - Ruff `UP` selection.
@@ -712,7 +712,118 @@ make lint
 - `report.md` - S04 commit correction and S05 observed evidence.
 
 #### コミット
-- pending S05 step commit.
+- `c1de2dd2` `build(static-analysis): Ruff UP違反を解消する`
+
+#### メモ
+- No material implementation decisions beyond the approved plan.
+
+---
+
+### セッションログ（2026-06-23 HH:MM - HH:MM）
+
+#### 対象
+- Step: S06 — Ruff B
+- AC/EC: AC-005, EC-001
+
+#### 実施内容
+- `dev-coder` に S06 を委任し、許可 path を `pyproject.toml`, `src/spec_dock/**/*.py`, `tests/**/*.py` に限定した。
+- `pyproject.toml` の Ruff `select` を `["F", "E", "I", "UP", "B"]` に変更した。
+- 初回 inventory は total 31 件だった。
+  - `B904`: 8 件。代表: `application/close_node.py`, `application/create_node.py`, `application/set_active.py`
+  - `B905`: 2 件。代表: `application/worktree.py`, `infra/template_scaffolder.py`
+  - `B009`: 4 件。代表: `commands/worktree.py`, `tests/cli_runtime/test_runtime_validate_s02.py`
+  - `B023`: 9 件。代表: `tests/cli_runtime/test_issue_lifecycle.py`, `tests/cli_runtime/test_runtime_new_doc_s09.py`
+  - `B007`: 6 件。代表: `tests/cli_runtime/test_runtime_import_s10.py`, `tests/cli_runtime/test_validate.py`
+  - `B012`: 1 件。代表: `tests/unit/commands/test_runtime_new_s08.py`
+  - `B043`: 1 件。代表: `tests/unit/presentation/test_runtime_sync_s07.py`
+- `B904` は exception cause を `from None` / `from error` で明示した。
+- `B905` は同じ元リスト由来の `zip` に `strict=True` を追加した。
+- `B009` / `B043` は通常の属性アクセス / 削除へ置換した。
+- `B023` は loop 変数を default 引数で束縛し、loop 後の最終値 capture を避けた。
+- `B007` は未使用 loop 変数を `_` prefix 化した。
+- `B012` は `finally` 内 `return` を `else` 分岐に置換した。
+
+#### 実行コマンド / 結果
+```bash
+uv run ruff check --select F,E,I,UP,B src/spec_dock tests
+# All checks passed!
+
+uv run pytest tests/cli_runtime/test_issue_lifecycle.py tests/cli_runtime/test_runtime_new_doc_s09.py tests/unit/commands/test_runtime_new_s08.py tests/unit/presentation/test_runtime_sync_s07.py -q
+# 162 passed in 30.46s
+
+git diff --check
+# pass
+
+make lint
+# ==> ruff check
+# All checks passed!
+# Summary:
+# - ruff check: pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S06 | Red / inventory | `tc-s06-001`: bug-prone pattern inventory | total 31: `B904` 8, `B905` 2, `B009` 4, `B023` 9, `B007` 6, `B012` 1, `B043` 1 | worker command: `uv run ruff check --select F,E,I,UP,B src/spec_dock tests` | pass | 代表ファイルは実施内容に記録 |
+| S06 | Green | `F,E,I,UP,B` violation 0 件 | `uv run ruff check --select F,E,I,UP,B src/spec_dock tests` -> All checks passed | command | pass | 親側でも再実行済み |
+| S06 | Regression | bug-prone fix の behavior impact を確認 | focused pytest 162 passed | command | pass | loop closure / finally return / presentation sync 周辺を含む |
+| S06 | Refactor | guardrail satisfied / no unrelated refactor | S07 以降 rule は追加せず、`spec-dock/` direct target なし | diff inspection | pass | broad suppression なし |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S06 | `B023` default argument 束縛は latent closure bug 修正だが tests の意図を変え得る | dev-coder / orchestrator | related lifecycle/new-doc tests を focused pytest に含めた | tc-s06-001 | no | focused pytest 162 passed |
+| S06 | `B012` finally return rewrite が context manager helper の cleanup behavior に影響し得る | dev-coder / orchestrator | `tests/unit/commands/test_runtime_new_s08.py` を focused pytest に含めた | tc-s06-001 | no | focused pytest 162 passed |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S06 | tc-s06-001 | Ruff `B` を追加し violation を 0 件にする。behavior bug の可能性がある修正は focused pytest を実行する | `pyproject.toml` select `["F", "E", "I", "UP", "B"]`; `uv run ruff check --select F,E,I,UP,B src/spec_dock tests` -> pass; focused pytest -> pass | pass | code-reviewer confirmed exception chaining / strict zip / closure fixes |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s06-001 / tc-s06-case-001 | S06 | yes | command | initial `B` inventory total 31 | `uv run ruff check --select F,E,I,UP,B src/spec_dock tests` | pass | `F,E,I,UP,B` violation 0 件 |
+| tc-s06-001 / tc-s06-regression-001 | S06 | yes | command | `B023` / `B012` 修正が behavior に触れる可能性 | focused pytest command | pass | `162 passed` |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s06-001 | S06 | `uv run ruff check --select F,E,I,UP,B src/spec_dock tests`; focused pytest; `git diff --check`; `make lint`; code-reviewer pass | pass | AC-005 S06 closed pending commit |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s06-001 | tc-s06-case-001 | tc-s06-001 | planned closure unchanged; concrete command case recorded | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S06 | delegated | bug-prone lint rule adoption step | dev-coder | Ruff `B` enablement and bugbear fixes | requirement/design/plan S06 | `pyproject.toml`; `src/spec_dock/**/*.py`; `tests/**/*.py` | report edits; commit; S07+ rules; dogfooding `spec-dock/`; broad suppression | `uv run ruff check --select F,E,I,UP,B src/spec_dock tests`; focused pytest for behavior-touching fixes | behavior regression; direct dogfooding edit needed | changed files; inventory; command results; behavior rationale | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S06 | dev-coder | Ruff `B` enabled; exception chaining, strict zip, closure binding, unused loop variables, finally return, and attribute access fixes applied | `pyproject.toml`; runtime application/commands/infra files; related tests under `tests/cli_runtime`, `tests/unit/commands`, `tests/unit/infra`, `tests/unit/presentation` | `uv run ruff check --select F,E,I,UP,B src/spec_dock tests` -> pass; focused pytest -> 162 passed; `git diff --check` -> pass | pass: code-reviewer `019ef2e6-069d-7812-b731-3d3caed9b34b` | none | accepted for S06 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S06 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit | pass: code-reviewer `019ef2e6-069d-7812-b731-3d3caed9b34b`; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S06 | ready to commit | S06 implementation files plus `report.md` S06 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `pyproject.toml` - Ruff `B` selection.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/*.py`, `commands/worktree.py`, `infra/*.py` - bugbear fixes.
+- `tests/**/*.py` - bugbear fixes for closures, attrs, loop vars, and helper cleanup.
+- `report.md` - S05 commit correction and S06 observed evidence.
+
+#### コミット
+- pending S06 step commit.
 
 #### メモ
 - No material implementation decisions beyond the approved plan.
