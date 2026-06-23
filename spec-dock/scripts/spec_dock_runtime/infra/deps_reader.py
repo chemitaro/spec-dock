@@ -1,20 +1,19 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from ..domain.ids import deps_node_sort_key, find_existing_id_by_num, format_id, parse_id
-from ..domain.models import SpecGraph
-from .contracts import DirectDependencyResolution
-from .contracts import DepsDependencyContext
-from .contracts import DepsTopologyLoadResult
-from .git_cli import origin_github_repo_slug
-from .json_store import load_json
+from spec_dock_runtime.domain.ids import deps_node_sort_key, find_existing_id_by_num, format_id, parse_id
+from spec_dock_runtime.infra.contracts import DepsDependencyContext, DepsTopologyLoadResult, DirectDependencyResolution
+from spec_dock_runtime.infra.git_cli import origin_github_repo_slug
+from spec_dock_runtime.infra.json_store import load_json
 
-_scoped_issue_ref_re = re.compile(
-    r"^(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)#(?P<num>[0-9]+)$"
-)
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from spec_dock_runtime.domain.models import SpecGraph
+
+_scoped_issue_ref_re = re.compile(r"^(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)#(?P<num>[0-9]+)$")
 _gh_issue_url_full_re = re.compile(
     r"^(?:https?://)?(?:www\.)?github\.com/(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)/issues/(?P<num>[0-9]+)(?:[/?#].*)?$",
     re.IGNORECASE,
@@ -102,7 +101,9 @@ def _find_node_by_github_issue_number(
             raise RuntimeError(f"Ambiguous github.issue_number={issue_number}: {ids}")
         return current_scoped[0].id
 
-    has_scoped = any(_normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is not None for node in matches)
+    has_scoped = any(
+        _normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is not None for node in matches
+    )
     has_unscoped = any(_normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None for node in matches)
     if has_scoped and has_unscoped:
         ids = ", ".join(
@@ -142,9 +143,7 @@ def _find_node_by_scoped_github_issue_number(
         and node.kind in ("initiative", "epic", "issue")
         and (
             _normalize_repo_slug(node.github_repo_owner, node.github_repo_name) == repo_slug
-            or (
-                allow_current_unscoped and _normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
-            )
+            or (allow_current_unscoped and _normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None)
         )
     ]
     if not matches:
@@ -221,9 +220,7 @@ def _resolve_dep_ref(
         except RuntimeError as e:
             raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): {e}") from e
         if prefix not in ("init", "epic", "iss"):
-            raise RuntimeError(
-                f"Unresolved dependency ref: {ref!r} (in {src_path}): unsupported id prefix: {prefix}"
-            )
+            raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): unsupported id prefix: {prefix}")
 
         existing = find_existing_id_by_num(graph.nodes_by_id, prefix=prefix, num=num, local=is_local)
         if not existing:
@@ -231,9 +228,7 @@ def _resolve_dep_ref(
             raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): node not found ({normalized})")
         return existing
 
-    raise RuntimeError(
-        f"Unresolved dependency ref: {ref!r} (in {src_path}): unsupported type: {type(ref).__name__}"
-    )
+    raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): unsupported type: {type(ref).__name__}")
 
 
 def _is_descendant(graph: SpecGraph, *, src_id: str, candidate_dep_id: str) -> bool:
@@ -275,7 +270,9 @@ def _resolved_direct_depends_on(
     deduped = sorted(set(resolved), key=deps_node_sort_key)
     for dep_id in deduped:
         if _is_descendant(graph, src_id=src_id, candidate_dep_id=dep_id):
-            raise RuntimeError(f"Invalid dependency: {src_id} cannot depend on its descendant {dep_id} (in {meta_path})")
+            raise RuntimeError(
+                f"Invalid dependency: {src_id} cannot depend on its descendant {dep_id} (in {meta_path})"
+            )
     return deduped
 
 
@@ -360,8 +357,7 @@ def build_candidate_issue_depends_on_map(
     to_node_id: str,
 ) -> dict[str, list[str]]:
     candidate: dict[str, set[str]] = {
-        issue_id: set(depends_on)
-        for issue_id, depends_on in issue_depends_on_map.items()
+        issue_id: set(depends_on) for issue_id, depends_on in issue_depends_on_map.items()
     }
     for issue_id in [node_id for node_id, node in graph.nodes_by_id.items() if node.kind == "issue"]:
         candidate.setdefault(issue_id, set())
@@ -410,13 +406,7 @@ def load_issue_depends_on_map(specdock_dir: Path, graph: SpecGraph) -> DepsTopol
         for dep_node_id in direct_dep_node_ids:
             dep_node = graph.nodes_by_id[dep_node_id]
             dep_issue_ids = _issue_ids_for_dep_node(graph, dep_node_id)
-            expansion = (
-                "empty"
-                if not dep_issue_ids
-                else "issue"
-                if dep_node.kind == "issue"
-                else "expanded"
-            )
+            expansion = "empty" if not dep_issue_ids else "issue" if dep_node.kind == "issue" else "expanded"
             target_issue_ids = tuple(dep_issue_ids)
             for src_issue_id in src_issue_ids:
                 dependency_contexts[src_issue_id].append(
@@ -447,8 +437,7 @@ def load_issue_depends_on_map(specdock_dir: Path, graph: SpecGraph) -> DepsTopol
                     issue_depends_on[src_issue_id].add(dep_issue_id)
 
     compiled = {
-        issue_id: sorted(list(issue_depends_on.get(issue_id, set())), key=deps_node_sort_key)
-        for issue_id in issue_ids
+        issue_id: sorted(issue_depends_on.get(issue_id, set()), key=deps_node_sort_key) for issue_id in issue_ids
     }
     return DepsTopologyLoadResult(
         issue_depends_on_map=compiled,

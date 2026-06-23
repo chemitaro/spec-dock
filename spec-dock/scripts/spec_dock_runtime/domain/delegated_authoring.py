@@ -1,22 +1,24 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
-from pathlib import Path
+import re
+from typing import TYPE_CHECKING
 
-from .discussion_docs import (
+from spec_dock_runtime.domain.discussion_docs import (
     is_creatable_discussion_doc_type,
     parse_timestamp_discussion_doc_filename,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
 CANONICAL_DOC_NAMES: tuple[str, ...] = ("requirement.md", "design.md", "plan.md", "report.md")
 FORBIDDEN_ROOT_NAMES: tuple[str, ...] = (".agents", ".codex", ".github", "src", "tests")
 NON_EDITABLE_DISCUSSION_STATE_RE = re.compile(
     r"(?im)^\s*(?:status|adoption_status|authority)\s*:\s*"
     r"(?:accepted|adopted|partially_adopted|integrated|partially_integrated|rejected|superseded|blocked|stale)\b"
 )
-EDITABLE_DISCUSSION_STATE_RE = re.compile(
-    r"(?im)^\s*(?:status\s*:\s*proposed|adoption_status\s*:\s*unreviewed)\b"
-)
+EDITABLE_DISCUSSION_STATE_RE = re.compile(r"(?im)^\s*(?:status\s*:\s*proposed|adoption_status\s*:\s*unreviewed)\b")
 REQUIRED_DISCUSSION_FRONTMATTER_FIELDS: tuple[str, ...] = (
     "created_by_role",
     "scope_id",
@@ -197,6 +199,8 @@ def _classify_entry(
     discussions_dir: Path,
     allowed_updates: set[Path],
 ) -> str | None:
+    del scope_dir, allowed_updates
+
     rel_path = _normalize_repo_path(entry.path, repo_root)
     abs_path = repo_root / rel_path
     status = entry.status
@@ -422,9 +426,7 @@ def _is_forbidden_root_path(rel_path: Path) -> bool:
         return False
     if parts[0] in FORBIDDEN_ROOT_NAMES:
         return True
-    if parts[0].startswith(".env"):
-        return True
-    return False
+    return bool(parts[0].startswith(".env"))
 
 
 def _is_direct_child_of(path: Path, parent: Path) -> bool:
