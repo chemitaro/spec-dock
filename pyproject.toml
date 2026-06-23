@@ -15,10 +15,29 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "ruff>=0.12.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+indent-width = 4
+preview = true
+exclude = [
+  "build/",
+  "dist/",
+  "*.egg-info/",
+  ".git/",
+  "__pycache__/",
+  ".venv/",
+  "venv/",
+  "spec-dock/",
+]
+
+[tool.ruff.lint]
+select = []
 
 [project.scripts]
 spec-dock = "spec_dock.cli:main"
