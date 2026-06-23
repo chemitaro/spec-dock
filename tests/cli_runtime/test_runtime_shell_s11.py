@@ -1,13 +1,14 @@
 import argparse
 import ast
+import contextlib
 import io
 import json
-import sys
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 
-import contextlib
 import pytest
+
 _LEGACY_HELPER_MODULES = {"io_json", "github", "render_md", "render_puml", "active", "nodes", "ids"}
 
 
@@ -24,9 +25,7 @@ def _runtime_modules():
     try:
         from spec_dock_runtime import app as runtime_app
         from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.cli import dispatch as cli_dispatch
-        from spec_dock_runtime.cli import parser as cli_parser
-        from spec_dock_runtime.cli import registry as cli_registry
+        from spec_dock_runtime.cli import dispatch as cli_dispatch, parser as cli_parser, registry as cli_registry
         from spec_dock_runtime.commands import contracts as cmd_contracts
         from spec_dock_runtime.domain import models as domain_models
     finally:

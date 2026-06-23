@@ -21,35 +21,35 @@ Design goals:
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
-from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from .cli.bootstrap import build_runtime as _cli_build_runtime
 from .cli.dispatch import dispatch as _cli_dispatch
 from .cli.parser import build_parser as _cli_build_parser
 from .cli.registry import build_registry as _cli_build_registry
-from .github import (
-    _ensure_gh_available,
-    _gh_issue_index,
-)
-from .infra.git_cli import origin_github_repo_slug as _origin_github_repo_slug
 from .domain.models import SpecGraph, SpecNodeSeed
 from .domain.tree import build_graph as _domain_build_graph
 from .domain.validation import (
-    validate_graph_and_deps as _domain_validate_graph_and_deps,
     validate_github_issue_numbers_unique as _domain_validate_github_issue_numbers_unique,
+    validate_graph_and_deps as _domain_validate_graph_and_deps,
+)
+from .github import (
+    _ensure_gh_available,
+    _gh_issue_index,
 )
 from .ids import (
     _deps_node_sort_key,
     _find_existing_id_by_num,
     _parse_id,
 )
+from .infra.git_cli import origin_github_repo_slug as _origin_github_repo_slug
 from .io_json import _load_json, _now_iso, _try_make_readonly, _warn, _write_json
 from .presentation.cli_text import render_deps_check_text as _render_deps_check_text
 from .presentation.json_state import render_deps_check_json as _render_deps_check_json

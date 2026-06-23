@@ -1,11 +1,11 @@
+from importlib.metadata import PackageNotFoundError, version
 import json
 import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
-from importlib.metadata import PackageNotFoundError, version
-from pathlib import Path
 
 import pytest
 

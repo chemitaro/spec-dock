@@ -14,13 +14,12 @@ from ..domain.models import (
     IssueSnapshot,
     IssueStatusSnapshot,
     ProgressMap,
-    SpecNode,
     SpecGraph,
+    SpecNode,
     TargetDepsInspection,
     ValidationReport,
 )
 from ..infra.contracts import StoredMetaRecord
-
 
 POST_MUTATION_FATAL_WARNING_CODES: tuple[str, ...] = ("gh_fetch_failed",)
 BootstrapStatus = Literal["skipped", "succeeded", "failed", "detection_failed"]

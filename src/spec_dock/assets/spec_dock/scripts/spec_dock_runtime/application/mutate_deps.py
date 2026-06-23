@@ -3,13 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from ..domain.deps import ensure_node_dependency_add_would_be_valid
-from ..domain.deps import validate_raw_node_dependency_graph
-from ..domain.models import SpecNodeSeed, SpecNodeKind
+from ..domain.deps import ensure_node_dependency_add_would_be_valid, validate_raw_node_dependency_graph
+from ..domain.models import SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
 from ..domain.validation import ensure_current_graph_and_deps_valid
-from ..infra.contracts import DirectDependencyResolution
-from ..infra.contracts import StoredMetaRecord
+from ..infra.contracts import DirectDependencyResolution, StoredMetaRecord
 from .contracts import MutateDepsError, MutateDepsRequest, MutateDepsResult
 from .ports import Ports
 from .repo_context import resolve_current_repo_slug

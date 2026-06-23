@@ -1,17 +1,16 @@
 import json
 import os
+from pathlib import Path
 import shutil
 import stat
 import tempfile
-from pathlib import Path
+
+import pytest
 
 from tests.cli_runtime.harness import (
     CliRuntimeHarness,
     main,
 )
-
-
-import pytest
 
 
 class TestCliDeps(CliRuntimeHarness):

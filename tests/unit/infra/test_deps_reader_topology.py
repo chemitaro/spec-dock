@@ -1,6 +1,6 @@
 import json
-import sys
 from pathlib import Path
+import sys
 
 
 def _runtime_modules():
@@ -14,8 +14,7 @@ def _runtime_modules():
     )
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        from spec_dock_runtime.domain import models as domain_models
-        from spec_dock_runtime.domain import tree as domain_tree
+        from spec_dock_runtime.domain import models as domain_models, tree as domain_tree
         from spec_dock_runtime.infra import deps_reader
     finally:
         sys.path.pop(0)

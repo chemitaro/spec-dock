@@ -1,16 +1,16 @@
+import contextlib
 import json
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
+
+import pytest
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 
-
-import contextlib
-import pytest
 _MISSING = object()
 
 
@@ -527,9 +527,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -597,9 +599,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1168,9 +1172,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1352,9 +1358,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1438,9 +1446,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1500,9 +1510,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1562,9 +1574,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1639,9 +1653,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1795,9 +1811,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1884,9 +1902,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -1983,9 +2003,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -2076,9 +2098,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -2141,9 +2165,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)
@@ -2226,9 +2252,11 @@ class TestCliWorktree(CliRuntimeHarness):
                 sys.path.insert(0, str(runtime_scripts_dir))
                 sys_path_inserted = True
             try:
-                from spec_dock_runtime.application import contracts as app_contracts
-                from spec_dock_runtime.application import ports as app_ports
-                from spec_dock_runtime.application import worktree as app_worktree
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
             finally:
                 if sys_path_inserted:
                     sys.path.pop(0)

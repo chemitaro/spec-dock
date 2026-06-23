@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+import subprocess
 
 from ..application.contracts import UseCases
 from ..presentation.contracts import CliText
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
-
 
 UPSTREAM_SOURCE = "git+https://github.com/chemitaro/spec-dock"
 

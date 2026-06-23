@@ -1,6 +1,6 @@
 import ast
-import sys
 from pathlib import Path
+import sys
 
 
 def _runtime_modules():
@@ -14,12 +14,13 @@ def _runtime_modules():
     )
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        from spec_dock_runtime import app as runtime_app
-        from spec_dock_runtime import ids as legacy_ids
-        from spec_dock_runtime.domain import ids as domain_ids
-        from spec_dock_runtime.domain import models as domain_models
-        from spec_dock_runtime.domain import tree as domain_tree
-        from spec_dock_runtime.domain import validation as domain_validation
+        from spec_dock_runtime import app as runtime_app, ids as legacy_ids
+        from spec_dock_runtime.domain import (
+            ids as domain_ids,
+            models as domain_models,
+            tree as domain_tree,
+            validation as domain_validation,
+        )
     finally:
         sys.path.pop(0)
 

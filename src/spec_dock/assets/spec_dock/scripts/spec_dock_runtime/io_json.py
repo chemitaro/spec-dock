@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
+import sys
 from typing import Any
 
-from .infra import clock as _infra_clock
-from .infra import json_store as _infra_json_store
+from .infra import clock as _infra_clock, json_store as _infra_json_store
 
 
 def _now_iso() -> str:

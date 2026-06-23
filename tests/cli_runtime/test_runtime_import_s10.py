@@ -1,10 +1,11 @@
 import json
 import os
+from pathlib import Path
 import sys
 import tempfile
-from pathlib import Path
 
 import pytest
+
 _UNSET = object()
 
 
@@ -20,12 +21,13 @@ def _runtime_modules():
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime import app as runtime_app
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import import_node as app_import_node
-        from spec_dock_runtime.application import ports as app_ports
+        from spec_dock_runtime.application import (
+            contracts as app_contracts,
+            import_node as app_import_node,
+            ports as app_ports,
+        )
         from spec_dock_runtime.domain import models as domain_models
-        from spec_dock_runtime.infra import artifact_writer as infra_artifact_writer
-        from spec_dock_runtime.infra import contracts as infra_contracts
+        from spec_dock_runtime.infra import artifact_writer as infra_artifact_writer, contracts as infra_contracts
         from spec_dock_runtime.presentation import cli_text as presentation_cli_text
     finally:
         sys.path.pop(0)

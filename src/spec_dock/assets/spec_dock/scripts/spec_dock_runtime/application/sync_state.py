@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import contextlib
+from dataclasses import dataclass, replace
+from datetime import datetime
 import errno
 import json
 import os
-import shutil
-from datetime import datetime
-from dataclasses import dataclass
-from dataclasses import replace
 from pathlib import Path
+import shutil
 from typing import Literal, cast
 from uuid import uuid4
 
@@ -20,6 +19,7 @@ from ..domain.deps import (
     validate_deps_cycles,
     validate_raw_node_dependency_graph,
 )
+from ..domain.discussion_docs import DISCUSSION_DOC_TIMESTAMP_FILENAME_RE as _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE
 from ..domain.ids import deps_node_sort_key
 from ..domain.models import (
     ActiveSelection,
@@ -34,7 +34,6 @@ from ..domain.models import (
 )
 from ..domain.status import build_progress_map, resolve_issue_snapshot_by_issue_id
 from ..domain.tree import build_graph, select_active_chain
-from ..domain.discussion_docs import DISCUSSION_DOC_TIMESTAMP_FILENAME_RE as _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE
 from ..domain.validation import (
     find_github_repo_scope_pairing_error,
     validate_graph_and_deps,
@@ -49,6 +48,7 @@ from ..presentation.json_state import (
 )
 from ..presentation.markdown import render_dashboard
 from .artifact_preflight import validate_required_artifacts_for_graph
+from .check_deps import load_cached_high_level_github_state_by_id, resolve_high_level_status_context
 from .contracts import (
     ActiveUpdateOutcome,
     ArtifactWriteFailure,
@@ -63,7 +63,6 @@ from .github_issue_targets import (
     normalize_repo_slug,
     snapshot_repo_issue_key,
 )
-from .check_deps import load_cached_high_level_github_state_by_id, resolve_high_level_status_context
 from .ports import Ports
 from .repo_context import (
     resolve_current_repo_slug,

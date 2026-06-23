@@ -1,18 +1,20 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import os
 import subprocess
-from dataclasses import dataclass
 
-from ..application.contracts import GitHubCapability
-from ..application.contracts import GitHubCapabilityDiagnostic
-from ..application.contracts import GitHubCapabilityDiagnosticCode
-from ..application.contracts import GitHubCapabilityGroup
-from ..application.contracts import GitHubCapabilityProbeRequest
-from ..application.contracts import GitHubCapabilitySeverity
-from ..application.contracts import GitHubCapabilityStatus
-from ..application.contracts import GitHubCapabilityTokenSource
+from ..application.contracts import (
+    GitHubCapability,
+    GitHubCapabilityDiagnostic,
+    GitHubCapabilityDiagnosticCode,
+    GitHubCapabilityGroup,
+    GitHubCapabilityProbeRequest,
+    GitHubCapabilitySeverity,
+    GitHubCapabilityStatus,
+    GitHubCapabilityTokenSource,
+)
 
 
 @dataclass(frozen=True)

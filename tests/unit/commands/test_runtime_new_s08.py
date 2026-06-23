@@ -1,12 +1,13 @@
-import os
 from contextlib import contextmanager
+import os
+from pathlib import Path
 import shlex
+import sys
+import tempfile
 import threading
 import time
-import tempfile
-import sys
+
 import pytest
-from pathlib import Path
 
 
 def _runtime_modules():
@@ -21,9 +22,11 @@ def _runtime_modules():
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime import app as runtime_app
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import create_node as app_create_node
-        from spec_dock_runtime.application import ports as app_ports
+        from spec_dock_runtime.application import (
+            contracts as app_contracts,
+            create_node as app_create_node,
+            ports as app_ports,
+        )
         from spec_dock_runtime.commands import new as new_commands
         from spec_dock_runtime.infra import contracts as infra_contracts
         from spec_dock_runtime.presentation import cli_text as presentation_cli_text
@@ -43,10 +46,12 @@ def _runtime_modules_import():
     )
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import create_node as app_create_node
-        from spec_dock_runtime.application import import_node as app_import_node
-        from spec_dock_runtime.application import ports as app_ports
+        from spec_dock_runtime.application import (
+            contracts as app_contracts,
+            create_node as app_create_node,
+            import_node as app_import_node,
+            ports as app_ports,
+        )
         from spec_dock_runtime.domain import models as domain_models
         from spec_dock_runtime.infra import contracts as infra_contracts
     finally:

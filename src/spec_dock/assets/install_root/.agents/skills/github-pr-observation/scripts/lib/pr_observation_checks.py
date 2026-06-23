@@ -1,8 +1,8 @@
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
 import subprocess
-from datetime import datetime, timezone
 
 repo = os.environ["OBS_REPO"]
 pr = int(os.environ["OBS_PR"])
