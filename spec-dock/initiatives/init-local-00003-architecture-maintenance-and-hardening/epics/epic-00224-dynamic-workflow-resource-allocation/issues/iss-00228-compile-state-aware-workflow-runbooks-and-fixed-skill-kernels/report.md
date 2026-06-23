@@ -319,6 +319,88 @@ uv run pytest tests/cli_runtime/test_runtime_shell_s11.py
 |---|---|---|---|---|---|---|---|---|
 | S01 | ready to commit | S01 runtime/tests/report evidence | pending | pending | N/A | N/A | N/A | N/A |
 
+### セッションログ（2026-06-24 S02）
+
+#### 対象
+- Step: S02
+- AC/EC: AC-005, EC-002
+- 計画上の出典:
+  - `plan.md` S02
+  - closure id: tc-004
+
+#### 実施内容
+- `RunbookStore` を追加し、`workflow next` の current Runbook projection を次の ignored generated paths へ atomic write するようにした。
+  - `spec-dock/.agent/runbooks/current-runbook.json`
+  - `spec-dock/.agent/runbooks/current-runbook.md`
+  - `spec-dock/active/current-runbook.json`
+  - `spec-dock/active/current-runbook.md`
+- `workflow next` の JSON / Markdown output に projection result を含めた。
+- projection write failure を silent continuation せず、`state=blocked` / `reason_code=runbook-write-failure` / doctor and temp cleanup guidance として返すようにした。
+- Skill assets、dogfooding mirror、profile-aware artifact composition、step routing、PR review tooling、unrelated `.gitignore` は変更していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_runbook_store.py tests/cli_runtime/test_workflow.py
+
+11 passed
+
+uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/runbook_store.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workflow.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/runbook.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/workflow_state.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/workflow.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py tests/unit/infra/test_runbook_store.py tests/cli_runtime/test_workflow.py
+
+All checks passed!
+
+uv run mypy src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/runbook_store.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workflow.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/runbook.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/workflow_state.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/workflow.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py
+
+Success: no issues found in 7 source files
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ | フェーズ | 計画した証跡要件 | 観測した証跡 | 証跡手段 | 結果 | メモ |
+|---|---|---|---|---|---|---|
+| S02 | Red | tc-004 red-required | `runbook_store` import missing, CLI JSON `projection` missing | `uv run pytest tests/unit/infra/test_runbook_store.py tests/cli_runtime/test_workflow.py` | fail as expected | 3 failed, 6 passed |
+| S02 | Green | projection store / clean Git / blocked failure tests pass | `11 passed` | `uv run pytest tests/unit/infra/test_runbook_store.py tests/cli_runtime/test_workflow.py` | pass | store transactional write, cleanup, blocked result, ignored projection paths |
+| S02 | Lint / typecheck | targeted lint/typecheck clean | Ruff passed; mypy passed | targeted `uv run ruff check ...` and `uv run mypy ...` | pass | changed source files and tests linted; source files typechecked |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ | 発見されたテスト / リスク | 起票元 | 実施した対応 | クロージャID / 新規ID | 計画修正要否 | 証跡 |
+|---|---|---|---|---|---|---|
+| S02 | Store failure cleanup だけでは application blocked result の検証が弱い | dev-coder | `workflow_next` が failing projection store を `blocked` result に変換する unit test を追加 | tc-004 | no | `tests/unit/infra/test_runbook_store.py` |
+| S02 | replace phase の途中失敗で projection set が partial に壊れる可能性 | code-reviewer | existing projection backups を作ってから replace し、失敗時に全 target を復元する test / implementation を追加 | tc-004 | no | code-reviewer P1 fix |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ | クロージャID | 計画上の close 条件 | 観測した証跡 | 結果 | メモ |
+|---|---|---|---|---|---|
+| S02 | tc-004 | projection tests pass、tracked diff safety が確認される | targeted pytest `11 passed`; CLI test commits scaffold baseline then asserts `git status --short == ""` after `workflow next` | pass | AC-005 / EC-002 covered |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID | ステップ | 必須 | 証跡レベル | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ |
+|---|---|---|---|---|---|---|---|
+| tc-004 | S02 | yes | red-required | failing store/CLI tests | `uv run pytest tests/unit/infra/test_runbook_store.py tests/cli_runtime/test_workflow.py` | pass | ignored projection paths, transactional cleanup/restore, blocked write failure |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID | ステップ | 検証証跡 | 観測結果 | メモ |
+|---|---|---|---|---|
+| tc-004 | S02 | targeted pytest + ruff + mypy | pass | covered |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別 | クロージャID | テストID alias | 解決先クロージャID | 理由 | 計画修正要否 | 再レビュー要否 |
+|---|---|---|---|---|---|---|
+| none | tc-004 | planned tests | tc-004 | planned S02 scope のまま完了 | no | step code review required |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ | 委任ロール | 委任 worker 要約 | 変更ファイル | 実行 tests または docs-only 検証 | レビュアー判定 | 未解決リスク | 親統合判断 |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | ignored generated Runbook projection store and workflow-next projection integration implemented; parent applied transactional restore reviewer fix | runtime workflow/store files, workflow tests, S02 report evidence | targeted pytest -> 11 passed; targeted ruff -> pass; targeted mypy -> pass | code-reviewer pass | S03/S90/S99 remain pending | accepted for commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ | ゲート名 | レビュアーロール | 鮮度 | 状態 | リスク受容 | 昇格 / 完了判断 | メモ |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | passed | no | proceed to S02 commit | Re-review passed with no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ | クロージャ状態 | コミット範囲 | コミットハッシュ / 最終台帳 | コミット後 clean 確認 | 差分なし根拠 | 差分なし確認済み契約 / ファイル | 差分なし diff-clean コマンド | 差分なし read-only 確認 |
+|---|---|---|---|---|---|---|---|---|
+| S02 | ready to commit | S02 runtime/tests/report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
 ## 最終品質ゲート（Final Quality Gate）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）

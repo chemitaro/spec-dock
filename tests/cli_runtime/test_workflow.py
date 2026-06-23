@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
@@ -128,6 +129,41 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert payload["authority"]["authorized_profile"] == "standard"
             assert payload["authority"]["obligation_source"] == "authorized_profile"
 
+    def test_workflow_next_writes_ignored_runbook_projection_without_tracked_diff(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_workflow_fixture(target, issue_number=301, title="Projected runbook")
+            self._commit_baseline(target)
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-planning", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["projection"]["written"] is True
+            assert payload["projection"]["paths"] == [
+                "spec-dock/.agent/runbooks/current-runbook.json",
+                "spec-dock/.agent/runbooks/current-runbook.md",
+                "spec-dock/active/current-runbook.json",
+                "spec-dock/active/current-runbook.md",
+            ]
+            for rel_path in payload["projection"]["paths"]:
+                assert (target / rel_path).is_file()
+            projected = json.loads((target / "spec-dock/.agent/runbooks/current-runbook.json").read_text(encoding="utf-8"))
+            assert projected["state"] == "requirement-capture"
+            assert projected["projection"]["written"] is True
+            status = subprocess.run(
+                ["git", "status", "--short"],
+                cwd=target,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            assert status.stdout == ""
+
     def _create_workflow_fixture(self, target: Path, *, issue_number: int, title: str) -> Path:
         self._create_same_repo_linked_hierarchy(
             target,
@@ -161,3 +197,21 @@ class TestCliWorkflow(CliRuntimeHarness):
             "- The command returns deterministic state and guidance.\n",
             encoding="utf-8",
         )
+
+    def _commit_baseline(self, target: Path) -> None:
+        subprocess.run(["git", "add", "."], cwd=target, check=True, capture_output=True, text=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=target,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "SpecDock Test"],
+            cwd=target,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(["git", "commit", "-m", "baseline"], cwd=target, check=True, capture_output=True, text=True)

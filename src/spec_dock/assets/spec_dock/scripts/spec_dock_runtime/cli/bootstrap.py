@@ -62,6 +62,7 @@ from spec_dock_runtime.infra import (
     github_cli as infra_github_cli,
     json_store as infra_json_store,
     make_cli as infra_make_cli,
+    runbook_store as infra_runbook_store,
     template_scaffolder as infra_template_scaffolder,
 )
 
@@ -326,6 +327,7 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         artifact_writer=_ArtifactWriter(),
     )
     assurance_store = infra_assurance_store.AssuranceStore(resolved_repo_root)
+    runbook_store = infra_runbook_store.RunbookStore(resolved_repo_root)
     use_cases = UseCases(
         create_initiative=lambda req: application_create_initiative(req, ports),
         create_epic=lambda req: application_create_epic(req, ports),
@@ -349,7 +351,7 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         classify_assurance=lambda req: application_classify_assurance(req, store=assurance_store),
         verify_assurance=lambda req: application_verify_assurance(req, store=assurance_store),
         workflow_status=lambda req: application_workflow_status(req, store=assurance_store),
-        workflow_next=lambda req: application_workflow_next(req, store=assurance_store),
+        workflow_next=lambda req: application_workflow_next(req, store=assurance_store, runbook_store=runbook_store),
         doctor=lambda req: application_doctor(req, ports),
         worktree_create=lambda req: application_worktree_create(req, ports),
         worktree_list=lambda req: application_worktree_list(req, ports),

@@ -10,8 +10,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from spec_dock_runtime.domain.assurance import AssuranceContract
-    from spec_dock_runtime.domain.runbook import Runbook, WorkflowTarget
-    from spec_dock_runtime.domain.workflow_state import WorkflowState
     from spec_dock_runtime.domain.models import (
         ActiveSelection,
         BranchDecision,
@@ -26,7 +24,10 @@ if TYPE_CHECKING:
         TargetDepsInspection,
         ValidationReport,
     )
+    from spec_dock_runtime.domain.runbook import Runbook, WorkflowTarget
+    from spec_dock_runtime.domain.workflow_state import WorkflowState
     from spec_dock_runtime.infra.contracts import StoredMetaRecord
+    from spec_dock_runtime.infra.runbook_store import RunbookProjectionResult
 
 POST_MUTATION_FATAL_WARNING_CODES: tuple[str, ...] = ("gh_fetch_failed",)
 BootstrapStatus = Literal["skipped", "succeeded", "failed", "detection_failed"]
@@ -123,6 +124,7 @@ class WorkflowResult:
     operation: Literal["status", "next"]
     state: WorkflowState
     runbook: Runbook | None = None
+    projection: RunbookProjectionResult | None = None
 
 
 @dataclass(frozen=True)
