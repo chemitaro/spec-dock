@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path
 import shutil
 import subprocess
+from typing import TYPE_CHECKING
 
 from ..application.contracts import BootstrapResult
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _MISSING_INIT_TARGET_FRAGMENTS = (
     "no rule to make target 'init'",

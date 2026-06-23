@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from ..domain.models import IssueSnapshot, IssueStatusSnapshot, SpecGraph
 from ..domain.status import resolve_issue_statuses
+
+if TYPE_CHECKING:
+    from ..domain.models import IssueSnapshot, IssueStatusSnapshot, SpecGraph
 
 
 @dataclass(frozen=True)

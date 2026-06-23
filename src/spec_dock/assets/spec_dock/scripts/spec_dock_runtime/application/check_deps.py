@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from ..domain.deps import inspect_target_deps, validate_deps_cycles, validate_raw_node_dependency_graph
 from ..domain.ids import format_id, parse_id
@@ -16,17 +16,19 @@ from ..domain.models import (
     SpecNodeSeed,
 )
 from ..domain.tree import build_graph
-from ..infra.contracts import StoredMetaRecord
 from .contracts import CheckDepsRequest, DepsCheckResult, TargetRef
 from .github_issue_targets import collect_repo_scoped_issue_view_targets, normalize_repo_slug
-from .ports import Ports
 from .repo_context import resolve_current_repo_slug
 from .status_context import resolve_issue_status_context
+
+if TYPE_CHECKING:
+    from ..infra.contracts import StoredMetaRecord
+    from .ports import Ports
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,

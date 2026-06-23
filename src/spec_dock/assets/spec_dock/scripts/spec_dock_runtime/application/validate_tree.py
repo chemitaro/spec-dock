@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from ..domain.authority import (
     evaluate_evidence_adoption_ledger_gate,
@@ -12,16 +12,18 @@ from ..domain.deps import validate_raw_node_dependency_graph
 from ..domain.models import SpecNodeKind, SpecNodeSeed, ValidationReport
 from ..domain.tree import build_graph
 from ..domain.validation import validate_graph_and_deps
-from ..infra.contracts import DirectDependencyResolution, StoredMetaRecord
 from .artifact_preflight import validate_required_artifacts_for_graph
 from .contracts import ValidateTreeRequest, ValidationResult
-from .ports import Ports
 from .repo_context import resolve_current_repo_slug
+
+if TYPE_CHECKING:
+    from ..infra.contracts import DirectDependencyResolution, StoredMetaRecord
+    from .ports import Ports
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,

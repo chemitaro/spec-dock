@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from ..domain.active import infer_active_node_from_branch
 from ..domain.authority import (
@@ -19,7 +19,6 @@ from ..domain.authority import (
 from ..domain.ids import format_id, parse_id
 from ..domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
-from ..infra.contracts import ActiveManifest, StoredMetaRecord
 from .close_node import close_node
 from .contracts import (
     ClearActiveRequest,
@@ -32,15 +31,18 @@ from .contracts import (
     TargetRef,
 )
 from .github_issue_targets import normalize_repo_slug
-from .ports import Ports
 from .repo_context import resolve_current_repo_slug
 from .set_active import build_context_pack_text, clear_active, commit_active_state, set_active
 from .sync_state import post_mutation_sync
 
+if TYPE_CHECKING:
+    from ..infra.contracts import ActiveManifest, StoredMetaRecord
+    from .ports import Ports
+
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,

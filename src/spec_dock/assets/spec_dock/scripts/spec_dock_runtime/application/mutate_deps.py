@@ -1,22 +1,24 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from ..domain.deps import ensure_node_dependency_add_would_be_valid, validate_raw_node_dependency_graph
 from ..domain.models import SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
 from ..domain.validation import ensure_current_graph_and_deps_valid
-from ..infra.contracts import DirectDependencyResolution, StoredMetaRecord
 from .contracts import MutateDepsError, MutateDepsRequest, MutateDepsResult
-from .ports import Ports
 from .repo_context import resolve_current_repo_slug
 from .sync_state import post_mutation_sync, skipped_post_mutation_sync
+
+if TYPE_CHECKING:
+    from ..infra.contracts import DirectDependencyResolution, StoredMetaRecord
+    from .ports import Ports
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,
@@ -75,7 +77,7 @@ def _load_direct_matching_refs(
 
     try:
         resolutions = cast(
-            list[DirectDependencyResolution],
+            "list[DirectDependencyResolution]",
             load_direct_resolutions(_resolve_specdock_dir(ports), graph, from_node_id),
         )
     except RuntimeError as error:
@@ -98,7 +100,7 @@ def _load_raw_node_depends_on_map(
     if callable(load_node_resolutions):
         try:
             resolutions_by_source = cast(
-                dict[str, list[DirectDependencyResolution]],
+                "dict[str, list[DirectDependencyResolution]]",
                 load_node_resolutions(_resolve_specdock_dir(ports), graph),
             )
         except RuntimeError as error:
@@ -118,7 +120,7 @@ def _load_raw_node_depends_on_map(
             continue
         try:
             resolutions = cast(
-                list[DirectDependencyResolution],
+                "list[DirectDependencyResolution]",
                 load_direct_resolutions(_resolve_specdock_dir(ports), graph, source_id),
             )
         except RuntimeError as error:
@@ -151,7 +153,7 @@ def _build_candidate_issue_depends_on_map(
 
     try:
         return cast(
-            dict[str, list[str]],
+            "dict[str, list[str]]",
             build_candidate(
                 graph,
                 issue_depends_on_map,

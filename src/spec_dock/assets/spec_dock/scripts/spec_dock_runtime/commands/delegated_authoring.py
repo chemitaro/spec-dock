@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from ..application.contracts import UseCases
 from ..application.delegated_authoring import (
     DelegatedAuthoringBaselineStatusRequest,
     DelegatedAuthoringDiffGuardRequest,
@@ -15,6 +14,11 @@ from ..application.delegated_authoring import (
 )
 from ..presentation.contracts import CliText
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
+
+if TYPE_CHECKING:
+    import argparse
+
+    from ..application.contracts import UseCases
 
 
 @dataclass(frozen=True)

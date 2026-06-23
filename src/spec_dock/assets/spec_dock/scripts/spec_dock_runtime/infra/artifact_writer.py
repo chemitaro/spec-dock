@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ..application.contracts import ArtifactWriteResult
-from ..presentation.contracts import ArtifactBundle
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from ..presentation.contracts import ArtifactBundle
 
 
 def _write_text(path: Path, text: str) -> None:

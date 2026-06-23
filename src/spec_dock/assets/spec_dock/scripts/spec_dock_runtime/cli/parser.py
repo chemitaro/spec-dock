@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+from typing import TYPE_CHECKING
 
-from ..commands.contracts import CommandRegistry, CommandSpec
+if TYPE_CHECKING:
+    from ..commands.contracts import CommandRegistry, CommandSpec
 
 
 class _RuntimeArgumentParser(argparse.ArgumentParser):

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ..application.contracts import ImportNodeRequest, ImportNodeResult, UseCases
 from ..presentation.cli_text import render_import_text
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
 from .targets import parse_github_issue_target_ref
+
+if TYPE_CHECKING:
+    import argparse
 
 
 @dataclass(frozen=True)

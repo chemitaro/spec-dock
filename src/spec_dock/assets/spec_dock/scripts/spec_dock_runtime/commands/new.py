@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from ..application.contracts import (
     CreateDiscussionDocRequest,
@@ -13,6 +12,9 @@ from ..application.contracts import (
 from ..presentation.cli_text import render_new_doc_text, render_new_node_text
 from ..presentation.contracts import CliText
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
+
+if TYPE_CHECKING:
+    import argparse
 
 _discussion_doc_types = (
     "adr",

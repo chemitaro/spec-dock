@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import re
 import shutil
 import subprocess
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..domain.models import IssueSnapshot
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _GH_ISSUE_URL_RE = re.compile(r"/issues/(?P<num>[0-9]+)\b")
 _GH_ISSUE_REPO_URL_RE = re.compile(

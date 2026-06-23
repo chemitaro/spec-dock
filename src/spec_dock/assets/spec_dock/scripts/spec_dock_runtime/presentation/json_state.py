@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from ..application.contracts import DepsCheckResult, SyncStateResult
 from ..domain.ids import deps_node_sort_key
-from ..domain.models import ActiveSelection, DepsNodeState, SpecNode
 from .contracts import DepsIssuesArtifact, DepsRawArtifact, IndexArtifact, TreeArtifact
 from .puml import (
     render_deps_disabled_deps_issues_puml,
@@ -15,6 +14,10 @@ from .puml import (
     render_deps_raw_puml,
     render_tree_ready_board_puml,
 )
+
+if TYPE_CHECKING:
+    from ..application.contracts import DepsCheckResult, SyncStateResult
+    from ..domain.models import ActiveSelection, DepsNodeState, SpecNode
 
 CURRENT_FUTURE_PROJECTION = "current-future"
 FULL_HISTORY_PROJECTION = "full-history"

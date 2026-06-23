@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import contextlib
-from pathlib import Path
 import shutil
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def render_text(text: str, replacements: dict[str, str]) -> str:

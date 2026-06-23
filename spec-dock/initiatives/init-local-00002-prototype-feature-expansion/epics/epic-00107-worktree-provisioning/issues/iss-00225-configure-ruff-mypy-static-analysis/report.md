@@ -1133,7 +1133,7 @@ make lint
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S09 | ready to commit | S09 implementation files plus `report.md` S09 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S09 | committed | S09 implementation files plus `report.md` S09 evidence | `b89f0436` `build(static-analysis): Ruff PTH違反を解消する` | `git status --short` -> clean; post-commit `make lint` -> pass; `./spec-dock/scripts/spec-dock validate` -> pass | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `pyproject.toml` - Ruff `PTH` selection.
@@ -1141,10 +1141,116 @@ make lint
 - `report.md` - S08 commit correction and S09 observed evidence.
 
 #### コミット
-- pending S09 step commit.
+- `b89f0436` `build(static-analysis): Ruff PTH違反を解消する`
 
 #### メモ
 - `os.readlink` remains intentionally in narrow raw symlink target contracts; each remaining PTH exception is scoped to the raw payload preservation line.
+
+---
+
+### セッションログ（2026-06-23 HH:MM - HH:MM）
+
+#### 対象
+- Step: S10 — Ruff TC
+- AC/EC: AC-005
+- 計画上の出典（Planned source）:
+  - `plan.md` S10 executable contract
+  - closure id: `tc-s10-001`
+
+#### 実施内容
+- `dev-coder` に S10 を委任し、許可 path を `pyproject.toml`, `src/spec_dock/**/*.py`, `tests/**/*.py` に限定した。
+- `pyproject.toml` の Ruff `select` を `["F", "E", "I", "UP", "B", "C4", "SIM", "PTH", "TC"]` に変更した。
+- 初回 inventory は total 163 件だった。
+  - `TC001`: 102 件。first-party type-only import。
+  - `TC003`: 42 件。standard-library type-only import。
+  - `TC006`: 19 件。`typing.cast()` の type expression。
+- type-only import を `if TYPE_CHECKING:` へ移動した。
+- `TC006` は `typing.cast()` の型引数を文字列化し、runtime value 側の import / evaluation は変更しない方針で処理した。
+- `application.contracts.SpecNode` は `app_contracts.SpecNode` として runtime caller が参照する public module attribute だったため、line-level `# noqa: TC001` で runtime re-export を保持した。
+
+#### 実行コマンド / 結果
+```bash
+uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC --statistics src/spec_dock tests
+# 102 TC001, 42 TC003, 19 TC006; total 163
+
+uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC src/spec_dock tests
+# All checks passed!
+
+uv run pytest tests/cli_runtime
+# 637 passed, 76 skipped
+
+git diff --check
+# pass
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=140
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S10 | Red / inventory | `tc-s10-001`: `TC` violation inventory | total 163; `TC001` 102, `TC003` 42, `TC006` 19 | parent command: `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC --statistics src/spec_dock tests` | pass | worker inventory matched parent inventory |
+| S10 | Green | `F,E,I,UP,B,C4,SIM,PTH,TC` violation 0 件 | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC src/spec_dock tests` -> All checks passed | command | pass | parent and worker reruns pass |
+| S10 | Regression | type-only import movement does not break runtime CLI imports | `uv run pytest tests/cli_runtime` -> 637 passed, 76 skipped | command | pass | shipped runtime import-time / CLI boundary covered |
+| S10 | Refactor | guardrail satisfied / no unrelated refactor | S11 以降 rule は追加せず、`spec-dock/` direct target なし | diff inspection + code-reviewer | pass | code-reviewer pass |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S10 | `application.contracts.SpecNode` は annotation-only に見えても runtime re-export として参照される | dev-coder / focused pytest | `SpecNode` だけ通常 import に戻し、line-level `# noqa: TC001` を付与 | tc-s10-001 | no | `tests/cli_runtime/test_runtime_import_s10.py` failure during worker loop; final `tests/cli_runtime` pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S10 | tc-s10-001 | Ruff `TC` を追加し violation を 0 件にする。type-only import 整理で runtime import boundary を壊さない | `pyproject.toml` select includes `TC`; Ruff TC command pass; `tests/cli_runtime` pass; one scoped `TC001` exception preserves runtime re-export | pass | code-reviewer pass |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s10-001 / tc-s10-case-001 | S10 | yes | command | initial `TC` inventory total 163 | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC src/spec_dock tests` | pass | `TC` violation 0 件 |
+| tc-s10-001 / tc-s10-runtime-001 | S10 | yes | command | type-only import movement could remove runtime attributes/imports | `uv run pytest tests/cli_runtime` | pass | 637 passed, 76 skipped |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s10-001 | S10 | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC src/spec_dock tests`; `uv run pytest tests/cli_runtime`; `git diff --check`; `./spec-dock/scripts/spec-dock validate`; code-reviewer pass | pass | AC-005 S10 closed pending commit |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s10-001 | tc-s10-case-001 | tc-s10-001 | planned closure unchanged; concrete command case recorded | no | yes |
+| added | tc-s10-001 | tc-s10-runtime-001 | tc-s10-001 | TC import movement affects runtime import boundary | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S10 | delegated | type-checking lint rule adoption step | dev-coder | Ruff `TC` enablement and type-only import fixes | requirement/design/plan S10 | `pyproject.toml`; `src/spec_dock/**/*.py`; `tests/**/*.py` | report edits; commit; S11+ rules; dogfooding `spec-dock/`; broad suppression | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC src/spec_dock tests`; focused pytest as needed | runtime import/re-export break; direct dogfooding edit needed | changed files; inventory; command results; suppression rationale | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S10 | dev-coder | Ruff `TC` enabled; type-only imports moved under `TYPE_CHECKING`; `TC006` cast type expressions stringified; `SpecNode` runtime re-export kept with scoped exception | `pyproject.toml`; `src/spec_dock/cli.py`; 56 shipped runtime files under `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/**/*.py` | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC src/spec_dock tests` -> pass; `uv run pytest tests/cli_runtime` -> 637 passed, 76 skipped; `git diff --check` -> pass | pass: code-reviewer `019ef338-84d0-7a01-8bc0-41878c029d52` | one scoped `TC001` exception remains intentionally for runtime compatibility | accepted for S10 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S10 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit | pass: code-reviewer `019ef338-84d0-7a01-8bc0-41878c029d52`; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S10 | ready to commit | S10 implementation files plus `report.md` S10 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `pyproject.toml` - Ruff `TC` selection.
+- `src/spec_dock/cli.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/**/*.py` - TC cleanup within S10 scope.
+- `report.md` - S09 commit correction and S10 observed evidence.
+
+#### コミット
+- pending S10 step commit.
+
+#### メモ
+- `application.contracts.SpecNode` is intentionally kept as a runtime import with `# noqa: TC001` because existing CLI/runtime callers access it as a module attribute.
 
 ---
 

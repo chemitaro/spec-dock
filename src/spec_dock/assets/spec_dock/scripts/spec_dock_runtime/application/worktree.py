@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import re
+from typing import TYPE_CHECKING
 
 from .contracts import (
     GitWorktreeRecord,
@@ -17,7 +18,9 @@ from .contracts import (
     WorktreeShowRequest,
     WorktreeShowResult,
 )
-from .ports import Ports
+
+if TYPE_CHECKING:
+    from .ports import Ports
 
 _LABEL_RE = re.compile(r"^[a-z0-9-]+$")
 _MAX_ATTEMPTS = 10000

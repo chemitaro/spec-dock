@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ..application.check_deps import check_deps as application_check_deps
 from ..application.close_node import close_node as application_close_node
@@ -54,6 +54,9 @@ from ..infra import (
     make_cli as infra_make_cli,
     template_scaffolder as infra_template_scaffolder,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @dataclass(frozen=True)

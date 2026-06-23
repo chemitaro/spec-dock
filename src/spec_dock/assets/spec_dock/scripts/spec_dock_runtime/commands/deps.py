@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ..application.contracts import (
     CheckDepsRequest,
@@ -20,6 +20,9 @@ from ..presentation.json_state import render_deps_check_json
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
 from .node_id_normalizer import normalize_node_id
 from .targets import parse_explicit_target_flags
+
+if TYPE_CHECKING:
+    import argparse
 
 
 @dataclass(frozen=True)

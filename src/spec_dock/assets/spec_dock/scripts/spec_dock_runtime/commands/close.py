@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ..application.contracts import CloseNodeRequest, TargetRef, UseCases
 from ..presentation.cli_text import render_close_text
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
 from .targets import parse_explicit_target_flags
+
+if TYPE_CHECKING:
+    import argparse
 
 
 @dataclass(frozen=True)

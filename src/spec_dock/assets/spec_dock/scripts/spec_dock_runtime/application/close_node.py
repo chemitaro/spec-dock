@@ -1,22 +1,24 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from ..domain.ids import format_id, parse_id
 from ..domain.models import SpecGraph, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
-from ..infra.contracts import StoredMetaRecord
 from .contracts import CloseNodeRequest, CloseNodeResult, TargetRef
 from .github_issue_targets import normalize_repo_slug
-from .ports import Ports
 from .repo_context import resolve_current_repo_slug
 from .sync_state import post_mutation_sync
+
+if TYPE_CHECKING:
+    from ..infra.contracts import StoredMetaRecord
+    from .ports import Ports
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,

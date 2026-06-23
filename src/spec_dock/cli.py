@@ -11,7 +11,6 @@ are handled by the repo-local runtime script installed at:
 from __future__ import annotations
 
 import argparse
-from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from importlib.resources import as_file, files
 import json
@@ -20,9 +19,12 @@ from pathlib import Path
 import re
 import shutil
 import sys
-from typing import Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from spec_dock import __version__
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 _SPEC_DOCK_DIRNAME = "spec-dock"
 _LEGACY_SPEC_DOCK_DIRNAME = ".spec-dock"

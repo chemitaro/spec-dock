@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-import argparse
 import sys
+from typing import TYPE_CHECKING
 
-from ..application.contracts import UseCases
 from ..commands.contracts import CommandOutcome, CommandRegistry
 from ..presentation.contracts import CliText
+
+if TYPE_CHECKING:
+    import argparse
+
+    from ..application.contracts import UseCases
 
 
 def dispatch(ns: argparse.Namespace, registry: CommandRegistry, use_cases: UseCases) -> int:

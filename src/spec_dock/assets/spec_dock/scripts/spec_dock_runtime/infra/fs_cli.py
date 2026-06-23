@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
 import shutil
 import stat
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def path_exists(path: Path) -> bool:
