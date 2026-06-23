@@ -378,6 +378,19 @@ def align_decision_observation_complete(payload: dict, observation_complete: boo
     payload["decision_fingerprint"] = fingerprint
 
 
+def refresh_decision_fingerprint(payload: dict) -> None:
+    decision = decision_payload(payload)
+    if not decision:
+        return
+    fingerprint_source = dict(decision)
+    fingerprint_source.pop("fingerprint", None)
+    fingerprint = hashlib.sha256(
+        json.dumps(fingerprint_source, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    decision["fingerprint"] = fingerprint
+    payload["decision_fingerprint"] = fingerprint
+
+
 def decision_int(decision: dict, key: str, default: int = 0) -> int:
     value = decision.get(key)
     return value if isinstance(value, int) else default
@@ -707,6 +720,42 @@ def semantic_fingerprint(payload: dict) -> str:
         "trigger": payload.get("trigger"),
     }
     return sha256_json(source)
+
+
+def blocker_fingerprints(payload: dict) -> list[str]:
+    decision = decision_payload(payload)
+    blocker_policy = decision.get("blocker_policy")
+    if not isinstance(blocker_policy, dict):
+        return []
+    values = blocker_policy.get("blocker_fingerprints")
+    if not isinstance(values, list):
+        return []
+    return [value for value in values if isinstance(value, str) and value]
+
+
+def mark_automation_stalled(payload: dict, *, same_count: int, same_required: int) -> bool:
+    fingerprints = blocker_fingerprints(payload)
+    if not fingerprints or same_count < same_required:
+        return False
+    decision = decision_payload(payload)
+    if decision.get("status") != "human_gate":
+        return False
+    if decision.get("recommended_next_action") == "merge_prepared":
+        return False
+    stalled = {
+        "present": True,
+        "reason": "same_blocker_fingerprint_repeated",
+        "blocker_fingerprints": fingerprints,
+        "same_fingerprint_observed": same_count,
+        "same_fingerprint_required": same_required,
+        "recommended_next_action": "human_gate",
+    }
+    payload["automation_stalled"] = stalled
+    decision["automation_stalled"] = stalled
+    decision["recommended_next_action"] = "human_gate"
+    decision["status_reason"] = "automation_stalled"
+    refresh_decision_fingerprint(payload)
+    return True
 
 
 def fallback_snapshot(snapshot_exit: int, stdout_text: str, stderr_text: str) -> dict:
@@ -1746,6 +1795,17 @@ while True:
         overall_status = "human_gate"
         next_action = "human_gate"
         mark_decision_review_completion_unknown(payload)
+
+    if normalized_status == "human_gate" and mark_automation_stalled(
+        payload, same_count=same_count, same_required=same_fingerprint_count
+    ):
+        normalized_status = "human_gate"
+        overall_status = "human_gate"
+        next_action = "human_gate"
+        observation_complete = False
+        terminal_now = True
+    elif normalized_status == "human_gate" and blocker_fingerprints(payload) and same_count < same_fingerprint_count:
+        terminal_now = False
 
     payload["script"] = "wait_pr_observation.sh"
     payload["status"] = normalized_status

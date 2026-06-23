@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
+from spec_dock_runtime.domain.assurance import auto_lite_readiness_report
 from spec_dock_runtime.presentation.contracts import CliText
 
 if TYPE_CHECKING:
@@ -99,6 +100,9 @@ def _result_payload(result: AssuranceResult) -> dict[str, Any]:
         payload["classification"] = classification
     if result.contract is not None:
         payload["contract"] = result.contract.to_dict()
+    readiness = _auto_lite_readiness_payload(result)
+    if readiness is not None:
+        payload["auto_lite_readiness"] = readiness
     return payload
 
 
@@ -114,6 +118,81 @@ def _classification_payload(result: AssuranceResult) -> dict[str, Any] | None:
             "reason_codes": ["strict_legacy_missing_assurance_contract"],
             "hard_triggers": [],
             "unknown_facts": [],
+        }
+    return None
+
+
+def _auto_lite_readiness_payload(result: AssuranceResult) -> dict[str, object] | None:
+    if result.contract is not None:
+        return auto_lite_readiness_report(result.contract.classification)
+    if result.status == "missing" and result.mode == "strict-legacy":
+        classification = _classification_payload(result)
+        if classification is None:
+            return None
+        return {
+            "automatic_lite_default_enabled": False,
+            "lite_candidate": False,
+            "lite_authorized": False,
+            "future_adoption_requires": [
+                "accepted_adr",
+                "policy_version_bump",
+                "rollout_issue",
+                "telemetry_gate",
+            ],
+            "adoption_blockers": [
+                "assurance_contract_missing",
+                "accepted_adr_missing",
+                "policy_version_bump_missing",
+                "rollout_issue_missing",
+                "telemetry_gate_missing",
+            ],
+            "rollback_mode": "strict-legacy",
+            "automation_stalled_routes_to": "human_gate",
+            "required_metrics": [
+                "false_positive_candidates",
+                "escalation_rate",
+                "p0_p1_escape",
+                "post_review_blocker",
+                "wall_clock_token_delta",
+                "missing_metrics_summary",
+            ],
+            "missing_metrics_summary": {
+                "present": True,
+                "missing": [
+                    "false_positive_candidates",
+                    "escalation_rate",
+                    "p0_p1_escape",
+                    "post_review_blocker",
+                    "wall_clock_token_delta",
+                    "missing_metrics_summary",
+                ],
+            },
+            "efficiency_baseline": {
+                "profiles": {
+                    "lite": {
+                        "invocation_count": 1,
+                        "runbook_sections": 3,
+                        "review_generation_required": False,
+                        "wall_clock_token_proxy": 1,
+                    },
+                    "standard": {
+                        "invocation_count": 2,
+                        "runbook_sections": 6,
+                        "review_generation_required": True,
+                        "wall_clock_token_proxy": 3,
+                    },
+                    "strict": {
+                        "invocation_count": 3,
+                        "runbook_sections": 9,
+                        "review_generation_required": True,
+                        "wall_clock_token_proxy": 5,
+                    },
+                },
+                "comparison": {
+                    "lite_vs_standard_wall_clock_token_proxy_delta": -2,
+                    "standard_vs_strict_wall_clock_token_proxy_delta": -2,
+                },
+            },
         }
     return None
 

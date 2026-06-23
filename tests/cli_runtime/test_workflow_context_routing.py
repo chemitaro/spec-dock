@@ -222,7 +222,7 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             assert "## Context Packets" in result.stdout
             assert "spec-dock/.agent/context-packets/current-context-packets.json" in result.stdout
 
-    def test_missing_assurance_takes_precedence_over_step_assurance_projection(self) -> None:
+    def test_missing_assurance_uses_strict_legacy_step_assurance_projection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -237,9 +237,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["state"] == "classification-required"
-            assert "step_assurance" not in payload
-            assert "context_packets" not in payload
+            assert payload["state"] == "ready"
+            assert payload["reason_code"] == "strict-legacy-missing-assurance"
+            assert payload["authority"]["authorized_profile"] == "strict"
+            assert payload["step_assurance"]["selected_step"]["id"] == "S02"
+            assert payload["context_packets"]["written"] is True
 
     def test_invalid_context_policy_degrades_worker_and_fails_closed_reviewers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

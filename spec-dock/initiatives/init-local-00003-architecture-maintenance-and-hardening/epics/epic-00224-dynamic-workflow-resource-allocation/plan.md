@@ -17,7 +17,7 @@ ID: "epic-00224"
 - この plan は reviewer-pass 済み `requirement.md` / `design.md` を、実行可能な Issue slice、依存順、統合 checkpoint、品質 gate、最終 exit contract へ変換する。
 - Issue 実体は作成済み。実装対象は `I01`〜`I07` の `iss-00227`〜`iss-00233` に対応する。
 - `iss-00226 / #226` は decision-only Issue として作成されたが、ADR-level decisions はこの Epic planning/design で固定すべきだったため closed / superseded historical evidence とする。
-- 初期 rollout では automatic Lite default を有効化しない。Lite は shadow / explicit opt-in / evidence-gated に限定し、future automatic Lite default は別 accepted ADR、policy version bump、rollout Issue が揃った場合だけ扱う。
+- 初期 rollout では automatic Lite default を有効化しない。Lite は shadow / explicit opt-in / evidence-gated に限定し、future automatic Lite default は別 accepted ADR、policy version bump、rollout Issue、telemetry gate が揃った場合だけ扱う。
 - 実装開始前の workflow authority decision は、Epic-scope accepted ADR 5 件として作成済み。これを `G0 Epic Decision Baseline` とする。
 
 ## この計画で閉じる E-RQ / E-AC
@@ -265,19 +265,16 @@ ID: "epic-00224"
 - provisional slug:
   - `roll-out-adaptive-workflow-with-legacy-compatibility-and-telemetry`
 - 目的:
-  - Shadow、opt-in、Standard default へ段階移行し、legacy compatibility、metrics、golden scenarios、provider/mirror parity を閉じる。
+  - 初期 rollout では automatic Lite default を有効化せず、strict-legacy compatibility、Auto-Lite readiness、automation-stalled operator surface、efficiency evidence、provider/mirror parity を閉じる。
 - 成果物:
-  - shadow classification。
-  - adaptive opt-in config。
-  - new Issue Standard default。
-  - Lite manual / evidence-gated activation。
-  - `auto-lite-readiness report`。
-  - false positive candidates / escalation rate / P0/P1 escape / post-review blocker / wall-clock-token delta / missing metrics summary。
-  - strict-legacy adapter。
-  - event / metrics projection。
-  - benchmark / review-quality corpus。
-  - installer migration / docs / validate / sync。
-  - rollback runbook。
+  - `auto-lite-readiness report` with `automatic_lite_default_enabled=false`。
+  - future automatic Lite adoption gates: accepted ADR、policy version bump、rollout Issue、telemetry gate。
+  - required metrics list: false positive candidates / escalation rate / P0/P1 escape / post-review blocker / wall-clock-token delta / missing metrics summary。
+  - efficiency baseline fixture comparing Lite / Standard / Strict expected workflow cost。
+  - substantive requirement + missing assurance strict-legacy workflow compatibility。
+  - repeated blocker fingerprint `automation_stalled` / human gate operator surface。
+  - provider / dogfooding mirror parity and validation evidence。
+  - rollback mode recorded as `strict-legacy`。
 - Assurance:
   - strict / complex
 - closes:
@@ -371,7 +368,7 @@ T6 I07 Rollout / telemetry / default switch
   - I05 後、base/head policy trust boundary、multiline trigger、stale head を実 PR または fake GitHub で確認する。
   - I06 後、P0/P1、P2 only、promoted P2、stagnation を確認する。
 - G9 Rollout:
-  - I07 後、shadow / opt-in / Standard default、legacy rollback、metrics を確認する。
+  - I07 後、automatic Lite default が無効のまま、Auto-Lite adoption gates、strict-legacy fallback、required metrics / missing metrics summary、automation-stalled human gate、efficiency baseline を確認する。
   - Epic-wide diff を fresh `deep-consultant`、`spec-reviewer`、code / QA 観点でレビューする。
 
 ## 品質ゲート
@@ -420,10 +417,9 @@ T6 I07 Rollout / telemetry / default switch
 ## ロールアウト / ドキュメント影響
 
 - Rollout:
-  - shadow only。
-  - explicit opt-in。
-  - selected dogfooding Issues。
-  - Standard default for new Issues。
+  - automatic Lite default disabled。
+  - future Auto-Lite adoption requires accepted ADR、policy version bump、rollout Issue、telemetry gate。
+  - selected dogfooding Issues keep strict-legacy fallback when assurance is missing。
   - Lite manual / evidence-gated activation only。
   - automatic Lite default is out of initial rollout。
 - Compatibility:
@@ -467,7 +463,7 @@ T6 I07 Rollout / telemetry / default switch
 - E-AC-001〜021 に evidence がある。
 - 7 implementation Issue が完了または明示的に superseded / deferred されている。
 - Required ADR が Epic-scope accepted ADR として作成 / 反映され、implementation Issue より先に reviewer-gated baseline になっている。
-- New Issue の Standard default path が dogfooding で成功している。
+- New Issue / substantive Issue の strict-legacy compatibility path が dogfooding で成功している。
 - Existing Issue の strict-legacy path が壊れていない。
 - No-active / planning / execution / PR / finish state が current Runbook として動作する。
 - Profile / Complexity / Step Assurance が machine-readable。
@@ -479,7 +475,7 @@ T6 I07 Rollout / telemetry / default switch
 - P0 / P1 / promoted blocker が閉じるまで merge-prepared にならない。
 - Automation-stalled が risk acceptance にならない。
 - Provider / mirror / installer / docs / tests が同期している。
-- Benchmark で agent invocation、P2 repair push、review generation の改善を確認する。
+- Efficiency baseline で Lite / Standard / Strict の agent invocation、review generation、workflow cost proxy の差分を確認し、live telemetry 不足は missing metrics summary として残る。
 - Epic-wide fresh review と human merge judgment が完了する。
 
 ## 依存 / ブロッカー

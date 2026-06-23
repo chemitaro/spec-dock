@@ -135,6 +135,37 @@ def test_lite_authorization_fails_closed_for_unknowns_and_requires_explicit_gate
     assert "lite_evidence_gate_missing_or_unknown" in all_positive_without_gates.reason_codes
 
 
+def test_auto_lite_readiness_report_keeps_default_disabled_and_records_adoption_gates() -> None:
+    assurance = _assurance_module()
+    classification = assurance.classify_risk_facts(assurance.default_risk_facts())
+
+    report = assurance.auto_lite_readiness_report(classification)
+
+    assert report["automatic_lite_default_enabled"] is False
+    assert report["lite_candidate"] is False
+    assert report["lite_authorized"] is False
+    assert report["future_adoption_requires"] == [
+        "accepted_adr",
+        "policy_version_bump",
+        "rollout_issue",
+        "telemetry_gate",
+    ]
+    assert report["rollback_mode"] == "strict-legacy"
+    assert report["automation_stalled_routes_to"] == "human_gate"
+    assert "missing_metrics_summary" in report["required_metrics"]
+    assert report["missing_metrics_summary"]["present"] is True
+    baseline = report["efficiency_baseline"]["profiles"]
+    assert baseline["lite"]["invocation_count"] < baseline["standard"]["invocation_count"]
+    assert baseline["lite"]["runbook_sections"] < baseline["standard"]["runbook_sections"]
+    assert baseline["lite"]["review_generation_required"] is False
+    assert baseline["standard"]["review_generation_required"] is True
+    assert baseline["standard"]["wall_clock_token_proxy"] < baseline["strict"]["wall_clock_token_proxy"]
+    assert (
+        report["efficiency_baseline"]["comparison"]["lite_vs_standard_wall_clock_token_proxy_delta"]
+        == baseline["lite"]["wall_clock_token_proxy"] - baseline["standard"]["wall_clock_token_proxy"]
+    )
+
+
 def test_hard_trigger_escalation_is_monotonic_and_drives_complexity_without_lite_override() -> None:
     assurance = _assurance_module()
 
