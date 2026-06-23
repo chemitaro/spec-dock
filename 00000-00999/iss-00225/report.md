@@ -364,7 +364,7 @@ uv run pytest tests/cli_runtime/test_active.py::TestCliActive::test_active_set_i
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S02 | ready to commit | S02 implementation files plus `report.md` S02 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S02 | committed | S02 implementation files plus `report.md` S02 evidence | `824b966a` `build(static-analysis): Ruff F違反を解消する` | `git status --short` -> clean; post-commit `make lint` -> pass; `spec-dock validate` -> pass | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `pyproject.toml` - Ruff `F` selection.
@@ -379,7 +379,7 @@ uv run pytest tests/cli_runtime/test_active.py::TestCliActive::test_active_set_i
 - `report.md` - S02 observed evidence.
 
 #### コミット
-- pending S02 step commit.
+- `824b966a` `build(static-analysis): Ruff F違反を解消する`
 
 #### メモ
 - `spec-dock/` dogfooding mirror is intentionally not updated in S02. S90 will resolve refresh/inspection evidence.
@@ -389,11 +389,122 @@ uv run pytest tests/cli_runtime/test_active.py::TestCliActive::test_active_set_i
 ### セッションログ（2026-06-23 HH:MM - HH:MM）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S03 — Ruff E
+- AC/EC: AC-005, EC-001, EC-002
 
 #### 実施内容
-- ...
+- `dev-coder` に S03 を委任し、許可 path を `pyproject.toml`, `src/spec_dock/**/*.py`, `tests/**/*.py` に限定した。
+- `pyproject.toml` の Ruff `select` を `["F", "E"]` に変更した。
+- `E501` は plan 上の最終 ignore として `extend-ignore = ["E501"]` に追加した。
+- `uv run ruff check --select F,E src/spec_dock tests` は CLI `--select` が `E501` を再選択するため、command compatibility と行長 churn 回避のため target-scoped per-file ignore も追加した。
+  - `"src/spec_dock/**/*.py" = ["E501"]`
+  - `"tests/**/*.py" = ["E501"]`
+- 初回 S03 対象 inventory は total 43 件だった。
+  - `E302`: 24 件
+  - `E303`: 7 件
+  - `E712`: 6 件
+  - `E402`: 3 件
+  - `E711`: 2 件
+  - `E305`: 1 件
+- 代表ファイルは `pr_review_snapshot.py`, `pr_observation_snapshot.py`, runtime `app.py`, `tests/cli_runtime/test_sync.py`, `tests/unit/infra/test_fake_gh_harness.py`, `tests/unit/infra/test_init_update.py`。
+- 空行系 `E302/E303/E305` は Ruff safe fix 相当の最小差分で修正した。
+- `E711/E712` は `is None` / truthiness / `is False` へ置換した。
+- `tests/unit/infra/test_fake_gh_harness.py` は runtime path injection 後 import が必要なため、3 行だけ `# noqa: E402` を付与した。
+- code-reviewer の P2 指摘により、boolean `false` contract を弱めていた `not ...` assertion は `is False` に修正した。
+
+#### 実行コマンド / 結果
+```bash
+uv run ruff check --select F,E src/spec_dock tests
+# All checks passed!
+
+uv run ruff check --select F,E --statistics src/spec_dock tests
+# exit 0
+
+uv run pytest tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_load_active_manifest_chain_regression tests/cli_runtime/test_sync.py::TestCliSync::test_sync_emits_deps_issues_json_and_puml_todo_only tests/unit/infra/test_fake_gh_harness.py::TestFakeGhHarness tests/unit/infra/test_init_update.py::TestInitUpdate::test_s04_codex_agent_permission_taxonomy_contract -q
+# 7 passed in 2.58s
+
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_s04_codex_agent_permission_taxonomy_contract -q
+# 1 passed in 1.29s
+
+git diff --check
+# pass
+
+make lint
+# ==> ruff check
+# All checks passed!
+# Summary:
+# - ruff check: pass
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=140
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | Red / inventory | `tc-s03-001`: `E` violation inventory と `E501` ignore 確認 | S03 対象 total 43。`E501` は ignore 後 0 / 非表示 | worker command: `uv run ruff check --select F,E --statistics src/spec_dock tests` | pass | `E501` は plan 通り final ignore |
+| S03 | Green | `F,E` violation 0 件 | `uv run ruff check --select F,E src/spec_dock tests` -> All checks passed | command | pass | 親側でも再実行済み |
+| S03 | Regression | 影響し得る runtime / config tests を維持 | focused pytest 7 passed; P2 修正後の focused pytest 1 passed | command | pass | boolean false contract は `is False` で保持 |
+| S03 | Refactor | guardrail satisfied / no unrelated refactor | S04 以降 rule は追加せず、`spec-dock/` direct target なし | diff inspection | pass | formatter-only phase は S16 に残す |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | CLI `--select F,E` が `extend-ignore = ["E501"]` だけでは `E501` を再選択する | dev-coder | target-scoped per-file ignore を追加し、plan command を維持 | tc-s03-001 | no | `E501` 1070 件相当を line rewrite せず ignore。`uv run ruff check --select F,E ...` pass |
+| S03 | `tests/unit/infra/test_fake_gh_harness.py` は runtime path injection 後 import が必要 | dev-coder | `# noqa: E402` を該当 3 import 行だけに付与 | tc-s03-001 | no | `TestFakeGhHarness` included in focused pytest |
+| S03 | `== False` から `not ...` への置換は TOML boolean `false` の契約を弱める | code-reviewer | `is False` に修正 | tc-s03-001 | no | code-reviewer P2; focused pytest 1 passed |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | tc-s03-001 | Ruff `E` を追加し violation を 0 件にする。`E501` は ignore として扱う | `pyproject.toml` select `["F", "E"]`; `E501` ignore; `uv run ruff check --select F,E src/spec_dock tests` -> pass | pass | P2 fixed before commit |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s03-001 / tc-s03-case-001 | S03 | yes | command | initial `E` inventory total 43 after `E501` ignore | `uv run ruff check --select F,E src/spec_dock tests` | pass | `F,E` violation 0 件 |
+| tc-s03-001 / tc-s03-regression-001 | S03 | yes | command | `E711/E712/E402` 修正が behavior に触れる可能性 | focused pytest command | pass | `7 passed` |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s03-001 | S03 | `uv run ruff check --select F,E src/spec_dock tests`; focused pytest; `git diff --check`; `make lint`; `spec-dock validate` | pass | AC-005 S03 closed pending commit |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s03-001 | tc-s03-case-001 | tc-s03-001 | planned closure unchanged; concrete command case recorded | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | lint rule adoption implementation step | dev-coder | Ruff `E` enablement and all S03 `E` violation fixes | requirement/design/plan S03 | `pyproject.toml`; `src/spec_dock/**/*.py`; `tests/**/*.py` | report edits; commit; S04+ rules; dogfooding `spec-dock/`; broad suppression beyond planned `E501` | `uv run ruff check --select F,E src/spec_dock tests`; focused pytest as needed | unplanned broad suppression; behavior regression; direct dogfooding edit needed | changed files; inventory; command results; ledger note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | Ruff `E` enabled; `E501` ignored as planned; empty-line and comparison violations fixed; targeted `E402` suppression added for runtime path injection test | `pyproject.toml`; `src/spec_dock/cli.py`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/json_store.py`; `tests/**/*.py` touched by S03 fixes | `uv run ruff check --select F,E src/spec_dock tests` -> pass; focused pytest -> 7 passed; `git diff --check` -> pass | pass with P2 by code-reviewer `019ef2cf-3922-7d03-ac98-d7c2cbd08702` | none after `is False` P2 fix | accepted for S03 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit after P2 fix | pass: code-reviewer `019ef2cf-3922-7d03-ac98-d7c2cbd08702`; P2 fixed with `is False` |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | ready to commit | S03 implementation files plus `report.md` S03 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `pyproject.toml` - Ruff `E` selection and planned `E501` ignore.
+- `src/spec_dock/cli.py`, `src/spec_dock/assets/**`, `tests/**/*.py` - S03 `E` violation fixes.
+- `report.md` - S02 commit correction and S03 observed evidence.
+
+#### コミット
+- pending S03 step commit.
+
+#### メモ
+- `E501` remains intentionally out of the semantic lint gate and will be handled by the dedicated format phase / final gate path.
 
 ---
 
