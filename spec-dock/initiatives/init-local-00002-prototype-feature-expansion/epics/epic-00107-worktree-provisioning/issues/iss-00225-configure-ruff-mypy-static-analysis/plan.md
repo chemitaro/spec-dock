@@ -29,7 +29,7 @@ ID: "iss-00225"
   - EC-003 untyped external dependency
   - EC-004 package/path 解決 noise
   - EC-005 formatter churn
-  - EC-006 dogfooding generated-copy drift
+- EC-006 dogfooding / installed-copy drift
 - 制約:
   - dogfooding `spec-dock/` は直接 target にしない。
   - pre-commit は実装しない。
@@ -110,7 +110,7 @@ ID: "iss-00225"
 | tc-s16-001 | S16 | acceptance | AC-007 | format check が green、format-only diff が隔離される | formatter churn mixing | yes | command + diff inspection |
 | tc-s17-001 | S17 | acceptance | AC-003/008 | `make lint` が final gate を実行し green | local/CI command divergence | yes | command |
 | tc-s18-001 | S18 | acceptance | AC-004 | provider CI が `make lint` を実行する。local/pre-PR では workflow inspection、PR/CI 観測可能時は GitHub Actions evidence で閉じる | CI enforcement gap | yes | inspection + CI/PR evidence when available |
-| tc-s90-001 | S90 | inspect-only | EC-006 | shipped runtime asset 変更時に dogfooding refresh/inspection 判断が report に残る | stale generated-copy risk | yes | inspection |
+| tc-s90-001 | S90 | inspect-only | EC-006 | shipped runtime asset / installed agent asset 変更時に dogfooding / installed-copy refresh/inspection 判断が report に残る | stale generated-copy risk | yes | inspection |
 | tc-s99-001 | S99 | acceptance | AC-008/009 | final checks がすべて green | incomplete baseline | yes | command |
 
 ## レビュー / QA ゲート方針
@@ -387,20 +387,21 @@ ID: "iss-00225"
 
 ### S90 — Docs / Dogfooding Impact Resolution
 - 目標:
-  - 実装により恒久 docs / README / workflow 更新が必要か確認し、shipped runtime asset 変更時の dogfooding impact を閉じる。
+  - 実装により恒久 docs / README / workflow 更新が必要か確認し、shipped runtime asset / installed agent asset 変更時の dogfooding / installed-copy impact を閉じる。
 - 対象:
   - README / docs / workflow / templates / dogfooding workspace inspection / none
 - 判定:
   - `make lint` が新しい標準 entrypoint になるため、README や developer docs に既存コマンド一覧がある場合は更新する。
   - 恒久 docs 更新が必要な場合は doc-writer に委任する。
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/` に変更がある場合は、dogfooding `spec-dock/` copy の refresh 要否を inspection し、実施または非実施の理由を記録する。
+  - `src/spec_dock/assets/install_root/.agents/` に変更がある場合は、installed `.agents/` copy の refresh 要否を inspection し、実施または非実施の理由を記録する。
 - 検証:
   - docs inspection。
   - `git diff --name-only` による shipped runtime asset 差分確認。
   - 必要に応じた `spec-dock update .` 相当の refresh 判断。
 - report 証跡:
   - 更新要否、更新した場合の file、更新しない場合の理由。
-  - dogfooding refresh/inspection 判断と証跡。
+  - dogfooding / installed-copy refresh/inspection 判断と証跡。
 
 ### S99 — Final Quality Gate
 - 目標:
@@ -410,7 +411,7 @@ ID: "iss-00225"
   - `uv run pytest`
   - `./spec-dock/scripts/spec-dock validate`
   - `git status --short`
-  - shipped runtime asset 差分がある場合の dogfooding impact evidence inspection
+  - shipped runtime asset / installed agent asset 差分がある場合の dogfooding / installed-copy impact evidence inspection
 - reviewer gates:
   - qa-reviewer pass
   - issue-wide code-reviewer pass
@@ -714,23 +715,23 @@ ID: "iss-00225"
 ### S90 executable contract
 - delegation contract:
   - delegated role: `doc-writer` if persistent docs update is required; otherwise orchestrator-approved inspect-only/no-op.
-  - allowed paths: README/docs/workflow/template files only if docs impact exists; `spec-dock/**` generated copy files only when `spec-dock update .` is intentionally run to refresh shipped runtime asset changes; `report.md` evidence through orchestrator integration.
+  - allowed paths: README/docs/workflow/template files only if docs impact exists; `spec-dock/**` generated copy files only when `spec-dock update .` is intentionally run to refresh shipped runtime asset changes; `.agents/**` installed asset copy files only when `spec-dock update .` is intentionally run to refresh installed agent asset changes; `report.md` evidence through orchestrator integration.
   - forbidden changes: source code cleanup, static-analysis config changes, dogfooding direct lint/typecheck target。
-  - acceptance criteria: docs impact and shipped runtime asset dogfooding impact are explicitly resolved。
-  - required verification: docs inspection, `git diff --name-only` shipped runtime asset check, refresh/inspection decision。
+  - acceptance criteria: docs impact and shipped runtime asset / installed agent asset dogfooding impact are explicitly resolved。
+  - required verification: docs inspection, `git diff --name-only` shipped runtime asset / installed agent asset check, refresh/inspection decision。
   - reviewer focus: docs/spec alignment and generated-copy source-of-truth discipline。
   - stop conditions: docs update requires product policy beyond issue scope, or dogfooding refresh would create unrelated generated churn that cannot be cleanly attributed to this issue。
-  - output required: docs update/no-op rationale, dogfooding refresh/inspection evidence, and either committed generated-copy refresh evidence or explicit unresolved handoff/follow-up if refresh is required but unsafe in this issue。
+  - output required: docs update/no-op rationale, dogfooding / installed-copy refresh/inspection evidence, and either committed generated-copy / installed-copy refresh evidence or explicit unresolved handoff/follow-up if refresh is required but unsafe in this issue。
 - 具体テストケース一覧:
   - `tc-s90-case-001` inspect-only: docs / dogfooding impact を閉じる
     - 前提: S18 までの implementation diff が存在する。
     - 操作: docs command list の有無と shipped runtime asset diff を inspection する。
-    - 期待結果: docs 更新要否と dogfooding refresh/inspection 判断が `report.md` に記録される。refresh が必要かつ this issue 内で安全なら `spec-dock/` generated copy 差分を許可範囲内で含め、危険なら unresolved handoff/follow-up として記録する。
-    - 失敗検出: `make lint` の新導線が docs から漏れる、または shipped runtime asset 変更後の generated-copy stale risk を見落とす。
+    - 期待結果: docs 更新要否と dogfooding / installed-copy refresh/inspection 判断が `report.md` に記録される。refresh が必要かつ this issue 内で安全なら `spec-dock/` generated copy / `.agents/` installed copy 差分を許可範囲内で含め、危険なら unresolved handoff/follow-up として記録する。
+    - 失敗検出: `make lint` の新導線が docs から漏れる、または shipped runtime asset / installed agent asset 変更後の generated-copy / installed-copy stale risk を見落とす。
     - 検証方法: docs inspection、`git diff --name-only`、必要に応じた `spec-dock update .` 判断。
     - 関連 closure id: `tc-s90-001`
 - step closure contract:
-  - close 条件: docs impact no-op/update と dogfooding impact evidence が report にある。refresh が必要な場合は、`spec-dock/` generated copy 差分がこの issue 由来として review 可能であるか、または unresolved handoff/follow-up が明示されている。
+  - close 条件: docs impact no-op/update と dogfooding / installed-copy impact evidence が report にある。refresh が必要な場合は、`spec-dock/` generated copy / `.agents/` installed copy 差分がこの issue 由来として review 可能であるか、または unresolved handoff/follow-up が明示されている。
   - report evidence destination: Spec Interpretation / Decision Ledger, Step Contract Closure, Test Contract Closure, Closure Coverage, Docs Impact Resolution。
   - step gate: docs update がある場合は spec-reviewer/docs review; no-op は approved-no-op evidence。
 
@@ -797,7 +798,7 @@ ID: "iss-00225"
 - Ruff format check が green。
 - `make lint`, `uv run pytest`, `./spec-dock/scripts/spec-dock validate` が成功する。
 - `report.md` に各 step の violation inventory と closure evidence がある。
-- shipped runtime asset 変更時は dogfooding refresh/inspection evidence が `report.md` にある。
+- shipped runtime asset / installed agent asset 変更時は dogfooding / installed-copy refresh/inspection evidence が `report.md` にある。
 - reviewer gates が pass している。
 - final commit 後に unintended changes が残っていない。
 

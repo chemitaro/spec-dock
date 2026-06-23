@@ -59,6 +59,7 @@ Disposition ごとの必須証跡:
 | D-008 | resolved | implementation | dev-coder / code-reviewer / orchestrator | S13 absolute import 化により `spec_dock_runtime` を Ruff の first-party import root として扱う必要が出た | relative import を suppress する; targeted `noqa` を追加する; Ruff `src` に provider package と shipped runtime scripts root を設定する | Ruff `src = ["src", "src/spec_dock/assets/spec_dock/scripts"]` を追加し、copied scaffold runtime の実行モデルと first-party 判定を一致させる | shipped entrypoint は consumer repo の `spec-dock/scripts` を `sys.path` に入れて `spec_dock_runtime.app` を import するため、provider 側でも同じ root を明示するのが最小で suppression 不要 | applied | S13 session log; code-reviewer `019ef36e-5f8c-7bb3-b2c1-3165a0c5d447`; `pyproject.toml`; `uv run pytest tests/cli_runtime` -> 637 passed, 76 skipped | none |
 | D-009 | resolved | test-strategy | dev-coder / orchestrator | S14 で mypy を `make lint` に追加すると、初回 inventory 段階では local gate が fail する | S14 では script に入れない; script に入れて expected fail として inventory 化; S14 で全修正まで行う | S14 で script に mypy を入れ、`make lint` fail を expected inventory evidence として扱う。0 件化は S15 に分離する | local command surface を早期に固定しつつ、大量 mypy error 修正を S15 に隔離する plan の意図を守る | applied | S14 session log; `scripts/static_analysis/run.sh`; `uv run mypy src/spec_dock tests` -> 362 errors; `make lint` -> expected fail | S15 cleanup |
 | D-010 | resolved | implementation | dev-coder / orchestrator / code-reviewer | S15 で source mypy errors は実修正できた一方、tests は dynamic JSON payload、runtime stubs、monkeypatch、fixture state に由来する test-only errors が大量に残った。初回 reviewer は `tests.*` 全体 override が広すぎると P2 指摘した | tests helper を広範囲に型付けし直す; `tests.*` 全体 override; module-local error-code override | source は実修正して full check し、tests override は観測済み 16 module と module-local error code のみに限定する | source error を suppression で隠さず、tests を command target に残したまま S15 を閉じる最小の移行策。`tests.*` 全体 override は reviewer P2 により撤去した | applied | S15 session log; code-reviewer `019ef38c-46c3-7760-835c-b36894e8304c` P2; P2 follow-up; code-reviewer `019ef392-411d-7eb2-95e8-aef6fbf65ce4` pass; `uv run mypy src/spec_dock tests` -> pass; `make lint` -> pass | none |
+| D-011 | resolved | implementation-contract | spec-reviewer / orchestrator | S90 diff included `.agents/**` installed asset refresh, but S90 executable contract only named `spec-dock/**` generated copy refresh | drop `.agents/**` refresh; keep refresh and update contract; handoff follow-up | Keep `.agents/**` refresh because provider `install_root/.agents` assets changed and `spec-dock update .` intentionally refreshes installed asset copies; update requirement/design/plan to authorize installed-copy refresh explicitly | `.agents/**` is generated/installed consumer copy, not provider source. Excluding it would leave dogfooding installed assets stale after provider-side install_root changes | applied | spec-reviewer `019ef3a9-1326-7a13-934f-dd7aa0f5790b` P1; updated `requirement.md`, `design.md`, `plan.md`; S90 session log | fresh spec-reviewer rerun |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -1989,14 +1990,93 @@ git diff --check
 ### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S18 | ready to commit | `.github/workflows/provider-ci.yml` plus `report.md` S18 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S18 | committed | `.github/workflows/provider-ci.yml` plus `report.md` S18 evidence | `40a3782c` | `git status --short` clean; `make lint` pass; validate pass | N/A | N/A | N/A | N/A |
 
 ### 変更したファイル
 - `.github/workflows/provider-ci.yml` - add `make lint` static-analysis step before pytest.
 - `report.md` - S17 commit gate correction and S18 observed evidence.
 
 ### コミット
-- pending S18 step commit.
+- `40a3782c` ci(static-analysis): provider CIでlintを実行する
+
+---
+
+## 実装セッションログ S90 — Docs / Dogfooding Impact Resolution
+
+### 実施概要
+- Step: S90 — Docs / Dogfooding Impact Resolution
+- Delegated workers: doc-writer `019ef3a5-cc33-76b0-984b-4b0a77d1073f`; spec-manager `019ef3a5-f6b7-7022-a6f5-3529564155cb`
+- Scope: docs impact と shipped runtime / installed agent asset の dogfooding refresh impact を解消する。
+- Parent decision: README の Testing 節に `make lint` を最小追記し、`uvx --from . spec-dock update .` で dogfooding consumer copy と installed agent assets を refresh する。
+
+### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S90 | Docs inspection | local static-analysis gate の docs 反映要否 | README Testing 節には pytest commands のみで `make lint` なし | inspection | pass | docs update required |
+| S90 | Docs update | command list に local static-analysis gate を反映 | README Testing 節に `make lint` と Ruff check / format check / mypy の説明を追加 | doc-writer diff | pass | README only |
+| S90 | Dogfooding refresh | shipped runtime / install_root asset 変更の generated copy 反映 | `uvx --from . spec-dock update .` success; `.agents/skills/...` 4 files and `spec-dock/scripts/spec_dock_runtime/**/*.py` 79 files refreshed | spec-manager command | pass | generated-copy refresh in scope |
+| S90 | Validation | refreshed dogfooding tree remains valid | `./spec-dock/scripts/spec-dock validate` -> ok nodes=140 | command | pass | parent and spec-manager validated |
+
+### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S90 | `spec-dock` executable は PATH に無かった | spec-manager | repo-local equivalent として `uvx --from . spec-dock update .` を実行 | tc-s90-001 | no | command success |
+| S90 | generated copy stale risk | requirement/design/plan | provider-side shipped runtime / install_root asset と generated/installed copy の一致を refresh し、spec-manager が `cmp` で mismatch なしを確認 | tc-s90-001 | no | `.agents/skills/...`; `spec-dock/scripts/spec_dock_runtime/...` |
+| S90 | `.agents/**` installed asset refresh が S90 plan allowed paths に明記されていなかった | spec-reviewer | requirement/design/plan の dogfooding / installed-copy impact wording を補正し、`.agents/**` refresh を S90 allowed paths に明記した | tc-s90-001 | yes | D-011; spec-reviewer P1; updated plan S90 executable contract |
+
+### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S90 | tc-s90-001 | docs impact no-op/update と dogfooding / installed-copy impact evidence が report にある | README updated; dogfooding generated copy refreshed; installed asset copy refreshed; P1 contract gap fixed in requirement/design/plan; validate pass; changed paths limited to README, issue requirement/design/plan/report, `.agents/skills/github-pr-observation/scripts/lib/*.py`, `spec-dock/scripts/spec_dock_runtime/**/*.py` | pass | spec-reviewer pass with P2 evidence alignment fixed |
+
+### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s90-001 | S90 | yes | docs inspection + command + path inspection | README lacked `make lint`; generated copy stale after shipped asset / installed agent asset changes; first spec-review found `.agents/**` allowed-path gap | README diff; `uvx --from . spec-dock update .`; `git status --short`; `./spec-dock/scripts/spec-dock validate`; provider/generated `cmp` by spec-manager; requirement/design/plan contract correction | pass | spec-reviewer pass with P2 evidence alignment fixed |
+
+### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s90-001 | S90 | README diff; requirement/design/plan P1 correction; generated-copy / installed-copy changed path categories; validate pass; spec-manager cmp mismatchなし; `git diff --check`; spec-reviewer pass | pass | docs/dogfooding/installed-copy impact closed pending commit |
+
+### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-s90-001 | N/A | tc-s90-001 | planned closure unchanged | no | yes |
+
+### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S90-docs | delegated | persistent README update | doc-writer | README Testing command list | requirement/design/plan S90 | README/docs if docs impact exists | source/test/config/workflow/report; large rewrite; commit | Markdown inspection; `git diff --check` | docs policy beyond scope | changed file; summary; verification | pass |
+| S90-dogfooding | delegated | SpecDock command operation | spec-manager | dogfooding generated-copy refresh | requirement/design/plan S90 | generated copy / installed agent assets from `spec-dock update .` | source/config/test/workflow/README/report edits; unrelated cleanup; commit | status; update command; changed path categories; validate; provider/generated consistency check | refresh unsafe or unrelated churn | commands; changed paths; validate; safety judgment | pass |
+
+### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S90-docs | doc-writer | README Testing に `make lint` static-analysis gate を追加 | `README.md` | Markdown inspection; `git diff --check` pass | pass: spec-reviewer `019ef3ad-271c-7243-8015-4bd253094331` | none | accepted for S90 step commit |
+| S90-dogfooding | spec-manager | repo-local update commandで dogfooding generated copy / installed agent assets を refresh | `.agents/skills/github-pr-observation/scripts/lib/*.py`; `spec-dock/scripts/spec_dock_runtime/**/*.py` | `uvx --from . spec-dock update .` success; validate pass; provider/generated `cmp` mismatchなし | pass: spec-reviewer `019ef3ad-271c-7243-8015-4bd253094331` | none | accepted for S90 step commit |
+| S90-contract | orchestrator | spec-reviewer P1 を受け、installed-copy refresh を S90 contract に明示 | `requirement.md`; `design.md`; `plan.md`; `report.md` | `git diff --check`; validate; `make lint` pass | pass: spec-reviewer `019ef3ad-271c-7243-8015-4bd253094331`; P2 evidence alignment fixed | none | accepted for S90 step commit |
+
+### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S90 | docs/dogfooding reviewer first pass | spec-reviewer | fresh | failed | N/A | blocked until contract correction | fail: spec-reviewer `019ef3a9-1326-7a13-934f-dd7aa0f5790b`; P1 `.agents/**` allowed-path gap |
+| S90 | docs/dogfooding reviewer rerun | spec-reviewer | fresh | passed | N/A | proceed to step commit after P2 evidence alignment fix | pass: spec-reviewer `019ef3ad-271c-7243-8015-4bd253094331`; P1 resolved; P2 report evidence alignment fixed |
+
+### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S90 | ready to commit | README, issue requirement/design/plan/report contract evidence, dogfooding generated copy, and installed asset copy refresh | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+### 変更したファイル
+- `README.md` - document `make lint` local static-analysis gate.
+- `requirement.md`, `design.md`, `plan.md` - authorize installed agent asset refresh in S90 contract after spec-reviewer P1.
+- `.agents/skills/github-pr-observation/scripts/lib/*.py` - installed agent asset refresh from provider-side install_root.
+- `spec-dock/scripts/spec_dock_runtime/**/*.py` - dogfooding generated runtime refresh from provider-side shipped runtime asset.
+- `report.md` - S18 commit gate correction, D-011, S90 observed evidence, and P2 evidence alignment fix.
+
+### コミット
+- pending S90 step commit.
 
 ---
 
@@ -2005,7 +2085,8 @@ git diff --check
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| README Testing | yes | doc-writer | `README.md` adds `make lint` local static-analysis gate | pending |
+| dogfooding generated runtime / installed agent assets | yes | spec-manager | `uvx --from . spec-dock update .`; `.agents/skills/...` and `spec-dock/scripts/spec_dock_runtime/...` refreshed; validate pass; provider/generated cmp mismatchなし | pending |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |

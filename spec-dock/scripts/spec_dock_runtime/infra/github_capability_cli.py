@@ -1,18 +1,20 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import os
 import subprocess
-from dataclasses import dataclass
 
-from ..application.contracts import GitHubCapability
-from ..application.contracts import GitHubCapabilityDiagnostic
-from ..application.contracts import GitHubCapabilityDiagnosticCode
-from ..application.contracts import GitHubCapabilityGroup
-from ..application.contracts import GitHubCapabilityProbeRequest
-from ..application.contracts import GitHubCapabilitySeverity
-from ..application.contracts import GitHubCapabilityStatus
-from ..application.contracts import GitHubCapabilityTokenSource
+from spec_dock_runtime.application.contracts import (
+    GitHubCapability,
+    GitHubCapabilityDiagnostic,
+    GitHubCapabilityDiagnosticCode,
+    GitHubCapabilityGroup,
+    GitHubCapabilityProbeRequest,
+    GitHubCapabilitySeverity,
+    GitHubCapabilityStatus,
+    GitHubCapabilityTokenSource,
+)
 
 
 @dataclass(frozen=True)
@@ -91,8 +93,7 @@ class GitHubCapabilityCliGateway:
         return diagnostics
 
 
-def _extended_checks(
-) -> list[tuple[GitHubCapability, GitHubCapabilityGroup, str, list[str]]]:
+def _extended_checks() -> list[tuple[GitHubCapability, GitHubCapabilityGroup, str, list[str]]]:
     return []
 
 
@@ -146,8 +147,7 @@ def _run_fixed_gh(command: list[str]) -> subprocess.CompletedProcess[str]:
             command,
             check=False,
             text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
         )
     except FileNotFoundError:
         return subprocess.CompletedProcess(command, 127, "", "gh executable not found")

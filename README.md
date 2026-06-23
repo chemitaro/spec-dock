@@ -182,6 +182,9 @@ See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + 
 # Daily local unit suite
 uv run pytest tests/unit
 
+# Local static-analysis gate: Ruff check, Ruff format check, and mypy
+make lint
+
 # Optional integration suite for real external boundaries
 uv run pytest tests/integration
 

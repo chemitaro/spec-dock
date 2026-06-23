@@ -1,14 +1,14 @@
+import contextlib
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import os
+from pathlib import Path
 import shutil
 import signal
 import subprocess
 import sys
 import time
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-
 
 REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS = 300
 REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS = 300
@@ -61,25 +61,19 @@ def numeric_age_seconds(value: object) -> int | None:
 
 
 def sha256_json(payload: object) -> str:
-    return hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def limitation_codes(payload: dict) -> list[str]:
     return [
-        str(item.get("code"))
-        for item in payload.get("limitations", [])
-        if isinstance(item, dict) and item.get("code")
+        str(item.get("code")) for item in payload.get("limitations", []) if isinstance(item, dict) and item.get("code")
     ]
 
 
 def has_blocking_limitation(payload: dict, ignored_codes: set[str] | None = None) -> bool:
     ignored_codes = ignored_codes or set()
     return any(
-        isinstance(item, dict)
-        and item.get("severity") == "blocking"
-        and item.get("code") not in ignored_codes
+        isinstance(item, dict) and item.get("severity") == "blocking" and item.get("code") not in ignored_codes
         for item in payload.get("limitations", [])
     )
 
@@ -93,17 +87,13 @@ def ci_source_policy(payload: dict) -> str | None:
 def has_zero_actions_limitation(payload: dict) -> bool:
     limitations = payload.get("limitations", [])
     has_zero_actions = any(
-        isinstance(item, dict) and item.get("code") == "zero_actions_runs_non_success"
-        for item in limitations
+        isinstance(item, dict) and item.get("code") == "zero_actions_runs_non_success" for item in limitations
     )
     if has_zero_actions:
         return True
     if ci_source_policy(payload) == "github_actions_only":
         return False
-    return any(
-        isinstance(item, dict) and item.get("code") == "zero_checks_s03_non_success"
-        for item in limitations
-    )
+    return any(isinstance(item, dict) and item.get("code") == "zero_checks_s03_non_success" for item in limitations)
 
 
 def has_permission_limitation(payload: dict) -> bool:
@@ -156,11 +146,7 @@ def sanitized_review_signals(payload: dict) -> list:
     signals = review.get("signals")
     if not isinstance(signals, list):
         return []
-    return [
-        {key: item.get(key) for key in safe_keys}
-        for item in signals
-        if isinstance(item, dict)
-    ]
+    return [{key: item.get(key) for key in safe_keys} for item in signals if isinstance(item, dict)]
 
 
 def review_progress_signal_is_current(item: dict) -> bool:
@@ -216,9 +202,7 @@ def ci_progress_counts(payload: dict) -> dict:
     summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
     actions = ci.get("actions") if isinstance(ci.get("actions"), dict) else {}
     workflow_runs = actions.get("workflow_runs") if isinstance(actions.get("workflow_runs"), dict) else {}
-    workflow_counts = (
-        workflow_runs.get("counts") if isinstance(workflow_runs.get("counts"), dict) else {}
-    )
+    workflow_counts = workflow_runs.get("counts") if isinstance(workflow_runs.get("counts"), dict) else {}
     jobs_summary = actions.get("jobs_summary") if isinstance(actions.get("jobs_summary"), dict) else {}
     job_counts = jobs_summary.get("counts") if isinstance(jobs_summary.get("counts"), dict) else {}
     job_total = int_count(jobs_summary, "total")
@@ -231,11 +215,7 @@ def ci_progress_counts(payload: dict) -> dict:
     if not counts and total == 0 and ci_source_policy(payload) != "github_actions_only":
         counts = ci.get("check_runs") if isinstance(ci.get("check_runs"), dict) else {}
         total = int_count(counts, "total")
-    ok = (
-        int_count(counts, "success")
-        + int_count(counts, "skipped")
-        + int_count(counts, "neutral")
-    )
+    ok = int_count(counts, "success") + int_count(counts, "skipped") + int_count(counts, "neutral")
     fail = int_count(counts, "failed")
     other = int_count(counts, "other")
     run = int_count(counts, "running")
@@ -268,10 +248,22 @@ def review_progress_counts(payload: dict) -> dict:
     selected_review_comments = codex_review.get("selected_review_comments")
     selected_reviews = codex_review.get("selected_reviews")
     comments = len(review_progress_signal_items(payload)) if signals else 0
-    decision_comment_count = len(decision.get("selected_review_comment_ids", [])) if isinstance(decision.get("selected_review_comment_ids"), list) else 0
-    decision_review_count = len(decision.get("selected_review_ids", [])) if isinstance(decision.get("selected_review_ids"), list) else 0
-    current_comment_count = len(current.get("selected_review_comments", [])) if isinstance(current.get("selected_review_comments"), list) else 0
-    current_review_count = len(current.get("selected_reviews", [])) if isinstance(current.get("selected_reviews"), list) else 0
+    decision_comment_count = (
+        len(decision.get("selected_review_comment_ids", []))
+        if isinstance(decision.get("selected_review_comment_ids"), list)
+        else 0
+    )
+    decision_review_count = (
+        len(decision.get("selected_review_ids", [])) if isinstance(decision.get("selected_review_ids"), list) else 0
+    )
+    current_comment_count = (
+        len(current.get("selected_review_comments", []))
+        if isinstance(current.get("selected_review_comments"), list)
+        else 0
+    )
+    current_review_count = (
+        len(current.get("selected_reviews", [])) if isinstance(current.get("selected_reviews"), list) else 0
+    )
     current_signal_count = len(current.get("signals", [])) if isinstance(current.get("signals"), list) else 0
     comments = max(
         comments,
@@ -636,18 +628,12 @@ def semantic_fingerprint(payload: dict) -> str:
         "normalized_status": payload.get("normalized_status"),
         "limitations": limitation_codes(payload),
         "ci": {
-            "status": payload.get("ci", {}).get("status")
-            if isinstance(payload.get("ci"), dict)
-            else None,
-            "failures": payload.get("ci", {}).get("failures")
-            if isinstance(payload.get("ci"), dict)
-            else None,
+            "status": payload.get("ci", {}).get("status") if isinstance(payload.get("ci"), dict) else None,
+            "failures": payload.get("ci", {}).get("failures") if isinstance(payload.get("ci"), dict) else None,
             "progress": ci_progress,
         },
         "review": {
-            "status": payload.get("review", {}).get("status")
-            if isinstance(payload.get("review"), dict)
-            else None,
+            "status": payload.get("review", {}).get("status") if isinstance(payload.get("review"), dict) else None,
             **(
                 {}
                 if decision
@@ -685,27 +671,23 @@ def semantic_fingerprint(payload: dict) -> str:
 def fallback_snapshot(snapshot_exit: int, stdout_text: str, stderr_text: str) -> dict:
     limitations = []
     if snapshot_exit != 0:
-        limitations.append(
-            {
-                "code": "snapshot_script_failed",
-                "source": "fetch_pr_observation_snapshot.sh",
-                "severity": "blocking",
-                "message": "snapshot script failed before final wait classification",
-                "exit_code": snapshot_exit,
-                "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
-                "stdout_sha256": hashlib.sha256(stdout_text.encode()).hexdigest(),
-            }
-        )
+        limitations.append({
+            "code": "snapshot_script_failed",
+            "source": "fetch_pr_observation_snapshot.sh",
+            "severity": "blocking",
+            "message": "snapshot script failed before final wait classification",
+            "exit_code": snapshot_exit,
+            "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
+            "stdout_sha256": hashlib.sha256(stdout_text.encode()).hexdigest(),
+        })
     else:
-        limitations.append(
-            {
-                "code": "snapshot_json_unavailable",
-                "source": "fetch_pr_observation_snapshot.sh",
-                "severity": "blocking",
-                "message": "snapshot script did not return parseable JSON",
-                "stdout_sha256": hashlib.sha256(stdout_text.encode()).hexdigest(),
-            }
-        )
+        limitations.append({
+            "code": "snapshot_json_unavailable",
+            "source": "fetch_pr_observation_snapshot.sh",
+            "severity": "blocking",
+            "message": "snapshot script did not return parseable JSON",
+            "stdout_sha256": hashlib.sha256(stdout_text.encode()).hexdigest(),
+        })
     return {
         "script": "fetch_pr_observation_snapshot.sh",
         "status": "unknown",
@@ -785,23 +767,18 @@ def append_snapshot_poll_timeout_limitation(
     stdout_text = "" if stdout_text is None else str(stdout_text)
     stderr_text = "" if stderr_text is None else str(stderr_text)
     limitations = payload.setdefault("limitations", [])
-    if any(
-        isinstance(item, dict) and item.get("code") == "snapshot_poll_timeout"
-        for item in limitations
-    ):
+    if any(isinstance(item, dict) and item.get("code") == "snapshot_poll_timeout" for item in limitations):
         return
-    limitations.append(
-        {
-            "code": "snapshot_poll_timeout",
-            "source": source,
-            "severity": severity,
-            "message": message,
-            "timeout_seconds": timeout_seconds,
-            "stdout_sha256": hashlib.sha256(stdout_text.encode()).hexdigest(),
-            "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
-            **({} if deadline_reached is None else {"deadline_reached": deadline_reached}),
-        }
-    )
+    limitations.append({
+        "code": "snapshot_poll_timeout",
+        "source": source,
+        "severity": severity,
+        "message": message,
+        "timeout_seconds": timeout_seconds,
+        "stdout_sha256": hashlib.sha256(stdout_text.encode()).hexdigest(),
+        "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
+        **({} if deadline_reached is None else {"deadline_reached": deadline_reached}),
+    })
 
 
 def terminate_process_group(proc: subprocess.Popen[str]) -> None:
@@ -816,10 +793,8 @@ def terminate_process_group(proc: subprocess.Popen[str]) -> None:
     try:
         proc.wait(timeout=1)
     except subprocess.TimeoutExpired:
-        try:
+        with contextlib.suppress(ProcessLookupError):
             os.killpg(pgid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
         proc.wait()
 
 
@@ -843,10 +818,19 @@ def run_snapshot(
         terminate_process_group(proc)
         stdout_text, stderr_text = proc.communicate()
         if exc.stdout:
-            stdout_text = (exc.stdout if isinstance(exc.stdout, str) else exc.stdout.decode(errors="replace")) + (stdout_text or "")
+            stdout_text = (exc.stdout if isinstance(exc.stdout, str) else exc.stdout.decode(errors="replace")) + (
+                stdout_text or ""
+            )
         if exc.stderr:
-            stderr_text = (exc.stderr if isinstance(exc.stderr, str) else exc.stderr.decode(errors="replace")) + (stderr_text or "")
-        return proc.returncode if proc.returncode is not None else -signal.SIGKILL, stdout_text or "", stderr_text or "", True
+            stderr_text = (exc.stderr if isinstance(exc.stderr, str) else exc.stderr.decode(errors="replace")) + (
+                stderr_text or ""
+            )
+        return (
+            proc.returncode if proc.returncode is not None else -signal.SIGKILL,
+            stdout_text or "",
+            stderr_text or "",
+            True,
+        )
 
 
 def trigger_failure_result(trigger_payload: dict, trigger_stdout: str, trigger_stderr: str) -> dict:
@@ -969,16 +953,14 @@ def run_trigger(
             "trigger": {"mode": "post-once", "action": "failed"},
         }
     if exit_code != 0:
-        payload.setdefault("limitations", []).append(
-            {
-                "code": "trigger_helper_failed",
-                "source": "trigger_codex_review.sh",
-                "severity": "blocking",
-                "message": "trigger helper exited non-zero",
-                "exit_code": exit_code,
-                "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
-            }
-        )
+        payload.setdefault("limitations", []).append({
+            "code": "trigger_helper_failed",
+            "source": "trigger_codex_review.sh",
+            "severity": "blocking",
+            "message": "trigger helper exited non-zero",
+            "exit_code": exit_code,
+            "stderr_sha256": hashlib.sha256(stderr_text.encode()).hexdigest(),
+        })
         payload["success"] = False
         payload.setdefault("overall_status", "trigger_helper_failed")
     payload["_helper_stdout"] = stdout_text
@@ -1039,10 +1021,10 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
 
     if payload.get("head_matches_expected") is False or top_level_status == "stale_head":
         return "stale_head", "stale_head", "rerun_for_current_head", False, True
-    if (
-        top_level_status == "human_gate"
-        and top_level_next_action in {"mark_pr_ready_for_review", "reopen_or_use_open_pr"}
-    ):
+    if top_level_status == "human_gate" and top_level_next_action in {
+        "mark_pr_ready_for_review",
+        "reopen_or_use_open_pr",
+    }:
         return "human_gate", "human_gate", top_level_next_action, False, True
     if ci_status == "none" and has_zero_actions_limitation(payload):
         zero_ignored_codes = {
@@ -1138,14 +1120,10 @@ def classify(payload: dict, poll: int, zero_check_grace_polls: int) -> tuple[str
 def resume_command_hint(payload: dict) -> str | None:
     trigger = payload.get("trigger") if isinstance(payload.get("trigger"), dict) else {}
     comment_id = (
-        trigger.get("comment_id")
-        or globals().get("trigger_comment_id")
-        or os.environ.get("OBS_TRIGGER_COMMENT_ID")
+        trigger.get("comment_id") or globals().get("trigger_comment_id") or os.environ.get("OBS_TRIGGER_COMMENT_ID")
     )
     created_at = (
-        trigger.get("created_at")
-        or globals().get("trigger_created_at")
-        or os.environ.get("OBS_TRIGGER_CREATED_AT")
+        trigger.get("created_at") or globals().get("trigger_created_at") or os.environ.get("OBS_TRIGGER_CREATED_AT")
     )
     if not comment_id or not created_at:
         return None
@@ -1216,8 +1194,7 @@ def progress_line(
         completion_signal = decision.get("completion_signal") or lifecycle.get("completion_signal")
         lifecycle_status = lifecycle.get("status")
         has_actionable_feedback = any(
-            int(review_counts.get(key, 0) or 0) > 0
-            for key in ("comments", "threads", "unresolved", "requested")
+            int(review_counts.get(key, 0) or 0) > 0 for key in ("comments", "threads", "unresolved", "requested")
         )
         if (
             not has_actionable_feedback
@@ -1235,16 +1212,14 @@ def progress_line(
     ]
     ci_detailed = phase == "wait" and ci_status in {"running", "pending", "none", "unknown"}
     if ci_detailed:
-        fields.extend(
-            [
-                ("checks", f"{ci_counts['done']}/{ci_counts['total']}", False),
-                ("ok", str(ci_counts["ok"]), False),
-                ("run", str(ci_counts["run"]), True),
-                ("pend", str(ci_counts["pend"]), True),
-                ("fail", str(ci_counts["fail"]), False),
-                ("other", str(ci_counts["other"]), True),
-            ]
-        )
+        fields.extend([
+            ("checks", f"{ci_counts['done']}/{ci_counts['total']}", False),
+            ("ok", str(ci_counts["ok"]), False),
+            ("run", str(ci_counts["run"]), True),
+            ("pend", str(ci_counts["pend"]), True),
+            ("fail", str(ci_counts["fail"]), False),
+            ("other", str(ci_counts["other"]), True),
+        ])
     elif ci_status == "failed":
         fields.append(("fail", str(ci_counts["fail"]), False))
 
@@ -1254,19 +1229,15 @@ def progress_line(
     if review_detailed or review_human_gate:
         fields.append(("comments", str(review_counts["comments"]), False))
     if review_detailed or review_status in {"unresolved", "changes_requested"}:
-        fields.extend(
-            [
-                ("threads", str(review_counts["threads"]), True),
-                ("unresolved", str(review_counts["unresolved"]), True),
-                ("requested", str(review_counts["requested"]), True),
-            ]
-        )
-    fields.extend(
-        [
-            ("quiet", f"{quiet_elapsed}/{quiet_required}", False),
-            ("stable", f"{same_count}/{same_required}", True),
-        ]
-    )
+        fields.extend([
+            ("threads", str(review_counts["threads"]), True),
+            ("unresolved", str(review_counts["unresolved"]), True),
+            ("requested", str(review_counts["requested"]), True),
+        ])
+    fields.extend([
+        ("quiet", f"{quiet_elapsed}/{quiet_required}", False),
+        ("stable", f"{same_count}/{same_required}", True),
+    ])
 
     drop_order = ["other", "requested", "threads", "unresolved", "stable", "pend", "run"]
     active = list(fields)
@@ -1280,9 +1251,7 @@ def progress_line(
     if len(line) <= 240:
         return line
     for key in drop_order:
-        candidate = [
-            item for item in active if not (item[0] == key and item[2])
-        ]
+        candidate = [item for item in active if not (item[0] == key and item[2])]
         if len(candidate) == len(active):
             continue
         active = candidate
@@ -1372,27 +1341,24 @@ if trigger_mode == "post-once":
         **trigger,
         "helper_success": trigger_payload.get("success") is True,
     }
-    if (
-        trigger_payload.get("success") is not True
-        or not trigger_comment_id
-        or not trigger_created_at
-    ):
+    if trigger_payload.get("success") is not True or not trigger_comment_id or not trigger_created_at:
         failure_payload = trigger_failure_result(trigger_payload, trigger_stdout, trigger_stderr)
         failure_payload.setdefault("artifacts", {})
-        failure_payload["artifacts"].update(
-            {
-                "result_json": str(out_dir / "result.json") if out_dir else None,
-                "latest_json": str(out_dir / "latest.json") if out_dir else None,
-                "events_ndjson": str(out_dir / "events.ndjson") if out_dir else None,
-                "latest_delta_json": str(out_dir / "latest_delta.json") if out_dir else None,
-                "snapshots_dir": str(out_dir / "snapshots") if out_dir else None,
-            }
+        failure_payload["artifacts"].update({
+            "result_json": str(out_dir / "result.json") if out_dir else None,
+            "latest_json": str(out_dir / "latest.json") if out_dir else None,
+            "events_ndjson": str(out_dir / "events.ndjson") if out_dir else None,
+            "latest_delta_json": str(out_dir / "latest_delta.json") if out_dir else None,
+            "snapshots_dir": str(out_dir / "snapshots") if out_dir else None,
+        })
+        result_text = (
+            json.dumps(
+                failure_payload,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n"
         )
-        result_text = json.dumps(
-            failure_payload,
-            sort_keys=True,
-            separators=(",", ":"),
-        ) + "\n"
         if out_dir:
             write_final_artifacts(out_dir=out_dir, result_text=result_text)
         print(
@@ -1429,9 +1395,7 @@ latest_snapshot_out_dir: Path | None = None
 final_phase = "timeout"
 ci_passed_first_monotonic: float | None = None
 recent_snapshot_elapsed_seconds = NEXT_SNAPSHOT_BUDGET_FLOOR_SECONDS
-next_poll_min_budget_seconds = (
-    recent_snapshot_elapsed_seconds + NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS
-)
+next_poll_min_budget_seconds = recent_snapshot_elapsed_seconds + NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS
 final_poll_skipped_reason: str | None = None
 under_budget_poll_exception_used = False
 under_budget_poll_exception_kind: str | None = None
@@ -1442,20 +1406,13 @@ while True:
             trigger_created_at_for_latency(latest_payload, trigger_created_at)
         )
         ci_passed_age_seconds_at_deadline = (
-            int(max(0, time.monotonic() - ci_passed_first_monotonic))
-            if ci_passed_first_monotonic is not None
-            else 0
+            int(max(0, time.monotonic() - ci_passed_first_monotonic)) if ci_passed_first_monotonic is not None else 0
         )
         latency_satisfied_at_deadline = (
-            review_trigger_age_seconds_at_deadline
-            >= REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS
-            and ci_passed_age_seconds_at_deadline
-            >= REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS
+            review_trigger_age_seconds_at_deadline >= REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS
+            and ci_passed_age_seconds_at_deadline >= REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS
         )
-        if (
-            is_carryover_missing_completion_wait(latest_payload)
-            and not latency_satisfied_at_deadline
-        ):
+        if is_carryover_missing_completion_wait(latest_payload) and not latency_satisfied_at_deadline:
             final_phase = "wait"
             latest_payload.setdefault("wait", {})["deadline_reached"] = True
             latest_payload["wait"]["next_poll_min_budget_seconds"] = round(
@@ -1472,17 +1429,13 @@ while True:
         break
 
     remaining_before_poll = deadline - time.monotonic()
-    under_budget_before_poll = (
-        latest_payload is not None and remaining_before_poll < next_poll_min_budget_seconds
-    )
+    under_budget_before_poll = latest_payload is not None and remaining_before_poll < next_poll_min_budget_seconds
     if under_budget_before_poll:
         quiet_elapsed_before_poll = int(max(0, time.monotonic() - latest_change_monotonic))
         quiet_can_be_evaluated = quiet_elapsed_before_poll >= quiet_seconds or (
             remaining_before_poll >= max(0, quiet_seconds - quiet_elapsed_before_poll)
         )
-        stability_can_be_evaluated = same_count >= same_fingerprint_count or (
-            same_count + 1 >= same_fingerprint_count
-        )
+        stability_can_be_evaluated = same_count >= same_fingerprint_count or (same_count + 1 >= same_fingerprint_count)
         (
             _,
             _,
@@ -1502,12 +1455,9 @@ while True:
             "zero_checks_s03_non_success",
         }
         zero_check_grace_can_be_evaluated = (
-            not (
-                under_budget_poll_exception_used
-                and under_budget_poll_exception_kind == "zero_check_grace"
-            )
-            and
-            has_zero_actions_limitation(latest_payload) and poll < zero_check_grace_polls
+            not (under_budget_poll_exception_used and under_budget_poll_exception_kind == "zero_check_grace")
+            and has_zero_actions_limitation(latest_payload)
+            and poll < zero_check_grace_polls
             and not has_blocking_limitation(
                 latest_payload,
                 ignored_codes=zero_ignored_codes,
@@ -1517,42 +1467,29 @@ while True:
             trigger_created_at_for_latency(latest_payload, trigger_created_at)
         )
         ci_passed_age_seconds_before_poll = (
-            int(max(0, time.monotonic() - ci_passed_first_monotonic))
-            if ci_passed_first_monotonic is not None
-            else 0
+            int(max(0, time.monotonic() - ci_passed_first_monotonic)) if ci_passed_first_monotonic is not None else 0
         )
         latency_satisfied_before_poll = (
-            review_trigger_age_seconds_before_poll
-            >= REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS
-            and ci_passed_age_seconds_before_poll
-            >= REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS
+            review_trigger_age_seconds_before_poll >= REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS
+            and ci_passed_age_seconds_before_poll >= REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS
         )
         under_budget_poll_exception_candidate_kind = None
         if (
             can_complete_when_stable_before_poll
             and quiet_can_be_evaluated
             and stability_can_be_evaluated
-            and not (
-                is_carryover_missing_completion_wait(latest_payload)
-                and not latency_satisfied_before_poll
-            )
+            and not (is_carryover_missing_completion_wait(latest_payload) and not latency_satisfied_before_poll)
         ):
             under_budget_poll_exception_candidate_kind = "stable_completion"
         elif zero_check_grace_can_be_evaluated:
             under_budget_poll_exception_candidate_kind = "zero_check_grace"
         under_budget_poll_allowed = (
-            not (
-                under_budget_poll_exception_used
-                and under_budget_poll_exception_candidate_kind == "zero_check_grace"
-            )
+            not (under_budget_poll_exception_used and under_budget_poll_exception_candidate_kind == "zero_check_grace")
             and under_budget_poll_exception_candidate_kind is not None
         )
         if not under_budget_poll_allowed:
             final_poll_skipped_reason = "insufficient_next_snapshot_budget"
-            if (
-                is_carryover_missing_completion_wait(latest_payload)
-                and not latency_satisfied_before_poll
-            ):
+            if is_carryover_missing_completion_wait(latest_payload) and not latency_satisfied_before_poll:
                 final_phase = "wait"
                 latest_payload.setdefault("wait", {})["next_poll_min_budget_seconds"] = round(
                     next_poll_min_budget_seconds,
@@ -1597,10 +1534,13 @@ while True:
         snapshot_timeout,
     )
     recent_snapshot_elapsed_seconds = max(0, time.monotonic() - now_before)
-    next_poll_min_budget_seconds = max(
-        NEXT_SNAPSHOT_BUDGET_FLOOR_SECONDS,
-        recent_snapshot_elapsed_seconds,
-    ) + NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS
+    next_poll_min_budget_seconds = (
+        max(
+            NEXT_SNAPSHOT_BUDGET_FLOOR_SECONDS,
+            recent_snapshot_elapsed_seconds,
+        )
+        + NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS
+    )
     if snapshot_poll_timed_out and latest_payload is not None:
         payload = latest_payload
         carryover_missing_completion_wait = is_carryover_missing_completion_wait(payload)
@@ -1608,9 +1548,7 @@ while True:
             trigger_created_at_for_latency(payload, trigger_created_at)
         )
         carryover_ci_passed_age_seconds = (
-            int(max(0, time.monotonic() - ci_passed_first_monotonic))
-            if ci_passed_first_monotonic is not None
-            else 0
+            int(max(0, time.monotonic() - ci_passed_first_monotonic)) if ci_passed_first_monotonic is not None else 0
         )
         carryover_latency_satisfied = (
             carryover_trigger_age_seconds >= REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS
@@ -1622,9 +1560,7 @@ while True:
             snapshot_stdout,
             snapshot_stderr,
             severity=(
-                "warning"
-                if carryover_missing_completion_wait and not carryover_latency_satisfied
-                else "blocking"
+                "warning" if carryover_missing_completion_wait and not carryover_latency_satisfied else "blocking"
             ),
         )
         if not carryover_missing_completion_wait or carryover_latency_satisfied:
@@ -1668,9 +1604,7 @@ while True:
             observed_age = age_seconds_from_timestamp(payload.get("observed_at"))
             ci_passed_first_monotonic = time.monotonic() - observed_age
             if previous_ci_passed_since is not None:
-                previous_age = int(
-                    max(0, (datetime.now(timezone.utc) - previous_ci_passed_since).total_seconds())
-                )
+                previous_age = int(max(0, (datetime.now(timezone.utc) - previous_ci_passed_since).total_seconds()))
                 ci_passed_first_monotonic = min(
                     ci_passed_first_monotonic,
                     time.monotonic() - previous_age,
@@ -1685,13 +1619,9 @@ while True:
     )
     stable = same_count >= same_fingerprint_count and quiet_elapsed >= quiet_seconds
     review_completion_unknown_candidate = is_review_completion_unknown_candidate(payload)
-    review_trigger_age_seconds = age_seconds_from_timestamp(
-        trigger_created_at_for_latency(payload, trigger_created_at)
-    )
+    review_trigger_age_seconds = age_seconds_from_timestamp(trigger_created_at_for_latency(payload, trigger_created_at))
     ci_passed_age_seconds = (
-        int(max(0, time.monotonic() - ci_passed_first_monotonic))
-        if ci_passed_first_monotonic is not None
-        else 0
+        int(max(0, time.monotonic() - ci_passed_first_monotonic)) if ci_passed_first_monotonic is not None else 0
     )
     ci_passed_since = (
         utc_text(datetime.now(timezone.utc) - timedelta(seconds=ci_passed_age_seconds))
@@ -1705,10 +1635,7 @@ while True:
     observation_complete = bool(
         can_complete_when_stable
         and stable
-        and (
-            not review_completion_unknown_candidate
-            or review_completion_unknown_latency_satisfied
-        )
+        and (not review_completion_unknown_candidate or review_completion_unknown_latency_satisfied)
     )
     elapsed = int(max(0, time.monotonic() - start_monotonic))
     remain = int(max(0, deadline - time.monotonic()))
@@ -1796,15 +1723,13 @@ while True:
     if final_poll_skipped_reason:
         payload["wait"]["final_poll_skipped_reason"] = final_poll_skipped_reason
     payload.setdefault("artifacts", {})
-    payload["artifacts"].update(
-        {
-            "result_json": str(out_dir / "result.json") if out_dir else None,
-            "latest_json": str(out_dir / "latest.json") if out_dir else None,
-            "events_ndjson": str(out_dir / "events.ndjson") if out_dir else None,
-            "latest_delta_json": str(out_dir / "latest_delta.json") if out_dir else None,
-            "snapshots_dir": str(out_dir / "snapshots") if out_dir else None,
-        }
-    )
+    payload["artifacts"].update({
+        "result_json": str(out_dir / "result.json") if out_dir else None,
+        "latest_json": str(out_dir / "latest.json") if out_dir else None,
+        "events_ndjson": str(out_dir / "events.ndjson") if out_dir else None,
+        "latest_delta_json": str(out_dir / "latest_delta.json") if out_dir else None,
+        "snapshots_dir": str(out_dir / "snapshots") if out_dir else None,
+    })
     if trigger_helper_metadata:
         snapshot_trigger = payload.get("trigger") if isinstance(payload.get("trigger"), dict) else {}
         payload["trigger"] = {
@@ -1858,11 +1783,7 @@ while True:
         observation_complete
         or terminal_now
         or final_phase == "timeout"
-        or (
-            final_phase == "wait"
-            and is_carryover_missing_completion_wait(payload)
-            and time.monotonic() >= deadline
-        )
+        or (final_phase == "wait" and is_carryover_missing_completion_wait(payload) and time.monotonic() >= deadline)
     ):
         break
 
