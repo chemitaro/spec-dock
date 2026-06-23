@@ -3,7 +3,7 @@
 ID: "iss-00230"
 タイトル: "Compile Step Assurance Agent Routing And Context Policy"
 関連GitHub: ["#230"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-23"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -55,12 +55,20 @@ Disposition ごとの必須証跡:
 | D-230-S01 | resolved | implementation | dev-coder | S01 policy needed concrete per-task defaults not fully enumerated in planning docs. | minimal distinct matrix; strict all-reviewer matrix; defer to S02 | Adopt minimal distinct matrix: docs-only/doc-writer/low/minimal/spec-reviewer; runtime/dev-coder/medium/recent_fork/code-reviewer; migration/dev-coder/high/bounded_packet/code+qa; security/dev-coder/max/bounded_packet/code+qa+spec. | Satisfies AC-001 with proportional obligations and keeps S02 projection deterministic. | applied | `context-routing-policy.json`; `test_context_routing.py` | none |
 | D-230-S01-R01 | resolved | implementation | code-reviewer | Unsupported context routing policy versions were accepted despite schema `const` and EC-002 fail-closed requirement. | accept any non-empty version; reject versions other than `context-routing-policy-v1` | Reject unsupported policy versions in `context_routing_policy_from_dict` and cover it with a unit test. | Keeps runtime parser behavior aligned with shipped schema and fail-closed policy. | applied | code-reviewer P1; `uv run pytest tests/unit/domain/test_context_routing.py` -> 4 passed | none |
 | D-230-S01-R02 | resolved | implementation | code-reviewer | Bounded return policy accepted supersets such as `raw_shell_transcript`, allowing policy JSON to broaden the return contract. | accept superset; reject any field outside the closed allowlist | Reject unsupported bounded return fields in parser and close the JSON schema allowlist with fixed size / enum / uniqueness. | Preserves S01 bounded return contract and EC-002 fail-closed behavior. | applied | code-reviewer P1; `uv run pytest tests/unit/domain/test_context_routing.py` -> 5 passed | none |
-| D-230-S02 | resolved | implementation | dev-coder | S02 needed packet/policy stores connected without editing bootstrap files outside allowed scope. | edit bootstrap; inject stores through existing runbook store; resolve stores inside `workflow_next` from `store.repo_root` | Resolve `ContextPolicyStore` and `ContextPacketStore` inside `workflow_next` using the existing `AssuranceStore.repo_root`. | Keeps S02 inside approved file scope and preserves existing command wiring; future bootstrap DI can be a refactor if needed. | applied | `application/workflow.py`; `tests/cli_runtime/test_workflow_context_routing.py` | none |
+| D-230-S02 | resolved | implementation | dev-coder | S02 needed packet/policy stores connected to `workflow next issue-execution`. | edit bootstrap; inject stores through workflow use case; resolve stores inside `workflow_next` from `store.repo_root` | Inject `ContextPolicyStore` and `ContextPacketStore` from bootstrap through Protocol-shaped parameters on `workflow_next`. | Final structural regression requires application code to depend on contracts, not concrete infra. Bootstrap is the existing composition root for runtime stores. | applied | `application/workflow.py`; `cli/bootstrap.py`; `tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::test_final_api_call_site_and_structural_regression` -> pass | none |
 | D-230-S02-R01 | resolved | implementation | orchestrator | Initial `ContextPacketStore` wrote multiple packet files without restoring prior projection set on partial replace failure. | leave as best-effort; add rollback backups like `RunbookStore` | Add backup/restore around packet projection replacement and test partial replace failure. | S02 requires atomic generated projection behavior and no tracked-state pollution. | applied | `tests/unit/infra/test_context_packet_store.py`; `uv run pytest ...` -> 17 passed | none |
 | D-230-S02-R02 | resolved | implementation | code-reviewer | RunbookStore projection omitted `step_assurance` / `context_packets` even though CLI stdout included them. | keep stdout-only; persist optional fields in runbook projection | Persist optional context fields in `RunbookStore` JSON / Markdown and test generated `current-runbook` files. | AC-007 requires current Runbook projection to carry routing decision and packet refs. | applied | code-reviewer P1; `tests/cli_runtime/test_workflow_context_routing.py` | none |
 | D-230-S02-R03 | resolved | implementation | code-reviewer | Stale role packet files remained after later projections omitted those roles. | leave stale files; remove stale role packet files with backup/restore | Delete role packet files not present in the new write set and preserve previous set on failure. | EC-002 fail-closed must not leave obsolete reviewer packet files available. | applied | code-reviewer P1; `tests/unit/infra/test_context_packet_store.py` | none |
 | D-230-S02-R04 | resolved | implementation | code-reviewer | Unselectable step fell back to runtime implementation packet. | keep runtime default; return issue-wide non-invocation default | Return `issue-wide` with no worker/reviewers/invocation events when no uncompleted implementation step can be selected. | EC-003 requires indeterminate selection not to prompt implementation start. | applied | code-reviewer P2; `tests/cli_runtime/test_workflow_context_routing.py` | none |
 | D-230-S02-R05 | resolved | implementation | code-reviewer | Packet assembly used default role context contracts instead of loaded valid policy exclusions. | leave default role contracts; pass loaded policy into role context contracts | Apply loaded policy to role packet / invocation event contracts and cover custom reviewer exclusion. | Keeps valid policy changes reflected in generated context packets. | applied | code-reviewer P2; `uv run pytest ...` -> 24 passed | none |
+| D-230-S99-R01 | resolved | implementation | final gate | `tests/cli_runtime` failed structural regression because `application/workflow.py` imported concrete infra stores. | keep direct imports; move store construction to bootstrap composition root | Move context policy / packet store construction to `cli/bootstrap.py` and pass stores through application Protocol parameters. | Preserves layered architecture while keeping the same `workflow next` behavior and context packet projection. | applied | first `uv run pytest tests/cli_runtime` -> 1 failed; targeted structural regression -> pass; full rerun -> 669 passed, 76 skipped | none |
+| D-230-S99-R02 | resolved | test-strategy | qa-reviewer | Workflow projection path did not pass `ContinuationFacts`, so dirty worktree / revalidation failure could still project `recent_fork`. | keep domain-only coverage; build current continuation facts in workflow path | Build continuation facts in `workflow_next` from source refs, current HEAD, worktree cleanliness, and file revalidation, and persist continuation state in context packet projection. | AC-002/AC-006/EC-004 are observable workflow obligations, not only domain-helper obligations. | applied | qa-reviewer P1; `tests/cli_runtime/test_workflow_context_routing.py::test_workflow_next_dirty_worktree_forces_bounded_continuation`; focused `uv run pytest ...` -> 34 passed; full `uv run pytest tests/cli_runtime` -> 672 passed, 76 skipped | none |
+| D-230-S99-R03 | resolved | implementation | code-reviewer | Step selection skipped S01 when report still contained scaffold text or failed/blocked S01 logs. | continue broad regex; require completed session evidence | Replace broad `Step:` regex with session-block completion detection that requires pass / committed / approved-no-op evidence and excludes fail / blocked blocks. | Maintains ordered execution and avoids scaffold/example text driving worker routing. | applied | code-reviewer P1; `tests/cli_runtime/test_workflow_context_routing.py::test_workflow_next_does_not_skip_step_from_scaffold_report_text`; focused `uv run pytest ...` -> 34 passed; full `uv run pytest tests/cli_runtime` -> 672 passed, 76 skipped | none |
+| D-230-S99-R04 | resolved | implementation | code-reviewer | Policy parser accepted worker roles in `reviewers`, letting malformed policy produce worker packets where clean-room reviewer context was required. | rely on schema only; enforce reviewer role set in parser | Reject non-reviewer roles in policy `reviewers` during runtime parsing. | Runtime parser must fail closed even when policy JSON bypasses schema validation. | applied | code-reviewer P1; `tests/unit/domain/test_context_routing.py::test_policy_parser_rejects_non_reviewer_roles_in_reviewers`; focused `uv run pytest ...` -> 34 passed; full `uv run pytest tests/unit` -> 818 passed | none |
+| D-230-S99-R05 | resolved | test-strategy | qa-reviewer | Observable workflow tests covered runtime default only, while plan-derived docs/migration/security routing could regress. | keep domain matrix only; add workflow-level task-kind coverage | Add CLI coverage for docs-only, migration, and security-sensitive plan markers. | AC-001 requires observable Runbook routing, not only pure domain matrix behavior. | applied | qa-reviewer P2; `tests/cli_runtime/test_workflow_context_routing.py::test_workflow_next_routes_plan_derived_task_kinds`; focused `uv run pytest ...` -> 34 passed; full `uv run pytest tests/cli_runtime` -> 672 passed, 76 skipped | none |
+| D-230-S99-R06 | resolved | implementation | code-reviewer re-review | Completion parser treated any incidental `fail` text in a session block as incomplete, including Red evidence and fail-closed wording. | block-level string exclusion; result-cell specific completion | Detect completed steps from table rows whose first cell is the step id and whose result cell is `pass` / `passed` / `committed` / `approved-no-op`, while explicit `fail` / `failed` / `blocked` result cells remain incomplete. | Step execution ordering must be based on closure evidence, not incidental wording. | applied | code-reviewer re-review P1; happy path report fixture includes `fail-closed` wording and still selects S02; failed result row still selects S01; focused `uv run pytest ...` -> 16 passed | none |
+| D-230-S99-R07 | resolved | implementation | code-reviewer re-review | Continuation git probes called `git` directly from `application/workflow.py`. | keep direct subprocess; inject continuation probe from bootstrap | Move current HEAD / status probes behind a `ContinuationProbeLike` Protocol implemented at bootstrap through `infra/git_cli`. | Preserves application-layer dependency boundaries and keeps external process access in infra. | applied | code-reviewer re-review P2; `tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::test_final_api_call_site_and_structural_regression` -> pass; `make lint` -> pass | none |
+| D-230-S99-R08 | resolved | implementation | code-reviewer second re-review | Completion parser still accepted Red-phase `pass` rows as step completion evidence. | accept any table pass row; restrict accepted rows to closure / commit sections | Only inspect step result rows inside `ステップ契約の完了証跡` / `Step Contract Closure` / step commit sections. | Red / Green / Refactor evidence is progress evidence, not step completion evidence. | applied | code-reviewer second re-review P1; `test_workflow_next_does_not_skip_step_from_red_phase_pass_only`; focused `uv run pytest tests/cli_runtime/test_workflow_context_routing.py tests/unit/domain/test_context_routing.py` -> 16 passed; `make lint` -> pass | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -77,6 +85,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-230-P01 | adopted | parent Epic design/plan and ADR discussions | issue planning artifacts | Epic I04 already fixes the scope for step assurance, context routing, clean-room reviewer packets, and bounded return contracts; the issue docs adopt that scope without adding PR review semantics. | `spec-dock/active/epic/design.md`; `spec-dock/active/epic/plan.md`; `requirement.md`; `design.md`; `plan.md` | spec-review |
 | EAL-230-S01 | adopted | dev-coder S01 implementation note | S01 runtime domain / policy / tests | Worker implemented only the approved S01 file set and returned material matrix defaults for orchestrator adoption. The matrix is the smallest distinct docs/runtime/migration/security routing set that satisfies AC-001 while preserving clean-room reviewer obligations. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/context_routing.py`; `tests/unit/domain/test_context_routing.py`; `uv run pytest tests/unit/domain/test_context_routing.py` | code-review |
 | EAL-230-S02 | adopted | dev-coder S02 implementation note | S02 workflow / packet projection / CLI tests | Worker connected S01 domain decisions to Runbook JSON/Markdown and ignored context packet projection, then orchestrator added atomic rollback coverage for projection writes. | `tests/cli_runtime/test_workflow_context_routing.py`; `tests/unit/infra/test_context_packet_store.py`; `uv run pytest tests/cli_runtime/test_workflow_context_routing.py tests/unit/infra/test_context_packet_store.py tests/cli_runtime/test_workflow.py` | code-review |
+| EAL-230-S99 | adopted | final gate command evidence | final implementation / report ledger | Full lint and CLI runtime verification found and then cleared one application-layer structural violation; final evidence is adopted as issue closure evidence. | `make lint`; `uv run pytest tests/cli_runtime`; `uv run pytest tests/unit`; `./spec-dock/scripts/spec-dock validate`; parity diffs | final review |
+| EAL-230-RR01 | adopted | qa-reviewer / code-reviewer / spec-reviewer final findings | final fixes / report ledger | Fresh final reviews identified workflow continuation, completed-step evidence, reviewer-role parser, task-kind coverage, and final ledger gaps; implementation findings were fixed and report findings are tracked for re-review. | D-230-S99-R02 through D-230-S99-R08; final gate rows | re-review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -137,108 +147,11 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- Step-level task kind / risk / assurance authority に基づく worker routing policy、clean-room reviewer / consultant context contract、bounded return contract を provider runtime に追加した。
+- `workflow next issue-execution` が routing decision、context packet refs、invocation event、continuation revalidation result を Runbook JSON / Markdown と ignored generated packet stateへ投影するようにした。
+- Provider runtime / assurance policy source は dogfooding mirror へ同期し、final reviewer findings に基づく regression tests と full regression evidence を追加した。
 
 ## 実装記録（セッションログ） (必須)
-
-### セッションログ（2026-06-23 HH:MM - HH:MM）
-
-#### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
-
-#### 実施内容
-- ...
-
-#### 実行コマンド / 結果
-```bash
-<command>
-
-<result>
-```
-
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
-
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
-
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
-
-#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
-`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
-
-| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
-|---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00230 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
-
-#### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
-
-| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
-
-#### 委任 worker 証跡（Delegated Worker Evidence）
-| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
-|---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
-
-#### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
-
-#### レビューゲート状態（Reviewer Gate Status）
-| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
-
-#### ステップ commit ゲート（Step Commit Gate）
-| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
-
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
-
-#### コミット
-- <hash> <message>
-
-#### メモ
-- ...
-
----
 
 ### セッションログ（2026-06-23 S01）
 
@@ -284,7 +197,7 @@ uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domai
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ | 委任ロール | 委任 worker 要約 | 変更ファイル | 実行 tests または docs-only 検証 | レビュアー判定 | 未解決リスク | 親統合判断 |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder | context routing matrix、continuation freshness、clean-room exclusions、bounded return contract を実装 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/context_routing.py`; `src/spec_dock/assets/spec_dock/system/assurance/context-routing-policy.json`; `src/spec_dock/assets/spec_dock/system/assurance/schemas/context-routing-policy.schema.json`; `tests/unit/domain/test_context_routing.py` | `uv run pytest tests/unit/domain/test_context_routing.py` -> pass; `uv run ruff check ...` -> pass | pending | S02 projection integration は未実装 | accepted |
+| S01 | dev-coder | context routing matrix、continuation freshness、clean-room exclusions、bounded return contract を実装 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/context_routing.py`; `src/spec_dock/assets/spec_dock/system/assurance/context-routing-policy.json`; `src/spec_dock/assets/spec_dock/system/assurance/schemas/context-routing-policy.schema.json`; `tests/unit/domain/test_context_routing.py` | `uv run pytest tests/unit/domain/test_context_routing.py` -> pass; `uv run ruff check ...` -> pass | passed; final reviewer findings resolved in D-230-S99-R04 | none; projection integration completed by S02 | accepted |
 
 ### セッションログ（2026-06-23 S02）
 
@@ -333,7 +246,7 @@ uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/appli
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ | 委任ロール | 委任 worker 要約 | 変更ファイル | 実行 tests または docs-only 検証 | レビュアー判定 | 未解決リスク | 親統合判断 |
 |---|---|---|---|---|---|---|---|
-| S02 | dev-coder | workflow next に step assurance / context packet projection / invocation event を接続 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`; `application/workflow.py`; `domain/runbook.py`; `infra/context_policy_store.py`; `infra/context_packet_store.py`; `presentation/workflow.py`; `tests/cli_runtime/test_workflow_context_routing.py`; `tests/unit/infra/test_context_packet_store.py` | `uv run pytest ...` -> pass; `uv run ruff check ...` -> pass | pending | dogfooding mirror sync は S90 範囲 | accepted |
+| S02 | dev-coder | workflow next に step assurance / context packet projection / invocation event を接続 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`; `application/workflow.py`; `domain/runbook.py`; `infra/context_policy_store.py`; `infra/context_packet_store.py`; `presentation/workflow.py`; `tests/cli_runtime/test_workflow_context_routing.py`; `tests/unit/infra/test_context_packet_store.py` | `uv run pytest ...` -> pass; `uv run ruff check ...` -> pass | passed; final reviewer findings resolved in D-230-S99-R02 / R03 / R05 | none; dogfooding mirror sync completed by S90 and re-synced after S99 fixes | accepted |
 
 ### セッションログ（2026-06-23 S90）
 
@@ -370,14 +283,63 @@ diff -ru src/spec_dock/assets/spec_dock/system/assurance spec-dock/system/assura
 |---|---|---|---|---|---|---|---|
 | S90 | docs impact reviewer | spec-reviewer | fresh | passed | no | proceed to commit | P2 final gate placeholders deferred to S99 |
 
-### セッションログ（2026-06-23 HH:MM - HH:MM）
+### セッションログ（2026-06-23 S99）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S99
+- AC/EC: full issue closure / final verification / reviewer readiness
 
 #### 実施内容
-- ...
+- `make lint` で formatter と mypy の最終ゲートを実行し、初回 failure を解消した。
+- `tests/cli_runtime` の初回全体実行で structural regression failure を検出し、context policy / packet store の生成責務を bootstrap composition root へ移した。
+- Provider runtime と dogfooding runtime mirror を再同期し、parity diff、targeted tests、full CLI runtime tests を再実行した。
+
+#### 実行コマンド / 結果
+```bash
+make lint
+# initial: ruff format check failed on 7 files; mypy failed in application/context_packets.py
+# after fixes: ruff check pass; ruff format check pass; mypy pass
+
+uv run pytest tests/unit
+# after reviewer fixes: 818 passed in 308.99s
+
+uv run pytest tests/cli_runtime
+# initial: 1 failed, 668 passed, 76 skipped
+# failure: application/workflow.py concrete infra imports violated S11 structural rule
+# after DI and reviewer fixes: 672 passed, 76 skipped in 502.21s
+
+uv run pytest tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::test_final_api_call_site_and_structural_regression tests/unit/infra/test_context_packet_store.py tests/unit/infra/test_runbook_store.py tests/cli_runtime/test_workflow_context_routing.py tests/cli_runtime/test_workflow.py
+# after reviewer fixes: 34 passed in 25.57s
+
+diff -ru -x __pycache__ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime spec-dock/scripts/spec_dock_runtime
+# pass
+
+diff -ru src/spec_dock/assets/spec_dock/system/assurance spec-dock/system/assurance
+# pass
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=148
+
+./spec-dock/scripts/spec-dock workflow next issue-execution --format json
+# state=ready; step_assurance and context_packets present
+```
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ | 発見されたテスト / リスク | 起票元 | 実施した対応 | クロージャID / 新規ID | 計画修正要否 | 証跡 |
+|---|---|---|---|---|---|---|
+| S99 | application layer must not import concrete infra context stores | final CLI runtime suite | moved store construction to bootstrap and injected Protocol-shaped dependencies | D-230-S99-R01 | no | `tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::test_final_api_call_site_and_structural_regression` -> pass |
+| S99 | workflow path must revalidate continuation facts before `recent_fork` | qa-reviewer | added workflow-level continuation facts and dirty worktree CLI test | D-230-S99-R02 | no | `test_workflow_next_dirty_worktree_forces_bounded_continuation` -> pass |
+| S99 | step selection must not treat scaffold or failed logs as completed | code-reviewer | changed completion detection to pass/commit evidence within session blocks | D-230-S99-R03 | no | `test_workflow_next_does_not_skip_step_from_scaffold_report_text` -> pass |
+| S99 | malformed policy reviewers must fail closed when non-reviewer roles appear | code-reviewer | rejected non-reviewer roles in parser and added unit regression | D-230-S99-R04 | no | `test_policy_parser_rejects_non_reviewer_roles_in_reviewers` -> pass |
+| S99 | plan-derived docs/migration/security routing needs observable workflow coverage | qa-reviewer | added parameterized CLI routing coverage | D-230-S99-R05 | no | `test_workflow_next_routes_plan_derived_task_kinds` -> pass |
+| S99 | completed-step parser must ignore incidental `fail` text and use result-specific evidence | code-reviewer re-review | changed parser to inspect step table result cells | D-230-S99-R06 | no | focused `uv run pytest ...` -> 16 passed |
+| S99 | continuation git probes must stay behind infra/bootstrap boundary | code-reviewer re-review | injected `ContinuationProbeLike` from bootstrap and moved subprocess access to `infra/git_cli` | D-230-S99-R07 | no | structural regression -> pass; `make lint` -> pass |
+| S99 | completed-step parser must not accept Red-phase pass rows as closure | code-reviewer second re-review | limited completion parser to Step Contract Closure / Step Commit sections | D-230-S99-R08 | no | `test_workflow_next_does_not_skip_step_from_red_phase_pass_only` -> pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ | クロージャID | 計画上の close 条件 | 観測した証跡 | 結果 | メモ |
+|---|---|---|---|---|---|
+| S99 | final-gate | lint / unit / CLI runtime / validate / mirror parity | `make lint`; `uv run pytest tests/unit`; `uv run pytest tests/cli_runtime`; `./spec-dock/scripts/spec-dock validate`; parity diffs | pass | initial failures fixed and rerun green |
 
 ---
 
@@ -393,32 +355,32 @@ diff -ru src/spec_dock/assets/spec_dock/system/assurance spec-dock/system/assura
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | added workflow-level continuation and task-kind routing coverage | initial review failed on P1 continuation coverage and P2 task-kind coverage; fixes recorded in D-230-S99-R02 / R05; focused `uv run pytest ...` -> 34 passed; full `uv run pytest tests/unit` -> 818 passed; full `uv run pytest tests/cli_runtime` -> 672 passed, 76 skipped; re-review passed | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | initial review failed on P1 completed-step evidence and P1 non-reviewer role policy parser; first re-review found result-specific completion P1 and continuation probe layering P2; second re-review found Red-phase pass completion P1; fixes recorded in D-230-S99-R03 / R04 / R06 / R07 / R08; focused `uv run pytest ...` -> 16 passed; `make lint` -> pass; third re-review passed | 3 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | initial review failed on final gate placeholders and stale delegated rows; placeholders replaced with concrete pending/pass evidence and delegated rows updated; re-review passed with P2 front matter status fix applied | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| final reviewer pass recorded | S99 reviewer-finding fixes, mirror sync, tests, report ledger | final response / Epic PR body after issue finish | ready for final commit |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: final reviewer / full regression で application layer の infra 直参照、workflow continuation 未接続、step 完了判定の scaffold 誤検出、policy reviewer role の runtime parser 漏れが見つかった。
+  - 解決: bootstrap DI、workflow-level continuation facts、session-block completion detection、reviewer role validation、追加 CLI / unit regression tests を適用した。
 
 ## 学んだこと (任意)
-- ...
+- Domain helper のみで満たしたように見える契約でも、Runbook / CLI projection の observable path で検証しないと agent routing contract の退行を見落とす。
 
 ## 今後の推奨事項 (任意)
-- ...
+- 後続 issue では workflow output に追加する agent-facing metadata について、domain unit と CLI runtime の両方で少なくとも 1 件ずつ regression を置く。
 
 ## 省略/例外メモ (必須)
 - 該当なし
