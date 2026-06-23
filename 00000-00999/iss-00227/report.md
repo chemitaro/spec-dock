@@ -167,6 +167,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | Initial focused test run failed before `domain.assurance` existed; follow-up review tests failed before raw fact, explicit empty facts, and source binding validation fixes | `uv run pytest tests/unit/domain/test_assurance.py` | pass | Red evidence observed by delegated worker and bounded review follow-ups |
 | S01 | 緑フェーズ（Green） | S01 focused tests pass | Domain assurance contract/policy/serialization tests pass after fixes | `uv run pytest tests/unit/domain/test_assurance.py` -> 9 passed | pass | Parent verification after reviewer P1 fix |
 | S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | No behavior-preserving refactor needed after minimal validation/test additions | diff inspection | approved-no-op | Domain module remains pure stdlib/domain and no adapter imports |
+| S02 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | Focused infra tests failed before `infra.assurance_store` existed | `uv run pytest tests/unit/infra/test_assurance_store.py` -> 4 failed | pass | Red evidence observed by delegated worker: `ModuleNotFoundError: No module named 'spec_dock_runtime.infra.assurance_store'` |
+| S02 | 緑フェーズ（Green） | S02 focused tests pass | Infra assurance store tests pass after implementation and review follow-ups | `uv run pytest tests/unit/infra/test_assurance_store.py` -> 5 passed; `uv run pytest tests/unit/domain/test_assurance.py tests/unit/infra/test_assurance_store.py` -> 14 passed | pass | Parent verification repeated after reviewer P1 fixes |
+| S02 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | Ruff passed and no behavior-preserving refactor needed after bounded infra implementation | `uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/assurance_store.py tests/unit/infra/test_assurance_store.py` -> pass | approved-no-op | Store remains in infra and reuses domain validation without duplicating policy |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
@@ -175,11 +178,15 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S01 | explicit empty `risk_facts=()` must not fall back to defaults | code-reviewer | added test and fixed `build_assurance_contract` None/empty distinction | `cl-dc010-default-facts`, `cl-ac003-lite-safety` | no | `tests/unit/domain/test_assurance.py` -> 7 passed |
 | S01 | empty source binding artifacts must be invalid | code-reviewer | added validation and test for missing source artifacts | `cl-ac002-deterministic-json`, `cl-ac006-layer-boundary` | no | `tests/unit/domain/test_assurance.py` -> 8 passed |
 | S01 | source binding path must be resolved repo-relative issue-local path | code-reviewer | added validation and test rejecting absolute and `spec-dock/active/` artifact paths | `cl-ac002-deterministic-json`, `cl-ac006-layer-boundary` | no | `tests/unit/domain/test_assurance.py` -> 9 passed |
+| S02 | target/path safety and missing/invalid contract distinctions | implementation | added focused infra tests and bounded `AssuranceStore` implementation | `cl-ac001-classify-contract-write`, `cl-ac004-strict-legacy-missing`, `cl-ac005-invalid-contract`, `cl-dc008-target-resolution`, `cl-ac006-layer-boundary` | no | `tests/unit/infra/test_assurance_store.py` -> 4 passed |
+| S02 | semantic invalid risk facts and obligations mismatch must fail as invalid schema | code-reviewer | added tests and fixed store validation to catch domain validation errors and validate `obligations.profile_preset` | `cl-ac005-invalid-contract` | no | Red: `tests/unit/infra/test_assurance_store.py` -> 1 failed / 3 passed; Green: 4 passed |
+| S02 | persisted `issue_id` and source binding path must be target-local | code-reviewer | added tests and fixed target-aware schema validation | `cl-ac005-invalid-contract`, `cl-ac001-classify-contract-write` | no | Red: `tests/unit/infra/test_assurance_store.py` -> 1 failed / 4 passed; Green: 5 passed |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
 | S01 | `cl-ac002-deterministic-json`, `cl-ac003-lite-safety`, `cl-ec002-hard-trigger-monotonic`, `cl-ac006-layer-boundary`, `cl-dc010-default-facts` | S01 domain policy/serializer tests pass, import boundary inspection/test passes, code-reviewer pass required before commit | `uv run pytest tests/unit/domain/test_assurance.py` -> 9 passed; fresh code-reviewer pass | pass | Red evidence observed by worker: initial focused tests failed before `domain.assurance` existed; follow-up red tests reproduced duplicate/invalid raw fact, explicit empty facts, empty source binding, and non-durable source path gaps |
+| S02 | `cl-ac001-classify-contract-write`, `cl-ac004-strict-legacy-missing`, `cl-ac005-invalid-contract`, `cl-dc008-target-resolution`, `cl-ac006-layer-boundary` | S02 infra source binding, store read/write/verify, missing/invalid distinction, and target safety tests pass; code-reviewer pass required before commit | `uv run pytest tests/unit/infra/test_assurance_store.py` -> 5 passed; `uv run pytest tests/unit/domain/test_assurance.py tests/unit/infra/test_assurance_store.py` -> 14 passed; fresh code-reviewer pass | pass | Red evidence observed by worker: initial focused tests failed before `infra.assurance_store` existed; follow-up red tests reproduced semantic invalid schema crash and target-local schema gaps before validation fixes |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -190,6 +197,10 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | `cl-ec002-hard-trigger-monotonic` | S01 | yes | red-required | worker observed initial domain test failure; follow-up invalid raw fact test failed before validation fix | `uv run pytest tests/unit/domain/test_assurance.py` | pass | strict/critical escalation and duplicate/invalid raw facts rejected |
 | `cl-ac006-layer-boundary` | S01 | yes | inspect-only plus test | new module import inspection planned; code-review follow-ups identified source binding validation gaps | `uv run pytest tests/unit/domain/test_assurance.py` | pass | domain module has no infra/commands/cli/presentation/GitHub/filesystem adapter imports; persisted contract validation rejects missing source artifacts and non-durable artifact paths |
 | `cl-dc010-default-facts` | S01 | yes | red-required | worker observed initial domain test failure before implementation; code-review follow-up identified explicit empty tuple fallback | `uv run pytest tests/unit/domain/test_assurance.py` | pass | default facts and reason/consequence codes are stable; omitted facts (`None`) and explicit empty facts are distinct |
+| `cl-ac001-classify-contract-write` | S02 | yes | red-required | worker observed initial infra test failure before implementation | `uv run pytest tests/unit/infra/test_assurance_store.py` | pass | store writes and reads issue-local `assurance.json` with durable requirement source binding |
+| `cl-ac004-strict-legacy-missing` | S02 | yes | red-required | worker observed initial infra test failure before implementation | `uv run pytest tests/unit/infra/test_assurance_store.py` | pass | missing `assurance.json` returns `missing` / `strict-legacy`, not invalid |
+| `cl-ac005-invalid-contract` | S02 | yes | red-required | worker observed initial infra test failure before implementation; follow-up tests reproduced semantic invalid schema crash and target-local schema gaps | `uv run pytest tests/unit/infra/test_assurance_store.py` | pass | invalid JSON, required-field schema invalid, semantic risk fact invalid, obligations mismatch, invalid issue id, and non issue-local source binding return invalid outcomes without crashing |
+| `cl-dc008-target-resolution` | S02 | yes | red-required | worker observed initial infra test failure before implementation | `uv run pytest tests/unit/infra/test_assurance_store.py` | pass | active, issue id, GitHub number, repo-contained path accepted; missing/non-issue/repo escape/symlink escape rejected |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -202,6 +213,10 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | `cl-ec002-hard-trigger-monotonic` | S01 | `uv run pytest tests/unit/domain/test_assurance.py` | pass | strict/critical escalation covered |
 | `cl-ac006-layer-boundary` | S01 | `uv run pytest tests/unit/domain/test_assurance.py` | pass | import-boundary static inspection covered |
 | `cl-dc010-default-facts` | S01 | `uv run pytest tests/unit/domain/test_assurance.py` | pass | default fact/reason-code fixture covered |
+| `cl-ac001-classify-contract-write` | S02 | `uv run pytest tests/unit/infra/test_assurance_store.py` | pass | source binding, issue-local write/read, and target-local persisted path validation covered |
+| `cl-ac004-strict-legacy-missing` | S02 | `uv run pytest tests/unit/infra/test_assurance_store.py` | pass | missing contract compatibility covered |
+| `cl-ac005-invalid-contract` | S02 | `uv run pytest tests/unit/infra/test_assurance_store.py` | pass | invalid JSON/schema distinction, semantic invalid schema handling, and target-aware schema checks covered |
+| `cl-dc008-target-resolution` | S02 | `uv run pytest tests/unit/infra/test_assurance_store.py` | pass | explicit target path containment and active fallback safety covered |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -226,12 +241,14 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
 | S01 | delegated | runtime domain implementation | dev-coder | S01 domain assurance model/policy/serialization only | `plan.md` S01 | `domain/assurance.py`, `tests/unit/domain/test_assurance.py` | infra/application/CLI/presentation/mirror/docs/config/skills/GitHub state | `uv run pytest tests/unit/domain/test_assurance.py` | policy/table conflict, domain requiring adapters, non-deterministic serializer | changed files, tests, risks, ledger note | pass |
+| S02 | delegated | runtime infra implementation | dev-coder | S02 assurance store, target resolution, source binding, schema validation only | `plan.md` S02 | `infra/assurance_store.py`, `tests/unit/infra/test_assurance_store.py` | parser/registry/bootstrap/application/presentation/domain policy/mirror/docs/config/skills/GitHub state | `uv run pytest tests/unit/infra/test_assurance_store.py` | broad target refactor, path behavior conflict, schema validator requiring domain semantic changes | changed files, tests, target/path notes, risks, ledger note | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
 | S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
 | S01 | dev-coder | Implemented pure domain assurance contract/policy/serializer and tests; bounded follow-ups added duplicate/invalid raw fact validation, explicit empty tuple rejection, empty source binding validation, and non-durable source path validation. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/assurance.py`; `tests/unit/domain/test_assurance.py` | `uv run pytest tests/unit/domain/test_assurance.py` -> 9 passed | pass | none | accepted |
+| S02 | dev-coder | Implemented infra assurance store, target resolution, source binding hash, read/write/verify, and missing/invalid distinctions; bounded follow-ups fixed semantic invalid schema and target-aware schema handling. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/assurance_store.py`; `tests/unit/infra/test_assurance_store.py` | `uv run pytest tests/unit/infra/test_assurance_store.py` -> 5 passed; `uv run pytest tests/unit/domain/test_assurance.py tests/unit/infra/test_assurance_store.py` -> 14 passed; `uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/assurance_store.py tests/unit/infra/test_assurance_store.py` -> pass | pass | none | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -243,21 +260,26 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 |---|---|---|---|---|---|---|---|
 | S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
 | S01 | step reviewer | code-reviewer | fresh | failed -> pass | no | proceed | Initial review found missing report evidence and raw fact validation gap. Follow-up reviews surfaced empty tuple, source binding edge cases, and TDD ledger gaps; bounded fixes applied. Fresh re-review passed with no findings. |
+| S02 | step reviewer | code-reviewer | fresh | failed -> pass | no | proceed | Reviews found semantic invalid schema crash, missing obligations validation, invalid issue id, and non issue-local source binding gaps. Bounded fixes applied; fresh re-review passed with no findings. |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
-| S01 | committed | `domain/assurance.py`, `tests/unit/domain/test_assurance.py`, S01 report evidence | final ledger reference: S01 reviewer pass and focused test evidence in this report | `git status --short` -> clean | N/A | N/A | N/A | N/A |
+| S01 | committed | `domain/assurance.py`, `tests/unit/domain/test_assurance.py`, S01 report evidence | `9a5f694f` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
+| S02 | committed | `infra/assurance_store.py`, `tests/unit/infra/test_assurance_store.py`, S02 report evidence | S02 commit in git history: `feat(assurance): Assurance Contractの保存基盤を追加` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `path/to/file1` - ...
 - `path/to/file2` - ...
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/assurance.py` - Assurance Contract v1 domain model, deterministic policy, serializer, validation helpers
 - `tests/unit/domain/test_assurance.py` - S01 domain tests for deterministic output, Lite safety, hard triggers, raw fact validation, and import boundary
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/assurance_store.py` - S02 issue target resolution, source binding, issue-local contract store, schema/missing/invalid distinction
+- `tests/unit/infra/test_assurance_store.py` - S02 infra tests for source binding, strict-legacy missing, invalid JSON/schema, explicit target safety
 
 #### コミット
-- <hash> <message>
+- `9a5f694f` `feat(assurance): Assurance Contractのドメイン分類を追加`
+- S02 commit in git history: `feat(assurance): Assurance Contractの保存基盤を追加`
 
 #### メモ
 - ...
