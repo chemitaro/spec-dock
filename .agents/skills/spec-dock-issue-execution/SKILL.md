@@ -23,12 +23,14 @@ This skill is a fixed kernel. It must not carry state-specific generated Runbook
 - Planning / execution contract: active issue `requirement.md`, `design.md`, `plan.md`, and `report.md`.
 - Clarification fallback: `spec-dock/docs/workflow_clarification.md`.
 - Behavior-first and test-case semantics: `spec-dock/docs/phase_plan_issue.md` and `spec-dock/docs/authoring/issue-plan.md`.
+- For planned executable workflow contract / command queue details, concrete `具体テストケース一覧`, report evidence destination, and amendment trigger rules, use `spec-dock/docs/authoring/issue-plan.md` and the active `plan.md`.
 
 ## Stop Conditions And Authority
 
 - Start execution only after `requirement.md`, `design.md`, and `plan.md` are approved / reviewer-pass and recorded as ready under the issue workflow.
 - Treat requirement / design / plan creation or repair as planning / spec authoring work, not issue execution work.
 - Stop if any artifact is draft, template-only, unresolved, stale, contradictory, or missing reviewer-pass evidence.
+- Stop on any unresolved spec gap; return to `spec-dock/docs/workflow_clarification.md` instead of absorbing the gap inside execution.
 - Stop if active context, allowed paths, acceptance criteria, reviewer requirements, delegated worker boundaries, or closure conditions cannot be verified.
 - Execute exactly one current implementation step at a time. Do not start implementation, review, or commit work for the next step until the current step is closed.
 - Treat `plan.md` as the planned executable workflow contract / command queue. A non-executable `plan.md` is a planning gap, not an execution assumption.
@@ -44,6 +46,7 @@ This skill is a fixed kernel. It must not carry state-specific generated Runbook
 - Parent direct implementation or direct reviewer-fail fixes require a documented Parent Implementation Exception before mutation.
 - Treat `report.md` as the observed evidence ledger for actual Red / Green / Refactor results, verification output, discovered tests, closure delta, reviewer verdicts, and commit/no-op evidence.
 - Treat `report.md` as the canonical `Spec Interpretation / Decision Ledger` for material implementation-time interpretation, decisions, deviations, tradeoffs, open questions, and promotion / follow-up. Do not store worker raw transcripts, private reasoning, or secrets there.
+- Keep the feedback loop grounded in public interface / observable behavior, reproduction evidence, and the approved `plan.md` contract.
 - Require delegated workers to return a `Ledger Note` when they encounter material interpretation, decision, deviation, tradeoff, open question, or follow-up. The minimum fields are `source-agent`, `topic`, `trigger`, `ambiguity / constraint`, `observed facts`, `options considered`, `proposed decision`, `rationale`, `affected files`, `affected tests`, `risk if wrong`, `rollback or revisit`, `confidence`, and `needs orchestrator decision`.
 - Require workers with no material decision to state `No material implementation decisions beyond the approved plan.` A worker `proposed decision` is not an accepted decision; the parent orchestrator must integrate, reject, defer, supersede, or promote it in the canonical report ledger.
 - Before completion, ensure ledger entries have no `Status=open`; each resolved / superseded entry has disposition evidence, required follow-up / promotion evidence, and no report-only durable decision.
@@ -59,6 +62,7 @@ This skill is a fixed kernel. It must not carry state-specific generated Runbook
 - Mutate dependencies command-first with `deps add`, `deps remove`, and `deps check`: `./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>`, `./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>`, and `./spec-dock/scripts/spec-dock deps check <target>`.
 - Evidence commands include `validate` and `sync`: `./spec-dock/scripts/spec-dock validate` and `./spec-dock/scripts/spec-dock sync`.
 - Use `--no-github` only for explicit cache/local verification without GitHub calls.
+- Step completion still requires required verification, a fresh step reviewer pass, the Step Commit Gate, and a post-commit clean check as defined by `workflow_issue.md`.
 
 ## Kernel Boundary
 

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
 import shutil
 import tempfile
 from typing import TYPE_CHECKING, Any
+
+from spec_dock_runtime.application.contracts import RunbookProjectionResult
 
 if TYPE_CHECKING:
     from spec_dock_runtime.domain.runbook import Runbook
@@ -18,13 +19,6 @@ CURRENT_RUNBOOK_PATHS: tuple[str, ...] = (
     "spec-dock/active/current-runbook.json",
     "spec-dock/active/current-runbook.md",
 )
-
-
-@dataclass(frozen=True)
-class RunbookProjectionResult:
-    written: bool
-    paths: tuple[str, ...]
-    errors: tuple[str, ...] = ()
 
 
 class RunbookStore:

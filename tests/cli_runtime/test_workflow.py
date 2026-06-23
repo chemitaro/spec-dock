@@ -107,6 +107,13 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert result.returncode != 0
             assert "invalid choice" in result.stderr
             assert "current-runbook" not in result.stdout
+            for rel_path in (
+                "spec-dock/.agent/runbooks/current-runbook.json",
+                "spec-dock/.agent/runbooks/current-runbook.md",
+                "spec-dock/active/current-runbook.json",
+                "spec-dock/active/current-runbook.md",
+            ):
+                assert not (target / rel_path).exists()
 
     def test_workflow_status_ready_uses_valid_assurance_authority(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -152,7 +159,9 @@ class TestCliWorkflow(CliRuntimeHarness):
             ]
             for rel_path in payload["projection"]["paths"]:
                 assert (target / rel_path).is_file()
-            projected = json.loads((target / "spec-dock/.agent/runbooks/current-runbook.json").read_text(encoding="utf-8"))
+            projected = json.loads(
+                (target / "spec-dock/.agent/runbooks/current-runbook.json").read_text(encoding="utf-8")
+            )
             assert projected["state"] == "requirement-capture"
             assert projected["projection"]["written"] is True
             status = subprocess.run(
@@ -187,8 +196,8 @@ class TestCliWorkflow(CliRuntimeHarness):
         (issue_dir / "requirement.md").write_text(
             "---\n"
             "種別: 要件定義書（Issue）\n"
-            "ID: \"iss-00301\"\n"
-            "状態: \"approved\"\n"
+            'ID: "iss-00301"\n'
+            '状態: "approved"\n'
             "---\n\n"
             "# Requirement\n\n"
             "## 目的\n"
