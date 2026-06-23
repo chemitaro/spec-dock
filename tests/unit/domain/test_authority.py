@@ -1,17 +1,10 @@
+from pathlib import Path
 import sys
 import tempfile
-from pathlib import Path
 
 
 def _authority_module():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.domain import authority
@@ -378,28 +371,26 @@ class TestAuthorityGate:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "design.md"
             path.write_text(
-                "\n".join(
-                    [
-                        "---",
-                        "status: draft",
-                        "authority: proposed",
-                        "grants: [review_input, planning_input]",
-                        "owner_role: main-orchestrator",
-                        "draft_author_role: system-architect",
-                        "approval: pending-main-promotion",
-                        "source_revision: rev-1",
-                        "approved_revision: rev-1",
-                        "approved_hash: hash-1",
-                        "manifest_hash: manifest-hash",
-                        "permission_profile_name: spec-dock-da",
-                        "permission_profile_hash: profile-hash",
-                        "write_session_invocation_hash: session-hash",
-                        "probe_run_id: probe-1",
-                        "positive_probe_result: pass",
-                        "---",
-                        "# Design",
-                    ]
-                )
+                "\n".join([
+                    "---",
+                    "status: draft",
+                    "authority: proposed",
+                    "grants: [review_input, planning_input]",
+                    "owner_role: main-orchestrator",
+                    "draft_author_role: system-architect",
+                    "approval: pending-main-promotion",
+                    "source_revision: rev-1",
+                    "approved_revision: rev-1",
+                    "approved_hash: hash-1",
+                    "manifest_hash: manifest-hash",
+                    "permission_profile_name: spec-dock-da",
+                    "permission_profile_hash: profile-hash",
+                    "write_session_invocation_hash: session-hash",
+                    "probe_run_id: probe-1",
+                    "positive_probe_result: pass",
+                    "---",
+                    "# Design",
+                ])
                 + "\n",
                 encoding="utf-8",
             )
@@ -421,33 +412,31 @@ class TestAuthorityGate:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "plan.md"
             path.write_text(
-                "\n".join(
-                    [
-                        "# Plan",
-                        "",
-                        "## Implementation",
-                        "",
-                        "- ordinary content",
-                        "",
-                        "## Delegated Draft Pilot Metadata",
-                        "",
-                        "- status=approved",
-                        "- authority=proposed",
-                        "- grants=review_input,planning_input",
-                        "- owner_role=main-orchestrator",
-                        "- draft_author_role=implementation-planner",
-                        "- approval=pending-main-promotion",
-                        "- source_revision=rev-1",
-                        "- approved_revision=none",
-                        "- approved_hash=none",
-                        "- manifest_hash=manifest-hash",
-                        "- permission_profile_name=spec-dock-da",
-                        "- permission_profile_hash=profile-hash",
-                        "- write_session_invocation_hash=session-hash",
-                        "- probe_run_id=probe-1",
-                        "- positive_probe_result=pass",
-                    ]
-                )
+                "\n".join([
+                    "# Plan",
+                    "",
+                    "## Implementation",
+                    "",
+                    "- ordinary content",
+                    "",
+                    "## Delegated Draft Pilot Metadata",
+                    "",
+                    "- status=approved",
+                    "- authority=proposed",
+                    "- grants=review_input,planning_input",
+                    "- owner_role=main-orchestrator",
+                    "- draft_author_role=implementation-planner",
+                    "- approval=pending-main-promotion",
+                    "- source_revision=rev-1",
+                    "- approved_revision=none",
+                    "- approved_hash=none",
+                    "- manifest_hash=manifest-hash",
+                    "- permission_profile_name=spec-dock-da",
+                    "- permission_profile_hash=profile-hash",
+                    "- write_session_invocation_hash=session-hash",
+                    "- probe_run_id=probe-1",
+                    "- positive_probe_result=pass",
+                ])
                 + "\n",
                 encoding="utf-8",
             )
@@ -468,36 +457,34 @@ class TestAuthorityGate:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "plan.md"
             path.write_text(
-                "\n".join(
-                    [
-                        "# Plan",
-                        "",
-                        "## Delegated Draft Pilot Metadata",
-                        "",
-                        "- status=approved",
-                        "- authority=approved",
-                        "- grants=implementation_start,issue_ready,issue_finish,phase_completion",
-                        "- owner_role=main-orchestrator",
-                        "- draft_author_role=implementation-planner",
-                        "- approval=fresh-reviewer-pass",
-                        "- source_revision=rev-1",
-                        "- approved_revision=rev-1",
-                        "- approved_hash=hash-1",
-                        "- manifest_hash=manifest-hash",
-                        "- permission_profile_name=spec-dock-da",
-                        "- permission_profile_hash=profile-hash",
-                        "- write_session_invocation_hash=session-hash",
-                        "- probe_run_id=probe-1",
-                        "- positive_probe_result=pass",
-                        "- promotion_record.status=approved",
-                        "- promotion_record.authority=approved",
-                        "- promotion_record.source_revision=rev-1",
-                        "- promotion_record.approved_revision=rev-1",
-                        "- promotion_record.approved_hash=hash-1",
-                        "- promotion_record.reviewer_target_hash=hash-1",
-                        "- promotion_record.promotion_decision=fresh_reviewer_promotion",
-                    ]
-                )
+                "\n".join([
+                    "# Plan",
+                    "",
+                    "## Delegated Draft Pilot Metadata",
+                    "",
+                    "- status=approved",
+                    "- authority=approved",
+                    "- grants=implementation_start,issue_ready,issue_finish,phase_completion",
+                    "- owner_role=main-orchestrator",
+                    "- draft_author_role=implementation-planner",
+                    "- approval=fresh-reviewer-pass",
+                    "- source_revision=rev-1",
+                    "- approved_revision=rev-1",
+                    "- approved_hash=hash-1",
+                    "- manifest_hash=manifest-hash",
+                    "- permission_profile_name=spec-dock-da",
+                    "- permission_profile_hash=profile-hash",
+                    "- write_session_invocation_hash=session-hash",
+                    "- probe_run_id=probe-1",
+                    "- positive_probe_result=pass",
+                    "- promotion_record.status=approved",
+                    "- promotion_record.authority=approved",
+                    "- promotion_record.source_revision=rev-1",
+                    "- promotion_record.approved_revision=rev-1",
+                    "- promotion_record.approved_hash=hash-1",
+                    "- promotion_record.reviewer_target_hash=hash-1",
+                    "- promotion_record.promotion_decision=fresh_reviewer_promotion",
+                ])
                 + "\n",
                 encoding="utf-8",
             )
@@ -560,29 +547,27 @@ class TestAuthorityGate:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "plan.md"
             path.write_text(
-                "\n".join(
-                    [
-                        "# Plan",
-                        "",
-                        "## Delegated Draft Pilot Metadata",
-                        "",
-                        "- status=draft",
-                        "- authority=proposed",
-                        "- grants=implementation_start,issue_ready,issue_finish,phase_completion",
-                        "- owner_role=main-orchestrator",
-                        "- draft_author_role=implementation-planner",
-                        "- approval=pending-main-promotion",
-                        "- source_revision=rev-1",
-                        "- approved_revision=none",
-                        "- approved_hash=none",
-                        "- manifest_hash=manifest-hash",
-                        "- permission_profile_name=spec-dock-da",
-                        "- permission_profile_hash=profile-hash",
-                        "- write_session_invocation_hash=session-hash",
-                        "- probe_run_id=probe-1",
-                        "- positive_probe_result=pass",
-                    ]
-                )
+                "\n".join([
+                    "# Plan",
+                    "",
+                    "## Delegated Draft Pilot Metadata",
+                    "",
+                    "- status=draft",
+                    "- authority=proposed",
+                    "- grants=implementation_start,issue_ready,issue_finish,phase_completion",
+                    "- owner_role=main-orchestrator",
+                    "- draft_author_role=implementation-planner",
+                    "- approval=pending-main-promotion",
+                    "- source_revision=rev-1",
+                    "- approved_revision=none",
+                    "- approved_hash=none",
+                    "- manifest_hash=manifest-hash",
+                    "- permission_profile_name=spec-dock-da",
+                    "- permission_profile_hash=profile-hash",
+                    "- write_session_invocation_hash=session-hash",
+                    "- probe_run_id=probe-1",
+                    "- positive_probe_result=pass",
+                ])
                 + "\n",
                 encoding="utf-8",
             )

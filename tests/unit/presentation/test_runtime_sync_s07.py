@@ -2,10 +2,9 @@ import contextlib
 import errno
 import io
 import json
-import os
+from pathlib import Path
 import sys
 import tempfile
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -14,23 +13,17 @@ _REQUIRED_NODE_DOCS = ("requirement.md", "design.md", "plan.md", "report.md")
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime import app as runtime_app
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import ports as app_ports
-        from spec_dock_runtime.application import sync_state as app_sync_state
+        from spec_dock_runtime.application import (
+            contracts as app_contracts,
+            ports as app_ports,
+            sync_state as app_sync_state,
+        )
         from spec_dock_runtime.domain import models as domain_models
-        from spec_dock_runtime.infra import artifact_writer as infra_artifact_writer
-        from spec_dock_runtime.infra import contracts as infra_contracts
+        from spec_dock_runtime.infra import artifact_writer as infra_artifact_writer, contracts as infra_contracts
         from spec_dock_runtime.presentation import cli_text as presentation_cli_text
     finally:
         sys.path.pop(0)
@@ -47,14 +40,7 @@ def _runtime_modules():
 
 
 def _presentation_json_state_module():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.presentation import json_state as presentation_json_state
@@ -537,9 +523,9 @@ class TestRuntimeSyncS07:
 
             assert {source.source_path for source in sources} == {initiative_doc, epic_doc, issue_doc}
             assert {source.basename for source in sources} == {
-                    "20260312t010203z-adr-init-decision.md",
-                    "20260312t010204z-adr-epic-decision.md",
-                    "20260312t010205z-01-adr-issue-decision.md",
+                "20260312t010203z-adr-init-decision.md",
+                "20260312t010204z-adr-epic-decision.md",
+                "20260312t010205z-01-adr-issue-decision.md",
             }
 
     def test_sync_fails_before_write_on_adr_mirror_basename_collision_and_preserves_adrs(self) -> None:
@@ -665,7 +651,8 @@ class TestRuntimeSyncS07:
             for source in (initiative_doc, issue_doc):
                 link_path = adrs_dir / source.name
                 assert link_path.is_symlink(), f"missing ADR mirror symlink: {link_path}"
-                assert not os.readlink(link_path).startswith("/"), os.readlink(link_path)
+                link_target = str(link_path.readlink())
+                assert not link_target.startswith("/"), link_target
                 assert link_path.resolve() == source.resolve()
 
     def test_sync_warns_and_succeeds_with_empty_adrs_when_symlinks_are_unsupported(self) -> None:
@@ -708,14 +695,14 @@ class TestRuntimeSyncS07:
                 artifact_writer=infra_artifact_writer.FileArtifactWriter(),
                 clock=_StubClock(),
             )
-            original_symlink = app_sync_state.os.symlink
-            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+            original_symlink_to = app_sync_state.Path.symlink_to
+            app_sync_state.Path.symlink_to = lambda self, target, *args, **kwargs: (_ for _ in ()).throw(
                 OSError(errno.ENOSYS, "symlink unsupported")
             )
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
 
             assert result.artifact_failure is None
             assert result.write_result is not None
@@ -778,15 +765,15 @@ class TestRuntimeSyncS07:
                 write_calls.append(path)
 
             infra_artifact_writer._write_text = _partial_write_then_fail
-            original_symlink = app_sync_state.os.symlink
-            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+            original_symlink_to = app_sync_state.Path.symlink_to
+            app_sync_state.Path.symlink_to = lambda self, target, *args, **kwargs: (_ for _ in ()).throw(
                 OSError(errno.ENOSYS, "symlink unsupported")
             )
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
                 infra_artifact_writer._write_text = original_write_text
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
 
             assert result.write_result is None
             assert result.artifact_failure is not None
@@ -799,8 +786,9 @@ class TestRuntimeSyncS07:
             assert persisted_paths != expected_paths
             assert expected_paths - persisted_paths
             persisted_index_paths = [
-                path for path in write_calls if path.relative_to(specdock_dir).as_posix() in
-                {".agent/index-all.json", ".agent/index.json"}
+                path
+                for path in write_calls
+                if path.relative_to(specdock_dir).as_posix() in {".agent/index-all.json", ".agent/index.json"}
             ]
             for persisted_index_path in persisted_index_paths:
                 payload = json.loads(persisted_index_path.read_text(encoding="utf-8"))
@@ -851,9 +839,9 @@ class TestRuntimeSyncS07:
                 clock=_StubClock(),
             )
 
-            original_symlink = app_sync_state.os.symlink
+            original_symlink_to = app_sync_state.Path.symlink_to
             original_render_dashboard = app_sync_state.render_dashboard
-            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+            app_sync_state.Path.symlink_to = lambda self, target, *args, **kwargs: (_ for _ in ()).throw(
                 OSError(errno.ENOSYS, "symlink unsupported")
             )
             app_sync_state.render_dashboard = lambda *args, **kwargs: (_ for _ in ()).throw(
@@ -865,7 +853,7 @@ class TestRuntimeSyncS07:
                     ports,
                 )
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
                 app_sync_state.render_dashboard = original_render_dashboard
 
             assert not spy_writer.called
@@ -957,7 +945,7 @@ class TestRuntimeSyncS07:
             )
             adrs_dir = specdock_dir / "adrs"
             try:
-                os.symlink("missing-generated-adrs-dir", adrs_dir)
+                Path(adrs_dir).symlink_to("missing-generated-adrs-dir")
             except OSError as error:
                 if app_sync_state._is_environment_symlink_unsupported(error):
                     pytest.skip("symlinks not supported in test environment")
@@ -1017,7 +1005,7 @@ class TestRuntimeSyncS07:
             preserved.write_text("keep-me\n", encoding="utf-8")
             adrs_dir = specdock_dir / "adrs"
             try:
-                os.symlink(managed_target_dir, adrs_dir)
+                Path(adrs_dir).symlink_to(managed_target_dir)
             except OSError as error:
                 if app_sync_state._is_environment_symlink_unsupported(error):
                     pytest.skip("symlinks not supported in test environment")
@@ -1037,18 +1025,17 @@ class TestRuntimeSyncS07:
                 clock=_StubClock(),
             )
             symlink_calls: list[tuple[str, Path]] = []
-            original_symlink = app_sync_state.os.symlink
+            original_symlink_to = app_sync_state.Path.symlink_to
 
-            def _recording_symlink(src, dst):
-                dst_path = Path(dst)
-                symlink_calls.append((str(src), dst_path))
-                return original_symlink(src, dst)
+            def _recording_symlink(self, target, *args, **kwargs):
+                symlink_calls.append((str(target), self))
+                return original_symlink_to(self, target, *args, **kwargs)
 
-            app_sync_state.os.symlink = _recording_symlink
+            app_sync_state.Path.symlink_to = _recording_symlink
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
 
             assert result.artifact_failure is None
             assert result.write_result is not None
@@ -1115,7 +1102,7 @@ class TestRuntimeSyncS07:
             )
             adrs_dir = specdock_dir / "adrs"
             adrs_dir.mkdir(parents=True, exist_ok=True)
-            os.chmod(adrs_dir, 0o555)
+            Path(adrs_dir).chmod(0o555)
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(records),
                 repo_root=repo_root,
@@ -1131,25 +1118,21 @@ class TestRuntimeSyncS07:
                 clock=_StubClock(),
             )
             symlink_calls: list[tuple[str, Path]] = []
-            original_symlink = app_sync_state.os.symlink
+            original_symlink_to = app_sync_state.Path.symlink_to
 
-            def _read_only_generated_adrs_probe(src, dst):
-                dst_path = Path(dst)
-                symlink_calls.append((str(src), dst_path))
-                if (
-                    dst_path.parent == adrs_dir
-                    and dst_path.name.startswith(".spec-dock-adr-mirror-probe-")
-                ):
+            def _read_only_generated_adrs_probe(self, target, *args, **kwargs):
+                symlink_calls.append((str(target), self))
+                if self.parent == adrs_dir and self.name.startswith(".spec-dock-adr-mirror-probe-"):
                     raise PermissionError(errno.EPERM, "operation not permitted")
-                return original_symlink(src, dst)
+                return original_symlink_to(self, target, *args, **kwargs)
 
-            app_sync_state.os.symlink = _read_only_generated_adrs_probe
+            app_sync_state.Path.symlink_to = _read_only_generated_adrs_probe
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
                 if adrs_dir.exists() and not adrs_dir.is_symlink():
-                    os.chmod(adrs_dir, 0o755)
+                    Path(adrs_dir).chmod(0o755)
 
             assert result.artifact_failure is None
             assert result.write_result is not None
@@ -1244,14 +1227,14 @@ class TestRuntimeSyncS07:
                 artifact_writer=infra_artifact_writer.FileArtifactWriter(),
                 clock=_StubClock(),
             )
-            original_symlink = app_sync_state.os.symlink
-            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+            original_symlink_to = app_sync_state.Path.symlink_to
+            app_sync_state.Path.symlink_to = lambda self, target, *args, **kwargs: (_ for _ in ()).throw(
                 OSError(errno.ENOSYS, "symlink unsupported")
             )
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
 
             assert result.artifact_failure is None
             assert result.write_result is not None
@@ -1298,14 +1281,14 @@ class TestRuntimeSyncS07:
                 artifact_writer=infra_artifact_writer.FileArtifactWriter(),
                 clock=_StubClock(),
             )
-            original_symlink = app_sync_state.os.symlink
-            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+            original_symlink_to = app_sync_state.Path.symlink_to
+            app_sync_state.Path.symlink_to = lambda self, target, *args, **kwargs: (_ for _ in ()).throw(
                 PermissionError(errno.EPERM, "operation not permitted")
             )
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
 
             assert result.artifact_failure is not None
             assert result.artifact_failure.status == "failed_before_write"
@@ -1353,8 +1336,8 @@ class TestRuntimeSyncS07:
                 artifact_writer=_SpyArtifactWriter(),
                 clock=_StubClock(),
             )
-            original_symlink = app_sync_state.os.symlink
-            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+            original_symlink_to = app_sync_state.Path.symlink_to
+            app_sync_state.Path.symlink_to = lambda self, target, *args, **kwargs: (_ for _ in ()).throw(
                 PermissionError(errno.EPERM, "operation not permitted")
             )
             try:
@@ -1363,7 +1346,7 @@ class TestRuntimeSyncS07:
                     ports,
                 )
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
 
             assert result.write_result is None
             assert result.artifact_failure is not None
@@ -1418,20 +1401,19 @@ class TestRuntimeSyncS07:
                 clock=_StubClock(),
             )
             symlink_calls: list[tuple[str, Path]] = []
-            original_symlink = app_sync_state.os.symlink
+            original_symlink_to = app_sync_state.Path.symlink_to
 
-            def _fail_only_actual_mirror_link(src, dst):
-                dst_path = Path(dst)
-                symlink_calls.append((str(src), dst_path))
+            def _fail_only_actual_mirror_link(self, target, *args, **kwargs):
+                symlink_calls.append((str(target), self))
                 if len(symlink_calls) == 1:
-                    return original_symlink(src, dst)
+                    return original_symlink_to(self, target, *args, **kwargs)
                 raise PermissionError(errno.EPERM, "operation not permitted")
 
-            app_sync_state.os.symlink = _fail_only_actual_mirror_link
+            app_sync_state.Path.symlink_to = _fail_only_actual_mirror_link
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
 
             probe_path = symlink_calls[0][1]
             assert [path.name for _, path in symlink_calls] == [probe_path.name, mirror_path.name]
@@ -1461,10 +1443,7 @@ class TestRuntimeSyncS07:
         ) = _runtime_modules()
 
         sentinel = object()
-        original_codes = {
-            name: getattr(app_sync_state.errno, name, sentinel)
-            for name in ("EOPNOTSUPP", "ENOTSUP")
-        }
+        original_codes = {name: getattr(app_sync_state.errno, name, sentinel) for name in ("EOPNOTSUPP", "ENOTSUP")}
         app_sync_state.errno.EOPNOTSUPP = 9001
         app_sync_state.errno.ENOTSUP = 9002
         try:
@@ -1520,9 +1499,7 @@ class TestRuntimeSyncS07:
                     infra_contracts,
                     {"iss-local-00001": ["iss-local-00002"], "iss-local-00002": []},
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "done"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "done"}),
                 issue_gateway=_StubIssueGateway([]),
                 active_state_store=_StubActiveStateStore(infra_contracts, events),
                 git_gateway=_StubGitGateway("main"),
@@ -1590,10 +1567,7 @@ class TestRuntimeSyncS07:
                 return out
 
             node_paths = (
-                _index_paths(index_all)
-                + _index_paths(index_todo)
-                + _tree_paths(tree_all)
-                + _tree_paths(tree_todo)
+                _index_paths(index_all) + _index_paths(index_todo) + _tree_paths(tree_all) + _tree_paths(tree_todo)
             )
             assert node_paths
             for node_path in node_paths:
@@ -1677,9 +1651,7 @@ class TestRuntimeSyncS07:
                         "iss-local-00002": ["iss-local-00001"],
                     },
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "open"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "open"}),
                 active_state_store=_StubActiveStateStore(infra_contracts, []),
                 git_gateway=_StubGitGateway("main"),
                 artifact_writer=infra_artifact_writer.FileArtifactWriter(),
@@ -1798,9 +1770,7 @@ class TestRuntimeSyncS07:
                     infra_contracts,
                     {"iss-local-00001": [], "iss-local-00002": []},
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "open"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "open"}),
                 issue_gateway=issue_gateway,
                 active_state_store=_StubActiveStateStore(infra_contracts, []),
                 git_gateway=_StubGitGateway("main"),
@@ -1891,9 +1861,7 @@ class TestRuntimeSyncS07:
                     infra_contracts,
                     {"iss-local-00001": [], "iss-local-00002": []},
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "open"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "open"}),
                 issue_gateway=issue_gateway,
                 active_state_store=_StubActiveStateStore(infra_contracts, []),
                 git_gateway=_StubGitGateway("main"),
@@ -1979,9 +1947,7 @@ class TestRuntimeSyncS07:
                     infra_contracts,
                     {"iss-local-00001": [], "iss-local-00002": []},
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "open"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "open"}),
                 issue_gateway=issue_gateway,
                 active_state_store=_StubActiveStateStore(infra_contracts, []),
                 git_gateway=_StubGitGateway("main"),
@@ -2068,9 +2034,7 @@ class TestRuntimeSyncS07:
                     infra_contracts,
                     {"iss-local-00001": [], "iss-local-00002": []},
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "open"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "open"}),
                 issue_gateway=issue_gateway,
                 active_state_store=_StubActiveStateStore(infra_contracts, []),
                 git_gateway=_StubGitGateway("main"),
@@ -2274,9 +2238,7 @@ class TestRuntimeSyncS07:
                     infra_contracts,
                     {"iss-local-00001": [], "iss-local-00002": []},
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "open"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "open"}),
                 issue_gateway=issue_gateway,
                 active_state_store=_StubActiveStateStore(infra_contracts, []),
                 git_gateway=_StubGitGateway("main"),
@@ -2365,9 +2327,7 @@ class TestRuntimeSyncS07:
                     infra_contracts,
                     {"iss-local-00001": [], "iss-local-00002": []},
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "open"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "open"}),
                 issue_gateway=issue_gateway,
                 active_state_store=_StubActiveStateStore(infra_contracts, []),
                 git_gateway=_StubGitGateway("main"),
@@ -2394,11 +2354,11 @@ class TestRuntimeSyncS07:
             assert foreign_status.source == "github"
             assert foreign_status.effective_status == "done"
             assert (
-                result.state.github_snapshot_by_repo_and_issue_number[("current/repo", 301)].url
+                result.state.github_snapshot_by_repo_and_issue_number["current/repo", 301].url
                 == "https://github.com/current/repo/issues/301"
             )
             assert (
-                result.state.github_snapshot_by_repo_and_issue_number[("other/repo", 301)].url
+                result.state.github_snapshot_by_repo_and_issue_number["other/repo", 301].url
                 == "https://github.com/other/repo/issues/301"
             )
 
@@ -2473,9 +2433,7 @@ class TestRuntimeSyncS07:
                     infra_contracts,
                     {"iss-local-00001": [], "iss-local-00002": []},
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "open"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "open"}),
                 issue_gateway=issue_gateway,
                 active_state_store=_StubActiveStateStore(infra_contracts, []),
                 git_gateway=_StubGitGateway("main"),
@@ -2496,8 +2454,8 @@ class TestRuntimeSyncS07:
             assert "gh_index_incomplete" in result.state.warnings
             assert "gh_fetch_failed" in result.state.warnings
             assert issue_gateway.view_calls == [
-                    (str(repo_root), 301, "current/repo"),
-                    (str(repo_root), 301, "other/repo"),
+                (str(repo_root), 301, "current/repo"),
+                (str(repo_root), 301, "other/repo"),
             ]
 
             current_status = result.state.issue_statuses["iss-local-00001"]
@@ -2632,9 +2590,7 @@ class TestRuntimeSyncS07:
                     infra_contracts,
                     {"iss-local-00001": [], "iss-local-00002": []},
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "open"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "open"}),
                 issue_gateway=issue_gateway,
                 active_state_store=_StubActiveStateStore(infra_contracts, []),
                 git_gateway=_StubGitGateway("main"),
@@ -2653,8 +2609,8 @@ class TestRuntimeSyncS07:
             )
             assert result.artifact_failure is None
             assert issue_gateway.view_calls == [
-                    (str(repo_root), 101, "upstream/product"),
-                    (str(repo_root), 201, "upstream/product"),
+                (str(repo_root), 101, "upstream/product"),
+                (str(repo_root), 201, "upstream/product"),
             ]
 
             index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
@@ -2748,9 +2704,7 @@ class TestRuntimeSyncS07:
                     infra_contracts,
                     {"iss-local-00001": [], "iss-local-00002": []},
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "open"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "open"}),
                 issue_gateway=issue_gateway,
                 active_state_store=_StubActiveStateStore(infra_contracts, []),
                 git_gateway=_StubGitGateway("main"),
@@ -2843,9 +2797,7 @@ class TestRuntimeSyncS07:
                     infra_contracts,
                     {"iss-local-00001": [], "iss-local-00002": []},
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "open"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "open"}),
                 issue_gateway=issue_gateway,
                 active_state_store=_StubActiveStateStore(infra_contracts, []),
                 git_gateway=_StubGitGateway("main"),
@@ -2905,9 +2857,7 @@ class TestRuntimeSyncS07:
                     infra_contracts,
                     {"iss-local-00001": ["iss-local-00002"], "iss-local-00002": []},
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "done"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "done"}),
                 active_state_store=active_store,
                 git_gateway=_StubGitGateway("feature/iss-local-00001-implement"),
                 artifact_writer=_FailingArtifactWriter(events, "disk full"),
@@ -2952,9 +2902,7 @@ class TestRuntimeSyncS07:
                     infra_contracts,
                     {"iss-local-00001": ["iss-local-00002"], "iss-local-00002": []},
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "done"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "done"}),
                 active_state_store=_StubActiveStateStore(infra_contracts, []),
                 git_gateway=_StubGitGateway("feature/iss-local-00001-implement"),
                 artifact_writer=_FailingArtifactWriter([], "read-only fs"),
@@ -2991,9 +2939,7 @@ class TestRuntimeSyncS07:
                     infra_contracts,
                     {"iss-local-00001": ["iss-local-00002"], "iss-local-00002": []},
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "done"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "done"}),
                 active_state_store=_StubActiveStateStore(infra_contracts, []),
                 git_gateway=_StubGitGateway("feature/iss-local-00001-implement"),
                 artifact_writer=spy_writer,
@@ -3001,7 +2947,9 @@ class TestRuntimeSyncS07:
             )
 
             original_render_dashboard = app_sync_state.render_dashboard
-            app_sync_state.render_dashboard = lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("render failed"))
+            app_sync_state.render_dashboard = lambda *args, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("render failed")
+            )
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
@@ -3046,18 +2994,16 @@ class TestRuntimeSyncS07:
                     infra_contracts,
                     {"iss-local-00001": ["iss-local-00002"], "iss-local-00002": []},
                 ),
-                derived_state_reader=_StubDerivedStateReader(
-                    {"iss-local-00001": "open", "iss-local-00002": "done"}
-                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open", "iss-local-00002": "done"}),
                 active_state_store=_StubActiveStateStore(infra_contracts, []),
                 git_gateway=_StubGitGateway("feature/iss-local-00001-implement"),
                 artifact_writer=spy_writer,
                 clock=_StubClock(),
             )
 
-            original_symlink = app_sync_state.os.symlink
+            original_symlink_to = app_sync_state.Path.symlink_to
             original_render_dashboard = app_sync_state.render_dashboard
-            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+            app_sync_state.Path.symlink_to = lambda self, target, *args, **kwargs: (_ for _ in ()).throw(
                 OSError(errno.ENOSYS, "symlink unsupported")
             )
             app_sync_state.render_dashboard = lambda *args, **kwargs: (_ for _ in ()).throw(
@@ -3066,7 +3012,7 @@ class TestRuntimeSyncS07:
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
                 app_sync_state.render_dashboard = original_render_dashboard
 
             assert not spy_writer.called
@@ -3320,7 +3266,7 @@ class TestRuntimeSyncS07:
                         target_node_kind="issue",
                         target_issue_ids=("iss-00301",),
                         expansion="issue",
-                    )
+                    ),
                 ],
             },
             high_level_statuses_by_node_id={
@@ -3333,7 +3279,7 @@ class TestRuntimeSyncS07:
                     node_id="epic-00202",
                     state="closed",
                     source="github",
-                )
+                ),
             },
         )
 
@@ -3342,10 +3288,9 @@ class TestRuntimeSyncS07:
 
         assert set(payload["nodes"]) == {"epic-00201", "iss-00301", "iss-00303"}
         assert "iss-00302" not in payload["nodes"]
-        assert [
-            (edge["from"], edge["to"], edge["state"], edge["relation"])
-            for edge in payload["edges"]
-        ] == [("iss-00301", "epic-00201", "blocking", "raw_direct")]
+        assert [(edge["from"], edge["to"], edge["state"], edge["relation"]) for edge in payload["edges"]] == [
+            ("iss-00301", "epic-00201", "blocking", "raw_direct")
+        ]
         assert payload["dependency_contexts"] == [
             {
                 "source_node_id": "epic-00201",
@@ -3893,8 +3838,7 @@ class TestRuntimeSyncS07:
         assert outcome.exit_code == 1
         assert "spec-dock: ok (deps add)" in "\n".join(outcome.text.stdout_lines)
         assert "spec-dock: ok (deps add auto-sync)" not in outcome.text.stdout_lines
-        assert "spec-dock: failed (deps add auto-sync) from=iss-00093 to=iss-00094" in \
-            outcome.text.stderr_lines
+        assert "spec-dock: failed (deps add auto-sync) from=iss-00093 to=iss-00094" in outcome.text.stderr_lines
         assert any("GitHub issue state fetch was incomplete" in line for line in outcome.text.stderr_lines)
         assert outcome.text.warnings == ["gh_fetch_failed"]
 
@@ -3939,8 +3883,7 @@ class TestRuntimeSyncS07:
         assert success_outcome.exit_code == 0
         assert "spec-dock: ok (deps add auto-sync)" in success_outcome.text.stdout_lines
         assert skip_outcome.exit_code == 0
-        assert "spec-dock: skipped (deps add auto-sync) reason=unchanged" in \
-            skip_outcome.text.stdout_lines
+        assert "spec-dock: skipped (deps add auto-sync) reason=unchanged" in skip_outcome.text.stdout_lines
 
     def test_tc_s06_003_delete_json_includes_post_sync_outcome_and_failure_exit(self) -> None:
         (
@@ -4016,8 +3959,7 @@ class TestRuntimeSyncS07:
             _infra_contracts,
             _presentation_cli_text,
         ) = _runtime_modules()
-        from spec_dock_runtime.cli import parser as cli_parser
-        from spec_dock_runtime.cli import registry as cli_registry
+        from spec_dock_runtime.cli import parser as cli_parser, registry as cli_registry
 
         parser = cli_parser.build_parser(cli_registry.build_registry())
         help_commands = [
@@ -4033,9 +3975,8 @@ class TestRuntimeSyncS07:
         help_by_command: dict[tuple[str, ...], str] = {}
         for argv in help_commands:
             stdout = io.StringIO()
-            with contextlib.redirect_stdout(stdout):
-                with pytest.raises(SystemExit) as cm:
-                    parser.parse_args(argv)
+            with contextlib.redirect_stdout(stdout), pytest.raises(SystemExit) as cm:
+                parser.parse_args(argv)
             assert cm.value.code == 0
             help_by_command[tuple(argv)] = stdout.getvalue()
 
@@ -4044,8 +3985,8 @@ class TestRuntimeSyncS07:
         assert "--disable-auto-sync" not in help_text
         assert "no_auto_sync" not in help_text
 
-        deps_add_help = " ".join(help_by_command[("deps", "add", "--help")].split())
-        deps_remove_help = " ".join(help_by_command[("deps", "remove", "--help")].split())
+        deps_add_help = " ".join(help_by_command["deps", "add", "--help"].split())
+        deps_remove_help = " ".join(help_by_command["deps", "remove", "--help"].split())
         assert "Existing initiative, epic, or issue node id for dependency source" in deps_add_help
         assert "Existing initiative, epic, or issue node id for dependency target" in deps_add_help
         assert "Existing initiative, epic, or issue node id for dependency source" in deps_remove_help
@@ -4126,7 +4067,7 @@ class TestRuntimeSyncS07:
                 if had_attr:
                     app_sync_state.collect_safe_current_repo_backfill_node_ids = original_collector
                 else:
-                    delattr(app_sync_state, "collect_safe_current_repo_backfill_node_ids")
+                    del app_sync_state.collect_safe_current_repo_backfill_node_ids
 
             assert "iss-local-00001" in state.graph.nodes_by_id
             assert len(issue_gateway.index_calls) == 1

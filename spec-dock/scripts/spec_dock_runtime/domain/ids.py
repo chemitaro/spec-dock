@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import re
-import unicodedata
 from typing import Any
+import unicodedata
 
 DEFAULT_ID_WIDTH = 5
 
@@ -106,7 +106,7 @@ def normalize_id_input(value: str, *, prefix: str, field: str) -> str:
 
 def find_existing_id_by_num(nodes: dict[str, Any], *, prefix: str, num: int, local: bool) -> str | None:
     """Find an existing node id by `(prefix, num, local)` in `nodes`."""
-    for node_id in nodes.keys():
+    for node_id in nodes:
         try:
             p, is_local, n = parse_id(str(node_id))
         except RuntimeError:
@@ -125,15 +125,13 @@ def resolve_id_input(value: str, *, prefix: str, field: str, nodes: dict[str, An
     if NUM_RE.fullmatch(raw):
         num = int(raw)
         normal = format_id(prefix, num, local=False)
-        local_id = format_id(prefix, num, local=True)
         if not nodes:
             return normal
         existing_normal = find_existing_id_by_num(nodes, prefix=prefix, num=num, local=False)
         existing_local = find_existing_id_by_num(nodes, prefix=prefix, num=num, local=True)
         if existing_normal and existing_local:
             raise RuntimeError(
-                f"{field} is ambiguous: {value} could mean {existing_normal} or {existing_local}. "
-                "Use full id."
+                f"{field} is ambiguous: {value} could mean {existing_normal} or {existing_local}. Use full id."
             )
         if existing_normal:
             return existing_normal

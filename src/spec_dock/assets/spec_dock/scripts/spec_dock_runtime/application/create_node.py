@@ -1,24 +1,35 @@
 from __future__ import annotations
 
-import os
-import shlex
-import time
-import uuid
 from dataclasses import replace
 from datetime import date, datetime, timezone
+import os
 from pathlib import Path
-from typing import Callable
-from typing import Literal
-from typing import cast
+import shlex
+import time
+from typing import TYPE_CHECKING, Literal, cast
+import uuid
 
-from ..domain.discussion_docs import (
+from spec_dock_runtime.application.contracts import (
+    CreateDiscussionDocRequest,
+    CreateDiscussionDocResult,
+    CreateNodeRequest,
+    CreateNodeResult,
+    CreatePlan,
+)
+from spec_dock_runtime.application.repo_context import (
+    require_current_repo_slug,
+    resolve_current_repo_slug,
+    split_repo_slug,
+)
+from spec_dock_runtime.application.sync_state import post_mutation_sync
+from spec_dock_runtime.domain.discussion_docs import (
     CREATABLE_DISCUSSION_DOC_TYPES as _CREATABLE_DISCUSSION_DOC_TYPES,
     DRAFT_DISCUSSION_DOC_TYPES as _DRAFT_DISCUSSION_DOC_TYPES,
     RETIRED_DISCUSSION_DOC_TYPES as _RETIRED_DISCUSSION_DOC_TYPES,
     discussion_doc_id_from_path,
     parse_timestamp_discussion_doc_filename,
 )
-from ..domain.ids import (
+from spec_dock_runtime.domain.ids import (
     find_existing_id_by_num,
     format_id,
     parse_id,
@@ -27,20 +38,15 @@ from ..domain.ids import (
     slugify,
     validate_input_slug_kebab,
 )
-from ..domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
-from ..domain.tree import build_graph
-from ..domain.validation import find_malformed_discussion_doc_filename_error, validate_graph_and_deps
-from ..infra.contracts import StoredMetaRecord
-from .contracts import (
-    CreateDiscussionDocRequest,
-    CreateDiscussionDocResult,
-    CreateNodeRequest,
-    CreateNodeResult,
-    CreatePlan,
-)
-from .ports import Ports
-from .repo_context import require_current_repo_slug, resolve_current_repo_slug, split_repo_slug
-from .sync_state import post_mutation_sync
+from spec_dock_runtime.domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
+from spec_dock_runtime.domain.tree import build_graph
+from spec_dock_runtime.domain.validation import find_malformed_discussion_doc_filename_error, validate_graph_and_deps
+from spec_dock_runtime.infra.contracts import StoredMetaRecord
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from spec_dock_runtime.application.ports import Ports
 
 _META_FILENAME = ".meta.json"
 _DRAFT_TARGET_BY_DOC_TYPE = {
@@ -236,7 +242,7 @@ def _acquire_create_lock(specdock_dir: Path) -> tuple[Path, str]:
                         stale=True,
                         lock_meta_summary=summary,
                     )
-                )
+                ) from None
             if elapsed >= wait_seconds:
                 raise RuntimeError(
                     _lock_failure_message(
@@ -247,7 +253,7 @@ def _acquire_create_lock(specdock_dir: Path) -> tuple[Path, str]:
                         stale=False,
                         lock_meta_summary=summary,
                     )
-                )
+                ) from None
             remaining = max(0.0, deadline - time.monotonic())
             if remaining <= 0:
                 continue
@@ -326,8 +332,7 @@ def _scan_discussion_timestamp_duplicate_state(discussions_dir: Path) -> tuple[s
         dup_slot = duplicate_standard_slots[0]
         files = ", ".join(path.name for path in sorted(by_standard_slot[dup_slot], key=lambda p: p.as_posix()))
         return (
-            f"Duplicate discussion timestamp slot detected under {discussions_dir}: "
-            f"slot={dup_slot} files=[{files}]",
+            f"Duplicate discussion timestamp slot detected under {discussions_dir}: slot={dup_slot} files=[{files}]",
             doc_ids,
         )
 
@@ -335,7 +340,7 @@ def _scan_discussion_timestamp_duplicate_state(discussions_dir: Path) -> tuple[s
     if duplicate_suffix_slots:
         dup_timestamp, dup_suffix = duplicate_suffix_slots[0]
         files = ", ".join(
-            path.name for path in sorted(by_suffix_slot[(dup_timestamp, dup_suffix)], key=lambda p: p.as_posix())
+            path.name for path in sorted(by_suffix_slot[dup_timestamp, dup_suffix], key=lambda p: p.as_posix())
         )
         return (
             f"Duplicate discussion timestamp suffix detected under {discussions_dir}: "
@@ -426,7 +431,7 @@ def _resolve_template_scaffolder(ports: Ports):
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,
@@ -443,7 +448,7 @@ def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
 
 def _to_spec_node(record: StoredMetaRecord) -> SpecNode:
     return SpecNode(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,
@@ -487,6 +492,8 @@ def _prefix_for_kind(kind: Literal["initiative", "epic", "issue"]) -> str:
 def _resolve_github_mode(
     req: CreateNodeRequest, kind: Literal["initiative", "epic", "issue"]
 ) -> Literal["create", "link_existing"]:
+    del kind
+
     if req.github_mode is None:
         return "create"
     if req.github_mode not in ("create", "link_existing"):
@@ -587,10 +594,7 @@ def guard_github_issue_uniqueness(
                 mixed_scope_conflict.append(node)
                 continue
         if mixed_scope_conflict:
-            found = ", ".join(
-                f"{node.kind}:{node.id} ({node.meta_path.as_posix()})"
-                for node in mixed_scope_conflict
-            )
+            found = ", ".join(f"{node.kind}:{node.id} ({node.meta_path.as_posix()})" for node in mixed_scope_conflict)
             requested_repo_label = requested_repo_slug if requested_repo_slug is not None else "(current-or-unknown)"
             raise RuntimeError(
                 "github linkage scope is ambiguous and rejected (fail-closed): "
@@ -672,7 +676,7 @@ def _create_relative_symlink(link_path: Path, target_path: Path) -> None:
     _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
     link_path.parent.mkdir(parents=True, exist_ok=True)
     rel_target = os.path.relpath(target_path, start=link_path.parent)
-    os.symlink(rel_target, link_path)
+    Path(link_path).symlink_to(rel_target)
 
 
 def _validate_parent_dir_preflight(parent_dir: Path) -> None:
@@ -715,7 +719,7 @@ def _preflight_symlink_creation_capability(*, link_path: Path) -> None:
     probe_path = probe_dir / f".spec-dock-symlink-probe-{os.getpid()}-{uuid.uuid4().hex}"
     probe_target = f".spec-dock-symlink-target-{uuid.uuid4().hex}"
     try:
-        os.symlink(probe_target, probe_path)
+        Path(probe_path).symlink_to(probe_target)
     except OSError as exc:
         raise RuntimeError(f"Symlink creation preflight failed at {link_path.parent}: {exc}") from exc
     try:
@@ -876,7 +880,9 @@ def plan_node_creation(
     existing_id = find_existing_id_by_num(graph.nodes_by_id, prefix=parsed_prefix, num=num, local=is_local)
     if existing_id and mode in ("create", "link_existing") and req.github_issue_number is not None:
         existing = graph.nodes_by_id[existing_id]
-        existing_repo_slug = _normalize_repo_slug(existing.github_repo_owner, existing.github_repo_name) or current_repo_slug
+        existing_repo_slug = (
+            _normalize_repo_slug(existing.github_repo_owner, existing.github_repo_name) or current_repo_slug
+        )
         if existing_repo_slug != requested_repo_slug:
             existing_repo_label = existing_repo_slug if existing_repo_slug is not None else "(current-or-unknown)"
             requested_repo_label = requested_repo_slug if requested_repo_slug is not None else "(current-or-unknown)"
@@ -915,7 +921,10 @@ def plan_node_creation(
             github_repo_owner, github_repo_name = current_scope
     template_dir = specdock_dir / "templates" / kind
     planned_paths = _scaffold_file_paths(template_dir, dest_dir)
-    planned_paths.extend(link_path for link_path, _target_path in _rules_scaffold_specs(kind=kind, dest_dir=dest_dir, specdock_dir=specdock_dir))
+    planned_paths.extend(
+        link_path
+        for link_path, _target_path in _rules_scaffold_specs(kind=kind, dest_dir=dest_dir, specdock_dir=specdock_dir)
+    )
     planned_paths.append(dest_dir / _META_FILENAME)
     meta_path = dest_dir / _META_FILENAME
     return CreatePlan(
@@ -1074,20 +1083,16 @@ def _scan_discussion_timestamp_sources(
         parsed = parse_timestamp_discussion_doc_filename(path.name)
         if parsed is None:
             continue
-        refs.append(
-            (
-                parsed.timestamp,
-                parsed.suffix,
-                parsed.doc_type,
-                path,
-            )
-        )
+        refs.append((
+            parsed.timestamp,
+            parsed.suffix,
+            parsed.doc_type,
+            path,
+        ))
     return refs
 
 
-def _format_discussion_doc_identity(
-    *, timestamp: str, doc_type: str, slug: str, suffix: int | None
-) -> tuple[str, str]:
+def _format_discussion_doc_identity(*, timestamp: str, doc_type: str, slug: str, suffix: int | None) -> tuple[str, str]:
     stem_prefix = f"{timestamp}-{doc_type}" if suffix is None else f"{timestamp}-{suffix:02d}-{doc_type}"
     return f"{stem_prefix}-{slug}", stem_prefix
 
@@ -1187,14 +1192,13 @@ def _allocate_discussion_doc_filename(
         effective_sleep_fn(sleep_seconds)
         remaining_seconds -= sleep_seconds
         next_timestamp = _format_discussion_timestamp(now_iso_provider())
-        if next_timestamp > timestamp:
-            if _discussion_standard_slot_is_free(discussions_dir, next_timestamp):
-                return _allocate_discussion_doc_filename_for_timestamp(
-                    discussions_dir,
-                    timestamp=next_timestamp,
-                    doc_type=doc_type,
-                    slug=slug,
-                )
+        if next_timestamp > timestamp and _discussion_standard_slot_is_free(discussions_dir, next_timestamp):
+            return _allocate_discussion_doc_filename_for_timestamp(
+                discussions_dir,
+                timestamp=next_timestamp,
+                doc_type=doc_type,
+                slug=slug,
+            )
 
     return _allocate_discussion_doc_filename_for_timestamp(
         discussions_dir,
@@ -1231,6 +1235,8 @@ def plan_discussion_doc(
     now_iso_provider: Callable[[], str | None] | None = None,
     sleep_fn: Callable[[float], None] | None = None,
 ) -> tuple[Path, Path, dict[str, str]]:
+    del today
+
     scope = _resolve_scope_node(req, graph)
     doc_type, title, slug = _normalize_discussion_doc_inputs(req)
 
@@ -1359,24 +1365,12 @@ def _github_issue_body(
     kind: Literal["initiative", "epic", "issue"],
 ) -> str:
     if kind == "initiative":
-        return (
-            "Created by spec-dock.\n\n"
-            "Type: initiative\n"
-            "Local specs are stored under `spec-dock/initiatives/`.\n"
-        )
+        return "Created by spec-dock.\n\nType: initiative\nLocal specs are stored under `spec-dock/initiatives/`.\n"
 
     if kind == "epic":
-        return (
-            "Created by spec-dock.\n\n"
-            "Type: epic\n"
-            "Local specs are stored under `spec-dock/initiatives/`.\n"
-        )
+        return "Created by spec-dock.\n\nType: epic\nLocal specs are stored under `spec-dock/initiatives/`.\n"
 
-    return (
-        "Created by spec-dock.\n\n"
-        "Type: issue\n"
-        "Local specs are stored under `spec-dock/initiatives/`.\n"
-    )
+    return "Created by spec-dock.\n\nType: issue\nLocal specs are stored under `spec-dock/initiatives/`.\n"
 
 
 def _validate_pre_github_create_inputs(
@@ -1385,6 +1379,8 @@ def _validate_pre_github_create_inputs(
     kind: Literal["initiative", "epic", "issue"],
     mode: Literal["create", "link_existing"],
 ) -> None:
+    del mode
+
     if kind == "epic" and req.parent_id is None:
         raise RuntimeError("--initiative is required")
 
@@ -1393,9 +1389,8 @@ def _validate_pre_github_create_inputs(
 
     owner = (req.github_repo_owner or "").strip()
     repo = (req.github_repo_name or "").strip()
-    if owner or repo:
-        if not owner or not repo:
-            raise RuntimeError("github_repo_owner and github_repo_name must be provided together")
+    if (owner or repo) and (not owner or not repo):
+        raise RuntimeError("github_repo_owner and github_repo_name must be provided together")
 
 
 def _precheck_pre_github_create_parent(
@@ -1461,9 +1456,7 @@ def _post_github_doctor_first_guidance(
     local_node_id: str | None,
 ) -> str:
     node_hint = (
-        f"local node `{local_node_id}`"
-        if local_node_id is not None
-        else "the local node created by this request"
+        f"local node `{local_node_id}`" if local_node_id is not None else "the local node created by this request"
     )
     return (
         "Create may already have succeeded. Do not rerun blindly. "
@@ -1472,7 +1465,7 @@ def _post_github_doctor_first_guidance(
 
 
 def _build_pre_github_create_failure(*, error: Exception) -> RuntimeError:
-    return RuntimeError("Outcome: pre_github_fail. " f"{error}")
+    return RuntimeError(f"Outcome: pre_github_fail. {error}")
 
 
 def _build_post_github_create_failure(

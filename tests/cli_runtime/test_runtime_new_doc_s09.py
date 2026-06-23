@@ -1,15 +1,13 @@
+import contextlib
+from pathlib import Path
+import re
 import sys
 import tempfile
 import threading
 import time
-from pathlib import Path
 
-
-
-
-import contextlib
 import pytest
-import re
+
 _MISSING = object()
 
 
@@ -43,21 +41,18 @@ def _patch_object(target, name, replacement=_MISSING, *, side_effect=_MISSING, r
         yield replacement
     finally:
         setattr(target, name, original)
+
+
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime import app as runtime_app
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import create_node as app_create_node
-        from spec_dock_runtime.application import ports as app_ports
+        from spec_dock_runtime.application import (
+            contracts as app_contracts,
+            create_node as app_create_node,
+            ports as app_ports,
+        )
         from spec_dock_runtime.commands import new as new_commands
         from spec_dock_runtime.infra import contracts as infra_contracts
         from spec_dock_runtime.presentation import cli_text as presentation_cli_text
@@ -182,10 +177,7 @@ class _SequenceClock:
         self.calls: list[str] = []
 
     def now_iso(self):
-        if len(self.calls) < len(self._values):
-            value = self._values[len(self.calls)]
-        else:
-            value = self._values[-1]
+        value = self._values[len(self.calls)] if len(self.calls) < len(self._values) else self._values[-1]
         self.calls.append(value)
         return value
 
@@ -343,7 +335,15 @@ class TestRuntimeNewDocS09:
         ]
 
     def test_timestamp_regression_and_planning(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -378,7 +378,15 @@ class TestRuntimeNewDocS09:
             assert replacements["<SCOPE_ID>"] == "iss-local-00001"
 
     def test_generated_path_name_content_regression(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -411,7 +419,15 @@ class TestRuntimeNewDocS09:
             assert "date=2026-03-12" in content
 
     def test_doc_type_parity_template_selection_regression(self, monkeypatch) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -445,7 +461,15 @@ class TestRuntimeNewDocS09:
                 assert f"id={expected_ids[doc_type]}" in content
 
     def test_report_and_reflection_are_not_creatable_discussion_doc_types(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -466,7 +490,15 @@ class TestRuntimeNewDocS09:
                     )
 
     def test_draft_doc_types_render_scope_specific_template_bodies(self, monkeypatch) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -476,7 +508,7 @@ class TestRuntimeNewDocS09:
                 (discussions_template_dir / f"{doc_type}.md").write_text(
                     f"type={doc_type}\nenvelope=discussion-draft-template\n",
                     encoding="utf-8",
-            )
+                )
             records = self._scope_records(infra_contracts, specdock_dir=specdock_dir)
             ports = self._ports(app_ports, specdock_dir=specdock_dir, records=records)
             monkeypatch.setattr(app_create_node, "_sleep_discussion_timestamp_poll", lambda _seconds: None)
@@ -505,7 +537,10 @@ class TestRuntimeNewDocS09:
                     )
                     assert re.search(rf"^20260312t010203z(?:-[0-9]{{2}})?-{doc_type}$", result.doc_id)
                     assert re.search(rf"^20260312t010203z(?:-[0-9]{{2}})?-{doc_type}-", result.path.name)
-                    assert ports.template_scaffolder.loaded_paths[-1] == specdock_dir / "templates" / scope_kind / f"{target}.md"
+                    assert (
+                        ports.template_scaffolder.loaded_paths[-1]
+                        == specdock_dir / "templates" / scope_kind / f"{target}.md"
+                    )
                     content = result.path.read_text(encoding="utf-8")
                     assert f"kind={scope_kind}-{target}" in content
                     assert f"body={scope_kind}-{target}" in content
@@ -527,13 +562,21 @@ class TestRuntimeNewDocS09:
                 for doc_type in ("draft-requirement", "draft-design", "draft-plan")
             ]
             assert [result.doc_id for result in suffix_results] == [
-                    "20260312t010203z-03-draft-requirement",
-                    "20260312t010203z-04-draft-design",
-                    "20260312t010203z-05-draft-plan",
-                ]
+                "20260312t010203z-03-draft-requirement",
+                "20260312t010203z-04-draft-design",
+                "20260312t010203z-05-draft-plan",
+            ]
 
     def test_occupied_timestamp_with_advancing_clock_uses_later_unsuffixed_doc(self, monkeypatch) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -565,7 +608,15 @@ class TestRuntimeNewDocS09:
             assert clock.calls == ["2026-03-12T01:02:03+00:00", "2026-03-12T01:02:04+00:00"]
 
     def test_retry_day_rollover_renders_date_from_allocated_timestamp(self, monkeypatch) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -597,7 +648,15 @@ class TestRuntimeNewDocS09:
             assert "id=20260313t000000z-pr-repair-batch" in content
 
     def test_draft_retry_day_rollover_renders_date_from_allocated_timestamp(self, monkeypatch) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -633,7 +692,15 @@ class TestRuntimeNewDocS09:
             assert '最終更新: "2026-03-13"' in content
 
     def test_frozen_clock_uses_suffix_after_bounded_wait(self, monkeypatch) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -670,7 +737,15 @@ class TestRuntimeNewDocS09:
             assert sleep_calls == [0.05, 0.05]
 
     def test_later_occupied_timestamp_exhaustion_falls_back_to_original_family(self, monkeypatch) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -725,7 +800,15 @@ class TestRuntimeNewDocS09:
         ),
     )
     def test_invalid_discussion_timestamp_wait_env_fails_fast(self, monkeypatch, env_name, value) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -754,7 +837,15 @@ class TestRuntimeNewDocS09:
             assert list(discussions_dir.glob("*scratch-invalid-env.md")) == []
 
     def test_suffix_exhaustion_fail_fast_no_write(self, monkeypatch) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -791,7 +882,15 @@ class TestRuntimeNewDocS09:
             assert list(discussions_dir.glob("20260312t010203z-*-scratch-*.md")) == []
 
     def test_duplicate_timestamp_corruption_fail_fast_no_write(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -821,12 +920,20 @@ class TestRuntimeNewDocS09:
             assert not lock_path.exists()
             assert not lock_path.parent.exists()
             assert sorted(path.name for path in discussions_dir.glob("*.md")) == [
-                    "20260312t010203z-adr-first.md",
-                    "20260312t010203z-disc-second.md",
-                ]
+                "20260312t010203z-adr-first.md",
+                "20260312t010203z-disc-second.md",
+            ]
 
     def test_duplicate_timestamp_suffix_corruption_fail_fast_no_lock_no_write(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -856,12 +963,20 @@ class TestRuntimeNewDocS09:
             assert not lock_path.exists()
             assert not lock_path.parent.exists()
             assert sorted(path.name for path in discussions_dir.glob("*.md")) == [
-                    "20260312t010203z-01-adr-first.md",
-                    "20260312t010203z-01-disc-second.md",
-                ]
+                "20260312t010203z-01-adr-first.md",
+                "20260312t010203z-01-disc-second.md",
+            ]
 
     def test_duplicate_timestamp_corruption_post_lock_rescan_fail_no_write(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -895,21 +1010,23 @@ class TestRuntimeNewDocS09:
             worker = threading.Thread(target=_release_and_corrupt)
             worker.start()
             try:
-                with _patch_object(
-                    app_create_node,
-                    "_scan_discussion_timestamp_duplicate_state",
-                    side_effect=_wrapped_scan,
+                with (
+                    _patch_object(
+                        app_create_node,
+                        "_scan_discussion_timestamp_duplicate_state",
+                        side_effect=_wrapped_scan,
+                    ),
+                    pytest.raises(RuntimeError, match="Duplicate discussion timestamp slot detected"),
                 ):
-                    with pytest.raises(RuntimeError, match="Duplicate discussion timestamp slot detected"):
-                        app_create_node.create_discussion_doc(
-                            app_contracts.CreateDiscussionDocRequest(
-                                doc_type="scratch",
-                                scope_node_id="iss-local-00001",
-                                title="Note one",
-                                slug=None,
-                            ),
-                            ports,
-                        )
+                    app_create_node.create_discussion_doc(
+                        app_contracts.CreateDiscussionDocRequest(
+                            doc_type="scratch",
+                            scope_node_id="iss-local-00001",
+                            title="Note one",
+                            slug=None,
+                        ),
+                        ports,
+                    )
             finally:
                 worker.join(timeout=5.0)
             assert not worker.is_alive(), "lock release worker did not finish"
@@ -920,7 +1037,15 @@ class TestRuntimeNewDocS09:
             assert sorted(path.name for path in discussions_dir.glob("*.md")) == [first_name, second_name]
 
     def test_malformed_discussion_candidate_fail_fast_pre_lock_no_write(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         cases = (
             "20260312t010203z-adr.md",
             "foo-adr-kickoff.md",
@@ -957,7 +1082,15 @@ class TestRuntimeNewDocS09:
                 assert sorted(path.name for path in discussions_dir.glob("*.md")) == [malformed_name]
 
     def test_malformed_timestamp_intent_variant_fail_fast_pre_lock_no_write(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -989,7 +1122,15 @@ class TestRuntimeNewDocS09:
             assert sorted(path.name for path in discussions_dir.glob("*.md")) == [malformed_name]
 
     def test_malformed_discussion_candidate_post_lock_rescan_fail_no_write(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         cases = (
             "20260329x-adr-kickoff.md",
             "foo-adr-kickoff.md",
@@ -1014,11 +1155,16 @@ class TestRuntimeNewDocS09:
                 scan_snapshots: list[list[str]] = []
                 original_scan = app_create_node._scan_discussion_timestamp_duplicate_state
 
-                def _wrapped_scan(target_dir):
+                def _wrapped_scan(target_dir, *, scan_snapshots=scan_snapshots, original_scan=original_scan):
                     scan_snapshots.append(sorted(path.name for path in target_dir.glob("*.md")))
                     return original_scan(target_dir)
 
-                def _release_and_corrupt() -> None:
+                def _release_and_corrupt(
+                    *,
+                    discussions_dir=discussions_dir,
+                    malformed_name=malformed_name,
+                    lock_path=lock_path,
+                ) -> None:
                     time.sleep(0.1)
                     (discussions_dir / malformed_name).write_text("broken\n", encoding="utf-8")
                     lock_path.unlink()
@@ -1026,21 +1172,23 @@ class TestRuntimeNewDocS09:
                 worker = threading.Thread(target=_release_and_corrupt)
                 worker.start()
                 try:
-                    with _patch_object(
-                        app_create_node,
-                        "_scan_discussion_timestamp_duplicate_state",
-                        side_effect=_wrapped_scan,
+                    with (
+                        _patch_object(
+                            app_create_node,
+                            "_scan_discussion_timestamp_duplicate_state",
+                            side_effect=_wrapped_scan,
+                        ),
+                        pytest.raises(RuntimeError, match="Malformed discussion document filename"),
                     ):
-                        with pytest.raises(RuntimeError, match="Malformed discussion document filename"):
-                            app_create_node.create_discussion_doc(
-                                app_contracts.CreateDiscussionDocRequest(
-                                    doc_type="scratch",
-                                    scope_node_id="iss-local-00001",
-                                    title="Note one",
-                                    slug=None,
-                                ),
-                                ports,
-                            )
+                        app_create_node.create_discussion_doc(
+                            app_contracts.CreateDiscussionDocRequest(
+                                doc_type="scratch",
+                                scope_node_id="iss-local-00001",
+                                title="Note one",
+                                slug=None,
+                            ),
+                            ports,
+                        )
                 finally:
                     worker.join(timeout=5.0)
                 assert not worker.is_alive(), "lock release worker did not finish"
@@ -1051,7 +1199,15 @@ class TestRuntimeNewDocS09:
                 assert sorted(path.name for path in discussions_dir.glob("*.md")) == [malformed_name]
 
     def test_parallel_new_doc_allocates_unique_suffixes(self, monkeypatch) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -1102,7 +1258,15 @@ class TestRuntimeNewDocS09:
             assert sorted(result.doc_type for result in results) == ["adr", "disc"]
 
     def test_invalid_slug_fail_fast_no_write(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -1127,7 +1291,15 @@ class TestRuntimeNewDocS09:
             assert list(discussions_dir.glob("*.md")) == []
 
     def test_new_node_non_regression_for_shared_file_edits(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -1177,7 +1349,15 @@ class TestRuntimeNewDocS09:
             assert (result.node.path / "README.md").exists()
 
     def test_renderer_text_regression(self) -> None:
-        _runtime_app, app_contracts, _app_create_node, _app_ports, _new_commands, _infra_contracts, presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            _app_create_node,
+            _app_ports,
+            _new_commands,
+            _infra_contracts,
+            presentation_cli_text,
+        ) = _runtime_modules()
         result = app_contracts.CreateDiscussionDocResult(
             doc_id="20260312t010203z-03-adr",
             doc_type="adr",
@@ -1190,16 +1370,24 @@ class TestRuntimeNewDocS09:
         )
         text = presentation_cli_text.render_new_doc_text(result)
         assert text.stdout_lines == [
-                (
-                    "spec-dock: ok (new doc) "
-                    "type=adr id=20260312t010203z-03-adr scope=iss-local-00001 "
-                    "path=spec-dock/initiatives/init-local-00001-auth/epics/epic-local-00001-login/"
-                    "issues/iss-local-00001-refresh-token/discussions/20260312t010203z-03-adr-decision-one.md"
-                )
-            ]
+            (
+                "spec-dock: ok (new doc) "
+                "type=adr id=20260312t010203z-03-adr scope=iss-local-00001 "
+                "path=spec-dock/initiatives/init-local-00001-auth/epics/epic-local-00001-login/"
+                "issues/iss-local-00001-refresh-token/discussions/20260312t010203z-03-adr-decision-one.md"
+            )
+        ]
 
     def test_command_new_doc_smoke(self) -> None:
-        _runtime_app, app_contracts, _app_create_node, _app_ports, new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        (
+            _runtime_app,
+            app_contracts,
+            _app_create_node,
+            _app_ports,
+            new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
         calls = []
 
         def _unexpected(_req):

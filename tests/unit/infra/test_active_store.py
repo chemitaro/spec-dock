@@ -1,22 +1,14 @@
 import json
+from pathlib import Path
 import sys
 import tempfile
-from pathlib import Path
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        from spec_dock_runtime.infra import active_store
-        from spec_dock_runtime.infra import contracts as infra_contracts
+        from spec_dock_runtime.infra import active_store, contracts as infra_contracts
     finally:
         sys.path.pop(0)
     return active_store, infra_contracts

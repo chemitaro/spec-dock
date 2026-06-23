@@ -1,27 +1,53 @@
 from __future__ import annotations
 
 import contextlib
+from dataclasses import dataclass, replace
+from datetime import datetime
 import errno
 import json
 import os
-import shutil
-from datetime import datetime
-from dataclasses import dataclass
-from dataclasses import replace
 from pathlib import Path
-from typing import Literal, cast
+import shutil
+from typing import TYPE_CHECKING, Literal, cast
 from uuid import uuid4
 
-from ..domain.active import infer_active_node_from_branch
-from ..domain.deps import (
+from spec_dock_runtime.application.artifact_preflight import validate_required_artifacts_for_graph
+from spec_dock_runtime.application.check_deps import (
+    load_cached_high_level_github_state_by_id,
+    resolve_high_level_status_context,
+)
+from spec_dock_runtime.application.contracts import (
+    ActiveUpdateOutcome,
+    ArtifactWriteFailure,
+    ArtifactWriteResult,
+    PostMutationSyncOutcome,
+    SyncCommandResult,
+    SyncRequest,
+    SyncStateResult,
+)
+from spec_dock_runtime.application.github_issue_targets import (
+    collect_repo_scoped_issue_view_targets,
+    normalize_repo_slug,
+    snapshot_repo_issue_key,
+)
+from spec_dock_runtime.application.repo_context import (
+    resolve_current_repo_slug,
+)
+from spec_dock_runtime.application.set_active import build_active_manifest, build_context_pack_text, commit_active_state
+from spec_dock_runtime.application.status_context import resolve_issue_status_context
+from spec_dock_runtime.domain.active import infer_active_node_from_branch
+from spec_dock_runtime.domain.deps import (
     build_deps_state,
     build_effective_deps_map,
     evaluate_readiness,
     validate_deps_cycles,
     validate_raw_node_dependency_graph,
 )
-from ..domain.ids import deps_node_sort_key
-from ..domain.models import (
+from spec_dock_runtime.domain.discussion_docs import (
+    DISCUSSION_DOC_TIMESTAMP_FILENAME_RE as _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE,
+)
+from spec_dock_runtime.domain.ids import deps_node_sort_key
+from spec_dock_runtime.domain.models import (
     ActiveSelection,
     DepsDependencyContext,
     DepsEvaluation,
@@ -32,44 +58,24 @@ from ..domain.models import (
     SpecNodeKind,
     SpecNodeSeed,
 )
-from ..domain.status import build_progress_map, resolve_issue_snapshot_by_issue_id
-from ..domain.tree import build_graph, select_active_chain
-from ..domain.validation import (
-    _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE,
+from spec_dock_runtime.domain.status import build_progress_map, resolve_issue_snapshot_by_issue_id
+from spec_dock_runtime.domain.tree import build_graph, select_active_chain
+from spec_dock_runtime.domain.validation import (
     find_github_repo_scope_pairing_error,
     validate_graph_and_deps,
 )
-from ..infra.contracts import ActiveManifest, DirectDependencyResolution, StoredMetaRecord
-from ..presentation.contracts import ArtifactBundle
-from ..presentation.json_state import (
+from spec_dock_runtime.presentation.contracts import ArtifactBundle
+from spec_dock_runtime.presentation.json_state import (
     render_deps_issues_artifact,
     render_deps_raw_artifact,
     render_index_artifact,
     render_tree_artifact,
 )
-from ..presentation.markdown import render_dashboard
-from .artifact_preflight import validate_required_artifacts_for_graph
-from .contracts import (
-    ActiveUpdateOutcome,
-    ArtifactWriteFailure,
-    ArtifactWriteResult,
-    PostMutationSyncOutcome,
-    SyncCommandResult,
-    SyncRequest,
-    SyncStateResult,
-)
-from .github_issue_targets import (
-    collect_repo_scoped_issue_view_targets,
-    normalize_repo_slug,
-    snapshot_repo_issue_key,
-)
-from .check_deps import load_cached_high_level_github_state_by_id, resolve_high_level_status_context
-from .ports import Ports
-from .repo_context import (
-    resolve_current_repo_slug,
-)
-from .set_active import build_active_manifest, build_context_pack_text, commit_active_state
-from .status_context import resolve_issue_status_context
+from spec_dock_runtime.presentation.markdown import render_dashboard
+
+if TYPE_CHECKING:
+    from spec_dock_runtime.application.ports import Ports
+    from spec_dock_runtime.infra.contracts import ActiveManifest, DirectDependencyResolution, StoredMetaRecord
 
 
 class _ArtifactWriteExecutionError(RuntimeError):
@@ -138,7 +144,7 @@ def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> d
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,
@@ -284,11 +290,7 @@ def _preflight_adr_mirror_sources(result: SyncStateResult) -> list[_AdrMirrorSou
     sources_by_basename: dict[str, list[_AdrMirrorSource]] = {}
     for source in sources:
         sources_by_basename.setdefault(source.basename, []).append(source)
-    collisions = sorted(
-        (basename, entries)
-        for basename, entries in sources_by_basename.items()
-        if len(entries) > 1
-    )
+    collisions = sorted((basename, entries) for basename, entries in sources_by_basename.items() if len(entries) > 1)
     if collisions:
         basename, entries = collisions[0]
         source_list = ", ".join(
@@ -351,7 +353,7 @@ def _preflight_adr_mirror_symlink_support(specdock_dir: Path) -> bool:
             probe_path = _build_adr_mirror_probe_path(probe_location.probe_dir)
             probe_created = False
             try:
-                os.symlink(".spec-dock-adr-mirror-probe-target", probe_path)
+                Path(probe_path).symlink_to(".spec-dock-adr-mirror-probe-target")
                 probe_created = True
                 return True
             except FileExistsError:
@@ -388,7 +390,7 @@ def _rebuild_adr_mirror(
     for source in sorted(sources, key=lambda item: item.basename):
         link_path = adrs_dir / source.basename
         rel_target = os.path.relpath(source.source_path, start=adrs_dir)
-        os.symlink(rel_target, link_path)
+        Path(link_path).symlink_to(rel_target)
     return True
 
 
@@ -464,7 +466,7 @@ def collect_sync_state(
                 deps_preflight_error = f"preflight validate failed: {error}"
                 _append_unique(warnings, "deps_preflight_failed")
             else:
-                raise RuntimeError(f"preflight validate failed: {error}")
+                raise RuntimeError(f"preflight validate failed: {error}") from error
         else:
             topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
             issue_depends_on_map = dict(topology.issue_depends_on_map)
@@ -516,15 +518,13 @@ def collect_sync_state(
         except RuntimeError:
             _append_unique(warnings, "gh_fetch_failed")
         else:
-            linked_numbers = sorted(
-                {
-                    int(node.github_issue_number)
-                    for node in graph.nodes_by_id.values()
-                    if node.kind == "issue"
-                    and node.github_issue_number is not None
-                    and normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
-                }
-            )
+            linked_numbers = sorted({
+                int(node.github_issue_number)
+                for node in graph.nodes_by_id.values()
+                if node.kind == "issue"
+                and node.github_issue_number is not None
+                and normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
+            })
             indexed_numbers = {int(snapshot.issue_number) for snapshot in issue_index_snapshots}
             missing = [num for num in linked_numbers if num not in indexed_numbers]
             if missing:
@@ -794,14 +794,14 @@ def _sync_impl(
         final_state = replace(final_state, warnings=sync_warnings)
     except _ArtifactWriteExecutionError as error:
         final_state = replace(final_state, warnings=sync_warnings)
-        status = error.status
+        artifact_status = error.status
         if active_update is not None and active_update.applied:
-            status = "failed_partial_or_stale"
+            artifact_status = "failed_partial_or_stale"
         return SyncCommandResult(
             state=final_state,
             write_result=None,
             active_update=active_update,
-            artifact_failure=ArtifactWriteFailure(status=status, reason=error.reason),
+            artifact_failure=ArtifactWriteFailure(status=artifact_status, reason=error.reason),
         )
     except Exception as error:
         status: Literal["failed_before_write", "failed_partial_or_stale"]

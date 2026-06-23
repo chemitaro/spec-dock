@@ -1,28 +1,22 @@
+import contextlib
 import io
 import json
+from pathlib import Path
 import sys
 import tempfile
-from pathlib import Path
 
 
-import contextlib
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime import app as runtime_app
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import ports as app_ports
-        from spec_dock_runtime.application import set_active as app_set_active
-        from spec_dock_runtime.infra import active_store as infra_active_store
-        from spec_dock_runtime.infra import contracts as infra_contracts
+        from spec_dock_runtime.application import (
+            contracts as app_contracts,
+            ports as app_ports,
+            set_active as app_set_active,
+        )
+        from spec_dock_runtime.infra import active_store as infra_active_store, contracts as infra_contracts
         from spec_dock_runtime.presentation import cli_text as presentation_cli_text
     finally:
         sys.path.pop(0)
@@ -110,7 +104,9 @@ class TestRuntimeActiveS05:
         assert "- issue: authoritative_input=none, downstream_block=missing_authority" in text
 
     def test_context_pack_marks_proposed_active_artifact_non_authoritative(self) -> None:
-        _runtime_app, _app_contracts, _app_ports, app_set_active, infra_active_store, infra_contracts, _cli = _runtime_modules()
+        _runtime_app, _app_contracts, _app_ports, app_set_active, infra_active_store, infra_contracts, _cli = (
+            _runtime_modules()
+        )
         manifest = infra_contracts.ActiveManifest(
             initiative=None,
             epic=None,
@@ -131,31 +127,34 @@ class TestRuntimeActiveS05:
             ),
         )
 
-        for rendered in (infra_active_store._render_context_pack(manifest), app_set_active.build_context_pack_text(manifest)):
+        for rendered in (
+            infra_active_store._render_context_pack(manifest),
+            app_set_active.build_context_pack_text(manifest),
+        ):
             assert "- issue: authority=proposed" in rendered
             assert "- issue: authoritative_input=none" in rendered
             assert "downstream_block=authority_not_approved" in rendered
 
     def test_context_pack_blocks_authoritative_input_when_scope_report_has_unresolved_eal(self) -> None:
-        _runtime_app, _app_contracts, _app_ports, app_set_active, infra_active_store, infra_contracts, _cli = _runtime_modules()
+        _runtime_app, _app_contracts, _app_ports, app_set_active, infra_active_store, infra_contracts, _cli = (
+            _runtime_modules()
+        )
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_rel = Path("spec-dock/initiatives/init-local-00001/epics/epic-local-00001/issues/iss-local-00001")
             issue_dir = repo_root / issue_rel
             issue_dir.mkdir(parents=True)
             (issue_dir / "report.md").write_text(
-                "\n".join(
-                    [
-                        "# Report",
-                        "",
-                        "## Evidence Adoption Ledger",
-                        "",
-                        "| ID | adoption_status | target_artifact | next_action |",
-                        "|---|---|---|---|",
-                        "| EAL-030 | blocked | plan.md | resolve plan evidence |",
-                        "",
-                    ]
-                ),
+                "\n".join([
+                    "# Report",
+                    "",
+                    "## Evidence Adoption Ledger",
+                    "",
+                    "| ID | adoption_status | target_artifact | next_action |",
+                    "|---|---|---|---|",
+                    "| EAL-030 | blocked | plan.md | resolve plan evidence |",
+                    "",
+                ]),
                 encoding="utf-8",
             )
             manifest = infra_contracts.ActiveManifest(
@@ -191,12 +190,7 @@ class TestRuntimeActiveS05:
         app_contracts, app_ports = _runtime_modules()[1:3]
         infra_contracts = _runtime_modules()[5]
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[2]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -262,7 +256,9 @@ class TestRuntimeActiveS05:
                 title="epic",
                 slug="epic",
                 path=Path("/repo/spec-dock/initiatives/init-local-00001-initiative/epics/epic-local-00001-epic"),
-                meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-initiative/epics/epic-local-00001-epic/.meta.json"),
+                meta_path=Path(
+                    "/repo/spec-dock/initiatives/init-local-00001-initiative/epics/epic-local-00001-epic/.meta.json"
+                ),
                 parent_id="init-local-00001",
                 initiative_id="init-local-00001",
                 epic_id=None,
@@ -397,15 +393,23 @@ class TestRuntimeActiveS05:
             legacy_current_path = work_dir / "current.json"
             legacy_active = {
                 "initiative": {"id": "init-local-00001", "path": "spec-dock/initiatives/init-local-00001-alpha"},
-                "epic": {"id": "epic-local-00001", "path": "spec-dock/initiatives/init-local-00001-alpha/epics/epic-local-00001-beta"},
-                "issue": {"id": "iss-local-00001", "path": "spec-dock/initiatives/init-local-00001-alpha/epics/epic-local-00001-beta/issues/iss-local-00001-gamma"},
+                "epic": {
+                    "id": "epic-local-00001",
+                    "path": "spec-dock/initiatives/init-local-00001-alpha/epics/epic-local-00001-beta",
+                },
+                "issue": {
+                    "id": "iss-local-00001",
+                    "path": "spec-dock/initiatives/init-local-00001-alpha/epics/epic-local-00001-beta/issues/iss-local-00001-gamma",
+                },
             }
             legacy_current = {
                 "initiative": {"id": "init-local-99999", "path": "spec-dock/initiatives/init-local-99999-ignored"},
                 "epic": None,
                 "issue": None,
             }
-            legacy_active_path.write_text(json.dumps(legacy_active, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            legacy_active_path.write_text(
+                json.dumps(legacy_active, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
             legacy_current_path.write_text(
                 json.dumps(legacy_current, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
@@ -465,7 +469,10 @@ class TestRuntimeActiveS05:
                 json.dumps(
                     {
                         "initiative": {"id": "init-local-stale", "path": "spec-dock/initiatives/init-local-stale"},
-                        "epic": {"id": "epic-local-stale", "path": "spec-dock/initiatives/init-local-stale/epics/epic-local-stale"},
+                        "epic": {
+                            "id": "epic-local-stale",
+                            "path": "spec-dock/initiatives/init-local-stale/epics/epic-local-stale",
+                        },
                         "issue": {
                             "id": "iss-local-stale",
                             "path": "spec-dock/initiatives/init-local-stale/epics/epic-local-stale/issues/iss-local-stale",
@@ -787,13 +794,13 @@ class TestRuntimeActiveS05:
         )
         text = presentation_cli_text.render_active_show_text(result)
         assert text.stdout_lines == [
-                "initiative: init-local-00001 (spec-dock/initiatives/init-local-00001-alpha)",
-                "epic: epic-local-00001 (spec-dock/initiatives/init-local-00001-alpha/epics/epic-local-00001-beta)",
-                (
-                    "issue: iss-local-00001 "
-                    "(spec-dock/initiatives/init-local-00001-alpha/epics/epic-local-00001-beta/issues/iss-local-00001-gamma)"
-                ),
-            ]
+            "initiative: init-local-00001 (spec-dock/initiatives/init-local-00001-alpha)",
+            "epic: epic-local-00001 (spec-dock/initiatives/init-local-00001-alpha/epics/epic-local-00001-beta)",
+            (
+                "issue: iss-local-00001 "
+                "(spec-dock/initiatives/init-local-00001-alpha/epics/epic-local-00001-beta/issues/iss-local-00001-gamma)"
+            ),
+        ]
         assert text.stderr_lines == []
         assert text.warnings == ["active_manifest_legacy_shape_normalized"]
 
@@ -806,10 +813,10 @@ class TestRuntimeActiveS05:
         )
         none_text = presentation_cli_text.render_active_show_text(none_result)
         assert none_text.stdout_lines == [
-                "spec-dock: active: (not set)",
-                "fallback: spec-dock/active/{initiative,epic,issue} -> spec-dock/system/active-none/{initiative,epic,issue}",
-                "next: spec-dock/scripts/spec-dock active set <target>",
-            ]
+            "spec-dock: active: (not set)",
+            "fallback: spec-dock/active/{initiative,epic,issue} -> spec-dock/system/active-none/{initiative,epic,issue}",
+            "next: spec-dock/scripts/spec-dock active set <target>",
+        ]
         assert none_text.stderr_lines == []
 
     def test_active_show_main_uses_use_case_and_returns_zero(self) -> None:
@@ -836,10 +843,8 @@ class TestRuntimeActiveS05:
             source="none",
             warnings=["active_show_warning"],
         )
-        runtime_app._load_active_manifest_no_migrate = (
-            lambda _specdock_dir: (_ for _ in ()).throw(
-                AssertionError("active show path must not call _load_active_manifest_no_migrate")
-            )
+        runtime_app._load_active_manifest_no_migrate = lambda _specdock_dir: (_ for _ in ()).throw(
+            AssertionError("active show path must not call _load_active_manifest_no_migrate")
         )
         try:
             stdout = io.StringIO()
@@ -853,8 +858,8 @@ class TestRuntimeActiveS05:
 
         assert exit_code == 0
         assert stdout.getvalue() == (
-                "spec-dock: active: (not set)\n"
-                "fallback: spec-dock/active/{initiative,epic,issue} -> spec-dock/system/active-none/{initiative,epic,issue}\n"
-                "next: spec-dock/scripts/spec-dock active set <target>\n"
-            )
+            "spec-dock: active: (not set)\n"
+            "fallback: spec-dock/active/{initiative,epic,issue} -> spec-dock/system/active-none/{initiative,epic,issue}\n"
+            "next: spec-dock/scripts/spec-dock active set <target>\n"
+        )
         assert "spec-dock: (warn) active_show_warning" in stderr.getvalue()

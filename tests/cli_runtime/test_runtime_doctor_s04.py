@@ -1,35 +1,24 @@
+import contextlib
 import io
 import json
 import os
+from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import time
-from pathlib import Path
 
-
-import contextlib
 import pytest
-
 
 _SECRET_TOKEN = "ghp_secret_token_value"
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime import app as runtime_app
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import doctor as app_doctor
-        from spec_dock_runtime.application import ports as app_ports
+        from spec_dock_runtime.application import contracts as app_contracts, doctor as app_doctor, ports as app_ports
         from spec_dock_runtime.infra import contracts as infra_contracts
     finally:
         sys.path.pop(0)
@@ -37,14 +26,7 @@ def _runtime_modules():
 
 
 def _runtime_fs_repo():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.infra import fs_repo as infra_fs_repo
@@ -54,14 +36,7 @@ def _runtime_fs_repo():
 
 
 def _runtime_doctor_command():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.commands import doctor as command_doctor
@@ -71,14 +46,7 @@ def _runtime_doctor_command():
 
 
 def _runtime_github_capability_cli():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.infra import github_capability_cli
@@ -88,14 +56,7 @@ def _runtime_github_capability_cli():
 
 
 def _render_doctor_text(app_contracts, result):
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.presentation.cli_text import render_doctor_text
@@ -264,10 +225,7 @@ class _StubGitHubCapabilityGateway:
 class _StubRawDepsTopologyReader:
     def __init__(self, infra_contracts, raw_node_depends_on_map):
         self._infra_contracts = infra_contracts
-        self._raw_node_depends_on_map = {
-            node_id: list(dep_ids)
-            for node_id, dep_ids in raw_node_depends_on_map.items()
-        }
+        self._raw_node_depends_on_map = {node_id: list(dep_ids) for node_id, dep_ids in raw_node_depends_on_map.items()}
 
     def load_issue_depends_on_map(self, specdock_dir, graph):
         del specdock_dir, graph
@@ -299,17 +257,15 @@ class TestRuntimeDoctorS04:
         parser = argparse.ArgumentParser(prog="doctor")
         spec.add_arguments(parser)
 
-        parsed = parser.parse_args(
-            [
-                "--github-repo",
-                "example/repo",
-                "--github-pr",
-                "123",
-                "--github-head-sha",
-                "abcde12345",
-                "--github-extended",
-            ]
-        )
+        parsed = parser.parse_args([
+            "--github-repo",
+            "example/repo",
+            "--github-pr",
+            "123",
+            "--github-head-sha",
+            "abcde12345",
+            "--github-extended",
+        ])
         args = spec.args_factory(parsed)
         assert args.github_repo == "example/repo"
         assert args.github_pr == 123
@@ -422,62 +378,60 @@ class TestRuntimeDoctorS04:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
             records, _issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
-            gateway = _StubGitHubCapabilityGateway(
-                [
-                    app_contracts.GitHubCapabilityDiagnostic(
-                        code="github_capability_ok",
-                        capability="actions_read",
-                        status="ok",
-                        token_source="gh_saved_auth",
-                        api="GET /repos/{repo}/actions/runs",
-                        severity="info",
-                        message="ok",
-                        recommended_next_action="none",
-                        secret_redacted=True,
-                        stderr_sha256=None,
-                        group="core",
-                    ),
-                    app_contracts.GitHubCapabilityDiagnostic(
-                        code="github_rate_limited",
-                        capability="pull_reviews_read",
-                        status="rate_limited",
-                        token_source="gh_saved_auth",
-                        api="GET /repos/{repo}/pulls/{pr}/reviews",
-                        severity="warning",
-                        message="GitHub API rate limit exceeded.",
-                        recommended_next_action="retry_after_rate_limit_reset",
-                        secret_redacted=True,
-                        stderr_sha256="def456",
-                        group="core",
-                    ),
-                    app_contracts.GitHubCapabilityDiagnostic(
-                        code="github_auth_missing",
-                        capability="issue_comments_read",
-                        status="auth_missing",
-                        token_source="gh_saved_auth",
-                        api="GET /repos/{repo}/issues/{pr}/comments",
-                        severity="blocking",
-                        message="GitHub authentication is missing.",
-                        recommended_next_action="authenticate_gh_or_set_token",
-                        secret_redacted=True,
-                        stderr_sha256="ghi789",
-                        group="core",
-                    ),
-                    app_contracts.GitHubCapabilityDiagnostic(
-                        code="github_schema_unavailable",
-                        capability="pull_review_threads_read",
-                        status="schema_unavailable",
-                        token_source="gh_saved_auth",
-                        api="GraphQL PullRequest.reviewDecision/reviewThreads",
-                        severity="warning",
-                        message="GitHub review thread GraphQL schema is unavailable.",
-                        recommended_next_action="inspect_gh_version_or_api_schema",
-                        secret_redacted=True,
-                        stderr_sha256="jkl012",
-                        group="core",
-                    ),
-                ]
-            )
+            gateway = _StubGitHubCapabilityGateway([
+                app_contracts.GitHubCapabilityDiagnostic(
+                    code="github_capability_ok",
+                    capability="actions_read",
+                    status="ok",
+                    token_source="gh_saved_auth",
+                    api="GET /repos/{repo}/actions/runs",
+                    severity="info",
+                    message="ok",
+                    recommended_next_action="none",
+                    secret_redacted=True,
+                    stderr_sha256=None,
+                    group="core",
+                ),
+                app_contracts.GitHubCapabilityDiagnostic(
+                    code="github_rate_limited",
+                    capability="pull_reviews_read",
+                    status="rate_limited",
+                    token_source="gh_saved_auth",
+                    api="GET /repos/{repo}/pulls/{pr}/reviews",
+                    severity="warning",
+                    message="GitHub API rate limit exceeded.",
+                    recommended_next_action="retry_after_rate_limit_reset",
+                    secret_redacted=True,
+                    stderr_sha256="def456",
+                    group="core",
+                ),
+                app_contracts.GitHubCapabilityDiagnostic(
+                    code="github_auth_missing",
+                    capability="issue_comments_read",
+                    status="auth_missing",
+                    token_source="gh_saved_auth",
+                    api="GET /repos/{repo}/issues/{pr}/comments",
+                    severity="blocking",
+                    message="GitHub authentication is missing.",
+                    recommended_next_action="authenticate_gh_or_set_token",
+                    secret_redacted=True,
+                    stderr_sha256="ghi789",
+                    group="core",
+                ),
+                app_contracts.GitHubCapabilityDiagnostic(
+                    code="github_schema_unavailable",
+                    capability="pull_review_threads_read",
+                    status="schema_unavailable",
+                    token_source="gh_saved_auth",
+                    api="GraphQL PullRequest.reviewDecision/reviewThreads",
+                    severity="warning",
+                    message="GitHub review thread GraphQL schema is unavailable.",
+                    recommended_next_action="inspect_gh_version_or_api_schema",
+                    secret_redacted=True,
+                    stderr_sha256="jkl012",
+                    group="core",
+                ),
+            ])
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(records),
                 repo_root=repo_root,
@@ -516,23 +470,21 @@ class TestRuntimeDoctorS04:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
             records, _issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
-            gateway = _StubGitHubCapabilityGateway(
-                [
-                    app_contracts.GitHubCapabilityDiagnostic(
-                        code="github_auth_missing",
-                        capability="pull_request_read",
-                        status="auth_missing",
-                        token_source="unknown",
-                        api="gh pr view",
-                        severity="blocking",
-                        message="GitHub authentication is missing.",
-                        recommended_next_action="authenticate_gh_or_set_token",
-                        secret_redacted=True,
-                        stderr_sha256="sha",
-                        group="core",
-                    )
-                ]
-            )
+            gateway = _StubGitHubCapabilityGateway([
+                app_contracts.GitHubCapabilityDiagnostic(
+                    code="github_auth_missing",
+                    capability="pull_request_read",
+                    status="auth_missing",
+                    token_source="unknown",
+                    api="gh pr view",
+                    severity="blocking",
+                    message="GitHub authentication is missing.",
+                    recommended_next_action="authenticate_gh_or_set_token",
+                    secret_redacted=True,
+                    stderr_sha256="sha",
+                    group="core",
+                )
+            ])
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(records),
                 repo_root=repo_root,
@@ -608,7 +560,9 @@ class TestRuntimeDoctorS04:
             assert "status=schema_unavailable" in rendered
             assert "status=permission_denied" not in rendered
 
-    @pytest.mark.parametrize("stderr", ("Unknown JSON field: \"statusCheckRollup\"", "unknown json field: statusCheckRollup"))
+    @pytest.mark.parametrize(
+        "stderr", ('Unknown JSON field: "statusCheckRollup"', "unknown json field: statusCheckRollup")
+    )
     def test_github_capability_cli_classifies_unknown_json_field_as_schema_unavailable(self, stderr: str) -> None:
         github_capability_cli = _runtime_github_capability_cli()
         completed = subprocess.CompletedProcess(["gh"], 1, "", stderr)
@@ -659,16 +613,14 @@ class TestRuntimeDoctorS04:
                 return subprocess.CompletedProcess(
                     command,
                     0,
-                    json.dumps(
-                        {
-                            "number": 123,
-                            "headRefOid": "abcde12345",
-                            "baseRefName": "release/1.0",
-                            "headRefName": "feature/do-work",
-                            "headRepositoryOwner": {"login": "example"},
-                            "mergeable": "MERGEABLE",
-                        }
-                    ),
+                    json.dumps({
+                        "number": 123,
+                        "headRefOid": "abcde12345",
+                        "baseRefName": "release/1.0",
+                        "headRefName": "feature/do-work",
+                        "headRepositoryOwner": {"login": "example"},
+                        "mergeable": "MERGEABLE",
+                    }),
                     "",
                 )
             return subprocess.CompletedProcess(command, 0, "{}", "")
@@ -723,16 +675,14 @@ class TestRuntimeDoctorS04:
                 return subprocess.CompletedProcess(
                     command,
                     0,
-                    json.dumps(
-                        {
-                            "number": 123,
-                            "headRefOid": "abcde12345",
-                            "baseRefName": "release/1.0",
-                            "headRefName": "feature/do-work",
-                            "headRepositoryOwner": {"login": "example"},
-                            "mergeable": "MERGEABLE",
-                        }
-                    ),
+                    json.dumps({
+                        "number": 123,
+                        "headRefOid": "abcde12345",
+                        "baseRefName": "release/1.0",
+                        "headRefName": "feature/do-work",
+                        "headRepositoryOwner": {"login": "example"},
+                        "mergeable": "MERGEABLE",
+                    }),
                     "",
                 )
             return subprocess.CompletedProcess(command, 0, "{}", "")
@@ -861,7 +811,7 @@ class TestRuntimeDoctorS04:
             ),
         )
 
-        for label, filenames, expected_message in cases:
+        for _label, filenames, expected_message in cases:
             with tempfile.TemporaryDirectory() as tmp:
                 repo_root = Path(tmp)
                 specdock_dir = repo_root / "spec-dock"
@@ -1235,7 +1185,9 @@ class TestRuntimeDoctorS04:
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
             codes = [finding.code for finding in result.findings]
             assert "stale_active_pointer" in codes
-            stale_finding = next((finding for finding in result.findings if finding.code == "stale_active_pointer"), None)
+            stale_finding = next(
+                (finding for finding in result.findings if finding.code == "stale_active_pointer"), None
+            )
             assert stale_finding is not None
             if stale_finding is None:
                 pytest.fail("stale_active_pointer finding was not returned")
@@ -1273,7 +1225,9 @@ class TestRuntimeDoctorS04:
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
             codes = [finding.code for finding in result.findings]
             assert "stale_active_pointer" in codes
-            stale_finding = next((finding for finding in result.findings if finding.code == "stale_active_pointer"), None)
+            stale_finding = next(
+                (finding for finding in result.findings if finding.code == "stale_active_pointer"), None
+            )
             assert stale_finding is not None
             if stale_finding is None:
                 pytest.fail("stale_active_pointer finding was not returned")
@@ -1310,7 +1264,9 @@ class TestRuntimeDoctorS04:
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
             codes = [finding.code for finding in result.findings]
             assert "stale_active_pointer" in codes
-            stale_finding = next((finding for finding in result.findings if finding.code == "stale_active_pointer"), None)
+            stale_finding = next(
+                (finding for finding in result.findings if finding.code == "stale_active_pointer"), None
+            )
             assert stale_finding is not None
             if stale_finding is None:
                 pytest.fail("stale_active_pointer finding was not returned")
@@ -1345,7 +1301,9 @@ class TestRuntimeDoctorS04:
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
             codes = [finding.code for finding in result.findings]
             assert "stale_active_pointer" in codes
-            stale_finding = next((finding for finding in result.findings if finding.code == "stale_active_pointer"), None)
+            stale_finding = next(
+                (finding for finding in result.findings if finding.code == "stale_active_pointer"), None
+            )
             assert stale_finding is not None
             if stale_finding is None:
                 pytest.fail("stale_active_pointer finding was not returned")
@@ -1373,7 +1331,9 @@ class TestRuntimeDoctorS04:
             assert not result.ok
             codes = [finding.code for finding in result.findings]
             assert "stale_active_pointer" in codes
-            stale_finding = next((finding for finding in result.findings if finding.code == "stale_active_pointer"), None)
+            stale_finding = next(
+                (finding for finding in result.findings if finding.code == "stale_active_pointer"), None
+            )
             assert stale_finding is not None
             if stale_finding is None:
                 pytest.fail("stale_active_pointer finding was not returned")
@@ -1391,15 +1351,13 @@ class TestRuntimeDoctorS04:
             lock_path = specdock_dir / "system" / ".runtime" / "create.lock"
             lock_path.parent.mkdir(parents=True, exist_ok=True)
             lock_path.write_text(
-                "\n".join(
-                    [
-                        "token=abc",
-                        "pid=1234",
-                        "user=tester",
-                        "created_unix=0",
-                        "created_iso=2026-03-01",
-                    ]
-                )
+                "\n".join([
+                    "token=abc",
+                    "pid=1234",
+                    "user=tester",
+                    "created_unix=0",
+                    "created_iso=2026-03-01",
+                ])
                 + "\n",
                 encoding="utf-8",
             )
@@ -1453,15 +1411,13 @@ class TestRuntimeDoctorS04:
             lock_path = specdock_dir / "system" / ".runtime" / "create.lock"
             lock_path.parent.mkdir(parents=True, exist_ok=True)
             lock_path.write_text(
-                "\n".join(
-                    [
-                        "token=running",
-                        "pid=5678",
-                        "user=tester",
-                        f"created_unix={time.time():.6f}",
-                        "created_iso=2026-03-18",
-                    ]
-                )
+                "\n".join([
+                    "token=running",
+                    "pid=5678",
+                    "user=tester",
+                    f"created_unix={time.time():.6f}",
+                    "created_iso=2026-03-18",
+                ])
                 + "\n",
                 encoding="utf-8",
             )

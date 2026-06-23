@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import argparse
+from typing import TYPE_CHECKING, NoReturn
 
-from ..commands.contracts import CommandRegistry, CommandSpec
+if TYPE_CHECKING:
+    from spec_dock_runtime.commands.contracts import CommandRegistry, CommandSpec
 
 
 class _RuntimeArgumentParser(argparse.ArgumentParser):
-    def error(self, message: str) -> None:  # noqa: A003 - argparse API
+    def error(self, message: str) -> NoReturn:
         legacy_flags = ("--initiative", "--epic", "--issue")
         hint = ""
         if "unrecognized arguments" in message and any(flag in message for flag in legacy_flags):
@@ -82,7 +84,9 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
     p_issue = sub.add_parser("issue", help="Run guided issue lifecycle commands")
     issue_sub = p_issue.add_subparsers(dest="issue_cmd", required=True)
     _bind_leaf(issue_sub.add_parser("start", help="Set active issue and checkout its branch"), registry, "issue_start")
-    _bind_leaf(issue_sub.add_parser("finish", help="Close active issue and clear active pointers"), registry, "issue_finish")
+    _bind_leaf(
+        issue_sub.add_parser("finish", help="Close active issue and clear active pointers"), registry, "issue_finish"
+    )
 
     p_worktree = sub.add_parser("worktree", help="Manage long-lived Git worktrees")
     worktree_sub = p_worktree.add_subparsers(dest="worktree_cmd", required=True)
@@ -92,7 +96,11 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         "worktree_create",
     )
     _bind_leaf(worktree_sub.add_parser("list", help="List Git worktrees for this repo"), registry, "worktree_list")
-    _bind_leaf(worktree_sub.add_parser("show", help="Show one Git worktree by id, path, or basename"), registry, "worktree_show")
+    _bind_leaf(
+        worktree_sub.add_parser("show", help="Show one Git worktree by id, path, or basename"),
+        registry,
+        "worktree_show",
+    )
     _bind_leaf(
         worktree_sub.add_parser("remove", help="Remove a Git worktree without deleting its branch"),
         registry,

@@ -1,47 +1,62 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
-from pathlib import Path
+import os
+from typing import TYPE_CHECKING
 
-from ..application.check_deps import check_deps as application_check_deps
-from ..application.close_node import close_node as application_close_node
-from ..application.create_node import create_discussion_doc as application_create_discussion_doc
-from ..application.create_node import create_epic as application_create_epic
-from ..application.create_node import create_initiative as application_create_initiative
-from ..application.create_node import create_issue as application_create_issue
-from ..application.delete_node import delete_node as application_delete_node
-from ..application.doctor import doctor as application_doctor
-from ..application.contracts import UseCases
-from ..application.import_node import import_epic as application_import_epic
-from ..application.import_node import import_initiative as application_import_initiative
-from ..application.import_node import import_issue as application_import_issue
-from ..application.issue_lifecycle import issue_finish as application_issue_finish
-from ..application.issue_lifecycle import issue_start as application_issue_start
-from ..application.mutate_deps import mutate_deps as application_mutate_deps
-from ..application.ports import Ports
-from ..application.set_active import clear_active as application_clear_active
-from ..application.set_active import set_active as application_set_active
-from ..application.set_active import show_active as application_show_active
-from ..application.sync_state import sync as application_sync
-from ..application.validate_tree import validate_tree as application_validate_tree
-from ..application.worktree import worktree_create as application_worktree_create
-from ..application.worktree import worktree_list as application_worktree_list
-from ..application.worktree import worktree_remove as application_worktree_remove
-from ..application.worktree import worktree_show as application_worktree_show
-from ..infra import active_store as infra_active_store
-from ..infra import artifact_writer as infra_artifact_writer
-from ..infra import clock as infra_clock
-from ..infra import deps_reader as infra_deps_reader
-from ..infra import derived_state_reader as infra_derived_state_reader
-from ..infra import fs_cli as infra_fs_cli
-from ..infra import fs_repo as infra_fs_repo
-from ..infra import git_cli as infra_git_cli
-from ..infra import github_capability_cli as infra_github_capability_cli
-from ..infra import github_cli as infra_github_cli
-from ..infra import json_store as infra_json_store
-from ..infra import make_cli as infra_make_cli
-from ..infra import template_scaffolder as infra_template_scaffolder
+from spec_dock_runtime.application.check_deps import check_deps as application_check_deps
+from spec_dock_runtime.application.close_node import close_node as application_close_node
+from spec_dock_runtime.application.contracts import UseCases
+from spec_dock_runtime.application.create_node import (
+    create_discussion_doc as application_create_discussion_doc,
+    create_epic as application_create_epic,
+    create_initiative as application_create_initiative,
+    create_issue as application_create_issue,
+)
+from spec_dock_runtime.application.delete_node import delete_node as application_delete_node
+from spec_dock_runtime.application.doctor import doctor as application_doctor
+from spec_dock_runtime.application.import_node import (
+    import_epic as application_import_epic,
+    import_initiative as application_import_initiative,
+    import_issue as application_import_issue,
+)
+from spec_dock_runtime.application.issue_lifecycle import (
+    issue_finish as application_issue_finish,
+    issue_start as application_issue_start,
+)
+from spec_dock_runtime.application.mutate_deps import mutate_deps as application_mutate_deps
+from spec_dock_runtime.application.ports import Ports
+from spec_dock_runtime.application.set_active import (
+    clear_active as application_clear_active,
+    set_active as application_set_active,
+    show_active as application_show_active,
+)
+from spec_dock_runtime.application.sync_state import sync as application_sync
+from spec_dock_runtime.application.validate_tree import validate_tree as application_validate_tree
+from spec_dock_runtime.application.worktree import (
+    worktree_create as application_worktree_create,
+    worktree_list as application_worktree_list,
+    worktree_remove as application_worktree_remove,
+    worktree_show as application_worktree_show,
+)
+from spec_dock_runtime.infra import (
+    active_store as infra_active_store,
+    artifact_writer as infra_artifact_writer,
+    clock as infra_clock,
+    deps_reader as infra_deps_reader,
+    derived_state_reader as infra_derived_state_reader,
+    fs_cli as infra_fs_cli,
+    fs_repo as infra_fs_repo,
+    git_cli as infra_git_cli,
+    github_capability_cli as infra_github_capability_cli,
+    github_cli as infra_github_cli,
+    json_store as infra_json_store,
+    make_cli as infra_make_cli,
+    template_scaffolder as infra_template_scaffolder,
+)
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -68,7 +83,9 @@ class _NodeRepository:
     def add_issue_dependency(self, meta_path: Path, to_id: str) -> None:
         infra_fs_repo.add_issue_dependency(meta_path, to_id)
 
-    def remove_issue_dependency(self, meta_path: Path, to_id: str, *, matching_refs: list[object] | None = None) -> None:
+    def remove_issue_dependency(
+        self, meta_path: Path, to_id: str, *, matching_refs: list[object] | None = None
+    ) -> None:
         infra_fs_repo.remove_issue_dependency(meta_path, to_id, matching_refs=matching_refs)
 
     def delete_tree(self, node_path: Path) -> None:
