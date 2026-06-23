@@ -5,7 +5,7 @@ ID: "iss-00228"
 関連GitHub: ["#228"]
 状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-06-23"
+最終更新: "2026-06-24"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00224", "init-local-00003"]
 ---
@@ -400,6 +400,81 @@ Success: no issues found in 7 source files
 | ステップ | クロージャ状態 | コミット範囲 | コミットハッシュ / 最終台帳 | コミット後 clean 確認 | 差分なし根拠 | 差分なし確認済み契約 / ファイル | 差分なし diff-clean コマンド | 差分なし read-only 確認 |
 |---|---|---|---|---|---|---|---|---|
 | S02 | ready to commit | S02 runtime/tests/report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+### セッションログ（2026-06-24 S03）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-005, AC-006
+- 計画上の出典:
+  - `plan.md` S03
+  - closure id: tc-005
+
+#### 実施内容
+- Provider 側 Planning / Execution Skill を fixed kernel として整理し、`workflow next` を first-read handoff にした。
+  - `./spec-dock/scripts/spec-dock workflow next issue-planning`
+  - `./spec-dock/scripts/spec-dock workflow next issue-execution`
+- Generated Runbook は canonical authority ではなく、source of truth として編集してはならないことを両 Skill に明示した。
+- freshness / authority stop conditions と canonical docs fallback を残した。
+- Execution Skill は `authorized_profile` を obligation authority とし、`lite_candidate` だけで obligation を減らさないことを明示した。
+- Runtime code、dogfooding mirror、actual `spec-dock/.agents` mirror は変更していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "skill"
+
+15 passed, 477 deselected
+
+uv run ruff check tests/unit/infra/test_init_update.py
+
+All checks passed!
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ | フェーズ | 計画した証跡要件 | 観測した証跡 | 証跡手段 | 結果 | メモ |
+|---|---|---|---|---|---|---|
+| S03 | Inspect / Green | tc-005 inspect-only | provider asset and installed skill text assertions passed | `uv run pytest tests/unit/infra/test_init_update.py -k "skill"` | pass | fixed kernel handoff, non-authority generated Runbook, fallback, `authorized_profile` authority |
+| S03 | Lint | changed test file lint clean | Ruff passed | `uv run ruff check tests/unit/infra/test_init_update.py` | pass | test file only |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ | 発見されたテスト / リスク | 起票元 | 実施した対応 | クロージャID / 新規ID | 計画修正要否 | 証跡 |
+|---|---|---|---|---|---|---|
+| S03 | Existing routing smoke required durable role/stop-condition markers after fixed-kernel shrink | doc-writer | restored concise markers without reintroducing full procedure sets | tc-005 | no | `test_bundled_skill_routing_contract` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ | クロージャID | 計画上の close 条件 | 観測した証跡 | 結果 | メモ |
+|---|---|---|---|---|---|
+| S03 | tc-005 | provider skill asset が fixed kernel になり、tests / inspection が pass | targeted pytest `15 passed, 477 deselected`; targeted Ruff pass | pass | AC-005 / AC-006 covered for provider skills |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID | ステップ | 必須 | 証跡レベル | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ |
+|---|---|---|---|---|---|---|---|
+| tc-005 | S03 | yes | inspect-only | direct skill inspection | `uv run pytest tests/unit/infra/test_init_update.py -k "skill"` | pass | provider asset direct assertion and installed skill assertion |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID | ステップ | 検証証跡 | 観測結果 | メモ |
+|---|---|---|---|---|
+| tc-005 | S03 | targeted pytest + Ruff | pass | covered |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別 | クロージャID | テストID alias | 解決先クロージャID | 理由 | 計画修正要否 | 再レビュー要否 |
+|---|---|---|---|---|---|---|
+| none | tc-005 | planned inspection/assertions | tc-005 | planned S03 scope のまま完了 | no | completed |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ | 委任ロール | 委任 worker 要約 | 変更ファイル | 実行 tests または docs-only 検証 | レビュアー判定 | 未解決リスク | 親統合判断 |
+|---|---|---|---|---|---|---|---|
+| S03 | doc-writer | planning/execution skill fixed kernels and structural assertions updated | provider issue skill assets, `tests/unit/infra/test_init_update.py`, S03 report evidence | targeted pytest -> 15 passed; targeted Ruff -> pass | spec-reviewer pass, no findings | S90 mirror sync remains pending and intentionally out of S03 scope | accepted for commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ | ゲート名 | レビュアーロール | 鮮度 | 状態 | リスク受容 | 昇格 / 完了判断 | メモ |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | spec-reviewer | fresh after S03 changes | pass | no | accepted for commit | reviewed uncommitted S03 diff; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ | クロージャ状態 | コミット範囲 | コミットハッシュ / 最終台帳 | コミット後 clean 確認 | 差分なし根拠 | 差分なし確認済み契約 / ファイル | 差分なし diff-clean コマンド | 差分なし read-only 確認 |
+|---|---|---|---|---|---|---|---|---|
+| S03 | ready for review | S03 skill/tests/report evidence | pending | pending | N/A | N/A | N/A | N/A |
 
 ## 最終品質ゲート（Final Quality Gate）
 

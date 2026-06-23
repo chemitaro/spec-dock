@@ -1991,6 +1991,57 @@ class TestInitUpdate(CliRuntimeHarness):
         ):
             assert fragment in text, f"{source} missing concise runtime command reminder: {fragment}"
 
+    def _assert_issue_skill_fixed_kernel_contract(
+        self,
+        *,
+        planning_text: str,
+        execution_text: str,
+        source: str,
+    ) -> None:
+        common_fragments = (
+            "This skill is a fixed kernel",
+            "state-specific generated Runbook text",
+            "It is not canonical authority",
+            "must not be edited as source of truth",
+            "canonical docs",
+            "current-runbook.*",
+            "Stop if",
+        )
+        for skill_name, text, command in (
+            ("planning", planning_text, "./spec-dock/scripts/spec-dock workflow next issue-planning"),
+            ("execution", execution_text, "./spec-dock/scripts/spec-dock workflow next issue-execution"),
+        ):
+            for fragment in common_fragments:
+                assert fragment in text, f"{source} {skill_name} skill missing fixed-kernel fragment: {fragment}"
+            assert command in text, f"{source} {skill_name} skill missing workflow next handoff: {command}"
+
+        assert "spec-dock/docs/workflow_issue.md" in planning_text
+        assert "spec-dock/docs/workflow_spec_authoring.md" in planning_text
+        assert "spec-dock/docs/workflow_clarification.md" in planning_text
+        assert "spec-dock/docs/phase_plan_issue.md" in planning_text
+        assert "spec-dock/docs/authoring/issue-plan.md" in planning_text
+        assert "spec-dock/docs/authoring/decision-routing.md" in planning_text
+
+        assert "spec-dock/docs/workflow_issue.md" in execution_text
+        assert "spec-dock/docs/workflow_clarification.md" in execution_text
+        assert "spec-dock/docs/phase_plan_issue.md" in execution_text
+        assert "spec-dock/docs/authoring/issue-plan.md" in execution_text
+        assert "`authorized_profile` as the obligation authority" in execution_text
+        assert "`lite_candidate` is not authority and must not reduce obligations by itself" in execution_text
+        assert "lite_candidate can reduce" not in execution_text.lower()
+
+    def test_issue_skills_provider_assets_are_fixed_workflow_next_kernels(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        skills_root = repo_root / "src/spec_dock/assets/install_root/.agents/skills"
+        planning_text = (skills_root / "spec-dock-issue-planning" / "SKILL.md").read_text(encoding="utf-8")
+        execution_text = (skills_root / "spec-dock-issue-execution" / "SKILL.md").read_text(encoding="utf-8")
+
+        self._assert_issue_skill_fixed_kernel_contract(
+            planning_text=planning_text,
+            execution_text=execution_text,
+            source="provider issue skills",
+        )
+
     def _assert_installed_templates_match_provider_assets(
         self,
         installed_base: Path,
@@ -3358,11 +3409,11 @@ class TestInitUpdate(CliRuntimeHarness):
             issue_planning_skill_text = (skills_root / "spec-dock-issue-planning" / "SKILL.md").read_text(
                 encoding="utf-8"
             )
-            assert "spec-dock/docs/workflow_issue.md" in issue_planning_skill_text
-            assert "spec-dock/docs/workflow_spec_authoring.md" in issue_planning_skill_text
-            assert "spec-dock/docs/workflow_clarification.md" in issue_planning_skill_text
-            assert "spec-dock/docs/phase_plan_issue.md" in issue_planning_skill_text
-            assert "spec-dock/docs/authoring/issue-plan.md" in issue_planning_skill_text
+            self._assert_issue_skill_fixed_kernel_contract(
+                planning_text=issue_planning_skill_text,
+                execution_text=issue_skill_text,
+                source="generated issue skills",
+            )
             self._assert_issue_execution_runtime_command_reminders(
                 issue_skill_text,
                 source="generated issue-execution skill",
