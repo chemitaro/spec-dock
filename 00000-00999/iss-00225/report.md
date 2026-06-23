@@ -139,8 +139,115 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ## 実装サマリー (任意)
 - Issue authoring phase completed. `requirement.md`, `design.md`, and `plan.md` have fresh spec-reviewer passes and are marked `approved`.
 - Implementation execution can start from `plan.md` S01, with report evidence recorded per step.
+- S01 completed: Ruff dependency/config skeleton, root `Makefile` `lint`, and `scripts/static_analysis/run.sh` were added. Direct command target is `src/spec_dock tests`; dogfooding `spec-dock/` remains excluded from direct Ruff/mypy targets.
 
 ## 実装記録（セッションログ） (必須)
+
+### セッションログ（2026-06-23 13:12 JST - 13:12 JST）
+
+#### 対象
+- Step: S01 — Dependency / Config / Local Command Skeleton
+- AC/EC: AC-001, AC-002, AC-003
+- 計画上の出典（Planned source）:
+  - `plan.md` S01 executable contract
+  - closure id: `tc-s01-001`
+
+#### 実施内容
+- `dev-coder` に S01 を委任し、許可 path を `pyproject.toml`, `uv.lock`, `scripts/static_analysis/run.sh`, `Makefile` に限定した。
+- `pyproject.toml` に `ruff>=0.12.0` と Ruff global config / exclude / S01 skeleton 用 `select = []` を追加した。
+- `uv.lock` に Ruff dependency resolution を記録した。
+- `scripts/static_analysis/run.sh` を追加し、S01 時点では `uv run ruff check src/spec_dock tests` のみを実行する grouped script skeleton とした。
+- Root `Makefile` に `lint` target を追加した。
+
+#### 実行コマンド / 結果
+```bash
+test -x scripts/static_analysis/run.sh
+# pass
+
+uv run ruff --version
+# ruff 0.15.18
+
+rg -n "src/spec_dock|tests|spec-dock/|ruff check|ruff format|mypy|tool\\.ruff\\.format" scripts/static_analysis/run.sh Makefile pyproject.toml
+# script direct target is `src/spec_dock tests`
+# `spec-dock/` appears only in pyproject exclude
+# no ruff format / mypy command in S01 script
+
+make lint
+# ==> ruff check
+# All checks passed!
+# Summary:
+# - ruff check: pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S01 | 代替証跡（inspect-only） | `tc-s01-001`: local command skeleton が安全な target を持つ | 実装前は Ruff 設定、Makefile、script が存在しないことを worker が inspection | worker inspection | pass | S01 は inspect-only step |
+| S01 | Green | `test -x`, `uv run ruff --version`, target inspection, S01-scoped `make lint` | script executable, Ruff `0.15.18`, target `src/spec_dock tests`, `make lint` pass | command | pass | `select = []` は S01 skeleton として意図通り |
+| S01 | Refactor | guardrail satisfied / no refactor needed | S16 範囲の format 設定は追加していない | diff inspection | pass | 追加 refactor なし |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S01 | none | dev-coder | recorded | tc-s01-001 | no | worker output; parent verification |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S01 | tc-s01-001 | inspection と Ruff version evidence が pass。`uv.lock` 変更は Ruff dependency 追加に由来する差分として記録する | `test -x` pass; `uv run ruff --version` -> `ruff 0.15.18`; `make lint` pass; `uv.lock` contains Ruff `0.15.18` | pass | Direct command target is `src/spec_dock tests` |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s01-001 / tc-s01-case-001 | S01 | yes | inspect-only | Ruff 設定、Makefile、script は未存在 | `test -x`; `uv run ruff --version`; Makefile/script/target inspection; `make lint` | pass | S01-scoped `make lint` only runs Ruff check skeleton |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s01-001 | S01 | `test -x scripts/static_analysis/run.sh`; `uv run ruff --version`; `make lint`; target inspection | pass | AC-001/002/003 skeleton portion closed |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-s01-001 | tc-s01-case-001 | tc-s01-001 | planned closure unchanged | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user objective invoking `spec-dock-issue-execution` and requesting implementation through PR | `/Users/iwasawayuuta/.codex/worktrees/f327/spec-dock` | iss-00225 | current goal session | dev-coder, code-reviewer, qa-reviewer, spec-reviewer, doc-writer as required by plan | same repo/worktree and active issue; no destructive action; no scope expansion; no external publishing without PR gate | issue completion or user revocation | none | proceed with S01 review gate |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated | tooling/config implementation step | dev-coder | Ruff dependency/config skeleton and local command skeleton | requirement/design/plan S01 | `pyproject.toml`; `uv.lock`; `scripts/static_analysis/run.sh`; `Makefile` | source/tests/CI/pre-commit/dogfooding files/report edits | `test -x`; `uv run ruff --version`; target inspection; S01 `make lint` if runnable | tool resolution failure; direct dogfooding target needed; scope外 setup | changed files; command results; lockfile rationale; ledger note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S01 | dev-coder | Ruff dependency/config skeleton, local script, and Makefile target added. No material implementation decisions beyond the approved plan. | `pyproject.toml`; `uv.lock`; `scripts/static_analysis/run.sh`; `Makefile` | `test -x` pass; `uv run ruff --version` -> `ruff 0.15.18`; `make lint` pass | pending code-reviewer | none | accepted for S01 code review |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S01 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit | pass: code-reviewer `019ef2af-51a0-7072-ad02-4d9937c95cbd` |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S01 | ready to commit | `pyproject.toml`; `uv.lock`; `scripts/static_analysis/run.sh`; `Makefile`; `report.md` S01 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `pyproject.toml` - Ruff dev dependency and S01 config skeleton.
+- `uv.lock` - Ruff `0.15.18` dependency resolution.
+- `scripts/static_analysis/run.sh` - S01 grouped static-analysis script skeleton.
+- `Makefile` - `lint` target.
+- `report.md` - S01 observed evidence.
+
+#### コミット
+- pending S01 commit.
+
+#### メモ
+- `select = []` is intentional for S01 so later steps add Ruff rules from `F` onward without starting cleanup early.
 
 ### セッションログ（2026-06-23 HH:MM - HH:MM）
 
