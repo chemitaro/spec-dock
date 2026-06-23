@@ -305,7 +305,7 @@ class TestCliDeps(CliRuntimeHarness):
                 "    number = int(args[2])\n"
                 "    item = ISSUES_BY_NUMBER.get(number)\n"
                 "    if item is None:\n"
-                "        print(f'issue not found: {number}', file=sys.stderr)\n"
+                "        print('issue not found: ' + str(number), file=sys.stderr)\n"
                 "        raise SystemExit(1)\n"
                 "    print(json.dumps({'number': number, 'url': item['url']}))\n"
                 "    raise SystemExit(0)\n"

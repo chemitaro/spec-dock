@@ -749,7 +749,7 @@ def _subtree_remote_close_targets(
             continue
         if canonical_remote is None:
             continue
-        canonical_targets[(canonical_remote.repo_slug, canonical_remote.issue_number)] = canonical_remote
+        canonical_targets[canonical_remote.repo_slug, canonical_remote.issue_number] = canonical_remote
     if invalid_messages:
         return None, _metadata_failure_result(
             target_id=None,

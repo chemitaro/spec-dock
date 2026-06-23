@@ -392,7 +392,7 @@ class TestRuntimeNewS08:
             assert plan.dest_dir / 'discussions' / 'rules.md' in plan.planned_paths
 
     def test_execution_regression_and_write_order(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -2886,7 +2886,7 @@ class TestRuntimeNewS08:
                 events=events,
                 issue_gateway=issue_gateway,
             )
-            with pytest.raises(RuntimeError, match='(?i)duplicate id') as raised:
+            with pytest.raises(RuntimeError, match=r"(?i)duplicate id") as raised:
                 app_create_node.create_initiative(
                     app_contracts.CreateNodeRequest(
                         title="Payments",

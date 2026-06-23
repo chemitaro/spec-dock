@@ -532,7 +532,7 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
             # Keep healthy real entrypoints as highest priority, but if the
             # user-visible pointer disagrees (e.g. placeholder link + real
             # `.path`), normalize the pointer to the same real target.
-            if link.is_symlink() and resolved_link_target != existing_target or link.exists() and not link.is_symlink() and resolved_link_target != existing_target:
+            if (link.is_symlink() and resolved_link_target != existing_target) or (link.exists() and not link.is_symlink() and resolved_link_target != existing_target):
                 force_rebuild = True
             desired_target = existing_target
             if not force_rebuild:

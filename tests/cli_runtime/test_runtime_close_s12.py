@@ -927,7 +927,7 @@ class TestRuntimeCloseS12:
         ]
         ports = self._ports(repo_root=repo_root, records=records, issue_gateway=_StubIssueGateway())
 
-        with pytest.raises(RuntimeError, match="Ambiguous github.issue_number=301"):
+        with pytest.raises(RuntimeError, match=r"Ambiguous github\.issue_number=301"):
             app_close_node.close_node(
                 app_contracts.CloseNodeRequest(
                     target=app_contracts.TargetRef(kind="github_issue", node_id=None, github_issue_number=301)
@@ -977,7 +977,7 @@ class TestRuntimeCloseS12:
         ]
         ports = self._ports(repo_root=repo_root, records=records, issue_gateway=_StubIssueGateway())
 
-        with pytest.raises(RuntimeError, match="No node found for github.issue_number=301 in repo scope"):
+        with pytest.raises(RuntimeError, match=r"No node found for github\.issue_number=301 in repo scope"):
             app_close_node.close_node(
                 app_contracts.CloseNodeRequest(
                     target=app_contracts.TargetRef(

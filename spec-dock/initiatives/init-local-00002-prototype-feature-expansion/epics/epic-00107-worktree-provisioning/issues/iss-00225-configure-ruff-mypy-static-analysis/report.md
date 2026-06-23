@@ -55,6 +55,7 @@ Disposition ごとの必須証跡:
 | D-004 | resolved | compatibility | spec-reviewer | shipped runtime asset を静的解析 coverage に含める一方、dogfooding generated copy の refresh/inspection 証跡が requirement に明示されていなかった | dogfooding copy を直接 lint/typecheck target にする; provider target のまま refresh/inspection evidence を必須にする | provider target のまま、shipped runtime asset 変更時の dogfooding refresh/inspection 判断を requirement/design/plan に追加する | Option B と source-of-truth discipline を維持しつつ stale generated-copy risk を閉じる | applied | requirement review by spec-reviewer `019ef28b-e577-7523-9526-27515dc9a773`; `requirement.md`; `design.md`; `plan.md` | fresh spec-reviewer rerun |
 | D-005 | resolved | compatibility | spec-reviewer | design review で command target と shipped runtime logical coverage の表現揺れが指摘された | shipped runtime asset を第三の direct target として扱う; `src/spec_dock tests` の direct command targetに統一し、runtime asset は logical coverage として扱う | direct command target は `src/spec_dock tests` に統一し、shipped runtime asset は `src/spec_dock` に含まれる coverage/report evidence と明記する | duplicate traversal risk と command ambiguity を避ける | applied | design review by spec-reviewer `019ef295-db33-7aa3-a2ea-68e27e5ab80f`; `design.md`; `plan.md` | fresh design spec-reviewer rerun |
 | D-006 | resolved | test-strategy | spec-reviewer | plan review で `uv.lock` 許可不足、S02-S13 closure contract 不足、S90 refresh 許可範囲不足が指摘された | 現行 plan のまま進む; dependency/dogfooding/closure contract を明示する | S01/S14 allowed paths に `uv.lock` を追加し、S02-S13 shared step closure contract を追加し、S90 で安全な generated-copy refresh は許可し危険なら handoff/follow-up にする | execution handoff で worker が scope 違反せず進められるようにする | applied | plan review by spec-reviewer `019ef2a0-8d5e-7212-9608-d2bf37621852`; `plan.md` | fresh plan spec-reviewer rerun |
+| D-007 | resolved | implementation | dev-coder / orchestrator | S12 `RUF001` が日本語文言・全角句読点・期待文字列に大量発生した | 全置換する; top-level ignore のみ; target-scoped ignore; file-by-file ignore | `RUF001/RUF002/RUF003/RUF010` は `src/spec_dock/**/*.py` と `tests/**/*.py` の target-scoped ignore として扱い、`RUF067` は `src/spec_dock/__init__.py` のみ例外にする | 日本語文言と fullwidth 表記の可読性・意味を保ちつつ、explicit `--select RUF` 実行でも closure を満たす。`RUF012` など実バグ寄りの項目は修正した | applied | S12 session log; `pyproject.toml`; `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF src/spec_dock tests` -> pass | final reviewer gate |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -1343,7 +1344,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S11 | ready to commit | S11 implementation files plus `report.md` S11 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S11 | committed | S11 implementation files plus `report.md` S11 evidence | `f818e54a` `build(static-analysis): Ruff ARG違反を解消する` | `git status --short` -> clean; post-commit `make lint` -> pass; `./spec-dock/scripts/spec-dock validate` -> pass | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `pyproject.toml` - Ruff `ARG` selection, unused-arguments settings, tests-only `ARG` ignore.
@@ -1351,10 +1352,121 @@ git diff --check
 - `report.md` - S10 commit correction and S11 observed evidence.
 
 #### コミット
-- pending S11 step commit.
+- `f818e54a` `build(static-analysis): Ruff ARG違反を解消する`
 
 #### メモ
 - tests-only `ARG` ignore is intentional because pytest fixtures, callbacks, fake methods, and lambda signatures are contract surfaces in tests.
+
+---
+
+### セッションログ（2026-06-23 HH:MM - HH:MM）
+
+#### 対象
+- Step: S12 — Ruff RUF
+- AC/EC: AC-005, AC-009, EC-002
+- 計画上の出典（Planned source）:
+  - `plan.md` S12 executable contract
+  - closure id: `tc-s12-001`
+
+#### 実施内容
+- `dev-coder` に S12 を委任し、許可 path を `pyproject.toml`, `src/spec_dock/**/*.py`, `tests/**/*.py` に限定した。
+- `pyproject.toml` の Ruff `select` を `["F", "E", "I", "UP", "B", "C4", "SIM", "PTH", "TC", "ARG", "RUF"]` に変更した。
+- `RUF001/RUF002/RUF003/RUF010` は日本語文言・fullwidth 表記・explicit conversion 方針を保つため、`src/spec_dock/**/*.py` と `tests/**/*.py` の target-scoped ignore とした。
+- `RUF067` は package `__version__` public export のため、`src/spec_dock/__init__.py` の single-file ignore とした。
+- `RUF012`, `RUF031`, `RUF005`, `RUF052`, `RUF056`, `RUF059`, `RUF043`, `RUF021`, `RUF015`, `RUF027`, `RUF100` は局所修正した。
+- 初回 code-reviewer は global `ignore` に `RUF001/RUF002/RUF003/RUF010` が含まれている点を P1 として fail したため、global ignore から除去し、per-file ignore のみに限定した。
+- dogfooding `spec-dock/` は direct target / direct edit していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF --statistics src/spec_dock tests
+# 457 RUF001, 10 RUF012, 9 RUF031, 8 RUF005, 7 RUF052, 6 RUF056, 5 RUF059, 3 RUF043, 2 RUF021, 1 RUF015, 1 RUF027, 1 RUF067, 1 RUF100; total 511
+
+uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF src/spec_dock tests
+# All checks passed!
+
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_bootstraps_active_fallback_entrypoints_when_active_dir_is_empty
+# 1 passed
+
+make lint
+# pass
+
+git diff --check
+# pass
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=140
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S12 | Red / inventory | `tc-s12-001`: `RUF` violation inventory | total 511; `RUF001` 457 が dominant | parent command: `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF --statistics src/spec_dock tests` | pass | Japanese/fullwidth strings are treated as intentional text |
+| S12 | Green | `F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF` violation 0 件 | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF src/spec_dock tests` -> All checks passed | command | pass | target-scoped RUF ignores included |
+| S12 | Regression | RUF fixes do not break active fallback bootstrap behavior | focused pytest 1 passed | command | pass | worker broad subset had dogfooding/snapshot parity failures outside S12 write scope |
+| S12 | Refactor | guardrail satisfied / no unrelated refactor | S13 以降 rule は追加せず、`spec-dock/` direct target なし | diff inspection + code-reviewer | pass | code-reviewer pass after global ignore removal |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S12 | `RUF001` は日本語文言・全角句読点・期待文字列に 457 件発生し、機械置換すると可読性や意味を損なう | dev-coder / parent inventory | `RUF001/RUF002/RUF003` を target-scoped ignore とし、文字列は保持 | tc-s12-001 | no | `pyproject.toml`; required Ruff command pass |
+| S12 | `RUF010` は explicit conversion 方針と衝突し得る | dev-coder | `src/spec_dock/**/*.py` / `tests/**/*.py` の target-scoped ignore に含めた | tc-s12-001 | no | required Ruff command pass |
+| S12 | `RUF067` は `src/spec_dock/__init__.py` の package `__version__` public export を指摘した | dev-coder | `src/spec_dock/__init__.py` の single-file ignore とした | tc-s12-001 | no | `pyproject.toml`; package export preserved |
+| S12 | global `ignore` に `RUF001/RUF002/RUF003/RUF010` を入れると hidden broad suppression になる | code-reviewer | global ignore から除去し、per-file ignore のみに限定した | tc-s12-001 | no | code-reviewer `019ef357-92e1-7c01-b8d5-58e9ab6ca849` P1; required Ruff command pass after fix |
+| S12 | broad changed-file pytest subset は dogfooding snapshot / provider-vs-dogfooding mirror parity / `.agents` install_root parity で 5 failures | dev-coder | S12 closure evidence からは除外し、S90/S99 dogfooding/docs impact resolution に持ち越す | tc-s90-001 | no | worker report; no direct `spec-dock/` edit in S12 |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S12 | tc-s12-001 | Ruff `RUF` を追加し violation を 0 件にする。ignore は限定的にする | `pyproject.toml` select includes `RUF`; required Ruff command pass; target-scoped Unicode/conversion ignores recorded; single-file `RUF067` ignore recorded | pass | code-reviewer pass |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s12-001 / tc-s12-case-001 | S12 | yes | command | initial `RUF` inventory total 511 | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF src/spec_dock tests` | pass | `RUF` violation 0 件 |
+| tc-s12-001 / tc-s12-ignore-001 | S12 | yes | inspection + command | `RUF001` dominant Japanese/fullwidth string hits; `RUF067` package init export | `pyproject.toml` inspection; required Ruff command | pass | ignore scope and rationale recorded |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s12-001 | S12 | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF src/spec_dock tests`; focused pytest; `make lint`; `git diff --check`; `./spec-dock/scripts/spec-dock validate`; code-reviewer pass | pass | AC-005/009 S12 closed pending commit |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s12-001 | tc-s12-case-001 | tc-s12-001 | planned closure unchanged; concrete command case recorded | no | yes |
+| added | tc-s12-001 | tc-s12-ignore-001 | tc-s12-001 | RUF ignores require explicit scope/rationale evidence | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S12 | delegated | Ruff-native lint rule adoption step | dev-coder | Ruff `RUF` enablement and selected RUF fixes | requirement/design/plan S12 | `pyproject.toml`; `src/spec_dock/**/*.py`; `tests/**/*.py` | report edits; commit; S13+ rules; dogfooding `spec-dock/`; broad suppression without rationale | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF src/spec_dock tests`; focused pytest as needed | readability-damaging Unicode replacement; direct dogfooding edit needed | changed files; inventory; ignore rationale; command results | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S12 | dev-coder | Ruff `RUF` enabled; real RUF issues fixed; Unicode/conversion/package-init exceptions scoped and documented | `pyproject.toml`; selected `src/spec_dock/**/*.py`; selected `tests/**/*.py` touched by RUF fixes | required Ruff command -> pass; focused pytest -> 1 passed; broad subset -> 926 passed, 12 skipped, 5 failed from parity/snapshot scope; `git diff --check` -> pass | pass: code-reviewer `019ef35a-8e94-7581-ad36-41698e641398`; initial fail `019ef357-92e1-7c01-b8d5-58e9ab6ca849` resolved | target-wide `RUF001/RUF002/RUF003/RUF010` may be revisited if future policy narrows Japanese/fullwidth handling | accepted for S12 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S12 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit | pass: code-reviewer `019ef35a-8e94-7581-ad36-41698e641398`; previous P1 resolved |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S12 | ready to commit | S12 implementation files plus `report.md` S12 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `pyproject.toml` - Ruff `RUF` selection and scoped RUF ignores.
+- `src/spec_dock/**/*.py`, `tests/**/*.py` - RUF cleanup within S12 scope.
+- `report.md` - S11 commit correction, D-007, and S12 observed evidence.
+
+#### コミット
+- pending S12 step commit.
+
+#### メモ
+- `RUF001/RUF002/RUF003` are intentionally ignored for target source/test paths to preserve Japanese/fullwidth wording. This is a documented S12 exception, not a hidden global opt-out.
 
 ---
 

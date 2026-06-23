@@ -14,6 +14,7 @@ import sys
 import tarfile
 import tempfile
 import time
+from typing import ClassVar
 import zipfile
 
 try:
@@ -151,7 +152,8 @@ _JAPANESE_PRIMARY_FORBIDDEN_HEADING_PRIMARY_PHRASES = (
     "legacy files",
 )
 
-_JAPANESE_PRIMARY_TABLE_CONTRACT_EXCEPTIONS = _DELEGATED_DRAFT_REQUIRED_FAILURE_MODES + (
+_JAPANESE_PRIMARY_TABLE_CONTRACT_EXCEPTIONS = (
+    *_DELEGATED_DRAFT_REQUIRED_FAILURE_MODES,
     "active issue",
     "boundary",
     "denied / unavailable reason",
@@ -272,7 +274,7 @@ _JAPANESE_PRIMARY_TABLE_ROLE_TOKENS = {
 
 
 class TestInitUpdate(CliRuntimeHarness):
-    _CANONICAL_RULES_PROVIDER_ASSET_MAP = {
+    _CANONICAL_RULES_PROVIDER_ASSET_MAP: ClassVar[dict[str, object]] = {
         "spec-dock/docs/rules/initiative/discussions.md": (
             "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md"
         ),
@@ -390,7 +392,7 @@ class TestInitUpdate(CliRuntimeHarness):
 
     def _actions_by_path(self, payload: dict[str, object]) -> dict[str, dict[str, object]]:
         return {str(action["path"]): action for action in payload["actions"]}  # type: ignore[index]
-    _DOGFOODING_MIRROR_PROVIDER_ASSET_MAP = {
+    _DOGFOODING_MIRROR_PROVIDER_ASSET_MAP: ClassVar[dict[str, object]] = {
         "spec-dock/.gitignore": "src/spec_dock/assets/spec_dock/.gitignore",
         "spec-dock/templates/README.md": "src/spec_dock/assets/spec_dock/templates/README.md",
         "spec-dock/scripts/README.md": "src/spec_dock/assets/spec_dock/scripts/README.md",
@@ -508,7 +510,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "src/spec_dock/assets/install_root/.github/agents/spec-manager.agent.md"
         ),
     }
-    _DOGFOODING_ACTIVE_NONE_REPORT_PROVIDER_ASSET_MAP = {
+    _DOGFOODING_ACTIVE_NONE_REPORT_PROVIDER_ASSET_MAP: ClassVar[dict[str, object]] = {
         "spec-dock/system/active-none/initiative/report.md": (
             "src/spec_dock/assets/spec_dock/system/active-none/initiative/report.md"
         ),
@@ -519,7 +521,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "src/spec_dock/assets/spec_dock/system/active-none/issue/report.md"
         ),
     }
-    _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP = {
+    _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP: ClassVar[dict[str, object]] = {
         "spec-dock/scripts/spec_dock_runtime/app.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py"
         ),
@@ -588,7 +590,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
     }
 
-    _CANONICAL_RULES_EXPECTATIONS = {
+    _CANONICAL_RULES_EXPECTATIONS: ClassVar[dict[str, object]] = {
         "docs/rules/initiative/discussions.md": {
             "contains": (
                 "# 議論ルール（discussions/rules.md）",
@@ -704,7 +706,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "[reference_deps.md](reference_deps.md)",
         "[reference_sync.md](reference_sync.md)",
     )
-    _EXPECTED_HOST_ADAPTER_META = {
+    _EXPECTED_HOST_ADAPTER_META: ClassVar[dict[str, object]] = {
         "schema_version": 1,
         "owner": "spec-dock",
         "targets": {
@@ -837,7 +839,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ".github/agents/utility-worker.agent.md",
         ".github/workflows/ci.yml",
     )
-    _ISSUE_68_CLASSIFICATION_PREFIX_TO_RELATIVE_PATHS = {
+    _ISSUE_68_CLASSIFICATION_PREFIX_TO_RELATIVE_PATHS: ClassVar[dict[str, object]] = {
         ".agents/skills/": (
             ".agents/skills/git-commit-conventional-ja/SKILL.md",
             ".agents/skills/git-commit-conventional-ja/agents/openai.yaml",
@@ -922,7 +924,7 @@ class TestInitUpdate(CliRuntimeHarness):
     _ISSUE_68_RETIRED_LEGACY_ROOT = (
         Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "codex_skills"
     )
-    _ISSUE_68_PROVIDER_DUPLICATE_BOUNDARY = {
+    _ISSUE_68_PROVIDER_DUPLICATE_BOUNDARY: ClassVar[dict[str, object]] = {
         "spec-dock-hub skill": {
             "search_globs": (
                 "**/spec-dock-hub/SKILL.md",
@@ -1276,7 +1278,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00219-carryover-unresolved-threads-stop-observation/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00222-forbid-checks-api-pr-observation/.meta.json",
     )
-    _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
+    _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH: ClassVar[dict[str, object]] = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00028-manual-regression-runtime-github-bugs/.meta.json": [],
@@ -1492,7 +1494,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00219-carryover-unresolved-threads-stop-observation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00222-forbid-checks-api-pr-observation/.meta.json": [],
     }
-    _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
+    _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
         "iss-00035": ["iss-00036"],
         "iss-00036": ["iss-00034"],
         "iss-00037": ["iss-00034", "iss-00035", "iss-00036"],

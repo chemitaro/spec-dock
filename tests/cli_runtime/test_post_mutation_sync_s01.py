@@ -91,7 +91,7 @@ class TestPostMutationSyncS01:
         assert any("./spec-dock/scripts/spec-dock sync" in line for line in outcome.guidance)
 
     def test_tc_s01_003_artifact_failure_is_failed_and_guided(self) -> None:
-        app_contracts, app_sync_state, domain_models = _runtime_modules()
+        app_contracts, _app_sync_state, domain_models = _runtime_modules()
         failure = app_contracts.ArtifactWriteFailure(status="failed_partial_or_stale", reason="disk full")
         result = _sync_result(app_contracts, domain_models, artifact_failure=failure)
 

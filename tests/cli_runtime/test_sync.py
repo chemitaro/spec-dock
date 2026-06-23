@@ -787,7 +787,7 @@ class TestCliSync(CliRuntimeHarness):
             assert nodes["iss-00303"]["deps"] == {"ready": False, "depends_on": ["iss-00302"], "blockers_top": ["iss-00302"]}
 
             tree = json.loads((target / "spec-dock" / ".agent" / "tree.json").read_text(encoding="utf-8"))
-            tree_issue = [i for i in tree["tree"][0]["epics"][0]["issues"] if i["id"] == "iss-00303"][0]
+            tree_issue = next(i for i in tree["tree"][0]["epics"][0]["issues"] if i["id"] == "iss-00303")
             assert tree_issue["deps"] == nodes["iss-00303"]["deps"]
 
     def test_local_only_issue_is_open_and_ready_without_deps(self) -> None:

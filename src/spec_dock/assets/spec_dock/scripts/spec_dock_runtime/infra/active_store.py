@@ -384,8 +384,8 @@ def snapshot_current_state(specdock_dir: Path) -> ActiveStateSnapshot:
         if not path.exists():
             managed_agent_state[name] = None
             continue
-        _loaded = load_json(path)
-        if not isinstance(_loaded, dict):
+        loaded = load_json(path)
+        if not isinstance(loaded, dict):
             raise RuntimeError(f"invalid JSON shape (expected object): {path}")
         managed_agent_state[name] = path.read_text(encoding="utf-8")
 

@@ -373,7 +373,7 @@ class TestRuntimeValidateS02:
             domain_models,
             _infra_contracts,
             _presentation_cli_text,
-            presentation_contracts,
+            _presentation_contracts,
         ) = _runtime_modules()
         from spec_dock_runtime.cli import bootstrap as cli_bootstrap
 
