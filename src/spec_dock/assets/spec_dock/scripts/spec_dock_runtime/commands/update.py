@@ -69,9 +69,7 @@ def _run_update(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
             exit_code=127,
             text=CliText(
                 stdout_lines=[],
-                stderr_lines=[
-                    "error: uvx could not be executed. Install uv/uvx or ensure uvx is on PATH, then retry."
-                ],
+                stderr_lines=["error: uvx could not be executed. Install uv/uvx or ensure uvx is on PATH, then retry."],
                 warnings=[],
             ),
         )

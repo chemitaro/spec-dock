@@ -170,7 +170,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "status=pass" in p.stdout
         assert "reason=ok" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_discussion_created_by_different_authorized_role")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_discussion_created_by_different_authorized_role"
+    )
     def test_diff_guard_rejects_new_discussion_from_different_authorized_role(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
@@ -196,7 +198,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=new_discussion_created_by_role_mismatch" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_new_discussion_without_required_provenance")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_new_discussion_without_required_provenance"
+    )
     def test_diff_guard_rejects_new_discussion_without_required_provenance(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
@@ -224,7 +228,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "created_by_role" in p.stdout
         assert "diff_guard_result" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_multiple_new_discussion_drafts")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_multiple_new_discussion_drafts"
+    )
     def test_diff_guard_rejects_multiple_new_discussion_drafts(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
@@ -253,7 +259,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=expected_exactly_one_new_discussion_draft count=2" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_zero_new_discussion_drafts")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_zero_new_discussion_drafts"
+    )
     def test_diff_guard_rejects_zero_new_discussion_drafts(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
@@ -323,9 +331,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
         baseline_lines = [
-            line
-            for line in baseline.read_text(encoding="utf-8").splitlines()
-            if not line.startswith("# head\t")
+            line for line in baseline.read_text(encoding="utf-8").splitlines() if not line.startswith("# head\t")
         ]
         baseline.write_text("\n".join(baseline_lines) + "\n", encoding="utf-8")
         fake_tmp = tempfile.TemporaryDirectory()
@@ -335,11 +341,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert real_git is not None
         fake_git = fake_bin / "git"
         fake_git.write_text(
-            "#!/bin/sh\n"
-            "if [ \"$1\" = \"rev-parse\" ] && [ \"$2\" = \"HEAD\" ]; then\n"
-            "  exit 128\n"
-            "fi\n"
-            f"exec {real_git} \"$@\"\n",
+            f'#!/bin/sh\nif [ "$1" = "rev-parse" ] && [ "$2" = "HEAD" ]; then\n  exit 128\nfi\nexec {real_git} "$@"\n',
             encoding="utf-8",
         )
         fake_git.chmod(0o755)
@@ -369,9 +371,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
         baseline_lines = [
-            line
-            for line in baseline.read_text(encoding="utf-8").splitlines()
-            if not line.startswith("# head\t")
+            line for line in baseline.read_text(encoding="utf-8").splitlines() if not line.startswith("# head\t")
         ]
         baseline.write_text("\n".join(baseline_lines) + "\n", encoding="utf-8")
         discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
@@ -482,7 +482,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: ok (delegated-authoring diff-guard)" in p.stdout
         assert ".venv" not in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
+    )
     def test_diff_guard_rejects_backdated_ignored_forbidden_root_written_after_baseline(self) -> None:
         target = self._make_target_repo_with_scope()
         (target / ".gitignore").write_text("src/**\n", encoding="utf-8")
@@ -515,7 +517,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "src/delegated.py" in p.stdout
         assert "reason=forbidden_root" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
+    )
     def test_diff_guard_rejects_modified_preexisting_ignored_file_after_baseline(self) -> None:
         target = self._make_target_repo_with_scope()
         (target / ".gitignore").write_text("manual-tests/*\n", encoding="utf-8")
@@ -547,7 +551,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "manual-tests/preexisting.txt" in p.stdout
         assert "reason=outside_target_discussions" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
+    )
     def test_diff_guard_rejects_modified_child_in_preexisting_ignored_guarded_directory(self) -> None:
         target = self._make_target_repo_with_scope()
         (target / ".gitignore").write_text("manual-tests/*\n", encoding="utf-8")
@@ -580,7 +586,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "manual-tests/cache" in p.stdout
         assert "reason=outside_target_discussions" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_discussion_markdown")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_discussion_markdown"
+    )
     def test_diff_guard_ignores_preexisting_ignored_cache_from_baseline(self) -> None:
         target = self._make_target_repo_with_scope()
         (target / ".gitignore").write_text("cache/*\n", encoding="utf-8")
@@ -610,7 +618,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: ok (delegated-authoring diff-guard)" in p.stdout
         assert "cache/preexisting.txt" not in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_discussion_markdown")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_discussion_markdown"
+    )
     def test_diff_guard_allows_new_draft_artifact_discussion_markdown(self) -> None:
         for doc_type in ("draft-requirement", "draft-design", "draft-plan"):
             target = self._make_target_repo_with_scope()
@@ -698,7 +708,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: ok (delegated-authoring diff-guard)" in p.stdout
         assert "reason=ok" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
+    )
     def test_diff_guard_rejects_forbidden_path(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
@@ -755,7 +767,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=scope_not_found" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_discussion_markdown")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_discussion_markdown"
+    )
     def test_diff_guard_ignores_unchanged_preexisting_dirty_canonical_doc(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
@@ -782,7 +796,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert p.returncode == 0, p.stdout + p.stderr
         assert "spec-dock: ok (delegated-authoring diff-guard)" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_discussion_markdown")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_discussion_markdown"
+    )
     def test_diff_guard_ignores_unchanged_preexisting_dirty_path_with_space(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
@@ -836,7 +852,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert p.returncode == 0, p.stdout + p.stderr
         assert "spec-dock: ok (delegated-authoring diff-guard)" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
+    )
     def test_diff_guard_rejects_disappeared_baseline_forbidden_path(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
@@ -921,7 +939,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert p.returncode == 0, p.stdout + p.stderr
         assert "spec-dock: ok (delegated-authoring diff-guard)" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted"
+    )
     def test_diff_guard_rejects_explicit_existing_discussion_update(self) -> None:
         target = self._make_target_repo_with_scope()
         discussion = _issue_dir(target) / "discussions" / "20260525t010203z-01-disc-agent-draft.md"
@@ -950,7 +970,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=existing_discussion_update_unsupported" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted"
+    )
     def test_diff_guard_rejects_explicit_existing_draft_artifact_update(self) -> None:
         target = self._make_target_repo_with_scope()
         discussion = _issue_dir(target) / "discussions" / "20260525t010203z-draft-requirement-agent-draft.md"
@@ -979,7 +1001,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=existing_discussion_update_unsupported" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
+    )
     def test_diff_guard_rejects_preexisting_dirty_forbidden_path_after_baseline(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
@@ -1008,7 +1032,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=canonical_doc" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
+    )
     def test_diff_guard_rejects_committed_side_effect_after_baseline(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
@@ -1037,7 +1063,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "baseline_head=" in p.stdout
         assert "current_head=" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
+    )
     def test_diff_guard_rejects_preexisting_dirty_forbidden_path_mode_change_after_baseline(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
@@ -1064,7 +1092,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=canonical_doc" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
+    )
     def test_diff_guard_rejects_mixed_baseline_forbidden_path_staged_change(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
@@ -1097,7 +1127,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=canonical_doc" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted"
+    )
     def test_diff_guard_rejects_allowlisted_update_when_previous_state_was_accepted(self) -> None:
         target = self._make_target_repo_with_scope()
         discussion = _issue_dir(target) / "discussions" / "20260525t010203z-01-disc-agent-draft.md"
@@ -1126,7 +1158,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=existing_discussion_update_unsupported" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_allowlisted_existing_discussion_without_state_as_unsupported_update")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_allowlisted_existing_discussion_without_state_as_unsupported_update"
+    )
     def test_diff_guard_rejects_allowlisted_update_when_current_draft_claims_non_editable_authority(
         self,
     ) -> None:
@@ -1172,7 +1206,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
             assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
             assert "reason=existing_discussion_update_unsupported" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted"
+    )
     def test_diff_guard_rejects_dirty_baseline_discussion_state_rewrite(self) -> None:
         target = self._make_target_repo_with_scope()
         discussion = _issue_dir(target) / "discussions" / "20260525t010203z-01-disc-agent-draft.md"
@@ -1202,7 +1238,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=dirty_baseline_discussion" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_malformed_discussion_diffs")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_malformed_discussion_diffs"
+    )
     def test_diff_guard_rejects_nested_dirty_baseline_discussion(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
@@ -1229,7 +1267,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=dirty_baseline_discussion" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_symlinked_discussions_dir_without_status_entries")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_symlinked_discussions_dir_without_status_entries"
+    )
     def test_diff_guard_rejects_committed_symlinked_discussions_dir_without_diff(self) -> None:
         target = self._make_target_repo_with_scope()
         discussions_dir = _issue_dir(target) / "discussions"
@@ -1259,7 +1299,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=discussions_dir_symlink" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_discussion_symlink_without_status_entries")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_discussion_symlink_without_status_entries"
+    )
     def test_diff_guard_rejects_committed_discussion_symlink_without_diff(self) -> None:
         target = self._make_target_repo_with_scope()
         symlink = _issue_dir(target) / "discussions" / "20260525t010203z-disc-link.md"
@@ -1285,7 +1327,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=discussion_symlink" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
+    )
     def test_diff_guard_rejects_ignored_env_file_written_after_baseline(self) -> None:
         target = self._make_target_repo_with_scope()
         (target / ".gitignore").write_text(".env*\n", encoding="utf-8")
@@ -1313,7 +1357,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=env_file" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
+    )
     def test_diff_guard_rejects_nested_ignored_env_file_written_after_baseline(self) -> None:
         target = self._make_target_repo_with_scope()
         (target / ".gitignore").write_text("**/.env*\n", encoding="utf-8")
@@ -1343,7 +1389,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=env_file" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
+    )
     def test_diff_guard_rejects_ignored_env_directory_descendant_written_after_baseline(self) -> None:
         target = self._make_target_repo_with_scope()
         (target / ".gitignore").write_text("**/.env*\n", encoding="utf-8")
@@ -1373,7 +1421,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=env_file" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
+    )
     def test_diff_guard_rejects_ignored_env_symlink_retargeted_after_baseline(self) -> None:
         target = self._make_target_repo_with_scope()
         (target / ".gitignore").write_text(".env*\n", encoding="utf-8")
@@ -1408,7 +1458,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "reason=env_file" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_discussion_markdown")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_discussion_markdown"
+    )
     def test_diff_guard_ignores_unchanged_baseline_ignored_env_symlink(self) -> None:
         target = self._make_target_repo_with_scope()
         (target / ".gitignore").write_text(".env*\n", encoding="utf-8")
@@ -1438,7 +1490,9 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert p.returncode == 0, p.stdout + p.stderr
         assert "spec-dock: ok (delegated-authoring diff-guard)" in p.stdout
 
-    @pytest.mark.skip(reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted")
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted"
+    )
     def test_diff_guard_rejects_non_utf8_head_discussion_without_crashing(self) -> None:
         target = self._make_target_repo_with_scope()
         discussion = _issue_dir(target) / "discussions" / "20260525t010203z-01-disc-agent-draft.md"

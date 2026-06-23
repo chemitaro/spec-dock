@@ -131,8 +131,7 @@ def resolve_id_input(value: str, *, prefix: str, field: str, nodes: dict[str, An
         existing_local = find_existing_id_by_num(nodes, prefix=prefix, num=num, local=True)
         if existing_normal and existing_local:
             raise RuntimeError(
-                f"{field} is ambiguous: {value} could mean {existing_normal} or {existing_local}. "
-                "Use full id."
+                f"{field} is ambiguous: {value} could mean {existing_normal} or {existing_local}. Use full id."
             )
         if existing_normal:
             return existing_normal

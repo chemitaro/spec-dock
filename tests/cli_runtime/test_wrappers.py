@@ -23,8 +23,18 @@ class TestCliRulesContract(CliRuntimeHarness):
                     target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
                 ),
                 epic_dir / "issues" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md",
-                epic_dir / "discussions" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md",
-                issue_dir / "discussions" / "rules.md": target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md",
+                epic_dir / "discussions" / "rules.md": target
+                / "spec-dock"
+                / "docs"
+                / "rules"
+                / "epic"
+                / "discussions.md",
+                issue_dir / "discussions" / "rules.md": target
+                / "spec-dock"
+                / "docs"
+                / "rules"
+                / "issue"
+                / "discussions.md",
             }
             for link_path, target_path in expected_rules_links.items():
                 assert link_path.is_symlink(), f"missing rules symlink: {link_path}"
@@ -42,45 +52,35 @@ class TestCliRulesContract(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
 
             templates_readme = (target / "spec-dock" / "templates" / "README.md").read_text(encoding="utf-8")
-            workflow_initiative = (
-                target / "spec-dock" / "docs" / "workflow_initiative.md"
-            ).read_text(encoding="utf-8")
-            workflow_epic = (target / "spec-dock" / "docs" / "workflow_epic.md").read_text(
+            workflow_initiative = (target / "spec-dock" / "docs" / "workflow_initiative.md").read_text(encoding="utf-8")
+            workflow_epic = (target / "spec-dock" / "docs" / "workflow_epic.md").read_text(encoding="utf-8")
+            workflow_issue = (target / "spec-dock" / "docs" / "workflow_issue.md").read_text(encoding="utf-8")
+            reference_github = (target / "spec-dock" / "docs" / "reference_github.md").read_text(encoding="utf-8")
+            initiative_epics_rules = (target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md").read_text(
                 encoding="utf-8"
             )
-            workflow_issue = (target / "spec-dock" / "docs" / "workflow_issue.md").read_text(
-                encoding="utf-8"
-            )
-            reference_github = (target / "spec-dock" / "docs" / "reference_github.md").read_text(
-                encoding="utf-8"
-            )
-            initiative_epics_rules = (
-                target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md"
-            ).read_text(encoding="utf-8")
             initiative_discussions_rules = (
                 target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
             ).read_text(encoding="utf-8")
-            epic_issues_rules = (
-                target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md"
-            ).read_text(encoding="utf-8")
-            epic_discussions_rules = (
-                target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md"
-            ).read_text(encoding="utf-8")
-            issue_discussions_rules = (
-                target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md"
-            ).read_text(encoding="utf-8")
-            hub_skill = (
-                target / ".agents" / "skills" / "spec-dock-hub" / "SKILL.md"
-            ).read_text(encoding="utf-8")
-            issue_skill = (
-                target / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md"
-            ).read_text(encoding="utf-8")
-            issue_planning_skill = (
-                target / ".agents" / "skills" / "spec-dock-issue-planning" / "SKILL.md"
-            ).read_text(encoding="utf-8")
-            codex_adapter_skill = (
-                target / ".agents" / "skills" / "spec-dock-codex-adapter" / "SKILL.md"
-            ).read_text(encoding="utf-8")
+            epic_issues_rules = (target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md").read_text(
+                encoding="utf-8"
+            )
+            epic_discussions_rules = (target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md").read_text(
+                encoding="utf-8"
+            )
+            issue_discussions_rules = (target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md").read_text(
+                encoding="utf-8"
+            )
+            hub_skill = (target / ".agents" / "skills" / "spec-dock-hub" / "SKILL.md").read_text(encoding="utf-8")
+            issue_skill = (target / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            issue_planning_skill = (target / ".agents" / "skills" / "spec-dock-issue-planning" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            codex_adapter_skill = (target / ".agents" / "skills" / "spec-dock-codex-adapter" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
             copilot_adapter_skill = (
                 target / ".agents" / "skills" / "spec-dock-copilot-adapter" / "SKILL.md"
             ).read_text(encoding="utf-8")
@@ -93,25 +93,25 @@ class TestCliRulesContract(CliRuntimeHarness):
             assert "issues/new-issue" not in templates_readme
 
             assert "`spec-dock/docs/rules/initiative/epics.md`" in workflow_initiative
-            assert "`./spec-dock/scripts/spec-dock new epic --initiative <initiative-id> --title \"...\"`" in workflow_initiative
+            assert (
+                '`./spec-dock/scripts/spec-dock new epic --initiative <initiative-id> --title "..."`'
+                in workflow_initiative
+            )
             assert "./spec-dock/scripts/spec-dock validate" in workflow_initiative
             assert "./spec-dock/scripts/spec-dock sync" in workflow_initiative
             assert "./spec " not in workflow_initiative
             assert "epics/new-epic" not in workflow_initiative
 
             assert "`spec-dock/docs/rules/epic/issues.md`" in workflow_epic
-            assert "`./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title \"...\"`" in workflow_epic
+            assert '`./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title "..."`' in workflow_epic
             assert "./spec-dock/scripts/spec-dock validate" in workflow_epic
             assert "./spec-dock/scripts/spec-dock sync" in workflow_epic
             assert "./spec " not in workflow_epic
             assert "issues/new-issue" not in workflow_epic
 
             for command in (
-                "./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title \"...\"",
-                (
-                    "./spec-dock/scripts/spec-dock new issue --create-github-issue --epic "
-                    "<epic-id> --title \"...\""
-                ),
+                './spec-dock/scripts/spec-dock new issue --epic <epic-id> --title "..."',
+                ('./spec-dock/scripts/spec-dock new issue --create-github-issue --epic <epic-id> --title "..."'),
                 "./spec-dock/scripts/spec-dock validate",
                 "./spec-dock/scripts/spec-dock sync",
             ):
@@ -123,7 +123,10 @@ class TestCliRulesContract(CliRuntimeHarness):
             assert "workflow_issue.md" in issue_planning_skill
             assert "./spec " not in workflow_issue
             assert "issues/new-issue" not in workflow_issue
-            assert "./spec-dock/scripts/spec-dock new issue --no-github --epic <epic-id> --title \"...\"" not in workflow_issue
+            assert (
+                './spec-dock/scripts/spec-dock new issue --no-github --epic <epic-id> --title "..."'
+                not in workflow_issue
+            )
 
             assert "`spec-dock/docs/rules/**`" in reference_github
             assert "`--no-github` は node creation option ではありません" in reference_github
@@ -136,23 +139,23 @@ class TestCliRulesContract(CliRuntimeHarness):
             for text, expected_command in (
                 (
                     initiative_epics_rules,
-                    "`./spec-dock/scripts/spec-dock new epic --initiative <id> --title \"<title>\"`",
+                    '`./spec-dock/scripts/spec-dock new epic --initiative <id> --title "<title>"`',
                 ),
                 (
                     initiative_discussions_rules,
-                    "`./spec-dock/scripts/spec-dock new doc adr --initiative <id> --title \"<title>\"`",
+                    '`./spec-dock/scripts/spec-dock new doc adr --initiative <id> --title "<title>"`',
                 ),
                 (
                     epic_issues_rules,
-                    "`./spec-dock/scripts/spec-dock new issue --epic <id> --title \"<title>\"`",
+                    '`./spec-dock/scripts/spec-dock new issue --epic <id> --title "<title>"`',
                 ),
                 (
                     epic_discussions_rules,
-                    "`./spec-dock/scripts/spec-dock new doc adr --epic <id> --title \"<title>\"`",
+                    '`./spec-dock/scripts/spec-dock new doc adr --epic <id> --title "<title>"`',
                 ),
                 (
                     issue_discussions_rules,
-                    "`./spec-dock/scripts/spec-dock new doc adr --issue <id> --title \"<title>\"`",
+                    '`./spec-dock/scripts/spec-dock new doc adr --issue <id> --title "<title>"`',
                 ),
             ):
                 assert "spec-dock/docs/" in text
@@ -214,10 +217,16 @@ class TestCliRulesContract(CliRuntimeHarness):
             assert len(disc_files) == 1
             assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$", adr_files[0].name)
             assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-why-now\.md$", disc_files[0].name)
-            assert sorted(path.name for path in discussions_dir.iterdir()) == sorted([adr_files[0].name, disc_files[0].name, "rules.md"])
+            assert sorted(path.name for path in discussions_dir.iterdir()) == sorted([
+                adr_files[0].name,
+                disc_files[0].name,
+                "rules.md",
+            ])
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            assert validate_result.returncode == 0, f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            assert validate_result.returncode == 0, (
+                f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            )
             assert "spec-dock: ok (validate)" in validate_result.stdout
 
     def test_new_doc_numbering_and_validate_ignore_epic_discussion_rules_symlink(self) -> None:
@@ -227,15 +236,12 @@ class TestCliRulesContract(CliRuntimeHarness):
 
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"]
+            )
 
             epic_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / "epics"
-                / "epic-00002-jwt-auth"
+                target / "spec-dock" / "initiatives" / "init-00001-auth-platform" / "epics" / "epic-00002-jwt-auth"
             )
             discussions_dir = epic_dir / "discussions"
             rules_target = target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md"
@@ -252,10 +258,16 @@ class TestCliRulesContract(CliRuntimeHarness):
             assert len(disc_files) == 1
             assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$", adr_files[0].name)
             assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-why-now\.md$", disc_files[0].name)
-            assert sorted(path.name for path in discussions_dir.iterdir()) == sorted([adr_files[0].name, disc_files[0].name, "rules.md"])
+            assert sorted(path.name for path in discussions_dir.iterdir()) == sorted([
+                adr_files[0].name,
+                disc_files[0].name,
+                "rules.md",
+            ])
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            assert validate_result.returncode == 0, f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            assert validate_result.returncode == 0, (
+                f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            )
             assert "spec-dock: ok (validate)" in validate_result.stdout
 
     def test_new_doc_numbering_and_validate_ignore_issue_discussion_rules_symlink(self) -> None:
@@ -290,10 +302,16 @@ class TestCliRulesContract(CliRuntimeHarness):
             assert len(disc_files) == 1
             assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$", adr_files[0].name)
             assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-why-now\.md$", disc_files[0].name)
-            assert sorted(path.name for path in discussions_dir.iterdir()) == sorted([adr_files[0].name, disc_files[0].name, "rules.md"])
+            assert sorted(path.name for path in discussions_dir.iterdir()) == sorted([
+                adr_files[0].name,
+                disc_files[0].name,
+                "rules.md",
+            ])
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            assert validate_result.returncode == 0, f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            assert validate_result.returncode == 0, (
+                f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            )
             assert "spec-dock: ok (validate)" in validate_result.stdout
 
     def test_runtime_entrypoint_fails_fast_when_runtime_module_missing(self) -> None:

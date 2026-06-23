@@ -32,4 +32,3 @@ class CommandSpec:
 @dataclass(frozen=True)
 class CommandRegistry:
     items: dict[str, CommandSpec]
-

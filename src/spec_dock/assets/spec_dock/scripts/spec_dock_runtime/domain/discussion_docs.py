@@ -105,10 +105,7 @@ def discussion_doc_id_from_path(path: Path) -> str:
 
 
 def discussion_filename_expectation() -> str:
-    return (
-        "Expected `<ts>-<kind>-<slug>.md`, `<ts>-<nn>-<kind>-<slug>.md`, "
-        "or grandfathered `<nnn>-<kind>-<slug>.md`."
-    )
+    return "Expected `<ts>-<kind>-<slug>.md`, `<ts>-<nn>-<kind>-<slug>.md`, or grandfathered `<nnn>-<kind>-<slug>.md`."
 
 
 def _is_discussion_doc_type_candidate(token: str) -> bool:

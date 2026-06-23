@@ -174,7 +174,9 @@ def evaluate_authority_gate(
     normalized_grants = _normalize_grants(grants)
     if normalized_grants is None:
         return AuthorityGateResult(False, "missing_or_invalid_grants", (f"purpose={purpose}",))
-    invalid = tuple(grant for grant in normalized_grants if grant in INVALID_WILDCARD_GRANTS or grant not in VALID_GRANTS)
+    invalid = tuple(
+        grant for grant in normalized_grants if grant in INVALID_WILDCARD_GRANTS or grant not in VALID_GRANTS
+    )
     if invalid:
         return AuthorityGateResult(False, "invalid_grants", tuple(f"grant={grant}" for grant in invalid))
     if required_grant not in normalized_grants:
@@ -202,7 +204,9 @@ def evaluate_authority_gate(
         return AuthorityGateResult(False, "promotion_not_approved", (f"status={promotion_record.get('status')}",))
     if _promotion_value(promotion_record, "authority") != AUTHORITY_APPROVED:
         return AuthorityGateResult(False, "promotion_authority_not_approved", ())
-    if _promotion_value(promotion_record, "approved_hash") != _promotion_value(promotion_record, "reviewer_target_hash"):
+    if _promotion_value(promotion_record, "approved_hash") != _promotion_value(
+        promotion_record, "reviewer_target_hash"
+    ):
         return AuthorityGateResult(False, "stale_promotion_hash", ())
     if _promotion_value(promotion_record, "source_revision") != _promotion_value(promotion_record, "approved_revision"):
         return AuthorityGateResult(False, "stale_promotion_revision", ())

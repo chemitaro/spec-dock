@@ -3,14 +3,7 @@ import sys
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.application import contracts as app_contracts
@@ -103,11 +96,7 @@ def _state(
     nodes.update(extra_nodes or {})
     statuses = {node_id: _status(domain_models, node_id) for node_id, node in nodes.items() if node.kind == "issue"}
     statuses.update(issue_statuses or {})
-    evals = {
-        node_id: _eval(domain_models, ready=True)
-        for node_id, node in nodes.items()
-        if node.kind == "issue"
-    }
+    evals = {node_id: _eval(domain_models, ready=True) for node_id, node in nodes.items() if node.kind == "issue"}
     evals.update(deps_eval_by_id or {})
     return (
         app_contracts.SyncStateResult(

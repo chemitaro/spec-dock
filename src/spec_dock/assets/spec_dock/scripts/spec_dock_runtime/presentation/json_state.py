@@ -79,26 +79,19 @@ def render_deps_check_json(result: DepsCheckResult) -> str:
         "effective_depends_on": list(inspection.effective_depends_on),
         "blockers": list(inspection.evaluation.blockers),
         "issue_blockers": list(inspection.evaluation.issue_blockers),
-        "node_blockers": [
-            _deps_node_blocker_payload(blocker)
-            for blocker in inspection.evaluation.node_blockers
-        ],
+        "node_blockers": [_deps_node_blocker_payload(blocker) for blocker in inspection.evaluation.node_blockers],
         "satisfied_dependencies": [
-            _deps_dependency_context_payload(context)
-            for context in inspection.evaluation.satisfied_dependencies
+            _deps_dependency_context_payload(context) for context in inspection.evaluation.satisfied_dependencies
         ],
         "dependency_contexts": [
-            _deps_dependency_context_payload(context)
-            for context in inspection.evaluation.dependency_contexts
+            _deps_dependency_context_payload(context) for context in inspection.evaluation.dependency_contexts
         ],
         "nodes": {
             node_id: {
                 "state": node_state.status,
                 "ready": bool(node_state.ready),
                 "authority": (
-                    inspection.issue_statuses[node_id].authority
-                    if node_id in inspection.issue_statuses
-                    else "unknown"
+                    inspection.issue_statuses[node_id].authority if node_id in inspection.issue_statuses else "unknown"
                 ),
                 "effective_status": (
                     inspection.issue_statuses[node_id].effective_status
@@ -106,19 +99,13 @@ def render_deps_check_json(result: DepsCheckResult) -> str:
                     else "unknown"
                 ),
                 "source": (
-                    inspection.issue_statuses[node_id].source
-                    if node_id in inspection.issue_statuses
-                    else "unknown"
+                    inspection.issue_statuses[node_id].source if node_id in inspection.issue_statuses else "unknown"
                 ),
                 "stale": (
-                    bool(inspection.issue_statuses[node_id].stale)
-                    if node_id in inspection.issue_statuses
-                    else True
+                    bool(inspection.issue_statuses[node_id].stale) if node_id in inspection.issue_statuses else True
                 ),
                 "last_sync_at": (
-                    inspection.issue_statuses[node_id].last_sync_at
-                    if node_id in inspection.issue_statuses
-                    else None
+                    inspection.issue_statuses[node_id].last_sync_at if node_id in inspection.issue_statuses else None
                 ),
             }
             for node_id, node_state in inspection.node_states.items()
@@ -177,10 +164,7 @@ def _active_to_json(active: ActiveSelection | None) -> dict[str, object] | None:
 
 
 def _deps_state_by_issue_id(result: SyncStateResult) -> dict[str, DepsNodeState]:
-    return {
-        node_state.node_id: node_state
-        for node_state in result.deps_state.nodes
-    }
+    return {node_state.node_id: node_state for node_state in result.deps_state.nodes}
 
 
 def _build_children(graph_nodes: dict[str, SpecNode]) -> dict[str, list[str]]:
@@ -201,9 +185,9 @@ def _build_issue_edges_from_deps_state(
         edges: list[dict[str, str]] = []
         issue_ids = _sort_ids(list(result.issue_depends_on_map.keys()))
         for issue_id in issue_ids:
-            dep_ids = _sort_ids(
-                [dep_id for dep_id in result.issue_depends_on_map.get(issue_id, []) if isinstance(dep_id, str)]
-            )
+            dep_ids = _sort_ids([
+                dep_id for dep_id in result.issue_depends_on_map.get(issue_id, []) if isinstance(dep_id, str)
+            ])
             for dep_id in dep_ids:
                 edges.append({"from": issue_id, "to": dep_id, "kind": "depends_on"})
         edges.sort(key=lambda item: (_sort_key(item["from"]), _sort_key(item["to"])))
@@ -260,11 +244,7 @@ def _node_is_active_raw_participant(result: SyncStateResult, node_id: str) -> bo
         candidate.id
         for candidate in result.graph.nodes_by_id.values()
         if candidate.kind == "issue"
-        and (
-            candidate.id == node_id
-            or candidate.epic_id == node_id
-            or candidate.initiative_id == node_id
-        )
+        and (candidate.id == node_id or candidate.epic_id == node_id or candidate.initiative_id == node_id)
     ]
     visual_state = _high_level_visual_state(result, node_id)
     if visual_state is None:
@@ -298,9 +278,8 @@ def _raw_dependency_edge_is_satisfied(result: SyncStateResult, dependent_id: str
             if _object_value(context, "source_node_id", None) == dependent_id:
                 contexts.append(context)
     for context in contexts:
-        if (
-            _object_value(context, "target_node_id", None) == prerequisite_id
-            and _dependency_context_is_satisfied(context)
+        if _object_value(context, "target_node_id", None) == prerequisite_id and _dependency_context_is_satisfied(
+            context
         ):
             return True
     return False
@@ -357,13 +336,9 @@ def _build_deps_raw_payload(result: SyncStateResult) -> dict[str, object]:
     include_ids = _include_raw_ancestors(result, participant_ids)
 
     tree: list[dict[str, object]] = []
-    initiative_ids = _sort_ids(
-        [
-            node_id
-            for node_id, node in graph_nodes.items()
-            if node.kind == "initiative" and node_id in include_ids
-        ]
-    )
+    initiative_ids = _sort_ids([
+        node_id for node_id, node in graph_nodes.items() if node.kind == "initiative" and node_id in include_ids
+    ])
     for initiative_id in initiative_ids:
         init_node = graph_nodes[initiative_id]
         init_item: dict[str, object] = {
@@ -376,13 +351,11 @@ def _build_deps_raw_payload(result: SyncStateResult) -> dict[str, object]:
         if init_visual_state is not None:
             init_item.update(init_visual_state)
         epic_items: list[dict[str, object]] = []
-        epic_ids = _sort_ids(
-            [
-                node_id
-                for node_id, node in graph_nodes.items()
-                if node.kind == "epic" and node.parent_id == initiative_id and node_id in include_ids
-            ]
-        )
+        epic_ids = _sort_ids([
+            node_id
+            for node_id, node in graph_nodes.items()
+            if node.kind == "epic" and node.parent_id == initiative_id and node_id in include_ids
+        ])
         for epic_id in epic_ids:
             epic_node = graph_nodes[epic_id]
             epic_item: dict[str, object] = {
@@ -395,22 +368,18 @@ def _build_deps_raw_payload(result: SyncStateResult) -> dict[str, object]:
             if epic_visual_state is not None:
                 epic_item.update(epic_visual_state)
             issue_items: list[dict[str, object]] = []
-            issue_ids = _sort_ids(
-                [
-                    node_id
-                    for node_id, node in graph_nodes.items()
-                    if node.kind == "issue" and node.parent_id == epic_id and node_id in include_ids
-                ]
-            )
+            issue_ids = _sort_ids([
+                node_id
+                for node_id, node in graph_nodes.items()
+                if node.kind == "issue" and node.parent_id == epic_id and node_id in include_ids
+            ])
             for issue_id in issue_ids:
                 issue_node = graph_nodes[issue_id]
-                issue_items.append(
-                    {
-                        "id": issue_node.id,
-                        "title": issue_node.title,
-                        "state": _issue_raw_state(result, issue_node.id),
-                    }
-                )
+                issue_items.append({
+                    "id": issue_node.id,
+                    "title": issue_node.title,
+                    "state": _issue_raw_state(result, issue_node.id),
+                })
             epic_item["issues"] = issue_items
             epic_items.append(epic_item)
         init_item["epics"] = epic_items
@@ -493,27 +462,24 @@ def _build_state_payloads(result: SyncStateResult) -> StatePayloads:
                     issue_status = result.issue_statuses.get(node.id)
                     fallback_allowed = issue_status is not None and issue_status.source == "github"
                 if fallback_allowed:
-                    snapshot = result.github_snapshot_by_repo_scope_and_issue_number.get(
-                        (repo_scope, int(node.github_issue_number))
-                    )
+                    snapshot = result.github_snapshot_by_repo_scope_and_issue_number.get((
+                        repo_scope,
+                        int(node.github_issue_number),
+                    ))
             if snapshot is not None:
-                github_item.update(
-                    {
-                        "state": snapshot.state,
-                        "url": snapshot.url,
-                        "updated_at": snapshot.updated_at,
-                        "labels": list(snapshot.labels),
-                    }
-                )
+                github_item.update({
+                    "state": snapshot.state,
+                    "url": snapshot.url,
+                    "updated_at": snapshot.updated_at,
+                    "labels": list(snapshot.labels),
+                })
             elif node.kind in {"initiative", "epic"}:
                 visual_state = _high_level_visual_state(result, node.id)
                 if visual_state is not None and visual_state["state_source"] in {"github", "cache"}:
-                    github_item.update(
-                        {
-                            "state": visual_state["state"].upper(),
-                            "updated_at": result.generated_at,
-                        }
-                    )
+                    github_item.update({
+                        "state": visual_state["state"].upper(),
+                        "updated_at": result.generated_at,
+                    })
             item["github"] = github_item
 
         if node.kind in ("initiative", "epic"):
@@ -524,9 +490,7 @@ def _build_state_payloads(result: SyncStateResult) -> StatePayloads:
         nodes_all[node.id] = item
 
     tree_all: list[dict[str, object]] = []
-    initiative_ids = _sort_ids(
-        [node_id for node_id, node in graph_nodes.items() if node.kind == "initiative"]
-    )
+    initiative_ids = _sort_ids([node_id for node_id, node in graph_nodes.items() if node.kind == "initiative"])
     for initiative_id in initiative_ids:
         init_base = nodes_all.get(initiative_id)
         if not isinstance(init_base, dict):
@@ -551,31 +515,25 @@ def _build_state_payloads(result: SyncStateResult) -> StatePayloads:
         init_item["epics"] = epics_all
         tree_all.append(init_item)
 
-    todo_issue_ids = _sort_ids(
-        [
-            node_id
-            for node_id, item in nodes_all.items()
-            if isinstance(item, dict)
-            and item.get("type") == "issue"
-            and str(item.get("status") or "unknown").lower() != "done"
-        ]
-    )
+    todo_issue_ids = _sort_ids([
+        node_id
+        for node_id, item in nodes_all.items()
+        if isinstance(item, dict)
+        and item.get("type") == "issue"
+        and str(item.get("status") or "unknown").lower() != "done"
+    ])
     todo_issue_set = set(todo_issue_ids)
-    todo_epic_ids = _sort_ids(
-        [
-            node_id
-            for node_id, node in graph_nodes.items()
-            if node.kind == "epic" and any(child_id in todo_issue_set for child_id in children.get(node_id, []))
-        ]
-    )
+    todo_epic_ids = _sort_ids([
+        node_id
+        for node_id, node in graph_nodes.items()
+        if node.kind == "epic" and any(child_id in todo_issue_set for child_id in children.get(node_id, []))
+    ])
     todo_epic_set = set(todo_epic_ids)
-    todo_initiative_ids = _sort_ids(
-        [
-            node_id
-            for node_id, node in graph_nodes.items()
-            if node.kind == "initiative" and any(child_id in todo_epic_set for child_id in children.get(node_id, []))
-        ]
-    )
+    todo_initiative_ids = _sort_ids([
+        node_id
+        for node_id, node in graph_nodes.items()
+        if node.kind == "initiative" and any(child_id in todo_epic_set for child_id in children.get(node_id, []))
+    ])
     todo_initiative_set = set(todo_initiative_ids)
     todo_node_ids = todo_issue_set | todo_epic_set | todo_initiative_set
 
@@ -595,13 +553,17 @@ def _build_state_payloads(result: SyncStateResult) -> StatePayloads:
             continue
         init_item = dict(init_base)
         epics_todo: list[dict[str, object]] = []
-        for epic_id in _sort_ids([child_id for child_id in children.get(initiative_id, []) if child_id in todo_epic_set]):
+        for epic_id in _sort_ids([
+            child_id for child_id in children.get(initiative_id, []) if child_id in todo_epic_set
+        ]):
             epic_base = nodes_todo.get(epic_id)
             if not isinstance(epic_base, dict):
                 continue
             epic_item = dict(epic_base)
             issues_todo: list[dict[str, object]] = []
-            for issue_id in _sort_ids([child_id for child_id in children.get(epic_id, []) if child_id in todo_issue_set]):
+            for issue_id in _sort_ids([
+                child_id for child_id in children.get(epic_id, []) if child_id in todo_issue_set
+            ]):
                 issue_base = nodes_todo.get(issue_id)
                 if isinstance(issue_base, dict):
                     issues_todo.append(dict(issue_base))
@@ -617,9 +579,7 @@ def _build_state_payloads(result: SyncStateResult) -> StatePayloads:
         "edge_direction": "depends_on (dependent -> prerequisite)",
     }
     deps_issue_edges_todo = [
-        edge
-        for edge in deps_issue_edges_all
-        if edge.get("from") in todo_issue_set and edge.get("to") in todo_issue_set
+        edge for edge in deps_issue_edges_all if edge.get("from") in todo_issue_set and edge.get("to") in todo_issue_set
     ]
     deps_top_todo = {
         "valid": result.deps_preflight_error is None,
@@ -712,34 +672,30 @@ def _node_payload(result: SyncStateResult, node_id: str) -> dict[str, object] | 
         effective_status = status.effective_status if status is not None else "unknown"
         evaluation = result.deps_eval_by_id.get(node.id)
         ready = bool(evaluation.ready) if evaluation is not None else False
-        item.update(
-            {
-                "status": effective_status,
-                "authority": status.authority if status is not None else "unknown",
-                "effective_status": effective_status,
-                "source": status.source if status is not None else "unknown",
-                "stale": bool(status.stale) if status is not None else True,
-                "last_sync_at": status.last_sync_at if status is not None else None,
-                "ready": ready,
-                "depends_on": list(evaluation.blockers) if evaluation is not None else [],
-                "issue_blockers": list(evaluation.issue_blockers) if evaluation is not None else [],
-                "node_blockers": [
-                    _deps_node_blocker_payload(blocker)
-                    for blocker in (evaluation.node_blockers if evaluation is not None else [])
-                ],
-                "state": _issue_raw_state(result, node.id),
-            }
-        )
+        item.update({
+            "status": effective_status,
+            "authority": status.authority if status is not None else "unknown",
+            "effective_status": effective_status,
+            "source": status.source if status is not None else "unknown",
+            "stale": bool(status.stale) if status is not None else True,
+            "last_sync_at": status.last_sync_at if status is not None else None,
+            "ready": ready,
+            "depends_on": list(evaluation.blockers) if evaluation is not None else [],
+            "issue_blockers": list(evaluation.issue_blockers) if evaluation is not None else [],
+            "node_blockers": [
+                _deps_node_blocker_payload(blocker)
+                for blocker in (evaluation.node_blockers if evaluation is not None else [])
+            ],
+            "state": _issue_raw_state(result, node.id),
+        })
     else:
         visual_state = _high_level_visual_state(result, node.id)
         state = visual_state["state"] if visual_state is not None else "unknown"
-        item.update(
-            {
-                "state": state,
-                "state_source": visual_state["state_source"] if visual_state is not None else "none",
-                "ready": state in {"closed", "done"},
-            }
-        )
+        item.update({
+            "state": state,
+            "state_source": visual_state["state_source"] if visual_state is not None else "none",
+            "ready": state in {"closed", "done"},
+        })
     return item
 
 
@@ -936,9 +892,7 @@ def render_deps_issues_artifact(result: SyncStateResult) -> DepsIssuesArtifact:
 
 def render_deps_raw_artifact(result: SyncStateResult) -> DepsRawArtifact:
     if result.deps_preflight_error is not None:
-        return DepsRawArtifact(
-            puml_text=render_deps_disabled_deps_raw_puml(error=result.deps_preflight_error)
-        )
+        return DepsRawArtifact(puml_text=render_deps_disabled_deps_raw_puml(error=result.deps_preflight_error))
     payload = _build_deps_raw_payload(result)
     return DepsRawArtifact(puml_text=render_deps_raw_puml(payload))
 

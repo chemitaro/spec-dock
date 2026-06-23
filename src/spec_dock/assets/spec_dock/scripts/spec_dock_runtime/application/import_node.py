@@ -252,9 +252,7 @@ def _post_import_doctor_first_guidance(
     local_node_id: str | None,
 ) -> str:
     node_hint = (
-        f"local node `{local_node_id}`"
-        if local_node_id is not None
-        else "the local node targeted by this import"
+        f"local node `{local_node_id}`" if local_node_id is not None else "the local node targeted by this import"
     )
     return (
         "Import may have partially written local files. Do not rerun blindly. "
@@ -293,16 +291,10 @@ def _build_post_import_failure(
             f"{guidance}"
         )
     if local_error is not None:
-        return RuntimeError(
-            "Outcome: import_local_write_fail. "
-            f"{local_error} "
-            f"{guidance}"
-        )
+        return RuntimeError(f"Outcome: import_local_write_fail. {local_error} {guidance}")
     if release_error is not None:
         return RuntimeError(
-            "Outcome: import_local_write_success_cleanup_fail. "
-            f"Cleanup failure: {release_error}. "
-            f"{doctor_guidance}"
+            f"Outcome: import_local_write_success_cleanup_fail. Cleanup failure: {release_error}. {doctor_guidance}"
         )
     return None
 

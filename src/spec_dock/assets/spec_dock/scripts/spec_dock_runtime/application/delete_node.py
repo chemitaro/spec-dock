@@ -27,9 +27,7 @@ if TYPE_CHECKING:
     from spec_dock_runtime.application.ports import Ports
 
 _NUM_RE = re.compile(r"^[0-9]+$")
-_SCOPED_ISSUE_REF_RE = re.compile(
-    r"^(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)#(?P<num>[0-9]+)$"
-)
+_SCOPED_ISSUE_REF_RE = re.compile(r"^(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)#(?P<num>[0-9]+)$")
 _GITHUB_ISSUE_URL_RE = re.compile(
     r"^(?:https?://)?(?:www\.)?github\.com/(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)/issues/(?P<num>[0-9]+)(?:[/?#].*)?$",
     re.IGNORECASE,
@@ -259,11 +257,7 @@ def _is_canonical_managed_node_dir(*, specdock_dir: Path, node_dir: Path, kind: 
     if kind == "initiative":
         return len(relative_parts) == 2 and relative_parts[0] == "initiatives"
     if kind == "epic":
-        return (
-            len(relative_parts) == 4
-            and relative_parts[0] == "initiatives"
-            and relative_parts[2] == "epics"
-        )
+        return len(relative_parts) == 4 and relative_parts[0] == "initiatives" and relative_parts[2] == "epics"
     return (
         len(relative_parts) == 6
         and relative_parts[0] == "initiatives"
@@ -596,13 +590,13 @@ def _issue_ids_for_scope_node(*, node: SpecNode, graph: SpecGraph) -> list[str]:
     if node.kind == "issue":
         return [node.id]
     if node.kind == "epic":
-        return sorted(
-            [item.id for item in graph.nodes_by_id.values() if item.kind == "issue" and item.epic_id == node.id]
-        )
+        return sorted([
+            item.id for item in graph.nodes_by_id.values() if item.kind == "issue" and item.epic_id == node.id
+        ])
     if node.kind == "initiative":
-        return sorted(
-            [item.id for item in graph.nodes_by_id.values() if item.kind == "issue" and item.initiative_id == node.id]
-        )
+        return sorted([
+            item.id for item in graph.nodes_by_id.values() if item.kind == "issue" and item.initiative_id == node.id
+        ])
     return []
 
 
@@ -658,9 +652,7 @@ def _collect_surviving_raw_node_dependency_refs(
     deleted_node_ids = {node_id for node_id in subtree_ids if graph.nodes_by_id.get(node_id) is not None}
     if not deleted_node_ids:
         return {}, {}, {}
-    surviving_node_ids = {
-        node.id for node in _iter_managed_nodes(graph) if node.id not in subtree_ids
-    }
+    surviving_node_ids = {node.id for node in _iter_managed_nodes(graph) if node.id not in subtree_ids}
     surviving_node_to_deleted_node_ids: dict[str, set[str]] = {}
     surviving_node_to_deleted_raw_refs: dict[str, list[object]] = {}
     deleted_node_to_surviving_node_ids: dict[str, set[str]] = {}
@@ -681,9 +673,7 @@ def _collect_surviving_raw_node_dependency_refs(
                         )
                     continue
                 if resolution.resolved_node_id in deleted_node_ids:
-                    surviving_node_to_deleted_node_ids.setdefault(survivor_id, set()).add(
-                        resolution.resolved_node_id
-                    )
+                    surviving_node_to_deleted_node_ids.setdefault(survivor_id, set()).add(resolution.resolved_node_id)
                     surviving_node_to_deleted_raw_refs.setdefault(survivor_id, []).append(resolution.raw_ref)
         return (
             surviving_node_to_deleted_node_ids,
@@ -893,7 +883,9 @@ def _delete_subtree_locally(
             if not node.path.exists() and node.id not in deleted_set:
                 deleted_node_ids.append(node.id)
                 deleted_set.add(node.id)
-            remaining_node_ids = sorted(node_id for node_id in (item.id for item in ordered_nodes) if node_id not in deleted_set)
+            remaining_node_ids = sorted(
+                node_id for node_id in (item.id for item in ordered_nodes) if node_id not in deleted_set
+            )
             return deleted_node_ids, remaining_node_ids, False
 
     return deleted_node_ids, [], True
@@ -1034,7 +1026,9 @@ def _scrub_surviving_dependency_refs(
             exact_refs_to_remove = list((surviving_node_to_deleted_raw_refs or {}).get(survivor_id, []))
             if exact_refs_to_remove:
                 refs_to_remove = [ref for ref in depends_on if any(ref == exact for exact in exact_refs_to_remove)]
-                filtered_depends_on = [ref for ref in depends_on if not any(ref == exact for exact in exact_refs_to_remove)]
+                filtered_depends_on = [
+                    ref for ref in depends_on if not any(ref == exact for exact in exact_refs_to_remove)
+                ]
             else:
                 refs_to_remove = [
                     ref

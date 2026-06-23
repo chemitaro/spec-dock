@@ -751,8 +751,8 @@ class UseCases:
     issue_finish: Callable[[IssueFinishRequest], IssueFinishResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("issue_finish is not configured")
     )
-    doctor: Callable[[DoctorRequest], DoctorResult] = (
-        lambda _req: DoctorResult(ok=True, findings=[], warnings=[], github_capability_diagnostics=[])
+    doctor: Callable[[DoctorRequest], DoctorResult] = lambda _req: DoctorResult(
+        ok=True, findings=[], warnings=[], github_capability_diagnostics=[]
     )
     worktree_create: Callable[[WorktreeCreateRequest], WorktreeCreateResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("worktree_create is not configured")

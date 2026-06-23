@@ -62,4 +62,3 @@ def _expect_validate_args(args: CommandArgs) -> ValidateArgs:
     if not isinstance(args, ValidateArgs):
         raise RuntimeError("Invalid command args for validate")
     return args
-

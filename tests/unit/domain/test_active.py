@@ -3,14 +3,7 @@ import sys
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.domain import active as domain_active, models as domain_models, tree as domain_tree
@@ -23,52 +16,55 @@ class TestActiveDomain:
     def _graph(self):
         _domain_active, domain_models, domain_tree = _runtime_modules()
         root = Path("/repo/spec-dock/initiatives/init-00001-platform")
-        return domain_tree.build_graph(
-            [
-                domain_models.SpecNodeSeed(
-                    kind="initiative",
-                    id="init-00001",
-                    title="Platform",
-                    slug="platform",
-                    path=root,
-                    meta_path=root / ".meta.json",
-                    parent_id=None,
-                    initiative_id=None,
-                    epic_id=None,
-                    github_issue_number=101,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="epic",
-                    id="epic-00002",
-                    title="Delivery",
-                    slug="delivery",
-                    path=root / "epics" / "epic-00002-delivery",
-                    meta_path=root / "epics" / "epic-00002-delivery" / ".meta.json",
-                    parent_id="init-00001",
-                    initiative_id="init-00001",
-                    epic_id=None,
-                    github_issue_number=201,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-                domain_models.SpecNodeSeed(
-                    kind="issue",
-                    id="iss-00123",
-                    title="Add Refresh Token",
-                    slug="add-refresh-token",
-                    path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00123-add-refresh-token",
-                    meta_path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00123-add-refresh-token" / ".meta.json",
-                    parent_id="epic-00002",
-                    initiative_id="init-00001",
-                    epic_id="epic-00002",
-                    github_issue_number=123,
-                    github_repo_owner="example",
-                    github_repo_name="repo",
-                ),
-            ]
-        )
+        return domain_tree.build_graph([
+            domain_models.SpecNodeSeed(
+                kind="initiative",
+                id="init-00001",
+                title="Platform",
+                slug="platform",
+                path=root,
+                meta_path=root / ".meta.json",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=101,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="epic",
+                id="epic-00002",
+                title="Delivery",
+                slug="delivery",
+                path=root / "epics" / "epic-00002-delivery",
+                meta_path=root / "epics" / "epic-00002-delivery" / ".meta.json",
+                parent_id="init-00001",
+                initiative_id="init-00001",
+                epic_id=None,
+                github_issue_number=201,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+            domain_models.SpecNodeSeed(
+                kind="issue",
+                id="iss-00123",
+                title="Add Refresh Token",
+                slug="add-refresh-token",
+                path=root / "epics" / "epic-00002-delivery" / "issues" / "iss-00123-add-refresh-token",
+                meta_path=root
+                / "epics"
+                / "epic-00002-delivery"
+                / "issues"
+                / "iss-00123-add-refresh-token"
+                / ".meta.json",
+                parent_id="epic-00002",
+                initiative_id="init-00001",
+                epic_id="epic-00002",
+                github_issue_number=123,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            ),
+        ])
 
     def test_select_active_chain_resolves_missing_layers_as_placeholders_without_cli(self) -> None:
         _domain_active, domain_models, domain_tree = _runtime_modules()

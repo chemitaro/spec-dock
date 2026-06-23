@@ -4,14 +4,7 @@ import sys
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.domain import models as domain_models, tree as domain_tree
@@ -66,46 +59,44 @@ def test_load_issue_depends_on_map_retains_empty_epic_topology_context(tmp_path)
     _write_meta(target_epic_path, [])
     _write_meta(target_issue_path, ["epic-00202"])
 
-    graph = domain_tree.build_graph(
-        [
-            _seed(
-                domain_models,
-                kind="initiative",
-                node_id="init-00101",
-                path=init_path,
-                parent_id=None,
-                initiative_id=None,
-                epic_id=None,
-            ),
-            _seed(
-                domain_models,
-                kind="epic",
-                node_id="epic-00202",
-                path=empty_epic_path,
-                parent_id="init-00101",
-                initiative_id="init-00101",
-                epic_id=None,
-            ),
-            _seed(
-                domain_models,
-                kind="epic",
-                node_id="epic-00300",
-                path=target_epic_path,
-                parent_id="init-00101",
-                initiative_id="init-00101",
-                epic_id=None,
-            ),
-            _seed(
-                domain_models,
-                kind="issue",
-                node_id="iss-00301",
-                path=target_issue_path,
-                parent_id="epic-00300",
-                initiative_id="init-00101",
-                epic_id="epic-00300",
-            ),
-        ]
-    )
+    graph = domain_tree.build_graph([
+        _seed(
+            domain_models,
+            kind="initiative",
+            node_id="init-00101",
+            path=init_path,
+            parent_id=None,
+            initiative_id=None,
+            epic_id=None,
+        ),
+        _seed(
+            domain_models,
+            kind="epic",
+            node_id="epic-00202",
+            path=empty_epic_path,
+            parent_id="init-00101",
+            initiative_id="init-00101",
+            epic_id=None,
+        ),
+        _seed(
+            domain_models,
+            kind="epic",
+            node_id="epic-00300",
+            path=target_epic_path,
+            parent_id="init-00101",
+            initiative_id="init-00101",
+            epic_id=None,
+        ),
+        _seed(
+            domain_models,
+            kind="issue",
+            node_id="iss-00301",
+            path=target_issue_path,
+            parent_id="epic-00300",
+            initiative_id="init-00101",
+            epic_id="epic-00300",
+        ),
+    ])
 
     result = deps_reader.load_issue_depends_on_map(specdock_dir, graph)
 
@@ -144,64 +135,62 @@ def test_load_issue_depends_on_map_expands_non_empty_epic_and_keeps_raw_context(
     ]:
         _write_meta(path, depends_on)
 
-    graph = domain_tree.build_graph(
-        [
-            _seed(
-                domain_models,
-                kind="initiative",
-                node_id="init-00101",
-                path=init_path,
-                parent_id=None,
-                initiative_id=None,
-                epic_id=None,
-            ),
-            _seed(
-                domain_models,
-                kind="epic",
-                node_id="epic-00202",
-                path=blocker_epic_path,
-                parent_id="init-00101",
-                initiative_id="init-00101",
-                epic_id=None,
-            ),
-            _seed(
-                domain_models,
-                kind="epic",
-                node_id="epic-00300",
-                path=target_epic_path,
-                parent_id="init-00101",
-                initiative_id="init-00101",
-                epic_id=None,
-            ),
-            _seed(
-                domain_models,
-                kind="issue",
-                node_id="iss-00301",
-                path=target_issue_path,
-                parent_id="epic-00300",
-                initiative_id="init-00101",
-                epic_id="epic-00300",
-            ),
-            _seed(
-                domain_models,
-                kind="issue",
-                node_id="iss-00401",
-                path=blocker_one_path,
-                parent_id="epic-00202",
-                initiative_id="init-00101",
-                epic_id="epic-00202",
-            ),
-            _seed(
-                domain_models,
-                kind="issue",
-                node_id="iss-00402",
-                path=blocker_two_path,
-                parent_id="epic-00202",
-                initiative_id="init-00101",
-                epic_id="epic-00202",
-            ),
-        ]
-    )
+    graph = domain_tree.build_graph([
+        _seed(
+            domain_models,
+            kind="initiative",
+            node_id="init-00101",
+            path=init_path,
+            parent_id=None,
+            initiative_id=None,
+            epic_id=None,
+        ),
+        _seed(
+            domain_models,
+            kind="epic",
+            node_id="epic-00202",
+            path=blocker_epic_path,
+            parent_id="init-00101",
+            initiative_id="init-00101",
+            epic_id=None,
+        ),
+        _seed(
+            domain_models,
+            kind="epic",
+            node_id="epic-00300",
+            path=target_epic_path,
+            parent_id="init-00101",
+            initiative_id="init-00101",
+            epic_id=None,
+        ),
+        _seed(
+            domain_models,
+            kind="issue",
+            node_id="iss-00301",
+            path=target_issue_path,
+            parent_id="epic-00300",
+            initiative_id="init-00101",
+            epic_id="epic-00300",
+        ),
+        _seed(
+            domain_models,
+            kind="issue",
+            node_id="iss-00401",
+            path=blocker_one_path,
+            parent_id="epic-00202",
+            initiative_id="init-00101",
+            epic_id="epic-00202",
+        ),
+        _seed(
+            domain_models,
+            kind="issue",
+            node_id="iss-00402",
+            path=blocker_two_path,
+            parent_id="epic-00202",
+            initiative_id="init-00101",
+            epic_id="epic-00202",
+        ),
+    ])
 
     result = deps_reader.load_issue_depends_on_map(specdock_dir, graph)
 

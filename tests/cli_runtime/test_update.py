@@ -31,13 +31,13 @@ class TestUpdateCommand(CliRuntimeHarness):
 
             assert p.returncode == 0, f"stdout:\n{p.stdout}\nstderr:\n{p.stderr}"
             assert args_log.read_text(encoding="utf-8").splitlines() == [
-                    "--no-cache",
-                    "--from",
-                    "git+https://github.com/chemitaro/spec-dock",
-                    "spec-dock",
-                    "update",
-                    str(target.resolve()),
-                ]
+                "--no-cache",
+                "--from",
+                "git+https://github.com/chemitaro/spec-dock",
+                "spec-dock",
+                "update",
+                str(target.resolve()),
+            ]
 
     def test_update_passes_explicit_target_to_installer_update(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

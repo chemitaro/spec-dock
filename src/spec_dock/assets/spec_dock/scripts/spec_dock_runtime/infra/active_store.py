@@ -161,7 +161,9 @@ def _render_context_pack(manifest: ActiveManifest | None, *, repo_root: Path | N
     lines.append("")
     lines.append("## Authority")
     lines.append("- source: `spec-dock/.agent/active.json`")
-    lines.append("- rule: proposed or missing authority cannot authorize implementation, issue ready, issue finish, or phase completion.")
+    lines.append(
+        "- rule: proposed or missing authority cannot authorize implementation, issue ready, issue finish, or phase completion."
+    )
     for label, entry in (
         ("initiative", initiative),
         ("epic", epic),

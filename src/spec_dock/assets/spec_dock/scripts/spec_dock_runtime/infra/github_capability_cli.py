@@ -93,8 +93,7 @@ class GitHubCapabilityCliGateway:
         return diagnostics
 
 
-def _extended_checks(
-) -> list[tuple[GitHubCapability, GitHubCapabilityGroup, str, list[str]]]:
+def _extended_checks() -> list[tuple[GitHubCapability, GitHubCapabilityGroup, str, list[str]]]:
     return []
 
 

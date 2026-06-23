@@ -109,13 +109,9 @@ def resolve_issue_statuses(
 
     cache_last_sync_at_by_id = dict(cached_issue_last_sync_at_by_id or {})
     resolved: dict[str, IssueStatusSnapshot] = {}
-    status_target_ids = _safe_sorted_issue_ids(
-        [
-            node_id
-            for node_id, node in graph.nodes_by_id.items()
-            if node.kind in ("initiative", "epic", "issue")
-        ]
-    )
+    status_target_ids = _safe_sorted_issue_ids([
+        node_id for node_id, node in graph.nodes_by_id.items() if node.kind in ("initiative", "epic", "issue")
+    ])
     for issue_id in status_target_ids:
         issue_node = graph.nodes_by_id[issue_id]
 
@@ -169,13 +165,11 @@ def resolve_issue_snapshot_by_issue_id(
     issue_snapshot_by_number, issue_snapshot_by_repo_and_number = _build_issue_snapshot_indexes(issue_snapshots)
     current_repo_identity = _normalize_repo_slug_value(current_repo_slug)
     resolved: dict[str, IssueSnapshot] = {}
-    issue_ids = _safe_sorted_issue_ids(
-        [
-            node_id
-            for node_id, node in graph.nodes_by_id.items()
-            if node.kind in ("initiative", "epic", "issue") and node.github_issue_number is not None
-        ]
-    )
+    issue_ids = _safe_sorted_issue_ids([
+        node_id
+        for node_id, node in graph.nodes_by_id.items()
+        if node.kind in ("initiative", "epic", "issue") and node.github_issue_number is not None
+    ])
     for issue_id in issue_ids:
         issue_node = graph.nodes_by_id[issue_id]
         issue_snapshot = _resolve_issue_snapshot_for_node(
@@ -199,13 +193,7 @@ def build_progress_map(
             by_node_id[node_id] = {"total": 0, "done": 0, "open": 0, "unknown": 0}
 
     counts = {"total": 0, "done": 0, "open": 0, "unknown": 0}
-    issue_ids = _safe_sorted_issue_ids(
-        [
-            node_id
-            for node_id, node in graph.nodes_by_id.items()
-            if node.kind == "issue"
-        ]
-    )
+    issue_ids = _safe_sorted_issue_ids([node_id for node_id, node in graph.nodes_by_id.items() if node.kind == "issue"])
     for issue_id in issue_ids:
         issue_node = graph.nodes_by_id[issue_id]
         resolution = issue_statuses.get(

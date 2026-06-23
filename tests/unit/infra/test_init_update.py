@@ -130,13 +130,9 @@ _JAPANESE_PRIMARY_HEADING_ALLOWED_TOOL_TOKENS = (
     "PlantUML",
 )
 
-_JAPANESE_PRIMARY_FORBIDDEN_BARE_TOOL_TOKEN_HEADINGS = (
-    "PlantUML",
-)
+_JAPANESE_PRIMARY_FORBIDDEN_BARE_TOOL_TOKEN_HEADINGS = ("PlantUML",)
 
-_JAPANESE_PRIMARY_FORBIDDEN_HEADING_LABELS = (
-    "5. GitHub default と `--no-github`",
-)
+_JAPANESE_PRIMARY_FORBIDDEN_HEADING_LABELS = ("5. GitHub default と `--no-github`",)
 
 _JAPANESE_PRIMARY_FORBIDDEN_PRIMARY_PHRASES = (
     "diagram / trace guidance",
@@ -278,18 +274,10 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/rules/initiative/discussions.md": (
             "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md"
         ),
-        "spec-dock/docs/rules/initiative/epics.md": (
-            "src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md"
-        ),
-        "spec-dock/docs/rules/epic/discussions.md": (
-            "src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md"
-        ),
-        "spec-dock/docs/rules/epic/issues.md": (
-            "src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md"
-        ),
-        "spec-dock/docs/rules/issue/discussions.md": (
-            "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"
-        ),
+        "spec-dock/docs/rules/initiative/epics.md": ("src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md"),
+        "spec-dock/docs/rules/epic/discussions.md": ("src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md"),
+        "spec-dock/docs/rules/epic/issues.md": ("src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md"),
+        "spec-dock/docs/rules/issue/discussions.md": ("src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"),
     }
 
     def _assert_managed_skills_installed(self, target: Path) -> None:
@@ -299,12 +287,8 @@ class TestInitUpdate(CliRuntimeHarness):
             for skill_file in self._installed_skill_files(target)
             if skill_file.split("/", 1)[0] in managed_names
         )
-        assert installed_managed == sorted(
-            f"{name}/SKILL.md" for name in _EXPECTED_MANAGED_SKILL_NAMES
-        )
-        installed_skill_names = {
-            skill_file.split("/", 1)[0] for skill_file in self._installed_skill_files(target)
-        }
+        assert installed_managed == sorted(f"{name}/SKILL.md" for name in _EXPECTED_MANAGED_SKILL_NAMES)
+        installed_skill_names = {skill_file.split("/", 1)[0] for skill_file in self._installed_skill_files(target)}
         for deleted_skill_name in _DELETED_ROLE_SKILL_NAMES:
             assert deleted_skill_name not in installed_skill_names
 
@@ -392,65 +376,38 @@ class TestInitUpdate(CliRuntimeHarness):
 
     def _actions_by_path(self, payload: dict[str, object]) -> dict[str, dict[str, object]]:
         return {str(action["path"]): action for action in payload["actions"]}  # type: ignore[index]
+
     _DOGFOODING_MIRROR_PROVIDER_ASSET_MAP: ClassVar[dict[str, object]] = {
         "spec-dock/.gitignore": "src/spec_dock/assets/spec_dock/.gitignore",
         "spec-dock/templates/README.md": "src/spec_dock/assets/spec_dock/templates/README.md",
         "spec-dock/scripts/README.md": "src/spec_dock/assets/spec_dock/scripts/README.md",
         "spec-dock/docs/guide.md": "src/spec_dock/assets/spec_dock/docs/guide.md",
-        "spec-dock/docs/reference_worktree.md": (
-            "src/spec_dock/assets/spec_dock/docs/reference_worktree.md"
-        ),
-        "spec-dock/docs/phase_requirement.md": (
-            "src/spec_dock/assets/spec_dock/docs/phase_requirement.md"
-        ),
+        "spec-dock/docs/reference_worktree.md": ("src/spec_dock/assets/spec_dock/docs/reference_worktree.md"),
+        "spec-dock/docs/phase_requirement.md": ("src/spec_dock/assets/spec_dock/docs/phase_requirement.md"),
         "spec-dock/docs/phase_design.md": "src/spec_dock/assets/spec_dock/docs/phase_design.md",
         "spec-dock/docs/phase_plan.md": "src/spec_dock/assets/spec_dock/docs/phase_plan.md",
-        "spec-dock/docs/phase_plan_initiative.md": (
-            "src/spec_dock/assets/spec_dock/docs/phase_plan_initiative.md"
-        ),
-        "spec-dock/docs/phase_plan_epic.md": (
-            "src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md"
-        ),
-        "spec-dock/docs/phase_plan_issue.md": (
-            "src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md"
-        ),
-        "spec-dock/docs/workflow_spec_authoring.md": (
-            "src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md"
-        ),
-        "spec-dock/docs/workflow_clarification.md": (
-            "src/spec_dock/assets/spec_dock/docs/workflow_clarification.md"
-        ),
-        "spec-dock/docs/authoring/issue-plan.md": (
-            "src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md"
-        ),
+        "spec-dock/docs/phase_plan_initiative.md": ("src/spec_dock/assets/spec_dock/docs/phase_plan_initiative.md"),
+        "spec-dock/docs/phase_plan_epic.md": ("src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md"),
+        "spec-dock/docs/phase_plan_issue.md": ("src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md"),
+        "spec-dock/docs/workflow_spec_authoring.md": ("src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md"),
+        "spec-dock/docs/workflow_clarification.md": ("src/spec_dock/assets/spec_dock/docs/workflow_clarification.md"),
+        "spec-dock/docs/authoring/issue-plan.md": ("src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md"),
         "spec-dock/docs/authoring/decision-routing.md": (
             "src/spec_dock/assets/spec_dock/docs/authoring/decision-routing.md"
         ),
-        "spec-dock/docs/workflow_initiative.md": (
-            "src/spec_dock/assets/spec_dock/docs/workflow_initiative.md"
-        ),
+        "spec-dock/docs/workflow_initiative.md": ("src/spec_dock/assets/spec_dock/docs/workflow_initiative.md"),
         "spec-dock/docs/workflow_epic.md": "src/spec_dock/assets/spec_dock/docs/workflow_epic.md",
         "spec-dock/docs/workflow_issue.md": "src/spec_dock/assets/spec_dock/docs/workflow_issue.md",
         "spec-dock/docs/workflow-tree.md": "src/spec_dock/assets/spec_dock/docs/workflow-tree.md",
-        "spec-dock/docs/reference_github.md": (
-            "src/spec_dock/assets/spec_dock/docs/reference_github.md"
-        ),
-        "spec-dock/docs/reference_hard_cutover.md": (
-            "src/spec_dock/assets/spec_dock/docs/reference_hard_cutover.md"
-        ),
+        "spec-dock/docs/reference_github.md": ("src/spec_dock/assets/spec_dock/docs/reference_github.md"),
+        "spec-dock/docs/reference_hard_cutover.md": ("src/spec_dock/assets/spec_dock/docs/reference_hard_cutover.md"),
         "spec-dock/docs/rules/initiative/discussions.md": (
             "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md"
         ),
-        "spec-dock/docs/rules/initiative/epics.md": (
-            "src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md"
-        ),
-        "spec-dock/docs/rules/epic/discussions.md": (
-            "src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md"
-        ),
+        "spec-dock/docs/rules/initiative/epics.md": ("src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md"),
+        "spec-dock/docs/rules/epic/discussions.md": ("src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md"),
         "spec-dock/docs/rules/epic/issues.md": "src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md",
-        "spec-dock/docs/rules/issue/discussions.md": (
-            "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"
-        ),
+        "spec-dock/docs/rules/issue/discussions.md": ("src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"),
         ".agents/skills/spec-dock-hub/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md"
         ),
@@ -487,12 +444,8 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/host-adapters/meta.json": "src/spec_dock/assets/install_root/.agents/host-adapters/meta.json",
         ".codex/AGENTS.md": "src/spec_dock/assets/install_root/.codex/AGENTS.md",
         ".codex/config.toml": "src/spec_dock/assets/install_root/.codex/config.toml",
-        ".codex/prompts/execute-issue.md": (
-            "src/spec_dock/assets/install_root/.codex/prompts/execute-issue.md"
-        ),
-        ".codex/prompts/execute-epic.md": (
-            "src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md"
-        ),
+        ".codex/prompts/execute-issue.md": ("src/spec_dock/assets/install_root/.codex/prompts/execute-issue.md"),
+        ".codex/prompts/execute-epic.md": ("src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md"),
         ".codex/prompts/execute-initiative.md": (
             "src/spec_dock/assets/install_root/.codex/prompts/execute-initiative.md"
         ),
@@ -696,6 +649,7 @@ class TestInitUpdate(CliRuntimeHarness):
 
         for label in _INTERVIEW_REQUIRED_LABELS:
             assert label in interview_text
+
     _GUIDE_REFERENCE_NAME_REQUIRED_FRAGMENTS = (
         "[workflow_initiative.md](workflow_initiative.md)",
         "[workflow_epic.md](workflow_epic.md)",
@@ -767,7 +721,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 ".agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh",
                 ".codex/agents/pr-monitor.toml",
                 ".github/agents/pr-monitor.agent.md",
-            ]
+            ],
         },
         "generated_by": "spec-dock update",
         "updated_at": "2026-04-06T00:00:00Z",
@@ -870,9 +824,7 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/spec-dock-codex-adapter/SKILL.md",
             ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
         ),
-        ".agents/host-adapters/": (
-            ".agents/host-adapters/meta.json",
-        ),
+        ".agents/host-adapters/": (".agents/host-adapters/meta.json",),
         ".codex/agents/": (
             ".codex/agents/code-reviewer.toml",
             ".codex/agents/consultant.toml",
@@ -914,128 +866,86 @@ class TestInitUpdate(CliRuntimeHarness):
             ".codex/prompts/execute-initiative.md",
             ".codex/prompts/execute-issue.md",
         ),
-        ".codex/rules/": (
-            ".codex/rules/spec-dock-commands.rules",
-        ),
-        ".github/workflows/": (
-            ".github/workflows/ci.yml",
-        ),
+        ".codex/rules/": (".codex/rules/spec-dock-commands.rules",),
+        ".github/workflows/": (".github/workflows/ci.yml",),
     }
     _ISSUE_68_RETIRED_LEGACY_ROOT = (
         Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "codex_skills"
     )
     _ISSUE_68_PROVIDER_DUPLICATE_BOUNDARY: ClassVar[dict[str, object]] = {
         "spec-dock-hub skill": {
-            "search_globs": (
-                "**/spec-dock-hub/SKILL.md",
-            ),
-            "allowed_provider_paths": (
-                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md",
-            ),
+            "search_globs": ("**/spec-dock-hub/SKILL.md",),
+            "allowed_provider_paths": ("src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md",),
         },
         "spec-dock-adr-facilitation skill": {
-            "search_globs": (
-                "**/spec-dock-adr-facilitation/SKILL.md",
-            ),
+            "search_globs": ("**/spec-dock-adr-facilitation/SKILL.md",),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-adr-facilitation/SKILL.md",
             ),
         },
         "spec-dock-epic-planning skill": {
-            "search_globs": (
-                "**/spec-dock-epic-planning/SKILL.md",
-            ),
+            "search_globs": ("**/spec-dock-epic-planning/SKILL.md",),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md",
             ),
         },
         "spec-dock-epic-execution skill": {
-            "search_globs": (
-                "**/spec-dock-epic-execution/SKILL.md",
-            ),
+            "search_globs": ("**/spec-dock-epic-execution/SKILL.md",),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md",
             ),
         },
         "spec-dock-initiative-planning skill": {
-            "search_globs": (
-                "**/spec-dock-initiative-planning/SKILL.md",
-            ),
+            "search_globs": ("**/spec-dock-initiative-planning/SKILL.md",),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md",
             ),
         },
         "spec-dock-issue-planning skill": {
-            "search_globs": (
-                "**/spec-dock-issue-planning/SKILL.md",
-            ),
+            "search_globs": ("**/spec-dock-issue-planning/SKILL.md",),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md",
             ),
         },
         "spec-dock-issue-execution skill": {
-            "search_globs": (
-                "**/spec-dock-issue-execution/SKILL.md",
-            ),
+            "search_globs": ("**/spec-dock-issue-execution/SKILL.md",),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md",
             ),
         },
         "spec-dock-clarification skill": {
-            "search_globs": (
-                "**/spec-dock-clarification/SKILL.md",
-            ),
+            "search_globs": ("**/spec-dock-clarification/SKILL.md",),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md",
             ),
         },
         "spec-dock-codex-adapter skill": {
-            "search_globs": (
-                "**/spec-dock-codex-adapter/SKILL.md",
-            ),
+            "search_globs": ("**/spec-dock-codex-adapter/SKILL.md",),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-codex-adapter/SKILL.md",
             ),
         },
         "spec-dock-copilot-adapter skill": {
-            "search_globs": (
-                "**/spec-dock-copilot-adapter/SKILL.md",
-            ),
+            "search_globs": ("**/spec-dock-copilot-adapter/SKILL.md",),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-copilot-adapter/SKILL.md",
             ),
         },
         "host adapter metadata": {
-            "search_globs": (
-                "**/host-adapters/meta.json",
-            ),
-            "allowed_provider_paths": (
-                "src/spec_dock/assets/install_root/.agents/host-adapters/meta.json",
-            ),
+            "search_globs": ("**/host-adapters/meta.json",),
+            "allowed_provider_paths": ("src/spec_dock/assets/install_root/.agents/host-adapters/meta.json",),
         },
         "codex native shim": {
-            "search_globs": (
-                "**/spec-manager.toml",
-            ),
-            "allowed_provider_paths": (
-                "src/spec_dock/assets/install_root/.codex/agents/spec-manager.toml",
-            ),
+            "search_globs": ("**/spec-manager.toml",),
+            "allowed_provider_paths": ("src/spec_dock/assets/install_root/.codex/agents/spec-manager.toml",),
         },
         "github agent file": {
-            "search_globs": (
-                "**/orchestrator.agent.md",
-            ),
-            "allowed_provider_paths": (
-                "src/spec_dock/assets/install_root/.github/agents/orchestrator.agent.md",
-            ),
+            "search_globs": ("**/orchestrator.agent.md",),
+            "allowed_provider_paths": ("src/spec_dock/assets/install_root/.github/agents/orchestrator.agent.md",),
         },
         "github workflow asset": {
-            "search_globs": (
-                "**/.github/workflows/ci.yml",
-            ),
-            "allowed_provider_paths": (
-                "src/spec_dock/assets/install_root/.github/workflows/ci.yml",
-            ),
+            "search_globs": ("**/.github/workflows/ci.yml",),
+            "allowed_provider_paths": ("src/spec_dock/assets/install_root/.github/workflows/ci.yml",),
         },
     }
     _ISSUE_69_REPRESENTATIVE_ARTIFACT_RELATIVE_PATHS = (
@@ -1532,19 +1442,15 @@ class TestInitUpdate(CliRuntimeHarness):
     def _assert_canonical_rules_files_contract(self, text_map: dict[str, str]) -> None:
         for rel_suffix, expected in self._CANONICAL_RULES_EXPECTATIONS.items():
             matching_paths = [path for path in text_map if path.endswith(rel_suffix)]
-            assert len(matching_paths) == \
-                1, \
+            assert len(matching_paths) == 1, (
                 f"expected exactly one canonical rules document for {rel_suffix}: {matching_paths}"
+            )
             rel_path = matching_paths[0]
             text = text_map[rel_path]
             for fragment in expected["contains"]:
-                assert fragment in \
-                    text, \
-                    f"expected canonical rules fragment missing from {rel_path}: {fragment}"
+                assert fragment in text, f"expected canonical rules fragment missing from {rel_path}: {fragment}"
             for fragment in expected["absent"]:
-                assert fragment not in \
-                    text, \
-                    f"unexpected canonical rules fragment present in {rel_path}: {fragment}"
+                assert fragment not in text, f"unexpected canonical rules fragment present in {rel_path}: {fragment}"
 
     def _assert_canonical_rules_files_match_provider_assets(
         self,
@@ -1558,34 +1464,28 @@ class TestInitUpdate(CliRuntimeHarness):
             asset_path = repo_root / asset_rel_path
             assert installed_path.is_file(), f"missing canonical rules file: {installed_path}"
             assert asset_path.is_file(), f"missing canonical rules asset: {asset_path}"
-            assert installed_path.read_text(encoding="utf-8") == \
-                asset_path.read_text(encoding="utf-8"), \
+            assert installed_path.read_text(encoding="utf-8") == asset_path.read_text(encoding="utf-8"), (
                 f"canonical rules file diverged from provider asset: {installed_rel_path}"
+            )
 
     def _assert_workflow_tree_docs_contract(self, workflow_tree_text: str) -> None:
         for fragment in self._WORKFLOW_TREE_REQUIRED_FRAGMENTS:
-            assert fragment in \
-                workflow_tree_text, \
-                f"workflow-tree contract fragment missing: {fragment}"
+            assert fragment in workflow_tree_text, f"workflow-tree contract fragment missing: {fragment}"
         for legacy_token in (
             "spec-dock-guide.md",
             "sync.md",
             "workflow-issue.md",
             "workflow-adr.md",
         ):
-            assert f"`{legacy_token}`" not in \
-                workflow_tree_text, \
+            assert f"`{legacy_token}`" not in workflow_tree_text, (
                 f"workflow-tree contains legacy link token: {legacy_token}"
+            )
 
     def _assert_guide_docs_contract(self, guide_text: str) -> None:
         for fragment in self._GUIDE_REQUIRED_FRAGMENTS:
-            assert fragment in \
-                guide_text, \
-                f"guide contract fragment missing: {fragment}"
+            assert fragment in guide_text, f"guide contract fragment missing: {fragment}"
         for fragment in self._GUIDE_REFERENCE_NAME_REQUIRED_FRAGMENTS:
-            assert fragment in \
-                guide_text, \
-                f"guide reference-name contract fragment missing: {fragment}"
+            assert fragment in guide_text, f"guide reference-name contract fragment missing: {fragment}"
         for legacy_token in (
             "workflow-initiative.md",
             "workflow-epic.md",
@@ -1596,9 +1496,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "reference-deps.md",
             "reference-sync.md",
         ):
-            assert legacy_token not in \
-                guide_text, \
-                f"guide contains legacy link token: {legacy_token}"
+            assert legacy_token not in guide_text, f"guide contains legacy link token: {legacy_token}"
 
     def _assert_user_facing_markdown_labels_use_japanese_primary(
         self,
@@ -1618,24 +1516,14 @@ class TestInitUpdate(CliRuntimeHarness):
                 normalized,
             ):
                 return True
-            if re.fullmatch(r"[a-z0-9._/-]+", normalized) and any(
-                separator in normalized for separator in ("/", ".")
-            ):
+            if re.fullmatch(r"[a-z0-9._/-]+", normalized) and any(separator in normalized for separator in ("/", ".")):
                 return True
 
-            status_parts = [
-                part.strip()
-                for part in re.split(r"\s*/\s*", lower_primary)
-                if part.strip()
-            ]
+            status_parts = [part.strip() for part in re.split(r"\s*/\s*", lower_primary) if part.strip()]
             if status_parts and all(part in _JAPANESE_PRIMARY_TABLE_STATUS_TOKENS for part in status_parts):
                 return True
 
-            role_parts = [
-                part.strip()
-                for part in re.split(r"\s*/\s*", lower_primary)
-                if part.strip()
-            ]
+            role_parts = [part.strip() for part in re.split(r"\s*/\s*", lower_primary) if part.strip()]
             return bool(role_parts) and all(part in _JAPANESE_PRIMARY_TABLE_ROLE_TOKENS for part in role_parts)
 
         def assert_not_full_english_prose(line: str, *, line_number: int) -> None:
@@ -1687,8 +1575,7 @@ class TestInitUpdate(CliRuntimeHarness):
             if sum(1 for word in lowercase_words if word in common_prose_words) < 4:
                 return
             raise AssertionError(
-                f"{source}:{line_number}: explanatory prose must use Japanese primary "
-                f"with English anchor only: {line}"
+                f"{source}:{line_number}: explanatory prose must use Japanese primary with English anchor only: {line}"
             )
 
         in_code_fence = False
@@ -1702,26 +1589,25 @@ class TestInitUpdate(CliRuntimeHarness):
             heading_match = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
             if heading_match:
                 label = heading_match.group(2)
-                assert label not in \
-                    _JAPANESE_PRIMARY_FORBIDDEN_HEADING_LABELS, \
+                assert label not in _JAPANESE_PRIMARY_FORBIDDEN_HEADING_LABELS, (
                     f"{source}:{line_number}: heading must use Japanese primary with English anchor: {line}"
+                )
                 primary = re.split(r"\s*[（(]", label, maxsplit=1)[0].strip()
                 primary_without_number = re.sub(r"^\d+[.)]\s+", "", primary)
                 lower_primary = primary_without_number.lower()
-                assert primary_without_number not in \
-                    _JAPANESE_PRIMARY_FORBIDDEN_BARE_TOOL_TOKEN_HEADINGS, \
+                assert primary_without_number not in _JAPANESE_PRIMARY_FORBIDDEN_BARE_TOOL_TOKEN_HEADINGS, (
                     f"{source}:{line_number}: heading must use Japanese primary with tool anchor: {line}"
+                )
                 for phrase in _JAPANESE_PRIMARY_FORBIDDEN_PRIMARY_PHRASES:
-                    assert phrase not in \
-                        lower_primary, \
+                    assert phrase not in lower_primary, (
                         f"{source}:{line_number}: heading must keep English phrase in anchor only: {line}"
+                    )
                 for phrase in _JAPANESE_PRIMARY_FORBIDDEN_HEADING_PRIMARY_PHRASES:
-                    assert phrase not in \
-                        lower_primary, \
+                    assert phrase not in lower_primary, (
                         f"{source}:{line_number}: heading must use Japanese primary with English anchor: {line}"
+                    )
                 if any(
-                    primary_without_number.startswith(prefix)
-                    for prefix in _JAPANESE_PRIMARY_HEADING_ALLOWED_PREFIXES
+                    primary_without_number.startswith(prefix) for prefix in _JAPANESE_PRIMARY_HEADING_ALLOWED_PREFIXES
                 ):
                     continue
                 leading_tool_token = next(
@@ -1736,8 +1622,9 @@ class TestInitUpdate(CliRuntimeHarness):
                     token_remainder = primary_without_number[len(leading_tool_token) :].strip()
                     if not token_remainder or not re.match(r"^[A-Za-z`-]", token_remainder):
                         continue
-                assert not re.search(r"^[A-Za-z]", primary_without_number), \
+                assert not re.search(r"^[A-Za-z]", primary_without_number), (
                     f"{source}:{line_number}: heading must use Japanese primary with English anchor: {line}"
+                )
                 continue
 
             if line.startswith("|") and not re.fullmatch(r"\|[\s:-]+\|?", line):
@@ -1748,15 +1635,16 @@ class TestInitUpdate(CliRuntimeHarness):
                     primary = re.split(r"\s*[（(]", cell, maxsplit=1)[0].strip()
                     lower_primary = primary.lower()
                     for phrase in _JAPANESE_PRIMARY_FORBIDDEN_PRIMARY_PHRASES:
-                        assert phrase not in \
-                            lower_primary, \
+                        assert phrase not in lower_primary, (
                             f"{source}:{line_number}: table label must keep English phrase in anchor only: {line}"
+                        )
                     if not re.match(r"^[a-z]", lower_primary):
                         continue
-                    assert is_allowed_ascii_table_primary(primary), \
-                        f"{source}:{line_number}: table label must use Japanese primary " \
-                        "unless it is an explicit contract/code/path/status/role value " \
+                    assert is_allowed_ascii_table_primary(primary), (
+                        f"{source}:{line_number}: table label must use Japanese primary "
+                        "unless it is an explicit contract/code/path/status/role value "
                         f"(cell {cell_index}: {cell!r}): {line}"
+                    )
                 continue
 
             assert_not_full_english_prose(line, line_number=line_number)
@@ -1775,20 +1663,20 @@ class TestInitUpdate(CliRuntimeHarness):
         ]
         if section_end_candidates:
             section = section[: min(section_end_candidates)]
-        assert not re.search(r"(?m)^\|.*\|$", section), \
+        assert not re.search(r"(?m)^\|.*\|$", section), (
             f"{source} concrete test case section must not contain table rows"
+        )
         case_pattern = re.compile(
             r"(?m)^- `tc-s\d{2}-\d{3}` [^\n:]+: .+\n"
             r"(?:  - .+\n)+"
         )
         case_blocks = case_pattern.findall(section)
-        assert len(case_blocks) >= \
-            2, \
-            f"{source} must include at least two concrete nested test case examples"
+        assert len(case_blocks) >= 2, f"{source} must include at least two concrete nested test case examples"
         require_related_closure_id = len(case_blocks) > 1
         for case_block in case_blocks:
-            assert re.search(r"(?m)^- `tc-s\d{2}-\d{3}` [^:]+: .+$", case_block), \
+            assert re.search(r"(?m)^- `tc-s\d{2}-\d{3}` [^:]+: .+$", case_block), (
                 f"{source} concrete case must start with a backticked concrete test case id bullet"
+            )
             standard_labels_present = all(
                 re.search(rf"(?m)^  - {label}:[ \t]*\S.*$", case_block)
                 for label in ("前提", "操作", "期待結果", "失敗検出", "検証方法")
@@ -1797,14 +1685,17 @@ class TestInitUpdate(CliRuntimeHarness):
                 re.search(rf"(?m)^  - {label}:[ \t]*\S.*$", case_block)
                 for label in ("テスト不要理由", "代替検証方法", "期待結果", "記録先")
             )
-            assert standard_labels_present or alternative_labels_present, \
-                f"{source} concrete case must include standard test labels " \
+            assert standard_labels_present or alternative_labels_present, (
+                f"{source} concrete case must include standard test labels "
                 f"or inspect/manual alternative labels: {case_block}"
+            )
             if require_related_closure_id:
-                assert re.search(r"(?m)^  - 関連 closure id: .+", case_block), \
+                assert re.search(r"(?m)^  - 関連 closure id: .+", case_block), (
                     f"{source} multi-case section must map each case to related closure id: {case_block}"
-            assert not re.search(r"(?m)^\|.*\|$", case_block), \
+                )
+            assert not re.search(r"(?m)^\|.*\|$", case_block), (
                 f"{source} concrete case must not use a table row: {case_block}"
+            )
 
     def _assert_delegated_draft_evidence_schema_contract(self, text: str, *, source: str) -> None:
         for state in (
@@ -1826,8 +1717,9 @@ class TestInitUpdate(CliRuntimeHarness):
             r"|stale[\s\S]{0,80}rejected[\s\S]{0,80}superseded[\s\S]{0,80}blocked"
             r"[\s\S]{0,80}promotion evidence に使えない)"
         )
-        assert re.search(ineligible_rule_pattern, text), \
+        assert re.search(ineligible_rule_pattern, text), (
             f"{source}: missing explicit promotion-ineligible rule for stale/rejected/superseded/blocked"
+        )
         for field in (
             "role",
             "phase",
@@ -1866,9 +1758,9 @@ class TestInitUpdate(CliRuntimeHarness):
             "input authority path/hash",
             "session invocation path/hash",
         ):
-            assert retired_heavy_field not in \
-                text, \
+            assert retired_heavy_field not in text, (
                 f"{source}: retired manifest-heavy field must not be standard delegated draft evidence {retired_heavy_field}"
+            )
         for retired_grant_key in (
             "can_write_requirement",
             "can_write_design",
@@ -1880,9 +1772,9 @@ class TestInitUpdate(CliRuntimeHarness):
             "can_finish_issue",
             "can_complete_phase",
         ):
-            assert retired_grant_key not in \
-                text, \
+            assert retired_grant_key not in text, (
                 f"{source}: retired grant key must not appear in authority schema {retired_grant_key}"
+            )
         for invalid_wildcard in ("`*`", "`grants.*`", "`all`"):
             assert invalid_wildcard in text, f"{source}: missing invalid wildcard token {invalid_wildcard}"
         for field, alternatives in (
@@ -1891,8 +1783,9 @@ class TestInitUpdate(CliRuntimeHarness):
             ("report evidence path", ("report evidence path", "report 証跡の記録先", "レポート証跡の記録先")),
             ("promotion eligibility", ("promotion eligibility", "昇格可否")),
         ):
-            assert any(alternative in text for alternative in alternatives), \
+            assert any(alternative in text for alternative in alternatives), (
                 f"{source}: missing failure-mode field {field}"
+            )
         expected_failure_mode_rows = {
             "missing consent": (
                 "blocked / incomplete",
@@ -1987,23 +1880,18 @@ class TestInitUpdate(CliRuntimeHarness):
             matching_keys = [
                 key
                 for key in table_rows
-                if key == failure_mode
-                or key.startswith(f"{failure_mode}（")
-                or key.endswith(f"（{failure_mode}）")
+                if key == failure_mode or key.startswith(f"{failure_mode}（") or key.endswith(f"（{failure_mode}）")
             ]
             assert matching_keys, f"{source}: missing failure-mode table row {failure_mode}"
             cells = table_rows[matching_keys[0]]
-            assert cells[1] == \
-                expected_verdict, \
-                f"{source}: unexpected verdict for failure mode {failure_mode}"
-            assert cells[2] in \
-                expected_next_actions, \
+            assert cells[1] == expected_verdict, f"{source}: unexpected verdict for failure mode {failure_mode}"
+            assert cells[2] in expected_next_actions, (
                 f"{source}: unexpected next action for failure mode {failure_mode}"
-            assert cells[3], \
-                f"{source}: missing report evidence path for failure mode {failure_mode}"
-            assert cells[4] == \
-                "ineligible", \
+            )
+            assert cells[3], f"{source}: missing report evidence path for failure mode {failure_mode}"
+            assert cells[4] == "ineligible", (
                 f"{source}: unexpected promotion eligibility for failure mode {failure_mode}"
+            )
 
     def _assert_checked_in_dogfooding_mirror_docs_match_provider_assets(self, repo_root: Path) -> None:
         for mirror_rel_path, asset_rel_path in self._DOGFOODING_MIRROR_PROVIDER_ASSET_MAP.items():
@@ -2011,9 +1899,9 @@ class TestInitUpdate(CliRuntimeHarness):
             asset_path = repo_root / asset_rel_path
             assert mirror_path.is_file(), f"missing checked-in dogfooding mirror file: {mirror_path}"
             assert asset_path.is_file(), f"missing provider asset file: {asset_path}"
-            assert mirror_path.read_text(encoding="utf-8") == \
-                asset_path.read_text(encoding="utf-8"), \
+            assert mirror_path.read_text(encoding="utf-8") == asset_path.read_text(encoding="utf-8"), (
                 f"checked-in dogfooding mirror file diverged from provider asset: {mirror_rel_path}"
+            )
 
     def _assert_checked_in_dogfooding_active_none_reports_match_provider_assets(
         self,
@@ -2024,9 +1912,9 @@ class TestInitUpdate(CliRuntimeHarness):
             asset_path = repo_root / asset_rel_path
             assert mirror_path.is_file(), f"missing checked-in active-none report mirror: {mirror_path}"
             assert asset_path.is_file(), f"missing provider active-none report asset: {asset_path}"
-            assert mirror_path.read_text(encoding="utf-8") == \
-                asset_path.read_text(encoding="utf-8"), \
+            assert mirror_path.read_text(encoding="utf-8") == asset_path.read_text(encoding="utf-8"), (
                 f"checked-in active-none report mirror diverged from provider asset: {mirror_rel_path}"
+            )
 
     def _assert_checked_in_dogfooding_runtime_mirror_match_provider_assets(self, repo_root: Path) -> None:
         for mirror_rel_path, asset_rel_path in self._DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP.items():
@@ -2034,9 +1922,9 @@ class TestInitUpdate(CliRuntimeHarness):
             asset_path = repo_root / asset_rel_path
             assert mirror_path.is_file(), f"missing checked-in dogfooding runtime mirror file: {mirror_path}"
             assert asset_path.is_file(), f"missing provider runtime asset file: {asset_path}"
-            assert mirror_path.read_text(encoding="utf-8") == \
-                asset_path.read_text(encoding="utf-8"), \
+            assert mirror_path.read_text(encoding="utf-8") == asset_path.read_text(encoding="utf-8"), (
                 f"checked-in dogfooding runtime mirror file diverged from provider asset: {mirror_rel_path}"
+            )
 
     def _assert_issue_execution_runtime_command_reminders(self, text: str, *, source: str) -> None:
         for fragment in (
@@ -2066,23 +1954,21 @@ class TestInitUpdate(CliRuntimeHarness):
 
         mirror_entries = sorted(path.relative_to(mirror_root).as_posix() for path in mirror_root.rglob("*"))
         asset_entries = sorted(path.relative_to(asset_root).as_posix() for path in asset_root.rglob("*"))
-        assert mirror_entries == \
-            asset_entries, \
-            "installed templates tree diverged from provider assets"
+        assert mirror_entries == asset_entries, "installed templates tree diverged from provider assets"
 
         for rel_path in asset_entries:
             mirror_path = mirror_root / rel_path
             asset_path = asset_root / rel_path
-            assert mirror_path.is_dir() == \
-                asset_path.is_dir(), \
+            assert mirror_path.is_dir() == asset_path.is_dir(), (
                 f"installed templates entry kind diverged from provider asset: {rel_path}"
-            assert mirror_path.is_file() == \
-                asset_path.is_file(), \
+            )
+            assert mirror_path.is_file() == asset_path.is_file(), (
                 f"installed templates entry kind diverged from provider asset: {rel_path}"
+            )
             if asset_path.is_file():
-                assert mirror_path.read_text(encoding="utf-8") == \
-                    asset_path.read_text(encoding="utf-8"), \
+                assert mirror_path.read_text(encoding="utf-8") == asset_path.read_text(encoding="utf-8"), (
                     f"installed template diverged from provider asset: {rel_path}"
+                )
 
     def _run_command_with_host_adapter_manifest_override(
         self,
@@ -2091,9 +1977,7 @@ class TestInitUpdate(CliRuntimeHarness):
         manifest_override: dict[str, object],
     ) -> tuple[int, str]:
         def _mutate_assets(patched_assets_root: Path) -> None:
-            patched_meta = (
-                patched_assets_root / "install_root" / ".agents" / "host-adapters" / "meta.json"
-            )
+            patched_meta = patched_assets_root / "install_root" / ".agents" / "host-adapters" / "meta.json"
             patched_meta.write_text(
                 json.dumps(manifest_override, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
@@ -2155,8 +2039,7 @@ class TestInitUpdate(CliRuntimeHarness):
 
     def _managed_contract_guard_paths(self) -> tuple[str, ...]:
         managed_skill_paths = tuple(
-            f".agents/skills/{skill_name}/SKILL.md"
-            for skill_name in _EXPECTED_MANAGED_SKILL_NAMES
+            f".agents/skills/{skill_name}/SKILL.md" for skill_name in _EXPECTED_MANAGED_SKILL_NAMES
         )
         return (
             *managed_skill_paths,
@@ -2191,9 +2074,9 @@ class TestInitUpdate(CliRuntimeHarness):
         for rel_path, expected_bytes in expected_snapshot.items():
             path = target / rel_path
             observed_bytes = path.read_bytes() if path.is_file() else None
-            assert observed_bytes == \
-                expected_bytes, \
+            assert observed_bytes == expected_bytes, (
                 f"managed file changed despite manifest contract failure: {rel_path}"
+            )
 
     def _build_managed_skill_install_plan_from_assets_root(self, assets_root: Path):
         import spec_dock.cli as cli
@@ -2206,17 +2089,9 @@ class TestInitUpdate(CliRuntimeHarness):
         previous_plan: object,
         current_plan: object,
     ) -> set[str]:
-        previous_targets = {
-            mapping.target_rel.as_posix()
-            for mapping in previous_plan.current_file_mappings
-        }
-        current_targets = {
-            mapping.target_rel.as_posix()
-            for mapping in current_plan.current_file_mappings
-        }
-        current_obsolete = {
-            rel_path.as_posix() for rel_path in current_plan.obsolete_exact_rel_paths
-        }
+        previous_targets = {mapping.target_rel.as_posix() for mapping in previous_plan.current_file_mappings}
+        current_targets = {mapping.target_rel.as_posix() for mapping in current_plan.current_file_mappings}
+        current_obsolete = {rel_path.as_posix() for rel_path in current_plan.obsolete_exact_rel_paths}
         removed_targets = previous_targets.difference(current_targets)
         return removed_targets.difference(current_obsolete)
 
@@ -2234,8 +2109,7 @@ class TestInitUpdate(CliRuntimeHarness):
             if line.startswith(heading_marker):
                 start_index = index
                 break
-        assert start_index is not None, \
-            f"issue-71 expected heading prefix missing in {source_label}: {heading_prefix}"
+        assert start_index is not None, f"issue-71 expected heading prefix missing in {source_label}: {heading_prefix}"
 
         assert start_index is not None
         end_index = len(lines)
@@ -2252,9 +2126,9 @@ class TestInitUpdate(CliRuntimeHarness):
         delegation_expected: str,
         shim_label: str,
     ) -> None:
-        assert delegation_expected in \
-            text, \
+        assert delegation_expected in text, (
             f"spec-manager missing delegation reference ({shim_label}): {delegation_expected}"
+        )
         for fragment in (
             "command operator",
             "./spec-dock/scripts/spec-dock active {set,show,clear}",
@@ -2263,27 +2137,29 @@ class TestInitUpdate(CliRuntimeHarness):
             "manual",
             "Read order",
         ):
-            assert fragment in \
-                text, \
-                f"spec-manager missing command-operator fragment ({shim_label}): {fragment}"
-        assert re.search(r"(?i)(must not manually edit|manual file edit|manual file editing)", text), \
+            assert fragment in text, f"spec-manager missing command-operator fragment ({shim_label}): {fragment}"
+        assert re.search(r"(?i)(must not manually edit|manual file edit|manual file editing)", text), (
             f"spec-manager missing manual-edit prohibition ({shim_label})"
-        assert not re.search(self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN, text), \
+        )
+        assert not re.search(self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN, text), (
             f"spec-manager includes structured state payload keys ({shim_label})"
-        assert not re.search(self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN, text), \
+        )
+        assert not re.search(self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN, text), (
             f"spec-manager includes .agent/*.json or context-pack inline reference ({shim_label})"
-        assert not re.search(self._NATIVE_SHIM_DIRECT_PROTOCOL_PATTERN, text), \
+        )
+        assert not re.search(self._NATIVE_SHIM_DIRECT_PROTOCOL_PATTERN, text), (
             f"spec-manager includes direct protocol read reference ({shim_label})"
+        )
 
     def _assert_codex_native_shim_loader_contract(self, *, text: str, shim_label: str) -> None:
-        assert re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, text), \
+        assert re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, text), (
             f"codex native shim missing developer_instructions key ({shim_label})"
-        assert not re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, text), \
+        )
+        assert not re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, text), (
             f"codex native shim still uses legacy instructions key ({shim_label})"
+        )
         assert 'model = "gpt-5.5"' in text, f"codex spec-manager missing model ({shim_label})"
-        assert 'model_reasoning_effort = "low"' in \
-            text, \
-            f"codex spec-manager missing reasoning effort ({shim_label})"
+        assert 'model_reasoning_effort = "low"' in text, f"codex spec-manager missing reasoning effort ({shim_label})"
         assert 'approval_policy = "never"' in text, f"codex spec-manager missing approval policy ({shim_label})"
         assert 'sandbox_mode = "workspace-write"' in text, f"codex spec-manager missing sandbox mode ({shim_label})"
         assert "notify = []" in text, f"codex spec-manager missing notify disable ({shim_label})"
@@ -2293,9 +2169,7 @@ class TestInitUpdate(CliRuntimeHarness):
     def _assert_codex_doc_writer_contract(self, *, text: str, shim_label: str) -> None:
         assert 'name = "doc-writer"' in text, f"codex doc-writer missing name ({shim_label})"
         assert 'model = "gpt-5.5"' in text, f"codex doc-writer missing model ({shim_label})"
-        assert 'model_reasoning_effort = "medium"' in \
-            text, \
-            f"codex doc-writer missing reasoning effort ({shim_label})"
+        assert 'model_reasoning_effort = "medium"' in text, f"codex doc-writer missing reasoning effort ({shim_label})"
         assert 'approval_policy = "never"' in text, f"codex doc-writer missing approval policy ({shim_label})"
         assert 'sandbox_mode = "workspace-write"' in text, f"codex doc-writer missing sandbox mode ({shim_label})"
         assert "[features]" in text, f"codex doc-writer missing features table ({shim_label})"
@@ -2352,101 +2226,117 @@ class TestInitUpdate(CliRuntimeHarness):
             "Manual spec authoring remains valid",
             "fresh `spec-reviewer` pass remains required",
         ):
-            assert fragment in \
-                text, \
-                f"delegated author adapter missing boundary fragment ({shim_label}): {fragment}"
+            assert fragment in text, f"delegated author adapter missing boundary fragment ({shim_label}): {fragment}"
         assert 'model = "gpt-5.5"' in text, f"delegated author adapter missing model ({shim_label})"
-        assert 'model_reasoning_effort = "high"' in \
-            text, \
+        assert 'model_reasoning_effort = "high"' in text, (
             f"delegated author adapter missing reasoning effort ({shim_label})"
+        )
         assert 'web_search = "disabled"' in text, f"delegated author adapter missing web setting ({shim_label})"
         assert 'approval_policy = "never"' in text, f"delegated author adapter missing approval policy ({shim_label})"
-        assert 'sandbox_mode = "workspace-write"' in text, f"delegated author adapter missing sandbox mode ({shim_label})"
-        assert "[sandbox_workspace_write]" in text, f"delegated author adapter missing workspace-write table ({shim_label})"
+        assert 'sandbox_mode = "workspace-write"' in text, (
+            f"delegated author adapter missing sandbox mode ({shim_label})"
+        )
+        assert "[sandbox_workspace_write]" in text, (
+            f"delegated author adapter missing workspace-write table ({shim_label})"
+        )
         assert "network_access = false" in text, f"delegated author adapter must disable network ({shim_label})"
-        assert "default_permissions =" not in text, f"delegated author adapter must not use Permission Profiles ({shim_label})"
-        assert "[permissions." not in text, f"delegated author adapter must not define Permission Profiles ({shim_label})"
+        assert "default_permissions =" not in text, (
+            f"delegated author adapter must not use Permission Profiles ({shim_label})"
+        )
+        assert "[permissions." not in text, (
+            f"delegated author adapter must not define Permission Profiles ({shim_label})"
+        )
         assert "[features]" in text, f"delegated author adapter missing features table ({shim_label})"
         assert "shell_tool = true" in text, f"delegated author adapter missing shell tool enable ({shim_label})"
 
     def _assert_copilot_spec_manager_contract(self, *, text: str, shim_label: str) -> None:
         assert "name: spec-manager" in text, f"copilot spec-manager name missing ({shim_label})"
         assert "model: gpt-5.4-mini" in text, f"copilot spec-manager model missing ({shim_label})"
-        assert "tools: ['read', 'search', 'execute', 'todo']" in text, f"copilot spec-manager tools mismatch ({shim_label})"
+        assert "tools: ['read', 'search', 'execute', 'todo']" in text, (
+            f"copilot spec-manager tools mismatch ({shim_label})"
+        )
         assert "user-invocable: false" in text, f"copilot spec-manager must be subagent-only ({shim_label})"
         assert "mcp-servers:" not in text, f"copilot spec-manager must not add mcp-servers ({shim_label})"
         assert "'edit'" not in text, f"copilot spec-manager must not allow edit tool ({shim_label})"
         assert "'agent'" not in text, f"copilot spec-manager must not allow agent tool ({shim_label})"
         assert "'web'" not in text, f"copilot spec-manager must not allow web tool ({shim_label})"
-        assert not re.search(self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN, text), \
+        assert not re.search(self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN, text), (
             f"copilot spec-manager includes structured state payload keys ({shim_label})"
-        assert not re.search(self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN, text), \
+        )
+        assert not re.search(self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN, text), (
             f"copilot spec-manager includes .agent/*.json or context-pack inline reference ({shim_label})"
+        )
 
     def _assert_copilot_orchestrator_contract(self, *, text: str, shim_label: str) -> None:
         assert "name: orchestrator" in text, f"copilot orchestrator name missing ({shim_label})"
         assert "user-invocable: true" in text, f"copilot orchestrator must be user-invocable ({shim_label})"
-        assert "delegate bounded `./spec-dock/scripts/spec-dock ...` command operations to `spec-manager` by default" in \
-            text, \
-            f"copilot orchestrator missing spec-manager routing guidance ({shim_label})"
-        assert "Keep requirement/design/plan/report authoring, context synthesis, and user-facing judgment in the main orchestrator." in \
-            text, \
-            f"copilot orchestrator missing docs-owner boundary ({shim_label})"
-        assert "disable-model-invocation: true" not in \
-            text, \
+        assert (
+            "delegate bounded `./spec-dock/scripts/spec-dock ...` command operations to `spec-manager` by default"
+            in text
+        ), f"copilot orchestrator missing spec-manager routing guidance ({shim_label})"
+        assert (
+            "Keep requirement/design/plan/report authoring, context synthesis, and user-facing judgment in the main orchestrator."
+            in text
+        ), f"copilot orchestrator missing docs-owner boundary ({shim_label})"
+        assert "disable-model-invocation: true" not in text, (
             f"copilot orchestrator must keep model invocation enabled ({shim_label})"
-        assert not re.search(self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN, text), \
+        )
+        assert not re.search(self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN, text), (
             f"copilot orchestrator includes structured state payload keys ({shim_label})"
-        assert not re.search(self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN, text), \
+        )
+        assert not re.search(self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN, text), (
             f"copilot orchestrator includes .agent/*.json or context-pack inline reference ({shim_label})"
+        )
 
     def _assert_codex_bootstrap_routing_contract(self, *, text: str, shim_label: str) -> None:
         assert "Treat `spec-manager` as the default specialist for SpecDock operations." in text
-        assert "Use `spec-manager` by default for SpecDock command workflows instead of operating the tool ad hoc." in \
-            text, \
-            f"codex bootstrap missing command routing guidance ({shim_label})"
-        assert "Keep requirement/design/plan/report authoring with the main orchestrator." in \
-            text, \
+        assert (
+            "Use `spec-manager` by default for SpecDock command workflows instead of operating the tool ad hoc." in text
+        ), f"codex bootstrap missing command routing guidance ({shim_label})"
+        assert "Keep requirement/design/plan/report authoring with the main orchestrator." in text, (
             f"codex bootstrap missing docs-owner boundary ({shim_label})"
-        assert "delegate only the command portion to `spec-manager`" in \
-            text, \
+        )
+        assert "delegate only the command portion to `spec-manager`" in text, (
             f"codex bootstrap missing mixed-task delegation guidance ({shim_label})"
+        )
 
     def _assert_codex_main_config_routing_contract(self, *, text: str, shim_label: str) -> None:
-        assert "SpecDock のコマンド操作は原則として `spec-manager` へ委任する。" in \
-            text, \
+        assert "SpecDock のコマンド操作は原則として `spec-manager` へ委任する。" in text, (
             f"codex main config missing spec-manager routing guidance ({shim_label})"
+        )
         parsed = tomllib.loads(text)
-        assert parsed.get("agents", {}).get("max_depth") == 2, f"codex main config must set agents.max_depth = 2 ({shim_label})"
+        assert parsed.get("agents", {}).get("max_depth") == 2, (
+            f"codex main config must set agents.max_depth = 2 ({shim_label})"
+        )
 
     def _assert_codex_command_rules_contract(self, *, text: str, shim_label: str) -> None:
         assert "prefix_rule(" in text, f"codex command rules missing prefix_rule ({shim_label})"
-        assert 'pattern = [["./spec-dock/scripts/spec-dock", "./spec"]]' in \
-            text, \
+        assert 'pattern = [["./spec-dock/scripts/spec-dock", "./spec"]]' in text, (
             f"codex command rules missing repo-local entrypoint prefixes ({shim_label})"
+        )
         assert 'decision = "allow"' in text, f"codex command rules missing allow decision ({shim_label})"
-        assert "./spec-dock/scripts/spec-dock new future-command --flag value" in \
-            text, \
+        assert "./spec-dock/scripts/spec-dock new future-command --flag value" in text, (
             f"codex command rules must cover future subcommands by entrypoint prefix ({shim_label})"
-        assert "./spec future-command --flag value" in \
-            text, \
+        )
+        assert "./spec future-command --flag value" in text, (
             f"codex command rules must cover future shortcut subcommands by entrypoint prefix ({shim_label})"
+        )
         assert "spec-dock validate" in text, f"codex command rules missing global-command guard ({shim_label})"
-        assert "uvx --from . spec-dock update ." in \
-            text, \
+        assert "uvx --from . spec-dock update ." in text, (
             f"codex command rules missing installer-command guard ({shim_label})"
-        assert '["./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"]' in \
-            text, \
+        )
+        assert '["./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh"]' in text, (
             f"codex command rules missing PR observation wait wrapper allow prefix ({shim_label})"
-        assert '["./.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"]' in \
-            text, \
+        )
+        assert '["./.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh"]' in text, (
             f"codex command rules missing PR observation snapshot wrapper allow prefix ({shim_label})"
-        assert "gh api repos/owner/repo/pulls/13/comments" in \
-            text, \
+        )
+        assert "gh api repos/owner/repo/pulls/13/comments" in text, (
             f"codex command rules missing direct gh api guard ({shim_label})"
-        assert "curl https://api.github.com/repos/owner/repo/pulls/13/comments" in \
-            text, \
+        )
+        assert "curl https://api.github.com/repos/owner/repo/pulls/13/comments" in text, (
             f"codex command rules missing direct curl guard ({shim_label})"
+        )
 
     def _issue_69_run_subprocess(
         self,
@@ -2463,13 +2353,13 @@ class TestInitUpdate(CliRuntimeHarness):
             text=True,
             check=False,
         )
-        assert result.returncode == \
-            0, \
-            "issue-69 command failed:\n" \
-            f"command: {' '.join(args)}\n" \
-            f"cwd: {cwd}\n" \
-            f"stdout:\n{result.stdout}\n" \
+        assert result.returncode == 0, (
+            "issue-69 command failed:\n"
+            f"command: {' '.join(args)}\n"
+            f"cwd: {cwd}\n"
+            f"stdout:\n{result.stdout}\n"
             f"stderr:\n{result.stderr}"
+        )
 
     def _issue_69_run_subprocess_capture(
         self,
@@ -2486,27 +2376,22 @@ class TestInitUpdate(CliRuntimeHarness):
             text=True,
             check=False,
         )
-        assert result.returncode == \
-            0, \
-            "issue-69 command failed:\n" \
-            f"command: {' '.join(args)}\n" \
-            f"cwd: {cwd}\n" \
-            f"stdout:\n{result.stdout}\n" \
+        assert result.returncode == 0, (
+            "issue-69 command failed:\n"
+            f"command: {' '.join(args)}\n"
+            f"cwd: {cwd}\n"
+            f"stdout:\n{result.stdout}\n"
             f"stderr:\n{result.stderr}"
+        )
         return result
 
     def _issue_69_resolve_wheelhouse(self, repo_root: Path) -> Path:
         wheelhouse = repo_root / self._ISSUE_69_WHEELHOUSE_RELATIVE
-        assert wheelhouse.is_dir(), \
-            f"issue-69 local wheelhouse is missing: {wheelhouse}"
+        assert wheelhouse.is_dir(), f"issue-69 local wheelhouse is missing: {wheelhouse}"
         missing_wheels = [
-            wheel_name
-            for wheel_name in self._ISSUE_69_WHEELHOUSE_FILENAMES
-            if not (wheelhouse / wheel_name).is_file()
+            wheel_name for wheel_name in self._ISSUE_69_WHEELHOUSE_FILENAMES if not (wheelhouse / wheel_name).is_file()
         ]
-        assert missing_wheels == \
-            [], \
-            f"issue-69 local wheelhouse is missing pinned backend wheels: {missing_wheels}"
+        assert missing_wheels == [], f"issue-69 local wheelhouse is missing pinned backend wheels: {missing_wheels}"
         return wheelhouse
 
     def _issue_69_venv_python(self, venv_dir: Path) -> Path:
@@ -2580,13 +2465,11 @@ class TestInitUpdate(CliRuntimeHarness):
                 str(target_dir),
             ]
         if wheelhouse is not None:
-            command.extend(
-                [
-                    "--no-index",
-                    "--find-links",
-                    str(wheelhouse),
-                ]
-            )
+            command.extend([
+                "--no-index",
+                "--find-links",
+                str(wheelhouse),
+            ])
         command.extend(requirements)
         self._issue_69_run_subprocess(command)
 
@@ -2601,15 +2484,14 @@ class TestInitUpdate(CliRuntimeHarness):
         python_wrapper.write_text(
             "#!/bin/sh\n"
             f"PYTHONPATH={shlex.quote(str(site_packages_dir))}${{PYTHONPATH:+:${{PYTHONPATH}}}} "
-            f"exec {shlex.quote(sys.executable)} \"$@\"\n",
+            f'exec {shlex.quote(sys.executable)} "$@"\n',
             encoding="utf-8",
         )
         python_wrapper.chmod(0o755)
 
         spec_dock_wrapper = self._issue_69_venv_spec_dock(python_wrapper)
         spec_dock_wrapper.write_text(
-            "#!/bin/sh\n"
-            f"exec {shlex.quote(str(python_wrapper))} -m spec_dock.cli \"$@\"\n",
+            f'#!/bin/sh\nexec {shlex.quote(str(python_wrapper))} -m spec_dock.cli "$@"\n',
             encoding="utf-8",
         )
         spec_dock_wrapper.chmod(0o755)
@@ -2621,14 +2503,12 @@ class TestInitUpdate(CliRuntimeHarness):
             return spec_dock_wrapper
         if os.name == "nt":
             spec_dock_wrapper.write_text(
-                "@echo off\r\n"
-                f"\"{venv_python}\" -m spec_dock.cli %*\r\n",
+                f'@echo off\r\n"{venv_python}" -m spec_dock.cli %*\r\n',
                 encoding="utf-8",
             )
         else:
             spec_dock_wrapper.write_text(
-                "#!/bin/sh\n"
-                f"exec {shlex.quote(str(venv_python))} -m spec_dock.cli \"$@\"\n",
+                f'#!/bin/sh\nexec {shlex.quote(str(venv_python))} -m spec_dock.cli "$@"\n',
                 encoding="utf-8",
             )
             spec_dock_wrapper.chmod(0o755)
@@ -2655,8 +2535,7 @@ class TestInitUpdate(CliRuntimeHarness):
         )
         if venv_result.returncode == 0:
             venv_python = self._issue_69_venv_python(venv_dir)
-            assert venv_python.is_file(), \
-                f"issue-69 expected venv python executable at: {venv_python}"
+            assert venv_python.is_file(), f"issue-69 expected venv python executable at: {venv_python}"
             pip_result = subprocess.run(
                 [str(venv_python), "-m", "pip", "--version"],
                 capture_output=True,
@@ -2761,7 +2640,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "    resolved_assets_dir = Path(assets_dir).resolve()\n"
             "    install_root = resolved_assets_dir / 'install_root'\n"
             "    inventory = sorted(\n"
-            "        f\"spec_dock/assets/{candidate.relative_to(resolved_assets_dir).as_posix()}\"\n"
+            '        f"spec_dock/assets/{candidate.relative_to(resolved_assets_dir).as_posix()}"\n'
             "        for candidate in install_root.rglob('*')\n"
             "        if candidate.is_file()\n"
             "    )\n"
@@ -2824,18 +2703,21 @@ class TestInitUpdate(CliRuntimeHarness):
     ) -> None:
         spec_dock_file = Path(str(snapshot.get("spec_dock_file", ""))).resolve()
         assets_dir = Path(str(snapshot.get("assets_dir", ""))).resolve()
-        assert "site-packages" in \
-            spec_dock_file.as_posix(), \
+        assert "site-packages" in spec_dock_file.as_posix(), (
             f"issue-69 expected installed package module path, got: {spec_dock_file}"
-        assert "site-packages" in \
-            assets_dir.as_posix(), \
+        )
+        assert "site-packages" in assets_dir.as_posix(), (
             f"issue-69 expected installed package assets path, got: {assets_dir}"
-        assert not self._issue_69_path_is_within(spec_dock_file, repo_root), \
+        )
+        assert not self._issue_69_path_is_within(spec_dock_file, repo_root), (
             f"issue-69 runtime imported spec_dock from checkout path: {spec_dock_file}"
-        assert not self._issue_69_path_is_within(assets_dir, repo_root), \
+        )
+        assert not self._issue_69_path_is_within(assets_dir, repo_root), (
             f"issue-69 runtime loaded assets from checkout path: {assets_dir}"
-        assert not bool(snapshot.get("sys_path_has_repo_root")), \
+        )
+        assert not bool(snapshot.get("sys_path_has_repo_root")), (
             "issue-69 runtime sys.path unexpectedly includes repository checkout path"
+        )
 
     def _issue_69_seed_stale_fixtures_in_sdist_source_context(self, build_context: Path) -> set[str]:
         source_root = build_context / "src"
@@ -2939,14 +2821,11 @@ class TestInitUpdate(CliRuntimeHarness):
     def _issue_69_collect_installed_install_root_inventory(self, installed_root: Path) -> set[str]:
         package_root = installed_root / "spec_dock"
         install_root = package_root / "assets" / "install_root"
-        assert install_root.is_dir(), \
-            f"issue-69 installed package is missing install_root assets: {install_root}"
+        assert install_root.is_dir(), f"issue-69 installed package is missing install_root assets: {install_root}"
         return {
             f"spec_dock/{candidate.relative_to(package_root).as_posix()}"
             for candidate in install_root.rglob("*")
-            if candidate.is_file()
-            and "__pycache__" not in candidate.parts
-            and not candidate.name.endswith(".pyc")
+            if candidate.is_file() and "__pycache__" not in candidate.parts and not candidate.name.endswith(".pyc")
         }
 
     def _issue_69_collect_install_root_artifact_surfaces(self) -> dict[str, set[str]]:
@@ -2973,24 +2852,22 @@ class TestInitUpdate(CliRuntimeHarness):
             wheel_name_part, wheel_version_part, _ = wheel_path.name.split("-", 2)
             wheel_requirement = f"{wheel_name_part.replace('_', '-')}=={wheel_version_part}"
 
-            self._issue_69_run_subprocess(
-                [
-                    str(venv_python),
-                    "-m",
-                    "pip",
-                    "install",
-                    "--no-index",
-                    "--no-cache-dir",
-                    "--no-deps",
-                    "--find-links",
-                    str(wheel_dir),
-                    "--find-links",
-                    str(wheelhouse),
-                    "--target",
-                    str(installed_dir),
-                    wheel_requirement,
-                ]
-            )
+            self._issue_69_run_subprocess([
+                str(venv_python),
+                "-m",
+                "pip",
+                "install",
+                "--no-index",
+                "--no-cache-dir",
+                "--no-deps",
+                "--find-links",
+                str(wheel_dir),
+                "--find-links",
+                str(wheelhouse),
+                "--target",
+                str(installed_dir),
+                wheel_requirement,
+            ])
 
             wheel_inventory = self._issue_69_collect_wheel_install_root_inventory(wheel_path)
             sdist_inventory = self._issue_69_collect_sdist_install_root_inventory(sdist_path)
@@ -3082,9 +2959,7 @@ class TestInitUpdate(CliRuntimeHarness):
             phase_requirement = (docs_dir / "phase_requirement.md").read_text(encoding="utf-8")
             phase_design = (docs_dir / "phase_design.md").read_text(encoding="utf-8")
             phase_plan = (docs_dir / "phase_plan.md").read_text(encoding="utf-8")
-            issue_plan_authoring = (docs_dir / "authoring" / "issue-plan.md").read_text(
-                encoding="utf-8"
-            )
+            issue_plan_authoring = (docs_dir / "authoring" / "issue-plan.md").read_text(encoding="utf-8")
             assert "fresh `spec-reviewer`" in workflow_spec_authoring
             assert "`review_status: pass`" in workflow_spec_authoring
             assert "Spec Authoring Gate" in workflow_spec_authoring
@@ -3112,8 +2987,9 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "- `tc-s01-001` acceptance: <短い説明>" in issue_plan_authoring
             assert "concrete test case id" in issue_plan_authoring
             assert "関連 closure id" in issue_plan_authoring
-            assert "`spec-dock-issue-planning` skill を operational entrypoint / first-read spine" in \
-                issue_plan_authoring
+            assert (
+                "`spec-dock-issue-planning` skill を operational entrypoint / first-read spine" in issue_plan_authoring
+            )
             assert "複数の closure id または複数の concrete test case" in issue_plan_authoring
             self._assert_concrete_test_cases_nested_list_contract(
                 issue_plan_authoring,
@@ -3198,19 +3074,23 @@ class TestInitUpdate(CliRuntimeHarness):
             assert (placeholder_root / "initiative" / "README.md").is_file()
             assert (placeholder_root / "epic" / "README.md").is_file()
             assert (placeholder_root / "issue" / "README.md").is_file()
-            assert self._read_active_pointer_text(target, "initiative", "README.md") == \
-                (placeholder_root / "initiative" / "README.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "epic", "README.md") == \
-                (placeholder_root / "epic" / "README.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "issue", "README.md") == \
-                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "initiative", "README.md") == (
+                placeholder_root / "initiative" / "README.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "README.md") == (
+                placeholder_root / "epic" / "README.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "README.md") == (
+                placeholder_root / "issue" / "README.md"
+            ).read_text(encoding="utf-8")
             context_pack_text = (target / "spec-dock" / "active" / "context-pack.md").read_text(encoding="utf-8")
             assert "- initiative: (none)" in context_pack_text
             assert "- epic: (none)" in context_pack_text
             assert "- issue: (none)" in context_pack_text
             assert "- state (github default): `./spec-dock/scripts/spec-dock sync`" in context_pack_text
-            assert "- state (cache/local opt-out): `./spec-dock/scripts/spec-dock sync --no-github`" in \
-                context_pack_text
+            assert (
+                "- state (cache/local opt-out): `./spec-dock/scripts/spec-dock sync --no-github`" in context_pack_text
+            )
             assert "- state (local): `./spec-dock/scripts/spec-dock sync`" not in context_pack_text
             assert "- state (github): `./spec-dock/scripts/spec-dock sync --github`" not in context_pack_text
 
@@ -3279,8 +3159,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "## 実行ルール（全ステップ共通）" in plan_text
             assert "workflow_issue.md" in plan_text
             assert "phase_plan_issue.md" in plan_text
-            assert "### ドキュメント影響の解消ステップ S90（docs impact resolution / docs refresh）" in \
-                plan_text
+            assert "### ドキュメント影響の解消ステップ S90（docs impact resolution / docs refresh）" in plan_text
             assert "### 最終品質ゲートステップ S99（final quality gate）" in plan_text
             assert "step reviewer gate" in plan_text
             assert "commit gate" in plan_text
@@ -3357,9 +3236,9 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "no-op checked contracts / files" in report_text
 
             for scope in ("initiative", "epic", "issue"):
-                active_none_report = (
-                    target / "spec-dock" / "system" / "active-none" / scope / "report.md"
-                ).read_text(encoding="utf-8")
+                active_none_report = (target / "spec-dock" / "system" / "active-none" / scope / "report.md").read_text(
+                    encoding="utf-8"
+                )
                 assert "## 委任ドラフト証跡 schema（Delegated Draft Evidence Schema / reference）" in active_none_report
                 self._assert_delegated_draft_evidence_schema_contract(
                     active_none_report,
@@ -3368,20 +3247,35 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "no-op diff-clean command" in report_text
             assert "no-op read-only confirmation" in report_text
             assert "post-commit external evidence destination" in report_text
-            assert "| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |" in report_text
+            assert (
+                "| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |"
+                in report_text
+            )
             assert any(
-                    header in report_text
-                    for header in (
-                        "| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | reviewer 判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |",
-                        "| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |",
-                    )
+                header in report_text
+                for header in (
+                    "| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | reviewer 判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |",
+                    "| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |",
                 )
-            assert "| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |" in report_text
+            )
+            assert (
+                "| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |"
+                in report_text
+            )
             assert "delegated / approved-local-execution / degraded mode" in report_text
             assert "clean / expected only" not in report_text
-            assert "| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |" in report_text
-            assert "| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |" in report_text
-            assert "| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |" in report_text
+            assert (
+                "| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |"
+                in report_text
+            )
+            assert (
+                "| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |"
+                in report_text
+            )
+            assert (
+                "| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |"
+                in report_text
+            )
             assert "`closure id / test id` は Spec-Locked Closure Index の `id` を指す" in report_text
             assert "pass / approved-no-op / fail / blocked" in report_text
             assert "|---|---|---|---|---|" in report_text
@@ -3391,30 +3285,26 @@ class TestInitUpdate(CliRuntimeHarness):
             assert (target / ".codex" / "agents" / "spec-manager.toml").is_file()
             assert (target / ".github" / "agents" / "orchestrator.agent.md").is_file()
 
-            workflow_skill_text = (skills_root / "spec-dock-hub" / "SKILL.md").read_text(
-                encoding="utf-8"
-            )
+            workflow_skill_text = (skills_root / "spec-dock-hub" / "SKILL.md").read_text(encoding="utf-8")
             assert "`discussions/`" in workflow_skill_text
             assert "./spec-dock/scripts/spec-dock new doc adr --issue" in workflow_skill_text
             assert "`spec-dock/docs/reference_deps.md`" in workflow_skill_text
             assert "`spec-dock/docs/reference_sync.md`" in workflow_skill_text
             assert "./spec-dock/scripts/spec-dock ..." in workflow_skill_text
-            assert "./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>" not in \
-                workflow_skill_text
-            assert "./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>" not in \
-                workflow_skill_text
+            assert "./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>" not in workflow_skill_text
+            assert (
+                "./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>" not in workflow_skill_text
+            )
             assert "./spec-dock/scripts/spec-dock deps check <target>" not in workflow_skill_text
             assert "./spec-dock/scripts/spec-dock validate" not in workflow_skill_text
             assert "./spec-dock/scripts/spec-dock sync" not in workflow_skill_text
             assert "./spec " not in workflow_skill_text
             assert "adrs/new-adr" not in workflow_skill_text
 
-            issue_skill_text = (skills_root / "spec-dock-issue-execution" / "SKILL.md").read_text(
+            issue_skill_text = (skills_root / "spec-dock-issue-execution" / "SKILL.md").read_text(encoding="utf-8")
+            issue_planning_skill_text = (skills_root / "spec-dock-issue-planning" / "SKILL.md").read_text(
                 encoding="utf-8"
             )
-            issue_planning_skill_text = (
-                skills_root / "spec-dock-issue-planning" / "SKILL.md"
-            ).read_text(encoding="utf-8")
             assert "spec-dock/docs/workflow_issue.md" in issue_planning_skill_text
             assert "spec-dock/docs/workflow_spec_authoring.md" in issue_planning_skill_text
             assert "spec-dock/docs/workflow_clarification.md" in issue_planning_skill_text
@@ -3574,28 +3464,19 @@ class TestInitUpdate(CliRuntimeHarness):
             for installed_rel_path, corrupted_rules_text in corrupted_rules_text_map.items():
                 canonical_rules_path = target / installed_rel_path
                 self._write_text_force(canonical_rules_path, corrupted_rules_text)
-                assert canonical_rules_path.read_text(encoding="utf-8") == \
-                    corrupted_rules_text
+                assert canonical_rules_path.read_text(encoding="utf-8") == corrupted_rules_text
 
             self._write_text_force(
                 target / "spec-dock" / "docs" / "workflow_adr.md",
-                "./spec-dock/scripts/spec-dock new adr --issue iss-00123 --title \"...\"\n",
+                './spec-dock/scripts/spec-dock new adr --issue iss-00123 --title "..."\n',
             )
             legacy_template_text_map = {
                 "spec-dock/templates/adr.md": "# legacy adr template\n",
                 "spec-dock/templates/discussions/note.md": "# retired note template\n",
-                "spec-dock/templates/initiative/discussions/rules.md": (
-                    "legacy naming: <type>-00001-<slug>.md\n"
-                ),
-                "spec-dock/templates/epic/discussions/rules.md": (
-                    "legacy epic discussion rules\n"
-                ),
-                "spec-dock/templates/issue/discussions/rules.md": (
-                    "legacy issue discussion rules\n"
-                ),
-                "spec-dock/templates/issue/discussions/_template.md": (
-                    "# legacy discussion scaffold\n"
-                ),
+                "spec-dock/templates/initiative/discussions/rules.md": ("legacy naming: <type>-00001-<slug>.md\n"),
+                "spec-dock/templates/epic/discussions/rules.md": ("legacy epic discussion rules\n"),
+                "spec-dock/templates/issue/discussions/rules.md": ("legacy issue discussion rules\n"),
+                "spec-dock/templates/issue/discussions/_template.md": ("# legacy discussion scaffold\n"),
                 "spec-dock/templates/initiative/epics/new-epic": "#!/bin/sh\n",
                 "spec-dock/templates/epic/issues/new-issue": "#!/bin/sh\n",
             }
@@ -3608,9 +3489,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 target / "spec-dock" / "scripts" / "README.md",
                 "legacy example: new adr --issue ...\n",
             )
-            legacy_hub_skill_path = (
-                target / ".agents" / "skills" / "spec-driven-tdd-workflow" / "SKILL.md"
-            )
+            legacy_hub_skill_path = target / ".agents" / "skills" / "spec-driven-tdd-workflow" / "SKILL.md"
             legacy_hub_skill_path.parent.mkdir(parents=True, exist_ok=True)
             self._write_text_force(
                 legacy_hub_skill_path,
@@ -3619,16 +3498,11 @@ class TestInitUpdate(CliRuntimeHarness):
             legacy_gitignore_path = target / "spec-dock" / ".gitignore"
             self._write_text_force(
                 legacy_gitignore_path,
-                ".agent/\n"
-                "active/\n"
-                "tree-all.puml\n"
-                "tree.puml\n"
-                "deps-issues.puml\n"
-                "dashboard.md\n",
+                ".agent/\nactive/\ntree-all.puml\ntree.puml\ndeps-issues.puml\ndashboard.md\n",
             )
-            assert "/adrs/" not in \
-                legacy_gitignore_path.read_text(encoding="utf-8"), \
+            assert "/adrs/" not in legacy_gitignore_path.read_text(encoding="utf-8"), (
                 "legacy fixture must omit /adrs/ before update"
+            )
 
             assert main(["update", str(target)]) == 0
             gitignore = (target / "spec-dock" / ".gitignore").read_text(encoding="utf-8")
@@ -3639,13 +3513,11 @@ class TestInitUpdate(CliRuntimeHarness):
             self._assert_workflow_tree_docs_contract(
                 (target / "spec-dock" / "docs" / "workflow-tree.md").read_text(encoding="utf-8")
             )
-            self._assert_guide_docs_contract(
-                (target / "spec-dock" / "docs" / "guide.md").read_text(encoding="utf-8")
-            )
+            self._assert_guide_docs_contract((target / "spec-dock" / "docs" / "guide.md").read_text(encoding="utf-8"))
             for installed_rel_path, corrupted_rules_text in corrupted_rules_text_map.items():
-                assert (target / installed_rel_path).read_text(encoding="utf-8") != \
-                    corrupted_rules_text, \
+                assert (target / installed_rel_path).read_text(encoding="utf-8") != corrupted_rules_text, (
                     f"canonical rules file was not refreshed: {installed_rel_path}"
+                )
             for legacy_rel_path in legacy_template_text_map:
                 assert not (target / legacy_rel_path).exists(), f"legacy template survived update: {legacy_rel_path}"
 
@@ -3687,9 +3559,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 target / "spec-dock" / "templates" / "discussions" / "note.md": "# retired note template\n",
                 target / "spec-dock" / "templates" / "initiative" / "epics" / "new-epic": "#!/bin/sh\n",
                 target / "spec-dock" / "templates" / "epic" / "issues" / "new-issue": "#!/bin/sh\n",
-                target / "spec-dock" / "templates" / "issue" / "discussions" / "rules.md": (
-                    "managed legacy rules\n"
-                ),
+                target / "spec-dock" / "templates" / "issue" / "discussions" / "rules.md": ("managed legacy rules\n"),
             }
             for artifact_path, artifact_text in managed_legacy_artifacts.items():
                 artifact_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3699,9 +3569,7 @@ class TestInitUpdate(CliRuntimeHarness):
             node_legacy_artifacts = {
                 node_root / "epics" / "new-epic": "node legacy wrapper\n",
                 node_root / "epics" / "rules.md": "node legacy rules copy\n",
-                node_root / "epics" / "epic-local-00001-jwt-auth" / "issues" / "new-issue": (
-                    "node issue wrapper\n"
-                ),
+                node_root / "epics" / "epic-local-00001-jwt-auth" / "issues" / "new-issue": ("node issue wrapper\n"),
                 node_root
                 / "epics"
                 / "epic-local-00001-jwt-auth"
@@ -3763,9 +3631,9 @@ class TestInitUpdate(CliRuntimeHarness):
         pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
 
         for package_data_pattern in _ISS_00031_EXCLUDE_PATTERNS:
-            assert f'"{package_data_pattern}"' in \
-                pyproject_text, \
+            assert f'"{package_data_pattern}"' in pyproject_text, (
                 f"missing exclude-package-data guard for stale build artifact: {package_data_pattern}"
+            )
 
     def test_built_wheel_excludes_deleted_wrapper_era_assets_from_stale_build_outputs(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -3802,13 +3670,13 @@ class TestInitUpdate(CliRuntimeHarness):
             with zipfile.ZipFile(wheel_path) as wheel_zip:
                 wheel_entries = set(wheel_zip.namelist())
 
-            assert "spec_dock/assets/spec_dock/templates/README.md" in \
-                wheel_entries, \
+            assert "spec_dock/assets/spec_dock/templates/README.md" in wheel_entries, (
                 "sanity check failed: built wheel did not include expected live template asset"
+            )
             for stale_rel_path in _ISS_00031_STALE_WHEEL_PATHS:
-                assert stale_rel_path not in \
-                    wheel_entries, \
+                assert stale_rel_path not in wheel_entries, (
                     f"built wheel unexpectedly shipped stale build artifact: {stale_rel_path}"
+                )
 
     def test_issue_69_package_data_includes_hidden_install_root_subtrees(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -3820,22 +3688,20 @@ class TestInitUpdate(CliRuntimeHarness):
 
         package_data_section = pyproject_text.split(section_header, 1)[1].split(next_section_header, 1)[0]
         for pattern in self._ISSUE_69_INSTALL_ROOT_PACKAGE_DATA_PATTERNS:
-            assert f'"{pattern}"' in \
-                package_data_section, \
+            assert f'"{pattern}"' in package_data_section, (
                 f"missing issue-69 hidden install_root package-data inclusion: {pattern}"
+            )
 
     def test_issue_69_representative_install_root_assets_are_packaged_in_all_artifact_surfaces(self) -> None:
         surfaces = self._issue_69_collect_install_root_artifact_surfaces()
         for surface_name in ("source", "wheel", "sdist", "installed"):
-            assert surfaces[surface_name], \
+            assert surfaces[surface_name], (
                 f"issue-69 expected non-empty install_root inventory for artifact surface: {surface_name}"
+            )
             for artifact_relative_path in self._ISSUE_69_REPRESENTATIVE_ARTIFACT_RELATIVE_PATHS:
-                assert artifact_relative_path in \
-                    surfaces[surface_name], \
-                    (
-                        f"missing issue-69 representative install_root asset in {surface_name}: "
-                        f"{artifact_relative_path}"
-                    )
+                assert artifact_relative_path in surfaces[surface_name], (
+                    f"missing issue-69 representative install_root asset in {surface_name}: {artifact_relative_path}"
+                )
 
     def test_issue_69_full_install_root_inventory_is_packaged_in_wheel_sdist_and_installed_resources(self) -> None:
         surfaces = self._issue_69_collect_install_root_artifact_surfaces()
@@ -3846,12 +3712,10 @@ class TestInitUpdate(CliRuntimeHarness):
             observed_inventory = surfaces[surface_name]
             missing = sorted(source_inventory - observed_inventory)
             unexpected = sorted(observed_inventory - source_inventory)
-            assert observed_inventory == \
-                source_inventory, \
-                (
-                    f"issue-69 full install_root inventory parity failed for {surface_name}; "
-                    f"missing={missing[:10]} unexpected={unexpected[:10]}"
-                )
+            assert observed_inventory == source_inventory, (
+                f"issue-69 full install_root inventory parity failed for {surface_name}; "
+                f"missing={missing[:10]} unexpected={unexpected[:10]}"
+            )
 
     def test_issue_69_isolated_wheel_install_exposes_install_root_handoff_surface(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -3885,12 +3749,10 @@ class TestInitUpdate(CliRuntimeHarness):
                 for artifact_relative_path in installed_inventory
                 if any(artifact_relative_path.startswith(prefix) for prefix in scope_prefixes)
             }
-            assert discovered_handoff_scope == \
-                expected_handoff_surface, \
-                (
-                    "issue-69 isolated installed package handoff surface mismatch; "
-                    f"expected={sorted(expected_handoff_surface)} observed={sorted(discovered_handoff_scope)}"
-                )
+            assert discovered_handoff_scope == expected_handoff_surface, (
+                "issue-69 isolated installed package handoff surface mismatch; "
+                f"expected={sorted(expected_handoff_surface)} observed={sorted(discovered_handoff_scope)}"
+            )
 
     def test_issue_69_isolated_wheel_install_runs_init_update_without_checkout_fallback(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -3906,8 +3768,9 @@ class TestInitUpdate(CliRuntimeHarness):
                 temp_root=temp_root,
             )
             spec_dock_command = self._issue_69_venv_spec_dock(venv_python)
-            assert spec_dock_command.is_file(), \
+            assert spec_dock_command.is_file(), (
                 f"issue-69 expected installed spec-dock command in isolated venv: {spec_dock_command}"
+            )
             runtime_env = self._issue_69_runtime_env_without_checkout_fallback()
             init_result = self._issue_69_run_subprocess_capture(
                 [str(spec_dock_command), "init", str(target_repo)],
@@ -3920,18 +3783,16 @@ class TestInitUpdate(CliRuntimeHarness):
                 env=runtime_env,
             )
 
-            assert (target_repo / "spec-dock").is_dir(), \
+            assert (target_repo / "spec-dock").is_dir(), (
                 "issue-69 isolated installed package smoke should create target spec-dock directory"
+            )
             combined_output = (
                 f"{init_result.stdout}\n{init_result.stderr}\n{update_result.stdout}\n{update_result.stderr}"
             ).lower()
             for error_fragment in ("missing asset", "missing install_root", "missing bundled"):
-                assert error_fragment not in \
-                    combined_output, \
-                    (
-                        "issue-69 isolated installed package smoke emitted missing-asset diagnostics: "
-                        f"{error_fragment}"
-                    )
+                assert error_fragment not in combined_output, (
+                    f"issue-69 isolated installed package smoke emitted missing-asset diagnostics: {error_fragment}"
+                )
 
             snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
                 venv_python=venv_python,
@@ -3981,8 +3842,7 @@ class TestInitUpdate(CliRuntimeHarness):
 
             assert resolved == spec_dock_cmd
             assert ensured == spec_dock_cmd
-            assert spec_dock_cmd.read_text(encoding="utf-8").splitlines() == \
-                ["@echo off", "rem existing"]
+            assert spec_dock_cmd.read_text(encoding="utf-8").splitlines() == ["@echo off", "rem existing"]
             assert not (scripts_dir / "spec-dock.exe").exists()
 
     def test_issue_69_windows_helper_synthesizes_cmd_wrapper_when_launcher_missing(self) -> None:
@@ -4002,8 +3862,10 @@ class TestInitUpdate(CliRuntimeHarness):
             assert resolved == expected_wrapper
             assert ensured == expected_wrapper
             assert expected_wrapper.is_file()
-            assert expected_wrapper.read_text(encoding="utf-8").splitlines() == \
-                ["@echo off", f"\"{venv_python}\" -m spec_dock.cli %*"]
+            assert expected_wrapper.read_text(encoding="utf-8").splitlines() == [
+                "@echo off",
+                f'"{venv_python}" -m spec_dock.cli %*',
+            ]
             assert not (scripts_dir / "spec-dock.exe").exists()
 
     def test_issue_69_local_and_installed_handoff_surface_inventories_match(self) -> None:
@@ -4011,12 +3873,10 @@ class TestInitUpdate(CliRuntimeHarness):
         source_inventory = self._issue_69_collect_source_install_root_inventory(repo_root)
         expected_handoff_surface = set(self._ISSUE_69_HANDOFF_SURFACE_ARTIFACT_RELATIVE_PATHS)
         source_handoff_surface = source_inventory & expected_handoff_surface
-        assert source_handoff_surface == \
-            expected_handoff_surface, \
-            (
-                "issue-69 source handoff surface mismatch; "
-                f"expected={sorted(expected_handoff_surface)} observed={sorted(source_handoff_surface)}"
-            )
+        assert source_handoff_surface == expected_handoff_surface, (
+            "issue-69 source handoff surface mismatch; "
+            f"expected={sorted(expected_handoff_surface)} observed={sorted(source_handoff_surface)}"
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             temp_root = Path(tmp)
@@ -4039,12 +3899,10 @@ class TestInitUpdate(CliRuntimeHarness):
             installed_handoff_surface = installed_inventory & expected_handoff_surface
             missing = sorted(source_handoff_surface - installed_handoff_surface)
             unexpected = sorted(installed_handoff_surface - source_handoff_surface)
-            assert installed_handoff_surface == \
-                source_handoff_surface, \
-                (
-                    "issue-69 local and isolated installed handoff surface inventory mismatch; "
-                    f"missing={missing[:10]} unexpected={unexpected[:10]}"
-                )
+            assert installed_handoff_surface == source_handoff_surface, (
+                "issue-69 local and isolated installed handoff surface inventory mismatch; "
+                f"missing={missing[:10]} unexpected={unexpected[:10]}"
+            )
 
     def test_issue_69_wheel_build_prunes_seeded_stale_wrapper_era_outputs(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -4069,25 +3927,21 @@ class TestInitUpdate(CliRuntimeHarness):
                 build_env=build_env,
             )
 
-            assert pre_prune_snapshot.is_file(), \
-                f"issue-69 expected pre-prune snapshot to exist: {pre_prune_snapshot}"
+            assert pre_prune_snapshot.is_file(), f"issue-69 expected pre-prune snapshot to exist: {pre_prune_snapshot}"
             snapshot_payload = json.loads(pre_prune_snapshot.read_text(encoding="utf-8"))
             expected_seeded_fixtures = set(self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS)
-            assert set(snapshot_payload.get("expected_seeded_stale_fixture_paths", [])) == \
-                expected_seeded_fixtures, \
+            assert set(snapshot_payload.get("expected_seeded_stale_fixture_paths", [])) == expected_seeded_fixtures, (
                 "issue-69 setup.py snapshot did not report the approved seeded fixture set"
-            assert set(snapshot_payload.get("present_before_prune", [])) == \
-                expected_seeded_fixtures, \
+            )
+            assert set(snapshot_payload.get("present_before_prune", [])) == expected_seeded_fixtures, (
                 "issue-69 seeded stale fixture set must exist in wheel build staging before prune"
+            )
 
             wheel_inventory = self._issue_69_collect_wheel_file_inventory(wheel_path)
             for stale_artifact_path in self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS:
-                assert stale_artifact_path not in \
-                    wheel_inventory, \
-                    (
-                        "issue-69 wheel build unexpectedly shipped seeded stale wrapper-era output: "
-                        f"{stale_artifact_path}"
-                    )
+                assert stale_artifact_path not in wheel_inventory, (
+                    f"issue-69 wheel build unexpectedly shipped seeded stale wrapper-era output: {stale_artifact_path}"
+                )
 
     def test_issue_69_sdist_build_excludes_seeded_stale_wrapper_era_outputs(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -4101,9 +3955,9 @@ class TestInitUpdate(CliRuntimeHarness):
             self._issue_69_prepare_build_context(repo_root, build_context)
             present_before_build = self._issue_69_seed_stale_fixtures_in_sdist_source_context(build_context)
             expected_seeded_fixtures = set(self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS)
-            assert present_before_build == \
-                expected_seeded_fixtures, \
+            assert present_before_build == expected_seeded_fixtures, (
                 "issue-69 seeded stale fixture set must exist in sdist source context before build"
+            )
 
             _, sdist_path, _ = self._issue_69_build_artifacts_with_local_wheelhouse(
                 repo_root=repo_root,
@@ -4114,12 +3968,9 @@ class TestInitUpdate(CliRuntimeHarness):
 
             sdist_inventory = self._issue_69_collect_sdist_source_file_inventory(sdist_path)
             for stale_artifact_path in self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS:
-                assert stale_artifact_path not in \
-                    sdist_inventory, \
-                    (
-                        "issue-69 sdist build unexpectedly shipped seeded stale wrapper-era output: "
-                        f"{stale_artifact_path}"
-                    )
+                assert stale_artifact_path not in sdist_inventory, (
+                    f"issue-69 sdist build unexpectedly shipped seeded stale wrapper-era output: {stale_artifact_path}"
+                )
 
     def test_issue_69_stale_exclusion_patterns_are_aligned_between_pyproject_and_setup(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -4133,12 +3984,12 @@ class TestInitUpdate(CliRuntimeHarness):
         setup_pattern_set = set(setup_patterns)
         expected_pattern_set = set(self._ISSUE_69_STALE_EXCLUSION_ARTIFACT_RELATIVE_PATTERNS)
 
-        assert pyproject_normalized_patterns == \
-            setup_pattern_set, \
+        assert pyproject_normalized_patterns == setup_pattern_set, (
             "issue-69 stale exclusion patterns diverged between pyproject.toml and setup.py"
-        assert setup_pattern_set == \
-            expected_pattern_set, \
+        )
+        assert setup_pattern_set == expected_pattern_set, (
             "issue-69 stale exclusion patterns must stay aligned to the approved exact pattern set"
+        )
 
     def test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -4151,13 +4002,11 @@ class TestInitUpdate(CliRuntimeHarness):
             capture_output=True,
             text=True,
         )
-        assert doctor_help.returncode == \
-            0, \
-            (
-                "checked-in dogfooding runtime must expose 'doctor'\n"
-                f"stdout:\n{doctor_help.stdout}\n"
-                f"stderr:\n{doctor_help.stderr}\n"
-            )
+        assert doctor_help.returncode == 0, (
+            "checked-in dogfooding runtime must expose 'doctor'\n"
+            f"stdout:\n{doctor_help.stdout}\n"
+            f"stderr:\n{doctor_help.stderr}\n"
+        )
         assert "usage: spec-dock/scripts/spec-dock doctor" in doctor_help.stdout
 
         legacy_active = subprocess.run(
@@ -4225,8 +4074,7 @@ class TestInitUpdate(CliRuntimeHarness):
             )
         with pytest.raises(AssertionError, match="heading must use Japanese primary"):
             self._assert_user_facing_markdown_labels_use_japanese_primary(
-                "## 2. Initiative を固める（Outcome とガードレールを固定）\n"
-                "### 4.1 doc family と保存先\n",
+                "## 2. Initiative を固める（Outcome とガードレールを固定）\n### 4.1 doc family と保存先\n",
                 source="titlecase-heading-primary-guard-rejected-fixture",
             )
         with pytest.raises(AssertionError, match="explanatory prose must use Japanese primary"):
@@ -4297,8 +4145,7 @@ class TestInitUpdate(CliRuntimeHarness):
         issue_design = (template_root / "issue" / "design.md").read_text(encoding="utf-8")
         issue_plan = (template_root / "issue" / "plan.md").read_text(encoding="utf-8")
         issue_report = (template_root / "issue" / "report.md").read_text(encoding="utf-8")
-        assert "### 図表（UML / 推奨: システムコンテキスト / 目指す状態の全体像）" in \
-            initiative_design
+        assert "### 図表（UML / 推奨: システムコンテキスト / 目指す状態の全体像）" in initiative_design
         assert "```plantuml" in initiative_design
         assert "!include C4_Context.puml" in initiative_design
         assert "LAYOUT_WITH_LEGEND()" in initiative_design
@@ -4325,9 +4172,7 @@ class TestInitUpdate(CliRuntimeHarness):
         domain_model_section = epic_design.split("## ドメインモデル（Domain Model / DDD 必要時）", 1)[1].split(
             "## 契約", 1
         )[0]
-        data_model_section = epic_design.split("## データモデル", 1)[1].split(
-            "## 主要フロー", 1
-        )[0]
+        data_model_section = epic_design.split("## データモデル", 1)[1].split("## 主要フロー", 1)[0]
         assert "```plantuml" not in domain_model_section
         assert "```plantuml" not in data_model_section
         assert "N/A: 理由" in domain_model_section
@@ -4347,9 +4192,9 @@ class TestInitUpdate(CliRuntimeHarness):
             )[0],
             domain_model_section,
             data_model_section,
-            epic_design.split("## 主要フロー", 1)[1].split(
-                "## 状態 / アクティビティ（State / Activity / 必要時）", 1
-            )[0],
+            epic_design.split("## 主要フロー", 1)[1].split("## 状態 / アクティビティ（State / Activity / 必要時）", 1)[
+                0
+            ],
             state_activity_section,
         ):
             for metadata_field in (
@@ -4391,9 +4236,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ):
             assert "N/A: 理由" in optional_issue_section
             assert "```plantuml" not in optional_issue_section
-        assert issue_design.count("```plantuml") == \
-            1, \
+        assert issue_design.count("```plantuml") == 1, (
             "issue design scaffold should only ship the standard module dependency UML placeholder"
+        )
         assert "必要な場合だけ追加する" not in issue_design
         assert "## ディレクトリ / ファイル変更計画" in issue_design
         assert re.search(r"```text\n\.\n\|-- src/\n\|   \|-- package/", issue_design)
@@ -4422,13 +4267,19 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "## 仕様固定クロージャ索引（Spec-Locked Closure Index）" in issue_plan
         assert "coverage ledger" in issue_plan
         assert "実際の step-local obligation" in issue_plan
-        assert "| 識別子（ID） | ステップ（step） | スライス（slice） | 種別（type） | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル（evidence level） | クロージャ証跡（closure evidence） |" in issue_plan
+        assert (
+            "| 識別子（ID） | ステップ（step） | スライス（slice） | 種別（type） | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル（evidence level） | クロージャ証跡（closure evidence） |"
+            in issue_plan
+        )
         assert "証跡レベル（evidence level）:" in issue_plan
         assert "red-required:" in issue_plan
         assert "covered-existing:" in issue_plan
         assert "inspect-only:" in issue_plan
         assert "manual-required:" in issue_plan
-        assert "件数ではなく、AC、changed contract、failure mode、regression risk、invariant、manual / integration risk" in issue_plan
+        assert (
+            "件数ではなく、AC、changed contract、failure mode、regression risk、invariant、manual / integration risk"
+            in issue_plan
+        )
         assert "private method、実装アルゴリズム、mock 構造、assert 細部は原則固定しない" in issue_plan
         assert "テスト義務（test obligation）:" in issue_plan
         assert "closure id:" in issue_plan
@@ -4494,8 +4345,14 @@ class TestInitUpdate(CliRuntimeHarness):
             assert fragment in issue_report
         assert "#### 委任 worker 証跡（Delegated Worker Evidence）" in issue_report
         assert "#### 親実装例外（Parent Implementation Exception）" in issue_report
-        assert "| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |" in issue_report
-        assert "| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |" in issue_report
+        assert (
+            "| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |"
+            in issue_report
+        )
+        assert (
+            "| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |"
+            in issue_report
+        )
         for fragment in (
             "workflow_issue.md",
             "source of truth",
@@ -4506,9 +4363,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ):
             assert fragment in issue_report
 
-        phase_design = (repo_root / "src/spec_dock/assets/spec_dock/docs/phase_design.md").read_text(
-            encoding="utf-8"
-        )
+        phase_design = (repo_root / "src/spec_dock/assets/spec_dock/docs/phase_design.md").read_text(encoding="utf-8")
         assert "Markdown preview compatibility" in phase_design
         assert "`c4plantuml` fence は VS Code Markdown preview 互換性のため使わない" in phase_design
         assert "`!include C4_Context.puml`" in phase_design
@@ -4569,9 +4424,9 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "tree の下に同じ path 一覧を重複して置かない" in phase_design
         assert "この節は後方互換の入口です" in phase_design
 
-        phase_plan_issue = (
-            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md"
-        ).read_text(encoding="utf-8")
+        phase_plan_issue = (repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md").read_text(
+            encoding="utf-8"
+        )
         assert "`Module Dependency Diagram`" in phase_plan_issue
         assert "`ディレクトリ / ファイル変更計画`" in phase_plan_issue
         assert "`depends on`" in phase_plan_issue
@@ -4589,7 +4444,10 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "amendment trigger" in phase_plan_issue
         assert "仕様固定クロージャ索引（`Spec-Locked Closure Index`）" in phase_plan_issue
         assert "coverage ledger" in phase_plan_issue
-        assert "`spec link`、`locked expectation`、`observable input/state`、`bug class guarded`、`required`、`evidence level`、closure owner step" in phase_plan_issue
+        assert (
+            "`spec link`、`locked expectation`、`observable input/state`、`bug class guarded`、`required`、`evidence level`、closure owner step"
+            in phase_plan_issue
+        )
         assert "docs-only / inspect-only / manual-required" in phase_plan_issue
         assert "code test を義務化しない" in phase_plan_issue
         assert "raw count ではなく risk-calibrated obligation coverage" in phase_plan_issue
@@ -4627,9 +4485,7 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "完了済み issue plan/report の修正を含まない" in phase_plan_issue
         assert "manual authoring path が有効" in phase_plan_issue
 
-        phase_plan = (repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan.md").read_text(
-            encoding="utf-8"
-        )
+        phase_plan = (repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan.md").read_text(encoding="utf-8")
         assert "## 委任 plan authoring ゲート（delegated plan authoring gate）" in phase_plan
         assert "fresh requirement reviewer pass と fresh design reviewer pass" in phase_plan
         assert "Plan Summary" in phase_plan
@@ -4641,9 +4497,9 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "task manifest hash" in phase_plan
         assert "post-run diff guard が failed / not run" in phase_plan
 
-        phase_plan_epic = (
-            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md"
-        ).read_text(encoding="utf-8")
+        phase_plan_epic = (repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md").read_text(
+            encoding="utf-8"
+        )
         assert "delegated plan draft" in phase_plan_epic
         assert "fresh requirement/design reviewer pass" in phase_plan_epic
         assert "scope-local discussion direct-write consent" in phase_plan_epic
@@ -4653,9 +4509,9 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "完了済み issue plan/report の修正を含まない" in phase_plan_epic
         assert "manual authoring path が有効" in phase_plan_epic
 
-        workflow_issue = (
-            repo_root / "src/spec_dock/assets/spec_dock/docs/workflow_issue.md"
-        ).read_text(encoding="utf-8")
+        workflow_issue = (repo_root / "src/spec_dock/assets/spec_dock/docs/workflow_issue.md").read_text(
+            encoding="utf-8"
+        )
         assert "templates は完成形ではなく、書き始めるための最小 scaffold" in workflow_issue
         assert "項目を追加・削除・統合・並べ替えてよい" in workflow_issue
         assert "正確性、検証可能性、人間の理解、エージェントの実行" in workflow_issue
@@ -4675,7 +4531,10 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "Step Contract Closure" in workflow_issue
         assert "Test Contract Closure" in workflow_issue
         assert "Closure Coverage" in workflow_issue
-        assert "required closure id が step 契約クロージャ（`Step Contract Closure`）/ テスト契約クロージャ（`Test Contract Closure`）/ クロージャ coverage（`Closure Coverage`）で pass または approved-no-op" in workflow_issue
+        assert (
+            "required closure id が step 契約クロージャ（`Step Contract Closure`）/ テスト契約クロージャ（`Test Contract Closure`）/ クロージャ coverage（`Closure Coverage`）で pass または approved-no-op"
+            in workflow_issue
+        )
         assert "Closure Delta" in workflow_issue
         assert "planned executable workflow contract / command queue" in workflow_issue
         assert "`report.md` は observed evidence ledger" in workflow_issue
@@ -4685,10 +4544,16 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "bounded implementation batch" in workflow_issue
         assert "Implementation Delegation Gate" in workflow_issue
         assert "delegated worker handoff" in workflow_issue
-        assert "`delegated role`、`scope`、`source of truth`、`allowed changes`、`forbidden changes`、`required verification`、`stop conditions`、`output required`" in workflow_issue
+        assert (
+            "`delegated role`、`scope`、`source of truth`、`allowed changes`、`forbidden changes`、`required verification`、`stop conditions`、`output required`"
+            in workflow_issue
+        )
         assert "複数 layer / module / package" in workflow_issue
         assert "runtime / CLI / infra / templates / shipped scaffold / shared docs" in workflow_issue
-        assert "integration test / migration / backward compatibility / filesystem / GitHub / active state" in workflow_issue
+        assert (
+            "integration test / migration / backward compatibility / filesystem / GitHub / active state"
+            in workflow_issue
+        )
         assert "`delegated` / `approved-local-execution` / degraded mode" in workflow_issue
         assert "implementation delegation は reviewer gate の代替ではない" in workflow_issue
         for fragment in (
@@ -4707,7 +4572,10 @@ class TestInitUpdate(CliRuntimeHarness):
         ):
             assert fragment in workflow_issue
         assert "Parent Implementation Exception" in workflow_issue
-        assert "delegation 不可理由、user approval、allowed files、allowed operation、rollback plan、post-change verification、reviewer gate" in workflow_issue
+        assert (
+            "delegation 不可理由、user approval、allowed files、allowed operation、rollback plan、post-change verification、reviewer gate"
+            in workflow_issue
+        )
         assert "reviewer gate mapping" in workflow_issue
         assert "docs-only / template-only / skill-text-only" in workflow_issue
         assert "bounded delegated follow-up" in workflow_issue
@@ -4716,7 +4584,10 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "step reviewer gate → fix → re-review → commit → clean確認" in workflow_issue
         assert "`1 implementation step = 1 review scope = 1 commit`" in workflow_issue
         assert "`committed` または `approved-no-op`" in workflow_issue
-        assert "docs impact `none` は、docs / templates / README / workflow / skill / migration notes を確認" in workflow_issue
+        assert (
+            "docs impact `none` は、docs / templates / README / workflow / skill / migration notes を確認"
+            in workflow_issue
+        )
         assert "`qa-reviewer` がテスト十分性" in workflow_issue
         assert "issue-wide `code-reviewer` pass" in workflow_issue
         assert "final `spec-reviewer` pass" in workflow_issue
@@ -4725,8 +4596,7 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "意図しない staged / unstaged 変更なし" in workflow_issue
 
         issue_execution_skill = (
-            repo_root
-            / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
         ).read_text(encoding="utf-8")
         for fragment in (
             "spec-dock/docs/workflow_issue.md as the source of truth",
@@ -4755,8 +4625,7 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "Add Use Case, Sequence" not in issue_execution_skill
 
         workflow_skill = (
-            repo_root
-            / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md"
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md"
         ).read_text(encoding="utf-8")
         assert "minimum authoring scaffolds" in workflow_skill
         assert "add, remove, merge, reorder, or rewrite" in workflow_skill
@@ -4770,30 +4639,27 @@ class TestInitUpdate(CliRuntimeHarness):
             repo_root / "spec-dock/docs",
         ):
             for path in root.rglob("*.md"):
-                assert "```c4plantuml" not in \
-                    path.read_text(encoding="utf-8"), \
+                assert "```c4plantuml" not in path.read_text(encoding="utf-8"), (
                     f"Markdown preview does not render c4plantuml fences: {path}"
+                )
 
     def test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         initiatives_root = repo_root / "spec-dock" / "initiatives"
-        assert initiatives_root.is_dir(), \
-            f"checked-in dogfooding initiatives tree missing: {initiatives_root}"
+        assert initiatives_root.is_dir(), f"checked-in dogfooding initiatives tree missing: {initiatives_root}"
         meta_paths = sorted(initiatives_root.rglob(".meta.json"))
-        assert len(meta_paths) > \
-            0, \
-            f"checked-in dogfooding initiatives tree is empty of .meta.json: {initiatives_root}"
+        assert len(meta_paths) > 0, f"checked-in dogfooding initiatives tree is empty of .meta.json: {initiatives_root}"
         observed_meta_paths = [meta_path.relative_to(repo_root).as_posix() for meta_path in meta_paths]
-        assert observed_meta_paths == \
-            list(self._CHECKED_IN_DOGFOODING_META_JSON_PATHS), \
+        assert observed_meta_paths == list(self._CHECKED_IN_DOGFOODING_META_JSON_PATHS), (
             "checked-in dogfooding .meta.json path set diverged from cutover snapshot"
+        )
 
         legacy_deps_paths = sorted(
             path.relative_to(repo_root).as_posix() for path in initiatives_root.rglob("deps.json")
         )
-        assert legacy_deps_paths == \
-            [], \
+        assert legacy_deps_paths == [], (
             f"checked-in dogfooding initiatives still contain legacy deps.json: {legacy_deps_paths}"
+        )
 
         non_list_depends_on_paths: list[str] = []
         observed_depends_on_by_meta_path: dict[str, list[object]] = {}
@@ -4805,22 +4671,22 @@ class TestInitUpdate(CliRuntimeHarness):
                 non_list_depends_on_paths.append(rel_meta_path)
                 continue
             observed_depends_on_by_meta_path[rel_meta_path] = depends_on
-        assert non_list_depends_on_paths == \
-            [], \
-            "checked-in dogfooding .meta.json has non-list depends_on values: " \
-            f"{non_list_depends_on_paths}"
-        assert observed_depends_on_by_meta_path == \
-            self._CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH, \
+        assert non_list_depends_on_paths == [], (
+            f"checked-in dogfooding .meta.json has non-list depends_on values: {non_list_depends_on_paths}"
+        )
+        assert observed_depends_on_by_meta_path == self._CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH, (
             "checked-in dogfooding depends_on values diverged from cutover baseline"
+        )
 
     def test_checked_in_dogfooding_runtime_subprocess_validate_and_sync_on_cutover_snapshot(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         checked_in_initiatives_root = repo_root / "spec-dock" / "initiatives"
-        assert checked_in_initiatives_root.is_dir(), \
+        assert checked_in_initiatives_root.is_dir(), (
             f"checked-in dogfooding initiatives tree missing: {checked_in_initiatives_root}"
-        assert len(list(checked_in_initiatives_root.rglob(".meta.json"))) > \
-            0, \
+        )
+        assert len(list(checked_in_initiatives_root.rglob(".meta.json"))) > 0, (
             "checked-in dogfooding initiatives tree must contain .meta.json before runtime cutover checks"
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -4832,15 +4698,15 @@ class TestInitUpdate(CliRuntimeHarness):
             shutil.copytree(checked_in_initiatives_root, target_initiatives_root)
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            assert validate_result.returncode == \
-                0, \
+            assert validate_result.returncode == 0, (
                 f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            )
             assert "spec-dock: ok (validate)" in validate_result.stdout
 
             sync_result = self._run_runtime_capture(target, ["sync"])
-            assert sync_result.returncode == \
-                0, \
+            assert sync_result.returncode == 0, (
                 f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            )
             assert "spec-dock: ok (sync)" in sync_result.stdout
 
             runtime_map_check_code = f"""
@@ -4888,19 +4754,18 @@ assert observed_non_empty == expected_non_empty, json.dumps(
                 capture_output=True,
                 text=True,
             )
-            assert runtime_map_result.returncode == \
-                0, \
-                (
-                    "runtime issue_depends_on_map mismatch on cutover snapshot\n"
-                    f"stdout:\n{runtime_map_result.stdout}\n"
-                    f"stderr:\n{runtime_map_result.stderr}"
-                )
+            assert runtime_map_result.returncode == 0, (
+                "runtime issue_depends_on_map mismatch on cutover snapshot\n"
+                f"stdout:\n{runtime_map_result.stdout}\n"
+                f"stderr:\n{runtime_map_result.stderr}"
+            )
 
     def test_checked_in_dogfooding_runtime_subprocess_deps_mutation_on_cutover_snapshot(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         checked_in_initiatives_root = repo_root / "spec-dock" / "initiatives"
-        assert checked_in_initiatives_root.is_dir(), \
+        assert checked_in_initiatives_root.is_dir(), (
             f"checked-in dogfooding initiatives tree missing: {checked_in_initiatives_root}"
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -4917,57 +4782,53 @@ assert observed_non_empty == expected_non_empty, json.dumps(
                     payload = json.loads(meta_path.read_text(encoding="utf-8"))
                     if payload.get("type") == "issue" and payload.get("id") == issue_id:
                         matches.append(meta_path)
-                assert len(matches) == \
-                    1, \
-                    f"cutover snapshot must have exactly one issue meta for {issue_id}: {matches}"
+                assert len(matches) == 1, f"cutover snapshot must have exactly one issue meta for {issue_id}: {matches}"
                 return matches[0]
 
             from_issue_id = "iss-00063"
             to_issue_id = "iss-00062"
             from_meta_path = _find_issue_meta_path(from_issue_id)
-            assert json.loads(from_meta_path.read_text(encoding="utf-8")).get("depends_on") == \
-                [], \
+            assert json.loads(from_meta_path.read_text(encoding="utf-8")).get("depends_on") == [], (
                 f"expected empty depends_on before deps add on {from_issue_id}"
+            )
 
             add_result = self._run_runtime_capture(
                 target,
                 ["deps", "add", "--from", from_issue_id, "--to", to_issue_id],
             )
-            assert add_result.returncode == \
-                0, \
+            assert add_result.returncode == 0, (
                 f"deps add stdout:\n{add_result.stdout}\ndeps add stderr:\n{add_result.stderr}"
-            assert f"spec-dock: ok (deps add) from={from_issue_id} to={to_issue_id} result=updated" in \
-                add_result.stdout
-            assert json.loads(from_meta_path.read_text(encoding="utf-8")).get("depends_on") == \
-                [to_issue_id], \
+            )
+            assert f"spec-dock: ok (deps add) from={from_issue_id} to={to_issue_id} result=updated" in add_result.stdout
+            assert json.loads(from_meta_path.read_text(encoding="utf-8")).get("depends_on") == [to_issue_id], (
                 "deps add did not persist expected depends_on edge into .meta.json"
+            )
 
             remove_result = self._run_runtime_capture(
                 target,
                 ["deps", "remove", "--from", from_issue_id, "--to", to_issue_id],
             )
-            assert remove_result.returncode == \
-                0, \
-                (
-                    f"deps remove stdout:\n{remove_result.stdout}\n"
-                    f"deps remove stderr:\n{remove_result.stderr}"
-                )
-            assert f"spec-dock: ok (deps remove) from={from_issue_id} to={to_issue_id} result=updated" in \
-                remove_result.stdout
-            assert json.loads(from_meta_path.read_text(encoding="utf-8")).get("depends_on") == \
-                [], \
+            assert remove_result.returncode == 0, (
+                f"deps remove stdout:\n{remove_result.stdout}\ndeps remove stderr:\n{remove_result.stderr}"
+            )
+            assert (
+                f"spec-dock: ok (deps remove) from={from_issue_id} to={to_issue_id} result=updated"
+                in remove_result.stdout
+            )
+            assert json.loads(from_meta_path.read_text(encoding="utf-8")).get("depends_on") == [], (
                 "deps remove did not clear depends_on edge from .meta.json"
+            )
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            assert validate_result.returncode == \
-                0, \
+            assert validate_result.returncode == 0, (
                 f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            )
             assert "spec-dock: ok (validate)" in validate_result.stdout
 
             sync_result = self._run_runtime_capture(target, ["sync"])
-            assert sync_result.returncode == \
-                0, \
+            assert sync_result.returncode == 0, (
                 f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            )
             assert "spec-dock: ok (sync)" in sync_result.stdout
 
     def test_checked_in_dogfooding_runtime_mirror_match_provider_assets(self) -> None:
@@ -5740,7 +5601,9 @@ with tempfile.TemporaryDirectory() as td:
         )
         assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
-    def test_checked_in_dogfooding_runtime_no_write_preflight_collision_with_active_parent_fallback_parity(self) -> None:
+    def test_checked_in_dogfooding_runtime_no_write_preflight_collision_with_active_parent_fallback_parity(
+        self,
+    ) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""
@@ -9425,8 +9288,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             assert main(["update", str(target)]) == 0
             self._assert_managed_skills_installed(target)
-            assert json.loads(meta_path.read_text(encoding="utf-8")) == \
-                self._EXPECTED_HOST_ADAPTER_META
+            assert json.loads(meta_path.read_text(encoding="utf-8")) == self._EXPECTED_HOST_ADAPTER_META
             assert (custom_dir / "SKILL.md").is_file()
             assert (custom_dir / "notes.txt").is_file()
             assert not obsolete_hub_path.exists()
@@ -9460,10 +9322,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             def interrupted_copy(src: Path, dest: Path) -> None:
                 nonlocal failed_once
-                if (
-                    not failed_once
-                    and dest.as_posix().endswith("/.agents/skills/spec-dock-epic-planning/SKILL.md")
-                ):
+                if not failed_once and dest.as_posix().endswith("/.agents/skills/spec-dock-epic-planning/SKILL.md"):
                     failed_once = True
                     raise RuntimeError("simulated skill sync interruption")
                 original_copy_file(src, dest)
@@ -9494,20 +9353,20 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         for prefix, relative_paths in self._ISSUE_68_CLASSIFICATION_PREFIX_TO_RELATIVE_PATHS.items():
             for relative_path in relative_paths:
-                assert relative_path.startswith(prefix), \
+                assert relative_path.startswith(prefix), (
                     f"issue-68 classification mismatch for {relative_path}; expected prefix {prefix}"
-                assert (install_root / relative_path).is_file(), \
+                )
+                assert (install_root / relative_path).is_file(), (
                     f"missing issue-68 classified authoritative asset: {install_root / relative_path}"
+                )
                 classified_paths.add(relative_path)
 
-        assert classified_paths == \
-            set(self._ISSUE_68_AUTHORITATIVE_RELATIVE_PATHS), \
+        assert classified_paths == set(self._ISSUE_68_AUTHORITATIVE_RELATIVE_PATHS), (
             "issue-68 authoritative inventory should be fully classified under install_root"
+        )
 
     def test_issue_176_s05b_codex_review_trigger_helper_is_installed_by_init_and_update(self) -> None:
-        relative_path = Path(
-            ".agents/skills/github-pr-observation/scripts/trigger_codex_review.sh"
-        )
+        relative_path = Path(".agents/skills/github-pr-observation/scripts/trigger_codex_review.sh")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -9515,25 +9374,23 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert main(["init", str(target)]) == 0
 
             installed_helper = target / relative_path
-            assert installed_helper.is_file(), \
-                f"missing Codex review trigger helper after init: {relative_path}"
-            assert os.access(installed_helper, os.X_OK), \
+            assert installed_helper.is_file(), f"missing Codex review trigger helper after init: {relative_path}"
+            assert os.access(installed_helper, os.X_OK), (
                 f"Codex review trigger helper is not executable after init: {relative_path}"
+            )
 
             installed_helper.unlink()
             assert not installed_helper.exists()
 
             assert main(["update", str(target)]) == 0
 
-            assert installed_helper.is_file(), \
-                f"missing Codex review trigger helper after update: {relative_path}"
-            assert os.access(installed_helper, os.X_OK), \
+            assert installed_helper.is_file(), f"missing Codex review trigger helper after update: {relative_path}"
+            assert os.access(installed_helper, os.X_OK), (
                 f"Codex review trigger helper is not executable after update: {relative_path}"
+            )
 
     def test_issue_187_s201_actions_checks_python_asset_installed_by_init_and_update(self) -> None:
-        relative_path = Path(
-            ".agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py"
-        )
+        relative_path = Path(".agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -9542,8 +9399,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             installed_asset = target / relative_path
             provider_asset = self._ISSUE_68_INSTALL_ROOT / relative_path
-            assert installed_asset.is_file(), \
-                f"missing PR observation checks Python asset after init: {relative_path}"
+            assert installed_asset.is_file(), f"missing PR observation checks Python asset after init: {relative_path}"
             assert installed_asset.read_bytes() == provider_asset.read_bytes()
 
             installed_asset.unlink()
@@ -9551,14 +9407,13 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             assert main(["update", str(target)]) == 0
 
-            assert installed_asset.is_file(), \
+            assert installed_asset.is_file(), (
                 f"missing PR observation checks Python asset after update: {relative_path}"
+            )
             assert installed_asset.read_bytes() == provider_asset.read_bytes()
 
     def test_issue_187_s310_observation_snapshot_python_asset_installed_by_init_and_update(self) -> None:
-        relative_path = Path(
-            ".agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py"
-        )
+        relative_path = Path(".agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -9567,8 +9422,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             installed_asset = target / relative_path
             provider_asset = self._ISSUE_68_INSTALL_ROOT / relative_path
-            assert installed_asset.is_file(), \
+            assert installed_asset.is_file(), (
                 f"missing PR observation snapshot Python asset after init: {relative_path}"
+            )
             assert installed_asset.read_bytes() == provider_asset.read_bytes()
 
             installed_asset.unlink()
@@ -9576,14 +9432,13 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             assert main(["update", str(target)]) == 0
 
-            assert installed_asset.is_file(), \
+            assert installed_asset.is_file(), (
                 f"missing PR observation snapshot Python asset after update: {relative_path}"
+            )
             assert installed_asset.read_bytes() == provider_asset.read_bytes()
 
     def test_issue_187_s320_observation_wait_python_asset_installed_by_init_and_update(self) -> None:
-        relative_path = Path(
-            ".agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py"
-        )
+        relative_path = Path(".agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -9592,8 +9447,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             installed_asset = target / relative_path
             provider_asset = self._ISSUE_68_INSTALL_ROOT / relative_path
-            assert installed_asset.is_file(), \
-                f"missing PR observation wait Python asset after init: {relative_path}"
+            assert installed_asset.is_file(), f"missing PR observation wait Python asset after init: {relative_path}"
             assert installed_asset.read_bytes() == provider_asset.read_bytes()
 
             installed_asset.unlink()
@@ -9601,14 +9455,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             assert main(["update", str(target)]) == 0
 
-            assert installed_asset.is_file(), \
-                f"missing PR observation wait Python asset after update: {relative_path}"
+            assert installed_asset.is_file(), f"missing PR observation wait Python asset after update: {relative_path}"
             assert installed_asset.read_bytes() == provider_asset.read_bytes()
 
     def test_issue_197_pr_review_snapshot_python_asset_installed_by_init_and_update(self) -> None:
-        relative_path = Path(
-            ".agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py"
-        )
+        relative_path = Path(".agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -9617,8 +9468,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             installed_asset = target / relative_path
             provider_asset = self._ISSUE_68_INSTALL_ROOT / relative_path
-            assert installed_asset.is_file(), \
-                f"missing PR review snapshot Python asset after init: {relative_path}"
+            assert installed_asset.is_file(), f"missing PR review snapshot Python asset after init: {relative_path}"
             assert installed_asset.read_bytes() == provider_asset.read_bytes()
 
             installed_asset.unlink()
@@ -9626,21 +9476,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             assert main(["update", str(target)]) == 0
 
-            assert installed_asset.is_file(), \
-                f"missing PR review snapshot Python asset after update: {relative_path}"
+            assert installed_asset.is_file(), f"missing PR review snapshot Python asset after update: {relative_path}"
             assert installed_asset.read_bytes() == provider_asset.read_bytes()
 
     def test_issue_68_workflow_seed_matches_repo_root_ci_workflow(self) -> None:
         install_root_workflow = self._ISSUE_68_INSTALL_ROOT / ".github/workflows/ci.yml"
         repo_root_workflow = Path(".github/workflows/ci.yml")
 
-        assert repo_root_workflow.is_file(), \
-            f"missing repo-root workflow seed source: {repo_root_workflow}"
-        assert install_root_workflow.is_file(), \
-            f"missing issue-68 install_root workflow seed: {install_root_workflow}"
-        assert install_root_workflow.read_bytes() == \
-            repo_root_workflow.read_bytes(), \
+        assert repo_root_workflow.is_file(), f"missing repo-root workflow seed source: {repo_root_workflow}"
+        assert install_root_workflow.is_file(), f"missing issue-68 install_root workflow seed: {install_root_workflow}"
+        assert install_root_workflow.read_bytes() == repo_root_workflow.read_bytes(), (
             "install_root workflow seed must be byte-equivalent to repo-root .github/workflows/ci.yml"
+        )
         workflow_text = install_root_workflow.read_text(encoding="utf-8")
         assert "test -f ./spec-dock/scripts/spec-dock" in workflow_text
         assert "test -x ./spec-dock/scripts/spec-dock" not in workflow_text
@@ -9651,19 +9498,19 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         repo_root_provider_workflow = Path(".github/workflows/provider-ci.yml")
         install_root_provider_workflow = self._ISSUE_68_INSTALL_ROOT / ".github/workflows/provider-ci.yml"
 
-        assert repo_root_provider_workflow.is_file(), \
+        assert repo_root_provider_workflow.is_file(), (
             f"missing repo-root provider-only workflow: {repo_root_provider_workflow}"
-        assert not install_root_provider_workflow.exists(), \
-            (
-                "provider-only workflow must not be shipped in install_root managed assets: "
-                f"{install_root_provider_workflow}"
-            )
+        )
+        assert not install_root_provider_workflow.exists(), (
+            "provider-only workflow must not be shipped in install_root managed assets: "
+            f"{install_root_provider_workflow}"
+        )
         workflow_text = repo_root_provider_workflow.read_text(encoding="utf-8")
         assert "python -m pip install uv" in workflow_text
         workflow_lines = workflow_text.splitlines()
         step_index = workflow_lines.index("      - name: Run provider pytest suite")
         provider_pytest_run = None
-        for line in workflow_lines[step_index + 1:]:
+        for line in workflow_lines[step_index + 1 :]:
             if line.startswith("      - "):
                 break
             if line.startswith("        run: "):
@@ -9676,8 +9523,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
     def test_issue_68_legacy_codex_skills_tree_is_retired(self) -> None:
         legacy_root = self._ISSUE_68_RETIRED_LEGACY_ROOT
-        assert not legacy_root.exists(), \
+        assert not legacy_root.exists(), (
             f"issue-68 legacy provider tree must be retired from current repo: {legacy_root}"
+        )
 
     def test_issue_68_authority_inventory_disallows_unlisted_provider_duplicates(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -9691,9 +9539,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     for candidate in provider_assets_root.rglob(search_glob)
                     if candidate.is_file()
                 )
-            assert sorted(observed_provider_paths) == \
-                sorted(duplicate_boundary["allowed_provider_paths"]), \
+            assert sorted(observed_provider_paths) == sorted(duplicate_boundary["allowed_provider_paths"]), (
                 f"issue-68 authority inventory boundary mismatch for {asset_label}"
+            )
 
     def test_bundled_skill_assets_cover_managed_manifest(self) -> None:
         import spec_dock.cli as cli
@@ -9703,12 +9551,15 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             for skill_name in _EXPECTED_MANAGED_SKILL_NAMES:
                 skill_path = assets_dir / "install_root" / ".agents" / "skills" / skill_name / "SKILL.md"
                 assert skill_path.is_file(), f"missing bundled skill asset: {skill_path}"
-            assert (assets_dir / "install_root" / ".agents" / "host-adapters" / "meta.json").is_file(), \
+            assert (assets_dir / "install_root" / ".agents" / "host-adapters" / "meta.json").is_file(), (
                 "missing bundled host adapter metadata asset"
-            assert (assets_dir / "install_root" / ".codex" / "agents" / "spec-manager.toml").is_file(), \
+            )
+            assert (assets_dir / "install_root" / ".codex" / "agents" / "spec-manager.toml").is_file(), (
                 "missing bundled codex native shim asset"
-            assert (assets_dir / "install_root" / ".github" / "agents" / "orchestrator.agent.md").is_file(), \
+            )
+            assert (assets_dir / "install_root" / ".github" / "agents" / "orchestrator.agent.md").is_file(), (
                 "missing bundled copilot native shim asset"
+            )
 
     def test_deleted_role_skill_assets_stay_absent_from_provider_and_dogfooding_mirror(self) -> None:
         import spec_dock.cli as cli
@@ -9716,9 +9567,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         repo_root = Path(__file__).resolve().parents[3]
         with cli._assets_dir() as assets_dir:
             for skill_name in _DELETED_ROLE_SKILL_NAMES:
-                provider_path = (
-                    assets_dir / "install_root" / ".agents" / "skills" / skill_name / "SKILL.md"
-                )
+                provider_path = assets_dir / "install_root" / ".agents" / "skills" / skill_name / "SKILL.md"
                 mirror_path = repo_root / ".agents" / "skills" / skill_name / "SKILL.md"
 
                 assert not provider_path.exists(), f"deleted role skill asset must stay absent: {provider_path}"
@@ -9734,8 +9583,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             custom_skill.write_text("# custom\n", encoding="utf-8")
 
             deleted_role_paths = [
-                target / ".agents" / "skills" / skill_name / "SKILL.md"
-                for skill_name in _DELETED_ROLE_SKILL_NAMES
+                target / ".agents" / "skills" / skill_name / "SKILL.md" for skill_name in _DELETED_ROLE_SKILL_NAMES
             ]
             for deleted_role_path in deleted_role_paths:
                 deleted_role_path.parent.mkdir(parents=True, exist_ok=True)
@@ -9745,8 +9593,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert main(["update", str(target)]) == 0
 
             for deleted_role_path in deleted_role_paths:
-                assert not deleted_role_path.exists(), \
+                assert not deleted_role_path.exists(), (
                     f"deleted role skill must be pruned on update: {deleted_role_path}"
+                )
             assert custom_skill.read_text(encoding="utf-8") == "# custom\n"
             self._assert_managed_skills_installed(target)
 
@@ -9762,13 +9611,13 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             copilot_spec_manager_path = assets_dir / "install_root" / ".github" / "agents" / "spec-manager.agent.md"
             copilot_path = assets_dir / "install_root" / ".github" / "agents" / "orchestrator.agent.md"
             assert codex_path.is_file(), f"missing bundled codex native shim: {codex_path}"
-            assert codex_doc_writer_path.is_file(), \
-                f"missing bundled codex doc-writer agent: {codex_doc_writer_path}"
+            assert codex_doc_writer_path.is_file(), f"missing bundled codex doc-writer agent: {codex_doc_writer_path}"
             assert codex_bootstrap_path.is_file(), f"missing bundled codex bootstrap guide: {codex_bootstrap_path}"
             assert codex_config_path.is_file(), f"missing bundled codex main config: {codex_config_path}"
             assert codex_rules_path.is_file(), f"missing bundled codex command rules: {codex_rules_path}"
-            assert copilot_spec_manager_path.is_file(), \
+            assert copilot_spec_manager_path.is_file(), (
                 f"missing bundled copilot spec-manager: {copilot_spec_manager_path}"
+            )
             assert copilot_path.is_file(), f"missing bundled copilot native shim: {copilot_path}"
             codex_text = codex_path.read_text(encoding="utf-8")
             codex_doc_writer_text = codex_doc_writer_path.read_text(encoding="utf-8")
@@ -9849,9 +9698,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 with _case(adapter=label, surface="dogfooding"):
                     checked_in_path = Path(__file__).resolve().parents[3] / expected["path"]
                     assert checked_in_path.is_file(), f"missing dogfooding Codex adapter: {checked_in_path}"
-                    assert checked_in_path.read_bytes() == \
-                        provider_path.read_bytes(), \
+                    assert checked_in_path.read_bytes() == provider_path.read_bytes(), (
                         f"dogfooding Codex adapter drifted from provider asset: {expected['path']}"
+                    )
 
     def test_s04_codex_agent_permission_taxonomy_contract(self) -> None:
         import spec_dock.cli as cli
@@ -9895,7 +9744,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     assert parsed.get("sandbox_workspace_write", {}).get("network_access") is False
                     assert "write-capable delegated authoring path" in text
                     assert "post-run diff guard" in text
-                    assert "spec-dock/initiatives = \"write\"" not in text
+                    assert 'spec-dock/initiatives = "write"' not in text
                     assert '".codex" = "write"' not in text
                     assert '".agents" = "write"' not in text
 
@@ -9906,49 +9755,22 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             asset_paths = {
                 "workflow issue docs": assets_dir / "spec_dock" / "docs" / "workflow_issue.md",
                 "phase issue plan docs": assets_dir / "spec_dock" / "docs" / "phase_plan_issue.md",
-                "issue plan authoring docs": assets_dir
-                / "spec_dock"
-                / "docs"
-                / "authoring"
-                / "issue-plan.md",
+                "issue plan authoring docs": assets_dir / "spec_dock" / "docs" / "authoring" / "issue-plan.md",
                 "issue plan template": assets_dir / "spec_dock" / "templates" / "issue" / "plan.md",
                 "issue report template": assets_dir / "spec_dock" / "templates" / "issue" / "report.md",
-                "execute issue prompt": assets_dir
-                / "install_root"
-                / ".codex"
-                / "prompts"
-                / "execute-issue.md",
+                "execute issue prompt": assets_dir / "install_root" / ".codex" / "prompts" / "execute-issue.md",
                 "issue execution skill": assets_dir
                 / "install_root"
                 / ".agents"
                 / "skills"
                 / "spec-dock-issue-execution"
                 / "SKILL.md",
-                "dev-coder agent": assets_dir
-                / "install_root"
-                / ".codex"
-                / "agents"
-                / "dev-coder.toml",
-                "code-reviewer agent": assets_dir
-                / "install_root"
-                / ".codex"
-                / "agents"
-                / "code-reviewer.toml",
-                "qa-reviewer agent": assets_dir
-                / "install_root"
-                / ".codex"
-                / "agents"
-                / "qa-reviewer.toml",
-                "spec-reviewer agent": assets_dir
-                / "install_root"
-                / ".codex"
-                / "agents"
-                / "spec-reviewer.toml",
+                "dev-coder agent": assets_dir / "install_root" / ".codex" / "agents" / "dev-coder.toml",
+                "code-reviewer agent": assets_dir / "install_root" / ".codex" / "agents" / "code-reviewer.toml",
+                "qa-reviewer agent": assets_dir / "install_root" / ".codex" / "agents" / "qa-reviewer.toml",
+                "spec-reviewer agent": assets_dir / "install_root" / ".codex" / "agents" / "spec-reviewer.toml",
             }
-            texts = {
-                label: path.read_text(encoding="utf-8")
-                for label, path in asset_paths.items()
-            }
+            texts = {label: path.read_text(encoding="utf-8") for label, path in asset_paths.items()}
 
         for label, text in texts.items():
             with _case(asset=label, stale_count_guidance=True):
@@ -10079,57 +9901,22 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             asset_paths = {
                 "issue report template": assets_dir / "spec_dock" / "templates" / "issue" / "report.md",
                 "workflow issue docs": assets_dir / "spec_dock" / "docs" / "workflow_issue.md",
-                "issue plan authoring docs": assets_dir
-                / "spec_dock"
-                / "docs"
-                / "authoring"
-                / "issue-plan.md",
-                "execute issue prompt": assets_dir
-                / "install_root"
-                / ".codex"
-                / "prompts"
-                / "execute-issue.md",
+                "issue plan authoring docs": assets_dir / "spec_dock" / "docs" / "authoring" / "issue-plan.md",
+                "execute issue prompt": assets_dir / "install_root" / ".codex" / "prompts" / "execute-issue.md",
                 "issue execution skill": assets_dir
                 / "install_root"
                 / ".agents"
                 / "skills"
                 / "spec-dock-issue-execution"
                 / "SKILL.md",
-                "dev-coder agent": assets_dir
-                / "install_root"
-                / ".codex"
-                / "agents"
-                / "dev-coder.toml",
-                "doc-writer agent": assets_dir
-                / "install_root"
-                / ".codex"
-                / "agents"
-                / "doc-writer.toml",
-                "utility-worker agent": assets_dir
-                / "install_root"
-                / ".codex"
-                / "agents"
-                / "utility-worker.toml",
-                "code-reviewer agent": assets_dir
-                / "install_root"
-                / ".codex"
-                / "agents"
-                / "code-reviewer.toml",
-                "qa-reviewer agent": assets_dir
-                / "install_root"
-                / ".codex"
-                / "agents"
-                / "qa-reviewer.toml",
-                "spec-reviewer agent": assets_dir
-                / "install_root"
-                / ".codex"
-                / "agents"
-                / "spec-reviewer.toml",
+                "dev-coder agent": assets_dir / "install_root" / ".codex" / "agents" / "dev-coder.toml",
+                "doc-writer agent": assets_dir / "install_root" / ".codex" / "agents" / "doc-writer.toml",
+                "utility-worker agent": assets_dir / "install_root" / ".codex" / "agents" / "utility-worker.toml",
+                "code-reviewer agent": assets_dir / "install_root" / ".codex" / "agents" / "code-reviewer.toml",
+                "qa-reviewer agent": assets_dir / "install_root" / ".codex" / "agents" / "qa-reviewer.toml",
+                "spec-reviewer agent": assets_dir / "install_root" / ".codex" / "agents" / "spec-reviewer.toml",
             }
-            texts = {
-                label: path.read_text(encoding="utf-8")
-                for label, path in asset_paths.items()
-            }
+            texts = {label: path.read_text(encoding="utf-8") for label, path in asset_paths.items()}
 
         expected_fragments = {
             "issue report template": (
@@ -10253,15 +10040,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "phase issue plan docs": spec_dock_assets / "docs" / "phase_plan_issue.md",
                 "issue plan authoring docs": spec_dock_assets / "docs" / "authoring" / "issue-plan.md",
                 "workflow issue docs": spec_dock_assets / "docs" / "workflow_issue.md",
-                "issue execution skill": install_root
-                / ".agents"
-                / "skills"
-                / "spec-dock-issue-execution"
-                / "SKILL.md",
-                "system architect agent": install_root
-                / ".codex"
-                / "agents"
-                / "system-architect.toml",
+                "issue execution skill": install_root / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md",
+                "system architect agent": install_root / ".codex" / "agents" / "system-architect.toml",
             }
             texts = {label: path.read_text(encoding="utf-8") for label, path in asset_paths.items()}
 
@@ -10336,24 +10116,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "issue report template": spec_dock_assets / "templates" / "issue" / "report.md",
                 "epic report template": spec_dock_assets / "templates" / "epic" / "report.md",
                 "initiative report template": spec_dock_assets / "templates" / "initiative" / "report.md",
-                "clarification skill": install_root
-                / ".agents"
-                / "skills"
-                / "spec-dock-clarification"
-                / "SKILL.md",
-                "system architect agent": install_root
-                / ".codex"
-                / "agents"
-                / "system-architect.toml",
-                "implementation planner agent": install_root
-                / ".codex"
-                / "agents"
-                / "implementation-planner.toml",
-                "issue execution skill": install_root
-                / ".agents"
-                / "skills"
-                / "spec-dock-issue-execution"
-                / "SKILL.md",
+                "clarification skill": install_root / ".agents" / "skills" / "spec-dock-clarification" / "SKILL.md",
+                "system architect agent": install_root / ".codex" / "agents" / "system-architect.toml",
+                "implementation planner agent": install_root / ".codex" / "agents" / "implementation-planner.toml",
+                "issue execution skill": install_root / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md",
             }
             texts = {label: path.read_text(encoding="utf-8") for label, path in asset_paths.items()}
             discussions_dir = spec_dock_assets / "templates" / "discussions"
@@ -10389,9 +10155,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "Specialist agents may return question candidates",
             ),
             "interview template": (
-                "status: \"unanswered | answered | superseded | deferred\"",
-                "authority: \"proposed | user-approved | synthesized\"",
-                "adoption_status: \"unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked\"",
+                'status: "unanswered | answered | superseded | deferred"',
+                'authority: "proposed | user-approved | synthesized"',
+                'adoption_status: "unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked"',
                 "一つの `interview` artifact には one essential question / 一つの本質的な質問だけを書く",
                 "## source-grounded context (必須)",
                 "## Codex の推奨案 (必須)",
@@ -10514,16 +10280,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "phase plan docs": assets_dir / "spec_dock" / "docs" / "phase_plan.md",
                 "phase epic plan docs": assets_dir / "spec_dock" / "docs" / "phase_plan_epic.md",
                 "phase issue plan docs": assets_dir / "spec_dock" / "docs" / "phase_plan_issue.md",
-                "codex spec-reviewer agent": assets_dir
-                / "install_root"
-                / ".codex"
-                / "agents"
-                / "spec-reviewer.toml",
+                "codex spec-reviewer agent": assets_dir / "install_root" / ".codex" / "agents" / "spec-reviewer.toml",
             }
-            texts = {
-                label: path.read_text(encoding="utf-8")
-                for label, path in asset_paths.items()
-            }
+            texts = {label: path.read_text(encoding="utf-8") for label, path in asset_paths.items()}
 
         expected_fragments = {
             "phase design docs": (
@@ -10676,10 +10435,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     continue
                 text = path.read_text(encoding="utf-8")
                 for term in forbidden_terms:
-                    if (
-                        path.name == "test_delegated_authoring.py"
-                        and term == "scoped" + "-context"
-                    ):
+                    if path.name == "test_delegated_authoring.py" and term == "scoped" + "-context":
                         continue
                     if term in text:
                         offenders.append(f"{path.relative_to(repo_root)}: {term}")
@@ -10694,42 +10450,39 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             hub_text = (skills_dir / "spec-dock-hub" / "SKILL.md").read_text(encoding="utf-8")
             initiative_text = (skills_dir / "spec-dock-initiative-planning" / "SKILL.md").read_text(encoding="utf-8")
             epic_text = (skills_dir / "spec-dock-epic-planning" / "SKILL.md").read_text(encoding="utf-8")
-            issue_planning_text = (skills_dir / "spec-dock-issue-planning" / "SKILL.md").read_text(
-                encoding="utf-8"
-            )
+            issue_planning_text = (skills_dir / "spec-dock-issue-planning" / "SKILL.md").read_text(encoding="utf-8")
             issue_text = (skills_dir / "spec-dock-issue-execution" / "SKILL.md").read_text(encoding="utf-8")
-            clarification_text = (skills_dir / "spec-dock-clarification" / "SKILL.md").read_text(
-                encoding="utf-8"
-            )
+            clarification_text = (skills_dir / "spec-dock-clarification" / "SKILL.md").read_text(encoding="utf-8")
             agents_dir = assets_dir / "install_root" / ".codex" / "agents"
             system_architect_text = (agents_dir / "system-architect.toml").read_text(encoding="utf-8")
-            implementation_planner_text = (agents_dir / "implementation-planner.toml").read_text(
-                encoding="utf-8"
-            )
+            implementation_planner_text = (agents_dir / "implementation-planner.toml").read_text(encoding="utf-8")
             adr_text = (skills_dir / "spec-dock-adr-facilitation" / "SKILL.md").read_text(encoding="utf-8")
-            codex_adapter_text = (skills_dir / "spec-dock-codex-adapter" / "SKILL.md").read_text(
-                encoding="utf-8"
-            )
-            copilot_adapter_text = (skills_dir / "spec-dock-copilot-adapter" / "SKILL.md").read_text(
-                encoding="utf-8"
-            )
+            codex_adapter_text = (skills_dir / "spec-dock-codex-adapter" / "SKILL.md").read_text(encoding="utf-8")
+            copilot_adapter_text = (skills_dir / "spec-dock-copilot-adapter" / "SKILL.md").read_text(encoding="utf-8")
 
-        assert "`spec-dock-initiative-planning`: initiative-level requirement/design/plan planning." in \
-            hub_text
-        assert "`spec-dock-epic-planning`: epic-level requirement/design/plan planning." in \
-            hub_text
-        assert "`spec-dock-issue-planning`: issue-level requirement/design/plan planning, review readiness, and implementation handoff readiness." in \
-            hub_text
-        assert "`spec-dock-issue-execution`: issue-level TDD execution and report updates after approved / reviewer-pass planning artifacts and an executable `plan.md` are ready." in \
-            hub_text
-        assert "`spec-dock-clarification`: first-class docs-aware clarification companion" in \
-            hub_text
-        assert "`system-architect` agent role: delegated architecture analysis and draft design evidence created through `./spec-dock/scripts/spec-dock new doc ...` and written to the returned scope-local discussion path. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/system-architect.toml`, not in a skill." in \
-            hub_text
-        assert "`implementation-planner` agent role: delegated planning analysis and draft plan evidence created through `./spec-dock/scripts/spec-dock new doc ...` and written to the returned scope-local discussion path. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/implementation-planner.toml`, not in a skill." in \
-            hub_text
-        assert "`spec-dock-adr-facilitation`: ADR drafting/decision facilitation linked to the current workflow." in \
-            hub_text
+        assert "`spec-dock-initiative-planning`: initiative-level requirement/design/plan planning." in hub_text
+        assert "`spec-dock-epic-planning`: epic-level requirement/design/plan planning." in hub_text
+        assert (
+            "`spec-dock-issue-planning`: issue-level requirement/design/plan planning, review readiness, and implementation handoff readiness."
+            in hub_text
+        )
+        assert (
+            "`spec-dock-issue-execution`: issue-level TDD execution and report updates after approved / reviewer-pass planning artifacts and an executable `plan.md` are ready."
+            in hub_text
+        )
+        assert "`spec-dock-clarification`: first-class docs-aware clarification companion" in hub_text
+        assert (
+            "`system-architect` agent role: delegated architecture analysis and draft design evidence created through `./spec-dock/scripts/spec-dock new doc ...` and written to the returned scope-local discussion path. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/system-architect.toml`, not in a skill."
+            in hub_text
+        )
+        assert (
+            "`implementation-planner` agent role: delegated planning analysis and draft plan evidence created through `./spec-dock/scripts/spec-dock new doc ...` and written to the returned scope-local discussion path. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/implementation-planner.toml`, not in a skill."
+            in hub_text
+        )
+        assert (
+            "`spec-dock-adr-facilitation`: ADR drafting/decision facilitation linked to the current workflow."
+            in hub_text
+        )
         assert "`spec-dock/docs/reference_github.md`" in hub_text
         assert "`spec-dock/docs/reference_deps.md`" in hub_text
         assert "`spec-dock/docs/reference_sync.md`" in hub_text
@@ -10747,12 +10500,19 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert "spec-dock/docs/workflow_issue.md" in copilot_adapter_text
         assert "thin" in copilot_adapter_text.lower()
 
-        for skill_text in (issue_planning_text, issue_text, clarification_text, codex_adapter_text, copilot_adapter_text):
+        for skill_text in (
+            issue_planning_text,
+            issue_text,
+            clarification_text,
+            codex_adapter_text,
+            copilot_adapter_text,
+        ):
             if "./spec-dock/scripts/spec-dock" not in skill_text:
                 assert (
                     "spec-dock/docs/workflow_issue.md as the source of truth" in skill_text
                     or "spec-dock/docs/workflow_clarification.md` is the source of truth" in skill_text
-                    or "Use `spec-dock/docs/workflow_clarification.md` only for detailed artifact semantics" in skill_text
+                    or "Use `spec-dock/docs/workflow_clarification.md` only for detailed artifact semantics"
+                    in skill_text
                     or "Primary lifecycle / execution workflow: `spec-dock/docs/workflow_issue.md`" in skill_text
                 )
             else:
@@ -10965,16 +10725,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 if candidate.is_file()
             }
 
-        managed_targets = {
-            mapping.target_rel.as_posix() for mapping in plan.current_file_mappings
-        }
+        managed_targets = {mapping.target_rel.as_posix() for mapping in plan.current_file_mappings}
         assert managed_targets == expected_inventory
         assert ".github/workflows/ci.yml" in managed_targets
-        assert {
-                mapping.source_asset_rel.as_posix()
-                for mapping in plan.current_file_mappings
-            } == \
-            {f"install_root/{rel_path}" for rel_path in expected_inventory}
+        assert {mapping.source_asset_rel.as_posix() for mapping in plan.current_file_mappings} == {
+            f"install_root/{rel_path}" for rel_path in expected_inventory
+        }
 
     def test_issue_70_update_rejects_missing_or_invalid_managed_assets_obsolete_manifest(self) -> None:
         cases = (
@@ -11021,9 +10777,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert main(["init", str(target)]) == 0
             before = self._seed_managed_contract_guard_snapshot(target)
             malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-            malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
-                ".agents/host-adapters/meta.json"
-            ]
+            malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [".agents/host-adapters/meta.json"]
 
             exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
                 target,
@@ -11031,9 +10785,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             )
 
             assert exit_code == 1
-            assert "managed_assets.obsolete_exact_file_paths overlaps current managed path " \
-                "'.agents/host-adapters/meta.json'" in \
-                stderr
+            assert (
+                "managed_assets.obsolete_exact_file_paths overlaps current managed path "
+                "'.agents/host-adapters/meta.json'" in stderr
+            )
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_issue_70_init_rejects_current_managed_directory_conflict_before_writes(self) -> None:
@@ -11049,11 +10804,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             stderr = err.getvalue()
 
             assert exit_code == 1
-            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in \
-                stderr
+            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in stderr
             assert not (target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes"
-            assert (target / "README.md").read_text(encoding="utf-8") == \
-                "preflight-marker\n"
+            assert (target / "README.md").read_text(encoding="utf-8") == "preflight-marker\n"
 
     def test_issue_70_init_rejects_current_managed_container_file_conflict_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -11066,8 +10819,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             stderr = err.getvalue()
 
             assert exit_code == 1
-            assert "target directory/container conflict for current managed path '.github/agents/" in \
-                stderr
+            assert "target directory/container conflict for current managed path '.github/agents/" in stderr
             assert "non-directory container: '.github'" in stderr
             assert not (target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes"
 
@@ -11089,8 +10841,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             stderr = err.getvalue()
 
             assert exit_code == 1
-            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in \
-                stderr
+            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in stderr
             assert "symlink container: '.github/workflows'" in stderr
             assert not (target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes"
             assert (target / "README.md").read_text(encoding="utf-8") == "preflight-marker\n"
@@ -11115,8 +10866,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             stderr = err.getvalue()
 
             assert exit_code == 1
-            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in \
-                stderr
+            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in stderr
             assert "symlink at exact file path" in stderr
             assert managed_workflow_path.is_symlink()
             assert not (target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes"
@@ -11138,8 +10888,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             stderr = err.getvalue()
 
             assert exit_code == 1
-            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in \
-                stderr
+            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in stderr
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_issue_70_update_rejects_current_managed_symlink_parent_conflict_before_writes(self) -> None:
@@ -11165,8 +10914,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             stderr = err.getvalue()
 
             assert exit_code == 1
-            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in \
-                stderr
+            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in stderr
             assert "symlink container: '.github/workflows'" in stderr
             self._assert_managed_contract_guard_unchanged(target, before)
 
@@ -11191,8 +10939,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             stderr = err.getvalue()
 
             assert exit_code == 1
-            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in \
-                stderr
+            assert "target directory/container conflict for current managed path '.github/workflows/ci.yml'" in stderr
             assert "symlink at exact file path" in stderr
             assert managed_workflow_path.is_symlink()
             assert symlink_target.read_text(encoding="utf-8") == "managed-workflow-symlink-target\n"
@@ -11215,9 +10962,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert exit_code == 0
             assert (target / "spec-dock").is_dir(), "init should complete when bootstrap-only symlink points to file"
             assert bootstrap_path.is_symlink(), "bootstrap-only path should remain a symlink"
-            assert symlink_target.read_text(encoding="utf-8") == \
-                "# bootstrap symlink target\n", \
+            assert symlink_target.read_text(encoding="utf-8") == "# bootstrap symlink target\n", (
                 "init must preserve existing bootstrap-only symlink target content"
+            )
 
     def test_issue_75_update_allows_bootstrap_only_exact_file_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -11236,9 +10983,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             assert exit_code == 0
             assert bootstrap_path.is_symlink(), "update should keep bootstrap-only path as symlink"
-            assert symlink_target.read_text(encoding="utf-8") == \
-                "# bootstrap update symlink target\n", \
+            assert symlink_target.read_text(encoding="utf-8") == "# bootstrap update symlink target\n", (
                 "update must preserve existing bootstrap-only symlink target content"
+            )
 
     def test_issue_170_update_does_not_migrate_bootstrap_only_config_symlink_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -11277,8 +11024,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             stderr = err.getvalue()
 
             assert exit_code == 1
-            assert "target directory/container conflict for current managed path '.codex/config.toml'" in \
-                stderr
+            assert "target directory/container conflict for current managed path '.codex/config.toml'" in stderr
             assert "symlink at exact file path" in stderr
             assert bootstrap_path.is_symlink()
             assert not (target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes"
@@ -11303,8 +11049,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             stderr = err.getvalue()
 
             assert exit_code == 1
-            assert "target directory/container conflict for current managed path '.codex/config.toml'" in \
-                stderr
+            assert "target directory/container conflict for current managed path '.codex/config.toml'" in stderr
             assert "symlink at exact file path" in stderr
             assert bootstrap_path.is_symlink()
             assert not (target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes"
@@ -11330,8 +11075,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             )
 
             assert exit_code == 1
-            assert "target directory/container conflict for obsolete managed path '.github/workflows/spec-dock-close.yml'" in \
-                stderr
+            assert (
+                "target directory/container conflict for obsolete managed path '.github/workflows/spec-dock-close.yml'"
+                in stderr
+            )
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_issue_70_update_prunes_obsolete_managed_symlink_exact_file_path(self) -> None:
@@ -11357,8 +11104,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert exit_code == 0, stderr
             assert not obsolete_target.exists()
             assert not obsolete_target.is_symlink()
-            assert symlink_target.read_text(encoding="utf-8") == \
-                "obsolete symlink target\n"
+            assert symlink_target.read_text(encoding="utf-8") == "obsolete symlink target\n"
 
     def test_issue_70_update_prunes_obsolete_managed_symlink_to_directory_exact_file_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -11385,8 +11131,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert exit_code == 0, stderr
             assert not obsolete_target.exists()
             assert not obsolete_target.is_symlink()
-            assert symlink_target_file.read_text(encoding="utf-8") == \
-                "keep me\n"
+            assert symlink_target_file.read_text(encoding="utf-8") == "keep me\n"
 
     def test_issue_70_update_syncs_workflow_and_prunes_obsolete_exact_workflow_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -11395,14 +11140,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             repo_root = Path(__file__).resolve().parents[3]
             expected_workflow = (
-                repo_root
-                / "src"
-                / "spec_dock"
-                / "assets"
-                / "install_root"
-                / ".github"
-                / "workflows"
-                / "ci.yml"
+                repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".github" / "workflows" / "ci.yml"
             ).read_bytes()
             managed_workflow = target / ".github" / "workflows" / "ci.yml"
             obsolete_workflow = target / ".github" / "workflows" / "spec-dock-close.yml"
@@ -11460,8 +11198,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             assert exit_code == 1
             assert "managed current sync incomplete (missing target): .github/workflows/ci.yml" in stderr
-            assert obsolete_codex_path.is_file(), \
+            assert obsolete_codex_path.is_file(), (
                 "obsolete cleanup must be skipped when current sync verification fails"
+            )
 
     def test_issue_70_update_reflection_ignores_legacy_codex_skills_duplicates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -11481,14 +11220,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 / "SKILL.md"
             ).read_bytes()
             expected_codex_shim = (
-                repo_root
-                / "src"
-                / "spec_dock"
-                / "assets"
-                / "install_root"
-                / ".codex"
-                / "agents"
-                / "spec-manager.toml"
+                repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".codex" / "agents" / "spec-manager.toml"
             ).read_bytes()
 
             def _mutate_assets(patched_assets_root: Path) -> None:
@@ -11504,7 +11236,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     encoding="utf-8",
                 )
                 legacy_shim.write_text(
-                    "name = \"legacy-stale-codex\"\n",
+                    'name = "legacy-stale-codex"\n',
                     encoding="utf-8",
                 )
                 legacy_meta.write_text(
@@ -11527,12 +11259,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 _mutate_assets,
             )
             assert exit_code == 0
-            assert (target / ".agents" / "skills" / "spec-dock-codex-adapter" / "SKILL.md").read_bytes() == \
-                expected_adapter_skill
-            assert (target / ".codex" / "agents" / "spec-manager.toml").read_bytes() == \
-                expected_codex_shim
-            assert json.loads((target / ".agents" / "host-adapters" / "meta.json").read_text(encoding="utf-8")) == \
-                self._EXPECTED_HOST_ADAPTER_META
+            assert (
+                target / ".agents" / "skills" / "spec-dock-codex-adapter" / "SKILL.md"
+            ).read_bytes() == expected_adapter_skill
+            assert (target / ".codex" / "agents" / "spec-manager.toml").read_bytes() == expected_codex_shim
+            assert (
+                json.loads((target / ".agents" / "host-adapters" / "meta.json").read_text(encoding="utf-8"))
+                == self._EXPECTED_HOST_ADAPTER_META
+            )
 
     def test_issue_70_provider_transition_detects_removed_current_paths_without_obsolete_coverage(self) -> None:
         repo_assets_root = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets"
@@ -11550,9 +11284,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             previous_plan=previous_plan,
             current_plan=current_plan,
         )
-        assert missing_coverage == \
-            {removed_workflow_rel.as_posix()}, \
+        assert missing_coverage == {removed_workflow_rel.as_posix()}, (
             "removed current managed paths must be covered by obsolete manifest or ownership transfer"
+        )
 
     def test_issue_70_provider_transition_accepts_removed_current_paths_with_obsolete_coverage(self) -> None:
         repo_assets_root = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets"
@@ -11563,9 +11297,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             shutil.copytree(repo_assets_root, patched_assets_root)
             removed_workflow_rel = Path(".github") / "workflows" / "ci.yml"
             (patched_assets_root / "install_root" / removed_workflow_rel).unlink()
-            patched_manifest_path = (
-                patched_assets_root / "install_root" / ".agents" / "host-adapters" / "meta.json"
-            )
+            patched_manifest_path = patched_assets_root / "install_root" / ".agents" / "host-adapters" / "meta.json"
             patched_manifest = json.loads(patched_manifest_path.read_text(encoding="utf-8"))
             patched_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
                 *patched_manifest["managed_assets"]["obsolete_exact_file_paths"],
@@ -11599,8 +11331,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 temp_root=temp_root,
             )
             spec_dock_command = self._issue_69_venv_spec_dock(venv_python)
-            assert spec_dock_command.is_file(), \
+            assert spec_dock_command.is_file(), (
                 f"issue-70 expected installed spec-dock command in isolated venv: {spec_dock_command}"
+            )
 
             runtime_snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
                 venv_python=venv_python,
@@ -11617,18 +11350,20 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             )
 
             installed_assets_dir = Path(str(runtime_snapshot.get("assets_dir", ""))).resolve()
-            assert Path(str(plan_snapshot.get("assets_dir", ""))).resolve() == \
-                installed_assets_dir, \
+            assert Path(str(plan_snapshot.get("assets_dir", ""))).resolve() == installed_assets_dir, (
                 "issue-70 installed plan snapshot should resolve from the same installed assets root"
+            )
 
             current_targets = {str(path) for path in plan_snapshot.get("current_targets", [])}
             current_sources = {str(path) for path in plan_snapshot.get("current_sources", [])}
             obsolete_targets = {str(path) for path in plan_snapshot.get("obsolete_targets", [])}
             assert current_sources, "issue-70 installed plan must expose current managed sources"
-            assert all(source.startswith("install_root/") for source in current_sources), \
+            assert all(source.startswith("install_root/") for source in current_sources), (
                 "issue-70 installed plan should source current managed files from install_root only"
-            assert not any("codex_skills" in source for source in current_sources), \
+            )
+            assert not any("codex_skills" in source for source in current_sources), (
                 "issue-70 installed plan should not source current managed files from legacy codex_skills"
+            )
             for required_target in (
                 ".agents/skills/spec-dock-codex-adapter/SKILL.md",
                 ".agents/host-adapters/meta.json",
@@ -11637,18 +11372,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 ".github/agents/orchestrator.agent.md",
                 ".github/workflows/ci.yml",
             ):
-                assert required_target in \
-                    current_targets, \
+                assert required_target in current_targets, (
                     f"issue-70 installed plan is missing required managed target: {required_target}"
-            assert ".codex/agents/orchestrator.toml" not in \
-                current_targets, \
+                )
+            assert ".codex/agents/orchestrator.toml" not in current_targets, (
                 "issue-70 installed plan should not generate codex direct orchestrator target"
-            assert ".codex/agents/spec-dock-codex-adapter.toml" in \
-                obsolete_targets, \
+            )
+            assert ".codex/agents/spec-dock-codex-adapter.toml" in obsolete_targets, (
                 "issue-70 installed plan missing obsolete managed codex shim target"
-            assert ".github/agents/spec-dock-copilot-adapter.agent.md" in \
-                obsolete_targets, \
+            )
+            assert ".github/agents/spec-dock-copilot-adapter.agent.md" in obsolete_targets, (
                 "issue-70 installed plan missing obsolete managed copilot shim target"
+            )
 
             install_root = installed_assets_dir / "install_root"
             managed_rel_paths = (
@@ -11664,18 +11399,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             }
             expected_bootstrap_only_bytes = (install_root / bootstrap_only_rel_path).read_bytes()
 
-            legacy_skill_duplicate = (
-                installed_assets_dir / "codex_skills" / "spec-dock-codex-adapter" / "SKILL.md"
-            )
-            legacy_native_shim_duplicate = (
-                installed_assets_dir / "codex_skills" / "native-shims" / "spec-dock.toml"
-            )
+            legacy_skill_duplicate = installed_assets_dir / "codex_skills" / "spec-dock-codex-adapter" / "SKILL.md"
+            legacy_native_shim_duplicate = installed_assets_dir / "codex_skills" / "native-shims" / "spec-dock.toml"
             legacy_meta_duplicate = installed_assets_dir / "codex_skills" / "host-adapters" / "meta.json"
             legacy_skill_duplicate.parent.mkdir(parents=True, exist_ok=True)
             legacy_native_shim_duplicate.parent.mkdir(parents=True, exist_ok=True)
             legacy_meta_duplicate.parent.mkdir(parents=True, exist_ok=True)
             legacy_skill_duplicate.write_text("# issue-70 stale legacy skill duplicate\n", encoding="utf-8")
-            legacy_native_shim_duplicate.write_text("name = \"issue-70-legacy-stale\"\n", encoding="utf-8")
+            legacy_native_shim_duplicate.write_text('name = "issue-70-legacy-stale"\n', encoding="utf-8")
             legacy_meta_duplicate.write_text("{ invalid legacy duplicate json\n", encoding="utf-8")
 
             runtime_env = self._issue_69_runtime_env_without_checkout_fallback()
@@ -11688,15 +11419,16 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             for rel_path, expected_bytes in expected_managed_bytes.items():
                 target_path = target_repo / rel_path
                 assert target_path.is_file(), f"missing managed file after isolated init: {target_path}"
-                assert target_path.read_bytes() == \
-                    expected_bytes, \
+                assert target_path.read_bytes() == expected_bytes, (
                     f"isolated init did not reflect installed install_root asset for: {rel_path}"
+                )
             bootstrap_only_target = target_repo / bootstrap_only_rel_path
-            assert bootstrap_only_target.is_file(), \
+            assert bootstrap_only_target.is_file(), (
                 f"missing bootstrap-only file after isolated init: {bootstrap_only_target}"
-            assert bootstrap_only_target.read_bytes() == \
-                expected_bootstrap_only_bytes, \
+            )
+            assert bootstrap_only_target.read_bytes() == expected_bootstrap_only_bytes, (
                 "isolated init did not copy bootstrap-only codex config from install_root"
+            )
 
             for rel_path in managed_rel_paths:
                 self._write_text_force(target_repo / rel_path, f"issue-70 stale managed payload: {rel_path}\n")
@@ -11721,7 +11453,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             custom_paths = {
                 ".agents/skills/custom-reviewer/SKILL.md": "# custom skill must survive update\n",
-                ".codex/agents/custom-reviewer.toml": "name = \"custom-reviewer\"\n",
+                ".codex/agents/custom-reviewer.toml": 'name = "custom-reviewer"\n',
                 ".github/workflows/custom-review.yml": "name: custom workflow must survive update\n",
             }
             for rel_path, text in custom_paths.items():
@@ -11738,26 +11470,27 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             for rel_path, expected_bytes in expected_managed_bytes.items():
                 target_path = target_repo / rel_path
                 assert target_path.is_file(), f"missing managed file after isolated update: {target_path}"
-                assert target_path.read_bytes() == \
-                    expected_bytes, \
+                assert target_path.read_bytes() == expected_bytes, (
                     f"isolated update did not reflect installed install_root asset for: {rel_path}"
-            assert bootstrap_only_target.read_text(encoding="utf-8") == \
-                bootstrap_only_custom_text, \
+                )
+            assert bootstrap_only_target.read_text(encoding="utf-8") == bootstrap_only_custom_text, (
                 "isolated update should preserve user-edited bootstrap-only codex config"
-            assert not (target_repo / ".codex/agents/orchestrator.toml").exists(), \
+            )
+            assert not (target_repo / ".codex/agents/orchestrator.toml").exists(), (
                 "isolated update should not generate codex direct orchestrator"
+            )
 
             for rel_path in obsolete_paths:
-                assert not (target_repo / rel_path).exists(), \
+                assert not (target_repo / rel_path).exists(), (
                     f"isolated update should prune obsolete managed path: {rel_path}"
+                )
 
             for rel_path, expected_text in custom_paths.items():
                 custom_path = target_repo / rel_path
-                assert custom_path.is_file(), \
-                    f"isolated update removed custom managed-outside file: {rel_path}"
-                assert custom_path.read_text(encoding="utf-8") == \
-                    expected_text, \
+                assert custom_path.is_file(), f"isolated update removed custom managed-outside file: {rel_path}"
+                assert custom_path.read_text(encoding="utf-8") == expected_text, (
                     f"isolated update mutated custom managed-outside file: {rel_path}"
+                )
 
     def test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -11779,8 +11512,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             if provider_prefix_path.is_file():
                 provider_rel_paths.add(rel_prefix.as_posix())
             else:
-                assert provider_prefix_path.is_dir(), \
+                assert provider_prefix_path.is_dir(), (
                     f"issue-71 missing provider parity directory: {provider_prefix_path}"
+                )
                 provider_rel_paths.update(
                     path.relative_to(install_root).as_posix()
                     for path in provider_prefix_path.rglob("*")
@@ -11790,28 +11524,26 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             if checked_in_prefix_path.is_file():
                 checked_in_rel_paths.add(rel_prefix.as_posix())
             else:
-                assert checked_in_prefix_path.is_dir(), \
+                assert checked_in_prefix_path.is_dir(), (
                     f"issue-71 missing checked-in parity directory: {checked_in_prefix_path}"
+                )
                 checked_in_rel_paths.update(
                     path.relative_to(repo_root).as_posix()
                     for path in checked_in_prefix_path.rglob("*")
                     if path.is_file()
                 )
 
-        assert checked_in_rel_paths == \
-            provider_rel_paths, \
+        assert checked_in_rel_paths == provider_rel_paths, (
             "issue-71 checked-in host-pack parity file inventory diverged from install_root"
+        )
 
         for rel_path in sorted(provider_rel_paths):
             with _case(rel_path=rel_path):
                 checked_in_path = repo_root / rel_path
                 provider_asset_path = install_root / rel_path
-                assert checked_in_path.read_bytes() == \
-                    provider_asset_path.read_bytes(), \
-                    (
-                        "issue-71 checked-in agent-tooling parity diverged from install_root asset: "
-                        f"{rel_path}"
-                    )
+                assert checked_in_path.read_bytes() == provider_asset_path.read_bytes(), (
+                    f"issue-71 checked-in agent-tooling parity diverged from install_root asset: {rel_path}"
+                )
 
     def test_issue_105_pr_merge_preparer_install_and_update_contract(self) -> None:
         required_paths = (
@@ -11823,15 +11555,17 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             for rel_path in required_paths:
-                assert (target / rel_path).is_file(), \
+                assert (target / rel_path).is_file(), (
                     f"missing github-pr-merge-preparer managed asset after init: {rel_path}"
+                )
 
             shutil.rmtree(target / ".agents" / "skills" / "github-pr-merge-preparer")
             assert main(["update", str(target)]) == 0
             self._assert_managed_skills_installed(target)
             for rel_path in required_paths:
-                assert (target / rel_path).is_file(), \
+                assert (target / rel_path).is_file(), (
                     f"missing github-pr-merge-preparer managed asset after update: {rel_path}"
+                )
 
     def test_issue_105_pr_merge_preparer_content_regression_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -11858,13 +11592,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             / "SKILL.md"
         ).read_text(encoding="utf-8")
         workflow_issue = (
-            repo_root
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "docs"
-            / "workflow_issue.md"
+            repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "docs" / "workflow_issue.md"
         ).read_text(encoding="utf-8")
 
         merge_preparer_phrases = (
@@ -11957,15 +11685,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
     def test_issue_211_epic_execution_route_content_regression_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         route_asset_pairs = {
-            "spec-dock/docs/workflow_epic.md": (
-                "src/spec_dock/assets/spec_dock/docs/workflow_epic.md"
-            ),
+            "spec-dock/docs/workflow_epic.md": ("src/spec_dock/assets/spec_dock/docs/workflow_epic.md"),
             ".agents/skills/spec-dock-hub/SKILL.md": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md"
             ),
-            ".codex/prompts/execute-epic.md": (
-                "src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md"
-            ),
+            ".codex/prompts/execute-epic.md": ("src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md"),
             ".codex/prompts/execute-initiative.md": (
                 "src/spec_dock/assets/install_root/.codex/prompts/execute-initiative.md"
             ),
@@ -11974,8 +11698,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         for mirror_rel_path, provider_rel_path in route_asset_pairs.items():
             with _case(mirror=mirror_rel_path, provider=provider_rel_path):
-                assert self._DOGFOODING_MIRROR_PROVIDER_ASSET_MAP[mirror_rel_path] == \
-                    provider_rel_path
+                assert self._DOGFOODING_MIRROR_PROVIDER_ASSET_MAP[mirror_rel_path] == provider_rel_path
                 mirror_path = repo_root / mirror_rel_path
                 provider_path = repo_root / provider_rel_path
                 assert mirror_path.is_file(), f"missing dogfooding route mirror: {mirror_path}"
@@ -11995,9 +11718,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         ):
             assert phrase in workflow_epic
 
-        hub_skill = route_texts[
-            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md"
-        ]
+        hub_skill = route_texts["src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md"]
         for phrase in (
             "spec-dock-epic-planning",
             "spec-dock-epic-execution",
@@ -12008,9 +11729,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         ):
             assert phrase in hub_skill
 
-        execute_epic_prompt = route_texts[
-            "src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md"
-        ]
+        execute_epic_prompt = route_texts["src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md"]
         for phrase in (
             "$spec-dock-epic-execution",
             "Epic execution",
@@ -12050,12 +11769,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Do not start or execute Issues directly",
         ):
             assert phrase in execute_initiative_prompt
-        assert "issue decomposition using the\n  `/execute-epic` contract" not in \
-            execute_initiative_prompt
-        assert "For each issue produced by those epics, run" not in \
-            execute_initiative_prompt
-        assert "`./spec-dock/scripts/spec-dock issue start <issue-id>` before implementation" not in \
-            execute_initiative_prompt
+        assert "issue decomposition using the\n  `/execute-epic` contract" not in execute_initiative_prompt
+        assert "For each issue produced by those epics, run" not in execute_initiative_prompt
+        assert (
+            "`./spec-dock/scripts/spec-dock issue start <issue-id>` before implementation"
+            not in execute_initiative_prompt
+        )
 
     def test_issue_93_execute_prompts_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -12112,28 +11831,23 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             for prompt_name, scope_fragments in prompt_contracts.items():
                 with _case(prompt=prompt_name):
                     provider_prompt_path = (
-                        repo_root
-                        / "src"
-                        / "spec_dock"
-                        / "assets"
-                        / "install_root"
-                        / ".codex"
-                        / "prompts"
-                        / prompt_name
+                        repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".codex" / "prompts" / prompt_name
                     )
                     dogfooding_prompt_path = repo_root / ".codex/prompts" / prompt_name
                     installed_prompt_path = target / ".codex/prompts" / prompt_name
 
-                    assert provider_prompt_path.is_file(), \
+                    assert provider_prompt_path.is_file(), (
                         f"missing execute prompt provider asset: {provider_prompt_path}"
-                    assert dogfooding_prompt_path.is_file(), \
+                    )
+                    assert dogfooding_prompt_path.is_file(), (
                         f"missing execute prompt dogfooding mirror: {dogfooding_prompt_path}"
-                    assert dogfooding_prompt_path.read_bytes() == \
-                        provider_prompt_path.read_bytes(), \
+                    )
+                    assert dogfooding_prompt_path.read_bytes() == provider_prompt_path.read_bytes(), (
                         "execute prompt dogfooding mirror must match provider asset"
-                    assert installed_prompt_path.read_bytes() == \
-                        provider_prompt_path.read_bytes(), \
+                    )
+                    assert installed_prompt_path.read_bytes() == provider_prompt_path.read_bytes(), (
                         "execute prompt must be installed from provider asset"
+                    )
 
                     prompt_text = provider_prompt_path.read_text(encoding="utf-8")
                     required_fragments = (
@@ -12216,16 +11930,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 assert "github-codex-pr-review-comments" not in text
 
         merge_preparer_text = (
-            repo_root
-            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md"
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md"
         ).read_text(encoding="utf-8")
         assert "./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh" in merge_preparer_text
         assert "stdout final JSON" in merge_preparer_text
         assert "latest head SHA" in merge_preparer_text
 
         creator_text = (
-            repo_root
-            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-creator/SKILL.md"
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/github-pr-creator/SKILL.md"
         ).read_text(encoding="utf-8")
         assert "github-pr-observation" in creator_text
         assert (
@@ -12289,8 +12001,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             assert not old_skill_dir.exists(), "empty obsolete review skill directory must be pruned"
             assert (target / ".agents" / "skills").is_dir(), "managed skills root must remain"
-            assert (target / ".agents" / "skills" / "github-pr-observation").is_dir(), \
+            assert (target / ".agents" / "skills" / "github-pr-observation").is_dir(), (
                 "current managed observation skill parent must remain"
+            )
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -12753,7 +12466,16 @@ exit 44
                 ("--repo", "owner/repo", "--pr", "0", "--head-sha", "a" * 40),
                 ("--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40, "--progress", "verbose"),
                 ("--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40, "--timeout-seconds", "0"),
-                ("--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40, "--trigger-created-at", "2026-06-08T01:02:03not-iso"),
+                (
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-created-at",
+                    "2026-06-08T01:02:03not-iso",
+                ),
                 ("--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40, "--endpoint", "x"),
             )
             for args in invalid_wait_args:
@@ -12919,10 +12641,11 @@ else:
                 check=False,
                 timeout=10,
             )
-            calls = [
-                json.loads(line)
-                for line in gh_log.read_text(encoding="utf-8").splitlines()
-            ] if gh_log.exists() else []
+            calls = (
+                [json.loads(line) for line in gh_log.read_text(encoding="utf-8").splitlines()]
+                if gh_log.exists()
+                else []
+            )
             return result, calls
 
     def test_issue_176_s01_trigger_helper_posts_fixed_review_comment_once(self) -> None:
@@ -12942,18 +12665,18 @@ else:
         assert result.returncode == 0, result.stdout + result.stderr
         payload = json.loads(result.stdout)
         post_calls = [
-            call for call in calls
-            if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]
-            and "--method" in call
+            call for call in calls if call[:2] == ["api", "repos/owner/repo/issues/13/comments"] and "--method" in call
         ]
-        assert post_calls == [[
-            "api",
-            "repos/owner/repo/issues/13/comments",
-            "--method",
-            "POST",
-            "--raw-field",
-            "body=@codex review",
-        ]]
+        assert post_calls == [
+            [
+                "api",
+                "repos/owner/repo/issues/13/comments",
+                "--method",
+                "POST",
+                "--raw-field",
+                "body=@codex review",
+            ]
+        ]
         assert payload["success"] is True
         assert payload["overall_status"] == "trigger_posted"
         assert payload["trigger"]["action"] == "posted"
@@ -13046,9 +12769,7 @@ exit 44
         assert result.returncode == 0, result.stdout + result.stderr
         payload = json.loads(result.stdout)
         post_calls = [
-            call for call in calls
-            if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]
-            and "--method" in call
+            call for call in calls if call[:2] == ["api", "repos/owner/repo/issues/13/comments"] and "--method" in call
         ]
         assert len(post_calls) == 1
         assert payload["success"] is True
@@ -13104,14 +12825,9 @@ exit 44
         assert result.returncode == 0, result.stdout + result.stderr
         payload = json.loads(result.stdout)
         post_calls = [
-            call for call in calls
-            if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]
-            and "--method" in call
+            call for call in calls if call[:2] == ["api", "repos/owner/repo/issues/13/comments"] and "--method" in call
         ]
-        get_calls = [
-            call for call in calls
-            if call == ["api", "repos/owner/repo/issues/13/comments", "--paginate"]
-        ]
+        get_calls = [call for call in calls if call == ["api", "repos/owner/repo/issues/13/comments", "--paginate"]]
         assert len(post_calls) == 1
         assert len(get_calls) == 2
         assert payload["success"] is False
@@ -13144,9 +12860,7 @@ exit 44
         assert result.returncode == 0, result.stdout + result.stderr
         payload = json.loads(result.stdout)
         post_calls = [
-            call for call in calls
-            if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]
-            and "--method" in call
+            call for call in calls if call[:2] == ["api", "repos/owner/repo/issues/13/comments"] and "--method" in call
         ]
         assert len(post_calls) == 1
         assert payload["success"] is False
@@ -13184,9 +12898,7 @@ exit 44
         assert result.returncode == 0, result.stdout + result.stderr
         payload = json.loads(result.stdout)
         post_calls = [
-            call for call in calls
-            if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]
-            and "--method" in call
+            call for call in calls if call[:2] == ["api", "repos/owner/repo/issues/13/comments"] and "--method" in call
         ]
         assert len(post_calls) == 1
         assert payload["success"] is False
@@ -13217,9 +12929,7 @@ exit 44
         assert token_marker not in result.stdout
         payload = json.loads(result.stdout)
         permission_limitations = [
-            item
-            for item in payload["limitations"]
-            if item.get("code") == "github_token_permission_denied"
+            item for item in payload["limitations"] if item.get("code") == "github_token_permission_denied"
         ]
         assert len(permission_limitations) == 1
         limitation = permission_limitations[0]
@@ -13231,17 +12941,22 @@ exit 44
         assert "stderr_sha256" in limitation
         assert "gh_stderr" not in limitation
         assert payload["overall_status"] == "trigger_post_failed"
-        assert len([
-            call for call in calls
-            if call == [
-                "api",
-                "repos/owner/repo/issues/13/comments",
-                "--method",
-                "POST",
-                "--raw-field",
-                "body=@codex review",
-            ]
-        ]) == 1
+        assert (
+            len([
+                call
+                for call in calls
+                if call
+                == [
+                    "api",
+                    "repos/owner/repo/issues/13/comments",
+                    "--method",
+                    "POST",
+                    "--raw-field",
+                    "body=@codex review",
+                ]
+            ])
+            == 1
+        )
 
     def test_issue_180_s02_trigger_helper_reports_github_token_source(self) -> None:
         token_marker = "ghs_secret_marker_trigger"
@@ -13260,9 +12975,7 @@ exit 44
         assert token_marker not in result.stdout
         payload = json.loads(result.stdout)
         limitation = next(
-            item
-            for item in payload["limitations"]
-            if item.get("code") == "github_token_permission_denied"
+            item for item in payload["limitations"] if item.get("code") == "github_token_permission_denied"
         )
         assert limitation["capability"] == "trigger_comment_write"
         assert limitation["token_source"] == "GITHUB_TOKEN"
@@ -13282,9 +12995,7 @@ exit 44
         assert result.returncode == 0, result.stdout + result.stderr
         payload = json.loads(result.stdout)
         permission_limitations = [
-            item
-            for item in payload["limitations"]
-            if item.get("code") == "github_token_permission_denied"
+            item for item in payload["limitations"] if item.get("code") == "github_token_permission_denied"
         ]
         assert len(permission_limitations) == 1
         limitation = permission_limitations[0]
@@ -13369,9 +13080,7 @@ esac
             assert payload["observation_complete"] is False
             assert payload["recommended_next_action"] == "fix_github_token_permissions"
             limitation = next(
-                item
-                for item in payload["limitations"]
-                if item.get("code") == "github_token_permission_denied"
+                item for item in payload["limitations"] if item.get("code") == "github_token_permission_denied"
             )
             assert limitation["capability"] == "trigger_comment_write"
             assert limitation["api"] == "repos/owner/repo/issues/13/comments"
@@ -13395,9 +13104,7 @@ esac
         assert result.returncode == 0, result.stdout + result.stderr
         payload = json.loads(result.stdout)
         post_calls = [
-            call for call in calls
-            if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]
-            and "--method" in call
+            call for call in calls if call[:2] == ["api", "repos/owner/repo/issues/13/comments"] and "--method" in call
         ]
         assert len(post_calls) == 1
         assert payload["success"] is False
@@ -13438,9 +13145,7 @@ esac
         assert result.returncode == 0, result.stdout + result.stderr
         payload = json.loads(result.stdout)
         post_calls = [
-            call for call in calls
-            if call[:2] == ["api", "repos/owner/repo/issues/13/comments"]
-            and "--method" in call
+            call for call in calls if call[:2] == ["api", "repos/owner/repo/issues/13/comments"] and "--method" in call
         ]
         assert len(post_calls) == 1
         assert payload["success"] is True
@@ -13502,10 +13207,7 @@ esac
 
         assert result.returncode == 0, result.stdout + result.stderr
         payload = json.loads(result.stdout)
-        get_calls = [
-            call for call in calls
-            if call == ["api", "repos/owner/repo/issues/13/comments", "--paginate"]
-        ]
+        get_calls = [call for call in calls if call == ["api", "repos/owner/repo/issues/13/comments", "--paginate"]]
         assert len(get_calls) == 2
         assert payload["success"] is True
         assert payload["overall_status"] == "trigger_recovered"
@@ -13707,7 +13409,14 @@ PY
             env = {**os.environ, "S02_WAIT_LOG": str(log_path)}
             invalid_arg_sets = (
                 ("--trigger-mode", "invalid"),
-                ("--trigger-mode", "post-once", "--trigger-comment-id", "456", "--trigger-created-at", "2026-06-09T01:02:03Z"),
+                (
+                    "--trigger-mode",
+                    "post-once",
+                    "--trigger-comment-id",
+                    "456",
+                    "--trigger-created-at",
+                    "2026-06-09T01:02:03Z",
+                ),
                 ("--trigger-mode", "resume", "--trigger-comment-id", "456"),
                 ("--trigger-mode", "resume", "--trigger-created-at", "2026-06-09T01:02:03Z"),
             )
@@ -13795,7 +13504,11 @@ printf '%s\\n' "$S04_WAIT_PAYLOAD"
             "expected_head_sha": "a" * 40,
             "current_head_sha": current_head,
             "head_matches_expected": head_matches_expected,
-            "summary": {"ci": ci_status, "review": review_status, "head": "match" if head_matches_expected else "mismatch"},
+            "summary": {
+                "ci": ci_status,
+                "review": review_status,
+                "head": "match" if head_matches_expected else "mismatch",
+            },
             "limitations": [],
             "recommended_next_action": "fix_ci" if ci_failed else "wait",
             "ci": {
@@ -15218,9 +14931,7 @@ esac
                     "decision_authoritative": False,
                     "total": legacy_unresolved_count,
                     "unresolved": legacy_unresolved_count,
-                    "items": [
-                        {"id": "RT_old", "is_resolved": False}
-                    ] if legacy_unresolved_count else [],
+                    "items": [{"id": "RT_old", "is_resolved": False}] if legacy_unresolved_count else [],
                 },
                 "current": {
                     "scope": "current_trigger_boundary",
@@ -15789,9 +15500,7 @@ esac
             assert payload["ci"]["required_check_state"]["available"] is False
             assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
             assert payload["ci"]["required_check_state"]["merge_state_status"] is None
-            assert "required_checks_missing_or_pending" not in [
-                item["code"] for item in payload["limitations"]
-            ]
+            assert "required_checks_missing_or_pending" not in [item["code"] for item in payload["limitations"]]
 
     def test_issue_222_s01_pr_observation_ci_collector_forbids_checks_api_surfaces(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -15877,9 +15586,7 @@ else:
             assert payload["ci"]["required_check_state"]["status_check_rollup_total"] == 0
             assert payload["ci"]["check_runs"]["total"] == 0
             assert payload["ci"]["commit_statuses"]["total"] == 0
-            assert "ci_coverage_limited_to_github_actions" not in [
-                item["code"] for item in payload["limitations"]
-            ]
+            assert "ci_coverage_limited_to_github_actions" not in [item["code"] for item in payload["limitations"]]
             gh_calls = gh_log.read_text(encoding="utf-8")
             assert "actions/runs?head_sha=" in gh_calls
             assert "actions/runs/202/jobs" in gh_calls
@@ -16050,9 +15757,7 @@ else:
         assert payload["ci"]["actions"]["workflow_runs"]["total"] == 1
         assert payload["ci"]["check_runs"]["total"] == 0
         assert payload["ci"]["commit_statuses"]["total"] == 0
-        assert "ci_coverage_limited_to_github_actions" not in [
-            item["code"] for item in payload["limitations"]
-        ]
+        assert "ci_coverage_limited_to_github_actions" not in [item["code"] for item in payload["limitations"]]
         assert not any("check-runs" in call for call in gh_calls)
         assert not any("/status" in call for call in gh_calls)
         assert not any("statusCheckRollup" in call for call in gh_calls)
@@ -16088,9 +15793,7 @@ else:
         assert payload["ci"]["status"] == "none"
         assert payload["ci"]["status"] != "passed"
         assert payload["ci"]["actions"]["workflow_runs"]["total"] == 0
-        assert "zero_actions_runs_non_success" in [
-            item["code"] for item in payload["limitations"]
-        ]
+        assert "zero_actions_runs_non_success" in [item["code"] for item in payload["limitations"]]
         assert payload["ci"]["check_runs"]["total"] == 0
         assert payload["ci"]["commit_statuses"]["total"] == 0
         assert not any("check-runs" in call for call in gh_calls)
@@ -16110,9 +15813,7 @@ else:
         assert not any("/status" in call for call in gh_calls)
 
     def test_issue_222_s02_failed_run_stays_failed_when_jobs_api_unavailable(self) -> None:
-        payload, gh_calls = self._issue_222_s02_run_actions_ci_collector(
-            case_name="failed_jobs_unavailable"
-        )
+        payload, gh_calls = self._issue_222_s02_run_actions_ci_collector(case_name="failed_jobs_unavailable")
 
         assert payload["ci"]["source_policy"] == "github_actions_only"
         assert payload["ci"]["status"] == "failed"
@@ -16510,9 +16211,7 @@ esac
             assert payload["ci"]["status"] == "passed"
             assert payload["ci"]["progress_status"] == "passed"
             assert payload["ci"]["required_check_state"]["merge_state_status"] is None
-            assert "pr_merge_state_blocking" not in [
-                item["code"] for item in payload["limitations"]
-            ]
+            assert "pr_merge_state_blocking" not in [item["code"] for item in payload["limitations"]]
 
     def test_issue_170_pr_observation_checks_collector_treats_dirty_merge_state_as_human_gate(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -16917,10 +16616,7 @@ esac
             assert token_marker not in result.stdout
             payload = json.loads(result.stdout)
             assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
-            assert not any(
-                item.get("capability") == "commit_statuses_read"
-                for item in payload["limitations"]
-            )
+            assert not any(item.get("capability") == "commit_statuses_read" for item in payload["limitations"])
 
     def test_issue_180_s02_checks_collector_maps_integration_permission_denied(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -16980,10 +16676,7 @@ esac
             assert token_marker not in result.stdout
             payload = json.loads(result.stdout)
             assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
-            assert not any(
-                item.get("capability") == "check_runs_read"
-                for item in payload["limitations"]
-            )
+            assert not any(item.get("capability") == "check_runs_read" for item in payload["limitations"])
 
     def test_issue_180_s02_checks_collector_maps_status_check_rollup_permission_denied(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -17042,10 +16735,7 @@ esac
             assert token_marker not in result.stdout
             payload = json.loads(result.stdout)
             assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
-            assert not any(
-                item.get("capability") == "status_check_rollup_read"
-                for item in payload["limitations"]
-            )
+            assert not any(item.get("capability") == "status_check_rollup_read" for item in payload["limitations"])
 
     def test_issue_187_actions_only_green_passes_with_coverage_limitation(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -17127,9 +16817,7 @@ esac
             assert payload["ci"]["actions"]["jobs_detail"] == payload["ci"]["actions"]["jobs"]
             limitations = payload["limitations"]
             assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
-            assert "ci_coverage_limited_to_github_actions" not in [
-                item.get("code") for item in limitations
-            ]
+            assert "ci_coverage_limited_to_github_actions" not in [item.get("code") for item in limitations]
             assert not any(
                 item.get("capability")
                 in {
@@ -17140,13 +16828,10 @@ esac
                 for item in limitations
             )
             assert not any(
-                item.get("code") == "github_token_permission_denied"
-                and item.get("severity") == "blocking"
+                item.get("code") == "github_token_permission_denied" and item.get("severity") == "blocking"
                 for item in limitations
             )
-            assert payload.get("decision", {}).get("recommended_next_action") != (
-                "fix_github_token_permissions"
-            )
+            assert payload.get("decision", {}).get("recommended_next_action") != ("fix_github_token_permissions")
 
     def test_issue_187_s203_multiple_green_runs_do_not_expand_every_job(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -17491,8 +17176,7 @@ else:
             limitation = next(
                 item
                 for item in payload["limitations"]
-                if item.get("code") == "github_token_permission_denied"
-                and item.get("capability") == "actions_read"
+                if item.get("code") == "github_token_permission_denied" and item.get("capability") == "actions_read"
             )
             assert limitation["severity"] == "blocking"
             assert limitation["secret_redacted"] is True
@@ -17624,9 +17308,7 @@ else:
                 }
             ]
             assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
-            assert "ci_coverage_limited_to_github_actions" not in [
-                item.get("code") for item in payload["limitations"]
-            ]
+            assert "ci_coverage_limited_to_github_actions" not in [item.get("code") for item in payload["limitations"]]
             assert not any(
                 item.get("capability")
                 in {
@@ -17637,8 +17319,7 @@ else:
                 for item in payload["limitations"]
             )
             assert not any(
-                item.get("code") == "github_token_permission_denied"
-                and item.get("severity") == "blocking"
+                item.get("code") == "github_token_permission_denied" and item.get("severity") == "blocking"
                 for item in payload["limitations"]
             )
             assert "fix_github_token_permissions" not in result.stdout
@@ -17910,14 +17591,11 @@ esac
             assert payload["ci"]["status"] == "passed"
             assert "fix_github_token_permissions" not in result.stdout
             assert not any(
-                item.get("code") == "github_token_permission_denied"
-                and item.get("severity") == "blocking"
+                item.get("code") == "github_token_permission_denied" and item.get("severity") == "blocking"
                 for item in payload["limitations"]
             )
             assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
-            assert "ci_coverage_limited_to_github_actions" not in [
-                item.get("code") for item in payload["limitations"]
-            ]
+            assert "ci_coverage_limited_to_github_actions" not in [item.get("code") for item in payload["limitations"]]
 
     def test_issue_187_actions_jobs_unavailable_prevents_actions_only_pass(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -17985,13 +17663,10 @@ esac
             assert payload["ci"]["actions"]["workflow_runs"]["counts"]["success"] == 1
             assert payload["ci"]["actions"]["jobs_summary"]["total"] == 0
             assert any(
-                item.get("capability") == "actions_read"
-                and item.get("severity") == "blocking"
+                item.get("capability") == "actions_read" and item.get("severity") == "blocking"
                 for item in payload["limitations"]
             )
-            assert "ci_coverage_limited_to_github_actions" not in [
-                item.get("code") for item in payload["limitations"]
-            ]
+            assert "ci_coverage_limited_to_github_actions" not in [item.get("code") for item in payload["limitations"]]
 
     @pytest.mark.parametrize(
         "jobs_response",
@@ -18002,9 +17677,7 @@ esac
         ],
         ids=["missing-jobs", "object-jobs", "null-jobs"],
     )
-    def test_issue_187_actions_jobs_missing_field_prevents_actions_only_pass(
-        self, jobs_response: str
-    ) -> None:
+    def test_issue_187_actions_jobs_missing_field_prevents_actions_only_pass(self, jobs_response: str) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -18073,15 +17746,11 @@ esac
             }
             assert payload["ci"]["actions"]["jobs_summary"]["total"] == 0
             limitation = next(
-                item
-                for item in payload["limitations"]
-                if item.get("code") == "github_actions_jobs_unavailable"
+                item for item in payload["limitations"] if item.get("code") == "github_actions_jobs_unavailable"
             )
             assert limitation["capability"] == "actions_read"
             assert limitation["severity"] == "blocking"
-            assert "ci_coverage_limited_to_github_actions" not in [
-                item.get("code") for item in payload["limitations"]
-            ]
+            assert "ci_coverage_limited_to_github_actions" not in [item.get("code") for item in payload["limitations"]]
 
     def test_issue_187_actions_failed_job_surfaces_step_detail(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -18270,9 +17939,7 @@ esac
                 }
             ]
             assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
-            assert "ci_coverage_limited_to_github_actions" not in [
-                item.get("code") for item in payload["limitations"]
-            ]
+            assert "ci_coverage_limited_to_github_actions" not in [item.get("code") for item in payload["limitations"]]
             assert not any(
                 item.get("capability")
                 in {
@@ -18283,8 +17950,7 @@ esac
                 for item in payload["limitations"]
             )
             assert not any(
-                item.get("code") == "github_token_permission_denied"
-                and item.get("severity") == "blocking"
+                item.get("code") == "github_token_permission_denied" and item.get("severity") == "blocking"
                 for item in payload["limitations"]
             )
 
@@ -18445,9 +18111,7 @@ esac
             payload = json.loads(result.stdout)
             assert payload["ci"]["status"] == "failed"
             assert payload["ci"]["failures"][0]["workflow_conclusion"] == "stale"
-            assert "stale_head_check" not in [
-                item.get("code") for item in payload["limitations"]
-            ]
+            assert "stale_head_check" not in [item.get("code") for item in payload["limitations"]]
 
     def test_issue_187_actions_running_and_pending_states_are_not_passed(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -18595,11 +18259,7 @@ esac
             assert token_marker not in result.stderr
             payload = json.loads(result.stdout)
             assert payload["ci"]["status"] == "unknown"
-            limitation = next(
-                item
-                for item in payload["limitations"]
-                if item.get("capability") == "actions_read"
-            )
+            limitation = next(item for item in payload["limitations"] if item.get("capability") == "actions_read")
             assert limitation["severity"] == "blocking"
             assert limitation["secret_redacted"] is True
             assert "stderr_sha256" in limitation
@@ -18668,9 +18328,7 @@ esac
             payload = json.loads(result.stdout)
             assert payload["ci"]["status"] == "unknown"
             limitation = next(
-                item
-                for item in payload["limitations"]
-                if item.get("code") == "github_api_collection_failed"
+                item for item in payload["limitations"] if item.get("code") == "github_api_collection_failed"
             )
             assert limitation["capability"] == "actions_read"
             assert limitation["severity"] == "blocking"
@@ -18742,9 +18400,7 @@ esac
             payload = json.loads(result.stdout)
             assert payload["ci"]["status"] == "unknown"
             limitation = next(
-                item
-                for item in payload["limitations"]
-                if item.get("code") == "github_api_schema_unavailable"
+                item for item in payload["limitations"] if item.get("code") == "github_api_schema_unavailable"
             )
             assert limitation["capability"] == "actions_read"
             assert limitation["severity"] == "blocking"
@@ -18814,9 +18470,7 @@ esac
             assert payload["ci"]["status"] == "none"
             assert payload["ci"]["actions"]["workflow_runs"]["total"] == 0
             assert payload["ci"]["check_runs"]["success"] == 0
-            assert "zero_actions_runs_non_success" in [
-                item.get("code") for item in payload["limitations"]
-            ]
+            assert "zero_actions_runs_non_success" in [item.get("code") for item in payload["limitations"]]
 
     def test_issue_187_s202_zero_actions_runs_with_green_commit_status_can_pass(
         self,
@@ -18883,9 +18537,7 @@ esac
             assert payload["ci"]["actions"]["workflow_runs"]["total"] == 0
             assert payload["ci"]["commit_statuses"]["total"] == 0
             assert payload["ci"]["commit_statuses"]["success"] == 0
-            assert "zero_actions_runs_non_success" in [
-                item.get("code") for item in payload["limitations"]
-            ]
+            assert "zero_actions_runs_non_success" in [item.get("code") for item in payload["limitations"]]
 
     def test_issue_187_u001_zero_actions_green_legacy_status_passes_with_checks_permission_denied(
         self,
@@ -18956,14 +18608,10 @@ esac
             assert payload["ci"]["commit_statuses"]["total"] == 0
             assert payload["ci"]["commit_statuses"]["success"] == 0
             limitation = next(
-                item
-                for item in payload["limitations"]
-                if item.get("code") == "zero_checks_s03_non_success"
+                item for item in payload["limitations"] if item.get("code") == "zero_checks_s03_non_success"
             )
             assert limitation["severity"] == "blocking"
-            assert payload.get("decision", {}).get("recommended_next_action") != (
-                "fix_github_token_permissions"
-            )
+            assert payload.get("decision", {}).get("recommended_next_action") != ("fix_github_token_permissions")
 
     def test_issue_187_u001_zero_actions_failed_legacy_status_keeps_checks_permission_blocking(
         self,
@@ -19033,9 +18681,7 @@ esac
             assert payload["ci"]["status"] != "passed"
             assert payload["ci"]["commit_statuses"]["failure"] == 0
             limitation = next(
-                item
-                for item in payload["limitations"]
-                if item.get("code") == "zero_checks_s03_non_success"
+                item for item in payload["limitations"] if item.get("code") == "zero_checks_s03_non_success"
             )
             assert limitation["severity"] == "blocking"
 
@@ -19106,12 +18752,8 @@ esac
             assert payload["ci"]["status"] == "none"
             assert payload["ci"]["actions"]["workflow_runs"]["total"] == 0
             assert payload["ci"]["check_runs"]["success"] == 0
-            assert "zero_checks_s03_non_success" in [
-                item.get("code") for item in payload["limitations"]
-            ]
-            assert payload.get("decision", {}).get("recommended_next_action") != (
-                "fix_github_token_permissions"
-            )
+            assert "zero_checks_s03_non_success" in [item.get("code") for item in payload["limitations"]]
+            assert payload.get("decision", {}).get("recommended_next_action") != ("fix_github_token_permissions")
 
     def test_issue_187_u001_zero_actions_neutral_check_runs_pass_with_status_permission_denied(
         self,
@@ -19181,9 +18823,7 @@ esac
             assert payload["ci"]["check_runs"]["success"] == 0
             assert payload["ci"]["check_runs"]["skipped"] == 0
             assert payload["ci"]["check_runs"]["neutral"] == 0
-            assert "zero_checks_s03_non_success" in [
-                item.get("code") for item in payload["limitations"]
-            ]
+            assert "zero_checks_s03_non_success" in [item.get("code") for item in payload["limitations"]]
 
     @pytest.mark.parametrize(
         ("case_name", "stderr_text"),
@@ -19267,9 +18907,7 @@ esac
             assert payload["ci"]["status"] != "passed"
             assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
             limitation = next(
-                item
-                for item in payload["limitations"]
-                if item.get("code") == "zero_checks_s03_non_success"
+                item for item in payload["limitations"] if item.get("code") == "zero_checks_s03_non_success"
             )
             assert limitation["severity"] == "blocking"
             assert not any(
@@ -19440,9 +19078,7 @@ esac
             assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
             assert payload["ci"]["check_runs"]["total"] == 0
             assert payload["ci"]["commit_statuses"]["total"] == 0
-            assert "zero_checks_s03_non_success" in [
-                item.get("code") for item in payload["limitations"]
-            ]
+            assert "zero_checks_s03_non_success" in [item.get("code") for item in payload["limitations"]]
             assert payload["ci"]["status"] != "passed"
 
     def test_issue_187_snapshot_propagates_actions_pass_with_informational_supplemental_permission(
@@ -19535,8 +19171,7 @@ esac
             assert payload["recommended_next_action"] == "merge_prepared"
             assert payload["decision"]["recommended_next_action"] == "merge_prepared"
             assert not any(
-                item.get("code") == "github_token_permission_denied"
-                and item.get("severity") == "blocking"
+                item.get("code") == "github_token_permission_denied" and item.get("severity") == "blocking"
                 for item in payload["limitations"]
             )
 
@@ -19607,8 +19242,7 @@ JSON
             assert payload["normalized_status"] in {"running", "timeout"}
             assert payload["recommended_next_action"] == "wait_or_resume"
             assert not any(
-                item.get("code") == "github_token_permission_denied"
-                and item.get("severity") == "blocking"
+                item.get("code") == "github_token_permission_denied" and item.get("severity") == "blocking"
                 for item in payload["limitations"]
             )
 
@@ -19693,9 +19327,7 @@ esac
             payload = json.loads(result.stdout)
             assert payload["ci"]["status"] == expected_status
             assert payload["ci"]["required_check_state"]["collection_policy"] == "forbidden"
-            assert "ci_coverage_limited_to_github_actions" not in [
-                item.get("code") for item in payload["limitations"]
-            ]
+            assert "ci_coverage_limited_to_github_actions" not in [item.get("code") for item in payload["limitations"]]
             assert not any(
                 item.get("capability")
                 in {
@@ -19706,8 +19338,7 @@ esac
                 for item in payload["limitations"]
             )
             assert not any(
-                item.get("code") == "github_token_permission_denied"
-                and item.get("severity") == "blocking"
+                item.get("code") == "github_token_permission_denied" and item.get("severity") == "blocking"
                 for item in payload["limitations"]
             )
 
@@ -19732,9 +19363,7 @@ esac
                         "ci": "passed",
                         "review": "approved",
                         "merge_state_status": "BLOCKED",
-                        "status_check_rollup": [
-                            {"name": "test", "status": "PENDING", "conclusion": None}
-                        ],
+                        "status_check_rollup": [{"name": "test", "status": "PENDING", "conclusion": None}],
                     },
                 ]),
                 encoding="utf-8",
@@ -19765,9 +19394,7 @@ esac
         assert payload["normalized_status"] == "passed"
         assert payload["recommended_next_action"] == "merge_prepared"
         assert payload["observation_complete"] is True
-        assert "required_checks_missing_or_pending" not in [
-            item["code"] for item in payload["limitations"]
-        ]
+        assert "required_checks_missing_or_pending" not in [item["code"] for item in payload["limitations"]]
 
     def test_issue_170_pr_observation_wait_keeps_required_checks_pending_as_wait(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -19791,9 +19418,7 @@ esac
                         "ci": "passed",
                         "review": "approved",
                         "merge_state_status": "BLOCKED",
-                        "status_check_rollup": [
-                            {"name": "test", "status": "PENDING", "conclusion": None}
-                        ],
+                        "status_check_rollup": [{"name": "test", "status": "PENDING", "conclusion": None}],
                     },
                 ]),
                 encoding="utf-8",
@@ -19844,19 +19469,14 @@ esac
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            events = [
-                json.loads(line)
-                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
-            ]
+            events = [json.loads(line) for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()]
         assert events[0]["normalized_status"] == "passed"
         assert events[0]["ci"] == "passed"
         assert "phase=wait ci=passed" in result.stderr
         payload = json.loads(result.stdout)
         assert payload["normalized_status"] == "timeout"
         assert payload["recommended_next_action"] == "wait_or_resume"
-        assert "required_checks_missing_or_pending" not in [
-            item["code"] for item in payload["limitations"]
-        ]
+        assert "required_checks_missing_or_pending" not in [item["code"] for item in payload["limitations"]]
 
     def _issue_222_run_observation_snapshot_scenario(
         self,
@@ -19916,24 +19536,22 @@ esac
             return json.loads(result.stdout), gh_log.read_text(encoding="utf-8")
 
     def test_issue_222_pr_observation_snapshot_does_not_call_mergeability_compare_or_protection(self) -> None:
-        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario(
-            {
-                "head": "a" * 40,
-                "ci": "passed",
-                "review": "approved",
-                "mergeable": "CONFLICTING",
-                "compare": {"status": "behind", "ahead_by": 0, "behind_by": 3},
-                "branch": {"name": "main", "protected": True},
-                "branch_protection": {
-                    "required_status_checks": {
-                        "strict": True,
-                        "contexts": ["external-ci"],
-                        "checks": [{"context": "external-ci", "app_id": 12345}],
-                    },
-                    "required_signatures": {"enabled": True},
+        payload, gh_calls = self._issue_222_run_observation_snapshot_scenario({
+            "head": "a" * 40,
+            "ci": "passed",
+            "review": "approved",
+            "mergeable": "CONFLICTING",
+            "compare": {"status": "behind", "ahead_by": 0, "behind_by": 3},
+            "branch": {"name": "main", "protected": True},
+            "branch_protection": {
+                "required_status_checks": {
+                    "strict": True,
+                    "contexts": ["external-ci"],
+                    "checks": [{"context": "external-ci", "app_id": 12345}],
                 },
-            }
-        )
+                "required_signatures": {"enabled": True},
+            },
+        })
 
         limitation_codes = [item["code"] for item in payload["limitations"] if isinstance(item, dict)]
         assert payload["ci"]["source_policy"] == "github_actions_only"
@@ -20854,10 +20472,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert "comments=2" not in result.stderr
             payload = json.loads(result.stdout)
             assert payload["wait"]["latest_change_poll"] == 1
-            events = [
-                json.loads(line)
-                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
-            ]
+            events = [json.loads(line) for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()]
             assert [event["changed"] for event in events] == [True, False]
 
     def test_issue_174_pr_observation_wait_resets_quiet_for_non_codex_current_review_change(self) -> None:
@@ -20921,10 +20536,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert "comments=0" in result.stderr
             payload = json.loads(result.stdout)
             assert payload["wait"]["latest_change_poll"] == 2
-            events = [
-                json.loads(line)
-                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
-            ]
+            events = [json.loads(line) for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()]
             assert [event["changed"] for event in events] == [True, True, False]
 
     def test_issue_174_pr_observation_wait_ignores_stale_review_progress_for_quiet(self) -> None:
@@ -20965,10 +20577,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert "comments=1" not in result.stderr
             payload = json.loads(result.stdout)
             assert payload["wait"]["latest_change_poll"] == 1
-            events = [
-                json.loads(line)
-                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
-            ]
+            events = [json.loads(line) for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()]
             assert [event["changed"] for event in events] == [True, False]
 
     def test_issue_174_pr_observation_wait_ignores_raw_review_fingerprint_drift_for_quiet(self) -> None:
@@ -21007,10 +20616,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert "comments=1" in result.stderr
             payload = json.loads(result.stdout)
             assert payload["wait"]["latest_change_poll"] == 1
-            events = [
-                json.loads(line)
-                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
-            ]
+            events = [json.loads(line) for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()]
             assert [event["changed"] for event in events] == [True, False]
             snapshots_dir = out_dir / "snapshots"
             first_snapshot = json.loads((snapshots_dir / "poll-0001.json").read_text(encoding="utf-8"))
@@ -21062,7 +20668,11 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                         "audit_fingerprint": "audit-v2",
                         "review_fingerprint": "audit-review-v2",
                         "check_runs": {"total": 1, "success": 1},
-                        "threads": {"total": 2, "unresolved": 2, "items": [{"id": "old-thread"}, {"id": "older-thread"}]},
+                        "threads": {
+                            "total": 2,
+                            "unresolved": 2,
+                            "items": [{"id": "old-thread"}, {"id": "older-thread"}],
+                        },
                     },
                 ],
                 timeout_seconds=4,
@@ -21079,10 +20689,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert payload["fingerprint"] == payload["decision_fingerprint"]
             assert payload["wait"]["same_fingerprint_observed"] >= 2
             assert payload["wait"]["latest_change_poll"] == 1
-            events = [
-                json.loads(line)
-                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
-            ]
+            events = [json.loads(line) for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()]
             assert [event["changed"] for event in events[:2]] == [True, False]
             assert all(event["changed"] is False for event in events[1:])
 
@@ -21351,9 +20958,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                                 "status": "completed",
                                 "completion_signal": "codex_no_findings_issue_comment",
                                 "confidence": "medium",
-                                "no_findings_completion_candidate": decision[
-                                    "no_findings_completion_candidate"
-                                ],
+                                "no_findings_completion_candidate": decision["no_findings_completion_candidate"],
                             }
                         },
                         "check_runs": {"total": 1, "success": 1},
@@ -21634,9 +21239,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert payload["overall_status"] == "human_gate"
             assert payload["recommended_next_action"] == "manual_review_required_non_retryable"
             assert payload["observation_complete"] is False
-            assert payload["decision"]["recommended_next_action"] == (
-                "manual_review_required_non_retryable"
-            )
+            assert payload["decision"]["recommended_next_action"] == ("manual_review_required_non_retryable")
 
     def test_issue_187_s101_wait_promotes_stable_no_completion_to_human_gate_unknown(self) -> None:
         evidence = {
@@ -21674,9 +21277,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                 "confidence": "medium",
                 "no_completion_evidence": evidence,
             },
-            "collection_summary": {
-                "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
-            },
+            "collection_summary": {"review_threads": {"unresolved_count": 0, "unresolved_ids": []}},
         }
         with tempfile.TemporaryDirectory() as tmp_dir:
             result, _out_dir = self._issue_174_run_wait_fake_snapshots(
@@ -21773,9 +21374,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                                     "confidence": "medium",
                                     "no_completion_evidence": evidence,
                                 },
-                                "collection_summary": {
-                                    "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
-                                },
+                                "collection_summary": {"review_threads": {"unresolved_count": 0, "unresolved_ids": []}},
                             },
                             "observed_at": "2000-01-01T00:00:00Z",
                             "trigger": trigger,
@@ -21847,9 +21446,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                                 "confidence": "medium",
                                 "no_completion_evidence": evidence,
                             },
-                            "collection_summary": {
-                                "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
-                            },
+                            "collection_summary": {"review_threads": {"unresolved_count": 0, "unresolved_ids": []}},
                         },
                         "observed_at": "2999-01-01T00:00:00Z",
                         "check_runs": {"total": 1, "success": 1},
@@ -21947,9 +21544,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                                 "confidence": "medium",
                                 "no_completion_evidence": evidence,
                             },
-                            "collection_summary": {
-                                "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
-                            },
+                            "collection_summary": {"review_threads": {"unresolved_count": 0, "unresolved_ids": []}},
                         },
                         "check_runs": {"total": 1, "success": 1},
                         "threads": {"total": 0, "unresolved": 0, "items": []},
@@ -22018,9 +21613,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                                 "confidence": "medium",
                                 "no_completion_evidence": evidence,
                             },
-                            "collection_summary": {
-                                "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
-                            },
+                            "collection_summary": {"review_threads": {"unresolved_count": 0, "unresolved_ids": []}},
                         },
                         "observed_at": "2000-01-01T00:00:00Z",
                         "check_runs": {"total": 1, "success": 1},
@@ -22502,19 +22095,14 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert payload["overall_status"] == "unknown"
             assert payload["observation_complete"] is False
             assert payload["recommended_next_action"] == "human_gate"
-            assert "zero_checks_s03_non_success" in [
-                item["code"] for item in payload["limitations"]
-            ]
+            assert "zero_checks_s03_non_success" in [item["code"] for item in payload["limitations"]]
             stderr_lines = result.stderr.strip().splitlines()
             assert len(stderr_lines) == 3
             assert "poll=1" in stderr_lines[0]
             assert "phase=wait" in stderr_lines[0]
             assert "poll=3" in stderr_lines[-1]
             assert "phase=terminal" in stderr_lines[-1]
-            events = [
-                json.loads(line)
-                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
-            ]
+            events = [json.loads(line) for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()]
             assert [event["poll"] for event in events] == [1, 2, 3]
             assert events[0]["normalized_status"] == "none"
             assert events[-1]["normalized_status"] == "unknown"
@@ -22607,9 +22195,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert (out_dir / "result.json").read_text(encoding="utf-8") == result.stdout
             latest_payload = json.loads((out_dir / "latest.json").read_text(encoding="utf-8"))
             assert latest_payload["limitations"][0]["code"] == "snapshot_poll_timeout"
-            snapshot_payload = json.loads(
-                (out_dir / "snapshots" / "poll-0001.json").read_text(encoding="utf-8")
-            )
+            snapshot_payload = json.loads((out_dir / "snapshots" / "poll-0001.json").read_text(encoding="utf-8"))
             assert snapshot_payload["limitations"][0]["code"] == "snapshot_poll_timeout"
             assert (out_dir / "events.ndjson").read_text(encoding="utf-8").count("\n") == 1
             assert (out_dir / "latest_delta.json").is_file()
@@ -22794,10 +22380,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert payload["recommended_next_action"] == "merge_prepared"
             assert payload["wait"]["same_fingerprint_observed"] >= 2
             assert payload["wait"]["latest_change_poll"] == 1
-            events = [
-                json.loads(line)
-                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
-            ]
+            events = [json.loads(line) for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()]
             assert [event["changed"] for event in events[:2]] == [True, False]
             assert all(event["changed"] is False for event in events[1:])
             snapshots_dir = out_dir / "snapshots"
@@ -22946,17 +22529,10 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             assert payload["normalized_status"] == "human_gate"
             assert payload["wait"]["same_fingerprint_observed"] == 2
             assert payload["wait"]["latest_change_poll"] == 1
-            events = [
-                json.loads(line)
-                for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()
-            ]
+            events = [json.loads(line) for line in (out_dir / "events.ndjson").read_text(encoding="utf-8").splitlines()]
             assert [event["changed"] for event in events] == [True, False]
-            first_snapshot = json.loads(
-                (out_dir / "snapshots" / "poll-0001.json").read_text(encoding="utf-8")
-            )
-            second_snapshot = json.loads(
-                (out_dir / "snapshots" / "poll-0002.json").read_text(encoding="utf-8")
-            )
+            first_snapshot = json.loads((out_dir / "snapshots" / "poll-0001.json").read_text(encoding="utf-8"))
+            second_snapshot = json.loads((out_dir / "snapshots" / "poll-0002.json").read_text(encoding="utf-8"))
             assert first_snapshot["review"]["signals"][0]["body"] != second_snapshot["review"]["signals"][0]["body"]
             assert (
                 first_snapshot["review"]["signals"][0]["body_sha256"]
@@ -23204,13 +22780,9 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
                 },
             ]
             poll_raw_bodies = json.loads(
-                (
-                    out_dir
-                    / "snapshots"
-                    / "poll-0002-artifacts"
-                    / "raw"
-                    / "review_bodies.json"
-                ).read_text(encoding="utf-8")
+                (out_dir / "snapshots" / "poll-0002-artifacts" / "raw" / "review_bodies.json").read_text(
+                    encoding="utf-8"
+                )
             )
             assert poll_raw_bodies == raw_bodies
 
@@ -23768,9 +23340,7 @@ esac
             assert payload["ci"]["status"] == "unknown"
             assert payload["ci"]["status"] != "passed"
             limitation = next(
-                item
-                for item in payload["limitations"]
-                if item.get("code") == "pr_head_sha_resolution_failed"
+                item for item in payload["limitations"] if item.get("code") == "pr_head_sha_resolution_failed"
             )
             assert limitation["source"] == "gh_pr_view"
             assert limitation["severity"] == "blocking"
@@ -23861,12 +23431,12 @@ esac
             assert payload["recommended_next_action"] == "fix_github_token_permissions"
             assert payload["ci"]["status"] == "unknown"
             limitation = next(
-                item
-                for item in payload["limitations"]
-                if item.get("code") == "github_token_permission_denied"
+                item for item in payload["limitations"] if item.get("code") == "github_token_permission_denied"
             )
             assert limitation["capability"] == "actions_read"
-            assert limitation["api"] == "repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            assert (
+                limitation["api"] == "repos/owner/repo/actions/runs?head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            )
             assert limitation["token_source"] == "GH_TOKEN"
             assert limitation["secret_redacted"] is True
             assert limitation["recommended_next_action"] == "fix_github_token_permissions"
@@ -24213,9 +23783,7 @@ esac
                     "workflow_status": "completed",
                 }
             ]
-            assert [
-                item["code"] for item in payload["limitations"]
-            ] == ["github_api_collection_failed"]
+            assert [item["code"] for item in payload["limitations"]] == ["github_api_collection_failed"]
             assert payload["limitations"][0]["source"] == "repos/owner/repo/actions/runs/203/jobs"
 
     def test_issue_75_pr_observation_checks_collector_ci_taxonomy(self) -> None:
@@ -24396,9 +23964,7 @@ esac
             payload = json.loads(result.stdout)
             assert payload["ci"]["status"] == "passed"
             assert payload["ci"]["required_check_state"]["merge_state_status"] is None
-            assert "pr_merge_state_blocking" not in [
-                item["code"] for item in payload["limitations"]
-            ]
+            assert "pr_merge_state_blocking" not in [item["code"] for item in payload["limitations"]]
 
     def test_issue_170_pr_observation_checks_collector_honors_aggregate_status_state(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -24536,10 +24102,7 @@ esac
             assert payload["ci"]["status"] == "passed"
             assert payload["ci"]["progress_status"] == "passed"
             assert payload["ci"]["commit_statuses"]["aggregate_state"] is None
-            assert [
-                item["kind"]
-                for item in payload["ci"]["failures"]
-            ] == []
+            assert [item["kind"] for item in payload["ci"]["failures"]] == []
 
     def test_issue_170_pr_observation_checks_collector_ignores_empty_aggregate_pending(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -24685,9 +24248,7 @@ esac
             assert payload["ci"]["status"] == "passed"
             assert payload["ci"]["check_runs"]["success"] == 0
             assert payload["ci"]["collector"] == "s03"
-            assert "ci_review_collectors_pending" not in [
-                item["code"] for item in payload["limitations"]
-            ]
+            assert "ci_review_collectors_pending" not in [item["code"] for item in payload["limitations"]]
 
     def test_issue_170_pr_observation_snapshot_revalidates_head_after_collection(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -25126,9 +24687,7 @@ esac
         assert decision["actionable_unresolved_count"] == 1
         assert decision["carryover_unresolved_thread_ids"] == ["RT_carryover"]
         assert decision["actionable_unresolved_thread_ids"] == ["RT_carryover"]
-        assert payload["review"]["current"]["carryover_non_outdated_unresolved_thread_ids"] == [
-            "RT_carryover"
-        ]
+        assert payload["review"]["current"]["carryover_non_outdated_unresolved_thread_ids"] == ["RT_carryover"]
 
     def test_issue_187_s410_outdated_unresolved_remains_audit_only(self) -> None:
         payload = self._issue_187_s410_run_review_inventory_snapshot(
@@ -25502,8 +25061,7 @@ esac
         poll_timeout_limitations = [
             item
             for item in payload.get("limitations", [])
-            if item.get("source") == "fetch_pr_observation_snapshot.sh"
-            and item.get("code") == "snapshot_poll_timeout"
+            if item.get("source") == "fetch_pr_observation_snapshot.sh" and item.get("code") == "snapshot_poll_timeout"
         ]
         assert poll_timeout_limitations
         assert poll_timeout_limitations[0]["severity"] == "warning"
@@ -25583,8 +25141,7 @@ esac
         poll_timeout_limitations = [
             item
             for item in payload.get("limitations", [])
-            if item.get("source") == "fetch_pr_observation_snapshot.sh"
-            and item.get("code") == "snapshot_poll_timeout"
+            if item.get("source") == "fetch_pr_observation_snapshot.sh" and item.get("code") == "snapshot_poll_timeout"
         ]
         assert poll_timeout_limitations
         assert poll_timeout_limitations[0]["severity"] == "blocking"
@@ -25995,9 +25552,7 @@ esac
             assert payload["wait"].get("final_poll_skipped_reason") is None
             assert payload["normalized_status"] == "unknown"
             assert payload["recommended_next_action"] == "human_gate"
-            assert "zero_checks_s03_non_success" in [
-                item.get("code") for item in payload.get("limitations", [])
-            ]
+            assert "zero_checks_s03_non_success" in [item.get("code") for item in payload.get("limitations", [])]
 
     def test_issue_187_s430_zero_check_grace_does_not_hide_permission_under_budget(self) -> None:
         zero_check_limitation = {
@@ -26074,9 +25629,7 @@ esac
             payload = json.loads(result.stdout)
             assert payload["wait"]["polls"] == 2
             assert payload["wait"]["final_poll_skipped_reason"] == "insufficient_next_snapshot_budget"
-            assert "zero_checks_s03_non_success" in [
-                item.get("code") for item in payload.get("limitations", [])
-            ]
+            assert "zero_checks_s03_non_success" in [item.get("code") for item in payload.get("limitations", [])]
 
     def test_issue_187_s430_under_budget_final_poll_preserves_latest_useful_payload(self) -> None:
         decision = self._issue_187_s430_no_completion_decision("no-completion-s430-preserve")
@@ -26123,8 +25676,7 @@ esac
             assert payload["wait"]["deadline_reached"] is True
             assert payload["wait"]["final_poll_skipped_reason"] == "insufficient_next_snapshot_budget"
             assert not any(
-                item.get("source") == "fetch_pr_observation_snapshot.sh"
-                and item.get("code") == "snapshot_poll_timeout"
+                item.get("source") == "fetch_pr_observation_snapshot.sh" and item.get("code") == "snapshot_poll_timeout"
                 for item in payload.get("limitations", [])
             )
 
@@ -26170,12 +25722,11 @@ esac
             assert payload["wait"]["polls"] == 1
             assert payload["wait"]["next_poll_min_budget_seconds"] >= 1.5
             assert payload["wait"]["final_poll_skipped_reason"] == "insufficient_next_snapshot_budget"
-            assert payload["wait"]["remaining_seconds_before_final_poll"] < payload["wait"][
-                "next_poll_min_budget_seconds"
-            ]
+            assert (
+                payload["wait"]["remaining_seconds_before_final_poll"] < payload["wait"]["next_poll_min_budget_seconds"]
+            )
             assert not any(
-                item.get("source") == "fetch_pr_observation_snapshot.sh"
-                and item.get("code") == "snapshot_poll_timeout"
+                item.get("source") == "fetch_pr_observation_snapshot.sh" and item.get("code") == "snapshot_poll_timeout"
                 for item in payload.get("limitations", [])
             )
 
@@ -26225,9 +25776,7 @@ esac
                         "repo": "owner/repo",
                         "pr": 13,
                         "expected_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                        "observed_at": datetime.now(timezone.utc)
-                        .isoformat()
-                        .replace("+00:00", "Z"),
+                        "observed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                         "resume": {
                             "repo": "owner/repo",
                             "pr": 13,
@@ -26305,9 +25854,7 @@ esac
                                 "completion_signal": "none",
                                 "no_completion_evidence": decision["no_completion_evidence"],
                             },
-                            "collection_summary": {
-                                "review_threads": {"unresolved_count": 0, "unresolved_ids": []}
-                            },
+                            "collection_summary": {"review_threads": {"unresolved_count": 0, "unresolved_ids": []}},
                         },
                         "observed_at": "2000-01-01T00:00:00Z",
                         "check_runs": {"total": 1, "success": 1},
@@ -26444,11 +25991,7 @@ esac
             assert review["body_mode"]["item_count_cap"] == 50
             assert review["body_mode"]["item_count_omitted"] == 0
             assert all("body_sha256" in item for item in review["signals"])
-            included_bodies = [
-                item.get("body")
-                for item in review["signals"]
-                if item.get("body") is not None
-            ]
+            included_bodies = [item.get("body") for item in review["signals"] if item.get("body") is not None]
             assert "same timestamp body after trigger" in included_bodies
             assert all("old trigger" not in body for body in included_bodies)
             assert any(item.get("body_truncated") for item in review["signals"])
@@ -26545,18 +26088,9 @@ esac
             review = payload["review"]
             assert review["status"] == "unresolved"
             assert review["review_decision"] == "CHANGES_REQUESTED"
-            assert any(
-                item["kind"] == "issue_comment" and item["id"] == 100
-                for item in review["signals"]
-            )
-            assert any(
-                item["kind"] == "pull_review" and item["id"] == 201
-                for item in review["signals"]
-            )
-            assert any(
-                item["kind"] == "pull_review_comment" and item["id"] == 301
-                for item in review["signals"]
-            )
+            assert any(item["kind"] == "issue_comment" and item["id"] == 100 for item in review["signals"])
+            assert any(item["kind"] == "pull_review" and item["id"] == 201 for item in review["signals"])
+            assert any(item["kind"] == "pull_review_comment" and item["id"] == 301 for item in review["signals"])
             assert review["review_requests"] == [
                 {
                     "kind": "review_request",
@@ -26694,11 +26228,18 @@ esac
                     assert codex_review["collection_summary"]["reviews"]["boundary_before_excluded_ids"] == [200]
                     assert codex_review["collection_summary"]["review_comments"]["fetched_ids"] == [300, 301]
                     assert codex_review["collection_summary"]["review_comments"]["selected_ids"] == [301]
-                    assert codex_review["collection_summary"]["review_comments"]["boundary_before_excluded_ids"] == [300]
-                    assert codex_review["collection_summary"]["review_threads"]["fetched_ids"] == ["RT_old", "RT_selected"]
+                    assert codex_review["collection_summary"]["review_comments"]["boundary_before_excluded_ids"] == [
+                        300
+                    ]
+                    assert codex_review["collection_summary"]["review_threads"]["fetched_ids"] == [
+                        "RT_old",
+                        "RT_selected",
+                    ]
                     assert codex_review["collection_summary"]["review_threads"]["selected_ids"] == ["RT_selected"]
                     assert codex_review["collection_summary"]["review_threads"]["unresolved_ids"] == ["RT_selected"]
-                    assert codex_review["collection_summary"]["review_threads"]["boundary_before_excluded_ids"] == ["RT_old"]
+                    assert codex_review["collection_summary"]["review_threads"]["boundary_before_excluded_ids"] == [
+                        "RT_old"
+                    ]
                     decision = payload["decision"]
                     assert decision["scope"] == "current_trigger_boundary"
                     assert decision["trigger"] == {
@@ -26981,14 +26522,10 @@ esac
             out_only_payload = json.loads(out_only_result.stdout)
             fallback = payload["decision"]["fallback_pass_candidate"]
             assert out_only_payload["decision"]["fallback_pass_candidate"] == fallback
-            assert all(
-                "_fallback_pass_raw_body" not in item
-                for item in out_only_payload["review"]["signals"]
-            )
+            assert all("_fallback_pass_raw_body" not in item for item in out_only_payload["review"]["signals"])
             assert all("body" not in item for item in out_only_payload["review"]["signals"])
             assert all(
-                item.get("omitted_reason") == "body_mode_out_only"
-                for item in out_only_payload["review"]["signals"]
+                item.get("omitted_reason") == "body_mode_out_only" for item in out_only_payload["review"]["signals"]
             )
             fallback = payload["decision"]["fallback_pass_candidate"]
             assert fallback == {
@@ -27252,7 +26789,9 @@ esac
             assert decision["no_findings_completion_candidate"]["present"] is False
             assert decision["no_findings_completion_candidate"]["promotes_top_level_status"] is False
 
-    def test_issue_218_s01_review_collector_no_findings_with_review_required_and_requested_reviewer_does_not_promote(self) -> None:
+    def test_issue_218_s01_review_collector_no_findings_with_review_required_and_requested_reviewer_does_not_promote(
+        self,
+    ) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -27341,7 +26880,9 @@ esac
             assert decision["no_findings_completion_candidate"]["present"] is False
             assert decision["no_findings_completion_candidate"]["promotes_top_level_status"] is False
 
-    def test_issue_218_s01_review_collector_no_findings_with_active_changes_requested_review_does_not_promote(self) -> None:
+    def test_issue_218_s01_review_collector_no_findings_with_active_changes_requested_review_does_not_promote(
+        self,
+    ) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -27753,7 +27294,9 @@ esac
             assert decision["carryover_unresolved_thread_ids"] == ["RT_carryover"]
             assert decision["selected_unresolved_thread_ids"] == []
 
-    def test_issue_218_s01_review_collector_no_findings_with_actionable_unresolved_thread_does_not_promote(self) -> None:
+    def test_issue_218_s01_review_collector_no_findings_with_actionable_unresolved_thread_does_not_promote(
+        self,
+    ) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -28816,10 +28359,7 @@ esac
             assert evidence["explicit_completion_present"] is True
             assert evidence["promotes_top_level_status"] is False
             assert payload["codex_review"]["lifecycle"]["status"] == "unresolved"
-            assert (
-                payload["codex_review"]["lifecycle"]["completion_signal"]
-                == "submitted_pull_request_review"
-            )
+            assert payload["codex_review"]["lifecycle"]["completion_signal"] == "submitted_pull_request_review"
             assert payload["decision"]["status"] == "human_gate"
             assert payload["decision"]["status_reason"] == "current_selected_unresolved_thread"
             assert payload["decision"]["recommended_next_action"] == "address_review_feedback"
@@ -28915,10 +28455,7 @@ esac
             assert evidence["selected_blocker_present"] is False
             assert evidence["promotes_top_level_status"] is False
             assert payload["codex_review"]["lifecycle"]["status"] == "completed"
-            assert (
-                payload["codex_review"]["lifecycle"]["completion_signal"]
-                == "submitted_pull_request_review"
-            )
+            assert payload["codex_review"]["lifecycle"]["completion_signal"] == "submitted_pull_request_review"
             assert payload["decision"]["status"] == "passed"
             assert payload["decision"]["status_reason"] == "passed"
             assert payload["decision"]["recommended_next_action"] == "merge_prepared"
@@ -28978,7 +28515,9 @@ esac
                     },
                 },
             },
-            metadata=metadata if metadata is not None else {"state": "OPEN", "isDraft": False, "mergeable": "MERGEABLE"},
+            metadata=metadata
+            if metadata is not None
+            else {"state": "OPEN", "isDraft": False, "mergeable": "MERGEABLE"},
             limitations=limitations if limitations is not None else [],
             head_matches_expected=head_matches_expected,
             normalized_status=normalized_status,
@@ -29094,7 +28633,14 @@ esac
             ),
         ]
 
-        for decision_overrides, limitations, expected_status, expected_action, expected_complete, expected_reason in cases:
+        for (
+            decision_overrides,
+            limitations,
+            expected_status,
+            expected_action,
+            expected_complete,
+            expected_reason,
+        ) in cases:
             with _case(expected_reason=expected_reason):
                 status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(
                     limitations=limitations,
@@ -29385,13 +28931,8 @@ esac
                 "created_at": "2026-06-08T01:00:00Z",
             }
             assert inferred_payload["review"]["current"]["scope"] == "inferred_current_boundary"
-            assert "trigger_inferred" in [
-                item["code"] for item in inferred_payload["limitations"]
-            ]
-            assert any(
-                item.get("body") == "latest codex body"
-                for item in inferred_payload["review"]["signals"]
-            )
+            assert "trigger_inferred" in [item["code"] for item in inferred_payload["limitations"]]
+            assert any(item.get("body") == "latest codex body" for item in inferred_payload["review"]["signals"])
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
@@ -29459,13 +29000,8 @@ esac
             assert unknown.returncode == 0, unknown.stdout + unknown.stderr
             unknown_payload = json.loads(unknown.stdout)
             assert unknown_payload["trigger"]["source"] == "unknown"
-            assert "trigger_unknown" in [
-                item["code"] for item in unknown_payload["limitations"]
-            ]
-            assert all(
-                item.get("body") is None
-                for item in unknown_payload["review"]["signals"]
-            )
+            assert "trigger_unknown" in [item["code"] for item in unknown_payload["limitations"]]
+            assert all(item.get("body") is None for item in unknown_payload["review"]["signals"])
             raw_bodies = json.loads((out_dir / "raw" / "review_bodies.json").read_text(encoding="utf-8"))
             assert raw_bodies == []
 
@@ -29544,9 +29080,7 @@ esac
             payload = json.loads(result.stdout)
             assert payload["review"]["status"] == "unknown"
             assert payload["review"]["threads"]["state_available"] is False
-            assert "thread_state_unavailable" in [
-                item["code"] for item in payload["limitations"]
-            ]
+            assert "thread_state_unavailable" in [item["code"] for item in payload["limitations"]]
 
     def test_issue_75_pr_observation_review_collector_paginates_review_threads(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -29699,7 +29233,9 @@ esac
             assert thread["latest_comment_updated_at"] == "2026-06-08T01:12:00Z"
             assert thread["activity_at"] == "2026-06-08T01:12:00Z"
 
-    def test_issue_75_pr_observation_review_collector_uses_thread_comment_update_activity_for_current_window(self) -> None:
+    def test_issue_75_pr_observation_review_collector_uses_thread_comment_update_activity_for_current_window(
+        self,
+    ) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -29945,9 +29481,7 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
             assert payload["review"]["status"] == "unknown"
-            assert "trigger_timestamp_unparseable" in [
-                item["code"] for item in payload["limitations"]
-            ]
+            assert "trigger_timestamp_unparseable" in [item["code"] for item in payload["limitations"]]
 
     def test_issue_75_pr_observation_review_collector_ignores_trigger_only_comments_for_status(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -30095,10 +29629,7 @@ esac
             / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
         )
         provider_python = provider_script.with_name("pr_review_snapshot.py")
-        mirror_script = (
-            repo_root
-            / ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
-        )
+        mirror_script = repo_root / ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
         mirror_python = mirror_script.with_name("pr_review_snapshot.py")
 
         provider_text = provider_script.read_text(encoding="utf-8")
@@ -30209,9 +29740,7 @@ esac
                 encoding="utf-8",
             )
             fake_gh.chmod(0o755)
-            env = {
-                key: value for key, value in os.environ.items() if not key.startswith("OBS_")
-            }
+            env = {key: value for key, value in os.environ.items() if not key.startswith("OBS_")}
             env["PATH"] = f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"
 
             result = subprocess.run(
@@ -30398,9 +29927,7 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
             assert payload["review"]["status"] == "none"
-            review_signal = next(
-                item for item in payload["review"]["signals"] if item["kind"] == "pull_review"
-            )
+            review_signal = next(item for item in payload["review"]["signals"] if item["kind"] == "pull_review")
             assert review_signal["state"] == "dismissed"
 
     def test_issue_170_pr_review_collector_reports_pending_and_unknown_review_states(self) -> None:
@@ -30578,9 +30105,7 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
             assert payload["review"]["status"] == "none"
-            comments = [
-                item for item in payload["review"]["signals"] if item["kind"] == "pull_review_comment"
-            ]
+            comments = [item for item in payload["review"]["signals"] if item["kind"] == "pull_review_comment"]
             assert [item["thread_state"] for item in comments] == ["resolved", "outdated"]
             assert payload["review"]["threads"]["resolved"] == 1
             assert payload["review"]["threads"]["outdated"] == 1
@@ -30661,9 +30186,7 @@ esac
             payload = json.loads(result.stdout)
             assert payload["review"]["status"] == "none"
             inline_comment = next(
-                item
-                for item in payload["review"]["signals"]
-                if item["kind"] == "pull_review_comment"
+                item for item in payload["review"]["signals"] if item["kind"] == "pull_review_comment"
             )
             assert inline_comment["thread_id"] == "RT_resolved_old_thread"
             assert inline_comment["thread_state"] == "resolved"
@@ -30901,11 +30424,10 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
             assert payload["review"]["status"] == "changes_requested"
-            assert [
-                item.get("state")
-                for item in payload["review"]["signals"]
-                if item["kind"] == "pull_review"
-            ] == ["approved", "changes_requested"]
+            assert [item.get("state") for item in payload["review"]["signals"] if item["kind"] == "pull_review"] == [
+                "approved",
+                "changes_requested",
+            ]
             assert all("_api_index" not in item for item in payload["review"]["signals"])
 
     def test_issue_170_pr_review_collector_excludes_pre_trigger_unresolved_threads_from_status(self) -> None:
@@ -31058,10 +30580,7 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
             assert payload["review"]["status"] == "commented"
-            assert any(
-                item["kind"] == "issue_comment" and item["id"] == 100
-                for item in payload["review"]["signals"]
-            )
+            assert any(item["kind"] == "issue_comment" and item["id"] == 100 for item in payload["review"]["signals"])
 
     def test_issue_170_pr_review_collector_review_required_decision_is_requested(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -31201,9 +30720,7 @@ esac
                 "created_at": "2026-06-08T01:00:00Z",
             }
             assert payload["review"]["status"] == "commented"
-            assert "trigger_timestamp_unresolved" not in [
-                item["code"] for item in payload["limitations"]
-            ]
+            assert "trigger_timestamp_unresolved" not in [item["code"] for item in payload["limitations"]]
 
     def test_issue_75_pr_observation_review_collector_uses_inline_comment_update_for_current_window(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -31283,9 +30800,7 @@ esac
             payload = run_with_updated_at("2026-06-08T01:06:00Z")
             assert payload["review"]["status"] == "commented"
             inline_comment = next(
-                item
-                for item in payload["review"]["signals"]
-                if item["kind"] == "pull_review_comment"
+                item for item in payload["review"]["signals"] if item["kind"] == "pull_review_comment"
             )
             assert inline_comment["created_at"] == "2026-06-08T00:30:00Z"
             assert inline_comment["updated_at"] == "2026-06-08T01:06:00Z"
@@ -31385,26 +30900,20 @@ esac
             payload = run_with_updated_at("2026-06-08T01:00:00Z")
             assert payload["review"]["status"] == "commented"
             issue_comment = next(
-                item
-                for item in payload["review"]["signals"]
-                if item["kind"] == "issue_comment" and item["id"] == 98
+                item for item in payload["review"]["signals"] if item["kind"] == "issue_comment" and item["id"] == 98
             )
             assert issue_comment["created_at"] == "2026-06-08T00:30:00Z"
             assert issue_comment["updated_at"] == "2026-06-08T01:00:00Z"
             assert issue_comment["body"] == "issue comment edited at trigger"
             assert issue_comment.get("omitted_reason") is None
             trigger_comment = next(
-                item
-                for item in payload["review"]["signals"]
-                if item["kind"] == "issue_comment" and item["id"] == 99
+                item for item in payload["review"]["signals"] if item["kind"] == "issue_comment" and item["id"] == 99
             )
             assert trigger_comment["updated_at"] == "2026-06-08T01:07:00Z"
             assert trigger_comment.get("body") is None
             assert trigger_comment["omitted_reason"] == "outside_trigger_window"
             created_only_comment = next(
-                item
-                for item in payload["review"]["signals"]
-                if item["kind"] == "issue_comment" and item["id"] == 97
+                item for item in payload["review"]["signals"] if item["kind"] == "issue_comment" and item["id"] == 97
             )
             assert created_only_comment.get("body") is None
             assert created_only_comment["omitted_reason"] == "outside_trigger_window"
@@ -31497,15 +31006,9 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
             assert payload["review"]["status"] == "none"
-            same_second_review = next(
-                item
-                for item in payload["review"]["signals"]
-                if item["kind"] == "pull_review"
-            )
+            same_second_review = next(item for item in payload["review"]["signals"] if item["kind"] == "pull_review")
             same_second_comment = next(
-                item
-                for item in payload["review"]["signals"]
-                if item["kind"] == "pull_review_comment"
+                item for item in payload["review"]["signals"] if item["kind"] == "pull_review_comment"
             )
             assert same_second_review["omitted_reason"] == "outside_trigger_window"
             assert same_second_comment["omitted_reason"] == "outside_trigger_window"
@@ -31587,9 +31090,7 @@ esac
             assert payload["review"]["status"] == "changes_requested"
             assert payload["review"]["review_decision"] == "CHANGES_REQUESTED"
             pull_review = next(
-                item
-                for item in payload["review"]["signals"]
-                if item["kind"] == "pull_review" and item["id"] == 201
+                item for item in payload["review"]["signals"] if item["kind"] == "pull_review" and item["id"] == 201
             )
             assert pull_review["stale"] is True
 
@@ -31682,9 +31183,10 @@ esac
                     "thread_id": "RT_selected",
                 },
             ]
-            assert payload["review"]["current"]["selected_changes_requested_evidence"] == decision[
-                "selected_changes_requested_evidence"
-            ]
+            assert (
+                payload["review"]["current"]["selected_changes_requested_evidence"]
+                == decision["selected_changes_requested_evidence"]
+            )
 
     def test_issue_182_s01_review_collector_does_not_promote_global_changes_requested_decision(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -31821,9 +31323,7 @@ esac
                 "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
             }
 
-            def run_with_historical_thread(
-                thread_id: str, created_at: str, is_outdated: bool
-            ) -> dict[str, object]:
+            def run_with_historical_thread(thread_id: str, created_at: str, is_outdated: bool) -> dict[str, object]:
                 result = subprocess.run(
                     [
                         str(script_path),
@@ -31851,18 +31351,10 @@ esac
                 assert result.returncode == 0, result.stdout + result.stderr
                 return json.loads(result.stdout)
 
-            first_audit_only = run_with_historical_thread(
-                "RT_old_1", "2026-06-08T00:20:00Z", True
-            )
-            second_audit_only = run_with_historical_thread(
-                "RT_old_2", "2026-06-08T00:30:00Z", True
-            )
-            first_actionable = run_with_historical_thread(
-                "RT_old_1", "2026-06-08T00:20:00Z", False
-            )
-            second_actionable = run_with_historical_thread(
-                "RT_old_2", "2026-06-08T00:30:00Z", False
-            )
+            first_audit_only = run_with_historical_thread("RT_old_1", "2026-06-08T00:20:00Z", True)
+            second_audit_only = run_with_historical_thread("RT_old_2", "2026-06-08T00:30:00Z", True)
+            first_actionable = run_with_historical_thread("RT_old_1", "2026-06-08T00:20:00Z", False)
+            second_actionable = run_with_historical_thread("RT_old_2", "2026-06-08T00:30:00Z", False)
             assert first_audit_only["decision"]["selected_unresolved_count"] == 0
             assert first_audit_only["decision"]["actionable_unresolved_count"] == 0
             assert first_audit_only["decision_fingerprint"] == second_audit_only["decision_fingerprint"]
@@ -31944,9 +31436,7 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
             included_bodies = [
-                item.get("body")
-                for item in payload["review"]["signals"]
-                if item.get("body") is not None
+                item.get("body") for item in payload["review"]["signals"] if item.get("body") is not None
             ]
             assert included_bodies == ["after trigger instant"]
             assert payload["review"]["status"] == "commented"
@@ -32119,9 +31609,7 @@ esac
             assert all("body" not in item for item in payload["review"]["signals"])
             raw_bodies_path = out_dir / "raw" / "review_bodies.json"
             assert json.loads(raw_bodies_path.read_text(encoding="utf-8")) == []
-            assert "raw review body must not be persisted" not in raw_bodies_path.read_text(
-                encoding="utf-8"
-            )
+            assert "raw review body must not be persisted" not in raw_bodies_path.read_text(encoding="utf-8")
 
     def test_issue_75_pr_observation_snapshot_includes_s04_review_collector_result(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -32240,9 +31728,7 @@ esac
                 "latest_delta_json": None,
                 "snapshots_dir": None,
             }
-            assert "review_collector_pending_s04" not in [
-                item["code"] for item in payload["limitations"]
-            ]
+            assert "review_collector_pending_s04" not in [item["code"] for item in payload["limitations"]]
 
             out_dir = tmp_path / "out"
             out_result = subprocess.run(
@@ -32286,8 +31772,7 @@ esac
         script_paths = [
             repo_root
             / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh",
-            repo_root
-            / ".agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh",
+            repo_root / ".agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh",
         ]
 
         for script_path in script_paths:
@@ -32336,21 +31821,21 @@ esac
             "stale exclusion guard:",
             "isolated install smoke:",
         ):
-            assert required_phrase in \
-                package_parity_section, \
+            assert required_phrase in package_parity_section, (
                 f"issue-71 missing package parity subcheck phrase: {required_phrase}"
-        assert package_parity_section.count("- result:") >= \
-            4, \
+            )
+        assert package_parity_section.count("- result:") >= 4, (
             "issue-71 package parity evidence should include result lines for required subchecks"
-        assert package_parity_section.count("- pass") >= \
-            4, \
+        )
+        assert package_parity_section.count("- pass") >= 4, (
             "issue-71 package parity evidence should include pass results for required subchecks"
-        assert "pending" not in \
-            package_parity_section.lower(), \
+        )
+        assert "pending" not in package_parity_section.lower(), (
             "issue-71 package parity evidence should not be pending-only"
-        assert "placeholder" not in \
-            package_parity_section.lower(), \
+        )
+        assert "placeholder" not in package_parity_section.lower(), (
             "issue-71 package parity evidence should not be placeholder-only"
+        )
 
         handoff_section = self._issue_71_extract_markdown_section_by_heading_prefix(
             markdown_text=issue_70_text,
@@ -32363,21 +31848,17 @@ esac
             "current managed / obsolete managed boundary assertions:",
             "installed-package cutover evidence:",
         ):
-            assert required_phrase in \
-                handoff_section, \
+            assert required_phrase in handoff_section, (
                 f"issue-71 missing issue-70 handoff subcheck phrase: {required_phrase}"
-        assert handoff_section.count("- result:") >= \
-            4, \
+            )
+        assert handoff_section.count("- result:") >= 4, (
             "issue-71 handoff evidence should include result lines for required subchecks"
-        assert handoff_section.count("- pass") >= \
-            4, \
+        )
+        assert handoff_section.count("- pass") >= 4, (
             "issue-71 handoff evidence should include pass results for required subchecks"
-        assert "pending" not in \
-            handoff_section.lower(), \
-            "issue-71 handoff evidence should not be pending-only"
-        assert "placeholder" not in \
-            handoff_section.lower(), \
-            "issue-71 handoff evidence should not be placeholder-only"
+        )
+        assert "pending" not in handoff_section.lower(), "issue-71 handoff evidence should not be pending-only"
+        assert "placeholder" not in handoff_section.lower(), "issue-71 handoff evidence should not be placeholder-only"
 
     def test_issue_71_isolated_wheel_install_final_smoke_closure_surface_without_fallback(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -32394,8 +31875,9 @@ esac
                 temp_root=temp_root,
             )
             spec_dock_command = self._issue_69_venv_spec_dock(venv_python)
-            assert spec_dock_command.is_file(), \
+            assert spec_dock_command.is_file(), (
                 f"issue-71 expected installed spec-dock command in isolated venv: {spec_dock_command}"
+            )
 
             runtime_env = self._issue_69_runtime_env_without_checkout_fallback()
             assert "PYTHONPATH" not in runtime_env, "issue-71 runtime env must not rely on PYTHONPATH fallback"
@@ -32410,8 +31892,9 @@ esac
                 snapshot=runtime_snapshot,
                 repo_root=repo_root,
             )
-            assert not bool(runtime_snapshot.get("sys_path_has_repo_root")), \
+            assert not bool(runtime_snapshot.get("sys_path_has_repo_root")), (
                 "issue-71 isolated installed runtime unexpectedly resolved repo-root fallback in sys.path"
+            )
 
             plan_snapshot = self._issue_70_collect_isolated_installed_plan_snapshot(
                 venv_python=venv_python,
@@ -32419,10 +31902,12 @@ esac
             )
             current_sources = {str(path) for path in plan_snapshot.get("current_sources", [])}
             assert current_sources, "issue-71 installed plan must expose current managed sources"
-            assert all(source.startswith("install_root/") for source in current_sources), \
+            assert all(source.startswith("install_root/") for source in current_sources), (
                 "issue-71 installed plan should source current managed files from install_root only"
-            assert not any(source.startswith("codex_skills/") for source in current_sources), \
+            )
+            assert not any(source.startswith("codex_skills/") for source in current_sources), (
                 "issue-71 installed plan must not source current managed files from legacy codex_skills"
+            )
 
             installed_assets_dir = Path(str(runtime_snapshot.get("assets_dir", ""))).resolve()
             managed_rel_path = ".codex/agents/spec-manager.toml"
@@ -32436,9 +31921,9 @@ esac
 
             managed_target = target_repo / managed_rel_path
             assert managed_target.is_file(), f"issue-71 missing managed file after isolated init: {managed_target}"
-            assert managed_target.read_bytes() == \
-                expected_managed_bytes, \
+            assert managed_target.read_bytes() == expected_managed_bytes, (
                 "issue-71 isolated init did not reflect install_root managed asset bytes"
+            )
 
             obsolete_rel_path = ".codex/agents/spec-dock-codex-adapter.toml"
             obsolete_target = target_repo / obsolete_rel_path
@@ -32458,16 +31943,16 @@ esac
                 env=runtime_env,
             )
 
-            assert managed_target.read_bytes() == \
-                expected_managed_bytes, \
+            assert managed_target.read_bytes() == expected_managed_bytes, (
                 "issue-71 isolated update did not restore managed file from install_root"
-            assert not obsolete_target.exists(), \
+            )
+            assert not obsolete_target.exists(), (
                 f"issue-71 isolated update should prune obsolete managed path: {obsolete_rel_path}"
-            assert custom_target.is_file(), \
-                f"issue-71 isolated update removed custom unmanaged file: {custom_rel_path}"
-            assert custom_target.read_text(encoding="utf-8") == \
-                custom_text, \
+            )
+            assert custom_target.is_file(), f"issue-71 isolated update removed custom unmanaged file: {custom_rel_path}"
+            assert custom_target.read_text(encoding="utf-8") == custom_text, (
                 f"issue-71 isolated update mutated custom unmanaged file: {custom_rel_path}"
+            )
 
     def test_init_generated_native_shims_satisfy_static_delegation_only_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -32476,14 +31961,7 @@ esac
 
             repo_root = Path(__file__).resolve().parents[3]
             expected_codex_bytes = (
-                repo_root
-                / "src"
-                / "spec_dock"
-                / "assets"
-                / "install_root"
-                / ".codex"
-                / "agents"
-                / "spec-manager.toml"
+                repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".codex" / "agents" / "spec-manager.toml"
             ).read_bytes()
             expected_copilot_bytes = (
                 repo_root
@@ -32515,20 +31993,22 @@ esac
             assert codex_path.is_file(), f"missing generated codex native shim: {codex_path}"
             assert codex_bootstrap_path.is_file(), f"missing generated codex bootstrap guide: {codex_bootstrap_path}"
             assert codex_config_path.is_file(), f"missing generated codex main config: {codex_config_path}"
-            assert copilot_spec_manager_path.is_file(), \
+            assert copilot_spec_manager_path.is_file(), (
                 f"missing generated copilot spec-manager: {copilot_spec_manager_path}"
+            )
             assert copilot_path.is_file(), f"missing generated copilot native shim: {copilot_path}"
-            assert not codex_orchestrator_path.exists(), \
+            assert not codex_orchestrator_path.exists(), (
                 f"codex direct orchestrator should not be generated: {codex_orchestrator_path}"
-            assert codex_path.read_bytes() == \
-                expected_codex_bytes, \
+            )
+            assert codex_path.read_bytes() == expected_codex_bytes, (
                 "generated codex native shim diverged from provider asset bytes"
-            assert copilot_path.read_bytes() == \
-                expected_copilot_bytes, \
+            )
+            assert copilot_path.read_bytes() == expected_copilot_bytes, (
                 "generated copilot native shim diverged from provider asset bytes"
-            assert copilot_spec_manager_path.read_bytes() == \
-                expected_copilot_spec_manager_bytes, \
+            )
+            assert copilot_spec_manager_path.read_bytes() == expected_copilot_spec_manager_bytes, (
                 "generated copilot spec-manager diverged from provider asset bytes"
+            )
             codex_text = codex_path.read_text(encoding="utf-8")
             codex_bootstrap_text = codex_bootstrap_path.read_text(encoding="utf-8")
             codex_config_text = codex_config_path.read_text(encoding="utf-8")
@@ -32597,9 +32077,9 @@ esac
 
             generated_path = target / ".codex" / "agents" / "spec-manager.toml"
             generated_text = generated_path.read_text(encoding="utf-8")
-            assert generated_path.read_bytes() == \
-                expected_bytes, \
+            assert generated_path.read_bytes() == expected_bytes, (
                 "update should copy legacy codex shim asset bytes without normalization"
+            )
             assert re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, generated_text)
             assert not re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, generated_text)
 
@@ -32634,9 +32114,9 @@ esac
 
             generated_path = target / ".codex" / "agents" / "spec-manager.toml"
             generated_text = generated_path.read_text(encoding="utf-8")
-            assert generated_path.read_bytes() == \
-                expected_bytes, \
+            assert generated_path.read_bytes() == expected_bytes, (
                 "init should copy legacy codex shim asset bytes without normalization"
+            )
             assert re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, generated_text)
             assert not re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, generated_text)
 
@@ -32686,9 +32166,9 @@ esac
 
             generated_path = target / ".codex" / "agents" / "spec-manager.toml"
             generated_text = generated_path.read_text(encoding="utf-8")
-            assert generated_path.read_bytes() == \
-                expected_bytes, \
+            assert generated_path.read_bytes() == expected_bytes, (
                 "update should copy codex shim asset bytes without instruction key validation"
+            )
             assert not re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, generated_text)
             assert not re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, generated_text)
 
@@ -32699,14 +32179,7 @@ esac
 
             repo_root = Path(__file__).resolve().parents[3]
             codex_shim_asset = (
-                repo_root
-                / "src"
-                / "spec_dock"
-                / "assets"
-                / "install_root"
-                / ".codex"
-                / "agents"
-                / "spec-manager.toml"
+                repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".codex" / "agents" / "spec-manager.toml"
             )
             copilot_shim_asset = (
                 repo_root
@@ -32736,10 +32209,10 @@ esac
             custom_skill_path = target / ".agents" / "skills" / "custom-reviewer" / "SKILL.md"
             meta_path = target / ".agents" / "host-adapters" / "meta.json"
 
-            stale_managed_codex = b"name = \"stale-managed\"\n"
+            stale_managed_codex = b'name = "stale-managed"\n'
             stale_managed_copilot = b"# stale managed copilot shim\n"
             bootstrap_only_codex_config = "# user custom codex config should survive update\n"
-            custom_codex_content = "name = \"custom-reviewer\"\n"
+            custom_codex_content = 'name = "custom-reviewer"\n'
             custom_copilot_content = "# custom reviewer copilot agent\n"
             custom_skill_content = "# custom skill that must be preserved\n"
 
@@ -32758,12 +32231,8 @@ esac
             assert main(["update", str(target)]) == 0
 
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            managed_codex_bytes = (
-                managed_codex_path.read_bytes() if managed_codex_path.is_file() else None
-            )
-            managed_copilot_bytes = (
-                managed_copilot_path.read_bytes() if managed_copilot_path.is_file() else None
-            )
+            managed_codex_bytes = managed_codex_path.read_bytes() if managed_codex_path.is_file() else None
+            managed_copilot_bytes = managed_copilot_path.read_bytes() if managed_copilot_path.is_file() else None
             gate_2_sync_prune_evidence: dict[str, dict[str, object]] = {
                 "managed_codex_shim_generated_or_updated": {
                     "expected": "managed codex shim exists and matches provider asset",
@@ -32936,9 +32405,7 @@ esac
             malformed_manifest["targets"]["codex"]["native_shim"]["target_file"] = (
                 ".github/agents/orchestrator.agent.md"
             )
-            malformed_manifest["targets"]["copilot"]["native_shim"]["target_file"] = (
-                ".codex/agents/spec-manager.toml"
-            )
+            malformed_manifest["targets"]["copilot"]["native_shim"]["target_file"] = ".codex/agents/spec-manager.toml"
 
             exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
                 target,
@@ -32946,8 +32413,10 @@ esac
             )
 
             assert exit_code == 1
-            assert "required host 'codex' must use canonical native_shim.target_file '.codex/agents/spec-manager.toml'" in \
-                stderr
+            assert (
+                "required host 'codex' must use canonical native_shim.target_file '.codex/agents/spec-manager.toml'"
+                in stderr
+            )
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_duplicate_required_host_native_shim_target_file(self) -> None:
@@ -32956,9 +32425,7 @@ esac
             assert main(["init", str(target)]) == 0
             before = self._seed_managed_contract_guard_snapshot(target)
             malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-            malformed_manifest["targets"]["copilot"]["native_shim"]["target_file"] = (
-                ".codex/agents/spec-manager.toml"
-            )
+            malformed_manifest["targets"]["copilot"]["native_shim"]["target_file"] = ".codex/agents/spec-manager.toml"
 
             exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
                 target,
@@ -32966,8 +32433,7 @@ esac
             )
 
             assert exit_code == 1
-            assert "duplicate native_shim.target_file '.codex/agents/spec-manager.toml'" in \
-                stderr
+            assert "duplicate native_shim.target_file '.codex/agents/spec-manager.toml'" in stderr
             assert "for hosts 'codex' and 'copilot'" in stderr
             self._assert_managed_contract_guard_unchanged(target, before)
 
@@ -32986,8 +32452,10 @@ esac
             )
 
             assert exit_code == 1
-            assert "required host 'codex' must use canonical native_shim.target_file '.codex/agents/spec-manager.toml'" in \
-                stderr
+            assert (
+                "required host 'codex' must use canonical native_shim.target_file '.codex/agents/spec-manager.toml'"
+                in stderr
+            )
             assert list(target.iterdir()) == [], "preflight failure should not write managed scaffold files"
 
     def test_update_preflight_rejects_missing_or_non_directory_later_managed_asset_before_mutation(self) -> None:
@@ -33030,8 +32498,10 @@ esac
             )
 
             assert exit_code == 1
-            assert "required host 'codex' must use canonical entry_file '.agents/skills/spec-dock-codex-adapter/SKILL.md'" in \
-                stderr
+            assert (
+                "required host 'codex' must use canonical entry_file '.agents/skills/spec-dock-codex-adapter/SKILL.md'"
+                in stderr
+            )
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_missing_or_malformed_required_native_shim_owner_and_delegates_to_before_writes(
@@ -33134,9 +32604,10 @@ esac
             )
 
             assert exit_code == 1
-            assert "invalid managed_assets.obsolete_exact_file_paths item (must be exact file path): " \
-                "'.codex/agents/legacy'" in \
-                stderr
+            assert (
+                "invalid managed_assets.obsolete_exact_file_paths item (must be exact file path): "
+                "'.codex/agents/legacy'" in stderr
+            )
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_parent_traversal_native_shim_paths(self) -> None:
@@ -33230,9 +32701,7 @@ esac
                 assert main(["init", str(target)]) == 0
                 before = self._seed_managed_contract_guard_snapshot(target)
                 malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
-                    invalid_obsolete
-                ]
+                malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [invalid_obsolete]
 
                 exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
                     target,
@@ -33249,9 +32718,9 @@ esac
         with cli._assets_dir() as assets_dir:
             bundled = (assets_dir / "spec_dock" / "docs" / "reference_sync.md").read_text(encoding="utf-8")
 
-        repo_copy = (
-            Path(__file__).resolve().parents[3] / "spec-dock" / "docs" / "reference_sync.md"
-        ).read_text(encoding="utf-8")
+        repo_copy = (Path(__file__).resolve().parents[3] / "spec-dock" / "docs" / "reference_sync.md").read_text(
+            encoding="utf-8"
+        )
 
         assert repo_copy == bundled
 
@@ -33261,9 +32730,9 @@ esac
         with cli._assets_dir() as assets_dir:
             bundled = (assets_dir / "spec_dock" / "docs" / "reference_deps.md").read_text(encoding="utf-8")
 
-        repo_copy = (
-            Path(__file__).resolve().parents[3] / "spec-dock" / "docs" / "reference_deps.md"
-        ).read_text(encoding="utf-8")
+        repo_copy = (Path(__file__).resolve().parents[3] / "spec-dock" / "docs" / "reference_deps.md").read_text(
+            encoding="utf-8"
+        )
 
         assert repo_copy == bundled
 
@@ -33273,9 +32742,9 @@ esac
         with cli._assets_dir() as assets_dir:
             bundled = (assets_dir / "spec_dock" / "docs" / "workflow_issue.md").read_text(encoding="utf-8")
 
-        repo_copy = (
-            Path(__file__).resolve().parents[3] / "spec-dock" / "docs" / "workflow_issue.md"
-        ).read_text(encoding="utf-8")
+        repo_copy = (Path(__file__).resolve().parents[3] / "spec-dock" / "docs" / "workflow_issue.md").read_text(
+            encoding="utf-8"
+        )
 
         assert repo_copy == bundled
 
@@ -33375,7 +32844,12 @@ esac
             marker = target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("keep\n", encoding="utf-8")
 
-            exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--apply", "--keep-specs"])
+            exit_code, stdout, stderr = self._capture_installer_main([
+                "uninstall",
+                str(target),
+                "--apply",
+                "--keep-specs",
+            ])
 
             assert exit_code == 0, stderr
             assert stderr == ""
@@ -33524,8 +32998,7 @@ esac
             assert second_payload["status"] == "completed"
             assert second_payload["summary"]["already_removed"] > 0  # type: ignore[index]
             assert second_payload["summary"]["failed"] == 0  # type: ignore[index]
-            assert "already_removed" in \
-                {action["status"] for action in second_payload["actions"]}
+            assert "already_removed" in {action["status"] for action in second_payload["actions"]}
 
     def test_uninstall_apply_remove_specs_rerun_reports_already_removed_and_succeeds(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -33541,8 +33014,7 @@ esac
             assert second_payload["status"] == "completed"
             assert second_payload["summary"]["already_removed"] > 0  # type: ignore[index]
             assert second_payload["summary"]["failed"] == 0  # type: ignore[index]
-            assert "already_removed" in \
-                {action["status"] for action in second_payload["actions"]}
+            assert "already_removed" in {action["status"] for action in second_payload["actions"]}
 
     def test_uninstall_apply_partial_unlink_failure_reports_failed_separately(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -33612,7 +33084,12 @@ esac
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
 
-            exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--apply", "--keep-specs"])
+            exit_code, stdout, stderr = self._capture_installer_main([
+                "uninstall",
+                str(target),
+                "--apply",
+                "--keep-specs",
+            ])
 
             assert exit_code == 0, stderr
             assert stderr == ""
@@ -33680,9 +33157,13 @@ esac
             assert main(["init", str(target)]) == 0
             before = self._relative_file_snapshot(target)
 
-            exit_code, _stdout, stderr = self._capture_installer_main(
-                ["uninstall", str(target), "--apply", "--keep-specs", "--remove-specs"]
-            )
+            exit_code, _stdout, stderr = self._capture_installer_main([
+                "uninstall",
+                str(target),
+                "--apply",
+                "--keep-specs",
+                "--remove-specs",
+            ])
 
             assert exit_code == 2
             assert "not allowed with argument" in stderr
@@ -33741,9 +33222,7 @@ esac
             assert main(["init", str(target)]) == 0
             before = self._relative_file_snapshot(target)
 
-            cases = (
-                (["uninstall", str(target), "--json", "--apply"], "--keep-specs"),
-            )
+            cases = ((["uninstall", str(target), "--json", "--apply"], "--keep-specs"),)
             for args, expected_error_text in cases:
                 with _case(args=args):
                     exit_code, stdout, stderr = self._capture_installer_main(args)
@@ -34188,9 +33667,9 @@ esac
                 ["import", "issue", "123", "--title", "Imported issue", "--epic", "epic-local-00001"],
                 env=test_env,
             )
-            assert import_result.returncode == \
-                0, \
+            assert import_result.returncode == 0, (
                 f"import stdout:\n{import_result.stdout}\nimport stderr:\n{import_result.stderr}"
+            )
             assert "spec-dock: ok (import issue)" in import_result.stdout
             assert "import_post_sync_failed" not in import_result.stderr
             assert (target / "spec-dock" / ".agent" / "index.json").is_file()
@@ -34239,9 +33718,9 @@ esac
                 ["new", "issue", "--epic", "epic-local-00001", "--title", "Gateway failure issue"],
                 env=test_env,
             )
-            assert create_result.returncode == \
-                1, \
+            assert create_result.returncode == 1, (
                 f"new issue stdout:\n{create_result.stdout}\nnew issue stderr:\n{create_result.stderr}"
+            )
             assert "Outcome: pre_github_fail" in create_result.stderr
             assert "GitHub issue was created:" not in create_result.stderr
 
@@ -34259,8 +33738,12 @@ esac
             assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
-            self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
-            self._materialize_local_issue_under_epic(epic_dir, local_num=3, title="Depends issue", github_issue_number=203)
+            self._materialize_local_issue_under_epic(
+                epic_dir, local_num=2, title="Foreign issue", github_issue_number=202
+            )
+            self._materialize_local_issue_under_epic(
+                epic_dir, local_num=3, title="Depends issue", github_issue_number=203
+            )
 
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
@@ -34290,9 +33773,9 @@ esac
                 target,
                 ["deps", "check", "--id", "iss-local-00003", "--json"],
             )
-            assert deps_result.returncode == \
-                3, \
+            assert deps_result.returncode == 3, (
                 f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}"
+            )
             payload = json.loads(deps_result.stdout)
             assert payload.get("effective_depends_on") == ["iss-local-00001"]
             assert payload.get("blockers") == ["iss-local-00001"]
@@ -34304,7 +33787,9 @@ esac
             assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
-            self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
+            self._materialize_local_issue_under_epic(
+                epic_dir, local_num=2, title="Foreign issue", github_issue_number=202
+            )
 
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
@@ -34325,18 +33810,18 @@ esac
             self._write_json_force(foreign_meta_path, foreign_meta)
 
             ambiguous_active = self._run_runtime_capture(target, ["active", "set", "123", "--force"])
-            assert ambiguous_active.returncode == \
-                1, \
+            assert ambiguous_active.returncode == 1, (
                 f"active(ambiguous) stdout:\n{ambiguous_active.stdout}\nactive(ambiguous) stderr:\n{ambiguous_active.stderr}"
+            )
             assert "Ambiguous github.issue_number=123" in ambiguous_active.stderr
 
             scoped_active = self._run_runtime_capture(
                 target,
                 ["active", "set", "https://github.com/other/repo/issues/123", "--force"],
             )
-            assert scoped_active.returncode == \
-                0, \
+            assert scoped_active.returncode == 0, (
                 f"active(scoped) stdout:\n{scoped_active.stdout}\nactive(scoped) stderr:\n{scoped_active.stderr}"
+            )
             assert "spec-dock: ok (active set)" in scoped_active.stdout
 
             active_manifest = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
@@ -34346,9 +33831,9 @@ esac
                 target,
                 ["deps", "check", "https://github.com/other/repo/issues/123", "--json"],
             )
-            assert scoped_deps.returncode in \
-                (0, 3), \
+            assert scoped_deps.returncode in (0, 3), (
                 f"deps(scoped) stdout:\n{scoped_deps.stdout}\ndeps(scoped) stderr:\n{scoped_deps.stderr}"
+            )
             assert '"target": "iss-local-00002"' in scoped_deps.stdout
 
     def test_checked_in_dogfooding_runtime_subprocess_current_repo_url_target_resolves_unscoped_current_parity(
@@ -34359,7 +33844,9 @@ esac
             assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
-            self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
+            self._materialize_local_issue_under_epic(
+                epic_dir, local_num=2, title="Foreign issue", github_issue_number=202
+            )
 
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
@@ -34383,9 +33870,9 @@ esac
                 target,
                 ["active", "set", "https://github.com/current/repo/issues/123", "--force"],
             )
-            assert active_current.returncode == \
-                0, \
+            assert active_current.returncode == 0, (
                 f"active(current) stdout:\n{active_current.stdout}\nactive(current) stderr:\n{active_current.stderr}"
+            )
             active_manifest = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             assert active_manifest["issue"]["id"] == "iss-local-00001"
 
@@ -34393,9 +33880,9 @@ esac
                 target,
                 ["deps", "check", "https://github.com/current/repo/issues/123", "--json"],
             )
-            assert deps_current.returncode in \
-                (0, 3), \
+            assert deps_current.returncode in (0, 3), (
                 f"deps(current) stdout:\n{deps_current.stdout}\ndeps(current) stderr:\n{deps_current.stderr}"
+            )
             assert '"target": "iss-local-00001"' in deps_current.stdout
 
     def test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity(self) -> None:
@@ -34404,8 +33891,12 @@ esac
             assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
-            self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
-            self._materialize_local_issue_under_epic(epic_dir, local_num=3, title="Depends issue", github_issue_number=203)
+            self._materialize_local_issue_under_epic(
+                epic_dir, local_num=2, title="Foreign issue", github_issue_number=202
+            )
+            self._materialize_local_issue_under_epic(
+                epic_dir, local_num=3, title="Depends issue", github_issue_number=203
+            )
 
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
@@ -34442,9 +33933,9 @@ esac
                         target,
                         ["deps", "check", "--id", "iss-local-00003", "--json"],
                     )
-                    assert deps_result.returncode == \
-                        3, \
+                    assert deps_result.returncode == 3, (
                         f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}"
+                    )
                     payload = json.loads(deps_result.stdout)
                     assert payload.get("effective_depends_on") == [expected_dep]
                     assert payload.get("blockers") == [expected_dep]
@@ -34455,8 +33946,12 @@ esac
             assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, _current_issue_dir = self._create_minimal_local_tree(target)
-            self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
-            self._materialize_local_issue_under_epic(epic_dir, local_num=3, title="Depends issue", github_issue_number=203)
+            self._materialize_local_issue_under_epic(
+                epic_dir, local_num=2, title="Foreign issue", github_issue_number=202
+            )
+            self._materialize_local_issue_under_epic(
+                epic_dir, local_num=3, title="Depends issue", github_issue_number=203
+            )
 
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
@@ -34481,11 +33976,12 @@ esac
                 target,
                 ["deps", "check", "--id", "iss-local-00003"],
             )
-            assert deps_result.returncode == \
-                1, \
+            assert deps_result.returncode == 1, (
                 f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}"
-            assert "No node found for github.issue_number=123 in current repo scope (current/repo)" in \
-                deps_result.stderr
+            )
+            assert (
+                "No node found for github.issue_number=123 in current repo scope (current/repo)" in deps_result.stderr
+            )
             assert "Create/link the node first." in deps_result.stderr
 
     def test_checked_in_dogfooding_runtime_subprocess_keeps_sync_deps_active_validate_doctor_parity(self) -> None:
@@ -34496,35 +33992,36 @@ esac
             self._create_minimal_local_tree(target)
 
             sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            assert sync_result.returncode == \
-                0, \
+            assert sync_result.returncode == 0, (
                 f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            )
             assert "spec-dock: ok (sync)" in sync_result.stdout
 
             deps_result = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-local-00001"])
-            assert deps_result.returncode in \
-                (0, 3), \
+            assert deps_result.returncode in (0, 3), (
                 f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}"
-            assert "spec-dock: ok (deps check)" in deps_result.stdout \
-                or "spec-dock: blocked (deps check)" in deps_result.stderr, \
-                f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}"
+            )
+            assert (
+                "spec-dock: ok (deps check)" in deps_result.stdout
+                or "spec-dock: blocked (deps check)" in deps_result.stderr
+            ), f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}"
 
             active_result = self._run_runtime_capture(target, ["active", "set", "--id", "iss-local-00001", "--force"])
-            assert active_result.returncode == \
-                0, \
+            assert active_result.returncode == 0, (
                 f"active stdout:\n{active_result.stdout}\nactive stderr:\n{active_result.stderr}"
+            )
             assert "spec-dock: ok (active set)" in active_result.stdout
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            assert validate_result.returncode == \
-                0, \
+            assert validate_result.returncode == 0, (
                 f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            )
             assert "spec-dock: ok (validate)" in validate_result.stdout
 
             doctor_result = self._run_runtime_capture(target, ["doctor"])
-            assert doctor_result.returncode == \
-                0, \
+            assert doctor_result.returncode == 0, (
                 f"doctor stdout:\n{doctor_result.stdout}\ndoctor stderr:\n{doctor_result.stderr}"
+            )
             assert "spec-dock: ok (doctor) findings=0" in doctor_result.stdout
 
     def test_checked_in_dogfooding_runtime_subprocess_keeps_lone_unscoped_legacy_without_backfill_parity(self) -> None:
@@ -34536,7 +34033,9 @@ esac
             assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
-            self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
+            self._materialize_local_issue_under_epic(
+                epic_dir, local_num=2, title="Foreign issue", github_issue_number=202
+            )
 
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
@@ -34552,16 +34051,18 @@ esac
             self._write_json_force(foreign_meta_path, foreign_meta)
 
             sync_result = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"])
-            assert sync_result.returncode == \
-                0, \
+            assert sync_result.returncode == 0, (
                 f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            )
 
             current_meta_after = json.loads(current_meta_path.read_text(encoding="utf-8"))
             assert current_meta_after["github"]["issue_number"] == 123
             assert "repo_owner" not in current_meta_after["github"]
             assert "repo_name" not in current_meta_after["github"]
 
-    def test_checked_in_dogfooding_runtime_subprocess_keeps_readonly_lone_unscoped_without_backfill_parity(self) -> None:
+    def test_checked_in_dogfooding_runtime_subprocess_keeps_readonly_lone_unscoped_without_backfill_parity(
+        self,
+    ) -> None:
         if shutil.which("git") is None:
             pytest.skip("git not available")
 
@@ -34570,7 +34071,9 @@ esac
             assert main(["init", str(target)]) == 0
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
-            self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
+            self._materialize_local_issue_under_epic(
+                epic_dir, local_num=2, title="Foreign issue", github_issue_number=202
+            )
 
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
@@ -34596,9 +34099,9 @@ esac
             )
 
             sync_result = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"])
-            assert sync_result.returncode == \
-                0, \
+            assert sync_result.returncode == 0, (
                 f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            )
 
             current_meta_after = json.loads(current_meta_path.read_text(encoding="utf-8"))
             assert current_meta_after["github"]["issue_number"] == 123
@@ -34623,23 +34126,23 @@ esac
             (issue_dir / "design.md").unlink()
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            assert validate_result.returncode == \
-                1, \
+            assert validate_result.returncode == 1, (
                 f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            )
             assert "epic missing parent_id" in validate_result.stderr
             assert "Missing required artifact" not in validate_result.stderr
 
             doctor_result = self._run_runtime_capture(target, ["doctor"])
-            assert doctor_result.returncode == \
-                1, \
+            assert doctor_result.returncode == 1, (
                 f"doctor stdout:\n{doctor_result.stdout}\ndoctor stderr:\n{doctor_result.stderr}"
+            )
             assert "epic missing parent_id" in doctor_result.stderr
             assert "Missing required artifact" not in doctor_result.stderr
 
             sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            assert sync_result.returncode == \
-                1, \
+            assert sync_result.returncode == 1, (
                 f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            )
             assert "epic missing parent_id" in sync_result.stderr
             assert "Missing required artifact" not in sync_result.stderr
 
@@ -34654,9 +34157,9 @@ esac
             (issue_dir / "report.md").unlink()
 
             sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            assert sync_result.returncode == \
-                1, \
+            assert sync_result.returncode == 1, (
                 f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            )
             assert "preflight validate failed: Missing required artifact" in sync_result.stderr
             assert "report.md" in sync_result.stderr
             assert "spec-dock: ok (sync)" not in sync_result.stdout
@@ -34685,22 +34188,22 @@ esac
                 ["import", "issue", "123", "--title", "Imported issue", "--epic", "epic-local-00001"],
                 env=test_env,
             )
-            assert import_result.returncode == \
-                1, \
+            assert import_result.returncode == 1, (
                 f"import stdout:\n{import_result.stdout}\nimport stderr:\n{import_result.stderr}"
+            )
             assert "preflight validate failed" in import_result.stderr
             assert "Missing required artifact" in import_result.stderr
             assert "report.md" in import_result.stderr
             assert not (
-                    target
-                    / "spec-dock"
-                    / "initiatives"
-                    / "init-local-00001-auth-platform"
-                    / "epics"
-                    / "epic-local-00001-jwt-auth"
-                    / "issues"
-                    / "iss-00123-imported-issue"
-                ).exists()
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-imported-issue"
+            ).exists()
             if log_path.exists():
                 assert log_path.read_text(encoding="utf-8").strip() == ""
 
@@ -34793,13 +34296,14 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             (issue_dir / "report.md").unlink()
 
             sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active", "--force"])
-            assert sync_result.returncode == \
-                0, \
+            assert sync_result.returncode == 0, (
                 f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            )
             assert "preflight validate failed" in sync_result.stderr
             assert "report.md" in sync_result.stderr
-            assert "deps_preflight_failed" in sync_result.stderr or "DEPS_DISABLED" in sync_result.stderr, \
+            assert "deps_preflight_failed" in sync_result.stderr or "DEPS_DISABLED" in sync_result.stderr, (
                 f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            )
             assert "spec-dock: ok (sync)" in sync_result.stdout
 
             index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
@@ -34827,9 +34331,9 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             (issue_dir / "design.md").unlink()
 
             sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            assert sync_result.returncode == \
-                1, \
+            assert sync_result.returncode == 1, (
                 f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
+            )
             assert "epic missing parent_id" in sync_result.stderr
             assert "Missing required artifact" not in sync_result.stderr
 
@@ -34844,16 +34348,16 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             (issue_dir / "design.md").unlink()
 
             validate_result = self._run_runtime_capture(target, ["validate"])
-            assert validate_result.returncode == \
-                1, \
+            assert validate_result.returncode == 1, (
                 f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
+            )
             assert "Missing required artifact" in validate_result.stderr
             assert "design.md" in validate_result.stderr
 
             doctor_result = self._run_runtime_capture(target, ["doctor"])
-            assert doctor_result.returncode == \
-                1, \
+            assert doctor_result.returncode == 1, (
                 f"doctor stdout:\n{doctor_result.stdout}\ndoctor stderr:\n{doctor_result.stderr}"
+            )
             assert "[missing_artifact] Missing required artifact" in doctor_result.stderr
             assert "design.md" in doctor_result.stderr
 
@@ -34871,71 +34375,67 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             lock_path = target / "spec-dock" / "system" / ".runtime" / "create.lock"
             lock_path.parent.mkdir(parents=True, exist_ok=True)
             lock_path.write_text(
-                "\n".join(
-                    [
-                        "token=active",
-                        "pid=1234",
-                        "user=tester",
-                        "created_unix=9999999999",
-                        "created_iso=2286-11-20T17:46:39Z",
-                    ]
-                )
+                "\n".join([
+                    "token=active",
+                    "pid=1234",
+                    "user=tester",
+                    "created_unix=9999999999",
+                    "created_iso=2286-11-20T17:46:39Z",
+                ])
                 + "\n",
                 encoding="utf-8",
             )
 
             validate_in_progress = self._run_runtime_capture(target, ["validate"])
-            assert validate_in_progress.returncode == \
-                1, \
+            assert validate_in_progress.returncode == 1, (
                 f"validate(in_progress) stdout:\n{validate_in_progress.stdout}\nvalidate(in_progress) stderr:\n{validate_in_progress.stderr}"
+            )
             assert "Create in-progress state detected" in validate_in_progress.stderr
             assert "Missing required artifact" not in validate_in_progress.stderr
 
             sync_in_progress = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            assert sync_in_progress.returncode == \
-                1, \
+            assert sync_in_progress.returncode == 1, (
                 f"sync(in_progress) stdout:\n{sync_in_progress.stdout}\nsync(in_progress) stderr:\n{sync_in_progress.stderr}"
+            )
             assert "Create in-progress state detected" in sync_in_progress.stderr
 
             doctor_in_progress = self._run_runtime_capture(target, ["doctor"])
-            assert doctor_in_progress.returncode == \
-                1, \
+            assert doctor_in_progress.returncode == 1, (
                 f"doctor(in_progress) stdout:\n{doctor_in_progress.stdout}\ndoctor(in_progress) stderr:\n{doctor_in_progress.stderr}"
+            )
             assert "[stale_create_lock]" in doctor_in_progress.stderr
             assert "Create in-progress state detected" in doctor_in_progress.stderr
             assert "[missing_artifact]" not in doctor_in_progress.stderr
 
             lock_path.write_text(
-                "\n".join(
-                    [
-                        "token=stale",
-                        "pid=4321",
-                        "user=tester",
-                        "created_unix=0",
-                        "created_iso=1970-01-01T00:00:00Z",
-                    ]
-                )
+                "\n".join([
+                    "token=stale",
+                    "pid=4321",
+                    "user=tester",
+                    "created_unix=0",
+                    "created_iso=1970-01-01T00:00:00Z",
+                ])
                 + "\n",
                 encoding="utf-8",
             )
 
             validate_stale = self._run_runtime_capture(target, ["validate"])
-            assert validate_stale.returncode == \
-                1, \
+            assert validate_stale.returncode == 1, (
                 f"validate(stale) stdout:\n{validate_stale.stdout}\nvalidate(stale) stderr:\n{validate_stale.stderr}"
+            )
             assert "Stale create-lock state detected" in validate_stale.stderr
             assert "Missing required artifact" not in validate_stale.stderr
 
             sync_stale = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            assert sync_stale.returncode == \
-                1, \
+            assert sync_stale.returncode == 1, (
                 f"sync(stale) stdout:\n{sync_stale.stdout}\nsync(stale) stderr:\n{sync_stale.stderr}"
+            )
             assert "Stale create-lock state detected" in sync_stale.stderr
 
             doctor_stale = self._run_runtime_capture(target, ["doctor"])
-            assert doctor_stale.returncode == \
-                1, \
+            assert doctor_stale.returncode == 1, (
                 f"doctor(stale) stdout:\n{doctor_stale.stdout}\ndoctor(stale) stderr:\n{doctor_stale.stderr}"
+            )
             assert "[stale_create_lock]" in doctor_stale.stderr
             assert "Stale create-lock state detected" in doctor_stale.stderr
             assert "[missing_artifact]" not in doctor_stale.stderr
@@ -34968,12 +34468,15 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             assert main(["update", str(target)]) == 0
 
-            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
-                (epic_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "issue", "report.md") == \
-                (issue_dir / "report.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == (
+                initiative_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == (
+                epic_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == (issue_dir / "report.md").read_text(
+                encoding="utf-8"
+            )
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
             assert "- initiative: init-local-00001" in context_pack_text
@@ -34984,8 +34487,9 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "- `spec-dock/active/issue/report.md`" in context_pack_text
             assert "- `spec-dock/active/issue/README.md`" not in context_pack_text
             assert "- state (github default): `./spec-dock/scripts/spec-dock sync`" in context_pack_text
-            assert "- state (cache/local opt-out): `./spec-dock/scripts/spec-dock sync --no-github`" in \
-                context_pack_text
+            assert (
+                "- state (cache/local opt-out): `./spec-dock/scripts/spec-dock sync --no-github`" in context_pack_text
+            )
             assert "- state (local): `./spec-dock/scripts/spec-dock sync`" not in context_pack_text
             assert "- state (github): `./spec-dock/scripts/spec-dock sync --github`" not in context_pack_text
 
@@ -35044,12 +34548,15 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                     assert link.exists()
                     assert link.resolve() == expected.resolve()
 
-            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
-                (epic_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "issue", "report.md") == \
-                (issue_dir / "report.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == (
+                initiative_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == (
+                epic_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == (issue_dir / "report.md").read_text(
+                encoding="utf-8"
+            )
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
             assert "- initiative: init-local-00001" in context_pack_text
@@ -35111,12 +34618,15 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                         resolved = (active_dir / pathfile.read_text(encoding="utf-8").strip()).resolve()
                         assert resolved == expected.resolve()
 
-            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
-                (epic_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "issue", "report.md") == \
-                (issue_dir / "report.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == (
+                initiative_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == (
+                epic_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == (issue_dir / "report.md").read_text(
+                encoding="utf-8"
+            )
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
             assert "- initiative: init-local-00001" in context_pack_text
@@ -35173,12 +34683,15 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             assert main(["update", str(target)]) == 0
 
-            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
-                (epic_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "issue", "report.md") == \
-                (issue_dir / "report.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == (
+                initiative_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == (
+                epic_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == (issue_dir / "report.md").read_text(
+                encoding="utf-8"
+            )
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
             assert "- initiative: init-local-00001" in context_pack_text
@@ -35234,12 +34747,15 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             assert main(["update", str(target)]) == 0
 
-            assert self._read_active_pointer_text(target, "initiative", "README.md") == \
-                (placeholder_root / "initiative" / "README.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "epic", "README.md") == \
-                (placeholder_root / "epic" / "README.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "issue", "README.md") == \
-                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "initiative", "README.md") == (
+                placeholder_root / "initiative" / "README.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "README.md") == (
+                placeholder_root / "epic" / "README.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "README.md") == (
+                placeholder_root / "issue" / "README.md"
+            ).read_text(encoding="utf-8")
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
             assert "- initiative: (none)" in context_pack_text
@@ -35299,12 +34815,15 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             assert main(["update", str(target)]) == 0
 
-            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
-                (epic_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "issue", "report.md") == \
-                (issue_dir / "report.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == (
+                initiative_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == (
+                epic_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == (issue_dir / "report.md").read_text(
+                encoding="utf-8"
+            )
 
             context_pack_text = context_pack_path.read_text(encoding="utf-8")
             assert "- initiative: init-local-00001" in context_pack_text
@@ -35313,7 +34832,9 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "- initiative: (none)" not in context_pack_text
             assert "- issue: (none)" not in context_pack_text
 
-    def test_update_keeps_context_pack_aligned_with_existing_active_entrypoints_when_persisted_manifest_is_stale(self) -> None:
+    def test_update_keeps_context_pack_aligned_with_existing_active_entrypoints_when_persisted_manifest_is_stale(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -35453,7 +34974,9 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "epic-local-99999" not in context_pack_text
             assert "iss-local-99999" not in context_pack_text
 
-    def test_update_keeps_context_pack_aligned_with_existing_active_pathfiles_when_persisted_manifest_is_stale(self) -> None:
+    def test_update_keeps_context_pack_aligned_with_existing_active_pathfiles_when_persisted_manifest_is_stale(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -35575,12 +35098,15 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert main(["update", str(target)]) == 0
 
             placeholder_root = target / "spec-dock" / "system" / "active-none"
-            assert self._read_active_pointer_text(target, "initiative", "README.md") == \
-                (placeholder_root / "initiative" / "README.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "epic", "README.md") == \
-                (placeholder_root / "epic" / "README.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "issue", "README.md") == \
-                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "initiative", "README.md") == (
+                placeholder_root / "initiative" / "README.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "README.md") == (
+                placeholder_root / "epic" / "README.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "README.md") == (
+                placeholder_root / "issue" / "README.md"
+            ).read_text(encoding="utf-8")
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
             assert "- initiative: (none)" in context_pack_text
@@ -35634,8 +35160,9 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert main(["update", str(target)]) == 0
 
             placeholder_root = target / "spec-dock" / "system" / "active-none"
-            assert self._read_active_pointer_text(target, "issue", "README.md") == \
-                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "README.md") == (
+                placeholder_root / "issue" / "README.md"
+            ).read_text(encoding="utf-8")
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
             assert "- issue: (none)" in context_pack_text
@@ -35696,7 +35223,15 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert main(["init", str(target)]) == 0
 
             active_dir = target / "spec-dock" / "active"
-            for name in ("initiative", "epic", "issue", "context-pack.md", "initiative.path", "epic.path", "issue.path"):
+            for name in (
+                "initiative",
+                "epic",
+                "issue",
+                "context-pack.md",
+                "initiative.path",
+                "epic.path",
+                "issue.path",
+            ):
                 p = active_dir / name
                 if p.is_symlink() or p.is_file():
                     p.unlink(missing_ok=True)
@@ -35707,12 +35242,15 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert main(["update", str(target)]) == 0
 
             placeholder_root = target / "spec-dock" / "system" / "active-none"
-            assert self._read_active_pointer_text(target, "initiative", "README.md") == \
-                (placeholder_root / "initiative" / "README.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "epic", "README.md") == \
-                (placeholder_root / "epic" / "README.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "issue", "README.md") == \
-                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "initiative", "README.md") == (
+                placeholder_root / "initiative" / "README.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "README.md") == (
+                placeholder_root / "epic" / "README.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "README.md") == (
+                placeholder_root / "issue" / "README.md"
+            ).read_text(encoding="utf-8")
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
             assert "- initiative: (none)" in context_pack_text
             assert "- epic: (none)" in context_pack_text
@@ -35768,7 +35306,15 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert main(["init", str(target)]) == 0
 
             active_dir = target / "spec-dock" / "active"
-            for name in ("initiative", "epic", "issue", "context-pack.md", "initiative.path", "epic.path", "issue.path"):
+            for name in (
+                "initiative",
+                "epic",
+                "issue",
+                "context-pack.md",
+                "initiative.path",
+                "epic.path",
+                "issue.path",
+            ):
                 p = active_dir / name
                 if p.is_symlink() or p.is_file():
                     p.unlink(missing_ok=True)
@@ -35800,8 +35346,9 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                     assert pathfile.is_file()
                     resolved = (active_dir / pathfile.read_text(encoding="utf-8").strip()).resolve()
                     assert resolved == (placeholder_root / layer).resolve()
-                    assert self._read_active_pointer_text(target, layer, "README.md") == \
-                        (placeholder_root / layer / "README.md").read_text(encoding="utf-8")
+                    assert self._read_active_pointer_text(target, layer, "README.md") == (
+                        placeholder_root / layer / "README.md"
+                    ).read_text(encoding="utf-8")
 
     def test_update_rebuilds_active_path_files_from_persisted_manifest_when_symlink_creation_fails(self) -> None:
         import spec_dock.cli as cli
@@ -35859,12 +35406,15 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                     resolved = (active_dir / pathfile.read_text(encoding="utf-8").strip()).resolve()
                     assert resolved == expected.resolve()
 
-            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
-                (epic_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "issue", "report.md") == \
-                (issue_dir / "report.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == (
+                initiative_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == (
+                epic_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == (issue_dir / "report.md").read_text(
+                encoding="utf-8"
+            )
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
             assert "- initiative: init-local-00001" in context_pack_text
@@ -35931,12 +35481,15 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                     resolved = (active_dir / rel_target).resolve()
                     assert resolved == expected.resolve()
 
-            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
-                (epic_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "issue", "report.md") == \
-                (issue_dir / "report.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == (
+                initiative_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == (
+                epic_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == (issue_dir / "report.md").read_text(
+                encoding="utf-8"
+            )
 
     def test_update_repairs_stale_active_path_files_to_placeholder_when_persisted_manifest_broken_and_symlink_creation_fails(
         self,
@@ -35994,8 +35547,9 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                     assert rel_target != stale_rel
                     resolved = (active_dir / rel_target).resolve()
                     assert resolved == (placeholder_root / layer).resolve()
-                    assert self._read_active_pointer_text(target, layer, "README.md") == \
-                        (placeholder_root / layer / "README.md").read_text(encoding="utf-8")
+                    assert self._read_active_pointer_text(target, layer, "README.md") == (
+                        placeholder_root / layer / "README.md"
+                    ).read_text(encoding="utf-8")
 
     def test_update_prefers_existing_active_entrypoints_over_stale_persisted_manifest_for_context_pack(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -36041,12 +35595,15 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             assert main(["update", str(target)]) == 0
 
-            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
-                (epic_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "issue", "report.md") == \
-                (issue_dir / "report.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == (
+                initiative_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == (
+                epic_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == (issue_dir / "report.md").read_text(
+                encoding="utf-8"
+            )
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
             assert "- initiative: init-local-00001" in context_pack_text
@@ -36129,12 +35686,15 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                         continue
                     assert resolved[1] == expected_id
 
-            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == \
-                (initiative_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "epic", "requirement.md") == \
-                (epic_dir / "requirement.md").read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "issue", "report.md") == \
-                (issue_dir / "report.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == (
+                initiative_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == (
+                epic_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == (issue_dir / "report.md").read_text(
+                encoding="utf-8"
+            )
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
             assert "- initiative: init-local-00001" in context_pack_text
@@ -36206,8 +35766,9 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 assert issue_pathfile.is_file()
                 rel_target = issue_pathfile.read_text(encoding="utf-8").strip()
                 assert (active_dir / rel_target).resolve() == issue_dir.resolve()
-            assert self._read_active_pointer_text(target, "issue", "report.md") == \
-                (issue_dir / "report.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == (issue_dir / "report.md").read_text(
+                encoding="utf-8"
+            )
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
             assert "- issue: iss-local-00001" in context_pack_text
@@ -36275,8 +35836,9 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 assert issue_pathfile.is_file()
                 rel_target = issue_pathfile.read_text(encoding="utf-8").strip()
                 assert (active_dir / rel_target).resolve() == issue_dir.resolve()
-            assert self._read_active_pointer_text(target, "issue", "report.md") == \
-                (issue_dir / "report.md").read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == (issue_dir / "report.md").read_text(
+                encoding="utf-8"
+            )
 
             context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
             assert "- issue: iss-local-00001" in context_pack_text
@@ -36300,5 +35862,6 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert main(["update", str(target)]) == 0
 
             placeholder = target / "spec-dock" / "system" / "active-none" / "initiative" / "README.md"
-            assert self._read_active_pointer_text(target, "initiative", "README.md") == \
-                placeholder.read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "initiative", "README.md") == placeholder.read_text(
+                encoding="utf-8"
+            )

@@ -65,10 +65,7 @@ def _raw_node_depends_on_map(
 def _legacy_only_workspace_finding(*, legacy_dir: Path) -> DoctorFinding:
     return DoctorFinding(
         code="legacy_only_workspace",
-        message=(
-            "legacy workspace is present but current workspace is missing: "
-            f"path={legacy_dir}"
-        ),
+        message=(f"legacy workspace is present but current workspace is missing: path={legacy_dir}"),
         guidance=[
             "Do not rename '.spec-dock' to 'spec-dock' (formats are incompatible).",
             "Run `spec-dock init` to install a new `spec-dock/` workspace.",
@@ -137,10 +134,7 @@ def _finding_from_error(error_message: str) -> DoctorFinding:
                 "復元後に `spec-dock/scripts/spec-dock validate` を再実行してください。",
             ],
         )
-    if (
-        "Unsupported legacy meta.json detected" in error_message
-        or ".meta.json" in error_message
-    ):
+    if "Unsupported legacy meta.json detected" in error_message or ".meta.json" in error_message:
         return DoctorFinding(
             code="broken_meta",
             message=error_message,
@@ -223,8 +217,7 @@ def _stale_active_pointer_finding(
     invalid_manifest_warnings = [
         warning
         for warning in load_result.warnings
-        if warning.startswith("active_manifest_invalid_json:")
-        or warning.startswith("active_manifest_invalid_shape:")
+        if warning.startswith("active_manifest_invalid_json:") or warning.startswith("active_manifest_invalid_shape:")
     ]
     if manifest is None:
         if invalid_manifest_warnings:

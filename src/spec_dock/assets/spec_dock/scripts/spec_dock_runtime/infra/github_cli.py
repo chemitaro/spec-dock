@@ -189,11 +189,7 @@ def _issue_snapshot_from_raw(item: dict[str, Any], *, repo_slug: str | None = No
         issue_number=issue_number,
         state=str(item.get("state", "")),
         title=str(item.get("title", "")),
-        labels=[
-            str(label.get("name", ""))
-            for label in (item.get("labels") or [])
-            if isinstance(label, dict)
-        ],
+        labels=[str(label.get("name", "")) for label in (item.get("labels") or []) if isinstance(label, dict)],
         updated_at=str(item.get("updatedAt", "")),
         url=url,
         repo_owner=owner,
