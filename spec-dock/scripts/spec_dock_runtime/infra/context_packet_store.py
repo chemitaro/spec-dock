@@ -36,13 +36,11 @@ class ContextPacketStore:
                 path = self._safe_projection_path(rel_path)
                 text = json.dumps(packet_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
                 staged.append((_stage_text(path, text), path))
-                refs.append(
-                    {
-                        "path": rel_path,
-                        "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
-                        "missing_reason": None,
-                    }
-                )
+                refs.append({
+                    "path": rel_path,
+                    "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                    "missing_reason": None,
+                })
             for _tmp_path, path in staged:
                 backups.append((_backup_existing_path(path), path))
             stale_paths = self._stale_role_packet_paths(write_rel_paths)

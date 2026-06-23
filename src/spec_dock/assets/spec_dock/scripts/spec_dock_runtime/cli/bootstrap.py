@@ -55,6 +55,8 @@ from spec_dock_runtime.infra import (
     artifact_writer as infra_artifact_writer,
     assurance_store as infra_assurance_store,
     clock as infra_clock,
+    context_packet_store as infra_context_packet_store,
+    context_policy_store as infra_context_policy_store,
     deps_reader as infra_deps_reader,
     derived_state_reader as infra_derived_state_reader,
     fs_cli as infra_fs_cli,
@@ -254,6 +256,15 @@ class _GitGateway:
 
 
 @dataclass(frozen=True)
+class _ContinuationProbe:
+    def current_head(self, repo_root: Path) -> str | None:
+        return infra_git_cli.current_head_or_none(repo_root)
+
+    def status_short(self, repo_root: Path) -> str | None:
+        return infra_git_cli.status_short_or_none(repo_root)
+
+
+@dataclass(frozen=True)
 class _GitHubCapabilityGateway:
     def probe(self, request):
         return infra_github_capability_cli.GitHubCapabilityCliGateway().probe(request)
@@ -331,6 +342,8 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
     assurance_store = infra_assurance_store.AssuranceStore(resolved_repo_root)
     artifact_store = infra_artifact_store.ArtifactStore(resolved_repo_root)
     runbook_store = infra_runbook_store.RunbookStore(resolved_repo_root)
+    context_policy_store = infra_context_policy_store.ContextPolicyStore(resolved_repo_root)
+    context_packet_store = infra_context_packet_store.ContextPacketStore(resolved_repo_root)
     use_cases = UseCases(
         create_initiative=lambda req: application_create_initiative(req, ports),
         create_epic=lambda req: application_create_epic(req, ports),
@@ -359,7 +372,14 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
             artifact_store=artifact_store,
         ),
         workflow_status=lambda req: application_workflow_status(req, store=assurance_store),
-        workflow_next=lambda req: application_workflow_next(req, store=assurance_store, runbook_store=runbook_store),
+        workflow_next=lambda req: application_workflow_next(
+            req,
+            store=assurance_store,
+            runbook_store=runbook_store,
+            context_policy_store=context_policy_store,
+            context_packet_store=context_packet_store,
+            continuation_probe=_ContinuationProbe(),
+        ),
         doctor=lambda req: application_doctor(req, ports),
         worktree_create=lambda req: application_worktree_create(req, ports),
         worktree_list=lambda req: application_worktree_list(req, ports),

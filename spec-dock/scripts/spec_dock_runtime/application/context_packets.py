@@ -10,6 +10,7 @@ from spec_dock_runtime.domain.context_routing import (
     AssuranceAuthority,
     ContextMode,
     ContextRoutingPolicy,
+    ContinuationFacts,
     StepAssuranceDecision,
     StepFacts,
     TaskKind,
@@ -40,6 +41,7 @@ class StepAssuranceProjection:
     policy_status: str
     policy_reason: str
     source_refs: tuple[SourceRef, ...]
+    continuation_state: dict[str, str]
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -51,12 +53,18 @@ class StepAssuranceProjection:
             },
             "worker": self.decision.worker.value if self.decision is not None else None,
             "reasoning_effort": self.decision.reasoning_effort.value if self.decision is not None else None,
-            "context_mode": self.decision.context_mode.value if self.decision is not None else ContextMode.MINIMAL_PACKET.value,
+            "context_mode": self.decision.context_mode.value
+            if self.decision is not None
+            else ContextMode.MINIMAL_PACKET.value,
             "verification": list(self.decision.verification) if self.decision is not None else [],
             "reviewers": [role.value for role in self.decision.reviewers] if self.decision is not None else [],
             "return_contract": {
-                "allowed_fields": list(self.decision.return_contract.allowed_fields) if self.decision is not None else [],
-                "forbidden_fields": list(self.decision.return_contract.forbidden_fields) if self.decision is not None else [],
+                "allowed_fields": list(self.decision.return_contract.allowed_fields)
+                if self.decision is not None
+                else [],
+                "forbidden_fields": list(self.decision.return_contract.forbidden_fields)
+                if self.decision is not None
+                else [],
             },
             "continuation": None
             if self.decision is None or self.decision.continuation is None
@@ -65,6 +73,7 @@ class StepAssuranceProjection:
                 "context_mode": self.decision.continuation.context_mode.value,
                 "reason_codes": list(self.decision.continuation.reason_codes),
             },
+            "continuation_state": self.continuation_state,
             "source_refs": [ref.to_payload() for ref in self.source_refs],
         }
 
@@ -94,6 +103,8 @@ def compile_step_assurance_projection(
     report_text: str | None,
     source_refs: tuple[SourceRef, ...],
     policy_result: Any,
+    continuation_facts: ContinuationFacts | None = None,
+    continuation_state: dict[str, str] | None = None,
 ) -> StepAssuranceProjection:
     selected_step = _select_step(plan_text or "", report_text or "")
     if selected_step["selection_method"] == "issue_wide_default":
@@ -104,6 +115,7 @@ def compile_step_assurance_projection(
             policy_status=str(getattr(policy_result, "status", "missing")),
             policy_reason=str(getattr(policy_result, "reason", "context_policy_missing")),
             source_refs=source_refs,
+            continuation_state=continuation_state or {},
         )
     policy = getattr(policy_result, "policy", None)
     policy_status = str(getattr(policy_result, "status", "missing"))
@@ -122,6 +134,7 @@ def compile_step_assurance_projection(
         facts,
         AssuranceAuthority(authorized_profile=authorized_profile, lite_candidate=lite_candidate),
         policy=policy,
+        continuation_facts=continuation_facts,
     )
     if policy_status != "valid" and decision.worker == AgentRole.DEV_CODER:
         decision = StepAssuranceDecision(
@@ -142,6 +155,7 @@ def compile_step_assurance_projection(
         policy_status=policy_status,
         policy_reason=policy_reason,
         source_refs=source_refs,
+        continuation_state=continuation_state or {},
     )
 
 
@@ -152,9 +166,17 @@ def compile_context_packet_projection(
 ) -> ContextPacketProjection:
     payload = _packet_payload(step_projection)
     write_result = packet_store.write_current(payload)
-    refs = tuple(SourceRef(path=str(ref["path"]), sha256=_as_optional_str(ref.get("sha256"))) for ref in write_result.refs)
+    refs = tuple(
+        SourceRef(path=str(ref["path"]), sha256=_as_optional_str(ref.get("sha256"))) for ref in write_result.refs
+    )
     if not write_result.written:
-        refs = (SourceRef(path="spec-dock/.agent/context-packets/current-context-packets.json", sha256=None, missing_reason="write_failed"),)
+        refs = (
+            SourceRef(
+                path="spec-dock/.agent/context-packets/current-context-packets.json",
+                sha256=None,
+                missing_reason="write_failed",
+            ),
+        )
     return ContextPacketProjection(
         written=write_result.written,
         refs=refs,
@@ -165,14 +187,16 @@ def compile_context_packet_projection(
 
 def _packet_payload(step_projection: StepAssuranceProjection) -> dict[str, Any]:
     step_payload = step_projection.to_payload()
-    if step_projection.decision is None:
+    decision = step_projection.decision
+    if decision is None:
         return {
             "schema_version": "context-packet-projection-v1",
             "step_assurance": step_payload,
+            "continuation_state": step_projection.continuation_state,
             "packets": [],
             "invocation_events": [],
         }
-    roles = (step_projection.decision.worker, *step_projection.decision.reviewers)
+    roles = (decision.worker, *decision.reviewers)
     packets: list[dict[str, Any]] = []
     events: list[dict[str, Any]] = []
     for role in roles:
@@ -181,32 +205,32 @@ def _packet_payload(step_projection: StepAssuranceProjection) -> dict[str, Any]:
         context_mode = contract.context_mode
         if step_projection.policy_status != "valid" and contract.fail_closed_if_unavailable:
             missing_reason = step_projection.policy_reason
-        elif role == step_projection.decision.worker:
-            context_mode = step_projection.decision.context_mode
+        elif role == decision.worker:
+            context_mode = decision.context_mode
         event = _invocation_event(
             role=role,
-            reasoning_effort=step_projection.decision.reasoning_effort.value,
+            reasoning_effort=decision.reasoning_effort.value,
             context_mode=context_mode.value,
             step_projection=step_projection,
+            policy_version=decision.policy_version,
             include_categories=contract.include_categories,
             exclude_categories=contract.exclude_categories,
             missing_reason=missing_reason,
         )
         events.append(event)
         if missing_reason is None:
-            packets.append(
-                {
-                    "role": role.value,
-                    "step_assurance": step_payload,
-                    "context_mode": context_mode.value,
-                    "include_categories": list(contract.include_categories),
-                    "exclude_categories": list(contract.exclude_categories),
-                    "returned_evidence_refs": event["returned_evidence_refs"],
-                }
-            )
+            packets.append({
+                "role": role.value,
+                "step_assurance": step_payload,
+                "context_mode": context_mode.value,
+                "include_categories": list(contract.include_categories),
+                "exclude_categories": list(contract.exclude_categories),
+                "returned_evidence_refs": event["returned_evidence_refs"],
+            })
     return {
         "schema_version": "context-packet-projection-v1",
         "step_assurance": step_payload,
+        "continuation_state": step_projection.continuation_state,
         "packets": packets,
         "invocation_events": events,
     }
@@ -218,6 +242,7 @@ def _invocation_event(
     reasoning_effort: str,
     context_mode: str,
     step_projection: StepAssuranceProjection,
+    policy_version: str,
     include_categories: tuple[str, ...],
     exclude_categories: tuple[str, ...],
     missing_reason: str | None,
@@ -225,21 +250,19 @@ def _invocation_event(
     packet_hash = None
     if missing_reason is None:
         packet_hash = hashlib.sha256(
-            "|".join(
-                (
-                    role.value,
-                    reasoning_effort,
-                    context_mode,
-                    step_projection.decision.policy_version,
-                    _combined_hash(step_projection.source_refs),
-                )
-            ).encode("utf-8")
+            "|".join((
+                role.value,
+                reasoning_effort,
+                context_mode,
+                policy_version,
+                _combined_hash(step_projection.source_refs),
+            )).encode("utf-8")
         ).hexdigest()
     return {
         "role": role.value,
         "reasoning_effort": reasoning_effort,
         "context_mode": context_mode,
-        "policy_version": step_projection.decision.policy_version,
+        "policy_version": policy_version,
         "packet_hash": packet_hash,
         "source_hashes": [ref.to_payload() for ref in step_projection.source_refs],
         "fork_turn_count": 0,
@@ -252,8 +275,7 @@ def _invocation_event(
 
 def _select_step(plan_text: str, report_text: str) -> dict[str, Any]:
     matches = list(_STEP_HEADING_RE.finditer(plan_text))
-    completed = set(re.findall(r"Step:\s*(S\d+)|セッションログ（[^）]*(S\d+)", report_text))
-    completed_ids = {item for pair in completed for item in pair if item}
+    completed_ids = _completed_step_ids(report_text)
     all_heading_starts = [heading.start() for heading in _ANY_HEADING_RE.finditer(plan_text)]
     for match in matches:
         step_id = match.group(1)
@@ -276,6 +298,49 @@ def _select_step(plan_text: str, report_text: str) -> dict[str, Any]:
         "risk_tags": [],
         "selection_method": "issue_wide_default",
     }
+
+
+def _completed_step_ids(report_text: str) -> set[str]:
+    completed_ids: set[str] = set()
+    session_matches = list(re.finditer(r"^###\s+セッションログ（[^\n]*(S\d+)[^\n]*$", report_text, re.MULTILINE))
+    heading_starts = [heading.start() for heading in re.finditer(r"^###\s+", report_text, re.MULTILINE)]
+    for match in session_matches:
+        step_id = match.group(1)
+        block_end = next((start for start in heading_starts if start > match.start()), len(report_text))
+        block = report_text[match.start() : block_end]
+        if _block_has_completed_step_row(block, step_id):
+            completed_ids.add(step_id)
+    return completed_ids
+
+
+def _block_has_completed_step_row(block: str, step_id: str) -> bool:
+    completed_values = {"pass", "passed", "committed", "approved-no-op"}
+    incomplete_values = {"fail", "failed", "blocked"}
+    normalized_step_id = step_id.lower()
+    in_completion_section = False
+    for line in block.splitlines():
+        stripped = line.strip()
+        lowered = stripped.lower()
+        if lowered.startswith("####"):
+            in_completion_section = (
+                "ステップ契約の完了証跡" in stripped
+                or "step contract closure" in lowered
+                or "ステップ commit" in lowered
+                or "step commit gate" in lowered
+            )
+            continue
+        if not in_completion_section:
+            continue
+        if not stripped.startswith("|") or not stripped.endswith("|"):
+            continue
+        cells = [cell.strip().lower() for cell in stripped.strip("|").split("|")]
+        if not cells or cells[0] != normalized_step_id:
+            continue
+        if any(cell in incomplete_values for cell in cells):
+            return False
+        if any(cell in completed_values for cell in cells):
+            return True
+    return False
 
 
 def _classify_task_kind(text: str) -> tuple[TaskKind, tuple[str, ...]]:

@@ -15,6 +15,7 @@ from spec_dock_runtime.application.contracts import (
     WorkflowResult,
     WorkflowStatusRequest,
 )
+from spec_dock_runtime.domain.context_routing import ContinuationFacts
 from spec_dock_runtime.domain.runbook import compile_runbook
 from spec_dock_runtime.domain.workflow_state import (
     STRICT_LEGACY_AUTHORITY,
@@ -22,8 +23,6 @@ from spec_dock_runtime.domain.workflow_state import (
     WorkflowState,
     classify_requirement_text,
 )
-from spec_dock_runtime.infra.context_packet_store import ContextPacketStore
-from spec_dock_runtime.infra.context_policy_store import ContextPolicyStore
 
 if TYPE_CHECKING:
     from spec_dock_runtime.domain.runbook import Runbook
@@ -43,6 +42,20 @@ class RunbookStoreLike(Protocol):
     def write_current(self, runbook: Runbook) -> RunbookProjectionResult: ...
 
 
+class ContextPolicyStoreLike(Protocol):
+    def load(self) -> Any: ...
+
+
+class ContextPacketStoreLike(Protocol):
+    def write_current(self, payload: dict[str, Any]) -> Any: ...
+
+
+class ContinuationProbeLike(Protocol):
+    def current_head(self, repo_root: Path) -> str | None: ...
+
+    def status_short(self, repo_root: Path) -> str | None: ...
+
+
 def workflow_status(_request: WorkflowStatusRequest, *, store: WorkflowAssuranceStoreLike) -> WorkflowResult:
     state = _resolve_state(store)
     return WorkflowResult(operation="status", state=state, runbook=None)
@@ -53,12 +66,21 @@ def workflow_next(
     *,
     store: WorkflowAssuranceStoreLike,
     runbook_store: RunbookStoreLike,
+    context_policy_store: ContextPolicyStoreLike | None = None,
+    context_packet_store: ContextPacketStoreLike | None = None,
+    continuation_probe: ContinuationProbeLike | None = None,
 ) -> WorkflowResult:
     state = _resolve_state(store)
     step_assurance: dict[str, Any] | None = None
     context_packets: dict[str, Any] | None = None
     if request.workflow_target == "issue-execution" and state.kind == "ready":
-        step_assurance, context_packets = _compile_execution_context(store, state)
+        step_assurance, context_packets = _compile_execution_context(
+            store,
+            state,
+            context_policy_store=context_policy_store,
+            context_packet_store=context_packet_store,
+            continuation_probe=continuation_probe,
+        )
     runbook = compile_runbook(
         request.workflow_target,
         state,
@@ -174,9 +196,19 @@ def _resolve_state(store: WorkflowAssuranceStoreLike) -> WorkflowState:
 def _compile_execution_context(
     store: WorkflowAssuranceStoreLike,
     state: WorkflowState,
+    *,
+    context_policy_store: ContextPolicyStoreLike | None,
+    context_packet_store: ContextPacketStoreLike | None,
+    continuation_probe: ContinuationProbeLike | None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     repo_root = getattr(store, "repo_root", None)
-    if repo_root is None or state.active_issue_id is None:
+    if (
+        repo_root is None
+        or state.active_issue_id is None
+        or context_policy_store is None
+        or context_packet_store is None
+        or continuation_probe is None
+    ):
         return None, None
     try:
         target = store.resolve_issue_target(None)
@@ -185,7 +217,13 @@ def _compile_execution_context(
     repo_root_path = Path(repo_root)
     issue_dir = Path(target.issue_dir)
     source_refs = _source_refs(repo_root_path, issue_dir)
-    policy_result = ContextPolicyStore(repo_root_path).load()
+    policy_result = context_policy_store.load()
+    continuation_facts, continuation_state = _continuation_facts(
+        repo_root_path,
+        state.active_issue_id,
+        source_refs,
+        continuation_probe=continuation_probe,
+    )
     step_projection = compile_step_assurance_projection(
         issue_id=state.active_issue_id,
         authorized_profile=state.authority.authorized_profile,
@@ -194,12 +232,77 @@ def _compile_execution_context(
         report_text=_read_optional_text(issue_dir / "report.md"),
         source_refs=source_refs,
         policy_result=policy_result,
+        continuation_facts=continuation_facts,
+        continuation_state=continuation_state,
     )
     packet_projection = compile_context_packet_projection(
         step_projection=step_projection,
-        packet_store=ContextPacketStore(repo_root_path),
+        packet_store=context_packet_store,
     )
     return step_projection.to_payload(), packet_projection.to_payload()
+
+
+def _continuation_facts(
+    repo_root: Path,
+    issue_id: str,
+    source_refs: tuple[SourceRef, ...],
+    *,
+    continuation_probe: ContinuationProbeLike,
+) -> tuple[ContinuationFacts, dict[str, str]]:
+    current_source_binding_hash = _combined_source_hash(source_refs)
+    current_source_revision = continuation_probe.current_head(repo_root)
+    current_head_revalidated = current_source_revision is not None
+    current_source_revision = current_source_revision or ""
+    worktree_clean = continuation_probe.status_short(repo_root) == ""
+    files_revalidated = all(ref.sha256 is not None for ref in source_refs)
+    goal_hash = hashlib.sha256(issue_id.encode("utf-8")).hexdigest()
+    allowed_paths_hash = hashlib.sha256("|".join(ref.path for ref in source_refs).encode("utf-8")).hexdigest()
+    risk_fingerprint = hashlib.sha256(b"workflow-next:issue-execution").hexdigest()
+    previous = _previous_continuation_state(repo_root)
+    continuation_state = {
+        "source_binding_hash": current_source_binding_hash,
+        "source_revision": current_source_revision,
+        "goal_hash": goal_hash,
+        "scope_hash": goal_hash,
+        "allowed_paths_hash": allowed_paths_hash,
+        "risk_fingerprint": risk_fingerprint,
+    }
+    return ContinuationFacts(
+        previous_source_binding_hash=previous.get("source_binding_hash", current_source_binding_hash),
+        current_source_binding_hash=current_source_binding_hash,
+        previous_source_revision=previous.get("source_revision", current_source_revision),
+        current_source_revision=current_source_revision,
+        previous_goal_hash=previous.get("goal_hash", goal_hash),
+        current_goal_hash=goal_hash,
+        previous_scope_hash=previous.get("scope_hash", goal_hash),
+        current_scope_hash=goal_hash,
+        previous_allowed_paths_hash=previous.get("allowed_paths_hash", allowed_paths_hash),
+        current_allowed_paths_hash=allowed_paths_hash,
+        previous_risk_fingerprint=previous.get("risk_fingerprint", risk_fingerprint),
+        current_risk_fingerprint=risk_fingerprint,
+        current_head_revalidated=current_head_revalidated,
+        worktree_clean=worktree_clean,
+        files_revalidated=files_revalidated,
+    ), continuation_state
+
+
+def _previous_continuation_state(repo_root: Path) -> dict[str, str]:
+    path = repo_root / "spec-dock/.agent/context-packets/current-context-packets.json"
+    try:
+        import json
+
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    state = payload.get("continuation_state")
+    if not isinstance(state, dict):
+        return {}
+    return {key: value for key, value in state.items() if isinstance(key, str) and isinstance(value, str)}
+
+
+def _combined_source_hash(refs: tuple[SourceRef, ...]) -> str:
+    material = "|".join(f"{ref.path}:{ref.sha256 or ref.missing_reason or ''}" for ref in refs)
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
 
 def _source_refs(repo_root: Path, issue_dir: Path) -> tuple[SourceRef, ...]:
