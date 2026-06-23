@@ -258,7 +258,7 @@ def test_domain_assurance_has_no_runtime_adapter_imports() -> None:
         / "assurance.py"
     )
     tree = ast.parse(module_path.read_text(encoding="utf-8"))
-    imported_modules = set()
+    imported_modules: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             imported_modules.update(alias.name for alias in node.names)

@@ -164,7 +164,9 @@ class AssuranceStore:
         issue_dir = self._contained_existing_path(Path(issue.path), missing_reason="active_issue_path_missing")
         issue_meta = self._issue_meta_for_dir(issue_dir)
         if issue_meta is None:
-            raise AssuranceStoreError("active_issue_not_issue_dir", f"Active issue path is not an issue dir: {issue.path}")
+            raise AssuranceStoreError(
+                "active_issue_not_issue_dir", f"Active issue path is not an issue dir: {issue.path}"
+            )
         issue_id = _meta_string(issue_meta, "id") or issue.id
         return self._target_from_issue_dir(issue_dir, issue_id=issue_id)
 
@@ -181,7 +183,9 @@ class AssuranceStore:
             if not matches:
                 raise AssuranceStoreError("target_not_found", f"No issue found for GitHub issue number: {raw_target}")
             if len(matches) > 1:
-                raise AssuranceStoreError("target_ambiguous", f"Multiple issues found for GitHub issue number: {raw_target}")
+                raise AssuranceStoreError(
+                    "target_ambiguous", f"Multiple issues found for GitHub issue number: {raw_target}"
+                )
             return self._target_from_issue_dir(matches[0].issue_dir, issue_id=matches[0].issue_id)
         matches = [record for record in records if record.issue_id == target]
         if not matches:
@@ -332,18 +336,22 @@ def _contract_from_payload(payload: Any) -> tuple[AssuranceContract | None, tupl
     classification = _classification_from_payload(payload.get("classification"))
     risk_facts = _risk_facts_from_payload(payload.get("risk_facts"))
     obligations_errors = _obligations_errors(payload.get("obligations"), classification)
-    errors = _primitive_field_errors(payload) + tuple(
-        detail
-        for detail in (
-            _enum_error("stage", payload.get("stage"), ClassificationStage),
-            _enum_error("status", payload.get("status"), AssuranceStatus),
-            _enum_error("mode", payload.get("mode"), AssuranceMode),
-            None if source_binding is not None else "invalid_source_binding",
-            None if classification is not None else "invalid_classification",
-            None if risk_facts is not None else "invalid_risk_facts",
+    errors = (
+        _primitive_field_errors(payload)
+        + tuple(
+            detail
+            for detail in (
+                _enum_error("stage", payload.get("stage"), ClassificationStage),
+                _enum_error("status", payload.get("status"), AssuranceStatus),
+                _enum_error("mode", payload.get("mode"), AssuranceMode),
+                None if source_binding is not None else "invalid_source_binding",
+                None if classification is not None else "invalid_classification",
+                None if risk_facts is not None else "invalid_risk_facts",
+            )
+            if detail is not None
         )
-        if detail is not None
-    ) + obligations_errors
+        + obligations_errors
+    )
     if errors:
         return None, errors
     try:
@@ -438,6 +446,8 @@ def _risk_facts_from_payload(payload: Any) -> tuple[RiskFact, ...] | None:
         if not all(isinstance(item, str) for item in (key, value, source, reason_code)):
             return None
         if value not in ("true", "false", "unknown"):
+            return None
+        if source != "requirement" or not reason_code:
             return None
         parsed.append(RiskFact(key=key, value=value, source=source, reason_code=reason_code))
     return tuple(parsed)

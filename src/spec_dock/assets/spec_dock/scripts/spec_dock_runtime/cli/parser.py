@@ -52,7 +52,9 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
 
     p_assurance = sub.add_parser("assurance", help="Show, classify, and verify issue assurance contracts")
     assurance_sub = p_assurance.add_subparsers(dest="assurance_cmd", required=True)
-    _bind_leaf(assurance_sub.add_parser("show", help="Show the target issue assurance contract"), registry, "assurance_show")
+    _bind_leaf(
+        assurance_sub.add_parser("show", help="Show the target issue assurance contract"), registry, "assurance_show"
+    )
     _bind_leaf(
         assurance_sub.add_parser("classify", help="Classify the target issue and write assurance.json"),
         registry,

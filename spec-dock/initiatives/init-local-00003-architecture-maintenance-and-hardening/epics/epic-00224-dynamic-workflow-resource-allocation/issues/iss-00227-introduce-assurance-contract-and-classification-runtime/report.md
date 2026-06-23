@@ -190,6 +190,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S03 | application result mapping and presentation rendering | implementation | added use cases, result contracts, text/json renderers, and focused tests | `cl-ac001-classify-contract-write`, `cl-ac004-strict-legacy-missing`, `cl-ac005-invalid-contract`, `cl-ac006-layer-boundary`, `cl-dc010-default-facts` | no | `tests/unit/application/test_assurance.py tests/unit/presentation/test_assurance_text.py` -> 5 passed |
 | S04 | CLI command registration, argument parsing, output format, exit-code mapping, and explicit target precedence | implementation | added assurance CLI command specs, parser/registry/bootstrap wiring, and CLI runtime tests | `cl-ac001-classify-contract-write`, `cl-ac004-strict-legacy-missing`, `cl-ac005-invalid-contract`, `cl-dc008-target-resolution`, `cl-ac006-layer-boundary` | no | `tests/cli_runtime/test_assurance.py` -> 4 passed |
 | S04 | application layer must not import infra even through `TYPE_CHECKING` because runtime shell boundary tests inspect AST imports | broad runtime test | removed the type-only infra import from `application/assurance.py` and kept the store protocol structural | `cl-ac006-layer-boundary` | no | Red: `uv run pytest tests/cli_runtime` -> 1 failed / 640 passed / 76 skipped; Green: 641 passed / 76 skipped |
+| S99 | public CLI `--dry-run` must prove no-write behavior through parser/command/bootstrap wiring | qa-reviewer | added CLI runtime test for `assurance classify --dry-run --format json` and asserted no `assurance.json` is written | `cl-ac001-classify-contract-write` | no | `uv run pytest tests/cli_runtime/test_assurance.py` -> 5 passed |
+| S99 | persisted `risk_facts[].source` and `risk_facts[].reason_code` must be schema-validated fail-closed | issue-wide code-reviewer / qa-reviewer | added separate invalid persisted contract cases for non-`requirement` source and empty reason code, and rejected both in infra schema parser | `cl-ac005-invalid-contract` | no | Red: focused infra test failed with `classification_mismatch`; Green: `uv run pytest tests/unit/infra/test_assurance_store.py` -> 5 passed |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
@@ -197,8 +199,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S01 | `cl-ac002-deterministic-json`, `cl-ac003-lite-safety`, `cl-ec002-hard-trigger-monotonic`, `cl-ac006-layer-boundary`, `cl-dc010-default-facts` | S01 domain policy/serializer tests pass, import boundary inspection/test passes, code-reviewer pass required before commit | `uv run pytest tests/unit/domain/test_assurance.py` -> 9 passed; fresh code-reviewer pass | pass | Red evidence observed by worker: initial focused tests failed before `domain.assurance` existed; follow-up red tests reproduced duplicate/invalid raw fact, explicit empty facts, empty source binding, and non-durable source path gaps |
 | S02 | `cl-ac001-classify-contract-write`, `cl-ac004-strict-legacy-missing`, `cl-ac005-invalid-contract`, `cl-dc008-target-resolution`, `cl-ac006-layer-boundary` | S02 infra source binding, store read/write/verify, missing/invalid distinction, and target safety tests pass; code-reviewer pass required before commit | `uv run pytest tests/unit/infra/test_assurance_store.py` -> 5 passed; `uv run pytest tests/unit/domain/test_assurance.py tests/unit/infra/test_assurance_store.py` -> 14 passed; fresh code-reviewer pass | pass | Red evidence observed by worker: initial focused tests failed before `infra.assurance_store` existed; follow-up red tests reproduced semantic invalid schema crash and target-local schema gaps before validation fixes |
 | S03 | `cl-ac001-classify-contract-write`, `cl-ac004-strict-legacy-missing`, `cl-ac005-invalid-contract`, `cl-ac006-layer-boundary`, `cl-dc010-default-facts` | S03 application/presentation tests pass, related S01/S02 tests remain green, code-reviewer pass required before commit | `uv run pytest tests/unit/application/test_assurance.py tests/unit/presentation/test_assurance_text.py` -> 5 passed; `uv run pytest tests/unit/domain/test_assurance.py tests/unit/infra/test_assurance_store.py tests/unit/application/test_assurance.py tests/unit/presentation/test_assurance_text.py` -> 19 passed; fresh code-reviewer pass | pass | Red evidence observed by worker: S03 tests failed before application/presentation modules existed |
-| S04 | `cl-ac001-classify-contract-write`, `cl-ac004-strict-legacy-missing`, `cl-ac005-invalid-contract`, `cl-dc008-target-resolution`, `cl-ac006-layer-boundary` | S04 CLI assurance command tests pass, related S01-S04 tests remain green, broad CLI runtime boundary suite passes, code-reviewer pass required before commit | `uv run pytest tests/cli_runtime/test_assurance.py` -> 4 passed; related S01-S04 suite -> 23 passed; `uv run pytest tests/cli_runtime` -> 641 passed, 76 skipped; fresh code-reviewer pass | pass | Red evidence observed by worker: CLI tests failed before `assurance` argparse registration existed |
+| S04 | `cl-ac001-classify-contract-write`, `cl-ac004-strict-legacy-missing`, `cl-ac005-invalid-contract`, `cl-dc008-target-resolution`, `cl-ac006-layer-boundary` | S04 CLI assurance command tests pass, related S01-S04 tests remain green, broad CLI runtime boundary suite passes, code-reviewer pass required before commit | `uv run pytest tests/cli_runtime/test_assurance.py` -> 5 passed after S99 dry-run hardening; related S01-S04 suite -> 23 passed before S99 hardening; `uv run pytest tests/cli_runtime` -> 642 passed, 76 skipped; fresh code-reviewer pass | pass | Red evidence observed by worker: CLI tests failed before `assurance` argparse registration existed |
 | S90 | `cl-s90-provider-mirror-docs` | dogfooding mirror impact is resolved, docs/templates impact is updated or no-op justified, spec-reviewer pass required before commit | `uvx --from . spec-dock update .` -> ok; provider/mirror diff excluding `__pycache__` -> no output; `./spec-dock/scripts/spec-dock validate` -> ok nodes=148; mirror `assurance show` -> exit 0; fresh spec-reviewer pass | pass | Docs/templates inspected and no public command-reference update was required for iss-00227 |
+| S99 | `cl-s99-final-quality` | final QA/code/spec review gates, broad tests, lint, mirror diff-clean, and Epic-level PR deferral must be recorded | `uv run pytest tests/unit` -> 786 passed; `uv run pytest tests/cli_runtime` -> 642 passed, 76 skipped; `make lint` -> pass; provider/mirror diff -> no output; fresh QA pass; fresh issue-wide code-reviewer pass; fresh final spec-reviewer pass | pass | No per-issue PR created; delivery deferred to Epic-level PR |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -216,12 +219,13 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | `cl-ac001-classify-contract-write` | S03 | yes | red-required | worker observed S03 tests failing before application/presentation modules existed | `uv run pytest tests/unit/application/test_assurance.py tests/unit/presentation/test_assurance_text.py` | pass | classify write and dry-run return the same canonical default contract while dry-run does not write |
 | `cl-ac004-strict-legacy-missing` | S03 | yes | red-required | worker observed S03 tests failing before application/presentation modules existed | `uv run pytest tests/unit/application/test_assurance.py tests/unit/presentation/test_assurance_text.py` | pass | show/verify missing map to success strict-legacy result and renderer output |
 | `cl-ac005-invalid-contract` | S03 | yes | red-required | worker observed S03 tests failing before application/presentation modules existed | `uv run pytest tests/unit/application/test_assurance.py tests/unit/presentation/test_assurance_text.py` | pass | show/verify invalid outcomes remain failure with machine-readable reason/details |
-| `cl-ac001-classify-contract-write` | S04 | yes | red-required | worker observed CLI tests failing before `assurance` parser registration | `uv run pytest tests/cli_runtime/test_assurance.py` | pass | `assurance classify --stage requirement --format json` writes issue-local `assurance.json` and returns the persisted contract |
+| `cl-ac001-classify-contract-write` | S04/S99 | yes | red-required | worker observed CLI tests failing before `assurance` parser registration; QA follow-up identified missing CLI dry-run integration coverage | `uv run pytest tests/cli_runtime/test_assurance.py` | pass | `assurance classify --stage requirement --format json` writes issue-local `assurance.json`; `--dry-run` returns a contract without writing |
 | `cl-ac004-strict-legacy-missing` | S04 | yes | red-required | worker observed CLI tests failing before `assurance` parser registration | `uv run pytest tests/cli_runtime/test_assurance.py` | pass | `assurance show` and `assurance verify` report `missing` / `strict-legacy` with exit 0 |
-| `cl-ac005-invalid-contract` | S04 | yes | red-required | worker observed CLI tests failing before `assurance` parser registration | `uv run pytest tests/cli_runtime/test_assurance.py` | pass | invalid persisted JSON maps to `invalid`, exit 1, and machine-readable `reason` / `details` |
+| `cl-ac005-invalid-contract` | S04/S99 | yes | red-required | worker observed CLI tests failing before `assurance` parser registration; code-review follow-up reproduced malformed persisted risk fact validation gap | `uv run pytest tests/cli_runtime/test_assurance.py`; `uv run pytest tests/unit/infra/test_assurance_store.py` | pass | invalid persisted JSON maps to `invalid`; malformed risk fact source/reason code returns invalid schema |
 | `cl-dc008-target-resolution` | S04 | yes | red-required | worker observed CLI tests failing before `assurance` parser registration | `uv run pytest tests/cli_runtime/test_assurance.py` | pass | explicit `--issue` id, GitHub number, and path take precedence over active issue |
 | `cl-ac006-layer-boundary` | S04 | yes | inspect/test | broad CLI runtime initially failed on S03 type-only infra import | `uv run pytest tests/cli_runtime`; S04 ruff command | pass | parser/registry/bootstrap remain additive command wiring; application store protocol avoids infra imports inspected by runtime shell boundary test |
 | `cl-s90-provider-mirror-docs` | S90 | yes | inspect-only | mirror lacked assurance runtime before local provider update | `uvx --from . spec-dock update .`; provider/mirror `diff -qr --exclude=__pycache__`; `./spec-dock/scripts/spec-dock validate`; mirror `assurance show` | pass | dogfooding mirror now matches provider runtime; docs/templates inspected with no-op rationale |
+| `cl-s99-final-quality` | S99 | yes | manual-required plus review | final gate initially found QA dry-run coverage gap, code schema validation gap, and report placeholder/S90 commit evidence gaps | `uv run pytest tests/unit`; `uv run pytest tests/cli_runtime`; `make lint`; final reviewer re-runs | pass | fixes applied; broad validation passed; fresh QA, issue-wide code-reviewer, and final spec-reviewer passed |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -243,12 +247,13 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | `cl-ac005-invalid-contract` | S03 | `uv run pytest tests/unit/application/test_assurance.py tests/unit/presentation/test_assurance_text.py` | pass | invalid result and rendering covered |
 | `cl-ac006-layer-boundary` | S03 | `uv run ruff check ...assurance.py ...assurance_text.py ...test_assurance*.py` | pass | application/presentation remain separate from CLI wiring and presentation does not call domain classifier |
 | `cl-dc010-default-facts` | S03 | `uv run pytest tests/unit/application/test_assurance.py tests/unit/presentation/test_assurance_text.py` | pass | classify result carries S01 default contract through application result |
-| `cl-ac001-classify-contract-write` | S04 | `uv run pytest tests/cli_runtime/test_assurance.py` | pass | CLI classify writes the issue-local contract and returns matching JSON |
+| `cl-ac001-classify-contract-write` | S04/S99 | `uv run pytest tests/cli_runtime/test_assurance.py` | pass | CLI classify writes the issue-local contract, returns matching JSON, and `--dry-run` does not write |
 | `cl-ac004-strict-legacy-missing` | S04 | `uv run pytest tests/cli_runtime/test_assurance.py` | pass | CLI show/verify strict-legacy missing compatibility covered |
-| `cl-ac005-invalid-contract` | S04 | `uv run pytest tests/cli_runtime/test_assurance.py` | pass | CLI verify invalid persisted contract exits 1 with stable reason/details |
+| `cl-ac005-invalid-contract` | S04/S99 | `uv run pytest tests/cli_runtime/test_assurance.py`; `uv run pytest tests/unit/infra/test_assurance_store.py` | pass | CLI verify invalid persisted contract exits 1; infra rejects malformed persisted risk facts |
 | `cl-dc008-target-resolution` | S04 | `uv run pytest tests/cli_runtime/test_assurance.py` | pass | explicit CLI issue id/GitHub number/path target precedence covered |
 | `cl-ac006-layer-boundary` | S04 | `uv run pytest tests/cli_runtime`; S04 ruff command | pass | broad CLI runtime AST boundary suite passed after removing application type-only infra import |
 | `cl-s90-provider-mirror-docs` | S90 | `uvx --from . spec-dock update .`; `diff -qr --exclude=__pycache__ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime spec-dock/scripts/spec_dock_runtime`; `./spec-dock/scripts/spec-dock validate`; `./spec-dock/scripts/spec-dock assurance show --format json` | pass | dogfooding mirror synced from local provider and docs/templates no-op was reviewed |
+| `cl-s99-final-quality` | S99 | `uv run pytest tests/unit`; `uv run pytest tests/cli_runtime`; `make lint`; final reviewer re-runs | pass | tests/lint/mirror checks passed; fresh QA, issue-wide code-reviewer, and final spec-reviewer passed |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -259,6 +264,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | added | `cl-ac002-deterministic-json`, `cl-ac006-layer-boundary` | `test_contract_validation_rejects_missing_source_binding_artifacts` | existing S01 closure IDs | code-reviewer found empty source binding artifacts were accepted despite the persisted schema requiring source traceability | no | no |
 | added | `cl-ac002-deterministic-json`, `cl-ac006-layer-boundary` | `test_contract_validation_rejects_non_durable_source_binding_paths` | existing S01 closure IDs | code-reviewer found absolute and active symlink artifact paths could pass despite the resolved repo-relative source binding requirement | no | no |
 | changed | `cl-ac006-layer-boundary` | `application_assurance_removes_type_checking_infra_import` | existing S04 closure ID | broad runtime shell boundary test treats `TYPE_CHECKING` imports as layer-boundary evidence, so the application store protocol remains structural without importing infra types | no | no |
+| added | `cl-ac001-classify-contract-write` | `test_assurance_classify_dry_run_does_not_write_contract` | existing S04/S99 closure ID | qa-reviewer found public CLI `--dry-run` was covered at application level but not through CLI parser/command/bootstrap wiring | no | no |
+| added | `cl-ac005-invalid-contract` | `test_invalid_json_and_invalid_schema_have_distinct_machine_reasons` malformed risk fact source/reason case | existing S02/S99 closure ID | issue-wide code-reviewer found persisted risk facts with unsupported `source` or empty `reason_code` could be accepted when classification was adjusted | no | yes |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
@@ -309,7 +316,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | S02 | committed | `infra/assurance_store.py`, `tests/unit/infra/test_assurance_store.py`, S02 report evidence | `7c369295` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 | S03 | committed | `application/assurance.py`, `application/contracts.py`, `presentation/assurance_text.py`, S03 tests, S03 report evidence | `3b2ea12d` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 | S04 | committed | `commands/assurance.py`, CLI parser/registry/bootstrap wiring, `application/assurance.py` boundary cleanup, CLI runtime tests, S04 report evidence | S04 commit in git history: `feat(assurance): Assurance ContractのCLIを追加` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
-| S90 | ready-to-commit | dogfooding mirror runtime sync and S90 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S90 | committed | dogfooding mirror runtime sync and S90 report evidence | `fc125106` | `git status --short` -> clean after S90 commit | N/A | N/A | N/A | N/A |
+| S99 | pending-final-review | final lint/test hardening, snapshot update, schema validation fix, CLI dry-run test, final report evidence | pending | pending | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/assurance.py` - Assurance Contract v1 domain model, deterministic policy, serializer, validation helpers
@@ -326,6 +334,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/registry.py` - S04 command registry wiring
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - S04 assurance use case and store bootstrap wiring
 - `tests/cli_runtime/test_assurance.py` - S04 CLI runtime tests for write, strict-legacy missing, invalid contract, and explicit target precedence
+- `tests/cli_runtime/test_assurance.py` - S99 QA follow-up test for classify `--dry-run` no-write behavior
+- `tests/unit/infra/test_assurance_store.py` - S99 code-review follow-up test for malformed persisted risk fact source/reason-code schema validation
+- `tests/unit/infra/test_init_update.py` - checked-in dogfooding snapshot update for epic-00224 issue metadata and dependency map
 - `spec-dock/scripts/spec_dock_runtime/domain/assurance.py` - S90 dogfooding mirror sync of S01 provider runtime
 - `spec-dock/scripts/spec_dock_runtime/infra/assurance_store.py` - S90 dogfooding mirror sync of S02 provider runtime
 - `spec-dock/scripts/spec_dock_runtime/application/assurance.py` - S90 dogfooding mirror sync of S03 provider runtime
@@ -341,6 +352,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - `7c369295` `feat(assurance): Assurance Contractの保存基盤を追加`
 - `3b2ea12d` `feat(assurance): Assurance Contractのアプリケーション層を追加`
 - S04 commit in git history: `feat(assurance): Assurance ContractのCLIを追加`
+- `fc125106` `chore(dogfooding): Assurance runtimeをmirrorへ同期`
 
 #### メモ
 - ...
@@ -369,22 +381,22 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | added CLI dry-run integration test after reviewer P2 | initial pass with P2: CLI `--dry-run` no-write behavior lacked parser/command/bootstrap coverage; fixed by `test_assurance_classify_dry_run_does_not_write_contract`; split malformed risk fact source/reason-code cases after QA P2; focused CLI/infra tests passed | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | P1 malformed persisted risk fact validation fixed; P2 final report placeholders replaced | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | P1 final S99 placeholders and S90 commit-gate contradiction fixed; final QA/code pass results recorded before final spec re-review | 2 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| final S99 ledger complete | final report evidence, lint/snapshot/schema-validation/dry-run coverage hardening | Epic-level PR after all Epic issues complete; no per-issue PR | ready |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...

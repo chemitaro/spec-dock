@@ -19,19 +19,15 @@ def render_assurance_text(result: AssuranceResult) -> CliText:
     ]
     classification = _classification_payload(result)
     if classification is not None:
-        lines.extend(
-            [
-                f"authorized_profile: {classification['authorized_profile']}",
-                f"complexity_tier: {classification['complexity_tier']}",
-            ]
-        )
+        lines.extend([
+            f"authorized_profile: {classification['authorized_profile']}",
+            f"complexity_tier: {classification['complexity_tier']}",
+        ])
         if result.has_contract:
-            lines.extend(
-                [
-                    f"lite_candidate: {_bool_text(bool(classification['lite_candidate']))}",
-                    f"lite_authorized: {_bool_text(bool(classification['lite_authorized']))}",
-                ]
-            )
+            lines.extend([
+                f"lite_candidate: {_bool_text(bool(classification['lite_candidate']))}",
+                f"lite_authorized: {_bool_text(bool(classification['lite_authorized']))}",
+            ])
     lines.append(f"reason: {result.reason}")
     if result.details:
         lines.append("details:")

@@ -1194,6 +1194,14 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00219-carryover-unresolved-threads-stop-observation/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00222-forbid-checks-api-pr-observation/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00226-record-adaptive-workflow-authority-adrs/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00227-introduce-assurance-contract-and-classification-runtime/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00228-compile-state-aware-workflow-runbooks-and-fixed-skill-kernels/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00229-compose-profile-aware-planning-artifacts/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00230-compile-step-assurance-agent-routing-and-context-policy/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00231-inject-trusted-base-branch-codex-review-policy/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00232-enforce-blocker-centric-pr-repair-and-rereview/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00233-roll-out-adaptive-workflow-with-legacy-compatibility-and-telemetry/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH: ClassVar[dict[str, object]] = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1412,6 +1420,32 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00219-carryover-unresolved-threads-stop-observation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00222-forbid-checks-api-pr-observation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00226-record-adaptive-workflow-authority-adrs/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00227-introduce-assurance-contract-and-classification-runtime/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00228-compile-state-aware-workflow-runbooks-and-fixed-skill-kernels/.meta.json": [
+            "iss-00227",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00229-compose-profile-aware-planning-artifacts/.meta.json": [
+            "iss-00227",
+            "iss-00228",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00230-compile-step-assurance-agent-routing-and-context-policy/.meta.json": [
+            "iss-00229",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00231-inject-trusted-base-branch-codex-review-policy/.meta.json": [
+            "iss-00227",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00232-enforce-blocker-centric-pr-repair-and-rereview/.meta.json": [
+            "iss-00230",
+            "iss-00231",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00233-roll-out-adaptive-workflow-with-legacy-compatibility-and-telemetry/.meta.json": [
+            "iss-00228",
+            "iss-00229",
+            "iss-00230",
+            "iss-00231",
+            "iss-00232",
+        ],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
         "iss-00035": ["iss-00036"],
@@ -1438,6 +1472,12 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00164": ["iss-00159", "iss-00163"],
         "iss-00165": ["iss-00159", "iss-00163", "iss-00164"],
         "iss-00166": ["iss-00162", "iss-00163", "iss-00165"],
+        "iss-00228": ["iss-00227"],
+        "iss-00229": ["iss-00227", "iss-00228"],
+        "iss-00230": ["iss-00229"],
+        "iss-00231": ["iss-00227"],
+        "iss-00232": ["iss-00230", "iss-00231"],
+        "iss-00233": ["iss-00228", "iss-00229", "iss-00230", "iss-00231", "iss-00232"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'

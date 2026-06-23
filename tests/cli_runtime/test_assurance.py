@@ -35,6 +35,26 @@ class TestCliAssurance(CliRuntimeHarness):
             assert persisted["stage"] == "requirement"
             assert persisted["mode"] == "adaptive"
 
+    def test_assurance_classify_dry_run_does_not_write_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_assurance_fixture(target, issue_number=301, title="Preview assurance")
+
+            result = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--dry-run", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["operation"] == "classify"
+            assert payload["ok"] is True
+            assert payload["dry_run"] is True
+            assert payload["has_contract"] is True
+            assert payload["classification"]["authorized_profile"] == "standard"
+            assert not (issue_dir / "assurance.json").exists()
+
     def test_assurance_show_and_verify_strict_legacy_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
