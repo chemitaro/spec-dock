@@ -132,7 +132,8 @@ def infer_active_node_from_branch(
         current_repo_matches = [
             node
             for node in matches
-            if _effective_repo_slug(node, current_repo_slug=normalized_current_repo_slug) == normalized_current_repo_slug
+            if _effective_repo_slug(node, current_repo_slug=normalized_current_repo_slug)
+            == normalized_current_repo_slug
         ]
         if len(current_repo_matches) == 1:
             node = current_repo_matches[0]

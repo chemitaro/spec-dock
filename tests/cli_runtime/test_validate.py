@@ -107,7 +107,9 @@ class TestCliValidate(CliRuntimeHarness):
 
             self._run_runtime_expect_fail(target, ["validate"])
 
-    @pytest.mark.skip(reason="S04: covered by TestRuntimeDomainS03.test_validate_graph_rejects_local_only_initiative_under_github_mandatory_contract")
+    @pytest.mark.skip(
+        reason="S04: covered by TestRuntimeDomainS03.test_validate_graph_rejects_local_only_initiative_under_github_mandatory_contract"
+    )
     def test_validate_rejects_local_only_initiative_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -124,7 +126,9 @@ class TestCliValidate(CliRuntimeHarness):
             assert p.returncode != 0, p.stdout + p.stderr
             assert "initiative missing github.issue_number" in p.stderr
 
-    @pytest.mark.skip(reason="S04: covered by TestValidateApplication.test_validate_graph_reports_linkage_and_parent_diagnostics_without_cli")
+    @pytest.mark.skip(
+        reason="S04: covered by TestValidateApplication.test_validate_graph_reports_linkage_and_parent_diagnostics_without_cli"
+    )
     def test_validate_rejects_legacy_unscoped_issue_linkage(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -151,7 +155,9 @@ class TestCliValidate(CliRuntimeHarness):
             assert p.returncode != 0, p.stdout + p.stderr
             assert "legacy unscoped github linkage" in p.stderr
 
-    @pytest.mark.skip(reason="S04: covered by TestRuntimeSyncS07.test_sync_fails_preflight_for_malformed_partial_repo_scope_linkage")
+    @pytest.mark.skip(
+        reason="S04: covered by TestRuntimeSyncS07.test_sync_fails_preflight_for_malformed_partial_repo_scope_linkage"
+    )
     def test_sync_fails_preflight_on_partially_scoped_issue_linkage(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -184,7 +190,9 @@ class TestCliValidate(CliRuntimeHarness):
                 assert "both fields are required" in p.stderr
                 assert "deps_preflight_failed" not in p.stderr
 
-    @pytest.mark.skip(reason="S04: covered by TestRuntimeDomainS03.test_validate_graph_rejects_partially_scoped_issue_linkage")
+    @pytest.mark.skip(
+        reason="S04: covered by TestRuntimeDomainS03.test_validate_graph_rejects_partially_scoped_issue_linkage"
+    )
     def test_validate_rejects_blank_string_repo_scope_in_meta_loader(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -245,13 +253,7 @@ class TestCliValidate(CliRuntimeHarness):
 
             self._create_same_repo_linked_hierarchy(target)
 
-            init_meta = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / ".meta.json"
-            )
+            init_meta = target / "spec-dock" / "initiatives" / "init-00001-auth-platform" / ".meta.json"
             issue_meta = (
                 target
                 / "spec-dock"
@@ -281,7 +283,10 @@ class TestCliValidate(CliRuntimeHarness):
             assert "initiative:init-00001" in p.stderr
             assert "issue:iss-00003" in p.stderr
             assert "spec-dock/initiatives/init-00001-auth-platform/.meta.json" in p.stderr
-            assert "spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/issues/iss-00003-add-refresh-token/.meta.json" in p.stderr
+            assert (
+                "spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/issues/iss-00003-add-refresh-token/.meta.json"
+                in p.stderr
+            )
             assert "Fix github linkage" in p.stderr
 
     def test_validate_rejects_same_issue_number_when_repo_linkage_is_mixed_and_current_unknown(self) -> None:
@@ -291,13 +296,7 @@ class TestCliValidate(CliRuntimeHarness):
 
             self._create_same_repo_linked_hierarchy(target)
 
-            init_meta = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / ".meta.json"
-            )
+            init_meta = target / "spec-dock" / "initiatives" / "init-00001-auth-platform" / ".meta.json"
             issue_meta = (
                 target
                 / "spec-dock"
@@ -334,13 +333,7 @@ class TestCliValidate(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
-            init_meta = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / ".meta.json"
-            )
+            init_meta = target / "spec-dock" / "initiatives" / "init-00001-auth-platform" / ".meta.json"
             issue_meta = (
                 target
                 / "spec-dock"
@@ -614,10 +607,7 @@ class TestCliValidate(CliRuntimeHarness):
             ),
             (
                 "missing delegated metadata",
-                "---\n"
-                "authority: approved\n"
-                "manifest_hash: manifest-hash\n"
-                "---\n# Design\n",
+                "---\nauthority: approved\nmanifest_hash: manifest-hash\n---\n# Design\n",
                 "incomplete_draft_metadata",
             ),
         )
@@ -667,18 +657,16 @@ class TestCliValidate(CliRuntimeHarness):
                     / "iss-00003-add-refresh-token"
                 )
                 (issue_dir / "report.md").write_text(
-                    "\n".join(
-                        [
-                            "# Report",
-                            "",
-                            "## Evidence Adoption Ledger",
-                            "",
-                            "| ID | adoption_status | target_artifact | next_action |",
-                            "|---|---|---|---|",
-                            f"| {entry_id} | {status} | design.md | resolve reviewer evidence |",
-                            "",
-                        ]
-                    ),
+                    "\n".join([
+                        "# Report",
+                        "",
+                        "## Evidence Adoption Ledger",
+                        "",
+                        "| ID | adoption_status | target_artifact | next_action |",
+                        "|---|---|---|---|",
+                        f"| {entry_id} | {status} | design.md | resolve reviewer evidence |",
+                        "",
+                    ]),
                     encoding="utf-8",
                 )
 
@@ -773,7 +761,9 @@ class TestCliValidate(CliRuntimeHarness):
             assert "20260329t123456z-01-adr-first.md" in p.stderr
             assert "20260329t123456z-01-note-second.md" in p.stderr
 
-    @pytest.mark.skip(reason="S04: covered by TestValidateApplication.test_validate_tree_reports_missing_required_artifact_docs_without_cli")
+    @pytest.mark.skip(
+        reason="S04: covered by TestValidateApplication.test_validate_tree_reports_missing_required_artifact_docs_without_cli"
+    )
     def test_validate_detects_missing_required_artifact_docs_for_each_node_kind(self) -> None:
         artifact_names = ("requirement.md", "design.md", "plan.md", "report.md")
         node_roots = {
@@ -813,7 +803,9 @@ class TestCliValidate(CliRuntimeHarness):
                 assert expected in p.stderr
                 assert artifact_rel_path.as_posix() in p.stderr
 
-    @pytest.mark.skip(reason="S04: covered by TestValidateApplication.test_validate_tree_reports_missing_required_meta_without_cli")
+    @pytest.mark.skip(
+        reason="S04: covered by TestValidateApplication.test_validate_tree_reports_missing_required_meta_without_cli"
+    )
     def test_validate_detects_missing_required_meta_for_each_node_kind(self) -> None:
         cases = [
             (
@@ -823,9 +815,7 @@ class TestCliValidate(CliRuntimeHarness):
             ),
             (
                 "epic",
-                Path(
-                    "spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/.meta.json"
-                ),
+                Path("spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/.meta.json"),
                 "kind=epic id=epic-00002",
             ),
             (
@@ -892,15 +882,13 @@ class TestCliValidate(CliRuntimeHarness):
             lock_path = target / "spec-dock" / "system" / ".runtime" / "create.lock"
             lock_path.parent.mkdir(parents=True, exist_ok=True)
             lock_path.write_text(
-                "\n".join(
-                    [
-                        "token=active",
-                        "pid=1234",
-                        "user=tester",
-                        f"created_unix={time.time():.6f}",
-                        "created_iso=2026-03-23",
-                    ]
-                )
+                "\n".join([
+                    "token=active",
+                    "pid=1234",
+                    "user=tester",
+                    f"created_unix={time.time():.6f}",
+                    "created_iso=2026-03-23",
+                ])
                 + "\n",
                 encoding="utf-8",
             )
@@ -944,15 +932,13 @@ class TestCliValidate(CliRuntimeHarness):
             lock_path = target / "spec-dock" / "system" / ".runtime" / "create.lock"
             lock_path.parent.mkdir(parents=True, exist_ok=True)
             lock_path.write_text(
-                "\n".join(
-                    [
-                        "token=stale",
-                        "pid=4321",
-                        "user=tester",
-                        "created_unix=0",
-                        "created_iso=1970-01-01",
-                    ]
-                )
+                "\n".join([
+                    "token=stale",
+                    "pid=4321",
+                    "user=tester",
+                    "created_unix=0",
+                    "created_iso=1970-01-01",
+                ])
                 + "\n",
                 encoding="utf-8",
             )
@@ -1194,13 +1180,7 @@ class TestCliValidate(CliRuntimeHarness):
 
             self._create_same_repo_linked_hierarchy(target)
 
-            init_meta_path = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / ".meta.json"
-            )
+            init_meta_path = target / "spec-dock" / "initiatives" / "init-00001-auth-platform" / ".meta.json"
             epic_meta_path = (
                 target
                 / "spec-dock"
@@ -1263,9 +1243,15 @@ class TestCliValidate(CliRuntimeHarness):
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
 
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"])
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Current issue", "--github-issue", "123"])
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign issue", "--github-issue", "124"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Current issue", "--github-issue", "123"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Foreign issue", "--github-issue", "124"]
+            )
 
             current_issue_meta_path = (
                 target
@@ -1358,8 +1344,12 @@ class TestCliValidate(CliRuntimeHarness):
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
 
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"])
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Current issue", "--github-issue", "123"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Current issue", "--github-issue", "123"]
+            )
 
             current_issue_meta_path = (
                 target
@@ -1398,8 +1388,12 @@ class TestCliValidate(CliRuntimeHarness):
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
 
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"])
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Current issue", "--github-issue", "123"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Current issue", "--github-issue", "123"]
+            )
 
             current_issue_meta_path = (
                 target
@@ -1418,9 +1412,7 @@ class TestCliValidate(CliRuntimeHarness):
             self._write_json_force(current_issue_meta_path, current_meta)
             current_issue_meta_path.chmod(current_issue_meta_path.stat().st_mode & ~0o222)
 
-            runtime_fs_repo = (
-                target / "spec-dock" / "scripts" / "spec_dock_runtime" / "infra" / "fs_repo.py"
-            )
+            runtime_fs_repo = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "infra" / "fs_repo.py"
             runtime_fs_repo.write_text(
                 runtime_fs_repo.read_text(encoding="utf-8")
                 + "\n\n"
@@ -1567,9 +1559,7 @@ class TestCliValidate(CliRuntimeHarness):
                 assert active_path_file.is_file(), active_path_file.as_posix()
                 return ("path", active_path_file.read_text(encoding="utf-8").strip())
 
-            before_active_pointers = {
-                name: _snapshot_active_pointer(name) for name in ("initiative", "epic", "issue")
-            }
+            before_active_pointers = {name: _snapshot_active_pointer(name) for name in ("initiative", "epic", "issue")}
 
             agent_active_path = target / "spec-dock" / ".agent" / "active.json"
             assert not agent_active_path.exists(), agent_active_path.as_posix()

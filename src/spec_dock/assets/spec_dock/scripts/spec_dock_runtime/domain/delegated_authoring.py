@@ -18,9 +18,7 @@ NON_EDITABLE_DISCUSSION_STATE_RE = re.compile(
     r"(?im)^\s*(?:status|adoption_status|authority)\s*:\s*"
     r"(?:accepted|adopted|partially_adopted|integrated|partially_integrated|rejected|superseded|blocked|stale)\b"
 )
-EDITABLE_DISCUSSION_STATE_RE = re.compile(
-    r"(?im)^\s*(?:status\s*:\s*proposed|adoption_status\s*:\s*unreviewed)\b"
-)
+EDITABLE_DISCUSSION_STATE_RE = re.compile(r"(?im)^\s*(?:status\s*:\s*proposed|adoption_status\s*:\s*unreviewed)\b")
 REQUIRED_DISCUSSION_FRONTMATTER_FIELDS: tuple[str, ...] = (
     "created_by_role",
     "scope_id",

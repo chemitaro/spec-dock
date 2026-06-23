@@ -72,7 +72,8 @@ def _resolve_target_node_id(graph: SpecGraph, target: TargetRef, *, current_repo
         matches = [
             node
             for node in graph.nodes_by_id.values()
-            if node.github_issue_number == int(target.github_issue_number) and node.kind in ("initiative", "epic", "issue")
+            if node.github_issue_number == int(target.github_issue_number)
+            and node.kind in ("initiative", "epic", "issue")
         ]
         target_repo_slug = normalize_repo_slug(target.github_repo_owner, target.github_repo_name)
         if target_repo_slug is not None:
@@ -334,15 +335,13 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
             _append_unique(warnings, "gh_fetch_failed")
         else:
             issue_snapshots.extend(issue_index_snapshots)
-            linked_numbers = sorted(
-                {
-                    int(node.github_issue_number)
-                    for node in graph.nodes_by_id.values()
-                    if node.kind == "issue"
-                    and node.github_issue_number is not None
-                    and normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
-                }
-            )
+            linked_numbers = sorted({
+                int(node.github_issue_number)
+                for node in graph.nodes_by_id.values()
+                if node.kind == "issue"
+                and node.github_issue_number is not None
+                and normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
+            })
             indexed = {int(snapshot.issue_number) for snapshot in issue_index_snapshots}
             missing = [n for n in linked_numbers if n not in indexed]
             if missing:

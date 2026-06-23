@@ -259,7 +259,9 @@ def _parse_created_unix(meta: dict[str, str]) -> float | None:
         return None
 
 
-def _classify_create_lock_state(specdock_dir: Path) -> tuple[Literal["absent", "in_progress", "stale_create_lock"], str]:
+def _classify_create_lock_state(
+    specdock_dir: Path,
+) -> tuple[Literal["absent", "in_progress", "stale_create_lock"], str]:
     lock_path = specdock_dir / _CREATE_LOCK_RELATIVE_PATH
     if not lock_path.exists():
         return ("absent", f"path={lock_path} present=false")
@@ -331,22 +333,17 @@ def ensure_no_legacy_meta_json(specdock_dir: Path) -> None:
         return
     listed = "\n".join(f"- {p}" for p in legacy_paths)
     raise RuntimeError(
-        "Unsupported legacy meta.json detected. Rename legacy files to '.meta.json' and retry:\n"
-        f"{listed}"
+        f"Unsupported legacy meta.json detected. Rename legacy files to '.meta.json' and retry:\n{listed}"
     )
 
 
 def _require_non_empty_meta_string(meta: dict[str, Any], *, field: str, meta_path: Path) -> str:
     raw_value = meta.get(field)
     if not isinstance(raw_value, str):
-        raise RuntimeError(
-            f"Invalid .meta.json (required non-empty string field={field}): {meta_path}"
-        )
+        raise RuntimeError(f"Invalid .meta.json (required non-empty string field={field}): {meta_path}")
     value = raw_value.strip()
     if not value:
-        raise RuntimeError(
-            f"Invalid .meta.json (required non-empty string field={field}): {meta_path}"
-        )
+        raise RuntimeError(f"Invalid .meta.json (required non-empty string field={field}): {meta_path}")
     return value
 
 
@@ -382,17 +379,13 @@ def load_node_records(specdock_dir: Path) -> list[StoredMetaRecord]:
                 try:
                     github_issue_number = int(raw_issue_number)
                 except (TypeError, ValueError) as exc:
-                    raise RuntimeError(
-                        f"Invalid github.issue_number in {meta_path}: {raw_issue_number}"
-                    ) from exc
+                    raise RuntimeError(f"Invalid github.issue_number in {meta_path}: {raw_issue_number}") from exc
 
             owner_raw = github.get("repo_owner")
             name_raw = github.get("repo_name")
             if owner_raw is not None or name_raw is not None:
                 if owner_raw is None or name_raw is None:
-                    raise RuntimeError(
-                        f"Invalid github.repo_owner/repo_name in {meta_path}: both fields are required"
-                    )
+                    raise RuntimeError(f"Invalid github.repo_owner/repo_name in {meta_path}: both fields are required")
                 if not isinstance(owner_raw, str) or not isinstance(name_raw, str):
                     raise RuntimeError(
                         f"Invalid github.repo_owner/repo_name in {meta_path}: both fields must be strings"
@@ -501,9 +494,7 @@ def remove_issue_dependency(meta_path: Path, to_id: str, *, matching_refs: list[
     to_id_text = str(to_id)
     matching_ref_values = list(matching_refs or [])
     meta["depends_on"] = [
-        dep
-        for dep in depends_on
-        if str(dep) != to_id_text and not any(dep == ref for ref in matching_ref_values)
+        dep for dep in depends_on if str(dep) != to_id_text and not any(dep == ref for ref in matching_ref_values)
     ]
     if "updated_at" in meta:
         meta["updated_at"] = now_iso()
@@ -524,27 +515,19 @@ def backfill_github_repo_scope(meta_path: Path, *, repo_owner: str, repo_name: s
     if not isinstance(github, dict):
         raise RuntimeError(f"Invalid github payload in {meta_path}: expected object")
     if github.get("issue_number") is None:
-        raise RuntimeError(
-            f"Invalid github payload in {meta_path}: github.issue_number is required for scope backfill"
-        )
+        raise RuntimeError(f"Invalid github payload in {meta_path}: github.issue_number is required for scope backfill")
 
     existing_owner_raw = github.get("repo_owner")
     existing_repo_raw = github.get("repo_name")
     if existing_owner_raw is not None or existing_repo_raw is not None:
         if existing_owner_raw is None or existing_repo_raw is None:
-            raise RuntimeError(
-                f"Invalid github.repo_owner/repo_name in {meta_path}: both fields are required"
-            )
+            raise RuntimeError(f"Invalid github.repo_owner/repo_name in {meta_path}: both fields are required")
         if not isinstance(existing_owner_raw, str) or not isinstance(existing_repo_raw, str):
-            raise RuntimeError(
-                f"Invalid github.repo_owner/repo_name in {meta_path}: both fields must be strings"
-            )
+            raise RuntimeError(f"Invalid github.repo_owner/repo_name in {meta_path}: both fields must be strings")
         existing_owner = existing_owner_raw.strip().lower()
         existing_repo = existing_repo_raw.strip().lower()
         if not existing_owner or not existing_repo:
-            raise RuntimeError(
-                f"Invalid github.repo_owner/repo_name in {meta_path}: empty value is not allowed"
-            )
+            raise RuntimeError(f"Invalid github.repo_owner/repo_name in {meta_path}: empty value is not allowed")
         if existing_owner == normalized_owner and existing_repo == normalized_repo:
             return False
         raise RuntimeError(

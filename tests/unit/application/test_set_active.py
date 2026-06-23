@@ -5,14 +5,7 @@ import pytest
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.application import (
@@ -39,12 +32,10 @@ class _StubDepsTopologyReader:
     def __init__(self, issue_depends_on_map=None, node_depends_on_map=None, dependency_contexts=None):
         self.issue_depends_on_map = dict(issue_depends_on_map or {})
         self.node_depends_on_map = {
-            node_id: list(depends_on)
-            for node_id, depends_on in (node_depends_on_map or {}).items()
+            node_id: list(depends_on) for node_id, depends_on in (node_depends_on_map or {}).items()
         }
         self.dependency_contexts = {
-            issue_id: list(contexts)
-            for issue_id, contexts in (dependency_contexts or {}).items()
+            issue_id: list(contexts) for issue_id, contexts in (dependency_contexts or {}).items()
         }
 
     def load_issue_depends_on_map(self, specdock_dir, graph):
@@ -360,7 +351,10 @@ class TestSetActiveApplication:
         )
         assert by_id.selection.issue_id == "iss-00302"
         assert active_store.written[-1].issue.id == "iss-00302"
-        assert active_store.written[-1].issue.path == "spec-dock/initiatives/init-00101-auth-platform/epics/epic-00201-jwt-auth/issues/iss-00302-target-issue"
+        assert (
+            active_store.written[-1].issue.path
+            == "spec-dock/initiatives/init-00101-auth-platform/epics/epic-00201-jwt-auth/issues/iss-00302-target-issue"
+        )
 
         by_github = app_set_active.set_active(
             self._request(
@@ -415,12 +409,10 @@ class TestSetActiveApplication:
             active_store=active_store,
             deps={"iss-00302": []},
             dependency_contexts={"iss-00302": [context]},
-            issue_gateway=_StubIssueGateway(
-                [
-                    self._snapshot(domain_models, 202, "OPEN"),
-                    self._snapshot(domain_models, 302, "OPEN"),
-                ]
-            ),
+            issue_gateway=_StubIssueGateway([
+                self._snapshot(domain_models, 202, "OPEN"),
+                self._snapshot(domain_models, 302, "OPEN"),
+            ]),
         )
 
         with pytest.raises(RuntimeError) as exc_info:
@@ -457,13 +449,11 @@ class TestSetActiveApplication:
             active_store=active_store,
             deps={"iss-00302": ["iss-00301"]},
             dependency_contexts={"iss-00302": [context]},
-            issue_gateway=_StubIssueGateway(
-                [
-                    self._snapshot(domain_models, 101, "OPEN"),
-                    self._snapshot(domain_models, 301, "CLOSED"),
-                    self._snapshot(domain_models, 302, "OPEN"),
-                ]
-            ),
+            issue_gateway=_StubIssueGateway([
+                self._snapshot(domain_models, 101, "OPEN"),
+                self._snapshot(domain_models, 301, "CLOSED"),
+                self._snapshot(domain_models, 302, "OPEN"),
+            ]),
         )
 
         result = app_set_active.set_active(
@@ -506,12 +496,10 @@ class TestSetActiveApplication:
 
     def test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli(self) -> None:
         app_contracts, app_ports, app_set_active, domain_models, infra_contracts = _runtime_modules()
-        gateway = _StubIssueGateway(
-            [
-                self._snapshot(domain_models, 301, "CLOSED"),
-                self._snapshot(domain_models, 302, "OPEN"),
-            ]
-        )
+        gateway = _StubIssueGateway([
+            self._snapshot(domain_models, 301, "CLOSED"),
+            self._snapshot(domain_models, 302, "OPEN"),
+        ])
         active_store = _StubActiveStateStore()
         ports = self._ports(
             app_ports,

@@ -290,11 +290,7 @@ def _preflight_adr_mirror_sources(result: SyncStateResult) -> list[_AdrMirrorSou
     sources_by_basename: dict[str, list[_AdrMirrorSource]] = {}
     for source in sources:
         sources_by_basename.setdefault(source.basename, []).append(source)
-    collisions = sorted(
-        (basename, entries)
-        for basename, entries in sources_by_basename.items()
-        if len(entries) > 1
-    )
+    collisions = sorted((basename, entries) for basename, entries in sources_by_basename.items() if len(entries) > 1)
     if collisions:
         basename, entries = collisions[0]
         source_list = ", ".join(
@@ -522,15 +518,13 @@ def collect_sync_state(
         except RuntimeError:
             _append_unique(warnings, "gh_fetch_failed")
         else:
-            linked_numbers = sorted(
-                {
-                    int(node.github_issue_number)
-                    for node in graph.nodes_by_id.values()
-                    if node.kind == "issue"
-                    and node.github_issue_number is not None
-                    and normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
-                }
-            )
+            linked_numbers = sorted({
+                int(node.github_issue_number)
+                for node in graph.nodes_by_id.values()
+                if node.kind == "issue"
+                and node.github_issue_number is not None
+                and normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
+            })
             indexed_numbers = {int(snapshot.issue_number) for snapshot in issue_index_snapshots}
             missing = [num for num in linked_numbers if num not in indexed_numbers]
             if missing:

@@ -31,13 +31,13 @@ class TestUninstallCommand(CliRuntimeHarness):
 
             assert p.returncode == 0, f"stdout:\n{p.stdout}\nstderr:\n{p.stderr}"
             assert args_log.read_text(encoding="utf-8").splitlines() == [
-                    "--no-cache",
-                    "--from",
-                    "git+https://github.com/chemitaro/spec-dock",
-                    "spec-dock",
-                    "uninstall",
-                    str(target.resolve()),
-                ]
+                "--no-cache",
+                "--from",
+                "git+https://github.com/chemitaro/spec-dock",
+                "spec-dock",
+                "uninstall",
+                str(target.resolve()),
+            ]
 
     def test_uninstall_passes_explicit_target_to_installer_uninstall(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -73,7 +73,11 @@ class TestUninstallCommand(CliRuntimeHarness):
             assert p.returncode == 7
             assert "stub stdout" in p.stdout
             assert "stub stderr" in p.stderr
-            assert args_log.read_text(encoding="utf-8").splitlines()[-3:] == [str(target.resolve()), "--apply", "--keep-specs"]
+            assert args_log.read_text(encoding="utf-8").splitlines()[-3:] == [
+                str(target.resolve()),
+                "--apply",
+                "--keep-specs",
+            ]
 
     def test_uninstall_forwards_remove_specs_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -105,7 +109,12 @@ class TestUninstallCommand(CliRuntimeHarness):
 
             assert p.returncode == 0, f"stdout:\n{p.stdout}\nstderr:\n{p.stderr}"
             assert p.stdout == json_stdout + "\n"
-            assert args_log.read_text(encoding="utf-8").splitlines()[-4:] == [str(target.resolve()), "--apply", "--keep-specs", "--json"]
+            assert args_log.read_text(encoding="utf-8").splitlines()[-4:] == [
+                str(target.resolve()),
+                "--apply",
+                "--keep-specs",
+                "--json",
+            ]
 
     def test_uninstall_missing_uvx_fails_with_actionable_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -6,14 +6,7 @@ import pytest
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.application import (
@@ -39,17 +32,14 @@ class _StubNodeReader:
 class _StubDepsTopologyReader:
     def __init__(self, issue_depends_on_map, warnings=None, node_depends_on_map=None, dependency_contexts=None):
         self.issue_depends_on_map = {
-            issue_id: list(depends_on)
-            for issue_id, depends_on in issue_depends_on_map.items()
+            issue_id: list(depends_on) for issue_id, depends_on in issue_depends_on_map.items()
         }
         self.warnings = list(warnings or [])
         self.node_depends_on_map = {
-            node_id: list(depends_on)
-            for node_id, depends_on in (node_depends_on_map or {}).items()
+            node_id: list(depends_on) for node_id, depends_on in (node_depends_on_map or {}).items()
         }
         self.dependency_contexts = {
-            issue_id: list(contexts)
-            for issue_id, contexts in (dependency_contexts or {}).items()
+            issue_id: list(contexts) for issue_id, contexts in (dependency_contexts or {}).items()
         }
 
     def load_issue_depends_on_map(self, specdock_dir, graph):
@@ -422,13 +412,11 @@ class TestCheckDepsApplication:
 
     def test_github_index_incomplete_warns_and_leaves_missing_dependency_unknown(self) -> None:
         app_check_deps, app_contracts, app_ports, domain_models, infra_contracts = _runtime_modules()
-        issue_gateway = _StubIssueGateway(
-            [
-                self._snapshot(domain_models, 101, "OPEN"),
-                self._snapshot(domain_models, 201, "OPEN"),
-                self._snapshot(domain_models, 302, "OPEN"),
-            ]
-        )
+        issue_gateway = _StubIssueGateway([
+            self._snapshot(domain_models, 101, "OPEN"),
+            self._snapshot(domain_models, 201, "OPEN"),
+            self._snapshot(domain_models, 302, "OPEN"),
+        ])
         ports = self._ports(app_ports, infra_contracts, issue_gateway=issue_gateway)
 
         result = app_check_deps.check_deps(self._request(app_contracts, use_github=True), ports)
@@ -460,14 +448,12 @@ class TestCheckDepsApplication:
         ready_ports = self._ports(
             app_ports,
             infra_contracts,
-            issue_gateway=_StubIssueGateway(
-                [
-                    self._snapshot(domain_models, 101, "OPEN"),
-                    self._snapshot(domain_models, 201, "OPEN"),
-                    self._snapshot(domain_models, 301, "CLOSED", updated_at="2026-06-05T03:00:00Z"),
-                    self._snapshot(domain_models, 302, "OPEN"),
-                ]
-            ),
+            issue_gateway=_StubIssueGateway([
+                self._snapshot(domain_models, 101, "OPEN"),
+                self._snapshot(domain_models, 201, "OPEN"),
+                self._snapshot(domain_models, 301, "CLOSED", updated_at="2026-06-05T03:00:00Z"),
+                self._snapshot(domain_models, 302, "OPEN"),
+            ]),
         )
 
         ready = app_check_deps.check_deps(self._request(app_contracts, use_github=True), ready_ports)
@@ -481,14 +467,12 @@ class TestCheckDepsApplication:
         blocked_ports = self._ports(
             app_ports,
             infra_contracts,
-            issue_gateway=_StubIssueGateway(
-                [
-                    self._snapshot(domain_models, 101, "OPEN"),
-                    self._snapshot(domain_models, 201, "OPEN"),
-                    self._snapshot(domain_models, 301, "OPEN"),
-                    self._snapshot(domain_models, 302, "OPEN"),
-                ]
-            ),
+            issue_gateway=_StubIssueGateway([
+                self._snapshot(domain_models, 101, "OPEN"),
+                self._snapshot(domain_models, 201, "OPEN"),
+                self._snapshot(domain_models, 301, "OPEN"),
+                self._snapshot(domain_models, 302, "OPEN"),
+            ]),
         )
 
         blocked = app_check_deps.check_deps(self._request(app_contracts, use_github=True), blocked_ports)
@@ -515,13 +499,11 @@ class TestCheckDepsApplication:
             records=records,
             deps={"iss-00302": []},
             dependency_contexts={"iss-00302": [context]},
-            issue_gateway=_StubIssueGateway(
-                [
-                    self._snapshot(domain_models, 103, "OPEN"),
-                    self._snapshot(domain_models, 203, "OPEN"),
-                    self._snapshot(domain_models, 302, "OPEN"),
-                ]
-            ),
+            issue_gateway=_StubIssueGateway([
+                self._snapshot(domain_models, 103, "OPEN"),
+                self._snapshot(domain_models, 203, "OPEN"),
+                self._snapshot(domain_models, 302, "OPEN"),
+            ]),
         )
 
         result = app_check_deps.check_deps(self._request(app_contracts, use_github=True), ports)
@@ -534,8 +516,7 @@ class TestCheckDepsApplication:
             ("epic-00203", "empty_open", "open", "github")
         ]
         assert [
-            (b.dependency_disposition, b.disposition_basis)
-            for b in result.inspection.evaluation.node_blockers
+            (b.dependency_disposition, b.disposition_basis) for b in result.inspection.evaluation.node_blockers
         ] == [("blocking", "empty_open_container")]
 
     def test_deps_check_exposes_satisfied_closed_high_level_context(self) -> None:
@@ -555,13 +536,11 @@ class TestCheckDepsApplication:
             records=records,
             deps={"iss-00302": []},
             dependency_contexts={"iss-00302": [context]},
-            issue_gateway=_StubIssueGateway(
-                [
-                    self._snapshot(domain_models, 103, "OPEN"),
-                    self._snapshot(domain_models, 203, "CLOSED"),
-                    self._snapshot(domain_models, 302, "OPEN"),
-                ]
-            ),
+            issue_gateway=_StubIssueGateway([
+                self._snapshot(domain_models, 103, "OPEN"),
+                self._snapshot(domain_models, 203, "CLOSED"),
+                self._snapshot(domain_models, 302, "OPEN"),
+            ]),
         )
 
         result = app_check_deps.check_deps(self._request(app_contracts, use_github=True), ports)
@@ -573,8 +552,7 @@ class TestCheckDepsApplication:
             ("epic-00203", "empty")
         ]
         assert [
-            (c.dependency_disposition, c.disposition_basis)
-            for c in result.inspection.evaluation.satisfied_dependencies
+            (c.dependency_disposition, c.disposition_basis) for c in result.inspection.evaluation.satisfied_dependencies
         ] == [("satisfied", "lifecycle_closed")]
 
     def test_deps_check_exposes_satisfied_open_high_level_context_when_descendants_done(self) -> None:
@@ -594,15 +572,13 @@ class TestCheckDepsApplication:
             records=records,
             deps={"iss-00302": ["iss-00401", "iss-00402"]},
             dependency_contexts={"iss-00302": [context]},
-            issue_gateway=_StubIssueGateway(
-                [
-                    self._snapshot(domain_models, 102, "OPEN"),
-                    self._snapshot(domain_models, 202, "OPEN"),
-                    self._snapshot(domain_models, 302, "OPEN"),
-                    self._snapshot(domain_models, 401, "CLOSED"),
-                    self._snapshot(domain_models, 402, "CLOSED"),
-                ]
-            ),
+            issue_gateway=_StubIssueGateway([
+                self._snapshot(domain_models, 102, "OPEN"),
+                self._snapshot(domain_models, 202, "OPEN"),
+                self._snapshot(domain_models, 302, "OPEN"),
+                self._snapshot(domain_models, 401, "CLOSED"),
+                self._snapshot(domain_models, 402, "CLOSED"),
+            ]),
         )
 
         result = app_check_deps.check_deps(self._request(app_contracts, use_github=True), ports)
@@ -621,16 +597,14 @@ class TestCheckDepsApplication:
         agent_dir = specdock_dir / ".agent"
         agent_dir.mkdir(parents=True)
         (agent_dir / "index-all.json").write_text(
-            json.dumps(
-                {
-                    "nodes": {
-                        "epic-00203": {
-                            "type": "epic",
-                            "github": {"issue_number": 203, "state": "CLOSED", "updated_at": "2026-06-05T00:00:00Z"},
-                        }
+            json.dumps({
+                "nodes": {
+                    "epic-00203": {
+                        "type": "epic",
+                        "github": {"issue_number": 203, "state": "CLOSED", "updated_at": "2026-06-05T00:00:00Z"},
                     }
                 }
-            ),
+            }),
             encoding="utf-8",
         )
         records = self._records(infra_contracts) + self._empty_epic_records(infra_contracts)
@@ -679,7 +653,7 @@ class TestCheckDepsApplication:
                 epic_id=None,
                 github_issue_number=203,
                 meta_path="/repo/spec-dock/initiatives/init-00101-auth-platform/epics/epic-00203-linked-empty-epic/.meta.json",
-            )
+            ),
         ]
         context = infra_contracts.DepsDependencyContext(
             source_node_id="iss-00302",
@@ -707,8 +681,7 @@ class TestCheckDepsApplication:
             ("epic-00203", "empty_unknown", "unknown", "none")
         ]
         assert [
-            (b.dependency_disposition, b.disposition_basis)
-            for b in result.inspection.evaluation.node_blockers
+            (b.dependency_disposition, b.disposition_basis) for b in result.inspection.evaluation.node_blockers
         ] == [("indeterminate", "empty_unknown_container")]
 
     def test_local_empty_high_level_dependency_preserves_open_status(self) -> None:
@@ -726,7 +699,7 @@ class TestCheckDepsApplication:
                 epic_id=None,
                 github_issue_number=None,
                 meta_path="/repo/spec-dock/initiatives/init-00101-auth-platform/epics/epic-local-00203-local-empty-epic/.meta.json",
-            )
+            ),
         ]
         context = infra_contracts.DepsDependencyContext(
             source_node_id="iss-00302",
@@ -757,12 +730,7 @@ class TestCheckDepsApplication:
     def test_local_high_level_default_open_does_not_mask_done_descendant_aggregate(self) -> None:
         app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
         runtime_scripts_dir = (
-            Path(__file__).resolve().parents[3]
-            / "src"
-            / "spec_dock"
-            / "assets"
-            / "spec_dock"
-            / "scripts"
+            Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
         sys.path.insert(0, str(runtime_scripts_dir))
         try:
@@ -821,8 +789,7 @@ class TestCheckDepsApplication:
             ("epic-local-00203", "expanded")
         ]
         assert [
-            (c.dependency_disposition, c.disposition_basis)
-            for c in result.inspection.evaluation.satisfied_dependencies
+            (c.dependency_disposition, c.disposition_basis) for c in result.inspection.evaluation.satisfied_dependencies
         ] == [("satisfied", "all_descendant_issues_done")]
 
         graph = build_graph([app_check_deps._to_spec_node_seed(record) for record in records])

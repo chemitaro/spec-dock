@@ -36,10 +36,7 @@ def _normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:
 
 
 def _format_linked_github_nodes(linked: list[SpecNode], *, repo_root: Path | None = None) -> str:
-    return ", ".join(
-        f"{n.kind}:{n.id} ({_meta_json_path_for_output(n, repo_root=repo_root)})"
-        for n in linked
-    )
+    return ", ".join(f"{n.kind}:{n.id} ({_meta_json_path_for_output(n, repo_root=repo_root)})" for n in linked)
 
 
 def _path_for_output(path: Path, *, repo_root: Path | None = None) -> str:
@@ -198,9 +195,7 @@ def _validate_discussion_filenames(graph: SpecGraph, *, repo_root: Path | None =
         duplicate_doc_ids = sorted(doc_id for doc_id, paths in by_doc_id.items() if len(paths) > 1)
         if duplicate_doc_ids:
             duplicate_doc_id = duplicate_doc_ids[0]
-            files = ", ".join(
-                path.name for path in sorted(by_doc_id[duplicate_doc_id], key=lambda p: p.as_posix())
-            )
+            files = ", ".join(path.name for path in sorted(by_doc_id[duplicate_doc_id], key=lambda p: p.as_posix()))
             raise RuntimeError(
                 "Duplicate discussion doc_id detected under "
                 f"{_path_for_output(discussions_dir, repo_root=repo_root)}: "

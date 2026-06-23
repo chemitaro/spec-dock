@@ -83,11 +83,7 @@ def _load_direct_matching_refs(
     except RuntimeError as error:
         _raise_mutation_error(req, code="preflight_validate_failed", detail=_preflight_detail(error))
 
-    return [
-        item.raw_ref
-        for item in resolutions
-        if item.resolved_node_id == to_node_id
-    ]
+    return [item.raw_ref for item in resolutions if item.resolved_node_id == to_node_id]
 
 
 def _load_raw_node_depends_on_map(
@@ -142,8 +138,7 @@ def _build_candidate_issue_depends_on_map(
     if not callable(build_candidate):
         if graph.nodes_by_id[from_node_id].kind == "issue" and graph.nodes_by_id[to_node_id].kind == "issue":
             candidate_map: dict[str, list[str]] = {
-                issue_id: list(depends_on)
-                for issue_id, depends_on in issue_depends_on_map.items()
+                issue_id: list(depends_on) for issue_id, depends_on in issue_depends_on_map.items()
             }
             candidate_map.setdefault(from_node_id, [])
             candidate_map.setdefault(to_node_id, [])
@@ -200,7 +195,9 @@ def mutate_deps(req: MutateDepsRequest, ports: Ports) -> MutateDepsResult:
             _raise_mutation_error(req, code="invalid_add_unresolved", detail=f"Node not found: {req.to_id}")
     else:
         if from_node is None or to_node is None:
-            _raise_mutation_error(req, code="edge_not_found", detail=f"Dependency edge not found: {req.from_id} -> {req.to_id}")
+            _raise_mutation_error(
+                req, code="edge_not_found", detail=f"Dependency edge not found: {req.from_id} -> {req.to_id}"
+            )
 
     assert from_node is not None
     assert to_node is not None

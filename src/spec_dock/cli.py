@@ -8,6 +8,7 @@ Day-to-day operations (creating nodes, switching active issue, syncing state, et
 are handled by the repo-local runtime script installed at:
   `spec-dock/scripts/spec-dock`
 """
+
 from __future__ import annotations
 
 import argparse
@@ -533,7 +534,9 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
             # Keep healthy real entrypoints as highest priority, but if the
             # user-visible pointer disagrees (e.g. placeholder link + real
             # `.path`), normalize the pointer to the same real target.
-            if (link.is_symlink() and resolved_link_target != existing_target) or (link.exists() and not link.is_symlink() and resolved_link_target != existing_target):
+            if (link.is_symlink() and resolved_link_target != existing_target) or (
+                link.exists() and not link.is_symlink() and resolved_link_target != existing_target
+            ):
                 force_rebuild = True
             desired_target = existing_target
             if not force_rebuild:
@@ -552,7 +555,9 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
                     expected_id=persisted_id,
                     persisted_path=persisted_path,
                 )
-            desired_target = resolved_target if resolved_target is not None else _active_placeholder_dir(specdock_dir, layer)
+            desired_target = (
+                resolved_target if resolved_target is not None else _active_placeholder_dir(specdock_dir, layer)
+            )
 
         if existing_entrypoint is not None:
             existing_target, _existing_id = existing_entrypoint
@@ -702,9 +707,7 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
     """Install/update `spec-dock/` scaffold into the target repository."""
     specdock_dir = _specdock_dir(target_root)
     if specdock_dir.exists() and not force:
-        raise RuntimeError(
-            f"'{_SPEC_DOCK_DIRNAME}' already exists. Use 'spec-dock update' or re-run with '--force'."
-        )
+        raise RuntimeError(f"'{_SPEC_DOCK_DIRNAME}' already exists. Use 'spec-dock update' or re-run with '--force'.")
 
     with _assets_dir() as assets_dir:
         src_spec_dock = assets_dir / "spec_dock"
@@ -885,8 +888,7 @@ def _has_valid_uninstall_retry_marker(specdock_dir: Path) -> bool:
     marker = specdock_dir / _UNINSTALL_RETRY_MARKER_REL.relative_to("spec-dock")
     if marker.is_symlink():
         raise RuntimeError(
-            "target contains symlinked SpecDock uninstall retry marker: "
-            f"{_UNINSTALL_RETRY_MARKER_REL.as_posix()}"
+            f"target contains symlinked SpecDock uninstall retry marker: {_UNINSTALL_RETRY_MARKER_REL.as_posix()}"
         )
     if not marker.is_file():
         return False
@@ -901,8 +903,7 @@ def _reject_symlinked_uninstall_retry_marker(target_root: Path) -> None:
     marker = target_root / _UNINSTALL_RETRY_MARKER_REL
     if marker.is_symlink():
         raise RuntimeError(
-            "target contains symlinked SpecDock uninstall retry marker: "
-            f"{_UNINSTALL_RETRY_MARKER_REL.as_posix()}"
+            f"target contains symlinked SpecDock uninstall retry marker: {_UNINSTALL_RETRY_MARKER_REL.as_posix()}"
         )
 
 
@@ -1016,7 +1017,9 @@ def _iter_existing_files_or_symlinks(root: Path) -> tuple[Path, ...]:
         return ()
     if root.is_symlink():
         return (root,)
-    return tuple(sorted((path for path in root.rglob("*") if path.is_file() or path.is_symlink()), key=lambda p: p.as_posix()))
+    return tuple(
+        sorted((path for path in root.rglob("*") if path.is_file() or path.is_symlink()), key=lambda p: p.as_posix())
+    )
 
 
 def _add_generated_state_uninstall_actions(
@@ -1058,7 +1061,9 @@ def _add_spec_history_uninstall_action(
             )
         )
     else:
-        reason = "keep-specs mode" if specs_mode == "keep" else "dry-run preserves specs unless remove-specs is explicit"
+        reason = (
+            "keep-specs mode" if specs_mode == "keep" else "dry-run preserves specs unless remove-specs is explicit"
+        )
         actions.append(
             _UninstallAction(
                 rel_path=spec_history_path.as_posix(),
@@ -1069,7 +1074,9 @@ def _add_spec_history_uninstall_action(
         )
 
 
-def _add_uninstall_retry_marker_action(actions: list[_UninstallAction], target_root: Path, known_rel_paths: set[Path]) -> None:
+def _add_uninstall_retry_marker_action(
+    actions: list[_UninstallAction], target_root: Path, known_rel_paths: set[Path]
+) -> None:
     known_rel_paths.add(_UNINSTALL_RETRY_MARKER_REL)
     if not _path_exists_for_uninstall(target_root / _UNINSTALL_RETRY_MARKER_REL):
         return
@@ -1088,8 +1095,7 @@ def _add_shortcut_uninstall_action(actions: list[_UninstallAction], target_root:
     if not _path_exists_for_uninstall(shortcut):
         return
     if (
-        shortcut.is_symlink()
-        and os.readlink(shortcut) == f"{_SPEC_DOCK_DIRNAME}/scripts/spec-dock"  # noqa: PTH115 - raw exact target.
+        shortcut.is_symlink() and os.readlink(shortcut) == f"{_SPEC_DOCK_DIRNAME}/scripts/spec-dock"  # noqa: PTH115 - raw exact target.
     ):
         actions.append(
             _UninstallAction(
@@ -1301,7 +1307,9 @@ def _is_safe_uninstall_rel_path(rel_path: Path) -> bool:
         return False
     if rel_path.parts[0] == ".git":
         return False
-    return rel_path.parts[0] in {root.parts[0] for root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS} or rel_path == Path("spec")
+    return rel_path.parts[0] in {root.parts[0] for root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS} or rel_path == Path(
+        "spec"
+    )
 
 
 def _has_symlink_uninstall_container(target_root: Path, rel_path: Path) -> bool:
@@ -1460,11 +1468,7 @@ def _render_uninstall_text(payload: dict[str, Any]) -> str:
         lines.append(f"  {key}: {value}")
     lines.append("actions:")
     for action in payload["actions"]:
-        lines.append(
-            "  "
-            f"[{action['status']}] {action['path']} "
-            f"category={action['category']} reason={action['reason']}"
-        )
+        lines.append(f"  [{action['status']}] {action['path']} category={action['category']} reason={action['reason']}")
     lines.append("guidance:")
     for item in payload["guidance"]:
         lines.append(f"  - {item}")
@@ -1491,10 +1495,7 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
             apply=apply_requested,
             specs_mode=specs_mode,
             json_requested=json_requested,
-            message=(
-                "uninstall --apply requires exactly one specs mode: "
-                "--keep-specs or --remove-specs"
-            ),
+            message=("uninstall --apply requires exactly one specs mode: --keep-specs or --remove-specs"),
         )
 
     try:
@@ -1507,8 +1508,7 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
                     specs_mode=specs_mode,
                     json_requested=json_requested,
                     message=(
-                        "target contains symlinked SpecDock uninstall boundary root: "
-                        f"{symlink_boundary.as_posix()}"
+                        f"target contains symlinked SpecDock uninstall boundary root: {symlink_boundary.as_posix()}"
                     ),
                 )
             _reject_symlinked_uninstall_retry_marker(target_root)
@@ -1609,10 +1609,7 @@ def _build_obsolete_exact_rel_paths(
 
     obsolete_raw = managed_assets.get("obsolete_exact_file_paths")
     if not isinstance(obsolete_raw, list):
-        raise RuntimeError(
-            "invalid managed_assets.obsolete_exact_file_paths: "
-            f"{host_adapter_meta_src}"
-        )
+        raise RuntimeError(f"invalid managed_assets.obsolete_exact_file_paths: {host_adapter_meta_src}")
 
     obsolete_rel_paths: list[Path] = []
     for obsolete in obsolete_raw:
@@ -1624,8 +1621,7 @@ def _build_obsolete_exact_rel_paths(
             raise RuntimeError("invalid managed_assets.obsolete_exact_file_paths item")
         if normalized_rel in current_target_paths:
             raise RuntimeError(
-                "managed_assets.obsolete_exact_file_paths overlaps current managed path "
-                f"'{normalized_rel.as_posix()}'"
+                f"managed_assets.obsolete_exact_file_paths overlaps current managed path '{normalized_rel.as_posix()}'"
             )
         if any(_is_path_prefix(normalized_rel, current_path) for current_path in current_target_paths):
             raise RuntimeError(
@@ -1633,10 +1629,7 @@ def _build_obsolete_exact_rel_paths(
                 f"(must be exact file path): '{normalized_rel.as_posix()}'"
             )
         if any(normalized_rel == existing for existing in obsolete_rel_paths):
-            raise RuntimeError(
-                "duplicate managed_assets.obsolete_exact_file_paths item "
-                f"'{normalized_rel.as_posix()}'"
-            )
+            raise RuntimeError(f"duplicate managed_assets.obsolete_exact_file_paths item '{normalized_rel.as_posix()}'")
         for existing in obsolete_rel_paths:
             if _is_path_prefix(existing, normalized_rel) or _is_path_prefix(normalized_rel, existing):
                 raise RuntimeError(
@@ -1671,9 +1664,7 @@ def _normalize_exact_file_path_from_manifest(value: object, *, field_name: str) 
     if normalized_rel.as_posix() != value_norm:
         raise RuntimeError(f"invalid {field_name} item")
     if normalized_rel.suffix == "":
-        raise RuntimeError(
-            f"invalid {field_name} item (must be exact file path): '{normalized_rel.as_posix()}'"
-        )
+        raise RuntimeError(f"invalid {field_name} item (must be exact file path): '{normalized_rel.as_posix()}'")
     return normalized_rel
 
 
@@ -1689,10 +1680,7 @@ def _build_bootstrap_only_rel_paths(
 
     bootstrap_raw = managed_assets.get("bootstrap_only_exact_file_paths")
     if not isinstance(bootstrap_raw, list):
-        raise RuntimeError(
-            "invalid managed_assets.bootstrap_only_exact_file_paths: "
-            f"{host_adapter_meta_src}"
-        )
+        raise RuntimeError(f"invalid managed_assets.bootstrap_only_exact_file_paths: {host_adapter_meta_src}")
 
     bootstrap_rel_paths: list[Path] = []
     for bootstrap in bootstrap_raw:
@@ -1707,8 +1695,7 @@ def _build_bootstrap_only_rel_paths(
             )
         if any(normalized_rel == existing for existing in bootstrap_rel_paths):
             raise RuntimeError(
-                "duplicate managed_assets.bootstrap_only_exact_file_paths item "
-                f"'{normalized_rel.as_posix()}'"
+                f"duplicate managed_assets.bootstrap_only_exact_file_paths item '{normalized_rel.as_posix()}'"
             )
         for existing in bootstrap_rel_paths:
             if _is_path_prefix(existing, normalized_rel) or _is_path_prefix(normalized_rel, existing):
@@ -1783,8 +1770,7 @@ def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallP
         canonical_entry_file = _REQUIRED_MANAGED_NATIVE_SHIM_CANONICAL_ENTRY_FILES.get(host_name)
         if canonical_entry_file is not None and entry_file_rel != canonical_entry_file:
             raise RuntimeError(
-                f"required host '{host_name}' must use canonical entry_file "
-                f"'{canonical_entry_file.as_posix()}'"
+                f"required host '{host_name}' must use canonical entry_file '{canonical_entry_file.as_posix()}'"
             )
 
         native_shim = host_entry.get("native_shim")
@@ -1808,8 +1794,7 @@ def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallP
         native_owner_norm = native_owner.strip()
         if host_name in required_hosts and native_owner_norm != _REQUIRED_MANAGED_NATIVE_SHIM_OWNER:
             raise RuntimeError(
-                f"required host '{host_name}' must use native_shim.owner "
-                f"'{_REQUIRED_MANAGED_NATIVE_SHIM_OWNER}'"
+                f"required host '{host_name}' must use native_shim.owner '{_REQUIRED_MANAGED_NATIVE_SHIM_OWNER}'"
             )
 
         delegates_to = native_shim.get("delegates_to")
@@ -1875,8 +1860,7 @@ def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallP
             )
         if inventory_source != source_asset_rel:
             raise RuntimeError(
-                "native_shim.source_of_truth_asset does not match install_root inventory "
-                f"for host '{host_name}'"
+                f"native_shim.source_of_truth_asset does not match install_root inventory for host '{host_name}'"
             )
 
     return _ManagedSkillInstallPlan(
@@ -1926,8 +1910,7 @@ def _preflight_target_path_conflicts(
                 if allow_exact_file_symlink and target_path.exists() and target_path.is_file():
                     return
                 raise RuntimeError(
-                    "target directory/container conflict for "
-                    f"{path_kind} '{rel_posix}' (symlink at exact file path)"
+                    f"target directory/container conflict for {path_kind} '{rel_posix}' (symlink at exact file path)"
                 )
             return
 
@@ -2116,14 +2099,18 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     add_init_update_common(p_init)
     p_init.add_argument("--force", action="store_true", help="Overwrite managed files if 'spec-dock' already exists")
 
-    p_update = sub.add_parser("update", help="Update managed files (docs/templates/scripts/skill) in an existing project")
+    p_update = sub.add_parser(
+        "update", help="Update managed files (docs/templates/scripts/skill) in an existing project"
+    )
     add_init_update_common(p_update)
 
     p_uninstall = sub.add_parser("uninstall", help="Plan or remove managed spec-dock artifacts from a project")
     p_uninstall.add_argument("path", nargs="?", default=".", help="Target project path (default: current directory)")
     p_uninstall.add_argument("--apply", action="store_true", help="Apply the uninstall plan")
     specs_group = p_uninstall.add_mutually_exclusive_group()
-    specs_group.add_argument("--keep-specs", action="store_true", help="Preserve spec history under spec-dock/initiatives")
+    specs_group.add_argument(
+        "--keep-specs", action="store_true", help="Preserve spec history under spec-dock/initiatives"
+    )
     specs_group.add_argument("--remove-specs", action="store_true", help="Include spec history in the uninstall plan")
     p_uninstall.add_argument("--json", action="store_true", help="Emit exactly one JSON object on stdout")
 

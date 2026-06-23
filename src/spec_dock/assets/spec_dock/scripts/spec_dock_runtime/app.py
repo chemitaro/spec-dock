@@ -18,6 +18,7 @@ Design goals:
 - Link existing GitHub issues with `--github-issue` when needed.
 - `sync` reads GitHub issue state by default; use `sync --no-github` only for cache/local opt-out.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -217,8 +218,7 @@ def _ensure_no_legacy_meta_json(specdock_dir: Path) -> None:
         return
     listed = "\n".join(f"- {p}" for p in legacy_paths)
     raise RuntimeError(
-        "Unsupported legacy meta.json detected. Rename legacy files to '.meta.json' and retry:\n"
-        f"{listed}"
+        f"Unsupported legacy meta.json detected. Rename legacy files to '.meta.json' and retry:\n{listed}"
     )
 
 
@@ -232,9 +232,7 @@ def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
     for meta_path in _iter_node_meta_paths(initiatives_root):
         meta = _load_json(meta_path)
         if not isinstance(meta, dict):
-            raise RuntimeError(
-                f"Invalid .meta.json (expected object): {meta_path} (got {type(meta).__name__})"
-            )
+            raise RuntimeError(f"Invalid .meta.json (expected object): {meta_path} (got {type(meta).__name__})")
         node_type = str(meta.get("type", "")).strip()
         node_id = str(meta.get("id", "")).strip()
         title = str(meta.get("title", "")).strip()
@@ -403,7 +401,9 @@ def _active_entry(repo_root: Path, node: _Node | None) -> dict[str, str] | None:
     return {"id": node.id, "path": node.path.relative_to(repo_root).as_posix()}
 
 
-def _write_active_manifest(specdock_dir: Path, *, initiative: _Node | None, epic: _Node | None, issue: _Node | None) -> dict[str, Any]:
+def _write_active_manifest(
+    specdock_dir: Path, *, initiative: _Node | None, epic: _Node | None, issue: _Node | None
+) -> dict[str, Any]:
     """Write SSOT active manifest (schema v2) and prune legacy files."""
     repo_root = specdock_dir.parent
     agent_dir = specdock_dir / _AGENT_DIRNAME
@@ -729,9 +729,7 @@ def _select_active_from_node(nodes: dict[str, _Node], node: _Node) -> tuple[_Nod
 def _find_node_by_github_issue_number(nodes: dict[str, _Node], *, issue_number: int) -> _Node:
     """Find a unique node (initiative/epic/issue) by `github.issue_number`."""
     matches = [
-        n
-        for n in nodes.values()
-        if n.github_issue_number == issue_number and n.type in ("initiative", "epic", "issue")
+        n for n in nodes.values() if n.github_issue_number == issue_number and n.type in ("initiative", "epic", "issue")
     ]
     if not matches:
         raise RuntimeError(f"No node found for github.issue_number={issue_number}. Create/link the node first.")
@@ -768,9 +766,7 @@ def _parse_github_issue_target(target: str) -> int:
     if _NUM_RE.fullmatch(raw):
         return int(raw)
 
-    raise RuntimeError(
-        "Invalid target. Use a GitHub issue number (e.g. 123 / #123 / URL like .../issues/123)."
-    )
+    raise RuntimeError("Invalid target. Use a GitHub issue number (e.g. 123 / #123 / URL like .../issues/123).")
 
 
 def _meta_json_path_for_output(node: _Node, *, repo_root: Path | None = None) -> str:
@@ -784,9 +780,7 @@ def _meta_json_path_for_output(node: _Node, *, repo_root: Path | None = None) ->
     return meta_path.as_posix()
 
 
-def _linked_github_nodes(
-    nodes: dict[str, _Node], *, issue_number: int, repo_root: Path | None = None
-) -> list[_Node]:
+def _linked_github_nodes(nodes: dict[str, _Node], *, issue_number: int, repo_root: Path | None = None) -> list[_Node]:
     """Collect nodes linked to `github.issue_number`, sorted for stable diagnostics."""
     linked = [
         n for n in nodes.values() if n.github_issue_number == issue_number and n.type in ("initiative", "epic", "issue")
@@ -796,10 +790,7 @@ def _linked_github_nodes(
 
 def _format_linked_github_nodes(linked: list[_Node], *, repo_root: Path | None = None) -> str:
     """Format linked nodes for error messages (`type:id (path)` CSV)."""
-    return ", ".join(
-        f"{n.type}:{n.id} ({_meta_json_path_for_output(n, repo_root=repo_root)})"
-        for n in linked
-    )
+    return ", ".join(f"{n.type}:{n.id} ({_meta_json_path_for_output(n, repo_root=repo_root)})" for n in linked)
 
 
 def _ensure_github_issue_not_linked(
@@ -1095,11 +1086,7 @@ def _infer_active_node_from_branch(nodes: dict[str, _Node], *, branch: str) -> t
         # No signal: keep active unchanged silently (common on `main`, `develop`, etc.).
         return (None, None)
 
-    matches = [
-        n
-        for n in nodes.values()
-        if n.github_issue_number in nums and n.type in ("initiative", "epic", "issue")
-    ]
+    matches = [n for n in nodes.values() if n.github_issue_number in nums and n.type in ("initiative", "epic", "issue")]
     if len(matches) == 1:
         n = matches[0]
         return (n, f"matched github.issue_number={n.github_issue_number} from branch")
@@ -1222,13 +1209,11 @@ def _deps_evaluate_v2(
             )
             issue_index = {}
         else:
-            linked_numbers = sorted(
-                {
-                    int(n.github_issue_number)
-                    for n in nodes.values()
-                    if n.type == "issue" and n.github_issue_number is not None
-                }
-            )
+            linked_numbers = sorted({
+                int(n.github_issue_number)
+                for n in nodes.values()
+                if n.type == "issue" and n.github_issue_number is not None
+            })
             missing = [n for n in linked_numbers if n not in issue_index]
             if missing:
                 if "gh_index_incomplete" not in warnings:
@@ -1274,7 +1259,9 @@ def _deps_evaluate_v2(
     if target_node.type == "issue":
         target_ready = bool((derived_issue_deps.get(target_id) or {}).get("ready", False))
     else:
-        target_ready = all(bool((derived_issue_deps.get(issue_id) or {}).get("ready", False)) for issue_id in target_issue_ids)
+        target_ready = all(
+            bool((derived_issue_deps.get(issue_id) or {}).get("ready", False)) for issue_id in target_issue_ids
+        )
 
     active_issue_id = _deps_check_active_issue_id(specdock_dir)
     out_node_ids = sorted(set(target_issue_ids) | set(reachable_issue_ids), key=_deps_node_sort_key)
@@ -1712,7 +1699,13 @@ def _render_deps_puml(deps_state: dict[str, Any], *, todo_only: bool) -> str:
     lines.append("")
     lines.append("legend right")
     lines.append("|= State |= Color |")
-    for state, color in (("done", "#D5E8D4"), ("doing", "#DAE8FC"), ("todo", "#FFF2CC"), ("unknown", "#EEEEEE"), ("blocked", "#F8CECC")):
+    for state, color in (
+        ("done", "#D5E8D4"),
+        ("doing", "#DAE8FC"),
+        ("todo", "#FFF2CC"),
+        ("unknown", "#EEEEEE"),
+        ("blocked", "#F8CECC"),
+    ):
         lines.append(f"| {state} |<{color}> |")
     lines.append("endlegend")
     lines.append("")
@@ -1823,9 +1816,7 @@ def _find_dep_node_by_github_issue_number(
     current_repo_slug: str | None = None,
 ) -> _Node:
     matches = [
-        n
-        for n in nodes.values()
-        if n.github_issue_number == issue_number and n.type in ("initiative", "epic", "issue")
+        n for n in nodes.values() if n.github_issue_number == issue_number and n.type in ("initiative", "epic", "issue")
     ]
     if not matches:
         raise RuntimeError(f"No node found for github.issue_number={issue_number}. Create/link the node first.")
@@ -1847,7 +1838,9 @@ def _find_dep_node_by_github_issue_number(
             raise RuntimeError(f"Ambiguous github.issue_number={issue_number}: {ids}")
         return current_scoped[0]
 
-    has_scoped = any(_normalize_repo_slug_for_deps(node.github_repo_owner, node.github_repo_name) is not None for node in matches)
+    has_scoped = any(
+        _normalize_repo_slug_for_deps(node.github_repo_owner, node.github_repo_name) is not None for node in matches
+    )
     has_unscoped = any(
         _normalize_repo_slug_for_deps(node.github_repo_owner, node.github_repo_name) is None for node in matches
     )
@@ -1971,7 +1964,9 @@ def _resolved_direct_depends_on(
 
     for dep_id in direct:
         if is_descendant(dep_id):
-            raise RuntimeError(f"Invalid dependency: {node_id} cannot depend on its descendant {dep_id} (in {deps_path})")
+            raise RuntimeError(
+                f"Invalid dependency: {node_id} cannot depend on its descendant {dep_id} (in {deps_path})"
+            )
 
     return sorted(set(direct))
 
@@ -2009,9 +2004,7 @@ def _effective_depends_on(
 def _build_effective_deps_map_all(nodes: dict[str, _Node]) -> dict[str, list[str]]:
     """Build an effective dependency map for all nodes (sync=global scope)."""
     current_repo_slug = _resolve_current_repo_slug_for_deps()
-    dep_node_ids = sorted(
-        node_id for node_id, node in nodes.items() if node.type in ("initiative", "epic", "issue")
-    )
+    dep_node_ids = sorted(node_id for node_id, node in nodes.items() if node.type in ("initiative", "epic", "issue"))
     direct_map: dict[str, list[str]] = {}
     for node_id in dep_node_ids:
         direct_map[node_id] = _resolved_direct_depends_on(
@@ -2082,8 +2075,7 @@ def _compile_issue_direct_depends_on_map(nodes: dict[str, _Node]) -> tuple[dict[
                     if "deps_ref_expanded_to_empty" not in warning_codes:
                         warning_codes.append("deps_ref_expanded_to_empty")
                     _warn(
-                        "deps_ref_expanded_to_empty: "
-                        f"{src_id} depends_on={dep_node_id} expanded_to=0 (in {deps_path})"
+                        f"deps_ref_expanded_to_empty: {src_id} depends_on={dep_node_id} expanded_to=0 (in {deps_path})"
                     )
                 continue
 
@@ -2097,8 +2089,7 @@ def _compile_issue_direct_depends_on_map(nodes: dict[str, _Node]) -> tuple[dict[
                     issue_depends_on[src_issue_id].add(dep_issue_id)
 
     compiled = {
-        issue_id: sorted(issue_depends_on.get(issue_id, set()), key=_deps_node_sort_key)
-        for issue_id in issue_ids
+        issue_id: sorted(issue_depends_on.get(issue_id, set()), key=_deps_node_sort_key) for issue_id in issue_ids
     }
     return compiled, warning_codes
 
@@ -2278,7 +2269,9 @@ def _build_reachable_effective_deps_map(nodes: dict[str, _Node], start_id: str) 
 
         node = nodes.get(node_id)
         if not node or node.type not in ("initiative", "epic", "issue"):
-            raise RuntimeError(f"Unsupported node type for deps check: {node.type if node else '(missing)'} ({node_id})")
+            raise RuntimeError(
+                f"Unsupported node type for deps check: {node.type if node else '(missing)'} ({node_id})"
+            )
 
         ensure_direct(node_id)
         if node.type == "issue":

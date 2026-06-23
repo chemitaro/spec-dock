@@ -74,9 +74,7 @@ def validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult:
             None,
         )
         if callable(load_node_dependency_resolutions):
-            raw_node_depends_on_map = _raw_node_depends_on_map(
-                load_node_dependency_resolutions(specdock_dir, graph)
-            )
+            raw_node_depends_on_map = _raw_node_depends_on_map(load_node_dependency_resolutions(specdock_dir, graph))
             try:
                 validate_raw_node_dependency_graph(graph, raw_node_depends_on_map)
             except RuntimeError as error:
@@ -121,8 +119,7 @@ def _validate_delegated_authority_artifacts(graph, *, repo_root: Path) -> list[s
             detail = " ".join(result.details)
             errors.append(
                 "Delegated draft authority incomplete/blocked: "
-                f"path={artifact_path.as_posix()} reason={result.reason}"
-                + (f" details={detail}" if detail else "")
+                f"path={artifact_path.as_posix()} reason={result.reason}" + (f" details={detail}" if detail else "")
             )
     return errors
 
@@ -139,7 +136,6 @@ def _validate_evidence_adoption_ledgers(graph, *, repo_root: Path) -> list[str]:
         errors.append(
             "Evidence Adoption Ledger incomplete/blocked: "
             f"path={report_path.as_posix()} reason={result.reason} "
-            f"blocking_entry_id={result.blocking_entry_id}"
-            + (f" details={detail}" if detail else "")
+            f"blocking_entry_id={result.blocking_entry_id}" + (f" details={detail}" if detail else "")
         )
     return errors

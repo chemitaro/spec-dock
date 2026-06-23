@@ -108,14 +108,7 @@ def run_to_files(command: list[str], stdout_path: Path, stderr_path: Path) -> in
 
 
 def sha_matches(left: str | None, right: str | None) -> bool:
-    return bool(
-        left
-        and right
-        and (
-            left.lower().startswith(right.lower())
-            or right.lower().startswith(left.lower())
-        )
-    )
+    return bool(left and right and (left.lower().startswith(right.lower()) or right.lower().startswith(left.lower())))
 
 
 def token_source() -> str:
@@ -334,7 +327,9 @@ def pr_metadata_failure_limitation(
     }
 
 
-def collector_decision_payload(review_wrapper_payload: dict[str, object], review_payload: dict[str, object]) -> dict[str, object]:
+def collector_decision_payload(
+    review_wrapper_payload: dict[str, object], review_payload: dict[str, object]
+) -> dict[str, object]:
     wrapper_decision = review_wrapper_payload.get("decision")
     if isinstance(wrapper_decision, dict):
         return wrapper_decision
@@ -367,9 +362,7 @@ def current_selected_actionable_reason(decision: dict[str, object]) -> str | Non
         selected_unresolved_count,
     )
     selected_changes_requested_evidence = decision_list(decision, "selected_changes_requested_evidence")
-    decision_status_reason = (
-        decision.get("status_reason") if isinstance(decision.get("status_reason"), str) else None
-    )
+    decision_status_reason = decision.get("status_reason") if isinstance(decision.get("status_reason"), str) else None
     if (
         decision_status_reason == "current_selected_unresolved_thread"
         or selected_unresolved_count > 0
@@ -384,9 +377,7 @@ def current_selected_actionable_reason(decision: dict[str, object]) -> str | Non
 def carryover_inventory_reason(decision: dict[str, object]) -> str | None:
     carryover_unresolved_count = decision_int(decision, "carryover_unresolved_count")
     carryover_unresolved_thread_ids = decision_list(decision, "carryover_unresolved_thread_ids")
-    decision_status_reason = (
-        decision.get("status_reason") if isinstance(decision.get("status_reason"), str) else None
-    )
+    decision_status_reason = decision.get("status_reason") if isinstance(decision.get("status_reason"), str) else None
     if (
         decision_status_reason == "carryover_non_outdated_unresolved_thread"
         or carryover_unresolved_count > 0
@@ -404,9 +395,7 @@ def explicit_actionable_unresolved_reason(decision: dict[str, object]) -> str | 
     return None
 
 
-def trusted_completion_actionable_reason(
-    decision: dict[str, object], completion_signal: object
-) -> str | None:
+def trusted_completion_actionable_reason(decision: dict[str, object], completion_signal: object) -> str | None:
     current_reason = current_selected_actionable_reason(decision)
     if current_reason:
         return current_reason
@@ -425,9 +414,7 @@ def trusted_completion_actionable_reason(
 def has_blocking_limitation(limitations: list[object], ignored_codes: set[str] | None = None) -> bool:
     ignored_codes = ignored_codes or set()
     return any(
-        isinstance(item, dict)
-        and item.get("severity") == "blocking"
-        and item.get("code") not in ignored_codes
+        isinstance(item, dict) and item.get("severity") == "blocking" and item.get("code") not in ignored_codes
         for item in limitations
     )
 
@@ -467,24 +454,16 @@ def classify_snapshot(
     review_status = review_payload.get("status") or summary.get("review") or "unknown"
     decision = collector_decision_payload(review_wrapper_payload, review_payload)
     decision_status = decision.get("status") if isinstance(decision.get("status"), str) else None
-    decision_status_reason = (
-        decision.get("status_reason") if isinstance(decision.get("status_reason"), str) else None
-    )
+    decision_status_reason = decision.get("status_reason") if isinstance(decision.get("status_reason"), str) else None
     decision_action = (
-        decision.get("recommended_next_action")
-        if isinstance(decision.get("recommended_next_action"), str)
-        else None
+        decision.get("recommended_next_action") if isinstance(decision.get("recommended_next_action"), str) else None
     )
     decision_observation_complete = decision.get("observation_complete")
     selected_changes_requested_evidence = decision_list(decision, "selected_changes_requested_evidence")
     codex_review = (
         review_wrapper_payload.get("codex_review")
         if isinstance(review_wrapper_payload.get("codex_review"), dict)
-        else (
-            review_payload.get("codex_review")
-            if isinstance(review_payload.get("codex_review"), dict)
-            else {}
-        )
+        else (review_payload.get("codex_review") if isinstance(review_payload.get("codex_review"), dict) else {})
     )
     codex_lifecycle = codex_review.get("lifecycle") if isinstance(codex_review.get("lifecycle"), dict) else {}
     completion_signal = decision.get("completion_signal") or codex_lifecycle.get("completion_signal")
@@ -538,11 +517,7 @@ def classify_snapshot(
     if decision_status_reason == "missing_current_completion_signal":
         missing_status = decision_status if decision_status not in {None, "", "unknown"} else "pending"
         missing_action = decision_action or "wait_or_resume"
-        if (
-            missing_action == "wait_or_resume"
-            and not trigger_comment_id
-            and not trigger_created_at
-        ):
+        if missing_action == "wait_or_resume" and not trigger_comment_id and not trigger_created_at:
             missing_action = "wait"
         return str(missing_status), missing_action, False, "missing_current_completion_signal"
     if (
@@ -561,10 +536,15 @@ def classify_snapshot(
             decision_status_reason,
         )
     if review_status in {"requested", "commented", "changes_requested", "unresolved"}:
-        return "human_gate", "address_review_feedback", True, (
-            "current_selected_changes_requested"
-            if review_status == "changes_requested"
-            else "current_selected_unresolved_thread"
+        return (
+            "human_gate",
+            "address_review_feedback",
+            True,
+            (
+                "current_selected_changes_requested"
+                if review_status == "changes_requested"
+                else "current_selected_unresolved_thread"
+            ),
         )
     if completion_signal != "submitted_pull_request_review":
         return "pending", "wait", False, "missing_current_completion_signal"
@@ -689,26 +669,22 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
             )
         )
     elif not metadata or not current_head_sha:
-        limitations.append(
-            {
-                "code": "pr_metadata_schema_unavailable",
-                "source": "gh_pr_view",
-                "severity": "blocking",
-                "message": "fixed PR metadata collection did not return a usable headRefOid",
-            }
-        )
+        limitations.append({
+            "code": "pr_metadata_schema_unavailable",
+            "source": "gh_pr_view",
+            "severity": "blocking",
+            "message": "fixed PR metadata collection did not return a usable headRefOid",
+        })
     elif provided_head_sha and current_head_sha and not sha_matches(current_head_sha, provided_head_sha):
         normalized_status = "stale_head"
         summary["head"] = "stale"
         recommended_next_action = "rerun_for_current_head"
-        limitations.append(
-            {
-                "code": "stale_head",
-                "source": "pr_metadata",
-                "severity": "blocking",
-                "message": "current PR head SHA does not match expected head SHA",
-            }
-        )
+        limitations.append({
+            "code": "stale_head",
+            "source": "pr_metadata",
+            "severity": "blocking",
+            "message": "current PR head SHA does not match expected head SHA",
+        })
     else:
         if final_gh_exit != 0:
             limitations.append(
@@ -720,14 +696,12 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
                 )
             )
         elif not final_current_head_sha:
-            limitations.append(
-                {
-                    "code": "pr_head_revalidation_schema_unavailable",
-                    "source": "gh_pr_view",
-                    "severity": "blocking",
-                    "message": "fixed PR head revalidation did not return a usable headRefOid",
-                }
-            )
+            limitations.append({
+                "code": "pr_head_revalidation_schema_unavailable",
+                "source": "gh_pr_view",
+                "severity": "blocking",
+                "message": "fixed PR head revalidation did not return a usable headRefOid",
+            })
         elif collection_head_sha and not sha_matches(final_current_head_sha, collection_head_sha):
             current_head_sha = final_current_head_sha
             if final_metadata:
@@ -736,19 +710,19 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
             summary["head"] = "stale"
             recommended_next_action = "rerun_for_current_head"
             head_matches_expected = False
-            limitations.append(
-                {
-                    "code": "stale_head",
-                    "source": "pr_metadata_revalidation",
-                    "severity": "blocking",
-                    "message": "current PR head SHA changed during snapshot collection",
-                }
-            )
+            limitations.append({
+                "code": "stale_head",
+                "source": "pr_metadata_revalidation",
+                "severity": "blocking",
+                "message": "current PR head SHA changed during snapshot collection",
+            })
         elif final_current_head_sha:
             current_head_sha = final_current_head_sha
             if final_metadata:
                 metadata = final_metadata
-            head_matches_expected = None if expected_head_sha is None else sha_matches(current_head_sha, expected_head_sha)
+            head_matches_expected = (
+                None if expected_head_sha is None else sha_matches(current_head_sha, expected_head_sha)
+            )
         if summary["head"] != "stale":
             summary["head"] = "matched" if expected_head_sha else "observed"
 
@@ -760,16 +734,14 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
             summary["ci"] = ci_payload.get("status") or "unknown"
             limitations.extend(checks_payload.get("limitations", []))
         else:
-            limitations.append(
-                {
-                    "code": "ci_collection_failed",
-                    "source": "fetch_pr_checks_snapshot.sh",
-                    "severity": "blocking",
-                    "message": "fixed CI/check/status collector failed",
-                    "exit_code": checks_exit,
-                    "stderr_sha256": hashlib.sha256(read_text(checks_stderr).encode()).hexdigest(),
-                }
-            )
+            limitations.append({
+                "code": "ci_collection_failed",
+                "source": "fetch_pr_checks_snapshot.sh",
+                "severity": "blocking",
+                "message": "fixed CI/check/status collector failed",
+                "exit_code": checks_exit,
+                "stderr_sha256": hashlib.sha256(read_text(checks_stderr).encode()).hexdigest(),
+            })
 
         review_payload_raw = load_json_path(review_stdout)
         review_wrapper_payload = review_payload_raw if isinstance(review_payload_raw, dict) else {}
@@ -779,16 +751,14 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
             summary["review"] = review_payload.get("status") or "unknown"
             limitations.extend(review_wrapper_payload.get("limitations", []))
         else:
-            limitations.append(
-                {
-                    "code": "review_collection_failed",
-                    "source": "fetch_pr_review_snapshot.sh",
-                    "severity": "blocking",
-                    "message": "fixed review/comment/thread collector failed",
-                    "exit_code": review_exit,
-                    "stderr_sha256": hashlib.sha256(read_text(review_stderr).encode()).hexdigest(),
-                }
-            )
+            limitations.append({
+                "code": "review_collection_failed",
+                "source": "fetch_pr_review_snapshot.sh",
+                "severity": "blocking",
+                "message": "fixed review/comment/thread collector failed",
+                "exit_code": review_exit,
+                "stderr_sha256": hashlib.sha256(read_text(review_stderr).encode()).hexdigest(),
+            })
     normalized_status, recommended_next_action, observation_complete, status_reason = classify_snapshot(
         summary=summary,
         ci_payload=ci_payload,
@@ -804,14 +774,18 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
     if status_reason in {"current_selected_unresolved_thread", "carryover_non_outdated_unresolved_thread"}:
         summary["review"] = "unresolved"
 
-    review_collector_fingerprint = review_wrapper_payload.get("fingerprint") if isinstance(review_wrapper_payload, dict) else None
+    review_collector_fingerprint = (
+        review_wrapper_payload.get("fingerprint") if isinstance(review_wrapper_payload, dict) else None
+    )
     review_decision_payload = collector_decision_payload(review_wrapper_payload, review_payload)
     review_decision_fingerprint = (
         review_wrapper_payload.get("decision_fingerprint")
         if isinstance(review_wrapper_payload, dict) and review_wrapper_payload.get("decision_fingerprint")
         else review_decision_payload.get("fingerprint")
     )
-    review_audit_fingerprint = review_wrapper_payload.get("audit_fingerprint") if isinstance(review_wrapper_payload, dict) else None
+    review_audit_fingerprint = (
+        review_wrapper_payload.get("audit_fingerprint") if isinstance(review_wrapper_payload, dict) else None
+    )
     if isinstance(review_payload, dict) and review_collector_fingerprint:
         review_payload = {**review_payload, "fingerprint": review_collector_fingerprint}
     codex_review_payload = (
@@ -836,8 +810,7 @@ def observation_snapshot(args: Args, script_dir: Path, tmp_dir: Path) -> str:
         "normalized_status": normalized_status,
         "limitations": [item["code"] for item in limitations if isinstance(item, dict) and "code" in item],
         "ci_status": ci_payload.get("status"),
-        "ci_source_policy": checks_payload_for_fingerprint.get("source_policy")
-        or ci_payload.get("source_policy"),
+        "ci_source_policy": checks_payload_for_fingerprint.get("source_policy") or ci_payload.get("source_policy"),
         "ci_actions": {
             "available": ci_actions.get("available"),
             "workflow_runs": ci_actions.get("workflow_runs"),

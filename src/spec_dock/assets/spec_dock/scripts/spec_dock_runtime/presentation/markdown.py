@@ -48,14 +48,12 @@ def _render_dashboard_md(
             item,
             active_issue_id=active_issue_id,
         )
-        entries.append(
-            {
-                "id": node_id,
-                "title": str(item.get("title") or ""),
-                "state": state,
-                "blockers_top": blockers_top,
-            }
-        )
+        entries.append({
+            "id": node_id,
+            "title": str(item.get("title") or ""),
+            "state": state,
+            "blockers_top": blockers_top,
+        })
 
     by_state: dict[str, list[dict[str, object]]] = {
         "DOING": [],

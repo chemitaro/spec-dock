@@ -149,14 +149,10 @@ def render_new_node_text(result: CreateNodeResult) -> CliText:
     if node.kind == "initiative":
         line = f"spec-dock: ok (new initiative) id={node.id} path={rel}{gh}"
     elif node.kind == "epic":
-        line = (
-            "spec-dock: ok (new epic) "
-            f"id={node.id} initiative={node.initiative_id} path={rel}{gh}"
-        )
+        line = f"spec-dock: ok (new epic) id={node.id} initiative={node.initiative_id} path={rel}{gh}"
     else:
         line = (
-            "spec-dock: ok (new issue) "
-            f"id={node.id} epic={node.epic_id} initiative={node.initiative_id} path={rel}{gh}"
+            f"spec-dock: ok (new issue) id={node.id} epic={node.epic_id} initiative={node.initiative_id} path={rel}{gh}"
         )
     stdout_lines = [line]
     post_sync_line = _post_sync_stdout_line(result.post_sync, label=f"new {node.kind}")
@@ -175,10 +171,7 @@ def render_new_node_text(result: CreateNodeResult) -> CliText:
 
 def render_new_doc_text(result: CreateDiscussionDocResult) -> CliText:
     rel = _rel_path_for_output(result.path.as_posix())
-    line = (
-        "spec-dock: ok (new doc) "
-        f"type={result.doc_type} id={result.doc_id} scope={result.scope_node_id} path={rel}"
-    )
+    line = f"spec-dock: ok (new doc) type={result.doc_type} id={result.doc_id} scope={result.scope_node_id} path={rel}"
     return CliText(stdout_lines=[line], stderr_lines=[], warnings=list(result.warnings))
 
 
@@ -251,10 +244,7 @@ def render_deps_check_text(result: DepsCheckResult) -> CliText:
 
 def render_deps_mutation_text(result: MutateDepsResult) -> CliText:
     stdout_lines = [
-        (
-            f"spec-dock: ok (deps {result.action}) "
-            f"from={result.from_id} to={result.to_id} result={result.result}"
-        )
+        (f"spec-dock: ok (deps {result.action}) from={result.from_id} to={result.to_id} result={result.result}")
     ]
     post_sync_line = _post_sync_stdout_line(result.post_sync, label=f"deps {result.action}")
     if post_sync_line is not None:
@@ -271,12 +261,7 @@ def render_deps_mutation_text(result: MutateDepsResult) -> CliText:
 
 
 def render_deps_mutation_error_text(error: MutateDepsError) -> CliText:
-    stderr_lines = [
-        (
-            f"spec-dock: error (deps {error.action}) "
-            f"from={error.from_id} to={error.to_id} code={error.code}"
-        )
-    ]
+    stderr_lines = [(f"spec-dock: error (deps {error.action}) from={error.from_id} to={error.to_id} code={error.code}")]
     if error.detail:
         stderr_lines.append(f"- {error.detail}")
     return CliText(
@@ -294,11 +279,7 @@ def render_active_show_text(result: ActiveViewResult) -> CliText:
             return entry_id
         return "(none)"
 
-    all_none = (
-        result.initiative.id is None
-        and result.epic.id is None
-        and result.issue.id is None
-    )
+    all_none = result.initiative.id is None and result.epic.id is None and result.issue.id is None
     if all_none:
         stdout_lines = [
             "spec-dock: active: (not set)",
@@ -357,10 +338,7 @@ def render_issue_start_text(result: IssueStartResult) -> CliText:
     epic = selection.epic_id or "(none)"
     issue = selection.issue_id or "(none)"
     stdout_lines = [
-        (
-            "spec-dock: ok (issue start) "
-            f"target={result.target_display} initiative={ini} epic={epic} issue={issue}"
-        )
+        (f"spec-dock: ok (issue start) target={result.target_display} initiative={ini} epic={epic} issue={issue}")
     ]
     if result.active_set.branch is not None:
         stdout_lines.append(f"spec-dock: ok (issue checkout) branch={result.active_set.branch.desired}")
@@ -392,14 +370,8 @@ def render_issue_finish_text(result: IssueFinishResult) -> CliText:
 
 def render_worktree_create_text(result: WorktreeCreateResult) -> CliText:
     stdout_lines = [
-        (
-            "spec-dock: ok (worktree create) "
-            f"id={result.id} branch={result.branch_name} path={result.worktree_path}"
-        ),
-        (
-            "spec-dock: worktree bootstrap "
-            f"status={result.bootstrap_status} command={result.bootstrap_command or '-'}"
-        ),
+        (f"spec-dock: ok (worktree create) id={result.id} branch={result.branch_name} path={result.worktree_path}"),
+        (f"spec-dock: worktree bootstrap status={result.bootstrap_status} command={result.bootstrap_command or '-'}"),
     ]
     return CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=list(result.warnings))
 
@@ -702,9 +674,7 @@ def render_delete_text(result: DeleteNodeResult, *, json_output: bool) -> CliTex
         )
     return CliText(
         stdout_lines=[],
-        stderr_lines=[
-            f"spec-dock: blocked (delete) status={result.status} target={result.target_id or '(none)'}"
-        ],
+        stderr_lines=[f"spec-dock: blocked (delete) status={result.status} target={result.target_id or '(none)'}"],
         warnings=list(result.warnings),
     )
 
@@ -748,5 +718,7 @@ def render_sync_text(result: SyncCommandResult) -> CliText:
         if result.active_update.applied:
             sync_stderr_lines.append(f"spec-dock: sync: active updated ({result.active_update.reason or 'updated'})")
         else:
-            sync_stderr_lines.append(f"spec-dock: sync: active unchanged ({result.active_update.reason or 'unchanged'})")
+            sync_stderr_lines.append(
+                f"spec-dock: sync: active unchanged ({result.active_update.reason or 'unchanged'})"
+            )
     return CliText(stdout_lines=[line], stderr_lines=sync_stderr_lines, warnings=list(result.state.warnings))

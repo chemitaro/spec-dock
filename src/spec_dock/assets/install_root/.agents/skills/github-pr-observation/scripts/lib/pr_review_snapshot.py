@@ -54,9 +54,7 @@ owner = repo.split("/", 1)[0]
 name = repo.split("/", 1)[1]
 pr = int(parsed_args.pr)
 expected_head_sha = parsed_args.head_sha or None
-trigger_comment_id = (
-    int(parsed_args.trigger_comment_id) if parsed_args.trigger_comment_id else None
-)
+trigger_comment_id = int(parsed_args.trigger_comment_id) if parsed_args.trigger_comment_id else None
 trigger_created_at = parsed_args.trigger_created_at or None
 body_mode = parsed_args.body_mode
 out_dir = parsed_args.out
@@ -195,23 +193,31 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
             command.extend(["-F", "after=" + after])
         completed = subprocess.run(command, capture_output=True, text=True, check=False)
         if completed.returncode != 0:
-            return [], review_decision, {
-                "code": "thread_state_unavailable",
-                "source": "graphql.reviewThreads",
-                "severity": "blocking",
-                "message": "fixed GraphQL review thread state collection failed",
-                "exit_code": completed.returncode,
-                "stderr_sha256": hashlib.sha256(completed.stderr.encode()).hexdigest(),
-            }
+            return (
+                [],
+                review_decision,
+                {
+                    "code": "thread_state_unavailable",
+                    "source": "graphql.reviewThreads",
+                    "severity": "blocking",
+                    "message": "fixed GraphQL review thread state collection failed",
+                    "exit_code": completed.returncode,
+                    "stderr_sha256": hashlib.sha256(completed.stderr.encode()).hexdigest(),
+                },
+            )
         try:
             payload = json.loads(completed.stdout or "{}")
         except json.JSONDecodeError:
-            return [], review_decision, {
-                "code": "thread_state_unavailable",
-                "source": "graphql.reviewThreads",
-                "severity": "blocking",
-                "message": "fixed GraphQL review thread state returned non-JSON output",
-            }
+            return (
+                [],
+                review_decision,
+                {
+                    "code": "thread_state_unavailable",
+                    "source": "graphql.reviewThreads",
+                    "severity": "blocking",
+                    "message": "fixed GraphQL review thread state returned non-JSON output",
+                },
+            )
         try:
             pull_request = payload["data"]["repository"]["pullRequest"]
             if review_decision is None:
@@ -219,12 +225,16 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
             review_threads = pull_request["reviewThreads"]
             page_nodes = review_threads["nodes"]
         except (KeyError, TypeError):
-            return [], review_decision, {
-                "code": "thread_state_unavailable",
-                "source": "graphql.reviewThreads",
-                "severity": "blocking",
-                "message": "fixed GraphQL review thread state schema was unavailable",
-            }
+            return (
+                [],
+                review_decision,
+                {
+                    "code": "thread_state_unavailable",
+                    "source": "graphql.reviewThreads",
+                    "severity": "blocking",
+                    "message": "fixed GraphQL review thread state schema was unavailable",
+                },
+            )
         if isinstance(page_nodes, list):
             nodes.extend(page_nodes)
         page_info = review_threads.get("pageInfo") if isinstance(review_threads, dict) else {}
@@ -232,18 +242,26 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
             return nodes, review_decision, None
         after = page_info.get("endCursor")
         if not after:
-            return nodes, review_decision, {
-                "code": "thread_state_partial",
-                "source": "graphql.reviewThreads",
-                "severity": "blocking",
-                "message": "fixed GraphQL review thread pagination had no next cursor",
-            }
-    return nodes, review_decision, {
-        "code": "thread_state_partial",
-        "source": "graphql.reviewThreads",
-        "severity": "blocking",
-        "message": "fixed GraphQL review thread pagination exceeded page limit",
-    }
+            return (
+                nodes,
+                review_decision,
+                {
+                    "code": "thread_state_partial",
+                    "source": "graphql.reviewThreads",
+                    "severity": "blocking",
+                    "message": "fixed GraphQL review thread pagination had no next cursor",
+                },
+            )
+    return (
+        nodes,
+        review_decision,
+        {
+            "code": "thread_state_partial",
+            "source": "graphql.reviewThreads",
+            "severity": "blocking",
+            "message": "fixed GraphQL review thread pagination exceeded page limit",
+        },
+    )
 
 
 def as_list(payload, key=None):
@@ -347,9 +365,7 @@ def latest_iso8601_value(values):
 
 
 def signal_activity_time(signal):
-    return latest_iso8601_value(
-        (signal.get("created_at"), signal.get("submitted_at"), signal.get("updated_at"))
-    )
+    return latest_iso8601_value((signal.get("created_at"), signal.get("submitted_at"), signal.get("updated_at")))
 
 
 def numeric_id_sort_key(value):
@@ -497,9 +513,7 @@ def summarize_signal_collection(items, selected_ids):
         "fetched_ids": compact_ids(items),
         "selected_ids": selected_ids,
         "boundary_before_excluded_count": len(boundary_exclusions),
-        "boundary_before_excluded_ids": [
-            item["id"] for item in boundary_exclusions if item.get("id") is not None
-        ],
+        "boundary_before_excluded_ids": [item["id"] for item in boundary_exclusions if item.get("id") is not None],
         "boundary_before_exclusion_reasons": boundary_exclusions,
     }
 
@@ -534,9 +548,7 @@ def summarize_thread_collection(items, selected_ids, current_unresolved_ids):
         "unresolved_count": len(current_unresolved_ids),
         "unresolved_ids": current_unresolved_ids,
         "boundary_before_excluded_count": len(boundary_exclusions),
-        "boundary_before_excluded_ids": [
-            item["id"] for item in boundary_exclusions if item.get("id") is not None
-        ],
+        "boundary_before_excluded_ids": [item["id"] for item in boundary_exclusions if item.get("id") is not None],
         "boundary_before_exclusion_reasons": boundary_exclusions,
     }
 
@@ -580,14 +592,12 @@ if trigger_comment_id and not trigger_created_at:
         except (TypeError, ValueError):
             continue
     if not trigger_created_at:
-        limitations.append(
-            {
-                "code": "trigger_timestamp_unresolved",
-                "source": "issue_comments",
-                "severity": "informational",
-                "message": "explicit trigger comment id did not resolve to an issue comment timestamp",
-            }
-        )
+        limitations.append({
+            "code": "trigger_timestamp_unresolved",
+            "source": "issue_comments",
+            "severity": "informational",
+            "message": "explicit trigger comment id did not resolve to an issue comment timestamp",
+        })
 
 trigger_source = "none"
 if trigger_comment_id and not trigger_created_at:
@@ -606,127 +616,109 @@ elif issue_comments:
         trigger_comment_id = int(latest.get("id")) if latest.get("id") is not None else None
         trigger_created_at = latest.get("created_at")
         trigger_source = "inferred"
-        limitations.append(
-            {
-                "code": "trigger_inferred",
-                "source": "issue_comments",
-                "severity": "informational",
-                "message": "latest @codex review issue comment was inferred as trigger",
-            }
-        )
+        limitations.append({
+            "code": "trigger_inferred",
+            "source": "issue_comments",
+            "severity": "informational",
+            "message": "latest @codex review issue comment was inferred as trigger",
+        })
     else:
         trigger_source = "unknown"
-        limitations.append(
-            {
-                "code": "trigger_unknown",
-                "source": "issue_comments",
-                "severity": "informational",
-                "message": "no explicit trigger and no @codex review comment were available",
-            }
-        )
-else:
-    trigger_source = "unknown"
-    limitations.append(
-        {
+        limitations.append({
             "code": "trigger_unknown",
             "source": "issue_comments",
             "severity": "informational",
-            "message": "no explicit trigger and no issue comments were available",
-        }
-    )
+            "message": "no explicit trigger and no @codex review comment were available",
+        })
+else:
+    trigger_source = "unknown"
+    limitations.append({
+        "code": "trigger_unknown",
+        "source": "issue_comments",
+        "severity": "informational",
+        "message": "no explicit trigger and no issue comments were available",
+    })
 
 trigger_created_at_dt = parse_iso8601_instant(trigger_created_at)
 if trigger_created_at and trigger_created_at_dt is None:
-    limitations.append(
-        {
-            "code": "trigger_timestamp_unparseable",
-            "source": "trigger_created_at",
-            "severity": "blocking",
-            "message": "trigger timestamp could not be parsed as an aware instant",
-        }
-    )
+    limitations.append({
+        "code": "trigger_timestamp_unparseable",
+        "source": "trigger_created_at",
+        "severity": "blocking",
+        "message": "trigger timestamp could not be parsed as an aware instant",
+    })
 
 signals = []
 for comment in issue_comments:
     raw_body = comment.get("body") or ""
-    signals.append(
-        {
-            "kind": "issue_comment",
-            "id": comment.get("id"),
-            "author": user_login(comment),
-            "codex_authored": is_codex_authored(user_login(comment)),
-            "created_at": comment.get("created_at"),
-            "updated_at": comment.get("updated_at"),
-            "state": "commented",
-            "trigger_command": is_explicit_trigger_comment(comment) or is_trigger_command_body(raw_body),
-            "_raw_body": raw_body,
-        }
-    )
+    signals.append({
+        "kind": "issue_comment",
+        "id": comment.get("id"),
+        "author": user_login(comment),
+        "codex_authored": is_codex_authored(user_login(comment)),
+        "created_at": comment.get("created_at"),
+        "updated_at": comment.get("updated_at"),
+        "state": "commented",
+        "trigger_command": is_explicit_trigger_comment(comment) or is_trigger_command_body(raw_body),
+        "_raw_body": raw_body,
+    })
 
 for review_index, review in enumerate(reviews):
     commit_id = review.get("commit_id")
     stale = bool(expected_head_sha and commit_id and not sha_prefix_matches(commit_id, expected_head_sha))
-    signals.append(
-        {
-            "kind": "pull_review",
-            "id": review.get("id"),
-            "_api_index": review_index,
-            "author": user_login(review),
-            "codex_authored": is_codex_authored(user_login(review)),
-            "submitted_at": review.get("submitted_at"),
-            "commit_id": commit_id,
-            "stale": stale,
-            "state": normalize_review_state(review.get("state")),
-            "_raw_body": review.get("body") or "",
-        }
-    )
+    signals.append({
+        "kind": "pull_review",
+        "id": review.get("id"),
+        "_api_index": review_index,
+        "author": user_login(review),
+        "codex_authored": is_codex_authored(user_login(review)),
+        "submitted_at": review.get("submitted_at"),
+        "commit_id": commit_id,
+        "stale": stale,
+        "state": normalize_review_state(review.get("state")),
+        "_raw_body": review.get("body") or "",
+    })
 
 for comment in review_comments:
     commit_id = comment.get("commit_id")
     stale = bool(expected_head_sha and commit_id and not sha_prefix_matches(commit_id, expected_head_sha))
-    signals.append(
-        {
-            "kind": "pull_review_comment",
-            "id": comment.get("id"),
-            "review_id": comment.get("pull_request_review_id"),
-            "thread_id": comment.get("thread_id"),
-            "author": user_login(comment),
-            "codex_authored": is_codex_authored(user_login(comment)),
-            "created_at": comment.get("created_at"),
-            "updated_at": comment.get("updated_at"),
-            "commit_id": commit_id,
-            "original_commit_id": comment.get("original_commit_id"),
-            "path": comment.get("path"),
-            "line": comment.get("line"),
-            "stale": stale,
-            "state": "commented",
-            "_raw_body": comment.get("body") or "",
-        }
-    )
+    signals.append({
+        "kind": "pull_review_comment",
+        "id": comment.get("id"),
+        "review_id": comment.get("pull_request_review_id"),
+        "thread_id": comment.get("thread_id"),
+        "author": user_login(comment),
+        "codex_authored": is_codex_authored(user_login(comment)),
+        "created_at": comment.get("created_at"),
+        "updated_at": comment.get("updated_at"),
+        "commit_id": commit_id,
+        "original_commit_id": comment.get("original_commit_id"),
+        "path": comment.get("path"),
+        "line": comment.get("line"),
+        "stale": stale,
+        "state": "commented",
+        "_raw_body": comment.get("body") or "",
+    })
 
 review_request_signals = []
 for reviewer in requested_reviewers:
     login = reviewer.get("login") if isinstance(reviewer, dict) else None
-    review_request_signals.append(
-        {
-            "kind": "review_request",
-            "target_type": "user",
-            "target": login,
-            "codex_authored": is_codex_authored(login),
-            "state": "requested",
-        }
-    )
+    review_request_signals.append({
+        "kind": "review_request",
+        "target_type": "user",
+        "target": login,
+        "codex_authored": is_codex_authored(login),
+        "state": "requested",
+    })
 for team in requested_teams:
     slug = team.get("slug") if isinstance(team, dict) else None
-    review_request_signals.append(
-        {
-            "kind": "review_request",
-            "target_type": "team",
-            "target": slug,
-            "codex_authored": False,
-            "state": "requested",
-        }
-    )
+    review_request_signals.append({
+        "kind": "review_request",
+        "target_type": "team",
+        "target": slug,
+        "codex_authored": False,
+        "state": "requested",
+    })
 
 review_decision_requires_review = str(review_decision or "").upper() == "REVIEW_REQUIRED"
 review_decision_changes_requested = str(review_decision or "").upper() == "CHANGES_REQUESTED"
@@ -737,16 +729,10 @@ thread_states_by_thread_id = {}
 for thread in thread_nodes:
     comments = thread_comment_nodes(thread)
     first_comment = comments[0] if comments else {}
-    latest_comment_created_at = latest_iso8601_value(
-        comment.get("createdAt") for comment in comments
-    )
-    latest_comment_updated_at = latest_iso8601_value(
-        comment.get("updatedAt") for comment in comments
-    )
+    latest_comment_created_at = latest_iso8601_value(comment.get("createdAt") for comment in comments)
+    latest_comment_updated_at = latest_iso8601_value(comment.get("updatedAt") for comment in comments)
     activity_at = latest_iso8601_value(
-        timestamp
-        for comment in comments
-        for timestamp in (comment.get("createdAt"), comment.get("updatedAt"))
+        timestamp for comment in comments for timestamp in (comment.get("createdAt"), comment.get("updatedAt"))
     )
     resolved = thread.get("isResolved")
     outdated = thread.get("isOutdated")
@@ -777,22 +763,20 @@ for thread in thread_nodes:
                 "thread_id": thread_id,
                 "state": state,
             }
-    threads.append(
-        {
-            "id": thread.get("id"),
-            "state": state,
-            "is_resolved": resolved,
-            "is_outdated": outdated,
-            "comment_count": len(comments),
-            "comment_ids": comment_ids,
-            "first_comment_id": first_comment.get("databaseId") or first_comment.get("id"),
-            "first_comment_author": user_login(first_comment),
-            "first_comment_created_at": first_comment.get("createdAt"),
-            "latest_comment_created_at": latest_comment_created_at,
-            "latest_comment_updated_at": latest_comment_updated_at,
-            "activity_at": activity_at,
-        }
-    )
+    threads.append({
+        "id": thread.get("id"),
+        "state": state,
+        "is_resolved": resolved,
+        "is_outdated": outdated,
+        "comment_count": len(comments),
+        "comment_ids": comment_ids,
+        "first_comment_id": first_comment.get("databaseId") or first_comment.get("id"),
+        "first_comment_author": user_login(first_comment),
+        "first_comment_created_at": first_comment.get("createdAt"),
+        "latest_comment_created_at": latest_comment_created_at,
+        "latest_comment_updated_at": latest_comment_updated_at,
+        "activity_at": activity_at,
+    })
 
 signals.sort(key=signal_sort_key)
 body_state = {
@@ -826,18 +810,14 @@ for signal in signals:
     signal.pop("_raw_body_artifact", None)
 
 if body_mode == "trigger-window-full":
-    limitations.append(
-        {
-            "code": "body_mode_full_stdout_risk",
-            "source": "body_mode",
-            "severity": "informational",
-            "message": "trigger-window-full may produce large stdout JSON",
-        }
-    )
+    limitations.append({
+        "code": "body_mode_full_stdout_risk",
+        "source": "body_mode",
+        "severity": "informational",
+        "message": "trigger-window-full may produce large stdout JSON",
+    })
 
-blocking_collection_failure = any(
-    item.get("severity") == "blocking" for item in limitations
-)
+blocking_collection_failure = any(item.get("severity") == "blocking" for item in limitations)
 
 counts = {
     "all": {
@@ -889,28 +869,21 @@ active_review_signals = list(current_review_by_author.values())
 active_comment_signals = [
     item
     for item in status_signals
-    if item.get("kind") == "pull_review_comment"
-    and item.get("thread_state") not in {"resolved", "outdated"}
+    if item.get("kind") == "pull_review_comment" and item.get("thread_state") not in {"resolved", "outdated"}
 ]
 selected_review_signals = [
     item
     for item in active_review_signals
-    if item.get("codex_authored")
-    and item.get("state") in {"commented", "approved", "changes_requested"}
+    if item.get("codex_authored") and item.get("state") in {"commented", "approved", "changes_requested"}
 ]
-selected_review_ids = [
-    item.get("id") for item in selected_review_signals if item.get("id") is not None
-]
+selected_review_ids = [item.get("id") for item in selected_review_signals if item.get("id") is not None]
 selected_review_id_set = {str(value) for value in selected_review_ids}
 selected_comment_signals = [
     item
     for item in active_comment_signals
-    if item.get("review_id") is not None
-    and str(item.get("review_id")) in selected_review_id_set
+    if item.get("review_id") is not None and str(item.get("review_id")) in selected_review_id_set
 ]
-selected_review_comment_ids = [
-    item.get("id") for item in selected_comment_signals if item.get("id") is not None
-]
+selected_review_comment_ids = [item.get("id") for item in selected_comment_signals if item.get("id") is not None]
 selected_thread_ids = []
 for item in selected_comment_signals:
     thread_id = item.get("thread_id")
@@ -924,18 +897,12 @@ current_unresolved_thread_ids = [
     and (not body_state["trigger_known"] or thread_after_trigger(item))
 ]
 unresolved_thread_id_set = {
-    str(item.get("id"))
-    for item in threads
-    if item.get("state") == "unresolved" and item.get("id") is not None
+    str(item.get("id")) for item in threads if item.get("state") == "unresolved" and item.get("id") is not None
 }
 selected_unresolved_thread_ids = [
-    thread_id
-    for thread_id in selected_thread_ids
-    if str(thread_id) in unresolved_thread_id_set
+    thread_id for thread_id in selected_thread_ids if str(thread_id) in unresolved_thread_id_set
 ]
-selected_unresolved_thread_id_set = {
-    str(thread_id) for thread_id in selected_unresolved_thread_ids
-}
+selected_unresolved_thread_id_set = {str(thread_id) for thread_id in selected_unresolved_thread_ids}
 carryover_non_outdated_unresolved_threads = [
     item
     for item in threads
@@ -943,9 +910,7 @@ carryover_non_outdated_unresolved_threads = [
     and item.get("id") is not None
     and str(item.get("id")) not in selected_unresolved_thread_id_set
 ]
-carryover_unresolved_thread_ids = [
-    item.get("id") for item in carryover_non_outdated_unresolved_threads
-]
+carryover_unresolved_thread_ids = [item.get("id") for item in carryover_non_outdated_unresolved_threads]
 actionable_unresolved_thread_ids = list(selected_unresolved_thread_ids)
 for thread_id in carryover_unresolved_thread_ids:
     if thread_id not in actionable_unresolved_thread_ids:
@@ -991,9 +956,7 @@ def selected_review_comment_item(item):
 
 
 reviews_for_summary = [item for item in signals if item.get("kind") == "pull_review"]
-review_comments_for_summary = [
-    item for item in signals if item.get("kind") == "pull_review_comment"
-]
+review_comments_for_summary = [item for item in signals if item.get("kind") == "pull_review_comment"]
 review_collection_summary = {
     "reviews": summarize_signal_collection(reviews_for_summary, selected_review_ids),
     "review_comments": summarize_signal_collection(
@@ -1007,13 +970,9 @@ review_collection_summary = {
     ),
 }
 review_collection_summary["review_threads"]["non_outdated_unresolved_ids"] = [
-    item.get("id")
-    for item in threads
-    if item.get("state") == "unresolved" and item.get("id") is not None
+    item.get("id") for item in threads if item.get("state") == "unresolved" and item.get("id") is not None
 ]
-review_collection_summary["review_threads"]["carryover_non_outdated_unresolved_ids"] = (
-    carryover_unresolved_thread_ids
-)
+review_collection_summary["review_threads"]["carryover_non_outdated_unresolved_ids"] = carryover_unresolved_thread_ids
 
 
 def normalized_body_text(value):
@@ -1029,12 +988,7 @@ def reviewed_commit_from_no_findings_body(raw_body):
 
 
 def is_strict_no_findings_issue_comment(item):
-    raw_body = str(
-        item.get("_fallback_pass_raw_body")
-        or item.get("_raw_body_artifact")
-        or item.get("body")
-        or ""
-    )
+    raw_body = str(item.get("_fallback_pass_raw_body") or item.get("_raw_body_artifact") or item.get("body") or "")
     allowed_full_bodies = {
         "no major issues found",
         "no major issues found.",
@@ -1047,11 +1001,7 @@ def is_strict_no_findings_issue_comment(item):
     normalized_body = normalized_body_text(raw_body)
     if normalized_body in allowed_full_bodies:
         return True
-    non_empty_lines = [
-        normalized_body_text(line)
-        for line in raw_body.splitlines()
-        if line.strip()
-    ]
+    non_empty_lines = [normalized_body_text(line) for line in raw_body.splitlines() if line.strip()]
     if not non_empty_lines:
         return False
     first_line = non_empty_lines[0]
@@ -1070,21 +1020,16 @@ def is_strict_no_findings_issue_comment(item):
 current_codex_issue_comments = [
     item
     for item in signals
-    if item.get("kind") == "issue_comment"
-    and item.get("codex_authored")
-    and item.get("current_status_signal")
+    if item.get("kind") == "issue_comment" and item.get("codex_authored") and item.get("current_status_signal")
 ]
-latest_current_codex_issue_comment = (
-    current_codex_issue_comments[-1] if current_codex_issue_comments else None
-)
+latest_current_codex_issue_comment = current_codex_issue_comments[-1] if current_codex_issue_comments else None
 latest_current_codex_issue_comment_is_no_findings = (
     latest_current_codex_issue_comment is not None
     and is_strict_no_findings_issue_comment(latest_current_codex_issue_comment)
 )
 no_findings_source_ids = (
     [latest_current_codex_issue_comment.get("id")]
-    if latest_current_codex_issue_comment_is_no_findings
-    and latest_current_codex_issue_comment.get("id") is not None
+    if latest_current_codex_issue_comment_is_no_findings and latest_current_codex_issue_comment.get("id") is not None
     else []
 )
 stale_codex_head_context_present = any(
@@ -1108,8 +1053,7 @@ pending_codex_review_signals = [
     and (item.get("current_status_signal") or not signal_activity_time(item))
 ]
 current_pending_codex_review_present = any(
-    item.get("codex_authored") and item.get("state") == "pending"
-    for item in active_review_signals
+    item.get("codex_authored") and item.get("state") == "pending" for item in active_review_signals
 ) or any(item.get("codex_authored") for item in review_request_signals)
 if pending_codex_review_signals:
     current_pending_codex_review_present = True
@@ -1160,9 +1104,7 @@ selected_changes_requested_reviews = [
 selected_changes_requested_review_ids = [
     item.get("id") for item in selected_changes_requested_reviews if item.get("id") is not None
 ]
-selected_changes_requested_review_id_set = {
-    str(value) for value in selected_changes_requested_review_ids
-}
+selected_changes_requested_review_id_set = {str(value) for value in selected_changes_requested_review_ids}
 selected_changes_requested_comments = [
     item
     for item in status_signals
@@ -1214,11 +1156,7 @@ no_completion_present = no_completion_category == "missing_current_completion_si
 no_completion_evidence = {
     "present": no_completion_present,
     "category": no_completion_category,
-    "reason": (
-        "current_boundary_has_no_completion_or_blocking_signal"
-        if no_completion_present
-        else None
-    ),
+    "reason": ("current_boundary_has_no_completion_or_blocking_signal" if no_completion_present else None),
     "requires_wait_stability": no_completion_present,
     "promotes_top_level_status": False,
     "pending_review_present": pending_review_present,
@@ -1239,9 +1177,7 @@ codex_review_payload = {
         "no_completion_evidence": no_completion_evidence,
     },
     "selected_reviews": [selected_review_item(item) for item in selected_review_signals],
-    "selected_review_comments": [
-        selected_review_comment_item(item) for item in selected_comment_signals
-    ],
+    "selected_review_comments": [selected_review_comment_item(item) for item in selected_comment_signals],
     "collection_summary": review_collection_summary,
 }
 for signal in signals:
@@ -1252,11 +1188,17 @@ if blocking_collection_failure:
     status = "unknown"
 elif current_unresolved_thread_ids:
     status = "unresolved"
-elif any(item.get("state") == "changes_requested" for item in active_review_signals) or review_decision_changes_requested:
+elif (
+    any(item.get("state") == "changes_requested" for item in active_review_signals) or review_decision_changes_requested
+):
     status = "changes_requested"
 elif review_request_signals or review_decision_requires_review:
     status = "requested"
-elif any(item.get("state") == "commented" for item in active_review_signals) or active_comment_signals or any(item.get("state") == "commented" and item.get("kind") == "issue_comment" for item in status_signals):
+elif (
+    any(item.get("state") == "commented" for item in active_review_signals)
+    or active_comment_signals
+    or any(item.get("state") == "commented" and item.get("kind") == "issue_comment" for item in status_signals)
+):
     status = "commented"
 elif any(item.get("state") == "approved" for item in active_review_signals):
     status = "approved"
@@ -1340,11 +1282,7 @@ no_findings_completion_candidate = {
     "present": bool(no_findings_completion_promotes),
     "source": "issue_comment" if no_findings_source_ids else None,
     "source_ids": no_findings_source_ids,
-    "reason": (
-        "current_boundary_codex_no_findings_comment"
-        if no_findings_completion_promotes
-        else None
-    ),
+    "reason": ("current_boundary_codex_no_findings_comment" if no_findings_completion_promotes else None),
     "promotes_top_level_status": bool(no_findings_completion_promotes),
 }
 if selected_unresolved_thread_ids:
@@ -1369,15 +1307,11 @@ elif completion_signal == "none":
     decision_action = "wait_or_resume"
 else:
     decision_status_reason = (
-        "codex_no_findings_issue_comment"
-        if completion_signal == "codex_no_findings_issue_comment"
-        else "passed"
+        "codex_no_findings_issue_comment" if completion_signal == "codex_no_findings_issue_comment" else "passed"
     )
     decision_status = "passed"
     decision_action = (
-        "review_completion_observed"
-        if completion_signal == "codex_no_findings_issue_comment"
-        else "merge_prepared"
+        "review_completion_observed" if completion_signal == "codex_no_findings_issue_comment" else "merge_prepared"
     )
 decision_scope = (
     "current_trigger_boundary"
@@ -1418,11 +1352,7 @@ decision_source = {
     "fallback_pass_candidate": fallback_pass_candidate,
     "no_findings_completion_candidate": no_findings_completion_candidate,
     "no_completion_evidence": no_completion_evidence,
-    "blocking_limitations": [
-        item.get("code")
-        for item in limitations
-        if item.get("severity") == "blocking"
-    ],
+    "blocking_limitations": [item.get("code") for item in limitations if item.get("severity") == "blocking"],
 }
 decision_fingerprint = hashlib.sha256(
     json.dumps(decision_source, sort_keys=True, separators=(",", ":")).encode()
@@ -1433,11 +1363,7 @@ decision_payload["fingerprint"] = decision_fingerprint
 audit_fingerprint_source = {
     "status": status,
     "signals": [fingerprint_signal(item) for item in signals],
-    "codex_authored": [
-        fingerprint_signal(item)
-        for item in signals
-        if item.get("codex_authored")
-    ],
+    "codex_authored": [fingerprint_signal(item) for item in signals if item.get("codex_authored")],
     "review_requests": review_request_signals,
     "review_decision": review_decision,
     "threads": [fingerprint_thread(item) for item in threads],
@@ -1459,15 +1385,9 @@ fingerprint = audit_fingerprint
 review_current_payload = {
     "scope": decision_scope,
     "signals": status_signals,
-    "codex_authored": [
-        item
-        for item in status_signals + review_request_signals
-        if item.get("codex_authored")
-    ],
+    "codex_authored": [item for item in status_signals + review_request_signals if item.get("codex_authored")],
     "selected_reviews": [selected_review_item(item) for item in selected_review_signals],
-    "selected_review_comments": [
-        selected_review_comment_item(item) for item in selected_comment_signals
-    ],
+    "selected_review_comments": [selected_review_comment_item(item) for item in selected_comment_signals],
     "selected_review_ids": selected_review_ids,
     "selected_review_comment_ids": selected_review_comment_ids,
     "selected_thread_ids": selected_thread_ids,
@@ -1484,17 +1404,11 @@ review_audit_payload = {
     "scope": "all_fetched",
     "decision_authoritative": False,
     "signals": signals,
-    "codex_authored": [
-        item for item in signals + review_request_signals if item.get("codex_authored")
-    ],
+    "codex_authored": [item for item in signals + review_request_signals if item.get("codex_authored")],
     "threads": thread_counts,
-    "non_outdated_unresolved_thread_ids": review_collection_summary["review_threads"][
-        "non_outdated_unresolved_ids"
-    ],
+    "non_outdated_unresolved_thread_ids": review_collection_summary["review_threads"]["non_outdated_unresolved_ids"],
     "unknown_outdated_unresolved_thread_ids": [
-        item.get("id")
-        for item in threads
-        if item.get("state") == "unknown_outdated" and item.get("id") is not None
+        item.get("id") for item in threads if item.get("state") == "unknown_outdated" and item.get("id") is not None
     ],
     "fingerprint": audit_fingerprint,
 }
@@ -1520,9 +1434,7 @@ payload = {
         "signals_decision_authoritative": False,
         "review_requests": review_request_signals,
         "review_decision": review_decision,
-        "codex_authored": [
-            item for item in signals + review_request_signals if item.get("codex_authored")
-        ],
+        "codex_authored": [item for item in signals + review_request_signals if item.get("codex_authored")],
         "codex_authored_scope": "all_fetched",
         "codex_authored_decision_authoritative": False,
         "summary": counts,

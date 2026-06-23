@@ -208,7 +208,7 @@ def _parse_worktree_porcelain(text: str) -> list[GitWorktreeRecord]:
         branch = None
         if isinstance(branch_ref, str):
             prefix = "refs/heads/"
-            branch = branch_ref[len(prefix):] if branch_ref.startswith(prefix) else branch_ref
+            branch = branch_ref[len(prefix) :] if branch_ref.startswith(prefix) else branch_ref
         records.append(
             GitWorktreeRecord(
                 path=Path(str(current["path"])),
@@ -228,11 +228,11 @@ def _parse_worktree_porcelain(text: str) -> list[GitWorktreeRecord]:
             continue
         if line.startswith("worktree "):
             flush()
-            current = {"path": line[len("worktree "):]}
+            current = {"path": line[len("worktree ") :]}
         elif line.startswith("HEAD "):
-            current["head"] = line[len("HEAD "):]
+            current["head"] = line[len("HEAD ") :]
         elif line.startswith("branch "):
-            current["branch"] = line[len("branch "):]
+            current["branch"] = line[len("branch ") :]
         elif line == "detached":
             current["detached"] = True
         elif line == "bare":

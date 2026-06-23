@@ -46,14 +46,7 @@ def _patch_object(target, name, replacement=_MISSING, *, side_effect=_MISSING, r
 
 
 def _runtime_fs_repo():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.infra import fs_repo as infra_fs_repo
@@ -239,10 +232,10 @@ class TestCliDelete(CliRuntimeHarness):
         assert node_id not in index["nodes"]
         assert node_id not in deps_issues["nodes"]
         assert not any(
-                edge.get("from") == node_id or edge.get("to") == node_id
-                for edge in deps_issues.get("edges", [])
-                if isinstance(edge, dict)
-            )
+            edge.get("from") == node_id or edge.get("to") == node_id
+            for edge in deps_issues.get("edges", [])
+            if isinstance(edge, dict)
+        )
         assert node_id not in dashboard
         assert node_id not in deps_puml
 
@@ -487,7 +480,10 @@ class TestCliDelete(CliRuntimeHarness):
         assert len(issue58_matches) == 1
         issue58_dir = issue58_matches[0]
         issue58_meta_path = issue58_dir / ".meta.json"
-        assert "iss-00056" in [str(item).lower() for item in json.loads(issue58_meta_path.read_text(encoding="utf-8")).get("depends_on", [])]
+        assert "iss-00056" in [
+            str(item).lower()
+            for item in json.loads(issue58_meta_path.read_text(encoding="utf-8")).get("depends_on", [])
+        ]
 
         deleted = self._run_runtime_capture(
             target,
@@ -510,10 +506,10 @@ class TestCliDelete(CliRuntimeHarness):
         assert synced.returncode == 0, synced.stdout + synced.stderr
         deps_payload = json.loads((target / "spec-dock" / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
         assert not any(
-                edge.get("from") == "iss-00058" and edge.get("to") == "iss-00056"
-                for edge in deps_payload.get("edges", [])
-                if isinstance(edge, dict)
-            )
+            edge.get("from") == "iss-00058" and edge.get("to") == "iss-00056"
+            for edge in deps_payload.get("edges", [])
+            if isinstance(edge, dict)
+        )
 
         activated = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00058", "--force"], env=env)
         assert activated.returncode == 0, activated.stdout + activated.stderr

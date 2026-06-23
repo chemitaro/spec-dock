@@ -8,14 +8,7 @@ import tempfile
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.application import (
@@ -28,7 +21,16 @@ def _runtime_modules():
         from spec_dock_runtime.infra import contracts as infra_contracts
     finally:
         sys.path.pop(0)
-    return app_contracts, app_delete_node, app_ports, cli_dispatch, cli_parser, cli_registry, domain_models, infra_contracts
+    return (
+        app_contracts,
+        app_delete_node,
+        app_ports,
+        cli_dispatch,
+        cli_parser,
+        cli_registry,
+        domain_models,
+        infra_contracts,
+    )
 
 
 def _record(
@@ -50,12 +52,7 @@ def _record(
         node_dir = repo_root / "spec-dock" / "initiatives" / f"{node_id}-title"
     elif kind == "epic":
         node_dir = (
-            repo_root
-            / "spec-dock"
-            / "initiatives"
-            / f"{initiative_node_id}-title"
-            / "epics"
-            / f"{node_id}-title"
+            repo_root / "spec-dock" / "initiatives" / f"{initiative_node_id}-title" / "epics" / f"{node_id}-title"
         )
     else:
         node_dir = (
@@ -286,9 +283,7 @@ class _StubNodeRepository:
         to_id_text = str(to_id)
         matching_ref_values = list(matching_refs or [])
         payload["depends_on"] = [
-            dep
-            for dep in depends_on
-            if str(dep) != to_id_text and not any(dep == ref for ref in matching_ref_values)
+            dep for dep in depends_on if str(dep) != to_id_text and not any(dep == ref for ref in matching_ref_values)
         ]
         meta_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -391,9 +386,16 @@ class TestRuntimeDeleteS13:
         node_reader=None,
         sync_legacy_runner=None,
     ):
-        app_contracts, _app_delete_node, app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models_, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            _app_delete_node,
+            app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models_,
+            infra_contracts,
+        ) = _runtime_modules()
         if repo_root is None:
             repo_root = Path("/repo")
         for record in records:
@@ -414,8 +416,7 @@ class TestRuntimeDeleteS13:
             active_state_store=active_state_store or _StubActiveStateStore(infra_contracts, active_manifest),
             issue_gateway=issue_gateway,
             node_repo=node_repo,
-            sync_legacy_runner=sync_legacy_runner
-            or _SuccessfulSyncLegacyRunner(app_contracts, domain_models_),
+            sync_legacy_runner=sync_legacy_runner or _SuccessfulSyncLegacyRunner(app_contracts, domain_models_),
         )
 
     def _request(self, app_contracts, **overrides):
@@ -432,18 +433,32 @@ class TestRuntimeDeleteS13:
         return app_contracts.DeleteNodeRequest(**payload)
 
     def test_selector_missing_returns_invalid_selector_combination(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
         result = app_delete_node.delete_node(self._request(app_contracts), ports)
         assert result.status == "invalid_selector_combination"
 
     def test_selector_multiple_returns_invalid_selector_combination(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
         result = app_delete_node.delete_node(
@@ -453,18 +468,32 @@ class TestRuntimeDeleteS13:
         assert result.status == "invalid_selector_combination"
 
     def test_malformed_github_issue_returns_invalid_selector_syntax(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
         result = app_delete_node.delete_node(self._request(app_contracts, github_issue="#56"), ports)
         assert result.status == "invalid_selector_syntax"
 
     def test_node_id_exact_match_resolve(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root_pos = self._new_repo_root()
         ports_pos = self._ports(records=self._records(infra_contracts, repo_root_pos), repo_root=repo_root_pos)
         result_pos = app_delete_node.delete_node(
@@ -488,9 +517,16 @@ class TestRuntimeDeleteS13:
         assert result_id.remaining_node_ids == []
 
     def test_github_issue_selector_is_normalized(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root, with_github_links=True)
         issue_gateway = _StubIssueGateway(
@@ -514,9 +550,16 @@ class TestRuntimeDeleteS13:
         assert issue_gateway.close_calls == [(str(repo_root), "example/repo", 56)]
 
     def test_ambiguous_target_for_github_issue(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = [
             *self._records(infra_contracts, repo_root, with_github_links=True),
@@ -531,7 +574,7 @@ class TestRuntimeDeleteS13:
                 github_issue_number=56,
                 github_repo_owner="example",
                 github_repo_name="repo",
-            )
+            ),
         ]
         ports = self._ports(records=records, repo_root=repo_root)
         result = app_delete_node.delete_node(self._request(app_contracts, github_issue="56", confirmed=True), ports)
@@ -540,9 +583,16 @@ class TestRuntimeDeleteS13:
         assert "iss-local-00056" in result.offending_node_ids
 
     def test_unrelated_invalid_id_record_fails_closed_before_local_delete(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = [
             *self._records(infra_contracts, repo_root),
@@ -555,7 +605,7 @@ class TestRuntimeDeleteS13:
                 initiative_id="init-local-00001",
                 epic_id="epic-local-00001",
                 github_issue_number=99,
-            )
+            ),
         ]
         ports = self._ports(records=records, repo_root=repo_root)
         result = app_delete_node.delete_node(
@@ -570,9 +620,16 @@ class TestRuntimeDeleteS13:
         assert result.remaining_node_ids == []
 
     def test_preflight_precedence_confirmation_before_recursive_active_deps(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         manifest = infra_contracts.ActiveManifest(
             initiative=infra_contracts.ActiveManifestEntry(id="init-local-00001", path="spec-dock/initiatives/x"),
             epic=None,
@@ -592,9 +649,16 @@ class TestRuntimeDeleteS13:
         assert result.status == "confirmation_required"
 
     def test_active_conflict(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         manifest = infra_contracts.ActiveManifest(
             initiative=None,
             epic=None,
@@ -613,9 +677,16 @@ class TestRuntimeDeleteS13:
         assert result.status == "active_conflict"
 
     def test_dependency_conflict(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         ports = self._ports(
             records=self._records(infra_contracts, repo_root),
@@ -629,9 +700,16 @@ class TestRuntimeDeleteS13:
         assert result.status == "dependency_conflict"
 
     def test_dependency_topology_load_failure_returns_metadata_validation_failed_and_skips_local_delete(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root, with_github_links=True)
         node_repo = _StubNodeRepository()
@@ -676,9 +754,16 @@ class TestRuntimeDeleteS13:
         assert Path(records[2].path).exists()
 
     def test_node_dependency_resolution_failure_fails_closed_before_local_delete_or_scrub(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root, with_github_links=True)
         issue_gateway = _StubIssueGateway(
@@ -734,9 +819,16 @@ class TestRuntimeDeleteS13:
         assert Path(records[2].path).exists()
 
     def test_parent_dependency_conflict_without_force_stops_before_local_delete_mutation(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = [
             _record(
@@ -824,9 +916,16 @@ class TestRuntimeDeleteS13:
         assert "snapshot_current_state" not in active_calls
 
     def test_subtree_internal_dependency_is_not_conflict(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         ports = self._ports(
             records=self._records(infra_contracts, repo_root),
@@ -855,9 +954,16 @@ class TestRuntimeDeleteS13:
         assert result.remote_close.skipped_not_attempted == []
 
     def test_missing_recursive_for_parent(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
         result = app_delete_node.delete_node(
@@ -867,9 +973,16 @@ class TestRuntimeDeleteS13:
         assert result.status == "recursive_required"
 
     def test_missing_target_path(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root)
         ports = self._ports(records=records, repo_root=repo_root)
@@ -881,18 +994,32 @@ class TestRuntimeDeleteS13:
         assert result.status == "target_not_found"
 
     def test_missing_yes(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
         result = app_delete_node.delete_node(self._request(app_contracts, node_id="iss-local-00056"), ports)
         assert result.status == "confirmation_required"
 
     def test_force_does_not_override_missing_target_recursive_yes(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
 
@@ -915,9 +1042,16 @@ class TestRuntimeDeleteS13:
         assert result_missing_yes.status == "confirmation_required"
 
     def test_force_positive_path_overrides_active_and_dependency_conflict(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         manifest = infra_contracts.ActiveManifest(
             initiative=None,
             epic=None,
@@ -940,9 +1074,16 @@ class TestRuntimeDeleteS13:
         assert result.remaining_node_ids == []
 
     def test_issue_recursive_flag_is_accepted_noop(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
         result = app_delete_node.delete_node(
@@ -954,9 +1095,16 @@ class TestRuntimeDeleteS13:
         assert result.remaining_node_ids == []
 
     def test_would_match_target_invalid_metadata_returns_metadata_validation_failed(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root)
         ports = self._ports(records=records, repo_root=repo_root)
@@ -976,9 +1124,16 @@ class TestRuntimeDeleteS13:
         assert result.remote_close.skipped_not_attempted == []
 
     def test_target_local_metadata_load_failure_is_normalized_before_graph_build(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root)
         target_meta_path = Path(records[2].meta_path)
@@ -996,7 +1151,9 @@ class TestRuntimeDeleteS13:
         assert result.status == "metadata_validation_failed"
         assert result.target_id == "iss-local-00056"
         assert result.offending_node_ids == ["iss-local-00056"]
-        assert [(reason.node_id, reason.code) for reason in result.validation_reasons] == [("iss-local-00056", "metadata_validation_failed")]
+        assert [(reason.node_id, reason.code) for reason in result.validation_reasons] == [
+            ("iss-local-00056", "metadata_validation_failed")
+        ]
         assert result.remote_close is not None
         assert result.remote_close.closed == []
         assert result.remote_close.noop_already_closed == []
@@ -1004,9 +1161,16 @@ class TestRuntimeDeleteS13:
         assert result.remote_close.skipped_not_attempted == []
 
     def test_target_local_metadata_load_failure_uses_error_path_when_directory_match_is_ambiguous(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root)
         ports = self._ports(records=records, repo_root=repo_root)
@@ -1030,7 +1194,9 @@ class TestRuntimeDeleteS13:
         assert result.status == "metadata_validation_failed"
         assert result.target_id == "iss-local-00056"
         assert result.offending_node_ids == ["iss-local-00056"]
-        assert [(reason.node_id, reason.code) for reason in result.validation_reasons] == [("iss-local-00056", "metadata_validation_failed")]
+        assert [(reason.node_id, reason.code) for reason in result.validation_reasons] == [
+            ("iss-local-00056", "metadata_validation_failed")
+        ]
         assert result.remote_close is not None
         assert result.remote_close.closed == []
         assert result.remote_close.noop_already_closed == []
@@ -1038,21 +1204,23 @@ class TestRuntimeDeleteS13:
         assert result.remote_close.skipped_not_attempted == []
 
     def test_target_local_metadata_load_failure_ignores_non_canonical_duplicate_like_directory(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root)
         target_meta_path = Path(records[2].meta_path)
         target_meta_path.parent.mkdir(parents=True, exist_ok=True)
         target_meta_path.write_text("{invalid-json", encoding="utf-8")
         non_canonical_dir = (
-            repo_root
-            / "spec-dock"
-            / "initiatives"
-            / "stale-sandbox"
-            / "issues"
-            / f"{records[2].id}-shadow"
+            repo_root / "spec-dock" / "initiatives" / "stale-sandbox" / "issues" / f"{records[2].id}-shadow"
         )
         non_canonical_dir.mkdir(parents=True, exist_ok=True)
         (non_canonical_dir / ".meta.json").write_text("{}\n", encoding="utf-8")
@@ -1070,7 +1238,9 @@ class TestRuntimeDeleteS13:
         assert result.status == "metadata_validation_failed"
         assert result.target_id == "iss-local-00056"
         assert result.offending_node_ids == ["iss-local-00056"]
-        assert [(reason.node_id, reason.code) for reason in result.validation_reasons] == [("iss-local-00056", "metadata_validation_failed")]
+        assert [(reason.node_id, reason.code) for reason in result.validation_reasons] == [
+            ("iss-local-00056", "metadata_validation_failed")
+        ]
         assert result.remote_close is not None
         assert result.remote_close.closed == []
         assert result.remote_close.noop_already_closed == []
@@ -1078,9 +1248,16 @@ class TestRuntimeDeleteS13:
         assert result.remote_close.skipped_not_attempted == []
 
     def test_parent_recursive_delete_fails_with_subtree_metadata_validation_errors(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = [
             _record(
@@ -1174,9 +1351,16 @@ class TestRuntimeDeleteS13:
         assert result.remote_close.skipped_not_attempted == []
 
     def test_parent_recursive_delete_aborts_local_delete_when_remote_close_barrier_fails(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = [
             _record(
@@ -1230,11 +1414,31 @@ class TestRuntimeDeleteS13:
                 github_issue_number=9,
             ),
         ]
-        records[0] = infra_contracts.StoredMetaRecord(**{**records[0].__dict__, "github_repo_owner": "alpha", "github_repo_name": "repo"})
-        records[1] = infra_contracts.StoredMetaRecord(**{**records[1].__dict__, "github_repo_owner": "alpha", "github_repo_name": "repo"})
-        records[2] = infra_contracts.StoredMetaRecord(**{**records[2].__dict__, "github_repo_owner": "alpha", "github_repo_name": "repo"})
-        records[3] = infra_contracts.StoredMetaRecord(**{**records[3].__dict__, "github_repo_owner": "beta", "github_repo_name": "repo"})
-        records[4] = infra_contracts.StoredMetaRecord(**{**records[4].__dict__, "github_repo_owner": "gamma", "github_repo_name": "repo"})
+        records[0] = infra_contracts.StoredMetaRecord(**{
+            **records[0].__dict__,
+            "github_repo_owner": "alpha",
+            "github_repo_name": "repo",
+        })
+        records[1] = infra_contracts.StoredMetaRecord(**{
+            **records[1].__dict__,
+            "github_repo_owner": "alpha",
+            "github_repo_name": "repo",
+        })
+        records[2] = infra_contracts.StoredMetaRecord(**{
+            **records[2].__dict__,
+            "github_repo_owner": "alpha",
+            "github_repo_name": "repo",
+        })
+        records[3] = infra_contracts.StoredMetaRecord(**{
+            **records[3].__dict__,
+            "github_repo_owner": "beta",
+            "github_repo_name": "repo",
+        })
+        records[4] = infra_contracts.StoredMetaRecord(**{
+            **records[4].__dict__,
+            "github_repo_owner": "gamma",
+            "github_repo_name": "repo",
+        })
         issue_gateway = _StubIssueGateway(
             domain_models=domain_models,
             view_states={
@@ -1273,27 +1477,50 @@ class TestRuntimeDeleteS13:
         assert result.remote_close.failed == ["beta/repo#1"]
         assert result.remote_close.skipped_not_attempted == ["gamma/repo#9"]
         assert issue_gateway.view_calls == [
-                (str(repo_root), "alpha/repo", 2),
-                (str(repo_root), "alpha/repo", 3),
-                (str(repo_root), "beta/repo", 1),
-            ]
+            (str(repo_root), "alpha/repo", 2),
+            (str(repo_root), "alpha/repo", 3),
+            (str(repo_root), "beta/repo", 1),
+        ]
         assert issue_gateway.close_calls == [
-                (str(repo_root), "alpha/repo", 3),
-                (str(repo_root), "beta/repo", 1),
-            ]
+            (str(repo_root), "alpha/repo", 3),
+            (str(repo_root), "beta/repo", 1),
+        ]
         assert node_repo.delete_calls == []
         assert ("load_active_manifest", str(repo_root / "spec-dock")) in active_store.calls
 
     def test_all_required_remote_closes_succeed_before_local_delete_starts(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root, with_github_links=True)
-        records[0] = infra_contracts.StoredMetaRecord(**{**records[0].__dict__, "github_repo_owner": "zeta", "github_repo_name": "repo"})
-        records[1] = infra_contracts.StoredMetaRecord(**{**records[1].__dict__, "github_repo_owner": "alpha", "github_repo_name": "repo"})
-        records[2] = infra_contracts.StoredMetaRecord(**{**records[2].__dict__, "github_repo_owner": "alpha", "github_repo_name": "repo"})
-        records[3] = infra_contracts.StoredMetaRecord(**{**records[3].__dict__, "github_repo_owner": "beta", "github_repo_name": "repo"})
+        records[0] = infra_contracts.StoredMetaRecord(**{
+            **records[0].__dict__,
+            "github_repo_owner": "zeta",
+            "github_repo_name": "repo",
+        })
+        records[1] = infra_contracts.StoredMetaRecord(**{
+            **records[1].__dict__,
+            "github_repo_owner": "alpha",
+            "github_repo_name": "repo",
+        })
+        records[2] = infra_contracts.StoredMetaRecord(**{
+            **records[2].__dict__,
+            "github_repo_owner": "alpha",
+            "github_repo_name": "repo",
+        })
+        records[3] = infra_contracts.StoredMetaRecord(**{
+            **records[3].__dict__,
+            "github_repo_owner": "beta",
+            "github_repo_name": "repo",
+        })
         events: list[str] = []
 
         class _EventIssueGateway(_StubIssueGateway):
@@ -1342,33 +1569,40 @@ class TestRuntimeDeleteS13:
         assert result.deleted_node_ids == ["iss-local-00056", "iss-local-00057", "epic-local-00001", "init-local-00001"]
         assert result.remaining_node_ids == []
         assert issue_gateway.close_calls == [
-                (str(repo_root), "alpha/repo", 22),
-                (str(repo_root), "alpha/repo", 56),
-                (str(repo_root), "beta/repo", 57),
-                (str(repo_root), "zeta/repo", 11),
-            ]
+            (str(repo_root), "alpha/repo", 22),
+            (str(repo_root), "alpha/repo", 56),
+            (str(repo_root), "beta/repo", 57),
+            (str(repo_root), "zeta/repo", 11),
+        ]
         close_events = [event for event in events if event.startswith("close:")]
         delete_events = [event for event in events if event.startswith("delete:")]
         assert close_events == [
-                "close:alpha/repo#22",
-                "close:alpha/repo#56",
-                "close:beta/repo#57",
-                "close:zeta/repo#11",
-            ]
+            "close:alpha/repo#22",
+            "close:alpha/repo#56",
+            "close:beta/repo#57",
+            "close:zeta/repo#11",
+        ]
         assert delete_events == [
-                "delete:iss-local-00056-title",
-                "delete:iss-local-00057-title",
-                "delete:epic-local-00001-title",
-                "delete:init-local-00001-title",
-            ]
+            "delete:iss-local-00056-title",
+            "delete:iss-local-00057-title",
+            "delete:epic-local-00001-title",
+            "delete:init-local-00001-title",
+        ]
         first_delete_index = events.index(delete_events[0])
         last_close_index = max(events.index(event) for event in close_events)
         assert first_delete_index > last_close_index
 
     def test_recursive_epic_delete_succeeds_with_remote_close_barrier(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root, with_github_links=True)
         issue_gateway = _StubIssueGateway(
@@ -1401,19 +1635,26 @@ class TestRuntimeDeleteS13:
         assert result.deleted_node_ids == ["iss-local-00056", "iss-local-00057", "epic-local-00001"]
         assert result.remaining_node_ids == []
         assert issue_gateway.close_calls == [
-                (str(repo_root), "example/repo", 22),
-                (str(repo_root), "example/repo", 56),
-                (str(repo_root), "example/repo", 57),
-            ]
+            (str(repo_root), "example/repo", 22),
+            (str(repo_root), "example/repo", 56),
+            (str(repo_root), "example/repo", 57),
+        ]
         assert not Path(records[1].path).exists()
         assert not Path(records[2].path).exists()
         assert not Path(records[3].path).exists()
         assert Path(records[0].path).exists()
 
     def test_recursive_delete_order_is_deepest_first_and_same_depth_lexical(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = [
             _record(
@@ -1489,18 +1730,25 @@ class TestRuntimeDeleteS13:
 
         assert result.status == "ok"
         assert result.deleted_node_ids == [
-                "iss-local-00080",
-                "iss-local-00090",
-                "epic-local-00010",
-                "epic-local-00020",
-                "init-local-00001",
-            ]
+            "iss-local-00080",
+            "iss-local-00090",
+            "epic-local-00010",
+            "epic-local-00020",
+            "init-local-00001",
+        ]
         assert result.remaining_node_ids == []
 
     def test_parent_recursive_local_delete_partial_failure_reports_progress(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root)
 
@@ -1538,15 +1786,25 @@ class TestRuntimeDeleteS13:
         assert result.dependency_scrub_failures == []
         assert "local_delete_failed" in result.warnings
         assert len(result.recovery_guidance) >= 4
-        assert "./spec-dock/scripts/spec-dock delete --id epic-local-00001 --recursive --force --yes" in result.recovery_guidance[-1]
+        assert (
+            "./spec-dock/scripts/spec-dock delete --id epic-local-00001 --recursive --force --yes"
+            in result.recovery_guidance[-1]
+        )
         assert Path(records[1].path).exists()
         assert not Path(records[2].path).exists()
         assert not Path(records[3].path).exists()
 
     def test_parent_recursive_local_delete_partial_failure_counts_deleted_when_raise_after_removal(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root)
 
@@ -1589,9 +1847,16 @@ class TestRuntimeDeleteS13:
         assert not Path(records[3].path).exists()
 
     def test_forced_parent_delete_dependency_scrub_success_scrubs_surviving_parent_and_issue_deps(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = [
             _record(
@@ -1721,7 +1986,10 @@ class TestRuntimeDeleteS13:
         assert result.remaining_node_ids == []
         assert result.active_restore_result == "not_needed"
         assert result.dependency_scrub_failures == []
-        assert json.loads(init_meta.read_text(encoding="utf-8"))["depends_on"] == ["iss-local-00058", "epic-local-00002"]
+        assert json.loads(init_meta.read_text(encoding="utf-8"))["depends_on"] == [
+            "iss-local-00058",
+            "epic-local-00002",
+        ]
         assert json.loads(epic_meta.read_text(encoding="utf-8"))["depends_on"] == ["iss-local-00058"]
         assert json.loads(issue_meta.read_text(encoding="utf-8"))["depends_on"] == ["iss-local-00058"]
         assert not Path(records[1].path).exists()
@@ -1731,9 +1999,16 @@ class TestRuntimeDeleteS13:
         assert Path(records[5].path).exists()
 
     def test_forced_recursive_delete_scrubs_raw_ref_to_empty_deleted_container(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = [
             _record(
@@ -1797,9 +2072,16 @@ class TestRuntimeDeleteS13:
         assert not Path(records[1].path).exists()
 
     def test_recursive_delete_detects_numeric_raw_ref_to_empty_deleted_container(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = [
             _record(
@@ -1881,9 +2163,16 @@ class TestRuntimeDeleteS13:
         assert not Path(records[1].path).exists()
 
     def test_recursive_delete_detects_deleted_empty_source_raw_ref_to_surviving_empty_container(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = [
             _record(
@@ -1945,9 +2234,16 @@ class TestRuntimeDeleteS13:
         assert Path(records[1].path).exists()
 
     def test_forced_recursive_delete_allows_deleted_empty_source_raw_ref_to_surviving_empty_container(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = [
             _record(
@@ -2010,9 +2306,16 @@ class TestRuntimeDeleteS13:
         assert Path(records[1].path).exists()
 
     def test_recursive_delete_detects_empty_source_direct_raw_refs_to_deleted_subtree_nodes(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
 
         def build_case():
             repo_root = self._new_repo_root()
@@ -2128,9 +2431,16 @@ class TestRuntimeDeleteS13:
         assert Path(forced_records[3].path).exists()
 
     def test_forced_recursive_delete_fallback_scrubs_mixed_direct_and_url_refs_to_deleted_subtree(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = [
             _record(
@@ -2255,9 +2565,16 @@ class TestRuntimeDeleteS13:
         assert Path(records[5].path).exists()
 
     def test_recursive_delete_detects_non_empty_source_direct_raw_ref_to_empty_deleted_container(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
 
         def build_case():
             repo_root = self._new_repo_root()
@@ -2360,10 +2677,19 @@ class TestRuntimeDeleteS13:
         assert Path(forced_records[2].path).exists()
         assert not Path(forced_records[3].path).exists()
 
-    def test_forced_parent_delete_dependency_scrub_supports_numeric_scoped_and_url_refs_with_survivor_context_resolution(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+    def test_forced_parent_delete_dependency_scrub_supports_numeric_scoped_and_url_refs_with_survivor_context_resolution(
+        self,
+    ) -> None:
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = [
             _record(
@@ -2500,8 +2826,8 @@ class TestRuntimeDeleteS13:
         assert result.active_restore_result == "not_needed"
         assert result.dependency_scrub_failures == []
         assert json.loads(survivor_meta.read_text(encoding="utf-8"))["depends_on"] == [
-                "iss-local-00058",
-            ]
+            "iss-local-00058",
+        ]
         assert not Path(records[1].path).exists()
         assert not Path(records[2].path).exists()
         assert not Path(records[3].path).exists()
@@ -2510,9 +2836,16 @@ class TestRuntimeDeleteS13:
         assert Path(records[6].path).exists()
 
     def test_forced_parent_delete_dependency_scrub_fails_closed_on_ambiguous_numeric_ref(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = [
             _record(
@@ -2650,11 +2983,11 @@ class TestRuntimeDeleteS13:
         assert "Ambiguous github.issue_number=56" in result.validation_reasons[0].message
         assert issue_gateway.close_calls == []
         assert json.loads(survivor_meta.read_text(encoding="utf-8"))["depends_on"] == [
-                "56",
-                "example/repo#56",
-                "https://github.com/other/repo/issues/56",
-                "iss-local-00058",
-            ]
+            "56",
+            "example/repo#56",
+            "https://github.com/other/repo/issues/56",
+            "iss-local-00058",
+        ]
         assert Path(records[1].path).exists()
         assert Path(records[2].path).exists()
         assert Path(records[3].path).exists()
@@ -2663,9 +2996,16 @@ class TestRuntimeDeleteS13:
         assert Path(records[6].path).exists()
 
     def test_forced_parent_delete_dependency_scrub_failure_returns_partial_failure(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = [
             _record(
@@ -2760,7 +3100,9 @@ class TestRuntimeDeleteS13:
         assert result.deleted_node_ids == ["iss-local-00056", "iss-local-00057", "epic-local-00001"]
         assert result.remaining_node_ids == []
         assert result.active_restore_result == "not_needed"
-        assert [(item.node_id, item.edge_target_id) for item in result.dependency_scrub_failures] == [("iss-local-00058", "iss-local-00056")]
+        assert [(item.node_id, item.edge_target_id) for item in result.dependency_scrub_failures] == [
+            ("iss-local-00058", "iss-local-00056")
+        ]
         assert "dependency_scrub_failed" in result.warnings
         assert any("dependency_scrub_failures" in line for line in result.recovery_guidance)
         assert not Path(records[1].path).exists()
@@ -2770,9 +3112,16 @@ class TestRuntimeDeleteS13:
         assert Path(records[5].path).exists()
 
     def test_issue_target_remote_close_runs_before_local_delete_and_success_payload_is_fixed(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root, with_github_links=True)
         events: list[str] = []
@@ -2822,9 +3171,16 @@ class TestRuntimeDeleteS13:
         assert close_events == ["close:example/repo#56"]
 
     def test_issue_target_delete_succeeds_when_remote_issue_is_already_closed(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root, with_github_links=True)
         issue_gateway = _StubIssueGateway(
@@ -2856,9 +3212,16 @@ class TestRuntimeDeleteS13:
         assert not Path(records[2].path).exists()
 
     def test_issue_target_remote_close_failed_does_not_call_local_delete(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root, with_github_links=True)
         issue_gateway = _StubIssueGateway(
@@ -2892,9 +3255,16 @@ class TestRuntimeDeleteS13:
         assert Path(records[2].path).exists()
 
     def test_issue_target_local_delete_failure_after_remote_close_returns_partial_failure(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root, with_github_links=True)
 
@@ -2942,9 +3312,16 @@ class TestRuntimeDeleteS13:
         assert Path(records[2].path).exists()
 
     def test_issue_target_local_delete_failure_json_exit_code_is_non_zero(self) -> None:
-        app_contracts, app_delete_node, _app_ports, cli_dispatch, cli_parser, cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            cli_dispatch,
+            cli_parser,
+            cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root, with_github_links=True)
 
@@ -3000,9 +3377,16 @@ class TestRuntimeDeleteS13:
         assert stderr.getvalue() == ""
 
     def test_forced_issue_delete_clears_active_when_target_is_active(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root, with_github_links=True)
         manifest = infra_contracts.ActiveManifest(
@@ -3045,9 +3429,16 @@ class TestRuntimeDeleteS13:
         assert written_manifest.issue is None
 
     def test_forced_issue_delete_repairs_active_from_snapshot_when_clear_fails(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root)
         manifest = infra_contracts.ActiveManifest(
@@ -3107,9 +3498,16 @@ class TestRuntimeDeleteS13:
         assert not Path(records[2].path).exists()
 
     def test_forced_issue_delete_returns_partial_failure_when_clear_active_fails_after_local_delete(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            _cli_dispatch,
+            _cli_parser,
+            _cli_registry,
+            domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         records = self._records(infra_contracts, repo_root, with_github_links=True)
         manifest = infra_contracts.ActiveManifest(
@@ -3162,9 +3560,16 @@ class TestRuntimeDeleteS13:
         assert not Path(records[2].path).exists()
 
     def test_delete_command_positional_selector_wiring_and_json_exit_code(self) -> None:
-        app_contracts, _app_delete_node, _app_ports, cli_dispatch, cli_parser, cli_registry, _domain_models, _infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            _app_delete_node,
+            _app_ports,
+            cli_dispatch,
+            cli_parser,
+            cli_registry,
+            _domain_models,
+            _infra_contracts,
+        ) = _runtime_modules()
         captured = {}
 
         def _delete(req):
@@ -3224,9 +3629,16 @@ class TestRuntimeDeleteS13:
         assert stderr.getvalue() == ""
 
     def test_delete_json_field_matrix_for_blocker_statuses(self) -> None:
-        app_contracts, _app_delete_node, _app_ports, cli_dispatch, cli_parser, cli_registry, _domain_models, _infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            _app_delete_node,
+            _app_ports,
+            cli_dispatch,
+            cli_parser,
+            cli_registry,
+            _domain_models,
+            _infra_contracts,
+        ) = _runtime_modules()
         statuses = [
             "invalid_selector_combination",
             "invalid_selector_syntax",
@@ -3241,6 +3653,7 @@ class TestRuntimeDeleteS13:
         parser = cli_parser.build_parser(registry)
 
         for status in statuses:
+
             def _delete(_req, status=status):
                 return app_contracts.DeleteNodeResult(
                     status=status,
@@ -3302,9 +3715,16 @@ class TestRuntimeDeleteS13:
             assert stderr.getvalue() == ""
 
     def test_delete_json_field_matrix_for_ok_status_with_ordering(self) -> None:
-        app_contracts, _app_delete_node, _app_ports, cli_dispatch, cli_parser, cli_registry, _domain_models, _infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            _app_delete_node,
+            _app_ports,
+            cli_dispatch,
+            cli_parser,
+            cli_registry,
+            _domain_models,
+            _infra_contracts,
+        ) = _runtime_modules()
 
         def _ok(_req):
             return app_contracts.DeleteNodeResult(
@@ -3352,7 +3772,14 @@ class TestRuntimeDeleteS13:
 
         assert exit_code == 0
         payload = json.loads(stdout.getvalue())
-        assert list(payload.keys()) == ["status", "target_id", "deleted_node_ids", "remaining_node_ids", "remote_close", "active_restore_result"]
+        assert list(payload.keys()) == [
+            "status",
+            "target_id",
+            "deleted_node_ids",
+            "remaining_node_ids",
+            "remote_close",
+            "active_restore_result",
+        ]
         assert payload["status"] == "ok"
         assert payload["deleted_node_ids"] == ["iss-local-00056"]
         assert payload["remaining_node_ids"] == []
@@ -3361,9 +3788,16 @@ class TestRuntimeDeleteS13:
         assert stderr.getvalue() == ""
 
     def test_delete_json_field_matrix_for_metadata_validation_failed_and_remote_close_failed(self) -> None:
-        app_contracts, _app_delete_node, _app_ports, cli_dispatch, cli_parser, cli_registry, _domain_models, _infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            _app_delete_node,
+            _app_ports,
+            cli_dispatch,
+            cli_parser,
+            cli_registry,
+            _domain_models,
+            _infra_contracts,
+        ) = _runtime_modules()
         registry = cli_registry.build_registry()
         parser = cli_parser.build_parser(registry)
 
@@ -3418,7 +3852,13 @@ class TestRuntimeDeleteS13:
 
         assert exit_code == 1
         payload = json.loads(stdout.getvalue())
-        assert set(payload.keys()) == {"status", "target_id", "offending_node_ids", "validation_reasons", "remote_close"}
+        assert set(payload.keys()) == {
+            "status",
+            "target_id",
+            "offending_node_ids",
+            "validation_reasons",
+            "remote_close",
+        }
         assert payload["status"] == "metadata_validation_failed"
         assert stderr.getvalue() == ""
 
@@ -3472,9 +3912,16 @@ class TestRuntimeDeleteS13:
         assert stderr.getvalue() == ""
 
     def test_delete_json_field_matrix_for_local_delete_partial_failure(self) -> None:
-        app_contracts, _app_delete_node, _app_ports, cli_dispatch, cli_parser, cli_registry, _domain_models, _infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            _app_delete_node,
+            _app_ports,
+            cli_dispatch,
+            cli_parser,
+            cli_registry,
+            _domain_models,
+            _infra_contracts,
+        ) = _runtime_modules()
         registry = cli_registry.build_registry()
         parser = cli_parser.build_parser(registry)
 
@@ -3524,24 +3971,31 @@ class TestRuntimeDeleteS13:
         assert exit_code == 1
         payload = json.loads(stdout.getvalue())
         assert set(payload.keys()) == {
-                "status",
-                "target_id",
-                "deleted_node_ids",
-                "remaining_node_ids",
-                "remote_close",
-                "active_restore_result",
-                "recovery_guidance",
-                "dependency_scrub_failures",
-            }
+            "status",
+            "target_id",
+            "deleted_node_ids",
+            "remaining_node_ids",
+            "remote_close",
+            "active_restore_result",
+            "recovery_guidance",
+            "dependency_scrub_failures",
+        }
         assert payload["status"] == "local_delete_partial_failure"
         assert payload["deleted_node_ids"] == ["iss-local-00056"]
         assert payload["active_restore_result"] == "restored"
         assert stderr.getvalue() == ""
 
     def test_issue_delete_success_path_returns_ok_and_cli_success_text(self) -> None:
-        app_contracts, app_delete_node, _app_ports, cli_dispatch, cli_parser, cli_registry, _domain_models, infra_contracts = (
-            _runtime_modules()
-        )
+        (
+            app_contracts,
+            app_delete_node,
+            _app_ports,
+            cli_dispatch,
+            cli_parser,
+            cli_registry,
+            _domain_models,
+            infra_contracts,
+        ) = _runtime_modules()
         repo_root = self._new_repo_root()
         ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
         result = app_delete_node.delete_node(

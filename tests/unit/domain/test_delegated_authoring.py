@@ -4,14 +4,7 @@ import tempfile
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.application.delegated_authoring import (
@@ -25,14 +18,7 @@ def _runtime_modules():
 
 
 def _application_diff_guard_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.application.delegated_authoring import (
@@ -143,7 +129,8 @@ class TestDelegatedAuthoringRuntimeDomain:
                 / "pr-repair-batch.md"
             ).read_text(encoding="utf-8")
             discussion.write_text(
-                template.replace("<PR_REPAIR_BATCH_ID>", "20260525t010203z-pr-repair-batch")
+                template
+                .replace("<PR_REPAIR_BATCH_ID>", "20260525t010203z-pr-repair-batch")
                 .replace("<PR_REPAIR_BATCH_TITLE>", "PR Repair Batch")
                 .replace("<SCOPE_ID>", "iss-00003")
                 .replace("<YOUR_NAME>", "spec-dock")
@@ -179,7 +166,8 @@ class TestDelegatedAuthoringRuntimeDomain:
                 / "pr-repair-batch.md"
             ).read_text(encoding="utf-8")
             discussion.write_text(
-                template.replace("<PR_REPAIR_BATCH_ID>", "20260525t010204z-pr-repair-batch")
+                template
+                .replace("<PR_REPAIR_BATCH_ID>", "20260525t010204z-pr-repair-batch")
                 .replace("<PR_REPAIR_BATCH_TITLE>", "PR Repair Batch")
                 .replace("<SCOPE_ID>", "iss-00003")
                 .replace("<YOUR_NAME>", "spec-dock")
@@ -214,7 +202,8 @@ class TestDelegatedAuthoringRuntimeDomain:
                 / "pr-repair-batch.md"
             ).read_text(encoding="utf-8")
             discussion.write_text(
-                template.replace("<PR_REPAIR_BATCH_ID>", "20260525t010203z-pr-repair-batch")
+                template
+                .replace("<PR_REPAIR_BATCH_ID>", "20260525t010203z-pr-repair-batch")
                 .replace("<PR_REPAIR_BATCH_TITLE>", "PR Repair Batch")
                 .replace("<SCOPE_ID>", "iss-99999")
                 .replace("<YOUR_NAME>", "spec-dock")
@@ -464,7 +453,11 @@ class TestDelegatedAuthoringRuntimeDomain:
     def test_diff_guard_rejects_new_discussion_with_mismatched_scope_or_role(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         cases = (
-            ("scope", _draft_text("# draft").replace("scope_id: iss-00003", "scope_id: iss-99999"), "scope_id_mismatch"),
+            (
+                "scope",
+                _draft_text("# draft").replace("scope_id: iss-00003", "scope_id: iss-99999"),
+                "scope_id_mismatch",
+            ),
             (
                 "role",
                 _draft_text("# draft").replace("created_by_role: system-architect", "created_by_role: dev-coder"),
@@ -492,8 +485,18 @@ class TestDelegatedAuthoringRuntimeDomain:
     def test_diff_guard_rejects_new_discussion_with_empty_source_or_target_provenance(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         cases = (
-            ("source_paths", "source_paths:\n  - spec-dock/active/issue/requirement.md", "source_paths: []", "empty_source_paths"),
-            ("intended_targets", "intended_targets:\n  - spec-dock/active/issue/design.md", "intended_targets: []", "empty_intended_targets"),
+            (
+                "source_paths",
+                "source_paths:\n  - spec-dock/active/issue/requirement.md",
+                "source_paths: []",
+                "empty_source_paths",
+            ),
+            (
+                "intended_targets",
+                "intended_targets:\n  - spec-dock/active/issue/design.md",
+                "intended_targets: []",
+                "empty_intended_targets",
+            ),
             (
                 "inline_source_paths",
                 "source_paths:\n  - spec-dock/active/issue/requirement.md",
@@ -592,7 +595,9 @@ class TestDelegatedAuthoringRuntimeDomain:
                     domain.DiffGuardEntry(status=" M", path=path.relative_to(repo_root))
                     for path in (*non_editable_paths, unstated)
                 ),
-                allow_existing_discussions=tuple(path.relative_to(repo_root) for path in (*non_editable_paths, unstated)),
+                allow_existing_discussions=tuple(
+                    path.relative_to(repo_root) for path in (*non_editable_paths, unstated)
+                ),
             )
 
             assert not result.ok

@@ -116,7 +116,8 @@ def _resolve_target_node_id(graph: SpecGraph, target: TargetRef, *, current_repo
         matches = [
             node
             for node in graph.nodes_by_id.values()
-            if node.github_issue_number == int(target.github_issue_number) and node.kind in ("initiative", "epic", "issue")
+            if node.github_issue_number == int(target.github_issue_number)
+            and node.kind in ("initiative", "epic", "issue")
         ]
         target_repo_slug = normalize_repo_slug(target.github_repo_owner, target.github_repo_name)
         if target_repo_slug is not None:
@@ -243,7 +244,9 @@ def build_context_pack_text(manifest: ActiveManifest, *, repo_root: Path | None 
     lines.append("")
     lines.append("## Authority")
     lines.append("- source: `spec-dock/.agent/active.json`")
-    lines.append("- rule: proposed or missing authority cannot authorize implementation, issue ready, issue finish, or phase completion.")
+    lines.append(
+        "- rule: proposed or missing authority cannot authorize implementation, issue ready, issue finish, or phase completion."
+    )
     for label, entry in (
         ("initiative", manifest.initiative if has_init else None),
         ("epic", manifest.epic if has_epic else None),

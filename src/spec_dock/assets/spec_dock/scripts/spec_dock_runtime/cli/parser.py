@@ -84,7 +84,9 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
     p_issue = sub.add_parser("issue", help="Run guided issue lifecycle commands")
     issue_sub = p_issue.add_subparsers(dest="issue_cmd", required=True)
     _bind_leaf(issue_sub.add_parser("start", help="Set active issue and checkout its branch"), registry, "issue_start")
-    _bind_leaf(issue_sub.add_parser("finish", help="Close active issue and clear active pointers"), registry, "issue_finish")
+    _bind_leaf(
+        issue_sub.add_parser("finish", help="Close active issue and clear active pointers"), registry, "issue_finish"
+    )
 
     p_worktree = sub.add_parser("worktree", help="Manage long-lived Git worktrees")
     worktree_sub = p_worktree.add_subparsers(dest="worktree_cmd", required=True)
@@ -94,7 +96,11 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         "worktree_create",
     )
     _bind_leaf(worktree_sub.add_parser("list", help="List Git worktrees for this repo"), registry, "worktree_list")
-    _bind_leaf(worktree_sub.add_parser("show", help="Show one Git worktree by id, path, or basename"), registry, "worktree_show")
+    _bind_leaf(
+        worktree_sub.add_parser("show", help="Show one Git worktree by id, path, or basename"),
+        registry,
+        "worktree_show",
+    )
     _bind_leaf(
         worktree_sub.add_parser("remove", help="Remove a Git worktree without deleting its branch"),
         registry,

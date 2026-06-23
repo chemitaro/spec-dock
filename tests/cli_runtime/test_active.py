@@ -45,9 +45,8 @@ class TestCliActive(CliRuntimeHarness):
             assert isinstance(active.get("epic"), dict)
             assert active.get("issue") is None
             assert active["epic"]["path"] == (
-                    "spec-dock/initiatives/init-00001-auth-platform/epics/"
-                    "epic-00002-jwt-auth"
-                )
+                "spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth"
+            )
             assert not active["epic"]["path"].startswith(str(target))
             assert "epic-00002" in self._read_active_pointer_text(target, "epic", "requirement.md")
             assert "Active Issue: なし" in self._read_active_pointer_text(target, "issue", "README.md")
@@ -105,13 +104,17 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             assert active["issue"]["id"] == "iss-00123"
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli"
+    )
     def test_active_set_github_issue_flag_is_ambiguous_with_current_foreign_overlap_but_id_succeeds(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "124"])
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "124"]
+            )
 
             foreign_issue_meta = (
                 target
@@ -139,13 +142,17 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             assert active["issue"]["id"] == "iss-00123"
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli"
+    )
     def test_active_set_repo_scoped_url_resolves_exact_match_when_number_is_ambiguous(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "124"])
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "124"]
+            )
 
             foreign_issue_meta = (
                 target
@@ -166,7 +173,9 @@ class TestCliActive(CliRuntimeHarness):
             assert ambiguous.returncode != 0, ambiguous.stdout + ambiguous.stderr
             assert "Ambiguous github.issue_number=123" in ambiguous.stderr
 
-            by_url = self._run_runtime_capture(target, ["active", "set", "https://github.com/other/repo/issues/123", "--force"])
+            by_url = self._run_runtime_capture(
+                target, ["active", "set", "https://github.com/other/repo/issues/123", "--force"]
+            )
             assert by_url.returncode == 0, by_url.stdout + by_url.stderr
             assert "spec-dock: ok (active set)" in by_url.stdout
 
@@ -201,7 +210,9 @@ class TestCliActive(CliRuntimeHarness):
                 issue_issue_number=123,
                 issue_title="Current issue",
             )
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "124"])
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Foreign mirror", "--github-issue", "124"]
+            )
 
             foreign_issue_meta = (
                 target
@@ -233,7 +244,9 @@ class TestCliActive(CliRuntimeHarness):
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
-            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Baseline issue", "--github-issue", "124"])
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "2", "--title", "Baseline issue", "--github-issue", "124"]
+            )
 
             baseline = self._run_runtime_capture(target, ["active", "set", "iss-00124", "--force"])
             assert baseline.returncode == 0, baseline.stdout + baseline.stderr
@@ -282,7 +295,9 @@ class TestCliActive(CliRuntimeHarness):
             assert p.returncode != 0, p.stdout + p.stderr
             assert "positive integer" in p.stderr
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git"
+    )
     def test_active_set_github_issue_checkout_sets_active(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -315,13 +330,13 @@ class TestCliActive(CliRuntimeHarness):
                 gh_path.write_text(
                     "#!/usr/bin/env bash\n"
                     "set -euo pipefail\n"
-                    'if [[ \"$1\" == \"issue\" && \"$2\" == \"checkout\" ]]; then\n'
-                    "  n=\"$3\"\n"
-                    "  branch=\"gh-issue-${n}\"\n"
-                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
+                    '  n="$3"\n'
+                    '  branch="gh-issue-${n}"\n'
+                    '  git checkout -b "$branch" >/dev/null 2>&1 || git checkout "$branch" >/dev/null 2>&1\n'
                     "  exit 0\n"
                     "fi\n"
-                    "echo \"unexpected gh args: $@\" >&2\n"
+                    'echo "unexpected gh args: $@" >&2\n'
                     "exit 1\n",
                     encoding="utf-8",
                 )
@@ -334,12 +349,14 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             assert active["issue"]["id"] == "iss-00123"
             assert active["issue"]["path"] == (
-                    "spec-dock/initiatives/init-00001-auth-platform/epics/"
-                    "epic-00002-jwt-auth/issues/iss-00123-add-refresh-token"
-                )
+                "spec-dock/initiatives/init-00001-auth-platform/epics/"
+                "epic-00002-jwt-auth/issues/iss-00123-add-refresh-token"
+            )
             assert not active["issue"]["path"].startswith(str(target))
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli"
+    )
     def test_active_set_local_only_node_does_not_rename_branch(self) -> None:
         if shutil.which("git") is None:
             pytest.skip("git not available")
@@ -362,7 +379,9 @@ class TestCliActive(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert current == "feature/local-keep-branch"
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git"
+    )
     def test_active_set_detached_head_creates_desired_branch(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -402,7 +421,7 @@ class TestCliActive(CliRuntimeHarness):
                     'if [[ "$1" == "issue" && "$2" == "develop" ]]; then\n'
                     "  exit 0\n"
                     "fi\n"
-                    "echo \"unexpected gh args: $@\" >&2\n"
+                    'echo "unexpected gh args: $@" >&2\n'
                     "exit 1\n",
                     encoding="utf-8",
                 )
@@ -416,7 +435,9 @@ class TestCliActive(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert current == desired
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git"
+    )
     def test_active_set_reuses_existing_desired_branch_without_gh_checkout(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -455,21 +476,21 @@ class TestCliActive(CliRuntimeHarness):
                     f"counter_file='{counter.as_posix()}'\n"
                     'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
                     "  c=0\n"
-                    "  if [[ -f \"$counter_file\" ]]; then\n"
-                    "    c=$(cat \"$counter_file\")\n"
+                    '  if [[ -f "$counter_file" ]]; then\n'
+                    '    c=$(cat "$counter_file")\n'
                     "  fi\n"
-                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    '  echo $((c+1)) > "$counter_file"\n'
                     "  exit 0\n"
                     "fi\n"
                     'if [[ "$1" == "issue" && "$2" == "develop" ]]; then\n'
                     "  c=0\n"
-                    "  if [[ -f \"$counter_file\" ]]; then\n"
-                    "    c=$(cat \"$counter_file\")\n"
+                    '  if [[ -f "$counter_file" ]]; then\n'
+                    '    c=$(cat "$counter_file")\n'
                     "  fi\n"
-                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    '  echo $((c+1)) > "$counter_file"\n'
                     "  exit 0\n"
                     "fi\n"
-                    "echo \"unexpected gh args: $@\" >&2\n"
+                    'echo "unexpected gh args: $@" >&2\n'
                     "exit 1\n",
                     encoding="utf-8",
                 )
@@ -488,7 +509,9 @@ class TestCliActive(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert current == desired
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git"
+    )
     def test_active_set_reuses_existing_branch_recomputes_desired_after_checkout_for_github_issue_target(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -548,21 +571,21 @@ class TestCliActive(CliRuntimeHarness):
                     f"counter_file='{counter.as_posix()}'\n"
                     'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
                     "  c=0\n"
-                    "  if [[ -f \"$counter_file\" ]]; then\n"
-                    "    c=$(cat \"$counter_file\")\n"
+                    '  if [[ -f "$counter_file" ]]; then\n'
+                    '    c=$(cat "$counter_file")\n'
                     "  fi\n"
-                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    '  echo $((c+1)) > "$counter_file"\n'
                     "  exit 0\n"
                     "fi\n"
                     'if [[ "$1" == "issue" && "$2" == "develop" ]]; then\n'
                     "  c=0\n"
-                    "  if [[ -f \"$counter_file\" ]]; then\n"
-                    "    c=$(cat \"$counter_file\")\n"
+                    '  if [[ -f "$counter_file" ]]; then\n'
+                    '    c=$(cat "$counter_file")\n'
                     "  fi\n"
-                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    '  echo $((c+1)) > "$counter_file"\n'
                     "  exit 0\n"
                     "fi\n"
-                    "echo \"unexpected gh args: $@\" >&2\n"
+                    'echo "unexpected gh args: $@" >&2\n'
                     "exit 1\n",
                     encoding="utf-8",
                 )
@@ -577,7 +600,9 @@ class TestCliActive(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert current == "iss-00123-add-refresh-token"
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git"
+    )
     def test_active_set_reuses_existing_branch_recomputes_desired_after_checkout_for_node_id_target(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -637,21 +662,21 @@ class TestCliActive(CliRuntimeHarness):
                     f"counter_file='{counter.as_posix()}'\n"
                     'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
                     "  c=0\n"
-                    "  if [[ -f \"$counter_file\" ]]; then\n"
-                    "    c=$(cat \"$counter_file\")\n"
+                    '  if [[ -f "$counter_file" ]]; then\n'
+                    '    c=$(cat "$counter_file")\n'
                     "  fi\n"
-                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    '  echo $((c+1)) > "$counter_file"\n'
                     "  exit 0\n"
                     "fi\n"
                     'if [[ "$1" == "issue" && "$2" == "develop" ]]; then\n'
                     "  c=0\n"
-                    "  if [[ -f \"$counter_file\" ]]; then\n"
-                    "    c=$(cat \"$counter_file\")\n"
+                    '  if [[ -f "$counter_file" ]]; then\n'
+                    '    c=$(cat "$counter_file")\n'
                     "  fi\n"
-                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    '  echo $((c+1)) > "$counter_file"\n'
                     "  exit 0\n"
                     "fi\n"
-                    "echo \"unexpected gh args: $@\" >&2\n"
+                    'echo "unexpected gh args: $@" >&2\n'
                     "exit 1\n",
                     encoding="utf-8",
                 )
@@ -668,7 +693,9 @@ class TestCliActive(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert current == "iss-00123-add-refresh-token"
 
-    @pytest.mark.skip(reason="S05: covered by TestActiveDomain.test_branch_decision_falls_back_to_id_for_non_ascii_or_invalid_slug_without_git")
+    @pytest.mark.skip(
+        reason="S05: covered by TestActiveDomain.test_branch_decision_falls_back_to_id_for_non_ascii_or_invalid_slug_without_git"
+    )
     def test_active_set_fallbacks_to_id_when_id_slug_is_non_ascii(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -713,18 +740,18 @@ class TestCliActive(CliRuntimeHarness):
                     "#!/usr/bin/env bash\n"
                     "set -euo pipefail\n"
                     'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
-                    "  n=\"$3\"\n"
-                    "  branch=\"gh-issue-${n}\"\n"
-                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    '  n="$3"\n'
+                    '  branch="gh-issue-${n}"\n'
+                    '  git checkout -b "$branch" >/dev/null 2>&1 || git checkout "$branch" >/dev/null 2>&1\n'
                     "  exit 0\n"
                     "fi\n"
                     'if [[ "$1" == "issue" && "$2" == "develop" ]]; then\n'
-                    "  n=\"$3\"\n"
-                    "  branch=\"gh-issue-${n}\"\n"
-                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    '  n="$3"\n'
+                    '  branch="gh-issue-${n}"\n'
+                    '  git checkout -b "$branch" >/dev/null 2>&1 || git checkout "$branch" >/dev/null 2>&1\n'
                     "  exit 0\n"
                     "fi\n"
-                    "echo \"unexpected gh args: $@\" >&2\n"
+                    'echo "unexpected gh args: $@" >&2\n'
                     "exit 1\n",
                     encoding="utf-8",
                 )
@@ -740,7 +767,9 @@ class TestCliActive(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert current == "iss-00123"
 
-    @pytest.mark.skip(reason="S05: covered by TestActiveDomain.test_branch_decision_falls_back_to_id_for_non_ascii_or_invalid_slug_without_git")
+    @pytest.mark.skip(
+        reason="S05: covered by TestActiveDomain.test_branch_decision_falls_back_to_id_for_non_ascii_or_invalid_slug_without_git"
+    )
     def test_active_set_fallbacks_to_id_when_id_slug_is_invalid_ref(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -785,18 +814,18 @@ class TestCliActive(CliRuntimeHarness):
                     "#!/usr/bin/env bash\n"
                     "set -euo pipefail\n"
                     'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
-                    "  n=\"$3\"\n"
-                    "  branch=\"gh-issue-${n}\"\n"
-                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    '  n="$3"\n'
+                    '  branch="gh-issue-${n}"\n'
+                    '  git checkout -b "$branch" >/dev/null 2>&1 || git checkout "$branch" >/dev/null 2>&1\n'
                     "  exit 0\n"
                     "fi\n"
                     'if [[ "$1" == "issue" && "$2" == "develop" ]]; then\n'
-                    "  n=\"$3\"\n"
-                    "  branch=\"gh-issue-${n}\"\n"
-                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    '  n="$3"\n'
+                    '  branch="gh-issue-${n}"\n'
+                    '  git checkout -b "$branch" >/dev/null 2>&1 || git checkout "$branch" >/dev/null 2>&1\n'
                     "  exit 0\n"
                     "fi\n"
-                    "echo \"unexpected gh args: $@\" >&2\n"
+                    'echo "unexpected gh args: $@" >&2\n'
                     "exit 1\n",
                     encoding="utf-8",
                 )
@@ -812,7 +841,9 @@ class TestCliActive(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert current == "iss-00123"
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli"
+    )
     def test_active_set_parses_hash_and_url_targets(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -861,18 +892,18 @@ class TestCliActive(CliRuntimeHarness):
                     "#!/usr/bin/env bash\n"
                     "set -euo pipefail\n"
                     f"counter_file='{counter.as_posix()}'\n"
-                    'if [[ \"$1\" == \"issue\" && \"$2\" == \"checkout\" ]]; then\n'
-                    "  n=\"$3\"\n"
-                    "  branch=\"gh-issue-${n}\"\n"
-                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
+                    '  n="$3"\n'
+                    '  branch="gh-issue-${n}"\n'
+                    '  git checkout -b "$branch" >/dev/null 2>&1 || git checkout "$branch" >/dev/null 2>&1\n'
                     "  c=0\n"
-                    "  if [[ -f \"$counter_file\" ]]; then\n"
-                    "    c=$(cat \"$counter_file\")\n"
+                    '  if [[ -f "$counter_file" ]]; then\n'
+                    '    c=$(cat "$counter_file")\n'
                     "  fi\n"
-                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    '  echo $((c+1)) > "$counter_file"\n'
                     "  exit 0\n"
                     "fi\n"
-                    "echo \"unexpected gh args: $@\" >&2\n"
+                    'echo "unexpected gh args: $@" >&2\n'
                     "exit 1\n",
                     encoding="utf-8",
                 )
@@ -890,7 +921,9 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             assert active["issue"]["id"] == "iss-00123"
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli"
+    )
     def test_active_set_github_issue_number_requires_linked_node(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -924,18 +957,18 @@ class TestCliActive(CliRuntimeHarness):
                     "#!/usr/bin/env bash\n"
                     "set -euo pipefail\n"
                     f"counter_file='{counter.as_posix()}'\n"
-                    'if [[ \"$1\" == \"issue\" && \"$2\" == \"checkout\" ]]; then\n'
-                    "  n=\"$3\"\n"
-                    "  branch=\"gh-issue-${n}\"\n"
-                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
+                    '  n="$3"\n'
+                    '  branch="gh-issue-${n}"\n'
+                    '  git checkout -b "$branch" >/dev/null 2>&1 || git checkout "$branch" >/dev/null 2>&1\n'
                     "  c=0\n"
-                    "  if [[ -f \"$counter_file\" ]]; then\n"
-                    "    c=$(cat \"$counter_file\")\n"
+                    '  if [[ -f "$counter_file" ]]; then\n'
+                    '    c=$(cat "$counter_file")\n'
                     "  fi\n"
-                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    '  echo $((c+1)) > "$counter_file"\n'
                     "  exit 0\n"
                     "fi\n"
-                    "echo \"unexpected gh args: $@\" >&2\n"
+                    'echo "unexpected gh args: $@" >&2\n'
                     "exit 1\n",
                     encoding="utf-8",
                 )
@@ -946,7 +979,9 @@ class TestCliActive(CliRuntimeHarness):
                 self._run_runtime_expect_fail(target, ["active", "set", "999"], env=test_env)
                 assert not counter.exists()
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli"
+    )
     def test_active_set_blocked_by_deps_refuses_without_force(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -1007,7 +1042,9 @@ class TestCliActive(CliRuntimeHarness):
             after = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
             assert after == before
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli"
+    )
     def test_active_set_force_allows_blocked_target_and_warns(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -1064,7 +1101,9 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             assert active["issue"]["id"] == "iss-00302"
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli"
+    )
     def test_active_set_is_blocked_when_deps_not_ready(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -1129,7 +1168,9 @@ class TestCliActive(CliRuntimeHarness):
             after = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
             assert after == before
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli"
+    )
     def test_active_set_force_overrides_deps_guard(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -1198,7 +1239,9 @@ class TestCliActive(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"]
+            )
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Cycle A"])
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Cycle B"])
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Target C"])
@@ -1240,7 +1283,9 @@ class TestCliActive(CliRuntimeHarness):
             assert state_index["active"] is None
             assert state_tree["active"] is None
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli"
+    )
     def test_active_set_without_github_uses_synced_index_for_deps_guard(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -1319,9 +1364,7 @@ class TestCliActive(CliRuntimeHarness):
                     {"number": 302, "state": "OPEN", "title": "Target", "labels": [], "updatedAt": "t", "url": "u"},
                 ],
             )
-            p_sync_closed = self._run_runtime_capture(
-                target, ["sync", "--github", "--no-update-active"], env=test_env
-            )
+            p_sync_closed = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             assert p_sync_closed.returncode == 0, p_sync_closed.stdout + p_sync_closed.stderr
 
             # Inject a conflicting snapshot in todo view.
@@ -1361,7 +1404,9 @@ class TestCliActive(CliRuntimeHarness):
             assert data["blockers"] == []
             assert data["nodes"]["iss-00301"]["state"] == "done"
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli"
+    )
     def test_active_set_default_github_uses_live_state_for_deps_guard(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -1440,7 +1485,9 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             assert active["issue"]["id"] == "iss-00302"
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli"
+    )
     def test_active_set_without_github_uses_index_snapshot_when_present(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -1519,7 +1566,9 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             assert active["issue"]["id"] == "iss-00301"
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli"
+    )
     def test_active_set_without_github_blocks_when_snapshot_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -1570,7 +1619,9 @@ class TestCliActive(CliRuntimeHarness):
             after = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
             assert after == before
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli"
+    )
     def test_active_set_without_github_local_issue_without_deps_is_ready(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -1604,10 +1655,18 @@ class TestCliActive(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "202", "--title", "Blocker epic"])
-            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target issue"])
-            self._run_runtime(target, ["new", "issue", "--epic", "202", "--github-issue", "401", "--title", "Blocker issue"])
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"]
+            )
+            self._run_runtime(
+                target, ["new", "epic", "--initiative", "101", "--github-issue", "202", "--title", "Blocker epic"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target issue"]
+            )
+            self._run_runtime(
+                target, ["new", "issue", "--epic", "202", "--github-issue", "401", "--title", "Blocker issue"]
+            )
 
             target_issue_dir = (
                 target
@@ -1662,7 +1721,9 @@ class TestCliActive(CliRuntimeHarness):
             assert active_after_init_force["epic"] is None
             assert active_after_init_force["issue"] is None
 
-    @pytest.mark.skip(reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git")
+    @pytest.mark.skip(
+        reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git"
+    )
     def test_active_set_issue_auto_checkouts_when_github_linked(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
@@ -1697,18 +1758,18 @@ class TestCliActive(CliRuntimeHarness):
                     "#!/usr/bin/env bash\n"
                     "set -euo pipefail\n"
                     f"counter_file='{counter.as_posix()}'\n"
-                    'if [[ \"$1\" == \"issue\" && \"$2\" == \"checkout\" ]]; then\n'
-                    "  n=\"$3\"\n"
-                    "  branch=\"gh-issue-${n}\"\n"
-                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
+                    '  n="$3"\n'
+                    '  branch="gh-issue-${n}"\n'
+                    '  git checkout -b "$branch" >/dev/null 2>&1 || git checkout "$branch" >/dev/null 2>&1\n'
                     "  c=0\n"
-                    "  if [[ -f \"$counter_file\" ]]; then\n"
-                    "    c=$(cat \"$counter_file\")\n"
+                    '  if [[ -f "$counter_file" ]]; then\n'
+                    '    c=$(cat "$counter_file")\n'
                     "  fi\n"
-                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    '  echo $((c+1)) > "$counter_file"\n'
                     "  exit 0\n"
                     "fi\n"
-                    "echo \"unexpected gh args: $@\" >&2\n"
+                    'echo "unexpected gh args: $@" >&2\n'
                     "exit 1\n",
                     encoding="utf-8",
                 )
@@ -1780,13 +1841,13 @@ class TestCliActive(CliRuntimeHarness):
                 gh_path.write_text(
                     "#!/usr/bin/env bash\n"
                     "set -euo pipefail\n"
-                    'if [[ \"$1\" == \"issue\" && \"$2\" == \"checkout\" ]]; then\n'
-                    "  n=\"$3\"\n"
-                    "  branch=\"gh-issue-${n}\"\n"
-                    "  git checkout \"$branch\" >/dev/null 2>&1\n"
+                    'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
+                    '  n="$3"\n'
+                    '  branch="gh-issue-${n}"\n'
+                    '  git checkout "$branch" >/dev/null 2>&1\n'
                     "  exit 0\n"
                     "fi\n"
-                    "echo \"unexpected gh args: $@\" >&2\n"
+                    'echo "unexpected gh args: $@" >&2\n'
                     "exit 1\n",
                     encoding="utf-8",
                 )
@@ -1824,7 +1885,7 @@ class TestCliActive(CliRuntimeHarness):
             gh_path.write_text(
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
-                "echo \"gh should not be invoked when working tree is dirty\" >&2\n"
+                'echo "gh should not be invoked when working tree is dirty" >&2\n'
                 "exit 1\n",
                 encoding="utf-8",
             )

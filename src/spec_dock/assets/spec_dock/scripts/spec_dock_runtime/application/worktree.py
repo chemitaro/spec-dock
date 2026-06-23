@@ -30,7 +30,7 @@ _RETRYABLE_GIT_WORKTREE_ERRORS = (
     "a branch named",
 )
 _WORKTREE_ROOT_ENV = "SPEC_DOCK_WORKTREE_ROOT"
-_WORKTREE_ROOT_EXAMPLE = "export SPEC_DOCK_WORKTREE_ROOT=\"$HOME/workspace/worktrees\""
+_WORKTREE_ROOT_EXAMPLE = 'export SPEC_DOCK_WORKTREE_ROOT="$HOME/workspace/worktrees"'
 
 
 @dataclass(frozen=True)
@@ -481,7 +481,7 @@ def _raw_worktree_id(
         and basename.startswith(repo_prefix)
         and len(basename) > len(repo_prefix)
     ):
-        return basename[len(repo_prefix):]
+        return basename[len(repo_prefix) :]
     return basename
 
 
@@ -656,9 +656,4 @@ def _artifact_state(
         branch_exists = "unknown"
     path_exists = worktree_path.exists()
     record_exists = _canonical_path(worktree_path) in record_paths
-    return (
-        "artifact_state="
-        f"path_exists:{path_exists},"
-        f"branch_exists:{branch_exists},"
-        f"record_exists:{record_exists}"
-    )
+    return f"artifact_state=path_exists:{path_exists},branch_exists:{branch_exists},record_exists:{record_exists}"

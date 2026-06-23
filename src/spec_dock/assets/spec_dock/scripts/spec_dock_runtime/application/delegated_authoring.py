@@ -158,14 +158,18 @@ def run_delegated_authoring_diff_guard(
         baseline_only_entries = tuple(
             entry
             for entry in baseline.entries
-            if _entry_key(entry) not in current_keys and _repo_path(entry.path, req.repo_root) != baseline_path
+            if _entry_key(entry) not in current_keys
+            and _repo_path(entry.path, req.repo_root) != baseline_path
             and _entry_key(entry) not in existing_create_keys
         )
-        entries = tuple(
-            entry
-            for entry in entries
-            if _entry_key(entry) not in baseline_keys and _repo_path(entry.path, req.repo_root) != baseline_path
-        ) + baseline_only_entries
+        entries = (
+            tuple(
+                entry
+                for entry in entries
+                if _entry_key(entry) not in baseline_keys and _repo_path(entry.path, req.repo_root) != baseline_path
+            )
+            + baseline_only_entries
+        )
     entries = _attach_pre_change_text(req.repo_root, entries)
     return domain.evaluate_diff_guard(
         authorized_role=req.role,
@@ -373,9 +377,7 @@ def _create_entries_existing_at_baseline_keys(
     baseline_entries: tuple[domain.DiffGuardEntry, ...],
     baseline_file_states: dict[Path, tuple[str, str]],
 ) -> set[tuple[str, str, str | None]]:
-    baseline_create_keys = {
-        _entry_key(entry) for entry in baseline_entries if entry.status in ("!!", "??")
-    }
+    baseline_create_keys = {_entry_key(entry) for entry in baseline_entries if entry.status in ("!!", "??")}
     keys: set[tuple[str, str, str | None]] = set()
     for entry in entries:
         if not (entry.status == "!!" or entry.status == "??"):
@@ -839,7 +841,9 @@ def _file_state_map(file_states: tuple[_BaselineFileState, ...]) -> dict[Path, t
     return {file_state.path: (file_state.mode, file_state.sha256) for file_state in file_states}
 
 
-def _file_states_for_entries(repo_root: Path, entries: tuple[domain.DiffGuardEntry, ...]) -> tuple[_BaselineFileState, ...]:
+def _file_states_for_entries(
+    repo_root: Path, entries: tuple[domain.DiffGuardEntry, ...]
+) -> tuple[_BaselineFileState, ...]:
     file_states: list[_BaselineFileState] = []
     for entry in entries:
         rel_path = _repo_path(entry.path, repo_root)

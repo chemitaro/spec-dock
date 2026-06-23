@@ -55,6 +55,13 @@ ignore-variadic-names = true
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
 
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+docstring-code-format = true
+line-ending = "auto"
+
 [tool.ruff.lint.per-file-ignores]
 "src/spec_dock/__init__.py" = ["RUF067"]
 "src/spec_dock/**/*.py" = ["E501", "SIM108", "RUF001", "RUF002", "RUF003", "RUF010"]
