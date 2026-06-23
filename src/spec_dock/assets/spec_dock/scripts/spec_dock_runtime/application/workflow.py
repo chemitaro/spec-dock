@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol
 
-from spec_dock_runtime.application.contracts import WorkflowNextRequest, WorkflowResult, WorkflowStatusRequest
+from spec_dock_runtime.application.contracts import (
+    RunbookProjectionResult,
+    WorkflowNextRequest,
+    WorkflowResult,
+    WorkflowStatusRequest,
+)
 from spec_dock_runtime.domain.runbook import compile_runbook
 from spec_dock_runtime.domain.workflow_state import (
     STRICT_LEGACY_AUTHORITY,
@@ -13,7 +18,6 @@ from spec_dock_runtime.domain.workflow_state import (
 
 if TYPE_CHECKING:
     from spec_dock_runtime.domain.runbook import Runbook
-    from spec_dock_runtime.infra.runbook_store import RunbookProjectionResult
 
 
 class WorkflowAssuranceStoreLike(Protocol):

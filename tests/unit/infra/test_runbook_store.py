@@ -6,6 +6,8 @@ import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import pytest
 
 
@@ -88,8 +90,7 @@ def test_runbook_store_replace_failure_preserves_existing_projection_set(
     initial = store.write_current(_runbook())
     assert initial.written is True
     existing = {
-        rel_path: (tmp_path / rel_path).read_text(encoding="utf-8")
-        for rel_path in runbook_store.CURRENT_RUNBOOK_PATHS
+        rel_path: (tmp_path / rel_path).read_text(encoding="utf-8") for rel_path in runbook_store.CURRENT_RUNBOOK_PATHS
     }
     replace_calls = 0
 
@@ -148,7 +149,7 @@ class _NoActiveStore:
 
 
 class _FailingRunbookStore:
-    def __init__(self, result_type: object) -> None:
+    def __init__(self, result_type: Callable[..., object]) -> None:
         self._result_type = result_type
 
     def write_current(self, runbook: object) -> object:

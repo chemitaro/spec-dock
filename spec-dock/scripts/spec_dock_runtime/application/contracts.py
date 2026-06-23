@@ -27,7 +27,6 @@ if TYPE_CHECKING:
     from spec_dock_runtime.domain.runbook import Runbook, WorkflowTarget
     from spec_dock_runtime.domain.workflow_state import WorkflowState
     from spec_dock_runtime.infra.contracts import StoredMetaRecord
-    from spec_dock_runtime.infra.runbook_store import RunbookProjectionResult
 
 POST_MUTATION_FATAL_WARNING_CODES: tuple[str, ...] = ("gh_fetch_failed",)
 BootstrapStatus = Literal["skipped", "succeeded", "failed", "detection_failed"]
@@ -117,6 +116,13 @@ class WorkflowStatusRequest:
 @dataclass(frozen=True)
 class WorkflowNextRequest:
     workflow_target: WorkflowTarget
+
+
+@dataclass(frozen=True)
+class RunbookProjectionResult:
+    written: bool
+    paths: tuple[str, ...]
+    errors: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
