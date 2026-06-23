@@ -2,7 +2,6 @@ import contextlib
 import errno
 import io
 import json
-import os
 from pathlib import Path
 import sys
 import tempfile
@@ -666,7 +665,8 @@ class TestRuntimeSyncS07:
             for source in (initiative_doc, issue_doc):
                 link_path = adrs_dir / source.name
                 assert link_path.is_symlink(), f"missing ADR mirror symlink: {link_path}"
-                assert not os.readlink(link_path).startswith("/"), os.readlink(link_path)
+                link_target = str(link_path.readlink())
+                assert not link_target.startswith("/"), link_target
                 assert link_path.resolve() == source.resolve()
 
     def test_sync_warns_and_succeeds_with_empty_adrs_when_symlinks_are_unsupported(self) -> None:
@@ -709,14 +709,14 @@ class TestRuntimeSyncS07:
                 artifact_writer=infra_artifact_writer.FileArtifactWriter(),
                 clock=_StubClock(),
             )
-            original_symlink = app_sync_state.os.symlink
-            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+            original_symlink_to = app_sync_state.Path.symlink_to
+            app_sync_state.Path.symlink_to = lambda self, target, *args, **kwargs: (_ for _ in ()).throw(
                 OSError(errno.ENOSYS, "symlink unsupported")
             )
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
 
             assert result.artifact_failure is None
             assert result.write_result is not None
@@ -779,15 +779,15 @@ class TestRuntimeSyncS07:
                 write_calls.append(path)
 
             infra_artifact_writer._write_text = _partial_write_then_fail
-            original_symlink = app_sync_state.os.symlink
-            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+            original_symlink_to = app_sync_state.Path.symlink_to
+            app_sync_state.Path.symlink_to = lambda self, target, *args, **kwargs: (_ for _ in ()).throw(
                 OSError(errno.ENOSYS, "symlink unsupported")
             )
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
                 infra_artifact_writer._write_text = original_write_text
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
 
             assert result.write_result is None
             assert result.artifact_failure is not None
@@ -852,9 +852,9 @@ class TestRuntimeSyncS07:
                 clock=_StubClock(),
             )
 
-            original_symlink = app_sync_state.os.symlink
+            original_symlink_to = app_sync_state.Path.symlink_to
             original_render_dashboard = app_sync_state.render_dashboard
-            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+            app_sync_state.Path.symlink_to = lambda self, target, *args, **kwargs: (_ for _ in ()).throw(
                 OSError(errno.ENOSYS, "symlink unsupported")
             )
             app_sync_state.render_dashboard = lambda *args, **kwargs: (_ for _ in ()).throw(
@@ -866,7 +866,7 @@ class TestRuntimeSyncS07:
                     ports,
                 )
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
                 app_sync_state.render_dashboard = original_render_dashboard
 
             assert not spy_writer.called
@@ -958,7 +958,7 @@ class TestRuntimeSyncS07:
             )
             adrs_dir = specdock_dir / "adrs"
             try:
-                os.symlink("missing-generated-adrs-dir", adrs_dir)
+                Path(adrs_dir).symlink_to("missing-generated-adrs-dir")
             except OSError as error:
                 if app_sync_state._is_environment_symlink_unsupported(error):
                     pytest.skip("symlinks not supported in test environment")
@@ -1018,7 +1018,7 @@ class TestRuntimeSyncS07:
             preserved.write_text("keep-me\n", encoding="utf-8")
             adrs_dir = specdock_dir / "adrs"
             try:
-                os.symlink(managed_target_dir, adrs_dir)
+                Path(adrs_dir).symlink_to(managed_target_dir)
             except OSError as error:
                 if app_sync_state._is_environment_symlink_unsupported(error):
                     pytest.skip("symlinks not supported in test environment")
@@ -1038,18 +1038,17 @@ class TestRuntimeSyncS07:
                 clock=_StubClock(),
             )
             symlink_calls: list[tuple[str, Path]] = []
-            original_symlink = app_sync_state.os.symlink
+            original_symlink_to = app_sync_state.Path.symlink_to
 
-            def _recording_symlink(src, dst):
-                dst_path = Path(dst)
-                symlink_calls.append((str(src), dst_path))
-                return original_symlink(src, dst)
+            def _recording_symlink(self, target, *args, **kwargs):
+                symlink_calls.append((str(target), self))
+                return original_symlink_to(self, target, *args, **kwargs)
 
-            app_sync_state.os.symlink = _recording_symlink
+            app_sync_state.Path.symlink_to = _recording_symlink
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
 
             assert result.artifact_failure is None
             assert result.write_result is not None
@@ -1116,7 +1115,7 @@ class TestRuntimeSyncS07:
             )
             adrs_dir = specdock_dir / "adrs"
             adrs_dir.mkdir(parents=True, exist_ok=True)
-            os.chmod(adrs_dir, 0o555)
+            Path(adrs_dir).chmod(0o555)
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(records),
                 repo_root=repo_root,
@@ -1132,25 +1131,24 @@ class TestRuntimeSyncS07:
                 clock=_StubClock(),
             )
             symlink_calls: list[tuple[str, Path]] = []
-            original_symlink = app_sync_state.os.symlink
+            original_symlink_to = app_sync_state.Path.symlink_to
 
-            def _read_only_generated_adrs_probe(src, dst):
-                dst_path = Path(dst)
-                symlink_calls.append((str(src), dst_path))
+            def _read_only_generated_adrs_probe(self, target, *args, **kwargs):
+                symlink_calls.append((str(target), self))
                 if (
-                    dst_path.parent == adrs_dir
-                    and dst_path.name.startswith(".spec-dock-adr-mirror-probe-")
+                    self.parent == adrs_dir
+                    and self.name.startswith(".spec-dock-adr-mirror-probe-")
                 ):
                     raise PermissionError(errno.EPERM, "operation not permitted")
-                return original_symlink(src, dst)
+                return original_symlink_to(self, target, *args, **kwargs)
 
-            app_sync_state.os.symlink = _read_only_generated_adrs_probe
+            app_sync_state.Path.symlink_to = _read_only_generated_adrs_probe
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
                 if adrs_dir.exists() and not adrs_dir.is_symlink():
-                    os.chmod(adrs_dir, 0o755)
+                    Path(adrs_dir).chmod(0o755)
 
             assert result.artifact_failure is None
             assert result.write_result is not None
@@ -1245,14 +1243,14 @@ class TestRuntimeSyncS07:
                 artifact_writer=infra_artifact_writer.FileArtifactWriter(),
                 clock=_StubClock(),
             )
-            original_symlink = app_sync_state.os.symlink
-            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+            original_symlink_to = app_sync_state.Path.symlink_to
+            app_sync_state.Path.symlink_to = lambda self, target, *args, **kwargs: (_ for _ in ()).throw(
                 OSError(errno.ENOSYS, "symlink unsupported")
             )
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
 
             assert result.artifact_failure is None
             assert result.write_result is not None
@@ -1299,14 +1297,14 @@ class TestRuntimeSyncS07:
                 artifact_writer=infra_artifact_writer.FileArtifactWriter(),
                 clock=_StubClock(),
             )
-            original_symlink = app_sync_state.os.symlink
-            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+            original_symlink_to = app_sync_state.Path.symlink_to
+            app_sync_state.Path.symlink_to = lambda self, target, *args, **kwargs: (_ for _ in ()).throw(
                 PermissionError(errno.EPERM, "operation not permitted")
             )
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
 
             assert result.artifact_failure is not None
             assert result.artifact_failure.status == "failed_before_write"
@@ -1354,8 +1352,8 @@ class TestRuntimeSyncS07:
                 artifact_writer=_SpyArtifactWriter(),
                 clock=_StubClock(),
             )
-            original_symlink = app_sync_state.os.symlink
-            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+            original_symlink_to = app_sync_state.Path.symlink_to
+            app_sync_state.Path.symlink_to = lambda self, target, *args, **kwargs: (_ for _ in ()).throw(
                 PermissionError(errno.EPERM, "operation not permitted")
             )
             try:
@@ -1364,7 +1362,7 @@ class TestRuntimeSyncS07:
                     ports,
                 )
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
 
             assert result.write_result is None
             assert result.artifact_failure is not None
@@ -1419,20 +1417,19 @@ class TestRuntimeSyncS07:
                 clock=_StubClock(),
             )
             symlink_calls: list[tuple[str, Path]] = []
-            original_symlink = app_sync_state.os.symlink
+            original_symlink_to = app_sync_state.Path.symlink_to
 
-            def _fail_only_actual_mirror_link(src, dst):
-                dst_path = Path(dst)
-                symlink_calls.append((str(src), dst_path))
+            def _fail_only_actual_mirror_link(self, target, *args, **kwargs):
+                symlink_calls.append((str(target), self))
                 if len(symlink_calls) == 1:
-                    return original_symlink(src, dst)
+                    return original_symlink_to(self, target, *args, **kwargs)
                 raise PermissionError(errno.EPERM, "operation not permitted")
 
-            app_sync_state.os.symlink = _fail_only_actual_mirror_link
+            app_sync_state.Path.symlink_to = _fail_only_actual_mirror_link
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
 
             probe_path = symlink_calls[0][1]
             assert [path.name for _, path in symlink_calls] == [probe_path.name, mirror_path.name]
@@ -3056,9 +3053,9 @@ class TestRuntimeSyncS07:
                 clock=_StubClock(),
             )
 
-            original_symlink = app_sync_state.os.symlink
+            original_symlink_to = app_sync_state.Path.symlink_to
             original_render_dashboard = app_sync_state.render_dashboard
-            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+            app_sync_state.Path.symlink_to = lambda self, target, *args, **kwargs: (_ for _ in ()).throw(
                 OSError(errno.ENOSYS, "symlink unsupported")
             )
             app_sync_state.render_dashboard = lambda *args, **kwargs: (_ for _ in ()).throw(
@@ -3067,7 +3064,7 @@ class TestRuntimeSyncS07:
             try:
                 result = app_sync_state.sync(self._request(app_contracts), ports)
             finally:
-                app_sync_state.os.symlink = original_symlink
+                app_sync_state.Path.symlink_to = original_symlink_to
                 app_sync_state.render_dashboard = original_render_dashboard
 
             assert not spy_writer.called

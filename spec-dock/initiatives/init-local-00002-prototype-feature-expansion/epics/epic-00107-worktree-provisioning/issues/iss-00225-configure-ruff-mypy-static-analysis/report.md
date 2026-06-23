@@ -1016,7 +1016,7 @@ uv run pytest tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S08 | ready to commit | S08 implementation files plus `report.md` S08 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S08 | committed | S08 implementation files plus `report.md` S08 evidence | `d574d596` `build(static-analysis): Ruff SIM違反を解消する` | `git status --short` -> clean; post-commit `make lint` -> pass; `./spec-dock/scripts/spec-dock validate` -> pass | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `pyproject.toml` - Ruff `SIM` selection and `SIM108` ignore.
@@ -1024,10 +1024,127 @@ uv run pytest tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::
 - `report.md` - S07 commit correction and S08 observed evidence.
 
 #### コミット
-- pending S08 step commit.
+- `d574d596` `build(static-analysis): Ruff SIM違反を解消する`
 
 #### メモ
 - `SIM108` stays intentionally ignored because the project values readability over forced ternary expressions in these contexts.
+
+---
+
+### セッションログ（2026-06-23 HH:MM - HH:MM）
+
+#### 対象
+- Step: S09 — Ruff PTH
+- AC/EC: AC-005
+- 計画上の出典（Planned source）:
+  - `plan.md` S09 executable contract
+  - closure id: `tc-s09-001`
+
+#### 実施内容
+- `dev-coder` に S09 を委任し、許可 path を `pyproject.toml`, `src/spec_dock/**/*.py`, `tests/**/*.py` に限定した。
+- `pyproject.toml` の Ruff `select` を `["F", "E", "I", "UP", "B", "C4", "SIM", "PTH"]` に変更した。
+- 初回 inventory は total 64 件だった。
+  - `PTH211`: 40 件。代表: `src/spec_dock/cli.py`, `tests/unit/infra/test_init_update.py`
+  - `PTH115`: 15 件。代表: `application/delegated_authoring.py`, `tests/cli_runtime/test_sync.py`
+  - `PTH101`: 3 件
+  - `PTH118`: 2 件
+  - `PTH103`, `PTH105`, `PTH116`, `PTH123`: 各 1 件
+- `os.symlink`, `os.readlink`, `os.replace`, `os.stat`, `os.chmod`, `os.makedirs`, `open`, `os.path.join` などを、契約を保てる箇所から `pathlib` API へ移行した。
+- symlink / filesystem boundary で raw target 文字列の保持が契約になっている箇所は、`os.readlink` を限定的に残し、該当行だけ `# noqa: PTH115` を付けた。
+- symlink failure injection tests は `os.symlink` monkeypatch から `Path.symlink_to` monkeypatch へ移行した。
+- code-reviewer の P2 指摘を受け、diff guard hash と uninstall shortcut 判定に加えて、test snapshot helper `_relative_file_snapshot` も raw symlink target を保持するよう `os.readlink` に戻した。
+- raw symlink payload が `payload//target` から `payload/target` に変わる差分を検出する regression test を追加した。
+
+#### 実行コマンド / 結果
+```bash
+uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH src/spec_dock tests
+# All checks passed!
+
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_uninstall_dry_run_spec_shortcut_only_removes_matching_symlink tests/cli_runtime/test_delegated_authoring.py::TestDelegatedAuthoringCli::test_diff_guard_rejects_raw_symlink_payload_change_after_baseline -q
+# 2 passed
+
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_bootstraps_active_path_files_when_active_symlink_creation_fails tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_rebuilds_active_path_files_from_persisted_manifest_when_symlink_creation_fails tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_repairs_stale_active_path_files_to_persisted_targets_when_symlink_creation_fails tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_repairs_stale_active_path_files_to_placeholder_when_persisted_manifest_broken_and_symlink_creation_fails tests/cli_runtime/test_sync.py tests/cli_runtime/test_worktree.py -q
+# 80 passed, 2 skipped
+
+git diff --check
+# pass
+
+make lint
+# pass
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=140
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S09 | Red / inventory | `tc-s09-001`: `PTH` violation inventory | total 64; dominant codes are `PTH211` and `PTH115` | worker command: `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH --statistics src/spec_dock tests` | pass | path rewrite scope identified before fixing |
+| S09 | Green | `F,E,I,UP,B,C4,SIM,PTH` violation 0 件 | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH src/spec_dock tests` -> All checks passed | command | pass | parent and worker reruns pass |
+| S09 | Regression | pathlib migration does not break symlink/fs behavior | focused pytest 2 passed; broader sync/worktree/update tests 80 passed, 2 skipped | command | pass | raw symlink target regression added |
+| S09 | Refactor | guardrail satisfied / no unrelated refactor | S10 以降 rule は追加せず、`spec-dock/` direct target なし | diff inspection + code-reviewer follow-up | pass | code-reviewer pass after P2 fix and report update |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S09 | `Path.readlink()` / `str(...)` は raw symlink target の redundant separator を正規化し得る | code-reviewer / dev-coder | raw target が契約の箇所は `os.readlink` と scoped `# noqa: PTH115` を使用 | tc-s09-001 | no | `delegated_authoring.py`; `cli.py`; `_relative_file_snapshot`; raw payload regression |
+| S09 | uninstall shortcut 判定は生成 shortcut と user-created normalized-mismatch shortcut を区別する必要がある | code-reviewer | exact raw symlink target match に戻し、test case を拡張 | tc-s09-001 | no | `test_uninstall_dry_run_spec_shortcut_only_removes_matching_symlink` |
+| S09 | diff guard hash は raw symlink payload change を検出する必要がある | code-reviewer | `payload//target` -> `payload/target` を検出する regression を追加 | tc-s09-001 | no | `test_diff_guard_rejects_raw_symlink_payload_change_after_baseline` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S09 | tc-s09-001 | Ruff `PTH` を追加し violation を 0 件にする。CLI / filesystem boundary で `str` / raw path が必要な箇所は意図を保持する | `pyproject.toml` select includes `PTH`; `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH src/spec_dock tests` -> pass; raw symlink target exceptions are scoped | pass | code-reviewer pass |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s09-001 / tc-s09-case-001 | S09 | yes | command | initial `PTH` inventory total 64 | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH src/spec_dock tests` | pass | `PTH` violation 0 件 |
+| tc-s09-001 / tc-s09-symlink-001 | S09 | yes | command + regression | raw symlink target may be normalized by pathlib | focused pytest for uninstall shortcut and delegated-authoring diff guard | pass | raw target contract preserved with scoped exceptions |
+| tc-s09-001 / tc-s09-broader-001 | S09 | no | command | path rewrite touched sync/worktree/update behavior | focused broader pytest for update fallback, sync, worktree | pass | 80 passed, 2 skipped |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s09-001 | S09 | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH src/spec_dock tests`; focused symlink pytest; broader sync/worktree/update pytest; `git diff --check`; `make lint`; `./spec-dock/scripts/spec-dock validate`; code-reviewer pass | pass | AC-005 S09 closed pending commit |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s09-001 | tc-s09-case-001 | tc-s09-001 | planned closure unchanged; concrete command case recorded | no | yes |
+| added | tc-s09-001 | tc-s09-symlink-001 | tc-s09-001 | raw symlink target handling is part of filesystem boundary contract | no | yes |
+| added | tc-s09-001 | tc-s09-broader-001 | tc-s09-001 | PTH rewrite affected sync/worktree/update filesystem paths | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S09 | delegated | pathlib lint rule adoption step | dev-coder | Ruff `PTH` enablement and path handling fixes | requirement/design/plan S09 | `pyproject.toml`; `src/spec_dock/**/*.py`; `tests/**/*.py` | report edits; commit; S10+ rules; dogfooding `spec-dock/`; broad suppression | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH src/spec_dock tests`; focused pytest as needed | raw symlink target contract break; direct dogfooding edit needed | changed files; inventory; command results; raw boundary rationale | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S09 | dev-coder | Ruff `PTH` enabled; pathlib migration applied; raw symlink target exceptions preserved; regression tests added or adjusted | `pyproject.toml`; allowed `src/spec_dock/**/*.py`; allowed `tests/**/*.py` touched by PTH fixes | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH src/spec_dock tests` -> pass; focused pytest -> 2 passed; broader pytest -> 80 passed, 2 skipped; `git diff --check` -> pass | pass: code-reviewer `019ef31e-0ac0-7ff1-bb89-fc4a79d67049`; reviewer local pytest rerun blocked by environment `uv` panic but parent verification passed | none | accepted for S09 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S09 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit | pass: code-reviewer `019ef31e-0ac0-7ff1-bb89-fc4a79d67049`; previous P1/P2 resolved |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S09 | ready to commit | S09 implementation files plus `report.md` S09 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `pyproject.toml` - Ruff `PTH` selection.
+- `src/spec_dock/**/*.py`, `tests/**/*.py` - PTH cleanup within S09 scope.
+- `report.md` - S08 commit correction and S09 observed evidence.
+
+#### コミット
+- pending S09 step commit.
+
+#### メモ
+- `os.readlink` remains intentionally in narrow raw symlink target contracts; each remaining PTH exception is scoped to the raw payload preservation line.
 
 ---
 

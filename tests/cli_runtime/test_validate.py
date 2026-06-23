@@ -1562,7 +1562,7 @@ class TestCliValidate(CliRuntimeHarness):
                 active_path_file = active_dir / f"{name}.path"
                 if active_link_path.is_symlink():
                     assert not active_path_file.exists(), active_path_file.as_posix()
-                    return ("symlink", os.readlink(active_link_path))
+                    return ("symlink", str(active_link_path.readlink()))
                 assert not active_link_path.exists(), active_link_path.as_posix()
                 assert active_path_file.is_file(), active_path_file.as_posix()
                 return ("path", active_path_file.read_text(encoding="utf-8").strip())

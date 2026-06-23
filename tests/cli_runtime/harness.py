@@ -162,7 +162,7 @@ class CliRuntimeHarness:
             src = tmp / "src.txt"
             dst = tmp / "dst.txt"
             src.write_text("x\n", encoding="utf-8")
-            os.symlink("src.txt", dst)
+            Path(dst).symlink_to("src.txt")
             return dst.is_symlink()
         except OSError:
             return False

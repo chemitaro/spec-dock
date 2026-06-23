@@ -102,7 +102,7 @@ def _atomic_write_json(path: Path, payload: dict[str, Any], *, readonly_mode: in
             lock_mode = _readonly_mode_preserving_read_bits(tmp_path.stat().st_mode)
         tmp_path.chmod(lock_mode)
         stage = "replace"
-        os.replace(tmp_path, path)
+        Path(tmp_path).replace(path)
     except Exception as exc:
         raise RuntimeError(f"write_failed[{stage}]: {path}: {exc}") from exc
     finally:
@@ -567,8 +567,8 @@ def _handle_rmtree_permission_error(func, path, exc_info) -> None:
     if not isinstance(exc, PermissionError):
         raise exc
     try:
-        current_mode = os.stat(path).st_mode
-        os.chmod(path, current_mode | stat.S_IWRITE)
+        current_mode = Path(path).stat().st_mode
+        Path(path).chmod(current_mode | stat.S_IWRITE)
         func(path)
     except OSError:
         raise exc from None

@@ -523,7 +523,7 @@ class TestRuntimeNewS08:
             )
             broken_link = plan.dest_dir / "epics" / "rules.md"
             broken_link.parent.mkdir(parents=True, exist_ok=True)
-            os.symlink("../../../docs/rules/initiative/missing.md", broken_link)
+            Path(broken_link).symlink_to("../../../docs/rules/initiative/missing.md")
 
             with pytest.raises(RuntimeError, match='Destination already exists'):
                 app_create_node.execute_create_plan(plan, ports)
@@ -799,7 +799,7 @@ class TestRuntimeNewS08:
                 symlink_target.mkdir(parents=True, exist_ok=True)
                 collision = plan.dest_dir / collision_name
                 collision.parent.mkdir(parents=True, exist_ok=True)
-                os.symlink(symlink_target, collision)
+                Path(collision).symlink_to(symlink_target)
 
                 with pytest.raises(RuntimeError, match=f'Destination already exists: .*{collision_name}'):
                     app_create_node.execute_create_plan(plan, ports)

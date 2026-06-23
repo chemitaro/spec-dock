@@ -1501,7 +1501,7 @@ class TestRuntimeImportS10:
             rules_target = specdock_dir / "docs" / "rules" / "issue" / "discussions.md"
             assert rules_link.is_symlink(), f"missing imported rules symlink: {rules_link}"
             assert rules_link.resolve() == rules_target.resolve()
-            assert os.readlink(rules_link) == os.path.relpath(rules_target, start=rules_link.parent)
+            assert str(rules_link.readlink()) == os.path.relpath(rules_target, start=rules_link.parent)
             assert list(result.node.path.rglob("new-*")) == []
 
     def test_renderer_text_regression(self) -> None:

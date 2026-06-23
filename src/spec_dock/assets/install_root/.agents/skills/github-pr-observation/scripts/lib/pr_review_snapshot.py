@@ -2,7 +2,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
-import os
+import pathlib
 import re
 import subprocess
 import sys
@@ -1549,8 +1549,9 @@ payload = {
 }
 
 if out_dir:
-    os.makedirs(os.path.join(out_dir, "raw"), exist_ok=True)
-    with open(os.path.join(out_dir, "raw", "review_bodies.json"), "w", encoding="utf-8") as handle:
+    raw_dir = pathlib.Path(out_dir) / "raw"
+    raw_dir.mkdir(exist_ok=True, parents=True)
+    with (raw_dir / "review_bodies.json").open("w", encoding="utf-8") as handle:
         json.dump(
             raw_body_artifacts,
             handle,

@@ -345,7 +345,7 @@ def apply_active_pointers(specdock_dir: Path, manifest: ActiveManifest | None, r
         link = active_dir / name
         rel_target = os.path.relpath(target, start=active_dir)
         try:
-            os.symlink(rel_target, link)
+            Path(link).symlink_to(rel_target)
         except OSError:
             _write_pathfile(active_dir, name, target)
 

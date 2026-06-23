@@ -261,7 +261,7 @@ class TestCliImport(CliRuntimeHarness):
             for link_path, target_path in expected_rules_links.items():
                 assert link_path.is_symlink(), f"missing imported rules symlink: {link_path}"
                 assert link_path.resolve() == target_path.resolve()
-                assert os.readlink(link_path) == os.path.relpath(target_path, start=link_path.parent)
+                assert str(link_path.readlink()) == os.path.relpath(target_path, start=link_path.parent)
 
             for scope_dir in (
                 init_dir / "epics",
