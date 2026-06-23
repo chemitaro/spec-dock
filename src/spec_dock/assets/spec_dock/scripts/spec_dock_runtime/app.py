@@ -20,7 +20,6 @@ Design goals:
 """
 from __future__ import annotations
 
-import argparse
 import contextlib
 from dataclasses import dataclass
 import os
@@ -29,7 +28,7 @@ import re
 import shutil
 import subprocess
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .cli.bootstrap import build_runtime as _cli_build_runtime
 from .cli.dispatch import dispatch as _cli_dispatch
@@ -57,6 +56,9 @@ from .presentation.json_state import render_deps_check_json as _render_deps_chec
 from .render_puml import (
     _deps_disabled_error_text,
 )
+
+if TYPE_CHECKING:
+    import argparse
 
 __all__ = [
     "_render_deps_check_json",

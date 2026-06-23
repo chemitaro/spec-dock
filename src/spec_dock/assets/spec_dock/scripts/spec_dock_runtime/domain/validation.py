@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .deps import validate_deps_cycles
 from .discussion_docs import (
@@ -11,6 +11,9 @@ from .discussion_docs import (
 )
 from .ids import parse_id, validate_lowercase, validate_slug
 from .models import SpecGraph, SpecNode, ValidationReport
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _meta_json_path_for_output(node: SpecNode, *, repo_root: Path | None = None) -> str:

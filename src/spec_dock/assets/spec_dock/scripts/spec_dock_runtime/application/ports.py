@@ -1,28 +1,30 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
-from ..domain.models import IssueSnapshot, SpecGraph
-from ..infra.contracts import (
-    ActiveManifest,
-    ActiveManifestLoadResult,
-    ActiveStateSnapshot,
-    DepsTopologyLoadResult,
-    DirectDependencyResolution,
-    StoredMetaRecord,
-)
-from ..presentation.contracts import ArtifactBundle
-from .contracts import (
-    ArtifactWriteResult,
-    BootstrapResult,
-    GitHubCapabilityDiagnostic,
-    GitHubCapabilityProbeRequest,
-    GitWorktreeRecord,
-    SyncCommandResult,
-    SyncRequest,
-)
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from ..domain.models import IssueSnapshot, SpecGraph
+    from ..infra.contracts import (
+        ActiveManifest,
+        ActiveManifestLoadResult,
+        ActiveStateSnapshot,
+        DepsTopologyLoadResult,
+        DirectDependencyResolution,
+        StoredMetaRecord,
+    )
+    from ..presentation.contracts import ArtifactBundle
+    from .contracts import (
+        ArtifactWriteResult,
+        BootstrapResult,
+        GitHubCapabilityDiagnostic,
+        GitHubCapabilityProbeRequest,
+        GitWorktreeRecord,
+        SyncCommandResult,
+        SyncRequest,
+    )
 
 
 class ValidateNodeReader(Protocol):

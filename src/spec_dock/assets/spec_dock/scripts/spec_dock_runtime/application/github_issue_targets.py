@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
-from ..domain.models import IssueSnapshot, SpecGraph
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from ..domain.models import IssueSnapshot, SpecGraph
 
 
 def normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:

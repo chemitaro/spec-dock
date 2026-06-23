@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
 from pathlib import Path
 import subprocess
+from typing import TYPE_CHECKING
 
-from ..application.contracts import UseCases
 from ..presentation.contracts import CliText
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
+
+if TYPE_CHECKING:
+    import argparse
+
+    from ..application.contracts import UseCases
 
 UPSTREAM_SOURCE = "git+https://github.com/chemitaro/spec-dock"
 

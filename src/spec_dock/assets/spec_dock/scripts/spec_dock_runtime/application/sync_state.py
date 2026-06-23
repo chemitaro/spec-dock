@@ -8,7 +8,7 @@ import json
 import os
 from pathlib import Path
 import shutil
-from typing import Literal, cast
+from typing import TYPE_CHECKING, Literal, cast
 from uuid import uuid4
 
 from ..domain.active import infer_active_node_from_branch
@@ -38,7 +38,6 @@ from ..domain.validation import (
     find_github_repo_scope_pairing_error,
     validate_graph_and_deps,
 )
-from ..infra.contracts import ActiveManifest, DirectDependencyResolution, StoredMetaRecord
 from ..presentation.contracts import ArtifactBundle
 from ..presentation.json_state import (
     render_deps_issues_artifact,
@@ -63,12 +62,15 @@ from .github_issue_targets import (
     normalize_repo_slug,
     snapshot_repo_issue_key,
 )
-from .ports import Ports
 from .repo_context import (
     resolve_current_repo_slug,
 )
 from .set_active import build_active_manifest, build_context_pack_text, commit_active_state
 from .status_context import resolve_issue_status_context
+
+if TYPE_CHECKING:
+    from ..infra.contracts import ActiveManifest, DirectDependencyResolution, StoredMetaRecord
+    from .ports import Ports
 
 
 class _ArtifactWriteExecutionError(RuntimeError):
@@ -137,7 +139,7 @@ def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> d
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,

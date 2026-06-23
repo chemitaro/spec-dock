@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import replace
 from datetime import date, datetime, timezone
 import os
 from pathlib import Path
 import shlex
 import time
-from typing import Literal, cast
+from typing import TYPE_CHECKING, Literal, cast
 import uuid
 
 from ..domain.discussion_docs import (
@@ -37,9 +36,13 @@ from .contracts import (
     CreateNodeResult,
     CreatePlan,
 )
-from .ports import Ports
 from .repo_context import require_current_repo_slug, resolve_current_repo_slug, split_repo_slug
 from .sync_state import post_mutation_sync
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from .ports import Ports
 
 _META_FILENAME = ".meta.json"
 _DRAFT_TARGET_BY_DOC_TYPE = {
@@ -425,7 +428,7 @@ def _resolve_template_scaffolder(ports: Ports):
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,
@@ -442,7 +445,7 @@ def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
 
 def _to_spec_node(record: StoredMetaRecord) -> SpecNode:
     return SpecNode(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-import argparse
-from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from ..application.contracts import UseCases
-from ..presentation.contracts import CliText
+if TYPE_CHECKING:
+    import argparse
+    from collections.abc import Callable
+
+    from ..application.contracts import UseCases
+    from ..presentation.contracts import CliText
 
 
 @dataclass(frozen=True)

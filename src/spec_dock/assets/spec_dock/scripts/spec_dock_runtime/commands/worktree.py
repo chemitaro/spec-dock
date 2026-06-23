@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ..application.contracts import (
     UseCases,
@@ -23,6 +23,9 @@ from ..presentation.cli_text import (
     render_worktree_show_text,
 )
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
+
+if TYPE_CHECKING:
+    import argparse
 
 
 @dataclass(frozen=True)

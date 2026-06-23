@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from ..domain.deps import validate_raw_node_dependency_graph
 from ..domain.models import SpecGraph, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
 from ..domain.validation import validate_graph_and_deps
-from ..infra.contracts import ActiveManifestEntry, DirectDependencyResolution, StoredMetaRecord
 from . import create_node as app_create_node
 from .artifact_preflight import validate_required_artifacts_for_graph
 from .contracts import (
@@ -17,13 +16,16 @@ from .contracts import (
     GitHubCapabilityDiagnostic,
     GitHubCapabilityProbeRequest,
 )
-from .ports import Ports
 from .repo_context import resolve_current_repo_slug
+
+if TYPE_CHECKING:
+    from ..infra.contracts import ActiveManifestEntry, DirectDependencyResolution, StoredMetaRecord
+    from .ports import Ports
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 import re
+from typing import TYPE_CHECKING
 
 from .discussion_docs import (
     is_creatable_discussion_doc_type,
     parse_timestamp_discussion_doc_filename,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 CANONICAL_DOC_NAMES: tuple[str, ...] = ("requirement.md", "design.md", "plan.md", "report.md")
 FORBIDDEN_ROOT_NAMES: tuple[str, ...] = (".agents", ".codex", ".github", "src", "tests")

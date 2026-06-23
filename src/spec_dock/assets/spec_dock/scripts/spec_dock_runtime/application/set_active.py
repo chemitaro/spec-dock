@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from ..domain.active import resolve_branch_decision
 from ..domain.authority import (
@@ -32,14 +32,16 @@ from .contracts import (
     TargetRef,
 )
 from .github_issue_targets import collect_repo_scoped_issue_view_targets, normalize_repo_slug
-from .ports import Ports
 from .repo_context import resolve_current_repo_slug
 from .status_context import resolve_issue_status_context
+
+if TYPE_CHECKING:
+    from .ports import Ports
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,

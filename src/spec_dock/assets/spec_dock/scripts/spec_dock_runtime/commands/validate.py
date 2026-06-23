@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ..application.contracts import UseCases, ValidateTreeRequest
 from ..presentation.cli_text import render_validate_text
 from ..presentation.contracts import CliText
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
+
+if TYPE_CHECKING:
+    import argparse
 
 
 @dataclass(frozen=True)

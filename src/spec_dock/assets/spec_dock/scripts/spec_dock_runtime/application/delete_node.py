@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import re
 import shutil
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from ..domain.ids import format_id, parse_id
 from ..domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
@@ -21,8 +21,10 @@ from .contracts import (
     DeleteValidationReason,
 )
 from .github_issue_targets import normalize_repo_slug
-from .ports import Ports
 from .sync_state import post_mutation_sync
+
+if TYPE_CHECKING:
+    from .ports import Ports
 
 _NUM_RE = re.compile(r"^[0-9]+$")
 _SCOPED_ISSUE_REF_RE = re.compile(
@@ -43,7 +45,7 @@ class _CanonicalRemoteIssue:
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
-        kind=cast(SpecNodeKind, record.kind),
+        kind=cast("SpecNodeKind", record.kind),
         id=record.id,
         title=record.title,
         slug=record.slug,
@@ -93,7 +95,7 @@ def _result(
             )
         )
     return DeleteNodeResult(
-        status=cast(DeleteTerminalStatus, status),
+        status=cast("DeleteTerminalStatus", status),
         target_id=target_id,
         deleted_node_ids=[],
         remaining_node_ids=[],
@@ -697,7 +699,7 @@ def _collect_surviving_raw_node_dependency_refs(
             payload = _load_meta_payload(node.path / ".meta.json", ports=ports)
         except Exception:
             continue
-        for ref in cast(list[object], payload["depends_on"]):
+        for ref in cast("list[object]", payload["depends_on"]):
             if not isinstance(ref, str):
                 continue
             ref_lower = ref.strip().lower()
@@ -1028,7 +1030,7 @@ def _scrub_surviving_dependency_refs(
         meta_path = survivor.path / ".meta.json"
         try:
             payload = _load_meta_payload(meta_path, ports=ports)
-            depends_on = cast(list[object], payload["depends_on"])
+            depends_on = cast("list[object]", payload["depends_on"])
             exact_refs_to_remove = list((surviving_node_to_deleted_raw_refs or {}).get(survivor_id, []))
             if exact_refs_to_remove:
                 refs_to_remove = [ref for ref in depends_on if any(ref == exact for exact in exact_refs_to_remove)]

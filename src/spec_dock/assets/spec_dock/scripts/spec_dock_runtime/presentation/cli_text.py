@@ -1,33 +1,36 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
-from ..application.contracts import (
-    ActiveClearResult,
-    ActiveSetResult,
-    ActiveViewResult,
-    CloseNodeResult,
-    CreateDiscussionDocResult,
-    CreateNodeResult,
-    DeleteNodeResult,
-    DepsCheckResult,
-    DoctorResult,
-    ImportNodeResult,
-    IssueFinishResult,
-    IssueStartResult,
-    MutateDepsError,
-    MutateDepsResult,
-    PostMutationSyncOutcome,
-    SyncCommandResult,
-    ValidationResult,
-    WorktreeCommandError,
-    WorktreeCreateResult,
-    WorktreeListResult,
-    WorktreeRecordView,
-    WorktreeRemoveResult,
-    WorktreeShowResult,
-)
 from .contracts import CliText
+
+if TYPE_CHECKING:
+    from ..application.contracts import (
+        ActiveClearResult,
+        ActiveSetResult,
+        ActiveViewResult,
+        CloseNodeResult,
+        CreateDiscussionDocResult,
+        CreateNodeResult,
+        DeleteNodeResult,
+        DepsCheckResult,
+        DoctorResult,
+        ImportNodeResult,
+        IssueFinishResult,
+        IssueStartResult,
+        MutateDepsError,
+        MutateDepsResult,
+        PostMutationSyncOutcome,
+        SyncCommandResult,
+        ValidationResult,
+        WorktreeCommandError,
+        WorktreeCreateResult,
+        WorktreeListResult,
+        WorktreeRecordView,
+        WorktreeRemoveResult,
+        WorktreeShowResult,
+    )
 
 
 def _doctor_warning_message(code: str) -> str:

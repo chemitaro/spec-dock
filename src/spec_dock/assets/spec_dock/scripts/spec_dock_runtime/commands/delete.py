@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ..application.contracts import DeleteNodeRequest, UseCases
 from ..presentation.cli_text import render_delete_text
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
+
+if TYPE_CHECKING:
+    import argparse
 
 
 @dataclass(frozen=True)

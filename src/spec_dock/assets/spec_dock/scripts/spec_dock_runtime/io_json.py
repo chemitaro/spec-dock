@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .infra import clock as _infra_clock, json_store as _infra_json_store
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _now_iso() -> str:
