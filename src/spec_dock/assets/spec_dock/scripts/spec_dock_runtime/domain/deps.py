@@ -577,7 +577,7 @@ def validate_deps_cycles(issue_depends_on_map: dict[str, list[str]]) -> None:
                     start_index = path.index(dep_id)
                 except ValueError:
                     start_index = 0
-                cycle = path[start_index:] + [dep_id]
+                cycle = [*path[start_index:], dep_id]
                 raise RuntimeError("Dependency cycle detected: " + " -> ".join(cycle))
 
             if dep_id not in visited:

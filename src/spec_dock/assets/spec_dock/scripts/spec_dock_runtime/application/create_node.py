@@ -337,7 +337,7 @@ def _scan_discussion_timestamp_duplicate_state(discussions_dir: Path) -> tuple[s
     if duplicate_suffix_slots:
         dup_timestamp, dup_suffix = duplicate_suffix_slots[0]
         files = ", ".join(
-            path.name for path in sorted(by_suffix_slot[(dup_timestamp, dup_suffix)], key=lambda p: p.as_posix())
+            path.name for path in sorted(by_suffix_slot[dup_timestamp, dup_suffix], key=lambda p: p.as_posix())
         )
         return (
             f"Duplicate discussion timestamp suffix detected under {discussions_dir}: "

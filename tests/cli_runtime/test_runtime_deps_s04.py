@@ -1370,7 +1370,7 @@ class TestRuntimeDepsS04:
     def test_legacy_deps_path_delegates_and_exit_codes(self) -> None:
         (
             runtime_app,
-            app_check_deps,
+            _app_check_deps,
             app_contracts,
             _app_ports,
             _app_status_context,

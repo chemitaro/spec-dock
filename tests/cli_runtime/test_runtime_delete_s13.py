@@ -391,7 +391,7 @@ class TestRuntimeDeleteS13:
         node_reader=None,
         sync_legacy_runner=None,
     ):
-        app_contracts, _app_delete_node, app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+        app_contracts, _app_delete_node, app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models_, infra_contracts = (
             _runtime_modules()
         )
         if repo_root is None:
@@ -415,7 +415,7 @@ class TestRuntimeDeleteS13:
             issue_gateway=issue_gateway,
             node_repo=node_repo,
             sync_legacy_runner=sync_legacy_runner
-            or _SuccessfulSyncLegacyRunner(app_contracts, _domain_models),
+            or _SuccessfulSyncLegacyRunner(app_contracts, domain_models_),
         )
 
     def _request(self, app_contracts, **overrides):
@@ -518,7 +518,8 @@ class TestRuntimeDeleteS13:
             _runtime_modules()
         )
         repo_root = self._new_repo_root()
-        records = self._records(infra_contracts, repo_root, with_github_links=True) + [
+        records = [
+            *self._records(infra_contracts, repo_root, with_github_links=True),
             _record(
                 infra_contracts,
                 repo_root=repo_root,
@@ -543,7 +544,8 @@ class TestRuntimeDeleteS13:
             _runtime_modules()
         )
         repo_root = self._new_repo_root()
-        records = self._records(infra_contracts, repo_root) + [
+        records = [
+            *self._records(infra_contracts, repo_root),
             _record(
                 infra_contracts,
                 repo_root=repo_root,

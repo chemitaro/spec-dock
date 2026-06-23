@@ -2392,11 +2392,11 @@ class TestRuntimeSyncS07:
             assert foreign_status.source == "github"
             assert foreign_status.effective_status == "done"
             assert (
-                result.state.github_snapshot_by_repo_and_issue_number[("current/repo", 301)].url
+                result.state.github_snapshot_by_repo_and_issue_number["current/repo", 301].url
                 == "https://github.com/current/repo/issues/301"
             )
             assert (
-                result.state.github_snapshot_by_repo_and_issue_number[("other/repo", 301)].url
+                result.state.github_snapshot_by_repo_and_issue_number["other/repo", 301].url
                 == "https://github.com/other/repo/issues/301"
             )
 
@@ -4040,8 +4040,8 @@ class TestRuntimeSyncS07:
         assert "--disable-auto-sync" not in help_text
         assert "no_auto_sync" not in help_text
 
-        deps_add_help = " ".join(help_by_command[("deps", "add", "--help")].split())
-        deps_remove_help = " ".join(help_by_command[("deps", "remove", "--help")].split())
+        deps_add_help = " ".join(help_by_command["deps", "add", "--help"].split())
+        deps_remove_help = " ".join(help_by_command["deps", "remove", "--help"].split())
         assert "Existing initiative, epic, or issue node id for dependency source" in deps_add_help
         assert "Existing initiative, epic, or issue node id for dependency target" in deps_add_help
         assert "Existing initiative, epic, or issue node id for dependency source" in deps_remove_help

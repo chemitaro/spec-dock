@@ -1438,7 +1438,7 @@ def _deps_evaluate(
     blockers_by_id: dict[str, list[str]] = {}
     ready_by_id: dict[str, bool] = {}
     for node_id, eff in deps_map.items():
-        blockers_by_id[node_id] = [dep_id for dep_id in eff if not done_by_id.get(dep_id, False)]
+        blockers_by_id[node_id] = [dep_id for dep_id in eff if not done_by_id.get(dep_id)]
         ready_by_id[node_id] = len(blockers_by_id[node_id]) == 0
 
     blockers = blockers_by_id.get(target_id, [])
@@ -1449,7 +1449,7 @@ def _deps_evaluate(
         if not n:
             return "unknown"
 
-        if done_by_id.get(node_id, False):
+        if done_by_id.get(node_id):
             return "done"
 
         if n.type == "issue":
@@ -1482,7 +1482,7 @@ def _deps_evaluate(
         base = base_state(node_id)
         if base == "done":
             return "done"
-        if not ready_by_id.get(node_id, False):
+        if not ready_by_id.get(node_id):
             return "blocked"
         if is_active_scope(node_id):
             return "doing"
@@ -1582,7 +1582,7 @@ def _build_deps_state(
     blockers_by_id: dict[str, list[str]] = {}
     ready_by_id: dict[str, bool] = {}
     for node_id, eff in effective_deps_map.items():
-        blockers_by_id[node_id] = [dep_id for dep_id in eff if not done_by_id.get(dep_id, False)]
+        blockers_by_id[node_id] = [dep_id for dep_id in eff if not done_by_id.get(dep_id)]
         ready_by_id[node_id] = len(blockers_by_id[node_id]) == 0
 
     def base_state(node_id: str) -> str:
@@ -1590,7 +1590,7 @@ def _build_deps_state(
         if not n:
             return "unknown"
 
-        if done_by_id.get(node_id, False):
+        if done_by_id.get(node_id):
             return "done"
 
         if n.type == "issue":
@@ -1623,7 +1623,7 @@ def _build_deps_state(
         base = base_state(node_id)
         if base == "done":
             return "done"
-        if not ready_by_id.get(node_id, False):
+        if not ready_by_id.get(node_id):
             return "blocked"
         if is_active_scope(node_id):
             return "doing"
@@ -2331,7 +2331,7 @@ def _validate_deps_cycles(deps_map: dict[str, list[str]]) -> None:
                     start_index = path.index(dep_id)
                 except ValueError:
                     start_index = 0
-                cycle = path[start_index:] + [dep_id]
+                cycle = [*path[start_index:], dep_id]
                 raise RuntimeError("Dependency cycle detected: " + " -> ".join(cycle))
 
             if dep_id not in visited:

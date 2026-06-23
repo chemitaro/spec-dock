@@ -471,8 +471,8 @@ class TestDelegatedAuthoringRuntimeDomain:
                 "missing_provenance:created_by_role",
             ),
         )
-        for _name, text, expected in cases:
-            case = f"case={_name}"
+        for name_, text, expected in cases:
+            case = f"case={name_}"
             with tempfile.TemporaryDirectory() as tmp:
                 repo_root = Path(tmp)
                 issue_dir = _make_issue_scope(repo_root)
@@ -507,8 +507,8 @@ class TestDelegatedAuthoringRuntimeDomain:
                 "empty_intended_targets",
             ),
         )
-        for _name, old, new, expected in cases:
-            case = f"case={_name}"
+        for name_, old, new, expected in cases:
+            case = f"case={name_}"
             with tempfile.TemporaryDirectory() as tmp:
                 repo_root = Path(tmp)
                 issue_dir = _make_issue_scope(repo_root)

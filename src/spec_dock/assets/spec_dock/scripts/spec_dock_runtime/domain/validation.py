@@ -188,7 +188,7 @@ def _validate_discussion_filenames(graph: SpecGraph, *, repo_root: Path | None =
         if duplicate_suffix_slots:
             dup_timestamp, dup_suffix = duplicate_suffix_slots[0]
             files = ", ".join(
-                path.name for path in sorted(by_suffix_slot[(dup_timestamp, dup_suffix)], key=lambda p: p.as_posix())
+                path.name for path in sorted(by_suffix_slot[dup_timestamp, dup_suffix], key=lambda p: p.as_posix())
             )
             raise RuntimeError(
                 "Duplicate discussion timestamp suffix detected under "
@@ -224,8 +224,8 @@ def validate_github_issue_numbers_unique(
         if key is None:
             continue
         by_linkage.setdefault(key, []).append(node)
-        _repo_slug, issue_number = key
-        by_issue_number.setdefault(issue_number, []).append((node, explicit_repo_slug, _repo_slug))
+        repo_slug_, issue_number = key
+        by_issue_number.setdefault(issue_number, []).append((node, explicit_repo_slug, repo_slug_))
 
     # Fail closed: when current repo is unknown, mixing scoped and unscoped linkage for
     # the same issue number can represent duplicate logical linkage.
@@ -250,7 +250,7 @@ def validate_github_issue_numbers_unique(
 
     for repo_slug, issue_number in sorted(by_linkage.keys(), key=lambda item: (item[0] or "", item[1])):
         linked = sorted(
-            by_linkage[(repo_slug, issue_number)],
+            by_linkage[repo_slug, issue_number],
             key=lambda n: (n.kind, n.id, _meta_json_path_for_output(n, repo_root=repo_root)),
         )
         if len(linked) <= 1:

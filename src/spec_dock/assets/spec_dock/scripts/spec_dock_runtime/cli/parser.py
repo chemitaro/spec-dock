@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 
 class _RuntimeArgumentParser(argparse.ArgumentParser):
-    def error(self, message: str) -> None:  # noqa: A003 - argparse API
+    def error(self, message: str) -> None:
         legacy_flags = ("--initiative", "--epic", "--issue")
         hint = ""
         if "unrecognized arguments" in message and any(flag in message for flag in legacy_flags):

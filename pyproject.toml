@@ -37,7 +37,7 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["F", "E", "I", "UP", "B", "C4", "SIM", "PTH", "TC", "ARG"]
+select = ["F", "E", "I", "UP", "B", "C4", "SIM", "PTH", "TC", "ARG", "RUF"]
 ignore = ["E501", "SIM108"]
 
 [tool.ruff.lint.isort]
@@ -48,8 +48,9 @@ combine-as-imports = true
 ignore-variadic-names = true
 
 [tool.ruff.lint.per-file-ignores]
-"src/spec_dock/**/*.py" = ["E501", "SIM108"]
-"tests/**/*.py" = ["E501", "SIM108", "ARG"]
+"src/spec_dock/__init__.py" = ["RUF067"]
+"src/spec_dock/**/*.py" = ["E501", "SIM108", "RUF001", "RUF002", "RUF003", "RUF010"]
+"tests/**/*.py" = ["E501", "SIM108", "ARG", "RUF001", "RUF002", "RUF003", "RUF010"]
 
 [project.scripts]
 spec-dock = "spec_dock.cli:main"

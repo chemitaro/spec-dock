@@ -666,7 +666,8 @@ class TestCheckDepsApplication:
 
     def test_github_linked_empty_high_level_dependency_without_cache_fails_unknown(self) -> None:
         app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
-        records = self._records(infra_contracts) + [
+        records = [
+            *self._records(infra_contracts),
             infra_contracts.StoredMetaRecord(
                 kind="epic",
                 id="epic-00203",
@@ -712,7 +713,8 @@ class TestCheckDepsApplication:
 
     def test_local_empty_high_level_dependency_preserves_open_status(self) -> None:
         app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
-        records = self._records(infra_contracts) + [
+        records = [
+            *self._records(infra_contracts),
             infra_contracts.StoredMetaRecord(
                 kind="epic",
                 id="epic-local-00203",
@@ -753,7 +755,7 @@ class TestCheckDepsApplication:
         ]
 
     def test_local_high_level_default_open_does_not_mask_done_descendant_aggregate(self) -> None:
-        app_check_deps, app_contracts, app_ports, domain_models, infra_contracts = _runtime_modules()
+        app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
         runtime_scripts_dir = (
             Path(__file__).resolve().parents[3]
             / "src"
@@ -767,7 +769,8 @@ class TestCheckDepsApplication:
             from spec_dock_runtime.domain.tree import build_graph
         finally:
             sys.path.pop(0)
-        records = self._records(infra_contracts) + [
+        records = [
+            *self._records(infra_contracts),
             infra_contracts.StoredMetaRecord(
                 kind="epic",
                 id="epic-local-00203",

@@ -1041,8 +1041,8 @@ class TestCliWorktree(CliRuntimeHarness):
             assert (default_result.returncode == 0) == (force_result.returncode == 0)
 
             if default_result.returncode == 0:
-                for _label, worktree_path, _removed, payload in results:
-                    case_label = f"remove_case={_label}"
+                for label_, worktree_path, _removed, payload in results:
+                    case_label = f"remove_case={label_}"
                     assert payload["status"] == "ok", case_label
                     assert payload["removed_record"], case_label
                     assert payload["removed_directory"], case_label
@@ -1050,8 +1050,8 @@ class TestCliWorktree(CliRuntimeHarness):
                     assert payload["resolved_target"]["remove_blockers"] == [], case_label
                     assert not worktree_path.exists(), case_label
             else:
-                for _label, worktree_path, _removed, payload in results:
-                    case_label = f"remove_case={_label}"
+                for label_, worktree_path, _removed, payload in results:
+                    case_label = f"remove_case={label_}"
                     assert worktree_path.exists(), case_label
                     assert payload["error"]["code"] == "git_worktree_remove_failed", case_label
 

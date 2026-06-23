@@ -62,7 +62,7 @@ def _build_issue_snapshot_indexes(
         by_number.setdefault(issue_number, []).append(issue_snapshot)
         identity = _normalize_repo_identity(issue_snapshot.repo_owner, issue_snapshot.repo_name)
         if identity is not None:
-            by_repo_and_number[(identity[0], identity[1], issue_number)] = issue_snapshot
+            by_repo_and_number[identity[0], identity[1], issue_number] = issue_snapshot
     return by_number, by_repo_and_number
 
 
