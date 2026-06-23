@@ -3,7 +3,7 @@
 ID: "iss-00225"
 タイトル: "Configure Ruff And Mypy Static Analysis Cleanup"
 関連GitHub: ["#225"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-23"
 依存: ["requirement.md"]
@@ -63,6 +63,7 @@ ID: "iss-00225"
   - reference project 固有の FastAPI / SQLAlchemy / Alembic / Celery / import-linter 設定。
   - pre-commit hook。
   - public docstring rule。
+  - SpecDock layer-specific `banned-api` policy。今回の `TID` adoption は tidy imports / relative import discipline に限定し、layer boundary rule は別途設計が必要な future scope とする。
 
 ## 採用方針 / トレードオフ
 - 論点:
@@ -277,6 +278,7 @@ Tests --> Report : violation inventory
 - EC-003 -> `ignore_missing_imports` and targeted override policy
 - EC-004 -> command target design and `spec-dock/` exclusion
 - EC-005 -> formatter isolation
+- EC-006 -> Dogfooding Impact Design
 
 ## テスト戦略
 - 単体 / 既存 regression:
@@ -293,15 +295,30 @@ Tests --> Report : violation inventory
 - Report evidence:
   - 各 step の violation inventory、修正 summary、0 件確認、command result を `report.md` に記録する。
 
+## Dogfooding Impact Design
+- 方針:
+  - dogfooding `spec-dock/` copy は Ruff / mypy の direct target にしない。
+  - ただし shipped runtime asset under `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/` に差分が入った場合、consumer-visible generated copy への影響を無視しない。
+- 実装時の確認:
+  - shipped runtime asset 差分がある step では、`git diff --name-only` で対象差分を確認する。
+  - 必要なら `spec-dock update .` 相当の refresh が必要かを判断する。
+  - この issue の静的解析 command target は `src/spec_dock tests` のまま維持する。shipped runtime asset は第三の direct command target ではなく、`src/spec_dock` に含まれる logical coverage / report evidence として扱う。
+  - refresh 実施/非実施の判断と理由を `report.md` に残す。
+- final gate:
+  - `./spec-dock/scripts/spec-dock validate` を実行する。
+  - shipped runtime asset 変更がある場合は、dogfooding refresh/inspection evidence が `report.md` に存在することを final review 対象にする。
+
 ## リスク / 移行 / ロールバック
 - リスク:
   - Ruff rule step が予想以上に大きくなる。
   - mypy が shipped runtime asset に対して package/path noise を出す。
   - format-only churn が review を難しくする。
+  - shipped runtime asset 修正後に dogfooding generated copy の stale risk を見落とす。
 - 緩和:
   - rule を一つずつ有効化する。
   - format-only step を隔離する。
   - broad suppression は禁止し、必要な suppression は reason と scope を記録する。
+  - shipped runtime asset 差分がある step では dogfooding impact inspection を必須にする。
 - ロールバック:
   - 各 step は小さく commit できる単位にする。
   - 問題のある rule は plan amendment / follow-up 化を検討し、最終設定から外す場合は requirement/design へ戻す。
