@@ -184,10 +184,7 @@ class _SequenceClock:
         self.calls: list[str] = []
 
     def now_iso(self):
-        if len(self.calls) < len(self._values):
-            value = self._values[len(self.calls)]
-        else:
-            value = self._values[-1]
+        value = self._values[len(self.calls)] if len(self.calls) < len(self._values) else self._values[-1]
         self.calls.append(value)
         return value
 
@@ -901,17 +898,16 @@ class TestRuntimeNewDocS09:
                     app_create_node,
                     "_scan_discussion_timestamp_duplicate_state",
                     side_effect=_wrapped_scan,
-                ):
-                    with pytest.raises(RuntimeError, match="Duplicate discussion timestamp slot detected"):
-                        app_create_node.create_discussion_doc(
-                            app_contracts.CreateDiscussionDocRequest(
-                                doc_type="scratch",
-                                scope_node_id="iss-local-00001",
-                                title="Note one",
-                                slug=None,
-                            ),
-                            ports,
-                        )
+                ), pytest.raises(RuntimeError, match="Duplicate discussion timestamp slot detected"):
+                    app_create_node.create_discussion_doc(
+                        app_contracts.CreateDiscussionDocRequest(
+                            doc_type="scratch",
+                            scope_node_id="iss-local-00001",
+                            title="Note one",
+                            slug=None,
+                        ),
+                        ports,
+                    )
             finally:
                 worker.join(timeout=5.0)
             assert not worker.is_alive(), "lock release worker did not finish"
@@ -1037,17 +1033,16 @@ class TestRuntimeNewDocS09:
                         app_create_node,
                         "_scan_discussion_timestamp_duplicate_state",
                         side_effect=_wrapped_scan,
-                    ):
-                        with pytest.raises(RuntimeError, match="Malformed discussion document filename"):
-                            app_create_node.create_discussion_doc(
-                                app_contracts.CreateDiscussionDocRequest(
-                                    doc_type="scratch",
-                                    scope_node_id="iss-local-00001",
-                                    title="Note one",
-                                    slug=None,
-                                ),
-                                ports,
-                            )
+                    ), pytest.raises(RuntimeError, match="Malformed discussion document filename"):
+                        app_create_node.create_discussion_doc(
+                            app_contracts.CreateDiscussionDocRequest(
+                                doc_type="scratch",
+                                scope_node_id="iss-local-00001",
+                                title="Note one",
+                                slug=None,
+                            ),
+                            ports,
+                        )
                 finally:
                     worker.join(timeout=5.0)
                 assert not worker.is_alive(), "lock release worker did not finish"

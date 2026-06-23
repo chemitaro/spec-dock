@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from importlib.resources import as_file, files
 import json
 import os
@@ -394,10 +394,8 @@ def _resolve_existing_active_entrypoint(
     candidates: list[Path] = []
 
     if link.exists() or link.is_symlink():
-        try:
+        with suppress(OSError):
             candidates.append(link.resolve())
-        except OSError:
-            pass
 
     if pathfile.is_file():
         try:
@@ -532,9 +530,7 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
             # Keep healthy real entrypoints as highest priority, but if the
             # user-visible pointer disagrees (e.g. placeholder link + real
             # `.path`), normalize the pointer to the same real target.
-            if link.is_symlink() and resolved_link_target != existing_target:
-                force_rebuild = True
-            elif link.exists() and not link.is_symlink() and resolved_link_target != existing_target:
+            if link.is_symlink() and resolved_link_target != existing_target or link.exists() and not link.is_symlink() and resolved_link_target != existing_target:
                 force_rebuild = True
             desired_target = existing_target
             if not force_rebuild:
@@ -570,27 +566,21 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
                 if link.is_symlink() or link.is_file():
                     link.unlink(missing_ok=True)
                 elif link.is_dir():
-                    try:
+                    with suppress(OSError):
                         shutil.rmtree(link)
-                    except OSError:
-                        pass
             if link.exists() or link.is_symlink():
                 continue
             if pathfile.exists():
-                try:
+                with suppress(OSError):
                     pathfile.unlink()
-                except OSError:
-                    pass
             if pathfile.exists():
                 continue
 
         # If `.path` exists but does not resolve to a valid active entrypoint,
         # treat it as stale so recovery can rebuild from persisted state/placeholder.
         elif pathfile.exists():
-            try:
+            with suppress(OSError):
                 pathfile.unlink()
-            except OSError:
-                pass
 
         if link.exists() or link.is_symlink() or pathfile.exists():
             continue
@@ -1315,9 +1305,7 @@ def _has_symlink_uninstall_container(target_root: Path, rel_path: Path) -> bool:
     for index, part in enumerate(rel_path.parts):
         current = current / part
         if current.is_symlink():
-            if index == last_index:
-                return False
-            return True
+            return index != last_index
     return False
 
 

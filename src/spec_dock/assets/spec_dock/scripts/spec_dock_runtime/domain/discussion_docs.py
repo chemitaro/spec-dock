@@ -73,10 +73,7 @@ def parse_timestamp_discussion_doc_filename(name: str) -> TimestampDiscussionDoc
     suffix = int(suffix_raw) if suffix_raw is not None else None
     doc_type = str(matched.group("doc_type"))
     slug = str(matched.group("slug"))
-    if suffix is None:
-        doc_id = f"{timestamp}-{doc_type}"
-    else:
-        doc_id = f"{timestamp}-{suffix:02d}-{doc_type}"
+    doc_id = f"{timestamp}-{doc_type}" if suffix is None else f"{timestamp}-{suffix:02d}-{doc_type}"
     return TimestampDiscussionDocFilename(
         timestamp=timestamp,
         suffix=suffix,
@@ -149,6 +146,4 @@ def is_malformed_discussion_doc_candidate(path: Path) -> bool:
             return True
     if _DISCUSSION_DOC_TIMESTAMP_INTENT_TOKEN_RE.fullmatch(first) is not None:
         return True
-    if _DISCUSSION_DOC_TIMESTAMP_INTENT_PREFIX_RE.fullmatch(stem) is not None:
-        return True
-    return False
+    return _DISCUSSION_DOC_TIMESTAMP_INTENT_PREFIX_RE.fullmatch(stem) is not None

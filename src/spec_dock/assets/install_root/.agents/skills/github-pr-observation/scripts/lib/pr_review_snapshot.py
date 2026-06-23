@@ -1252,17 +1252,11 @@ if blocking_collection_failure:
     status = "unknown"
 elif current_unresolved_thread_ids:
     status = "unresolved"
-elif any(item.get("state") == "changes_requested" for item in active_review_signals):
+elif any(item.get("state") == "changes_requested" for item in active_review_signals) or review_decision_changes_requested:
     status = "changes_requested"
-elif review_decision_changes_requested:
-    status = "changes_requested"
-elif review_request_signals:
+elif review_request_signals or review_decision_requires_review:
     status = "requested"
-elif review_decision_requires_review:
-    status = "requested"
-elif any(item.get("state") == "commented" for item in active_review_signals) or active_comment_signals:
-    status = "commented"
-elif any(item.get("state") == "commented" and item.get("kind") == "issue_comment" for item in status_signals):
+elif any(item.get("state") == "commented" for item in active_review_signals) or active_comment_signals or any(item.get("state") == "commented" and item.get("kind") == "issue_comment" for item in status_signals):
     status = "commented"
 elif any(item.get("state") == "approved" for item in active_review_signals):
     status = "approved"

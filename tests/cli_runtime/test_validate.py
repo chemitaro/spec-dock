@@ -1,3 +1,4 @@
+import contextlib
 import json
 import os
 from pathlib import Path
@@ -1230,10 +1231,8 @@ class TestCliValidate(CliRuntimeHarness):
                 meta.pop("_spec_dock", None)
                 self._write_json_force(meta_path, meta)
                 if os.name == "posix":
-                    try:
+                    with contextlib.suppress(OSError):
                         meta_path.chmod(meta_path.stat().st_mode | 0o200)
-                    except OSError:
-                        pass
 
                 before_text = meta_path.read_text(encoding="utf-8")
                 before_texts[meta_path] = before_text

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import os
 from pathlib import Path
 import re
@@ -106,10 +107,8 @@ def _atomic_write_json(path: Path, payload: dict[str, Any], *, readonly_mode: in
         raise RuntimeError(f"write_failed[{stage}]: {path}: {exc}") from exc
     finally:
         if tmp_path is not None and tmp_path.exists():
-            try:
+            with contextlib.suppress(OSError):
                 tmp_path.unlink()
-            except OSError:
-                pass
 
 
 def _write_meta_json_atomic_with_permission_contract(meta_path: Path, payload: dict[str, Any]) -> None:

@@ -231,7 +231,7 @@ def _render_deps_issues_puml(deps_issues_state: dict[str, Any]) -> str:
             safe = "_" + safe
         return f"N{safe}"
 
-    include_ids = sorted([node_id for node_id in nodes.keys() if isinstance(node_id, str)], key=deps_node_sort_key)
+    include_ids = sorted([node_id for node_id in nodes if isinstance(node_id, str)], key=deps_node_sort_key)
     include_set = set(include_ids)
 
     lines: list[str] = []

@@ -1,3 +1,4 @@
+import contextlib
 import os
 from pathlib import Path
 import shutil
@@ -13,10 +14,8 @@ from tests.cli_runtime.harness import CliRuntimeHarness, main
 class TestDelegatedAuthoringCli(CliRuntimeHarness):
     def teardown_method(self) -> None:
         for tmp in getattr(self, "_tmpdir", []):
-            try:
+            with contextlib.suppress(OSError):
                 tmp.cleanup()
-            except OSError:
-                pass
         self._tmpdir = []
 
     def test_manifest_command_is_deprecated_blocked_and_writes_no_artifacts(self) -> None:

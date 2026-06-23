@@ -1,3 +1,4 @@
+import contextlib
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -815,10 +816,8 @@ def terminate_process_group(proc: subprocess.Popen[str]) -> None:
     try:
         proc.wait(timeout=1)
     except subprocess.TimeoutExpired:
-        try:
+        with contextlib.suppress(ProcessLookupError):
             os.killpg(pgid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
         proc.wait()
 
 

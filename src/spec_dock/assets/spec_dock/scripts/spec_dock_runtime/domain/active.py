@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import re
 
 from .ids import find_existing_id_by_num, parse_id
@@ -116,10 +117,8 @@ def infer_active_node_from_branch(
             continue
     leading = _LEADING_NUMBER_IN_TEXT_RE.match(leaf)
     if leading:
-        try:
+        with contextlib.suppress(TypeError, ValueError):
             nums.add(int(leading.group("num")))
-        except (TypeError, ValueError):
-            pass
 
     if not nums:
         return (None, None)

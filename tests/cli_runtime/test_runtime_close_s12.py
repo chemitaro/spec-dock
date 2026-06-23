@@ -1048,9 +1048,8 @@ class TestRuntimeCloseS12:
                 cmd=["gh", "issue", "close", "301"],
                 stderr="boom",
             ),
-        ):
-            with pytest.raises(RuntimeError, match="gh failed: gh issue close 301"):
-                infra_github_cli.issue_close_raw(repo_root, issue_number=301)
+        ), pytest.raises(RuntimeError, match="gh failed: gh issue close 301"):
+            infra_github_cli.issue_close_raw(repo_root, issue_number=301)
 
     def test_close_node_raises_when_close_and_fallback_view_both_fail(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()

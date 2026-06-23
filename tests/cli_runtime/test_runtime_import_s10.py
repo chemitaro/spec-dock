@@ -412,10 +412,7 @@ class TestRuntimeImportS10:
         git_gateway=_UNSET,
     ):
         self._materialize_required_artifacts(store.load())
-        if git_gateway is _UNSET:
-            resolved_git_gateway = _StubGitGateway("current/repo")
-        else:
-            resolved_git_gateway = git_gateway
+        resolved_git_gateway = _StubGitGateway("current/repo") if git_gateway is _UNSET else git_gateway
         return app_ports.Ports(
             node_reader=_StubNodeReader(store),
             node_repo=_StubNodeRepo(store, events=events),

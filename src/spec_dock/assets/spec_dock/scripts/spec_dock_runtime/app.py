@@ -21,6 +21,7 @@ Design goals:
 from __future__ import annotations
 
 import argparse
+import contextlib
 from dataclasses import dataclass
 import os
 from pathlib import Path
@@ -1073,10 +1074,8 @@ def _infer_active_node_from_branch(nodes: dict[str, _Node], *, branch: str) -> t
             continue
     m = _LEADING_NUMBER_IN_TEXT_RE.match(leaf)
     if m:
-        try:
+        with contextlib.suppress(TypeError, ValueError):
             nums.add(int(m.group("num")))
-        except (TypeError, ValueError):
-            pass
 
     if not nums:
         # No signal: keep active unchanged silently (common on `main`, `develop`, etc.).
@@ -1334,7 +1333,7 @@ def _deps_evaluate(
         else:
             # Warn when relevant linked issues are not included in the gh index.
             relevant_numbers: set[int] = set()
-            for node_id in deps_map.keys():
+            for node_id in deps_map:
                 n = nodes.get(node_id)
                 if not n:
                     continue
@@ -1432,7 +1431,7 @@ def _deps_evaluate(
 
         return False
 
-    done_by_id: dict[str, bool] = {node_id: is_done(node_id) for node_id in deps_map.keys()}
+    done_by_id: dict[str, bool] = {node_id: is_done(node_id) for node_id in deps_map}
 
     blockers_by_id: dict[str, list[str]] = {}
     ready_by_id: dict[str, bool] = {}
@@ -1576,7 +1575,7 @@ def _build_deps_state(
 
         return False
 
-    done_by_id: dict[str, bool] = {node_id: is_done(node_id) for node_id in effective_deps_map.keys()}
+    done_by_id: dict[str, bool] = {node_id: is_done(node_id) for node_id in effective_deps_map}
 
     blockers_by_id: dict[str, list[str]] = {}
     ready_by_id: dict[str, bool] = {}

@@ -1270,15 +1270,14 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
             if surviving_node_ids:
                 dep_conflicts.add(deleted_source_id)
                 dep_conflicts.update(surviving_node_ids)
-        if dep_conflicts:
-            if not req.force:
-                return _result(
-                    status="dependency_conflict",
-                    target_id=target.id,
-                    offending_node_ids=sorted(dep_conflicts),
-                    validation_code="dependency_conflict",
-                    validation_message="dependency edge crosses delete subtree boundary",
-                )
+        if dep_conflicts and not req.force:
+            return _result(
+                status="dependency_conflict",
+                target_id=target.id,
+                offending_node_ids=sorted(dep_conflicts),
+                validation_code="dependency_conflict",
+                validation_message="dependency edge crosses delete subtree boundary",
+            )
 
     required_remote_targets, subtree_metadata_failure = _subtree_remote_close_targets(
         subtree_ids=subtree_ids,

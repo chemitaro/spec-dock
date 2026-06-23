@@ -177,7 +177,7 @@ def _deps_state_by_issue_id(result: SyncStateResult) -> dict[str, DepsNodeState]
 
 
 def _build_children(graph_nodes: dict[str, SpecNode]) -> dict[str, list[str]]:
-    children: dict[str, list[str]] = {node_id: [] for node_id in graph_nodes.keys()}
+    children: dict[str, list[str]] = {node_id: [] for node_id in graph_nodes}
     for node in graph_nodes.values():
         if node.parent_id and node.parent_id in children:
             children[node.parent_id].append(node.id)
