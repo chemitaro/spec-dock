@@ -3,186 +3,84 @@
 ID: "iss-00231"
 タイトル: "Inject Trusted Base Branch Codex Review Policy"
 関連GitHub: ["#231"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-23"
 依存: ["requirement.md"]
 親: ["epic-00224", "init-local-00003"]
 ---
 
-# iss-00231 Inject Trusted Base Branch Codex Review Policy — 設計（どう実現するか）
+# iss-00231 Inject Trusted Base Branch Codex Review Policy — 設計
 
-> このテンプレートは最小 scaffold です。プロジェクトの目的、作業内容、人間の理解しやすさ、エージェントの実行可能性に合わせて、項目は追加・削除・統合・並べ替えてよい。
+## 全体像
+- 既存の fixed trigger helper を拡張し、PR metadata に `baseRefOid` が含まれる場合だけ trusted base policy を取得する。
+- Base policy が取得できる場合、投稿 body は runtime が合成する deterministic multiline text とし、caller-provided body は引き続き受け付けない。
+- Base policy が取得できない場合は compatibility fallback として従来の `@codex review` を使い、JSON payload の `review_policy` / `limitations` に状態を記録する。
 
-## 親図（Diagram）参照
-- Epic 図:
-  - ...
-- Initiative 図:
-  - ...
-- 再利用する決定:
-  - ...
+## 変更対象
+- Provider source:
+  - `src/spec_dock/assets/install_root/.github/codex/review-policy.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/trigger_codex_review.sh`
+- Dogfooding mirror:
+  - `.github/codex/review-policy.md`
+  - `.agents/skills/github-pr-observation/scripts/trigger_codex_review.sh`
+- Tests:
+  - `tests/unit/infra/test_init_update.py`
 
-## 目的・制約
-- 目的:
-  - ...
-- 必須 / 禁止:
-  - ...
-- 非交渉制約:
-  - ...
-- 前提:
-  - ...
+## Trigger body contract
+- Base policy loaded:
+  - first line: `@codex review`
+  - metadata block:
+    - `source: <owner>/<repo>@<base_sha>:.github/codex/review-policy.md`
+    - `policy_sha256: <sha256(policy_text)>`
+    - `reviewed_head_sha: <expected_head_sha>`
+  - policy text: base SHA contents decoded as UTF-8.
+- Base policy unavailable:
+  - body remains exact `@codex review`.
+  - payload records `review_policy.status` as `missing`, `invalid`, `too_large`, or `base_sha_missing`.
 
-## 既存実装 / 規約の理解
-- 参照した実装 / docs:
-  - ...
-- 現状理解:
-  - ...
-- 採用するパターン:
-  - ...
-- 採用しないもの:
-  - ...
-- 影響範囲:
-  - ...
+## JSON payload contract
+- Existing fields remain:
+  - `success`
+  - `overall_status`
+  - `expected_head_sha`
+  - `current_head_sha`
+  - `final_head_sha`
+  - `trigger`
+  - `limitations`
+- Added fields:
+  - `base_sha`
+  - `review_policy`
+    - `source`: `base_sha` or `fixed_default`
+    - `path`
+    - `base_sha`
+    - `hash`
+    - `bytes`
+    - `status`: `loaded`, `missing`, `invalid`, `too_large`, `base_sha_missing`, or `not_requested`
 
-## 採用方針 / トレードオフ
-- 論点:
-  - ...
-- 選択肢:
-  - ...
-- 決定:
-  - ...
+## Policy validation
+- The policy source path is fixed to `.github/codex/review-policy.md`.
+- The policy source revision is fixed to PR `baseRefOid`.
+- The policy content must decode as non-empty UTF-8 text.
+- The policy content must be 32 KiB or smaller before it can be included in the trigger body.
+- A missing `baseRefOid`, missing contents API result, invalid decode, or size violation keeps the trigger on the fixed `@codex review` fallback and records a limitation.
 
-## 依存関係分析
-- module 依存:
-  - ...
-- class 依存（必要時）:
-  - ...
-- function 依存（必要時）:
-  - ...
-- file 依存:
-  - ...
-- 上流 / 前提:
-  - ...
-- 下流 / 依存先:
-  - ...
-- 実装起点:
-  - 依存の少ないもの / 先に固定すべき interface / 先に通すべき test を書く
-- 順序への影響:
-  - plan では upstream / prerequisite から順に step を組む
+## Trust boundary
+- `gh pr view` supplies current head and base SHA.
+- `gh api repos/{owner}/{repo}/contents/.github/codex/review-policy.md?ref=<base_sha>` is the only policy fetch.
+- The helper never reads `.github/codex/review-policy.md` from the local checkout or PR head.
+- The helper never accepts `--body`, arbitrary endpoint, arbitrary method, GraphQL query, or raw `gh` args.
 
-## モジュール依存図（Module Dependency Diagram）
-- タイトル:
-  - ...
-- 答える問い:
-  - どの module / class / file / function の依存方向を固定し、どこから実装を始めるか
-- 範囲:
-  - ...
-- 含めない詳細:
-  - 網羅的な call graph / 全 method / 全 import は描かない
-- 更新条件:
-  - 依存方向、責務境界、実装起点、変更対象 module が変わるとき
-- 図:
-  - 下の `plantuml` block を更新する
+## Compatibility
+- Existing fake fixtures without `baseRefOid` continue to exercise the old fixed-body path.
+- Existing recovery logic still compares new comments against the expected `fixed_body`, which is now either exact `@codex review` or the deterministic multiline body.
+- Permission-denied behavior remains unchanged.
 
-### 図表（UML / 原則: モジュール依存 / パッケージ依存差分）
-```plantuml
-@startuml
-top to bottom direction
-' show module / class / file / function dependencies that affect implementation order
-' do not copy Initiative/Epic diagrams
-
-rectangle "対象module-a" as A
-rectangle "対象module-b" as B
-A --> B : depends_on
-@enduml
-```
-
-## ローカル図の差分（Local Diagram Delta / 必要時）
-- 変更する境界 / 責務 / 相互作用:
-  - N/A: 理由
-
-## インターフェース契約
-- API / function / protocol / data boundary:
-  - ...
-
-## シーケンス差分（Sequence Delta / 必要時）
-- 変更する相互作用:
-  - N/A: 理由
-- retry / transaction / external API / queue:
-  - ...
-- UML:
-  - N/A: 理由
-
-## ドメインモデル差分（Domain Model Delta / 必要時）
-- 親 model 参照:
-  - ...
-- aggregate / entity / value object 変更:
-  - N/A: 理由
-- domain event / policy / specification 変更:
-  - ...
-- 不変条件の変更:
-  - ...
-- UML:
-  - N/A: 理由
-
-## クラス / インターフェース詳細設計（必要時）
-- Class / Interface:
-  - ...
-- 責務:
-  - ...
-- 連携:
-  - ...
-- UML:
-  - N/A: 理由
-
-## ディレクトリ / ファイル変更計画
-```text
-.
-|-- src/
-|   |-- package/
-|   |   |-- new_module.py        # 追加: 目的; 依存: ...
-|   |   |-- existing_module.py   # 変更: 目的; 依存: ...
-|   |   `-- renamed_module.py    # 移動/rename 元: src/package/old_module.py; 目的
-|   `-- tests/
-|       `-- test_new_module.py   # 追加/変更: 目的; 依存: src/package/new_module.py
-|-- docs/
-|   `-- reference.md             # 読取のみ: 目的
-`-- legacy/
-    `-- obsolete_file.py         # 削除: 目的; 依存: 代替準備完了
-```
-
-## 要件 → 設計マッピング
-- AC-001 -> ...
-- EC-001 -> ...
-- constraint -> ...
-
-## テスト戦略
-- 単体:
-  - ...
-- 統合:
-  - ...
-- E2E / manual:
-  - ...
-- migration / rollback / feature flag if needed:
-  - ...
-
-## 要件 / 例外 -> 検証マッピング
-- AC-001 -> ...
-- EC-001 -> ...
-- constraint -> ...
-
-## リスク / 移行 / ロールバック（必要時）
-- ...
-
-## 未確定事項
-- Q-001:
-  - 質問:
-  - 選択肢:
-    - A:
-      - ...
-    - B:
-      - ...
-  - 推奨案:
-    - ...
-  - 影響範囲:
-    - ...
+## I05 trace decisions
+- Policy schema / validator / max size:
+  - This Issue treats the Markdown policy contract as fixed path + base SHA binding + UTF-8 + non-empty + 32 KiB runtime validation.
+  - A standalone JSON schema is not introduced because the policy artifact is Markdown instruction text, not structured JSON.
+- Doctor capability:
+  - No new `doctor` subcommand branch is introduced in this Issue.
+  - Machine-readable trigger limitations are the immediate operational evidence.
+  - Dedicated doctor surfacing is deferred to the Epic rollout / operationalization work so it can be validated with the final PR observation workflow.

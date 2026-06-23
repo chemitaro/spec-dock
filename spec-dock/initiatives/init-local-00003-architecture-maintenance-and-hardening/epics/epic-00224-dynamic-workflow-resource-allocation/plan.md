@@ -26,7 +26,7 @@ ID: "epic-00224"
 |---|---|---|
 | E-RQ-001〜005 | Assurance core、workflow state、fixed Skill kernel、Runbook compiler | CLI contract tests、golden Runbook、clean Git evidence |
 | E-RQ-006〜008, E-RQ-015〜021 | Planning composer、Step Assurance、agent context routing | artifact golden tests、step matrix、clean-room review evidence、context packet golden tests、return contract tests |
-| E-RQ-009 | trusted base-SHA review policy compiler | trigger JSON、base/head tests、doctor |
+| E-RQ-009 | trusted base-SHA review policy compiler | trigger JSON、base/head tests、runtime validation、I07 doctor defer |
 | E-RQ-010〜011 | blocker-centric repair / re-review / stagnation | finding matrix、repair loop tests、merge predicate |
 | E-RQ-012〜014 | legacy rollout、metrics、provider/mirror、Auto-Lite readiness | migration fixtures、benchmark、auto-lite-readiness report、validate / sync |
 | E-AC-001〜003 | I01〜I02 | state / classification tests |
@@ -206,12 +206,16 @@ ID: "epic-00224"
   - Project-owned review policy を PR base SHA から取得し、head SHA / policy hash へ bind した deterministic multiline `@codex review` を安全に投稿する。
 - 成果物:
   - `.github/codex/review-policy.md` bootstrap-only asset。
-  - Policy schema / validator / max size。
+  - Fixed Markdown policy path / base SHA binding。
+  - Policy runtime validator:
+    - non-empty UTF-8。
+    - 32 KiB max size。
+    - machine-readable limitation fallback。
   - Base SHA fixed-path fetch。
   - Trigger compiler / evidence。
   - Arbitrary body 禁止。
   - Multiline trigger observation compatibility。
-  - doctor capability。
+  - Dedicated doctor capability は I07 rollout / operationalization へ defer。
 - Assurance:
   - strict / complex
 - closes:
