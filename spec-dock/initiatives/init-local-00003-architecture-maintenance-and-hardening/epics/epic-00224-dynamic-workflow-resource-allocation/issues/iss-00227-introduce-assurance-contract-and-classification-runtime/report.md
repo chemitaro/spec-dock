@@ -164,36 +164,53 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required | Initial focused test run failed before `domain.assurance` existed; follow-up review tests failed before raw fact, explicit empty facts, and source binding validation fixes | `uv run pytest tests/unit/domain/test_assurance.py` | pass | Red evidence observed by delegated worker and bounded review follow-ups |
+| S01 | 緑フェーズ（Green） | S01 focused tests pass | Domain assurance contract/policy/serialization tests pass after fixes | `uv run pytest tests/unit/domain/test_assurance.py` -> 9 passed | pass | Parent verification after reviewer P1 fix |
+| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | No behavior-preserving refactor needed after minimal validation/test additions | diff inspection | approved-no-op | Domain module remains pure stdlib/domain and no adapter imports |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | raw `RiskFact` duplicate / invalid value must fail closed | code-reviewer | added test and fixed domain validation | `cl-ac003-lite-safety`, `cl-ec002-hard-trigger-monotonic` | no | `tests/unit/domain/test_assurance.py` -> 6 passed |
+| S01 | explicit empty `risk_facts=()` must not fall back to defaults | code-reviewer | added test and fixed `build_assurance_contract` None/empty distinction | `cl-dc010-default-facts`, `cl-ac003-lite-safety` | no | `tests/unit/domain/test_assurance.py` -> 7 passed |
+| S01 | empty source binding artifacts must be invalid | code-reviewer | added validation and test for missing source artifacts | `cl-ac002-deterministic-json`, `cl-ac006-layer-boundary` | no | `tests/unit/domain/test_assurance.py` -> 8 passed |
+| S01 | source binding path must be resolved repo-relative issue-local path | code-reviewer | added validation and test rejecting absolute and `spec-dock/active/` artifact paths | `cl-ac002-deterministic-json`, `cl-ac006-layer-boundary` | no | `tests/unit/domain/test_assurance.py` -> 9 passed |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | `cl-ac002-deterministic-json`, `cl-ac003-lite-safety`, `cl-ec002-hard-trigger-monotonic`, `cl-ac006-layer-boundary`, `cl-dc010-default-facts` | S01 domain policy/serializer tests pass, import boundary inspection/test passes, code-reviewer pass required before commit | `uv run pytest tests/unit/domain/test_assurance.py` -> 9 passed; fresh code-reviewer pass | pass | Red evidence observed by worker: initial focused tests failed before `domain.assurance` existed; follow-up red tests reproduced duplicate/invalid raw fact, explicit empty facts, empty source binding, and non-durable source path gaps |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | yes | red-required | worker observed initial domain test failure before implementation | `uv run pytest tests/unit/domain/test_assurance.py` | pass | S01 focused domain assurance test set passed after implementation and review follow-ups |
+| `cl-ac002-deterministic-json` | S01 | yes | red-required | worker observed initial domain test failure before implementation | `uv run pytest tests/unit/domain/test_assurance.py` | pass | deterministic bytes, no volatile fields, no `proposed_profile` |
+| `cl-ac003-lite-safety` | S01 | yes | red-required | worker observed initial domain test failure; follow-up duplicate/invalid/empty tests failed before validation fix | `uv run pytest tests/unit/domain/test_assurance.py` | pass | Lite unknown/all-positive-no-opt-in fail closed; duplicate/invalid/empty raw facts rejected |
+| `cl-ec002-hard-trigger-monotonic` | S01 | yes | red-required | worker observed initial domain test failure; follow-up invalid raw fact test failed before validation fix | `uv run pytest tests/unit/domain/test_assurance.py` | pass | strict/critical escalation and duplicate/invalid raw facts rejected |
+| `cl-ac006-layer-boundary` | S01 | yes | inspect-only plus test | new module import inspection planned; code-review follow-ups identified source binding validation gaps | `uv run pytest tests/unit/domain/test_assurance.py` | pass | domain module has no infra/commands/cli/presentation/GitHub/filesystem adapter imports; persisted contract validation rejects missing source artifacts and non-durable artifact paths |
+| `cl-dc010-default-facts` | S01 | yes | red-required | worker observed initial domain test failure before implementation; code-review follow-up identified explicit empty tuple fallback | `uv run pytest tests/unit/domain/test_assurance.py` | pass | default facts and reason/consequence codes are stable; omitted facts (`None`) and explicit empty facts are distinct |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | `uv run pytest tests/unit/domain/test_assurance.py` | pass | S01 focused test contract covered by 9 passed parent verification |
+| `cl-ac002-deterministic-json` | S01 | `uv run pytest tests/unit/domain/test_assurance.py` | pass | 9 passed in parent verification |
+| `cl-ac003-lite-safety` | S01 | `uv run pytest tests/unit/domain/test_assurance.py` | pass | includes unknown/no-opt-in and raw fact validation hardening |
+| `cl-ec002-hard-trigger-monotonic` | S01 | `uv run pytest tests/unit/domain/test_assurance.py` | pass | strict/critical escalation covered |
+| `cl-ac006-layer-boundary` | S01 | `uv run pytest tests/unit/domain/test_assurance.py` | pass | import-boundary static inspection covered |
+| `cl-dc010-default-facts` | S01 | `uv run pytest tests/unit/domain/test_assurance.py` | pass | default fact/reason-code fixture covered |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
 | none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| added | `cl-ac003-lite-safety`, `cl-ec002-hard-trigger-monotonic` | `test_classification_rejects_duplicate_raw_risk_fact_keys`, `test_classification_rejects_invalid_raw_risk_fact_values` | existing S01 closure IDs | code-reviewer found ambiguous raw `RiskFact` tuples could silently downscope policy; tests strengthen approved S01 fail-closed contract | no | no |
+| added | `cl-dc010-default-facts`, `cl-ac003-lite-safety` | `test_build_contract_rejects_explicit_empty_risk_facts` | existing S01 closure IDs | code-reviewer found explicit empty tuple could silently fall back to defaults; test preserves omitted-vs-empty distinction | no | no |
+| added | `cl-ac002-deterministic-json`, `cl-ac006-layer-boundary` | `test_contract_validation_rejects_missing_source_binding_artifacts` | existing S01 closure IDs | code-reviewer found empty source binding artifacts were accepted despite the persisted schema requiring source traceability | no | no |
+| added | `cl-ac002-deterministic-json`, `cl-ac006-layer-boundary` | `test_contract_validation_rejects_non_durable_source_binding_paths` | existing S01 closure IDs | code-reviewer found absolute and active symlink artifact paths could pass despite the resolved repo-relative source binding requirement | no | no |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
@@ -208,11 +225,13 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | runtime domain implementation | dev-coder | S01 domain assurance model/policy/serialization only | `plan.md` S01 | `domain/assurance.py`, `tests/unit/domain/test_assurance.py` | infra/application/CLI/presentation/mirror/docs/config/skills/GitHub state | `uv run pytest tests/unit/domain/test_assurance.py` | policy/table conflict, domain requiring adapters, non-deterministic serializer | changed files, tests, risks, ledger note | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
 | S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | dev-coder | Implemented pure domain assurance contract/policy/serializer and tests; bounded follow-ups added duplicate/invalid raw fact validation, explicit empty tuple rejection, empty source binding validation, and non-durable source path validation. | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/assurance.py`; `tests/unit/domain/test_assurance.py` | `uv run pytest tests/unit/domain/test_assurance.py` -> 9 passed | pass | none | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -223,15 +242,19 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step reviewer | code-reviewer | fresh | failed -> pass | no | proceed | Initial review found missing report evidence and raw fact validation gap. Follow-up reviews surfaced empty tuple, source binding edge cases, and TDD ledger gaps; bounded fixes applied. Fresh re-review passed with no findings. |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | committed | `domain/assurance.py`, `tests/unit/domain/test_assurance.py`, S01 report evidence | final ledger reference: S01 reviewer pass and focused test evidence in this report | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `path/to/file1` - ...
 - `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/assurance.py` - Assurance Contract v1 domain model, deterministic policy, serializer, validation helpers
+- `tests/unit/domain/test_assurance.py` - S01 domain tests for deterministic output, Lite safety, hard triggers, raw fact validation, and import boundary
 
 #### コミット
 - <hash> <message>
