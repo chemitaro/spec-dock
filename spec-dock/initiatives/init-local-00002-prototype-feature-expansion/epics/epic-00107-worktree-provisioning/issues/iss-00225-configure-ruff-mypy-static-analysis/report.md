@@ -1919,14 +1919,84 @@ git diff --check
 ### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S17 | ready to commit | `scripts/static_analysis/run.sh` plus `report.md` S17 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S17 | committed | `scripts/static_analysis/run.sh` plus `report.md` S17 evidence | `f220665e` | `git status --short` clean; `make lint` pass; validate pass | N/A | N/A | N/A | N/A |
 
 ### 変更したファイル
 - `scripts/static_analysis/run.sh` - add Ruff format check phase to grouped local gate.
 - `report.md` - S16 commit gate correction and S17 observed evidence.
 
 ### コミット
-- pending S17 step commit.
+- `f220665e` build(static-analysis): lintにformat checkを追加する
+
+---
+
+## 実装セッションログ S18 — Provider CI Static Analysis Gate
+
+### 実施概要
+- Step: S18 — Provider CI Static Analysis Gate
+- Delegated worker: dev-coder `019ef3a0-ad7b-7050-8df5-c545c384514b`
+- Scope: provider CI に local command surface と同じ `make lint` を実行する static-analysis gate を追加する。
+- Parent decision: `.github/workflows/provider-ci.yml` の pytest 前に `Run provider static analysis` step を最小追加する。PR 前のため GitHub Actions 実行証跡は S99 / PR preparation で回収する。
+
+### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S18 | Red / missing CI gate | provider CI が `make lint` を実行する | pre-change `.github/workflows/provider-ci.yml` は `uv run pytest` のみで `make lint` step なし | inspection | pass | S18 gap identified |
+| S18 | Green / workflow diff | provider CI が local と同じ command surface を呼ぶ | `Run provider static analysis` step added with `run: make lint` before pytest | diff inspection | pass | AC-004/008 |
+| S18 | YAML syntax | workflow syntax is parseable | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/provider-ci.yml")'` -> YAML parse: ok | command | pass | local syntax check |
+| S18 | Refactor | workflow minimality | diff is one CI step; no branch protection, pre-commit, source/test/script rewrite | diff inspection + code-reviewer | pass | code-reviewer pass |
+
+### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S18 | PR 前のため GitHub Actions 上で `make lint` が走る外部証跡は未観測 | dev-coder / parent | S18 は workflow inspection で閉じ、S99/PR preparation の external CI evidence として引き継ぐ | tc-s18-001 | no | workflow diff; report final quality gate pending |
+
+### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S18 | tc-s18-001 | workflow inspection pass; external CI evidence 未観測なら S99/PR preparation へ残す | provider CI calls `make lint`; YAML parse ok; `git diff --check` pass; code-reviewer pass; CI/PR evidence pending | pass | code-reviewer pass |
+
+### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s18-001 | S18 | yes | inspection + YAML parse | provider CI lacked `make lint` | workflow diff inspection; YAML parse; `git diff --check`; validate | pass | CI/PR evidence pending until PR |
+
+### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s18-001 | S18 | `.github/workflows/provider-ci.yml` diff; YAML parse; `git diff --check`; `./spec-dock/scripts/spec-dock validate`; code-reviewer pass | pass | AC-004/008 S18 closed pending commit; external CI pending |
+
+### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-s18-001 | N/A | tc-s18-001 | planned closure unchanged | no | yes |
+
+### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S18 | delegated | provider CI static-analysis gate step | dev-coder | provider CI workflow only | requirement/design/plan S18 | `.github/workflows/provider-ci.yml` | branch protection; pre-commit; unrelated workflow rewrite; source/test/script/Makefile/pyproject; commit | workflow diff; YAML parse; diff check | CI requires external secret/policy change or larger workflow redesign | workflow diff; local inspection; CI evidence status | pass |
+
+### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S18 | dev-coder | provider CI static-analysis step added before pytest; existing pytest step preserved | `.github/workflows/provider-ci.yml` | workflow diff inspection; YAML parse ok; `git diff --check` pass | pass: code-reviewer `019ef3a3-25bb-7c12-a53a-034935cb78aa` | GitHub Actions evidence unobserved until PR | accepted for S18 step commit |
+
+### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S18 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit | pass: code-reviewer `019ef3a3-25bb-7c12-a53a-034935cb78aa`; no findings |
+
+### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S18 | ready to commit | `.github/workflows/provider-ci.yml` plus `report.md` S18 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+### 変更したファイル
+- `.github/workflows/provider-ci.yml` - add `make lint` static-analysis step before pytest.
+- `report.md` - S17 commit gate correction and S18 observed evidence.
+
+### コミット
+- pending S18 step commit.
 
 ---
 
