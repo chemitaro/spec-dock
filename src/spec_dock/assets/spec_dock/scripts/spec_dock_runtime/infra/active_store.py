@@ -144,12 +144,12 @@ def _write_pathfile(active_dir: Path, name: str, target: Path) -> None:
 
 
 def _render_context_pack(manifest: ActiveManifest | None, *, repo_root: Path | None = None) -> str:
-    has_init = manifest is not None and manifest.initiative is not None
-    has_epic = manifest is not None and manifest.epic is not None
-    has_issue = manifest is not None and manifest.issue is not None
-    init_id = manifest.initiative.id if has_init else "(none)"
-    epic_id = manifest.epic.id if has_epic else "(none)"
-    issue_id = manifest.issue.id if has_issue else "(none)"
+    initiative = manifest.initiative if manifest is not None else None
+    epic = manifest.epic if manifest is not None else None
+    issue = manifest.issue if manifest is not None else None
+    init_id = initiative.id if initiative is not None else "(none)"
+    epic_id = epic.id if epic is not None else "(none)"
+    issue_id = issue.id if issue is not None else "(none)"
 
     lines: list[str] = []
     lines.append("# Context Pack (generated)")
@@ -163,9 +163,9 @@ def _render_context_pack(manifest: ActiveManifest | None, *, repo_root: Path | N
     lines.append("- source: `spec-dock/.agent/active.json`")
     lines.append("- rule: proposed or missing authority cannot authorize implementation, issue ready, issue finish, or phase completion.")
     for label, entry in (
-        ("initiative", manifest.initiative if has_init and manifest is not None else None),
-        ("epic", manifest.epic if has_epic and manifest is not None else None),
-        ("issue", manifest.issue if has_issue and manifest is not None else None),
+        ("initiative", initiative),
+        ("epic", epic),
+        ("issue", issue),
     ):
         if entry is None:
             lines.append(f"- {label}: authority=(none), grants=[]")
@@ -213,19 +213,19 @@ def _render_context_pack(manifest: ActiveManifest | None, *, repo_root: Path | N
         "- `spec-dock/active/context-pack.md` is human guidance that mirrors this contract; it is not the sole source of truth."
     )
     lines.append("- Then follow the active documents:")
-    if has_init:
+    if initiative is not None:
         lines.append("- `spec-dock/active/initiative/requirement.md`")
         lines.append("- `spec-dock/active/initiative/design.md`")
         lines.append("- `spec-dock/active/initiative/plan.md`")
     else:
         lines.append("- `spec-dock/active/initiative/README.md`")
-    if has_epic:
+    if epic is not None:
         lines.append("- `spec-dock/active/epic/requirement.md`")
         lines.append("- `spec-dock/active/epic/design.md`")
         lines.append("- `spec-dock/active/epic/plan.md`")
     else:
         lines.append("- `spec-dock/active/epic/README.md`")
-    if has_issue:
+    if issue is not None:
         lines.append("- `spec-dock/active/issue/requirement.md`")
         lines.append("- `spec-dock/active/issue/design.md`")
         lines.append("- `spec-dock/active/issue/plan.md`")

@@ -377,12 +377,13 @@ def load_node_records(specdock_dir: Path) -> list[StoredMetaRecord]:
         github_repo_name: str | None = None
         github = meta.get("github")
         if isinstance(github, dict):
-            if github.get("issue_number") is not None:
+            raw_issue_number = github.get("issue_number")
+            if raw_issue_number is not None:
                 try:
-                    github_issue_number = int(github.get("issue_number"))
+                    github_issue_number = int(raw_issue_number)
                 except (TypeError, ValueError) as exc:
                     raise RuntimeError(
-                        f"Invalid github.issue_number in {meta_path}: {github.get('issue_number')}"
+                        f"Invalid github.issue_number in {meta_path}: {raw_issue_number}"
                     ) from exc
 
             owner_raw = github.get("repo_owner")

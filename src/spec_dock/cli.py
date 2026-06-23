@@ -510,6 +510,7 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
     for layer in ("initiative", "epic", "issue"):
         link = active_dir / layer
         pathfile = active_dir / f"{layer}.path"
+        desired_target: Path
         # Repair stale symlinks so update can restore fallback pointers.
         if link.is_symlink() and not link.exists():
             link.unlink(missing_ok=True)
@@ -538,21 +539,20 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
             if not force_rebuild:
                 continue
         else:
-            desired_target = _resolve_manifest_target_dir(
+            resolved_target = _resolve_manifest_target_dir(
                 specdock_dir,
                 layer,
                 expected_id=persisted_id,
                 persisted_path=persisted_path,
             )
-            if desired_target is None:
-                desired_target = _resolve_persisted_path_dir(
+            if resolved_target is None:
+                resolved_target = _resolve_persisted_path_dir(
                     specdock_dir,
                     layer=layer,
                     expected_id=persisted_id,
                     persisted_path=persisted_path,
                 )
-            if desired_target is None:
-                desired_target = _active_placeholder_dir(specdock_dir, layer)
+            desired_target = resolved_target if resolved_target is not None else _active_placeholder_dir(specdock_dir, layer)
 
         if existing_entrypoint is not None:
             existing_target, _existing_id = existing_entrypoint

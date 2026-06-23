@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import TypeAlias
 
 from spec_dock_runtime.domain.ids import deps_node_sort_key
 from spec_dock_runtime.domain.models import (
@@ -22,7 +23,7 @@ from spec_dock_runtime.domain.models import (
 _BLOCKERS_TOP_LIMIT = 5
 _KNOWN_ISSUE_STATUSES = {"done", "open", "closed", "unknown"}
 
-DependencyContextInput = DepsDependencyContext | object
+DependencyContextInput: TypeAlias = DepsDependencyContext | dict[str, object]
 
 
 def _safe_sorted_node_ids(node_ids: set[str] | list[str]) -> list[str]:
@@ -198,7 +199,7 @@ def _build_evaluation(
     for issue_id in target_issue_ids:
         issue_info = derived_issue_deps.get(issue_id) or {"ready": False, "depends_on": []}
         status = _issue_status(issue_id, issue_statuses)
-        issue_blockers: set[str] = set()
+        issue_blocker_set: set[str] = set()
         suppressed_blockers = _dependency_closure(
             derived_issue_deps,
             suppressed_issue_roots_by_issue_id.get(issue_id, set()),
@@ -214,19 +215,21 @@ def _build_evaluation(
         suppressed_blockers -= unresolved_blockers
         suppressed_blockers -= direct_blockers
 
-        for blocker in issue_info.get("depends_on") or []:
+        raw_depends_on = issue_info.get("depends_on")
+        depends_on = raw_depends_on if isinstance(raw_depends_on, list) else []
+        for blocker in depends_on:
             if isinstance(blocker, str):
                 if blocker in suppressed_blockers:
                     continue
-                issue_blockers.add(blocker)
+                issue_blocker_set.add(blocker)
 
         if _issue_status_is_satisfied(status):
             issue_ready = True
         else:
-            issue_ready = status != "unknown" and len(issue_blockers) == 0
+            issue_ready = status != "unknown" and len(issue_blocker_set) == 0
         target_ready = target_ready and issue_ready
-        filtered_depends_on_by_issue_id[issue_id] = _safe_sorted_node_ids(issue_blockers)
-        issue_blockers_set.update(issue_blockers)
+        filtered_depends_on_by_issue_id[issue_id] = _safe_sorted_node_ids(issue_blocker_set)
+        issue_blockers_set.update(issue_blocker_set)
     node_blocker_ids = [blocker.node_id for blocker in node_blockers]
     issue_blockers = _safe_sorted_node_ids(issue_blockers_set)
     blockers = _safe_sorted_node_ids(issue_blockers + node_blocker_ids)
@@ -307,7 +310,9 @@ def _dependency_closure(
             continue
         closed.add(issue_id)
         issue_info = derived_issue_deps.get(issue_id) or {"depends_on": []}
-        for dep_id in issue_info.get("depends_on") or []:
+        raw_depends_on = issue_info.get("depends_on")
+        depends_on = raw_depends_on if isinstance(raw_depends_on, list) else []
+        for dep_id in depends_on:
             if isinstance(dep_id, str) and dep_id not in closed:
                 stack.append(dep_id)
     return closed
@@ -784,13 +789,11 @@ def inspect_target_deps(
     for issue_id in inspect_issue_ids:
         issue_view = derived_issue_deps.get(issue_id) or {"ready": False, "depends_on": [], "blockers_top": []}
         if isinstance(filtered_depends_by_issue, dict) and issue_id in filtered_depends_by_issue:
-            depends_on = [
-                dep
-                for dep in filtered_depends_by_issue.get(issue_id, [])
-                if isinstance(dep, str)
-            ]
+            raw_depends_on = filtered_depends_by_issue.get(issue_id, [])
+            depends_on = [dep for dep in raw_depends_on if isinstance(dep, str)] if isinstance(raw_depends_on, list) else []
         else:
-            depends_on = [dep for dep in issue_view.get("depends_on", []) if isinstance(dep, str)]
+            raw_depends_on = issue_view.get("depends_on", [])
+            depends_on = [dep for dep in raw_depends_on if isinstance(dep, str)] if isinstance(raw_depends_on, list) else []
         ready = _issue_is_satisfied(issue_id, issue_statuses) or (
             _issue_status(issue_id, issue_statuses) != "unknown" and len(depends_on) == 0
         )
@@ -811,10 +814,11 @@ def inspect_target_deps(
     target_effective_set: set[str] = set()
     for issue_id in target_issue_ids:
         if isinstance(filtered_depends_by_issue, dict) and issue_id in filtered_depends_by_issue:
-            depends_on = filtered_depends_by_issue.get(issue_id, [])
+            raw_depends_on = filtered_depends_by_issue.get(issue_id, [])
         else:
             issue_view = derived_issue_deps.get(issue_id) or {"depends_on": []}
-            depends_on = issue_view.get("depends_on", [])
+            raw_depends_on = issue_view.get("depends_on", [])
+        depends_on = raw_depends_on if isinstance(raw_depends_on, list) else []
         for dep_id in depends_on:
             if isinstance(dep_id, str):
                 target_effective_set.add(dep_id)

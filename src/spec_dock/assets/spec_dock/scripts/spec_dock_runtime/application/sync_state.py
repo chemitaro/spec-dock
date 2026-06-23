@@ -800,14 +800,14 @@ def _sync_impl(
         final_state = replace(final_state, warnings=sync_warnings)
     except _ArtifactWriteExecutionError as error:
         final_state = replace(final_state, warnings=sync_warnings)
-        status = error.status
+        artifact_status = error.status
         if active_update is not None and active_update.applied:
-            status = "failed_partial_or_stale"
+            artifact_status = "failed_partial_or_stale"
         return SyncCommandResult(
             state=final_state,
             write_result=None,
             active_update=active_update,
-            artifact_failure=ArtifactWriteFailure(status=status, reason=error.reason),
+            artifact_failure=ArtifactWriteFailure(status=artifact_status, reason=error.reason),
         )
     except Exception as error:
         status: Literal["failed_before_write", "failed_partial_or_stale"]
