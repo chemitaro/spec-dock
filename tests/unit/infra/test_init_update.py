@@ -31842,6 +31842,30 @@ esac
             assert blocker_policy["findings"][0]["protected_domain"] is True
             assert blocker_policy["findings"][0]["machine_evidence"] is True
 
+    def test_issue_232_blocker_fingerprint_ignores_reposted_comment_id(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        provider_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py"
+        )
+        module = ast.parse(provider_path.read_text(encoding="utf-8"))
+        selected = [
+            node
+            for node in module.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name in {"body_hash", "normalized_body_text", "finding_priority", "blocker_fingerprint"}
+        ]
+        blocker_function = next(node for node in selected if node.name == "blocker_fingerprint")
+        assert [arg.arg for arg in blocker_function.args.args] == ["kind", "raw_body"]
+        namespace = {"hashlib": hashlib, "re": re}
+        exec(compile(ast.Module(body=selected, type_ignores=[]), str(provider_path), "exec"), namespace)
+
+        body = "P1: deterministic blocker. Test: failing test proves it."
+
+        assert namespace["blocker_fingerprint"]("issue_comment", body) == namespace["blocker_fingerprint"](
+            "issue_comment", body
+        )
+
     @pytest.mark.parametrize(
         ("body", "expected_protected", "expected_machine"),
         [

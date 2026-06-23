@@ -334,7 +334,17 @@ def apply_active_pointers(specdock_dir: Path, manifest: ActiveManifest | None, r
     active_dir = specdock_dir / _ACTIVE_DIRNAME
     active_dir.mkdir(parents=True, exist_ok=True)
 
-    for name in ("initiative", "epic", "issue", "context-pack.md", "initiative.path", "epic.path", "issue.path"):
+    for name in (
+        "initiative",
+        "epic",
+        "issue",
+        "context-pack.md",
+        "current-runbook.json",
+        "current-runbook.md",
+        "initiative.path",
+        "epic.path",
+        "issue.path",
+    ):
         _unlink_any(active_dir / name)
 
     def _target_dir(layer: str) -> Path:

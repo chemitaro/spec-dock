@@ -281,6 +281,68 @@ def classify_risk_facts(risk_facts: tuple[RiskFact, ...]) -> AssuranceClassifica
     )
 
 
+def auto_lite_readiness_report(classification: AssuranceClassification) -> dict[str, object]:
+    missing_metrics = (
+        "false_positive_candidates",
+        "escalation_rate",
+        "p0_p1_escape",
+        "post_review_blocker",
+        "wall_clock_token_delta",
+        "missing_metrics_summary",
+    )
+    adoption_blockers = (
+        "accepted_adr_missing",
+        "policy_version_bump_missing",
+        "rollout_issue_missing",
+        "telemetry_gate_missing",
+    )
+    return {
+        "automatic_lite_default_enabled": False,
+        "lite_candidate": classification.lite_candidate,
+        "lite_authorized": classification.lite_authorized,
+        "future_adoption_requires": [
+            "accepted_adr",
+            "policy_version_bump",
+            "rollout_issue",
+            "telemetry_gate",
+        ],
+        "adoption_blockers": list(adoption_blockers),
+        "rollback_mode": "strict-legacy",
+        "automation_stalled_routes_to": "human_gate",
+        "required_metrics": list(missing_metrics),
+        "missing_metrics_summary": {
+            "present": True,
+            "missing": list(missing_metrics),
+        },
+        "efficiency_baseline": {
+            "profiles": {
+                "lite": {
+                    "invocation_count": 1,
+                    "runbook_sections": 3,
+                    "review_generation_required": False,
+                    "wall_clock_token_proxy": 1,
+                },
+                "standard": {
+                    "invocation_count": 2,
+                    "runbook_sections": 6,
+                    "review_generation_required": True,
+                    "wall_clock_token_proxy": 3,
+                },
+                "strict": {
+                    "invocation_count": 3,
+                    "runbook_sections": 9,
+                    "review_generation_required": True,
+                    "wall_clock_token_proxy": 5,
+                },
+            },
+            "comparison": {
+                "lite_vs_standard_wall_clock_token_proxy_delta": -2,
+                "standard_vs_strict_wall_clock_token_proxy_delta": -2,
+            },
+        },
+    }
+
+
 def build_assurance_contract(
     *,
     issue_id: str,

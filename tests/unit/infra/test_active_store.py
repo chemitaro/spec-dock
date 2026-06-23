@@ -72,6 +72,10 @@ class TestActiveStoreInfra:
             issue_dir.mkdir(parents=True)
             (issue_dir / "requirement.md").write_text("# req\n", encoding="utf-8")
             (issue_dir.parents[1]).mkdir(parents=True, exist_ok=True)
+            active_dir = specdock_dir / "active"
+            active_dir.mkdir(parents=True)
+            (active_dir / "current-runbook.json").write_text('{"active_issue_id":"iss-old"}\n', encoding="utf-8")
+            (active_dir / "current-runbook.md").write_text("# stale runbook\n", encoding="utf-8")
 
             active_store.apply_active_pointers(
                 specdock_dir,
@@ -86,11 +90,12 @@ class TestActiveStoreInfra:
                 "# context\n",
             )
 
-            active_dir = specdock_dir / "active"
             assert (active_dir / "issue").exists()
             assert "active-none/initiative" in (active_dir / "initiative").resolve().as_posix()
             assert "active-none/epic" in (active_dir / "epic").resolve().as_posix()
             assert (active_dir / "context-pack.md").read_text(encoding="utf-8") == "# context\n"
+            assert not (active_dir / "current-runbook.json").exists()
+            assert not (active_dir / "current-runbook.md").exists()
 
     def test_patch_agent_state_updates_cached_active_fields_without_rebuilding_indexes(self) -> None:
         active_store, infra_contracts = _runtime_modules()

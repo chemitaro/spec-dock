@@ -363,9 +363,10 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
     def _write_plan_and_report(self, issue_dir: Path) -> None:
         (issue_dir / "plan.md").write_text(
             "# Plan\n\n"
-            "## 実装ステップ S01 — Step Assurance と Context Routing policy を固定する\n"
+            "## 実装ステップ\n\n"
+            "### 実装ステップ S01 — Step Assurance と Context Routing policy を固定する\n"
             "- 対象ファイル: domain/context_routing.py\n\n"
-            "## 実装ステップ S02 — Context Packet と Runbook projection へ接続する\n"
+            "### 実装ステップ S02 — Context Packet と Runbook projection へ接続する\n"
             "- 対象ファイル: application / infra / presentation / CLI tests\n"
             "- Green 検証: unit_tests\n\n"
             "## ドキュメント影響の解消ステップ S90\n"
@@ -374,7 +375,7 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
         )
         (issue_dir / "report.md").write_text(
             "# Report\n\n"
-            "### セッションログ（2026-06-23 S01）\n\n"
+            "### セッションログ（2026-06-23 10:00 - 10:30）\n\n"
             "#### 対象\n"
             "- Step: S01\n\n"
             "#### ステップ契約の完了証跡\n"

@@ -1019,10 +1019,10 @@ def has_machine_evidence(raw_body):
     return any(term in normalized for term in evidence_terms)
 
 
-def blocker_fingerprint(kind, item_id, raw_body):
+def blocker_fingerprint(kind, raw_body):
     priority = finding_priority(raw_body) or "unknown"
     digest = body_hash(normalized_body_text(raw_body))
-    return f"{kind}:{item_id}:{priority}:{digest}"
+    return f"{kind}:{priority}:{digest}"
 
 
 def reviewed_commit_from_no_findings_body(raw_body):
@@ -1132,7 +1132,7 @@ for item in current_codex_issue_comments:
         "reason": reason,
         "protected_domain": protected_domain,
         "machine_evidence": machine_evidence,
-        "fingerprint": blocker_fingerprint(item.get("kind"), item.get("id"), raw_body),
+        "fingerprint": blocker_fingerprint(item.get("kind"), raw_body),
     })
 blocker_policy_blockers = [
     item for item in blocker_policy_findings if item.get("disposition") in {"blocker", "promoted_blocker"}
