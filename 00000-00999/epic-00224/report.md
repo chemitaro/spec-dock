@@ -63,10 +63,11 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-018 | `adopted` | user clarification + deep-consultants | `design.md`, `plan.md`, `report.md`, accepted ADRs | `iss-00226` で ADR を後続処理するのではなく、Epic planning/design 現段階で ADR-level decisions を固定する判断を採用した。3 本の deep-consultant は blocking human question なし、fail-closed/default-safe で進行可能と判定した。 | `discussions/20260623t074452z-disc-adr-decision-synthesis-after-issue-226-closure.md` | fresh decomposition re-review |
 | EAL-019 | `adopted` | accepted ADR artifacts | `design.md`, `plan.md`, issue draft review | Fixed Skill Kernel、Adaptive Assurance / Lite Authorization、Step Assurance / Context Routing、Trusted Base-SHA Review、Blocker-Centric PR Closure の 5 件を Epic-scope accepted ADR として固定した。 | `discussions/20260623t074441z-adr-*`, `20260623t074442z-adr-*`, `20260623t074443z-adr-*`, `20260623t074444z-adr-*`, `20260623t074447z-adr-*` | fresh decomposition re-review |
 | EAL-020 | `adopted` | spec-dock commands | dependency metadata, GitHub issue #226 | `iss-00226 / #226` を closed / superseded historical evidence とし、`iss-00227 -> iss-00226` dependency を command-first で削除した。 | `spec-dock close iss-00226`, `spec-dock deps remove --from iss-00227 --to iss-00226` | validate / sync / deps check |
-| EAL-021 | `adopted` | spec-reviewer findings | `requirement.md`, draft plan discussion | ADR authority correction review の P1/P2 指摘を受け、Auto-Lite adoption surface を別 accepted ADR + policy version bump + rollout Issue の 3 点必須に固定し、旧 draft plan の T0 tranche を superseded と明記した。 | spec-reviewer review result 2026-06-23: P1 Auto-Lite stale choice, P2 old T0 draft tranche | fresh re-review |
+| EAL-021 | `adopted` | spec-reviewer findings | `requirement.md`, draft plan discussion | ADR authority correction review の P1/P2 指摘を受け、Auto-Lite adoption surface を別 accepted ADR + policy version bump + rollout Issue + telemetry gate の 4 点必須に固定し、旧 draft plan の T0 tranche を superseded と明記した。 | spec-reviewer review result 2026-06-23: P1 Auto-Lite stale choice, P2 old T0 draft tranche; iss-00233 spec review P1 telemetry gate unification | fresh re-review |
 | EAL-022 | `adopted` | spec-reviewer | ADR authority correction handoff | Fresh re-review は findings なしで `review_status: pass`。Auto-Lite adoption surface、T0 supersession、ADR authority correction、dependency graph、implementation handoff readiness が妥当と判定された。 | spec-reviewer re-review result 2026-06-23, confidence 0.91 | downstream Issue planning may proceed from `iss-00227` |
 | EAL-023 | `adopted` | iss-00231 spec-reviewer finding | `plan.md`, `report.md`, `issues/iss-00231-*/{design.md,plan.md,report.md}` | I05 の `Policy schema / validator / max size` は Markdown policy の fixed path + base SHA + UTF-8 + 32 KiB runtime validation として回収し、dedicated `doctor` capability は I07 rollout / operationalization へ defer する。 | iss-00231 spec review P1: parent I05 scope contract contradicted Issue closure contract | fresh iss-00231 spec re-review |
 | EAL-024 | `adopted` | iss-00232 implementation + spec-reviewer finding | `plan.md`, `report.md`, `issues/iss-00232-*/{design.md,plan.md,report.md}` | I06 の blocker-centric repair は priority disposition / promoted P2 / blocker fingerprint evidence をこの Issue で閉じ、E-AC-013 と dedicated automation-stalled operator surfacing は I07 rollout / telemetry へ defer する。 | iss-00232 blocker policy payload and focused tests; spec review P1: E-AC-013 closure contradicted I07 defer | fresh iss-00232 spec re-review |
+| EAL-025 | `adopted` | iss-00233 implementation | `requirement.md`, `design.md`, `plan.md`, `issues/iss-00233-*/{requirement.md,design.md,plan.md,report.md}` | I07 は automatic Lite default を有効化せず、auto-lite readiness、strict-legacy workflow compatibility、automation-stalled operator surface、required metrics / missing metrics summary、efficiency baseline を rollout evidence として閉じる。 | iss-00233 focused tests、automation-stalled behavior test、workflow strict-legacy tests、provider/mirror parity | fresh iss-00233 reviews |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -159,21 +160,30 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - iss-00233 / #233: Roll Out Adaptive Workflow With Legacy Compatibility And Telemetry
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
-- E-AC-001: Pass / Fail（証拠: ...）
-- E-AC-002: ...
+- E-AC-001〜004: pass（証拠: iss-00227 report; assurance classification / schema / Lite safety targeted tests）
+- E-AC-005〜008: pass（証拠: iss-00228 / iss-00229 reports; workflow runbook, profile-aware planning, stale source binding tests）
+- E-AC-009〜012: pass（証拠: iss-00231 / iss-00232 reports; trusted base-SHA review policy, blocker disposition, promoted P2, rereview payload tests）
+- E-AC-013: pass（証拠: iss-00233 `test_issue_233_pr_observation_wait_exposes_automation_stalled_operator_surface`; repeated blocker fingerprint は `automation_stalled` / `human_gate` になり `merge_prepared` にならない）
+- E-AC-014: pass（証拠: iss-00233 `test_workflow_next_missing_assurance_uses_strict_legacy_execution_authority`, `test_assurance_show_and_verify_strict_legacy_missing`; missing assurance は strict-legacy ready、invalid / stale assurance は fail-closed）
+- E-AC-015: pass（証拠: iss-00233 Auto-Lite readiness assertions; `automatic_lite_default_enabled=false`、future adoption gates は accepted ADR / policy version bump / rollout Issue / telemetry gate）
+- E-AC-016: pass（証拠: iss-00233 `auto_lite_readiness_report` efficiency baseline assertions; Lite / Standard / Strict の invocation / review generation / workflow cost proxy 差分を固定し、live telemetry 不足は missing metrics summary として明示）
+- E-AC-017〜021: pass（証拠: iss-00230 report; step assurance, context routing, reviewer clean-room, bounded return contract, stale context invalidation tests）
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
-  - ...
+  - 初期 rollout では automatic Lite default を有効化していない。
+  - substantive Issue + missing assurance は strict-legacy compatibility path で execution-ready になる。
+  - future Auto-Lite adoption は accepted ADR、policy version bump、rollout Issue、telemetry gate が揃うまで blocker として report される。
 - 監視値（エラー率/レイテンシなど）:
-  - ...
+  - live telemetry backend はこの Epic では追加していない。
+  - `auto_lite_readiness` は required metrics と missing metrics summary を機械可読に出し、efficiency baseline fixture で expected cost proxy を固定する。
 - 障害/アラート:
-  - ...
+  - 該当なし。
 
 ## フォローアップ（別Issue化） (必須)
-- iss-00233:
-  - I05 で defer した dedicated review-policy doctor surfacing を rollout / operationalization 観点で扱う。
-  - I06 で defer した dedicated automation-stalled operator surfacing を rollout / telemetry 観点で扱う。
+- dedicated review-policy doctor surfacing は、この Epic では base-SHA policy validation / operator evidence までを対象とし、専用 doctor command は未作成。
+- production telemetry backend と automatic Lite activation tuning は、この Epic の initial rollout 対象外。採用には accepted ADR、policy version bump、rollout Issue、telemetry gate が必要。
+- I06 で defer した automation-stalled operator surface は iss-00233 で resolved。
 
 ## 省略/例外メモ (必須)
 - 該当なし

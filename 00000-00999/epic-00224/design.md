@@ -945,7 +945,7 @@ P2 + non-protected
 ### Future: Auto-Lite experimental
 
 - この Epic の初期完了条件には含めない。
-- `auto-lite-readiness report` の evidence をもとに、別 accepted ADR、policy version bump、rollout Issue の 3 点が揃った場合だけ採用できる。
+- `auto-lite-readiness report` の evidence をもとに、別 accepted ADR、policy version bump、rollout Issue、telemetry gate の 4 点が揃った場合だけ採用できる。
 - Policy version bump だけでは automatic Lite default を有効化できない。
 
 ### Rollback
@@ -1127,4 +1127,4 @@ The Issue-local draft requirement / draft design artifacts are discussion eviden
   - Review policy maximum size の初期値。
   - Metrics retention の初期値。
   - Repository-specific hard trigger extension surface。
-  - Future automatic Lite default の具体 rollout 条件。採用 surface は別 accepted ADR、policy version bump、rollout Issue に固定済み。
+  - Future automatic Lite default の具体 rollout 条件。採用 surface は別 accepted ADR、policy version bump、rollout Issue、telemetry gate に固定済み。
