@@ -38,6 +38,10 @@ from spec_dock_runtime.application.set_active import (
 )
 from spec_dock_runtime.application.sync_state import sync as application_sync
 from spec_dock_runtime.application.validate_tree import validate_tree as application_validate_tree
+from spec_dock_runtime.application.workflow import (
+    workflow_next as application_workflow_next,
+    workflow_status as application_workflow_status,
+)
 from spec_dock_runtime.application.worktree import (
     worktree_create as application_worktree_create,
     worktree_list as application_worktree_list,
@@ -344,6 +348,8 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         show_assurance=lambda req: application_show_assurance(req, store=assurance_store),
         classify_assurance=lambda req: application_classify_assurance(req, store=assurance_store),
         verify_assurance=lambda req: application_verify_assurance(req, store=assurance_store),
+        workflow_status=lambda req: application_workflow_status(req, store=assurance_store),
+        workflow_next=lambda req: application_workflow_next(req, store=assurance_store),
         doctor=lambda req: application_doctor(req, ports),
         worktree_create=lambda req: application_worktree_create(req, ports),
         worktree_list=lambda req: application_worktree_list(req, ports),
