@@ -4,7 +4,7 @@ import argparse
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..commands.contracts import CommandRegistry, CommandSpec
+    from spec_dock_runtime.commands.contracts import CommandRegistry, CommandSpec
 
 
 class _RuntimeArgumentParser(argparse.ArgumentParser):

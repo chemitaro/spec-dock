@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ..domain.ids import deps_node_sort_key
-from .contracts import DepsIssuesArtifact, DepsRawArtifact, IndexArtifact, TreeArtifact
-from .puml import (
+from spec_dock_runtime.domain.ids import deps_node_sort_key
+from spec_dock_runtime.presentation.contracts import DepsIssuesArtifact, DepsRawArtifact, IndexArtifact, TreeArtifact
+from spec_dock_runtime.presentation.puml import (
     render_deps_disabled_deps_issues_puml,
     render_deps_disabled_deps_raw_puml,
     render_deps_disabled_tree_puml,
@@ -16,8 +16,8 @@ from .puml import (
 )
 
 if TYPE_CHECKING:
-    from ..application.contracts import DepsCheckResult, SyncStateResult
-    from ..domain.models import ActiveSelection, DepsNodeState, SpecNode
+    from spec_dock_runtime.application.contracts import DepsCheckResult, SyncStateResult
+    from spec_dock_runtime.domain.models import ActiveSelection, DepsNodeState, SpecNode
 
 CURRENT_FUTURE_PROJECTION = "current-future"
 FULL_HISTORY_PROJECTION = "full-history"

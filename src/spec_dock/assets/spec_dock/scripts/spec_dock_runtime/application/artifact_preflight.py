@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from ..domain.models import SpecGraph
+    from spec_dock_runtime.domain.models import SpecGraph
 
 _REQUIRED_ARTIFACTS_BY_KIND: dict[str, tuple[str, ...]] = {
     "initiative": (".meta.json", "requirement.md", "design.md", "plan.md", "report.md"),

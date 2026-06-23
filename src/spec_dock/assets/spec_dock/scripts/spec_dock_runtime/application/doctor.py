@@ -3,24 +3,24 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from ..domain.deps import validate_raw_node_dependency_graph
-from ..domain.models import SpecGraph, SpecNodeKind, SpecNodeSeed
-from ..domain.tree import build_graph
-from ..domain.validation import validate_graph_and_deps
-from . import create_node as app_create_node
-from .artifact_preflight import validate_required_artifacts_for_graph
-from .contracts import (
+from spec_dock_runtime.application import create_node as app_create_node
+from spec_dock_runtime.application.artifact_preflight import validate_required_artifacts_for_graph
+from spec_dock_runtime.application.contracts import (
     DoctorFinding,
     DoctorRequest,
     DoctorResult,
     GitHubCapabilityDiagnostic,
     GitHubCapabilityProbeRequest,
 )
-from .repo_context import resolve_current_repo_slug
+from spec_dock_runtime.application.repo_context import resolve_current_repo_slug
+from spec_dock_runtime.domain.deps import validate_raw_node_dependency_graph
+from spec_dock_runtime.domain.models import SpecGraph, SpecNodeKind, SpecNodeSeed
+from spec_dock_runtime.domain.tree import build_graph
+from spec_dock_runtime.domain.validation import validate_graph_and_deps
 
 if TYPE_CHECKING:
-    from ..infra.contracts import ActiveManifestEntry, DirectDependencyResolution, StoredMetaRecord
-    from .ports import Ports
+    from spec_dock_runtime.application.ports import Ports
+    from spec_dock_runtime.infra.contracts import ActiveManifestEntry, DirectDependencyResolution, StoredMetaRecord
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:

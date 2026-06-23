@@ -56,6 +56,7 @@ Disposition ごとの必須証跡:
 | D-005 | resolved | compatibility | spec-reviewer | design review で command target と shipped runtime logical coverage の表現揺れが指摘された | shipped runtime asset を第三の direct target として扱う; `src/spec_dock tests` の direct command targetに統一し、runtime asset は logical coverage として扱う | direct command target は `src/spec_dock tests` に統一し、shipped runtime asset は `src/spec_dock` に含まれる coverage/report evidence と明記する | duplicate traversal risk と command ambiguity を避ける | applied | design review by spec-reviewer `019ef295-db33-7aa3-a2ea-68e27e5ab80f`; `design.md`; `plan.md` | fresh design spec-reviewer rerun |
 | D-006 | resolved | test-strategy | spec-reviewer | plan review で `uv.lock` 許可不足、S02-S13 closure contract 不足、S90 refresh 許可範囲不足が指摘された | 現行 plan のまま進む; dependency/dogfooding/closure contract を明示する | S01/S14 allowed paths に `uv.lock` を追加し、S02-S13 shared step closure contract を追加し、S90 で安全な generated-copy refresh は許可し危険なら handoff/follow-up にする | execution handoff で worker が scope 違反せず進められるようにする | applied | plan review by spec-reviewer `019ef2a0-8d5e-7212-9608-d2bf37621852`; `plan.md` | fresh plan spec-reviewer rerun |
 | D-007 | resolved | implementation | dev-coder / orchestrator | S12 `RUF001` が日本語文言・全角句読点・期待文字列に大量発生した | 全置換する; top-level ignore のみ; target-scoped ignore; file-by-file ignore | `RUF001/RUF002/RUF003/RUF010` は `src/spec_dock/**/*.py` と `tests/**/*.py` の target-scoped ignore として扱い、`RUF067` は `src/spec_dock/__init__.py` のみ例外にする | 日本語文言と fullwidth 表記の可読性・意味を保ちつつ、explicit `--select RUF` 実行でも closure を満たす。`RUF012` など実バグ寄りの項目は修正した | applied | S12 session log; `pyproject.toml`; `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF src/spec_dock tests` -> pass | final reviewer gate |
+| D-008 | resolved | implementation | dev-coder / code-reviewer / orchestrator | S13 absolute import 化により `spec_dock_runtime` を Ruff の first-party import root として扱う必要が出た | relative import を suppress する; targeted `noqa` を追加する; Ruff `src` に provider package と shipped runtime scripts root を設定する | Ruff `src = ["src", "src/spec_dock/assets/spec_dock/scripts"]` を追加し、copied scaffold runtime の実行モデルと first-party 判定を一致させる | shipped entrypoint は consumer repo の `spec-dock/scripts` を `sys.path` に入れて `spec_dock_runtime.app` を import するため、provider 側でも同じ root を明示するのが最小で suppression 不要 | applied | S13 session log; code-reviewer `019ef36e-5f8c-7bb3-b2c1-3165a0c5d447`; `pyproject.toml`; `uv run pytest tests/cli_runtime` -> 637 passed, 76 skipped | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -1455,7 +1456,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S12 | ready to commit | S12 implementation files plus `report.md` S12 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S12 | committed | S12 implementation files plus `report.md` S12 evidence | `2c9a56ff` `build(static-analysis): Ruff RUF違反を解消する` | `git status --short` -> clean; post-commit `make lint` -> pass; `./spec-dock/scripts/spec-dock validate` -> pass | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `pyproject.toml` - Ruff `RUF` selection and scoped RUF ignores.
@@ -1463,10 +1464,115 @@ git diff --check
 - `report.md` - S11 commit correction, D-007, and S12 observed evidence.
 
 #### コミット
-- pending S12 step commit.
+- `2c9a56ff` `build(static-analysis): Ruff RUF違反を解消する`
 
 #### メモ
 - `RUF001/RUF002/RUF003` are intentionally ignored for target source/test paths to preserve Japanese/fullwidth wording. This is a documented S12 exception, not a hidden global opt-out.
+
+---
+
+### セッションログ（2026-06-23 HH:MM - HH:MM）
+
+#### 対象
+- Step: S13 — Ruff TID
+- AC/EC: AC-005, AC-009
+- 計画上の出典（Planned source）:
+  - `plan.md` S13 executable contract
+  - closure id: `tc-s13-001`
+
+#### 実施内容
+- `dev-coder` に S13 を委任し、許可 path を `pyproject.toml`, `src/spec_dock/**/*.py`, `tests/**/*.py` に限定した。
+- `pyproject.toml` の Ruff `select` を `["F", "E", "I", "UP", "B", "C4", "SIM", "PTH", "TC", "ARG", "RUF", "TID"]` に変更した。
+- `[tool.ruff.lint.flake8-tidy-imports] ban-relative-imports = "all"` を追加した。
+- shipped runtime asset 配下の relative imports を absolute `spec_dock_runtime.*` imports へ変換した。
+- Ruff first-party 判定を runtime 実行モデルに合わせるため、`src = ["src", "src/spec_dock/assets/spec_dock/scripts"]` を追加した。
+- 新規 ignore / `noqa` は追加していない。
+- dogfooding `spec-dock/` は direct target / direct edit していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF,TID --statistics src/spec_dock tests
+# 397 TID252 relative-imports
+
+uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF,TID src/spec_dock tests
+# All checks passed!
+
+rg -n "^\s*from \.+" src/spec_dock tests
+# no matches
+
+uv run pytest tests/cli_runtime
+# 637 passed, 76 skipped
+
+git diff --check
+# pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S13 | Red / inventory | `tc-s13-001`: `TID` violation inventory | total 397; all `TID252` relative imports | parent command: `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF,TID --statistics src/spec_dock tests` | pass | shipped runtime package relative imports |
+| S13 | Green | `F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF,TID` violation 0 件 | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF,TID src/spec_dock tests` -> All checks passed | command | pass | no new suppression |
+| S13 | Regression | absolute imports preserve copied runtime execution model | `uv run pytest tests/cli_runtime` -> 637 passed, 76 skipped | command | pass | runtime import boundary covered |
+| S13 | Refactor | guardrail satisfied / no unrelated refactor | no S14 mypy config, no dogfooding direct edit | diff inspection + code-reviewer | pass | P2 decision-ledger evidence added |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S13 | shipped runtime asset は consumer repo の `spec-dock/scripts` を import root として `spec_dock_runtime.app` を import する | dev-coder / code-reviewer | Ruff `src` に `src/spec_dock/assets/spec_dock/scripts` を追加し、absolute import を runtime model に合わせた。D-008 に昇格した | tc-s13-001 | no | `pyproject.toml`; `tests/cli_runtime` pass; code-reviewer P2 |
+| S13 | relative import を ban すると runtime package 全体に広範な import 変換が入る | dev-coder / parent | `tests/cli_runtime` を focused verification として実行 | tc-s13-001 | no | 637 passed, 76 skipped |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S13 | tc-s13-001 | Ruff `TID` と relative import ban を追加し violation を 0 件にする | `pyproject.toml` select includes `TID`; `ban-relative-imports = "all"`; required Ruff command pass; `rg` relative import check no matches; `tests/cli_runtime` pass | pass | code-reviewer pass |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s13-001 / tc-s13-case-001 | S13 | yes | command | initial `TID` inventory total 397 | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF,TID src/spec_dock tests` | pass | `TID` violation 0 件 |
+| tc-s13-001 / tc-s13-runtime-001 | S13 | yes | command | relative import conversion could break copied runtime imports | `uv run pytest tests/cli_runtime` | pass | 637 passed, 76 skipped |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s13-001 | S13 | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF,TID src/spec_dock tests`; `rg` relative import check; `uv run pytest tests/cli_runtime`; `git diff --check`; code-reviewer pass | pass | AC-005/009 S13 closed pending commit |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s13-001 | tc-s13-case-001 | tc-s13-001 | planned closure unchanged; concrete command case recorded | no | yes |
+| added | tc-s13-001 | tc-s13-runtime-001 | tc-s13-001 | absolute import conversion affects copied runtime import model | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S13 | delegated | tidy import / relative import boundary adoption step | dev-coder | Ruff `TID` enablement and relative import conversion | requirement/design/plan S13 | `pyproject.toml`; `src/spec_dock/**/*.py`; `tests/**/*.py` | report edits; commit; S14 mypy config; dogfooding `spec-dock/`; broad suppression | `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF,TID src/spec_dock tests`; runtime pytest | runtime import model break; direct dogfooding edit needed | changed files; inventory; import-root rationale; command results | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S13 | dev-coder | Ruff `TID` enabled; relative imports converted to absolute `spec_dock_runtime.*`; Ruff `src` configured for shipped runtime import root | `pyproject.toml`; 65 runtime asset files under `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/**/*.py` | required Ruff command -> pass; `tests/cli_runtime` -> 637 passed, 76 skipped; `git diff --check` -> pass; relative import grep -> no matches | pass: code-reviewer `019ef36e-5f8c-7bb3-b2c1-3165a0c5d447`; P2 decision-ledger gap fixed as D-008 | dogfooding copy not refreshed in S13 and remains S90/S99 concern | accepted for S13 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S13 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit | pass: code-reviewer `019ef36e-5f8c-7bb3-b2c1-3165a0c5d447`; P2 D-008 added |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S13 | ready to commit | S13 implementation files plus `report.md` S13 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `pyproject.toml` - Ruff `TID` selection, `ban-relative-imports`, and runtime import root.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/**/*.py` - relative import conversion.
+- `report.md` - S12 commit correction and S13 observed evidence.
+
+#### コミット
+- pending S13 step commit.
+
+#### メモ
+- S13 is the final Ruff rule-adoption step before mypy base adoption. No S14 mypy config was added in this step.
 
 ---
 

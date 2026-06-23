@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 from typing import TYPE_CHECKING
 
-from .contracts import (
+from spec_dock_runtime.application.contracts import (
     GitWorktreeRecord,
     WorktreeCommandError,
     WorktreeCreateRequest,
@@ -20,7 +20,7 @@ from .contracts import (
 )
 
 if TYPE_CHECKING:
-    from .ports import Ports
+    from spec_dock_runtime.application.ports import Ports
 
 _LABEL_RE = re.compile(r"^[a-z0-9-]+$")
 _MAX_ATTEMPTS = 10000

@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ..application.contracts import ArtifactWriteResult
+from spec_dock_runtime.application.contracts import ArtifactWriteResult
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from ..presentation.contracts import ArtifactBundle
+    from spec_dock_runtime.presentation.contracts import ArtifactBundle
 
 
 def _write_text(path: Path, text: str) -> None:

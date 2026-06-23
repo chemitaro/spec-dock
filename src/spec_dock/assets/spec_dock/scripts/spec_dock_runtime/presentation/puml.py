@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from ..domain.ids import deps_node_sort_key
+from spec_dock_runtime.domain.ids import deps_node_sort_key
 
 _TREE_BOARD_BLOCKERS_LABEL_LIMIT = 3
 

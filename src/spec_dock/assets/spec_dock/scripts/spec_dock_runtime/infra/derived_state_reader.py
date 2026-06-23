@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .json_store import load_json
+from spec_dock_runtime.infra.json_store import load_json
 
 if TYPE_CHECKING:
     from pathlib import Path

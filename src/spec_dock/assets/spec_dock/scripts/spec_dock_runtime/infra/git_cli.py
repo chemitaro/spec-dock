@@ -5,7 +5,7 @@ import re
 import shutil
 import subprocess
 
-from ..application.contracts import GitWorktreeRecord
+from spec_dock_runtime.application.contracts import GitWorktreeRecord
 
 
 def _ensure_git_available() -> None:

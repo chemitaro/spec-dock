@@ -11,17 +11,43 @@ import shutil
 from typing import TYPE_CHECKING, Literal, cast
 from uuid import uuid4
 
-from ..domain.active import infer_active_node_from_branch
-from ..domain.deps import (
+from spec_dock_runtime.application.artifact_preflight import validate_required_artifacts_for_graph
+from spec_dock_runtime.application.check_deps import (
+    load_cached_high_level_github_state_by_id,
+    resolve_high_level_status_context,
+)
+from spec_dock_runtime.application.contracts import (
+    ActiveUpdateOutcome,
+    ArtifactWriteFailure,
+    ArtifactWriteResult,
+    PostMutationSyncOutcome,
+    SyncCommandResult,
+    SyncRequest,
+    SyncStateResult,
+)
+from spec_dock_runtime.application.github_issue_targets import (
+    collect_repo_scoped_issue_view_targets,
+    normalize_repo_slug,
+    snapshot_repo_issue_key,
+)
+from spec_dock_runtime.application.repo_context import (
+    resolve_current_repo_slug,
+)
+from spec_dock_runtime.application.set_active import build_active_manifest, build_context_pack_text, commit_active_state
+from spec_dock_runtime.application.status_context import resolve_issue_status_context
+from spec_dock_runtime.domain.active import infer_active_node_from_branch
+from spec_dock_runtime.domain.deps import (
     build_deps_state,
     build_effective_deps_map,
     evaluate_readiness,
     validate_deps_cycles,
     validate_raw_node_dependency_graph,
 )
-from ..domain.discussion_docs import DISCUSSION_DOC_TIMESTAMP_FILENAME_RE as _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE
-from ..domain.ids import deps_node_sort_key
-from ..domain.models import (
+from spec_dock_runtime.domain.discussion_docs import (
+    DISCUSSION_DOC_TIMESTAMP_FILENAME_RE as _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE,
+)
+from spec_dock_runtime.domain.ids import deps_node_sort_key
+from spec_dock_runtime.domain.models import (
     ActiveSelection,
     DepsDependencyContext,
     DepsEvaluation,
@@ -32,45 +58,24 @@ from ..domain.models import (
     SpecNodeKind,
     SpecNodeSeed,
 )
-from ..domain.status import build_progress_map, resolve_issue_snapshot_by_issue_id
-from ..domain.tree import build_graph, select_active_chain
-from ..domain.validation import (
+from spec_dock_runtime.domain.status import build_progress_map, resolve_issue_snapshot_by_issue_id
+from spec_dock_runtime.domain.tree import build_graph, select_active_chain
+from spec_dock_runtime.domain.validation import (
     find_github_repo_scope_pairing_error,
     validate_graph_and_deps,
 )
-from ..presentation.contracts import ArtifactBundle
-from ..presentation.json_state import (
+from spec_dock_runtime.presentation.contracts import ArtifactBundle
+from spec_dock_runtime.presentation.json_state import (
     render_deps_issues_artifact,
     render_deps_raw_artifact,
     render_index_artifact,
     render_tree_artifact,
 )
-from ..presentation.markdown import render_dashboard
-from .artifact_preflight import validate_required_artifacts_for_graph
-from .check_deps import load_cached_high_level_github_state_by_id, resolve_high_level_status_context
-from .contracts import (
-    ActiveUpdateOutcome,
-    ArtifactWriteFailure,
-    ArtifactWriteResult,
-    PostMutationSyncOutcome,
-    SyncCommandResult,
-    SyncRequest,
-    SyncStateResult,
-)
-from .github_issue_targets import (
-    collect_repo_scoped_issue_view_targets,
-    normalize_repo_slug,
-    snapshot_repo_issue_key,
-)
-from .repo_context import (
-    resolve_current_repo_slug,
-)
-from .set_active import build_active_manifest, build_context_pack_text, commit_active_state
-from .status_context import resolve_issue_status_context
+from spec_dock_runtime.presentation.markdown import render_dashboard
 
 if TYPE_CHECKING:
-    from ..infra.contracts import ActiveManifest, DirectDependencyResolution, StoredMetaRecord
-    from .ports import Ports
+    from spec_dock_runtime.application.ports import Ports
+    from spec_dock_runtime.infra.contracts import ActiveManifest, DirectDependencyResolution, StoredMetaRecord
 
 
 class _ArtifactWriteExecutionError(RuntimeError):

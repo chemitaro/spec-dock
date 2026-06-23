@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from .ids import deps_node_sort_key
-from .models import (
+from spec_dock_runtime.domain.ids import deps_node_sort_key
+from spec_dock_runtime.domain.models import (
     ActiveSelection,
     DepsDependencyContext,
     DepsDependencyDisposition,

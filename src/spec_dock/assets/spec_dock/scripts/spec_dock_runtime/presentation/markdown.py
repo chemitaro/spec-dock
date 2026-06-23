@@ -3,13 +3,13 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from ..domain.ids import deps_node_sort_key
-from .contracts import DashboardArtifact
-from .json_state import render_index_artifact
-from .puml import _deps_disabled_error_text, _issue_ready_board_state
+from spec_dock_runtime.domain.ids import deps_node_sort_key
+from spec_dock_runtime.presentation.contracts import DashboardArtifact
+from spec_dock_runtime.presentation.json_state import render_index_artifact
+from spec_dock_runtime.presentation.puml import _deps_disabled_error_text, _issue_ready_board_state
 
 if TYPE_CHECKING:
-    from ..application.contracts import SyncStateResult
+    from spec_dock_runtime.application.contracts import SyncStateResult
 
 _DASHBOARD_TOP_LIMIT = 10
 _TREE_BOARD_BLOCKERS_LABEL_LIMIT = 3

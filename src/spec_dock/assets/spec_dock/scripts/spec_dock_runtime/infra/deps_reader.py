@@ -3,15 +3,15 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any
 
-from ..domain.ids import deps_node_sort_key, find_existing_id_by_num, format_id, parse_id
-from .contracts import DepsDependencyContext, DepsTopologyLoadResult, DirectDependencyResolution
-from .git_cli import origin_github_repo_slug
-from .json_store import load_json
+from spec_dock_runtime.domain.ids import deps_node_sort_key, find_existing_id_by_num, format_id, parse_id
+from spec_dock_runtime.infra.contracts import DepsDependencyContext, DepsTopologyLoadResult, DirectDependencyResolution
+from spec_dock_runtime.infra.git_cli import origin_github_repo_slug
+from spec_dock_runtime.infra.json_store import load_json
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from ..domain.models import SpecGraph
+    from spec_dock_runtime.domain.models import SpecGraph
 
 _scoped_issue_ref_re = re.compile(
     r"^(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)#(?P<num>[0-9]+)$"

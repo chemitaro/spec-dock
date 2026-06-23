@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from .ids import deps_node_sort_key
-from .models import IssueSnapshot, IssueStatusSnapshot, ProgressMap, SpecGraph, SpecNode
+from spec_dock_runtime.domain.ids import deps_node_sort_key
+from spec_dock_runtime.domain.models import IssueSnapshot, IssueStatusSnapshot, ProgressMap, SpecGraph, SpecNode
 
 _KNOWN_ISSUE_STATUSES = {"done", "open", "unknown"}
 

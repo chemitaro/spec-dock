@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from ..application.contracts import (
+from spec_dock_runtime.application.contracts import (
     UseCases,
     WorktreeCommandError,
     WorktreeCreateRequest,
@@ -11,7 +11,8 @@ from ..application.contracts import (
     WorktreeRemoveRequest,
     WorktreeShowRequest,
 )
-from ..presentation.cli_text import (
+from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.presentation.cli_text import (
     render_worktree_create_text,
     render_worktree_error_json,
     render_worktree_error_text,
@@ -22,7 +23,6 @@ from ..presentation.cli_text import (
     render_worktree_show_json,
     render_worktree_show_text,
 )
-from .contracts import CommandArgs, CommandOutcome, CommandSpec
 
 if TYPE_CHECKING:
     import argparse

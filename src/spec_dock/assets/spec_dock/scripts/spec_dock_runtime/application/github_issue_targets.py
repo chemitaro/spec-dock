@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from ..domain.models import IssueSnapshot, SpecGraph
+    from spec_dock_runtime.domain.models import IssueSnapshot, SpecGraph
 
 
 def normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:

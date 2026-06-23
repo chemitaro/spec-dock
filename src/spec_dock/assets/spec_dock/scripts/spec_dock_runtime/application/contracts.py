@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
-from ..domain.models import SpecNode  # noqa: TC001 - runtime re-export used by CLI/runtime callers.
+from spec_dock_runtime.domain.models import SpecNode  # noqa: TC001 - runtime re-export used by CLI/runtime callers.
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-    from ..domain.models import (
+    from spec_dock_runtime.domain.models import (
         ActiveSelection,
         BranchDecision,
         DepsDependencyContext,
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
         TargetDepsInspection,
         ValidationReport,
     )
-    from ..infra.contracts import StoredMetaRecord
+    from spec_dock_runtime.infra.contracts import StoredMetaRecord
 
 POST_MUTATION_FATAL_WARNING_CODES: tuple[str, ...] = ("gh_fetch_failed",)
 BootstrapStatus = Literal["skipped", "succeeded", "failed", "detection_failed"]

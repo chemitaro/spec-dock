@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from ..application.contracts import DeleteNodeRequest, UseCases
-from ..presentation.cli_text import render_delete_text
-from .contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.application.contracts import DeleteNodeRequest, UseCases
+from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.presentation.cli_text import render_delete_text
 
 if TYPE_CHECKING:
     import argparse
