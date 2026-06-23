@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from spec_dock_runtime.application.contracts import (
     AssuranceOperation,
@@ -20,19 +20,17 @@ from spec_dock_runtime.domain.assurance import (
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from spec_dock_runtime.infra.assurance_store import AssuranceStoreResult, ResolvedIssueTarget
-
 
 class AssuranceStoreLike(Protocol):
-    def resolve_issue_target(self, target: str | Path | None) -> ResolvedIssueTarget: ...
+    def resolve_issue_target(self, target: str | Path | None) -> Any: ...
 
-    def build_requirement_source_binding(self, target: ResolvedIssueTarget) -> SourceBinding: ...
+    def build_requirement_source_binding(self, target: Any) -> SourceBinding: ...
 
-    def write_contract(self, target: ResolvedIssueTarget, contract: AssuranceContract) -> Path: ...
+    def write_contract(self, target: Any, contract: AssuranceContract) -> Path: ...
 
-    def read_contract(self, target: ResolvedIssueTarget) -> AssuranceStoreResult: ...
+    def read_contract(self, target: Any) -> Any: ...
 
-    def verify_contract(self, target: ResolvedIssueTarget) -> AssuranceStoreResult: ...
+    def verify_contract(self, target: Any) -> Any: ...
 
 
 def show_assurance(request: ShowAssuranceRequest, *, store: AssuranceStoreLike) -> AssuranceResult:
@@ -70,7 +68,7 @@ def verify_assurance(request: VerifyAssuranceRequest, *, store: AssuranceStoreLi
     return _result_from_store_result(operation="verify", store_result=store.verify_contract(target))
 
 
-def _result_from_store_result(*, operation: AssuranceOperation, store_result: AssuranceStoreResult) -> AssuranceResult:
+def _result_from_store_result(*, operation: AssuranceOperation, store_result: Any) -> AssuranceResult:
     return AssuranceResult(
         operation=operation,
         ok=store_result.status in ("valid", "missing"),
@@ -83,5 +81,5 @@ def _result_from_store_result(*, operation: AssuranceOperation, store_result: As
     )
 
 
-def _target_view(target: ResolvedIssueTarget) -> AssuranceTargetView:
+def _target_view(target: Any) -> AssuranceTargetView:
     return AssuranceTargetView(issue_id=target.issue_id, repo_relative_path=target.repo_relative_path)
