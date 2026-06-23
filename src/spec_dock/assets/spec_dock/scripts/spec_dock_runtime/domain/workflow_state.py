@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-WorkflowStateKind = Literal["no-active", "requirement-capture", "classification-required", "ready"]
+WorkflowStateKind = Literal["no-active", "requirement-capture", "classification-required", "ready", "blocked"]
 WorkflowArtifactReadiness = Literal["missing", "scaffold", "substantive"]
 WorkflowProfile = Literal["lite", "standard", "strict", "critical"]
 WorkflowObligationSource = Literal["authorized_profile"]

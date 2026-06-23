@@ -58,12 +58,21 @@ def render_workflow_markdown(result: WorkflowResult) -> CliText:
         lines.extend(f"- {detail}" for detail in runbook.details)
     lines.extend(["", "## Stop Conditions"])
     lines.extend(f"- {condition}" for condition in runbook.stop_conditions)
+    if result.projection is not None:
+        lines.extend(["", "## Projection", f"- written: {_bool_text(result.projection.written)}"])
+        lines.extend(f"- `{path}`" for path in result.projection.paths)
+        if result.projection.errors:
+            lines.extend(["", "## Projection Errors"])
+            lines.extend(f"- {error}" for error in result.projection.errors)
     return CliText(stdout_lines=lines, stderr_lines=[], warnings=[])
 
 
 def _payload(result: WorkflowResult) -> dict[str, Any]:
     if result.runbook is not None:
-        return _runbook_payload(result.runbook)
+        payload = _runbook_payload(result.runbook)
+        if result.projection is not None:
+            payload["projection"] = _projection_payload(result.projection)
+        return payload
     return {
         "operation": result.operation,
         **_state_payload(result.state),
@@ -102,6 +111,14 @@ def _state_payload(state: WorkflowState) -> dict[str, Any]:
             "obligation_source": state.authority.obligation_source,
         },
         "details": list(state.details),
+    }
+
+
+def _projection_payload(projection: Any) -> dict[str, Any]:
+    return {
+        "written": projection.written,
+        "paths": list(projection.paths),
+        "errors": list(projection.errors),
     }
 
 

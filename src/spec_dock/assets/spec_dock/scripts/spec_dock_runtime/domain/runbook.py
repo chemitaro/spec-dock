@@ -61,6 +61,18 @@ def compile_runbook(target: WorkflowTarget, state: WorkflowState) -> Runbook:
             ),
             stop_conditions=("Do not start implementation until assurance verification succeeds.",),
         )
+    if state.kind == "blocked":
+        return _runbook(
+            target,
+            state,
+            next_action="runbook-projection-repair-required",
+            commands=(
+                "./spec-dock/scripts/spec-dock doctor",
+                "Remove stale spec-dock/.agent/runbooks/*.tmp files if present.",
+            ),
+            notes=("Runbook projection write failed; repair generated output storage before continuing.",),
+            stop_conditions=("Do not continue from a Runbook whose projection could not be written.",),
+        )
     return _runbook(
         target,
         state,

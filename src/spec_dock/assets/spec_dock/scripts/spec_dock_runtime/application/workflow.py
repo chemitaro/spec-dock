@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from spec_dock_runtime.application.contracts import WorkflowNextRequest, WorkflowResult, WorkflowStatusRequest
 from spec_dock_runtime.domain.runbook import compile_runbook
@@ -11,6 +11,10 @@ from spec_dock_runtime.domain.workflow_state import (
     classify_requirement_text,
 )
 
+if TYPE_CHECKING:
+    from spec_dock_runtime.domain.runbook import Runbook
+    from spec_dock_runtime.infra.runbook_store import RunbookProjectionResult
+
 
 class WorkflowAssuranceStoreLike(Protocol):
     def resolve_issue_target(self, target: None) -> Any: ...
@@ -20,14 +24,44 @@ class WorkflowAssuranceStoreLike(Protocol):
     def read_requirement_text(self, target: Any) -> str | None: ...
 
 
+class RunbookStoreLike(Protocol):
+    def write_current(self, runbook: Runbook) -> RunbookProjectionResult: ...
+
+
 def workflow_status(_request: WorkflowStatusRequest, *, store: WorkflowAssuranceStoreLike) -> WorkflowResult:
     state = _resolve_state(store)
     return WorkflowResult(operation="status", state=state, runbook=None)
 
 
-def workflow_next(request: WorkflowNextRequest, *, store: WorkflowAssuranceStoreLike) -> WorkflowResult:
+def workflow_next(
+    request: WorkflowNextRequest,
+    *,
+    store: WorkflowAssuranceStoreLike,
+    runbook_store: RunbookStoreLike,
+) -> WorkflowResult:
     state = _resolve_state(store)
-    return WorkflowResult(operation="next", state=state, runbook=compile_runbook(request.workflow_target, state))
+    runbook = compile_runbook(request.workflow_target, state)
+    projection = runbook_store.write_current(runbook)
+    if projection.written:
+        return WorkflowResult(operation="next", state=state, runbook=runbook, projection=projection)
+    blocked_state = WorkflowState(
+        kind="blocked",
+        active_issue_id=state.active_issue_id,
+        reason_code="runbook-write-failure",
+        artifact_readiness=state.artifact_readiness,
+        authority=STRICT_LEGACY_AUTHORITY,
+        details=(
+            *projection.errors,
+            "Run ./spec-dock/scripts/spec-dock doctor.",
+            "Remove stale spec-dock/.agent/runbooks/*.tmp files if present.",
+        ),
+    )
+    return WorkflowResult(
+        operation="next",
+        state=blocked_state,
+        runbook=compile_runbook(request.workflow_target, blocked_state),
+        projection=projection,
+    )
 
 
 def _resolve_state(store: WorkflowAssuranceStoreLike) -> WorkflowState:
