@@ -58,6 +58,7 @@ ID: "iss-00229"
 ## 実装サマリー
 - 現時点では issue planning / authoring phase のみ完了候補であり、implementation step は未開始。
 - S01-S03 / S90 / S99 の実行結果、worker evidence、reviewer evidence、commit gates は実装時に追記する。
+- 実装前の Assurance classification は `authorized_profile=standard` / `status=provisional` / `verify=valid` で作成済み。
 
 ## ワークフロー委任同意の証跡（Workflow Delegation Consent）
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
@@ -81,11 +82,36 @@ ID: "iss-00229"
 | planning | spec authoring re-review | spec-reviewer | third candidate | failed | no | re-review required | P1 stale compose and requirement/design/plan source coverage fixed |
 | planning | spec authoring re-review | spec-reviewer | fourth candidate | failed | no | re-review required | P1 stale compose ownership between S02 and S03 fixed |
 | planning | spec authoring re-review | spec-reviewer | fifth candidate | passed | no | proceed to implementation | no findings; S02/S03 ownership conflict resolved |
+| planning | assurance readiness | local command | after planning commit | passed | no | proceed to implementation | `assurance classify --stage requirement`, `assurance verify`, `workflow next issue-execution` succeeded |
 
 ## ステップ commit ゲート（Step Commit Gate）
 | ステップ | クロージャ状態 | コミット範囲 | コミットハッシュ / 最終台帳 | コミット後 clean 確認 | 差分なし根拠 | 差分なし確認済み契約 / ファイル | 差分なし diff-clean コマンド | 差分なし read-only 確認 |
 |---|---|---|---|---|---|---|---|---|
-| planning | committed | requirement/design/plan/report authoring evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
+| planning | committed | requirement/design/plan/report authoring evidence | `1eb09f9a` | `git status --short` -> clean before assurance classification | N/A | N/A | N/A | N/A |
+| planning-assurance | ready for commit | `assurance.json` and readiness evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
 
 ## 実装記録（セッションログ）
 - Implementation not started during planning.
+
+### セッションログ（2026-06-23 planning readiness）
+
+#### 対象
+- Step: planning readiness gate
+- AC/EC: implementation handoff precondition
+
+#### 実施内容
+- `assurance classify --stage requirement --format json` で issue-local `assurance.json` を作成した。
+- `assurance verify --format json` で current requirement binding が valid であることを確認した。
+- `workflow next issue-execution --format json` で `state=ready` / `next_action=execution-ready` を確認した。
+
+#### 実行コマンド / 結果
+```bash
+./spec-dock/scripts/spec-dock assurance classify --stage requirement --format json
+# ok=true status=valid authorized_profile=standard written_path=.../iss-00229-compose-profile-aware-planning-artifacts/assurance.json
+
+./spec-dock/scripts/spec-dock assurance verify --format json
+# ok=true status=valid reason=ok
+
+./spec-dock/scripts/spec-dock workflow next issue-execution --format json
+# state=ready next_action=execution-ready reason_code=assurance-valid
+```
