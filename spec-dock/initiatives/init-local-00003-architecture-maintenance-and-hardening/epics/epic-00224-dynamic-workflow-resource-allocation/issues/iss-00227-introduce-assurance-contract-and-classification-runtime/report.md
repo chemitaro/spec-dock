@@ -49,7 +49,17 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | compatibility | spec-reviewer | `assurance verify` の missing contract exit behavior が未固定 | missing を exit 1; missing を strict-legacy exit 0 | missing `assurance.json` は strict-legacy candidate として exit 0、invalid JSON/schema は exit 1 | Existing Issue compatibility を守り、corruption detection と missing compatibility を分離するため | promoted_to_design | `design.md` インターフェース契約 / Schema validation v1 | なし |
+| D-002 | resolved | implementation | spec-reviewer | `source_binding.path` が `active/issue` symlink path だと durable stale detection に不向き | active path を保存; resolved path を保存; 両方保存 | persisted `path` は resolved issue-local repo-relative path、`display_path` は optional active path | 後続 stale detection が mutable pointer に依存しないようにするため | promoted_to_design | `design.md` `assurance.json` v1 contract | なし |
+| D-003 | resolved | test-strategy | spec-reviewer | hard-trigger / Lite predicate policy matrix が未固定 | 実装者判断; compact policy table | v1 deterministic classification policy table を設計に固定 | deterministic JSON と reviewable tests を実装者判断にしないため | promoted_to_design | `design.md` Deterministic classification policy v1 | なし |
+| D-004 | resolved | implementation | spec-reviewer | requirement が explicit issue path を要求する一方、design が v1 path target を拒否していた | requirement を縮小; design で path target 対応 | v1 `--issue` は issue id / GitHub number / repo-contained filesystem issue path を受け付け、explicit target が active issue より優先する | Approved requirement を design で弱めないため | promoted_to_design | `design.md` インターフェース契約 | なし |
+| D-005 | resolved | implementation | spec-reviewer | `RiskFact` domain model と schema validation table の fields が不一致 | key/value のみ保存; source/reason_code も保存 | v1 persisted `risk_facts[]` は `key`、`value`、`source`、`reason_code` を必須にする | Store / validator / audit expectation を一致させるため | promoted_to_design | `design.md` Schema validation v1 | なし |
+| D-006 | resolved | implementation | spec-reviewer | v1 classification の RiskFact derivation が未固定 | requirement text から自然言語抽出; 全 fact unknown/default; empty facts を許容 | v1 public CLI は自然言語抽出を行わず、全 supported fact を deterministic default で出力する | byte-identical output と安全な unknown fail-closed を優先するため | promoted_to_design | `design.md` RiskFact derivation v1 | 後続 Issue で structured fact extraction を検討 |
+| D-007 | resolved | implementation | spec-reviewer | `proposed_profile` の意味が未固定 | `lite_candidate` と別に定義; `authorized_profile` と同一に固定; v1 から削除 | v1 persisted schema から `proposed_profile` を削除し、`lite_candidate` と `authorized_profile` に集約する | downstream interpretation と deterministic schema を単純化するため | promoted_to_design | `design.md` `assurance.json` v1 contract / Schema validation v1 | なし |
+| D-008 | resolved | implementation | spec-reviewer | default classification example が unknown protected facts / reason codes を欠いていた | 例を簡略化; canonical default fixture を明記 | default JSON 例に protected-domain unknown facts、全 default fact reason code、policy consequence reason code を stable sort で明示する | plan / tests が fail-closed audit signal を落とさないため | promoted_to_design | `design.md` RiskFact derivation v1 / `assurance.json` v1 contract | なし |
+| D-009 | resolved | implementation | spec-reviewer | `proposed_profile` が unknown field として許可され得る | unknown fields 全許可; classification 配下は strict | `classification` / `risk_facts[]` 配下の unknown fields は v1 invalid とし、semantics-neutral fields だけ限定許可する | 二重 profile authority を防ぐため | promoted_to_design | `design.md` Schema validation v1 | なし |
+| D-010 | resolved | test-strategy | spec-reviewer | canonical plan が step-local delegation contract / evidence / closure gate を十分に持っていなかった | supporting draft を参照に留める; canonical plan に詳細を復元 | S01-S04/S90/S99 に delegated role、input docs、acceptance criteria、required output、reviewer focus、stop conditions、Red evidence、refactor guardrail、closure/commit gate を追加 | Worker / reviewer が canonical plan だけで実行判断できるようにするため | promoted_to_plan | `plan.md` S01-S04/S90/S99 step contracts | fresh plan re-review |
+| D-011 | resolved | test-strategy | spec-reviewer | canonical plan の concrete tests が card schema ではなく一行要約だった | 一行要約を維持; card schema へ展開 | S01-S04 の concrete tests を `前提`、`操作`、`期待結果`、`失敗検出`、`検証方法`、`関連 closure id` を持つ step-local cards に展開 | Worker が fixture / expected observation / failure mode を推測しないようにするため | promoted_to_plan | `plan.md` S01-S04 concrete test cards | fresh plan re-review |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +73,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | partially_adopted | sub-agent `system-architect` | `design.md` | Layered architecture、module responsibilities、CLI contract、strict-legacy compatibility、classification safety、test strategy は requirement と既存 runtime pattern に合致。`generated_at` example と未固定 exit-code 表現は deterministic / compatibility decision と衝突するため不採用。 | `discussions/20260623t124355z-draft-design-system-architect-design-draft.md`; manual diff guard: `git status --short` で allowed discussion path 以外の delegated write なし | fresh design re-review |
+| EAL-002 | partially_adopted | sub-agent `implementation-planner` | `plan.md` | Requirement/design trace、step slicing、closure index、test cards、S90/S99 gates、Epic-level PR deferred note を採用。Delegated provenance / HEAD observation / reviewer-pass claim は canonical authority として採用しない。 | `discussions/20260623t130929z-draft-plan-implementation-planner-plan-draft.md`; manual diff guard: `git status --short` で allowed discussion path 以外の delegated write なし | fresh plan review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +82,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | `requirement.md` 目的: tracked `assurance.json` と deterministic classification runtime | Static analysis baseline と provider/mirror authority | low | requirement pass; design pass; plan review pending |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +90,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | Epic requirement/design/plan、accepted ADR、draft requirement/design、current Ruff/MyPy baseline | 初回 reviewer P1/P2 に回答済み: Lite all-positive/no-opt-in safety、Epic draft baseline clarification | draft requirement を採用し reviewer findings を反映 | pass (`spec-reviewer`, 2026-06-23) | no | design authoring へ昇格 |
+| design | requirement、system-architect discussion draft、runtime parser/registry/usecase/json_store pattern、reviewer findings | P1/P2 に回答済み: delegated adoption ledger、durable source binding、policy table、schema validation、path targeting、RiskFact derivation、reason-code defaults | discussion draft を部分採用し reviewer findings を design / report に反映 | pass (`spec-reviewer`, 2026-06-23) | no | plan authoring へ昇格 |
+| plan | requirement、design、implementation-planner discussion draft、issue plan authoring docs、plan reviewer findings | P1 に回答済み: step-local delegation contract、Red evidence、closure gate、concrete test card schema | discussion draft を部分採用し canonical plan へ統合、reviewer findings を反映 | pass (`spec-reviewer`, 2026-06-23) | no | execution handoff ready |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -107,7 +120,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| system-architect | iss-00227 | `discussions/20260623t124355z-draft-design-system-architect-design-draft.md` | `requirement.md`; Epic requirement/design/plan; existing runtime source; tests layout | `design.md`; `plan.md` | partially_adopted | [`design.md`] | manual_pass: `git status --short` showed only orchestrator requirement/design changes plus allowed discussion file | canonical design integration by main orchestrator | `generated_at` persisted JSON example; undecided missing-contract exit-code language | none after design re-review pass | fail -> re-review pending | eligible after fresh `spec-reviewer` pass |
+| implementation-planner | iss-00227 | `discussions/20260623t130929z-draft-plan-implementation-planner-plan-draft.md` | `requirement.md`; `design.md`; `report.md`; issue plan authoring docs; runtime source layout; tests layout | `plan.md`; `report.md` | partially_adopted | [`plan.md`, `report.md`] | manual_pass: `git status --short` showed only orchestrator canonical planning changes plus allowed discussion file | canonical plan integration by main orchestrator | delegated provenance claims, raw HEAD observation, and reviewer-pass / implementation-readiness claims | none after plan review pass | pass (`spec-reviewer`, 2026-06-23) | eligible; execution handoff ready |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
