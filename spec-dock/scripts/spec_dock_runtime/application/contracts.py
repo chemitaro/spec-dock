@@ -24,7 +24,10 @@ if TYPE_CHECKING:
         TargetDepsInspection,
         ValidationReport,
     )
+    from spec_dock_runtime.domain.runbook import Runbook, WorkflowTarget
+    from spec_dock_runtime.domain.workflow_state import WorkflowState
     from spec_dock_runtime.infra.contracts import StoredMetaRecord
+    from spec_dock_runtime.infra.runbook_store import RunbookProjectionResult
 
 POST_MUTATION_FATAL_WARNING_CODES: tuple[str, ...] = ("gh_fetch_failed",)
 BootstrapStatus = Literal["skipped", "succeeded", "failed", "detection_failed"]
@@ -104,6 +107,24 @@ class AssuranceResult:
     @property
     def has_contract(self) -> bool:
         return self.contract is not None
+
+
+@dataclass(frozen=True)
+class WorkflowStatusRequest:
+    pass
+
+
+@dataclass(frozen=True)
+class WorkflowNextRequest:
+    workflow_target: WorkflowTarget
+
+
+@dataclass(frozen=True)
+class WorkflowResult:
+    operation: Literal["status", "next"]
+    state: WorkflowState
+    runbook: Runbook | None = None
+    projection: RunbookProjectionResult | None = None
 
 
 @dataclass(frozen=True)
@@ -790,6 +811,12 @@ class UseCases:
     )
     verify_assurance: Callable[[VerifyAssuranceRequest], AssuranceResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("verify_assurance is not configured")
+    )
+    workflow_status: Callable[[WorkflowStatusRequest], WorkflowResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("workflow_status is not configured")
+    )
+    workflow_next: Callable[[WorkflowNextRequest], WorkflowResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("workflow_next is not configured")
     )
     mutate_deps: Callable[[MutateDepsRequest], MutateDepsResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("mutate_deps is not configured")

@@ -15,6 +15,7 @@ from spec_dock_runtime.commands import (
     uninstall as uninstall_commands,
     update as update_commands,
     validate as validate_commands,
+    workflow as workflow_commands,
     worktree as worktree_commands,
 )
 from spec_dock_runtime.commands.contracts import CommandRegistry, CommandSpec
@@ -26,6 +27,7 @@ def build_registry() -> CommandRegistry:
     items.update(import_commands.command_specs())
     items.update(active_commands.command_specs())
     items.update(assurance_commands.command_specs())
+    items.update(workflow_commands.command_specs())
     items.update(delete_commands.command_specs())
     items.update(close_commands.command_specs())
     items.update(delegated_authoring_commands.command_specs())
