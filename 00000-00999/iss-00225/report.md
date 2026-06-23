@@ -52,6 +52,9 @@ Disposition ごとの必須証跡:
 | D-001 | resolved | scope | orchestrator | 初回 Ruff/mypy 導入で対象範囲が曖昧だった | Option A provider-first; Option B provider + shipped runtime explicit; Option C full dogfooding | Option B を採用し、dogfooding `spec-dock/` copy は direct target から除外する | source-of-truth discipline と shipped runtime coverage を両立する | applied | `discussions/20260623t024210z-interview-static-analysis-target-boundary.md`; `requirement.md`; `design.md`; `plan.md` | none |
 | D-002 | resolved | operation | orchestrator | static analysis を command-only にするか CI/local gate にするか | command-only; CI-enforced; local quality gate + CI | CI は scope に含め、pre-commit は scope 外。local grouped script と `make lint` は scope に含める | ユーザー回答により enforcement boundary が確定した | applied | `discussions/20260623t025015z-interview-static-analysis-enforcement-entrypoint.md`; `requirement.md`; `design.md`; `plan.md` | pre-commit は別 issue 候補 |
 | D-003 | resolved | test-strategy | orchestrator | 一括導入と段階導入のどちらで進めるか | 最終設定を一括投入; rule を小刻みに追加して各段階で 0 件化 | 小刻みな rule adoption を採用する | 大量違反と review scope の混在を避け、step closure を明確にする | promoted_to_plan | `discussions/20260623t030652z-disc-static-analysis-final-configuration-proposal.md`; `plan.md` | none |
+| D-004 | resolved | compatibility | spec-reviewer | shipped runtime asset を静的解析 coverage に含める一方、dogfooding generated copy の refresh/inspection 証跡が requirement に明示されていなかった | dogfooding copy を直接 lint/typecheck target にする; provider target のまま refresh/inspection evidence を必須にする | provider target のまま、shipped runtime asset 変更時の dogfooding refresh/inspection 判断を requirement/design/plan に追加する | Option B と source-of-truth discipline を維持しつつ stale generated-copy risk を閉じる | applied | requirement review by spec-reviewer `019ef28b-e577-7523-9526-27515dc9a773`; `requirement.md`; `design.md`; `plan.md` | fresh spec-reviewer rerun |
+| D-005 | resolved | compatibility | spec-reviewer | design review で command target と shipped runtime logical coverage の表現揺れが指摘された | shipped runtime asset を第三の direct target として扱う; `src/spec_dock tests` の direct command targetに統一し、runtime asset は logical coverage として扱う | direct command target は `src/spec_dock tests` に統一し、shipped runtime asset は `src/spec_dock` に含まれる coverage/report evidence と明記する | duplicate traversal risk と command ambiguity を避ける | applied | design review by spec-reviewer `019ef295-db33-7aa3-a2ea-68e27e5ab80f`; `design.md`; `plan.md` | fresh design spec-reviewer rerun |
+| D-006 | resolved | test-strategy | spec-reviewer | plan review で `uv.lock` 許可不足、S02-S13 closure contract 不足、S90 refresh 許可範囲不足が指摘された | 現行 plan のまま進む; dependency/dogfooding/closure contract を明示する | S01/S14 allowed paths に `uv.lock` を追加し、S02-S13 shared step closure contract を追加し、S90 で安全な generated-copy refresh は許可し危険なら handoff/follow-up にする | execution handoff で worker が scope 違反せず進められるようにする | applied | plan review by spec-reviewer `019ef2a0-8d5e-7212-9608-d2bf37621852`; `plan.md` | fresh plan spec-reviewer rerun |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -69,6 +72,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-002 | adopted | interview | `requirement.md`, `design.md`, `plan.md` | ユーザーが Option B target を明示採用したため、target boundary と non-scope に反映した | `discussions/20260623t024210z-interview-static-analysis-target-boundary.md` | fresh spec-reviewer review |
 | EAL-003 | adopted | interview | `requirement.md`, `design.md`, `plan.md` | CI enforcement、pre-commit out-of-scope、local script + Makefile in-scope のユーザー回答を反映した | `discussions/20260623t025015z-interview-static-analysis-enforcement-entrypoint.md` | fresh spec-reviewer review |
 | EAL-004 | adopted | discussion | `requirement.md`, `design.md`, `plan.md` | 最終設定案と段階導入方針を canonical docs へ採用した | `discussions/20260623t030652z-disc-static-analysis-final-configuration-proposal.md` | fresh spec-reviewer review |
+| EAL-005 | adopted | system-architect discussion | `design.md`, `report.md` | design は review-ready との判断を採用し、任意 refinement として layer-specific `banned-api` policy は今回 scope 外であることを design に明記した | `discussions/20260623t-design-static-analysis-architecture-review.md` | fresh design spec-reviewer review |
+| EAL-006 | adopted | implementation-planner discussion | `plan.md`, `report.md` | plan の実装順序は維持しつつ、step-local executable schema、S18 CI evidence、S01/S14 dependency evidence、S90 report destination、Final Exit Contract の補強を canonical plan に反映した | `discussions/20260623t-plan-static-analysis-execution-readiness-review.md` | fresh plan spec-reviewer review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -76,7 +81,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | Ruff/mypy を導入し、既存違反をすべて解消して CI/local gate を green にする | Makefile/script 追加、段階的 rule adoption、pre-commit deferred | low: plan は command wiring だけでなく違反 0 件化を primary closure にしている | pending: fresh spec-reviewer 未実施 |
+| OAL-001 | Ruff/mypy を導入し、既存違反をすべて解消して CI/local gate を green にする | Makefile/script 追加、段階的 rule adoption、pre-commit deferred | low: plan は command wiring だけでなく違反 0 件化を primary closure にしている | pass: requirement/design/plan fresh spec-reviewer pass 済み |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -84,9 +89,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| requirement | `pyproject.toml`, `.github/workflows/provider-ci.yml`, `AGENTS.md`, issue discussions | target boundary: Option B adopted; enforcement: CI + local script/Makefile adopted; pre-commit deferred | adopted | not_run | yes for execution handoff | Run fresh spec-reviewer before treating requirement as approved |
-| design | `requirement.md`, final configuration proposal, repository layout | no open design question; EC-002 triggers future amendment if discovered | adopted | not_run | yes for execution handoff | Run fresh spec-reviewer before treating design as approved |
-| plan | `requirement.md`, `design.md`, staged adoption discussion | user requested fine-grained rule-by-rule steps | adopted | not_run | yes for execution handoff | Run fresh spec-reviewer before issue execution |
+| requirement | `pyproject.toml`, `.github/workflows/provider-ci.yml`, `AGENTS.md`, issue discussions | target boundary: Option B adopted; enforcement: CI + local script/Makefile adopted; pre-commit deferred; dogfooding refresh/inspection evidence added after reviewer P2 | adopted | pass: fresh spec-reviewer `019ef28f-985c-7502-a05c-0f32ba138f86` | no | Promote to design review path |
+| design | `requirement.md`, final configuration proposal, repository layout, system-architect draft | no open design question; duplicate target wording resolved | adopted | pass: fresh spec-reviewer `019ef298-9f7c-7d50-a11d-cbd768bd0834` | no | Promote to plan review path |
+| plan | `requirement.md`, `design.md`, staged adoption discussion, implementation-planner draft | user requested fine-grained rule-by-rule steps; executable schema gaps fixed | adopted | pass: fresh spec-reviewer `019ef2a3-f781-7b30-970a-f1d2cdcb0d74` | no | Execution handoff ready |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -114,7 +119,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| system-architect | iss-00225 | `discussions/20260623t-design-static-analysis-architecture-review.md` | `requirement.md`; `design.md`; issue discussions; `AGENTS.md`; `pyproject.toml` | `design.md`; `report.md` | adopted | `design.md`; `report.md` | passed | 任意 refinement を canonical design に統合 | なし | なし | pass: design spec-reviewer `019ef298-9f7c-7d50-a11d-cbd768bd0834` | design approved |
+| implementation-planner | iss-00225 | `discussions/20260623t-plan-static-analysis-execution-readiness-review.md` | `requirement.md`; `design.md`; `plan.md`; issue discussions; `AGENTS.md`; `issue-plan.md`; `workflow_issue.md` | `plan.md`; `report.md` | adopted | `plan.md`; `report.md` | passed | step-local executable contracts と Final Exit Contract を canonical plan に統合 | なし | なし | pass: plan spec-reviewer `019ef2a3-f781-7b30-970a-f1d2cdcb0d74` | plan approved; execution handoff ready |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -131,7 +137,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- Issue authoring phase completed. `requirement.md`, `design.md`, and `plan.md` have fresh spec-reviewer passes and are marked `approved`.
+- Implementation execution can start from `plan.md` S01, with report evidence recorded per step.
 
 ## 実装記録（セッションログ） (必須)
 

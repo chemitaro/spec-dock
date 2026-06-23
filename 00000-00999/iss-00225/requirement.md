@@ -3,7 +3,7 @@
 ID: "iss-00225"
 タイトル: "Configure Ruff And Mypy Static Analysis Cleanup"
 関連GitHub: ["#225"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-23"
 親: ["epic-00107", "init-local-00002"]
@@ -55,6 +55,7 @@ ID: "iss-00225"
   - repository root の `Makefile` に、grouped script を呼ぶ `make lint` を追加する。
   - provider CI に static-analysis gate を追加する。
   - 段階ごとに検出違反を inventory 化し、当該段階の違反を 0 件にしてから次の検査項目を追加する。
+  - shipped runtime asset を修正した場合は、dogfooding workspace への影響を inspection し、必要なら `spec-dock update .` 相当の refresh 要否を判断して証跡化する。
   - 最終的に `make lint`、個別の `ruff check`、`ruff format --check`、`mypy`、既存 pytest、`spec-dock validate` が成功する。
 - 禁止:
   - dogfooding workspace `spec-dock/` を Ruff / mypy の直接 target に含めない。
@@ -76,6 +77,7 @@ ID: "iss-00225"
   - shipped runtime asset `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/` は静的解析 coverage に含める。
   - `tests/` は Ruff / mypy coverage に含める。ただし tests 固有の自然な未使用 fixture / callback 引数は per-file ignore で扱う。
   - 各 rule step の実行結果、違反分類、修正方針、0 件確認を `report.md` に記録する。
+  - shipped runtime asset に差分が入る step では、dogfooding `spec-dock/` copy を直接 lint/typecheck しない代わりに、generated-copy impact を inspection する。
 - 判断が必要:
   - 個別 rule が SpecDock の現行 architecture と衝突し、修正が大規模 architecture rewrite になる場合。
   - mypy の package 解決により duplicate module / generated asset 固有の noise が発生する場合。
@@ -144,7 +146,7 @@ ID: "iss-00225"
   - アクター: reviewer
   - 前提: すべての implementation step が完了している。
   - 操作: final quality gate を実行する。
-  - 期待結果: `make lint`, `uv run pytest`, `./spec-dock/scripts/spec-dock validate` が成功し、静的解析違反が残らない。
+  - 期待結果: `make lint`, `uv run pytest`, `./spec-dock/scripts/spec-dock validate` が成功し、静的解析違反が残らない。shipped runtime asset 変更がある場合は dogfooding refresh/inspection の判断と証跡が残る。
   - 観測点: final report ledger
 - AC-009 No hidden broad suppression:
   - アクター: reviewer
@@ -174,6 +176,10 @@ ID: "iss-00225"
   - 条件: Ruff format が大量の非意味差分を出す。
   - 期待: format-only step として隔離し、semantic/type fixes と混ぜない。
   - 観測点: git diff, step closure
+- EC-006 dogfooding generated-copy drift:
+  - 条件: shipped runtime asset `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/` に lint/type/format 修正が入る。
+  - 期待: dogfooding `spec-dock/` copy は直接静的解析 target にしないが、refresh が必要か、または provider-side 変更だけでよいかを inspection し、判断を `report.md` に残す。
+  - 観測点: `git diff`, `spec-dock validate`, `report.md`
 
 ## 用語
 - TERM-001 Option B target:
