@@ -15,9 +15,10 @@ ID: "epic-00224"
 ## 計画サマリー
 
 - この plan は reviewer-pass 済み `requirement.md` / `design.md` を、実行可能な Issue slice、依存順、統合 checkpoint、品質 gate、最終 exit contract へ変換する。
-- 本 turn では Issue 実体は作成しない。`I01`〜`I07` は Epic plan 上の provisional slice であり、後続の Issue 作成時に `spec-dock new issue` と dependency command へ変換する。
-- 初期 rollout では automatic Lite default を有効化しない。Lite は shadow / explicit opt-in / evidence-gated に限定し、future automatic Lite default は別 Issue、ADR、または policy version bump で扱う。
-- 実装開始前に、workflow authority に関わる 5 件の ADR を作成 / 承認する Issue を先行させる。
+- Issue 実体は作成済み。実装対象は `I01`〜`I07` の `iss-00227`〜`iss-00233` に対応する。
+- `iss-00226 / #226` は decision-only Issue として作成されたが、ADR-level decisions はこの Epic planning/design で固定すべきだったため closed / superseded historical evidence とする。
+- 初期 rollout では automatic Lite default を有効化しない。Lite は shadow / explicit opt-in / evidence-gated に限定し、future automatic Lite default は別 accepted ADR、policy version bump、rollout Issue が揃った場合だけ扱う。
+- 実装開始前の workflow authority decision は、Epic-scope accepted ADR 5 件として作成済み。これを `G0 Epic Decision Baseline` とする。
 
 ## この計画で閉じる E-RQ / E-AC
 
@@ -50,31 +51,11 @@ ID: "epic-00224"
   - Shared JSON schema / domain model は最初の vertical capability に同梱する。
   - Real GitHub review evaluation は network / external latency を含むため、final rollout Issue の acceptance に置く。
   - Codex Action migration は本 Epic 外の follow-up とする。
-  - ADR 作成 / 承認は execution capability ではないため、T0 の prerequisite slice として扱い、execution-ready Issue と混同しない。
+  - ADR 作成 / 承認は execution capability ではないため、Issue slice へ切り出さず Epic-scope `G0` gate として扱う。
 
 ## 課題一覧（Issue list / 順序 / tranche 付き）
 
-### T0 — Architecture ADR Prerequisites
-
-- provisional slug:
-  - `record-adaptive-workflow-authority-adrs`
-- 目的:
-  - 後続 implementation Issue が依存する長期 workflow authority 決定を ADR として固定する。
-- 成果物:
-  - Fixed Skill Kernel And Compiled Runbook Authority ADR。
-  - Adaptive Assurance Contract And Monotonic Escalation ADR。
-  - Tracked Agent Context Routing Policy And Clean-Room Evaluation ADR。
-  - Trusted Base-SHA GitHub Review Policy ADR。
-  - Blocker-Centric PR Risk Closure ADR。
-- closes:
-  - Design の required ADR before implementation。
-- 依存:
-  - reviewer-pass 済み requirement / design。
-- 非対象:
-  - runtime implementation。
-  - Issue execution readiness の claim。
-
-### I01 — Introduce Assurance Contract And Classification Runtime
+### I01 — Introduce Assurance Contract And Classification Runtime（iss-00227 / #227）
 
 - provisional slug:
   - `introduce-assurance-contract-and-classification-runtime`
@@ -94,14 +75,14 @@ ID: "epic-00224"
 - contributes:
   - E-RQ-012 strict-legacy detection prerequisite。正式 close は rollout / compatibility owner の I07。
 - 依存:
-  - T0
+  - G0 Epic Decision Baseline。
   - `epic-00158` の context-surface 境界。
 - 非対象:
   - Skill kernel 切替。
   - artifact composition。
   - GitHub review policy。
 
-### I02 — Compile State-Aware Workflow Runbooks And Fixed Skill Kernels
+### I02 — Compile State-Aware Workflow Runbooks And Fixed Skill Kernels（iss-00228 / #228）
 
 - provisional slug:
   - `compile-state-aware-workflow-runbooks-and-fixed-skill-kernels`
@@ -126,7 +107,7 @@ ID: "epic-00224"
   - Step execution routing。
   - PR review。
 
-### I03 — Compose Profile-Aware Planning Artifacts
+### I03 — Compose Profile-Aware Planning Artifacts（iss-00229 / #229）
 
 - provisional slug:
   - `compose-profile-aware-planning-artifacts`
@@ -151,7 +132,7 @@ ID: "epic-00224"
   - Step worker routing。
   - GitHub review。
 
-### I04 — Compile Step Assurance, Agent Routing, And Context Policy
+### I04 — Compile Step Assurance, Agent Routing, And Context Policy（iss-00230 / #230）
 
 - provisional slug:
   - `compile-step-assurance-agent-routing-and-context-policy`
@@ -217,7 +198,7 @@ ID: "epic-00224"
   - Cross-provider agent context transfer。
   - Private reasoning の保存または転送。
 
-### I05 — Inject Trusted Base-Branch Codex Review Policy
+### I05 — Inject Trusted Base-Branch Codex Review Policy（iss-00231 / #231）
 
 - provisional slug:
   - `inject-trusted-base-branch-codex-review-policy`
@@ -245,7 +226,7 @@ ID: "epic-00224"
   - Finding blocker policy。
   - Codex Action migration。
 
-### I06 — Enforce Blocker-Centric PR Repair And Re-Review
+### I06 — Enforce Blocker-Centric PR Repair And Re-Review（iss-00232 / #232）
 
 - provisional slug:
   - `enforce-blocker-centric-pr-repair-and-rereview`
@@ -271,7 +252,7 @@ ID: "epic-00224"
   - Automatic merge。
   - Human risk acceptance automation。
 
-### I07 — Roll Out Adaptive Workflow With Legacy Compatibility And Telemetry
+### I07 — Roll Out Adaptive Workflow With Legacy Compatibility And Telemetry（iss-00233 / #233）
 
 - provisional slug:
   - `roll-out-adaptive-workflow-with-legacy-compatibility-and-telemetry`
@@ -304,8 +285,6 @@ ID: "epic-00224"
 ## Tranche / 依存順
 
 ```text
-T0 Architecture ADR prerequisites
-  |
 T1 I01 Assurance core
   |
   +--> T2A I02 Workflow kernel
@@ -323,45 +302,47 @@ T5 I06 PR blocker closure
 T6 I07 Rollout / telemetry / default switch
 ```
 
-## Dependency commands（Issue作成後）
+## Dependency commands（登録済み）
 
-> この節は Issue 作成後に実行する予定 command であり、この plan 作成時点では実行しない。
+> この節の dependency edge は登録済み。再実行する場合は duplicate/no-op になることを確認する。
+> `iss-00227 -> iss-00226` は decision-only Issue routing correction により削除済み。
 
 ```bash
 # I02 -> I01
-./spec-dock/scripts/spec-dock deps add --from <I02_ID> --to <I01_ID>
+./spec-dock/scripts/spec-dock deps add --from iss-00228 --to iss-00227
 
 # I03 -> I01, I02
-./spec-dock/scripts/spec-dock deps add --from <I03_ID> --to <I01_ID>
-./spec-dock/scripts/spec-dock deps add --from <I03_ID> --to <I02_ID>
+./spec-dock/scripts/spec-dock deps add --from iss-00229 --to iss-00227
+./spec-dock/scripts/spec-dock deps add --from iss-00229 --to iss-00228
 
 # I04 -> I03
-./spec-dock/scripts/spec-dock deps add --from <I04_ID> --to <I03_ID>
+./spec-dock/scripts/spec-dock deps add --from iss-00230 --to iss-00229
 
 # I05 -> I01
-./spec-dock/scripts/spec-dock deps add --from <I05_ID> --to <I01_ID>
+./spec-dock/scripts/spec-dock deps add --from iss-00231 --to iss-00227
 
 # I06 -> I04, I05
-./spec-dock/scripts/spec-dock deps add --from <I06_ID> --to <I04_ID>
-./spec-dock/scripts/spec-dock deps add --from <I06_ID> --to <I05_ID>
+./spec-dock/scripts/spec-dock deps add --from iss-00232 --to iss-00230
+./spec-dock/scripts/spec-dock deps add --from iss-00232 --to iss-00231
 
 # I07 -> I02..I06
-./spec-dock/scripts/spec-dock deps add --from <I07_ID> --to <I02_ID>
-./spec-dock/scripts/spec-dock deps add --from <I07_ID> --to <I03_ID>
-./spec-dock/scripts/spec-dock deps add --from <I07_ID> --to <I04_ID>
-./spec-dock/scripts/spec-dock deps add --from <I07_ID> --to <I05_ID>
-./spec-dock/scripts/spec-dock deps add --from <I07_ID> --to <I06_ID>
+./spec-dock/scripts/spec-dock deps add --from iss-00233 --to iss-00228
+./spec-dock/scripts/spec-dock deps add --from iss-00233 --to iss-00229
+./spec-dock/scripts/spec-dock deps add --from iss-00233 --to iss-00230
+./spec-dock/scripts/spec-dock deps add --from iss-00233 --to iss-00231
+./spec-dock/scripts/spec-dock deps add --from iss-00233 --to iss-00232
 ```
 
 ## 統合チェックポイント
 
-- G0 Architecture / ADR:
-  - Fixed Skill Kernel / Compiled Runbook。
-  - Assurance Contract / monotonic escalation。
-  - Tracked Agent Context Routing Policy / clean-room evaluation。
-  - Trusted base-SHA review policy。
-  - Blocker-centric risk closure。
-  - ADR pass 後に implementation Issue を execution-ready にする。
+- G0 Epic Decision Baseline:
+  - `20260623t074441z-adr-fixed-skill-kernel-compiled-runbook-authority.md` accepted。
+  - `20260623t074443z-adr-adaptive-assurance-lite-authorization-monotonic-escalation.md` accepted。
+  - `20260623t074442z-adr-step-assurance-resource-allocation-agent-context-routing.md` accepted。
+  - `20260623t074444z-adr-trusted-base-sha-github-review-policy.md` accepted。
+  - `20260623t074447z-adr-blocker-centric-pr-risk-closure-rereview.md` accepted。
+  - `iss-00226 / #226` は closed / superseded historical evidence であり、implementation readiness dependency ではない。
+  - Fresh spec-reviewer pass 後に implementation Issue を downstream planning-ready にする。
 - G1 Core contract:
   - I01 後、classification truth table、legacy detection、schema/versioning を固定する。
   - I02 / I05 が依存できる public application contract を確認する。
@@ -476,7 +457,7 @@ T6 I07 Rollout / telemetry / default switch
 
 - E-AC-001〜021 に evidence がある。
 - 7 implementation Issue が完了または明示的に superseded / deferred されている。
-- Required ADR が作成 / 承認され、implementation Issue より先に閉じている。
+- Required ADR が Epic-scope accepted ADR として作成 / 反映され、implementation Issue より先に reviewer-gated baseline になっている。
 - New Issue の Standard default path が dogfooding で成功している。
 - Existing Issue の strict-legacy path が壊れていない。
 - No-active / planning / execution / PR / finish state が current Runbook として動作する。

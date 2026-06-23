@@ -3,7 +3,7 @@
 ID: "<EPIC_ID>"
 タイトル: "Adaptive Assurance And Compiled Agent Workflow"
 関連GitHub: ["<GITHUB_EPIC_NUMBER_OR_URL>"]
-状態: "draft"
+状態: "superseded"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-22"
 依存: ["requirement.md", "design.md"]
@@ -11,6 +11,12 @@ ID: "<EPIC_ID>"
 ---
 
 # <EPIC_ID> Adaptive Assurance And Compiled Agent Workflow — 計画（Issue と実施順序）
+
+## Supersession note
+- この draft は初期 planning evidence であり、`T0 Epic authoring / ADR` を Issue-like prerequisite として扱う古い構成を含む。
+- 現在の canonical plan は `G0 Epic Decision Baseline` を採用し、ADR authority は Epic-scope accepted ADR 5 件へ移動済みである。
+- `iss-00226 / #226` は closed / superseded historical evidence であり、implementation readiness dependency ではない。
+- Current handoff authority は `../plan.md`、`../design.md`、`../report.md`、および `20260623t074441z-*`〜`20260623t074447z-*` の accepted ADR を参照する。
 
 ## この計画で閉じる E-RQ / E-AC
 
