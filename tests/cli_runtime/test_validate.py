@@ -796,7 +796,7 @@ class TestCliValidate(CliRuntimeHarness):
             for kind, (node_root, expected) in node_roots.items()
             for artifact_name in artifact_names
         ]
-        for _name, artifact_name, artifact_rel_path, expected in cases:
+        for _name, _artifact_name, artifact_rel_path, expected in cases:
             with tempfile.TemporaryDirectory() as tmp:
                 target = Path(tmp)
                 assert main(["init", str(target)]) == 0
@@ -835,7 +835,7 @@ class TestCliValidate(CliRuntimeHarness):
                 "kind=issue id=iss-00003",
             ),
         ]
-        for kind, meta_rel_path, expected in cases:
+        for _kind, meta_rel_path, expected in cases:
             with tempfile.TemporaryDirectory() as tmp:
                 target = Path(tmp)
                 assert main(["init", str(target)]) == 0

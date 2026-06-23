@@ -33008,7 +33008,7 @@ esac
                     assert main(["init", str(target)]) == 0
                     before = self._seed_managed_contract_guard_snapshot(target)
 
-                    def _mutate_assets(patched_assets_root: Path) -> None:
+                    def _mutate_assets(patched_assets_root: Path, *, mode=mode) -> None:
                         scripts_dir = patched_assets_root / "spec_dock" / "scripts"
                         shutil.rmtree(scripts_dir)
                         if mode == "non_directory":

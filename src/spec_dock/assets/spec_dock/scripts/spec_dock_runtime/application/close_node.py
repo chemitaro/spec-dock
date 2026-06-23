@@ -163,7 +163,7 @@ def close_node(req: CloseNodeRequest, ports: Ports) -> CloseNodeResult:
         try:
             post_failure_snapshot = issue_gateway.issue_view_snapshot(repo_root, issue_number, repo_slug=repo_slug)
         except RuntimeError:
-            raise error
+            raise error from None
         if str(post_failure_snapshot.state).strip().upper() == "CLOSED":
             return _result(snapshot=post_failure_snapshot, already_closed=True)
         raise error

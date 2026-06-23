@@ -74,13 +74,13 @@ def _to_repo_relative_specdock_path(path: Path, *, repo_root: Path) -> str:
     except ValueError:
         parts = path.parts
         if not parts:
-            raise RuntimeError(f"Cannot canonicalize empty node path: {path}")
+            raise RuntimeError(f"Cannot canonicalize empty node path: {path}") from None
         if parts[0] == "spec-dock":
             return path.as_posix()
         if "spec-dock" in parts:
             index = parts.index("spec-dock")
             return Path(*parts[index:]).as_posix()
-        raise RuntimeError(f"Node path is not under repo root and missing 'spec-dock' segment: {path}")
+        raise RuntimeError(f"Node path is not under repo root and missing 'spec-dock' segment: {path}") from None
 
 
 def _find_existing_id_by_num(graph: SpecGraph, *, prefix: str, num: int, local: bool) -> str | None:

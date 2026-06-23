@@ -463,7 +463,7 @@ def collect_sync_state(
                 deps_preflight_error = f"preflight validate failed: {error}"
                 _append_unique(warnings, "deps_preflight_failed")
             else:
-                raise RuntimeError(f"preflight validate failed: {error}")
+                raise RuntimeError(f"preflight validate failed: {error}") from error
         else:
             topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
             issue_depends_on_map = dict(topology.issue_depends_on_map)

@@ -572,7 +572,7 @@ def _handle_rmtree_permission_error(func, path, exc_info) -> None:
         os.chmod(path, current_mode | stat.S_IWRITE)
         func(path)
     except OSError:
-        raise exc
+        raise exc from None
 
 
 def delete_tree(node_path: Path) -> None:

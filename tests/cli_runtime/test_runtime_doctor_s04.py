@@ -857,7 +857,7 @@ class TestRuntimeDoctorS04:
             ),
         )
 
-        for label, filenames, expected_message in cases:
+        for _label, filenames, expected_message in cases:
             with tempfile.TemporaryDirectory() as tmp:
                 repo_root = Path(tmp)
                 specdock_dir = repo_root / "spec-dock"
