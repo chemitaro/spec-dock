@@ -34,7 +34,8 @@ ID: "epic-00224"
 | E-AC-006, E-AC-008 | I03 | profile-specific planning、stale source binding / invalidation tests |
 | E-AC-007 | I04 | step routing matrix tests |
 | E-AC-009〜010 | I05 | trusted trigger integration tests |
-| E-AC-011〜013 | I06 | PR blocker policy tests |
+| E-AC-011〜012 | I06 | PR blocker policy tests |
+| E-AC-013 | I07 | automation-stalled rollout / telemetry tests |
 | E-AC-014〜016 | I07 | legacy / rollout / auto-lite-readiness / efficiency report |
 | E-AC-017〜021 | I04 | context routing / reviewer independence / reuse / invalidation / return contract tests |
 
@@ -242,13 +243,16 @@ ID: "epic-00224"
   - P2 default no-action / follow-up。
   - fresh re-review condition。
   - review-exempt / opportunistic observation。
-  - finding fingerprint / stagnation / automation-stalled。
+  - finding fingerprint / stagnation evidence。
+  - Dedicated automation-stalled operator surfacing は I07 rollout / telemetry へ defer。
   - updated repair batch / merge predicate。
 - Assurance:
   - strict / deep
 - closes:
   - E-RQ-010, E-RQ-011
-  - E-AC-011, E-AC-012, E-AC-013
+  - E-AC-011, E-AC-012
+- provides to I07:
+  - E-AC-013 prerequisite: blocker fingerprint evidence for stagnation detection。
 - 依存:
   - I04
   - I05
@@ -278,6 +282,7 @@ ID: "epic-00224"
   - strict / complex
 - closes:
   - E-RQ-012, E-RQ-013, E-RQ-014
+  - E-AC-013
   - E-AC-014, E-AC-015, E-AC-016
 - 依存:
   - I02, I03, I04, I05, I06

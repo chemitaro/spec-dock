@@ -1081,8 +1081,8 @@ ChildResultReturned
 | I03 | `iss-00229-compose-profile-aware-planning-artifacts` | `#229` | Profile-aware artifact composition and stale source binding | E-RQ-006, E-AC-006, E-AC-008 |
 | I04 | `iss-00230-compile-step-assurance-agent-routing-and-context-policy` | `#230` | Step Assurance, context routing policy, clean-room packets, bounded return contract | E-RQ-007, E-RQ-008, E-RQ-015〜021, E-AC-007, E-AC-017〜021 |
 | I05 | `iss-00231-inject-trusted-base-branch-codex-review-policy` | `#231` | Trusted base-SHA review policy and deterministic review trigger | E-RQ-009, E-AC-009, E-AC-010 |
-| I06 | `iss-00232-enforce-blocker-centric-pr-repair-and-rereview` | `#232` | PR Blocker Engine, P2 suppression, re-review / stagnation policy | E-RQ-010, E-RQ-011, E-AC-011〜013 |
-| I07 | `iss-00233-roll-out-adaptive-workflow-with-legacy-compatibility-and-telemetry` | `#233` | Rollout, strict-legacy compatibility, metrics, Auto-Lite readiness | E-RQ-012〜014, E-AC-014〜016 |
+| I06 | `iss-00232-enforce-blocker-centric-pr-repair-and-rereview` | `#232` | PR Blocker Engine, P2 suppression, blocker fingerprint evidence for stagnation detection | E-RQ-010, E-RQ-011, E-AC-011〜012 |
+| I07 | `iss-00233-roll-out-adaptive-workflow-with-legacy-compatibility-and-telemetry` | `#233` | Rollout, automation-stalled operator surfacing, strict-legacy compatibility, metrics, Auto-Lite readiness | E-RQ-012〜014, E-AC-013〜016 |
 
 Dependency direction:
 
