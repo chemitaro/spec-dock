@@ -23,6 +23,11 @@ ID: "iss-00229"
 | D-006 | resolved | test-strategy | spec-reviewer | stale source binding coverage did not explicitly include compose failure or design/plan stale hashes | A: requirement-only stale verify/workflow tests; B: compose/verify/workflow tests across requirement/design/plan stale cases | B を採用 | Requirement/design/plan stale authority must not produce planning sections or execution handoff | applied | `requirement.md` AC-004 / `design.md` Source binding / `plan.md` tc-s02-003 and tc-s03-001..004 | none |
 | D-007 | resolved | plan | spec-reviewer | S02 and S03 both appeared to own stale compose blocking while S02 forbade stale policy changes | A: let S02 implement stale checker; B: keep S02 to compose vertical slice and assign stale compose/verify/workflow blocking to S03 | B を採用 | S03 is the explicit stale source binding integration step and can include compose command wiring without changing section content rules | applied | `plan.md` S02/S03 ownership and allowed paths | none |
 | D-008 | resolved | plan | dev-coder | S02 allowed paths omitted CLI parser/bootstrap registration surfaces required for `assurance compose` | A: keep S02 limited and fail targeted CLI tests; B: amend S02 allowed paths to include `cli/parser.py` and `cli/bootstrap.py` | B を採用 | The requested user-facing CLI subcommand cannot be reachable without parser registration and UseCases wiring | promoted_to_plan | `plan.md` S02 allowed paths / amendment trigger | none |
+| D-009 | resolved | plan | orchestrator | S03 requires persisted contract validation to accept design/plan source binding roles | A: keep validation requirement-only; B: amend S03 allowed paths to include `domain/assurance.py` role validation | B を採用 | Planning source binding cannot persist design/plan hashes while domain validation rejects those roles | promoted_to_plan | `plan.md` S03 allowed paths / `domain/assurance.py` | none |
+| D-010 | resolved | compatibility | code-reviewer | pre-S03 partial source binding could omit design/plan and bypass stale detection | A: compare only persisted artifacts; B: require requirement/design/plan roles in persisted adaptive contracts | B を採用 | Fail-closed source authority requires all planning artifacts to be bound; partial legacy bindings are invalid schema rather than execution-ready authority | applied | `domain/assurance.py`; `tests/unit/infra/test_assurance_store.py` partial binding regression | none |
+| D-011 | resolved | compose-idempotence | orchestrator | `assurance compose` mutates design/plan/report after classification and would otherwise stale its own next run | A: require manual re-classification after compose; B: after successful non-dry-run compose writes, refresh contract source binding to current planning artifact hashes | B を採用 | Compose-owned deterministic managed section writes are the same operation that changes planning artifacts; refreshing binding preserves idempotent second compose while human edits before compose still fail closed | applied | `application/assurance.py`; `tests/cli_runtime/test_assurance_compose.py` second-run and stale tests | none |
+| D-012 | resolved | validation | code-reviewer | persisted contract could include all roles but bind a role to the wrong issue-local artifact path | A: only require role presence; B: require role-to-canonical-filename mapping for requirement/design/plan | B を採用 | Fail-closed stale detection must compare each role against its canonical planning artifact, not any issue-local file with a matching hash | applied | `domain/assurance.py`; `tests/unit/infra/test_assurance_store.py` role/path mismatch regression | none |
+| D-013 | resolved | validation | code-reviewer | same basename under nested issue-local path could satisfy role-to-filename suffix validation | A: accept any issue-local `*/design.md`; B: require target-aware exact canonical path `issue_dir/<role>.md` | B を採用 | Canonical planning authority is the issue artifact itself; nested same-named files must not become source authority | applied | `infra/assurance_store.py`; `tests/unit/infra/test_assurance_store.py` nested same-name regression | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger）
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
@@ -58,7 +63,9 @@ ID: "iss-00229"
 
 ## 実装サマリー
 - S01 で profile manifest と pure domain composer を追加した。
-- S02-S03 / S90 / S99 の実行結果、worker evidence、reviewer evidence、commit gates は後続ステップで追記する。
+- S02 で `assurance compose` CLI と issue-local artifact write path を追加した。
+- S03 で requirement/design/plan の source binding stale detection を `assurance compose` / `assurance verify` / `workflow next issue-execution` に接続した。
+- S90 / S99 の実行結果、worker evidence、reviewer evidence、commit gates は後続ステップで追記する。
 - 実装前の Assurance classification は `authorized_profile=standard` / `status=provisional` / `verify=valid` で作成済み。
 
 ## ワークフロー委任同意の証跡（Workflow Delegation Consent）
@@ -71,7 +78,7 @@ ID: "iss-00229"
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | domain / template / tests slice | dev-coder | profile manifest and domain composer | `plan.md` S01 | domain composer, template manifest, unit tests | CLI wiring / workflow state / GitHub review | targeted pytest | marker safety cannot be guaranteed | changed files, tests, ledger note | pass |
 | S02 | delegated | CLI vertical slice | dev-coder | compose command and artifact store | `plan.md` S02 | assurance command/application/presentation/infra, parser/bootstrap registration, and CLI tests | step routing / GitHub review / auto Lite default / stale policy | targeted pytest | compose would overwrite substantive content | changed files, tests, ledger note | pass |
-| S03 | planned delegated | stale binding integration slice | dev-coder | compose/verify/workflow blocking | `plan.md` S03 | assurance command/application/store/workflow and compose/workflow tests | compose section content rules / GitHub review | targeted pytest | legacy compatibility breaks | changed files, tests, ledger note | pending |
+| S03 | local execution | stale binding integration slice | orchestrator + reviewers | compose/verify/workflow blocking | `plan.md` S03 | assurance application/store/workflow/domain validation and compose/workflow tests | compose section content rules / GitHub review | targeted pytest | legacy compatibility breaks | changed files, tests, ledger note | pass |
 | S90 | planned local verification | provider/mirror sync | orchestrator | dogfooding update and parity checks | `plan.md` S90 | dogfooding mirror | provider source beyond sync | update / parity / validate | parity mismatch unresolved | evidence | pending |
 | S99 | planned final gate | issue-wide quality | orchestrator + reviewers | final validation and review | `plan.md` S99 | final report / reviewer fixes | new feature scope | full validation | final reviewer fail | final evidence | pending |
 
@@ -90,14 +97,20 @@ ID: "iss-00229"
 | S02 | plan amendment | spec-reviewer | during S02 implementation | passed with P2 | no | P2 traceability fixes applied | command registration requires `cli/parser.py` and `cli/bootstrap.py` |
 | S02 | step code review | code-reviewer | initial S02 diff | failed | no | fix required | P1 symlink artifact write safety fixed; P2 report evidence fixed |
 | S02 | step code re-review | code-reviewer | after P1/P2 fixes | passed | no | commit S02 | no findings |
+| S03 | plan amendment | spec-reviewer | during S03 implementation | passed | no | proceed with amended path | D-009 adds `domain/assurance.py` for requirement/design/plan source binding role validation |
+| S03 | step code review | code-reviewer | initial S03 diff | failed | no | fix required | P1 partial legacy source binding bypass fixed; P2 report evidence fixed |
+| S03 | step code re-review | code-reviewer | after partial binding fix | failed | no | fix required | P1 role/path mismatch bypass fixed |
+| S03 | step code re-review | code-reviewer | after role/path mismatch fix | failed | no | fix required | P1 nested same-basename bypass fixed |
+| S03 | step code final re-review | code-reviewer | after canonical path fix | passed | no | commit S03 | no findings |
 
 ## ステップ commit ゲート（Step Commit Gate）
 | ステップ | クロージャ状態 | コミット範囲 | コミットハッシュ / 最終台帳 | コミット後 clean 確認 | 差分なし根拠 | 差分なし確認済み契約 / ファイル | 差分なし diff-clean コマンド | 差分なし read-only 確認 |
 |---|---|---|---|---|---|---|---|---|
 | planning | committed | requirement/design/plan/report authoring evidence | `1eb09f9a` | `git status --short` -> clean before assurance classification | N/A | N/A | N/A | N/A |
 | planning-assurance | committed | `assurance.json` and readiness evidence | `46345f81` | `git status --short` -> clean before S01 | N/A | N/A | N/A | N/A |
-| S01 | ready for commit | domain composer, profile manifest, unit tests, report evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
-| S02 | ready for commit | compose CLI, artifact store, parser/bootstrap wiring, CLI runtime tests, report evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
+| S01 | committed | domain composer, profile manifest, unit tests, report evidence | `3d67f781` | `git status --short` -> clean before S02 | N/A | N/A | N/A | N/A |
+| S02 | committed | compose CLI, artifact store, parser/bootstrap wiring, CLI runtime tests, report evidence | `23ae5ecb` | `git status --short` -> clean before S03 | N/A | N/A | N/A | N/A |
+| S03 | ready for commit | stale source binding verify/compose/workflow integration, domain contract validation, tests, report evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
 
 ## 実装記録（セッションログ）
 - Implementation not started during planning.
@@ -207,3 +220,50 @@ git diff --check
 | tc-003 | S02 | compose preserves existing artifact text and rejects unsafe symlink artifact | pass | non-destructive write safety |
 | tc-004 | S02 | compose all materializes sections; missing/invalid assurance fail closed | pass | JSON output includes changed paths and artifacts |
 | tc-005 | S02 | marker conflict test keeps artifacts unchanged | pass | `reason=marker_conflict` |
+
+### セッションログ（2026-06-23 S03）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-004, AC-005, EC-004
+- Closure ids: tc-s03-001, tc-s03-002, tc-s03-003, tc-s03-004
+
+#### 実施内容
+- persisted Assurance Contract の source binding を requirement/design/plan の planning artifact set に拡張した。
+- `assurance verify` / `assurance compose` / `workflow next issue-execution` が stale source binding を fail-closed に扱うようにした。
+- `assurance compose` の deterministic managed-section 書き込み後は、成功した non-dry-run write に限り current planning artifact hashes へ source binding を更新するようにした。
+- pre-S03 partial legacy binding が design/plan stale を見逃さないよう、persisted adaptive contract validation で requirement/design/plan roles を必須化した。
+- role が存在していても別 artifact path を指す契約が stale 検出を迂回しないよう、requirement/design/plan role と canonical filename の対応を必須化した。
+- nested same-named path が canonical artifact として扱われないよう、target-aware validation で `issue_dir/<role>.md` との完全一致を必須化した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_assurance_store.py tests/unit/domain/test_assurance.py tests/cli_runtime/test_assurance_compose.py tests/cli_runtime/test_workflow.py
+# 39 passed
+
+uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/assurance.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/assurance_store.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/assurance.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workflow.py tests/unit/infra/test_assurance_store.py tests/unit/domain/test_assurance.py tests/cli_runtime/test_assurance_compose.py tests/cli_runtime/test_workflow.py
+# All checks passed!
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=148
+
+git diff --check
+# pass
+```
+
+#### TDD / review evidence
+| step | phase | planned evidence | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S03 | Red / alternative | stale source binding regression | initial tests exposed stale failures and reviewer exposed partial legacy binding bypass | pass | D-010 |
+| S03 | Green | verify/compose/workflow stale tests | targeted pytest -> 39 passed | pass | requirement/design/plan stale cases, partial binding invalid schema, role/path mismatch invalid schema, nested canonical path invalid schema |
+| S03 | Refactor | guardrail | targeted `ruff check`, `validate`, and `git diff --check` passed | pass | no further refactor needed before re-review |
+
+#### Closure coverage
+| closure id | step | verification evidence | observed result | notes |
+|---|---|---|---|---|
+| tc-s03-001 | S03 | `tests/unit/infra/test_assurance_store.py` stale requirement/design/plan cases | pass | `reason=stale_source_binding` |
+| tc-s03-002 | S03 | `tests/cli_runtime/test_assurance_compose.py` stale requirement/design/plan cases | pass | compose keeps artifacts unchanged |
+| tc-s03-003 | S03 | `tests/cli_runtime/test_workflow.py` stale requirement/design/plan cases | pass | workflow remains `classification-required` / `authority-invalid` |
+| tc-s03-004 | S03 | partial legacy binding regression | pass | missing design/plan roles are `invalid_schema` |
+| tc-s03-005 | S03 | role/path mismatch regression | pass | wrong canonical filename binding is `invalid_schema` |
+| tc-s03-006 | S03 | nested same-name canonical path regression | pass | nested `design.md` binding is `invalid_schema` |

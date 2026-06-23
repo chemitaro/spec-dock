@@ -279,6 +279,7 @@ ID: "iss-00229"
 - allowed paths:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/assurance.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/assurance.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/assurance.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/assurance_store.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workflow.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/workflow_state.py`
@@ -300,7 +301,7 @@ ID: "iss-00229"
   - S03 は code-reviewer pass 後に S03 scope のみで commit する。
   - no-op は、`assurance compose`、`assurance verify`、`workflow next` が既に stale source binding を fail-closed にしている場合に限り、証跡と reviewer pass を report に記録して approved-no-op とする。
 - amendment trigger:
-  - `assurance verify` status taxonomy、workflow state kind、legacy missing-contract compatibility を変更する必要が出た場合は plan amendment と fresh spec-reviewer re-review を行う。
+  - `assurance verify` status taxonomy、workflow state kind、legacy missing-contract compatibility、または Assurance Contract validation roles を変更する必要が出た場合は plan amendment と fresh spec-reviewer re-review を行う。
 
 #### 委任契約（delegation contract）
 - 委任ロール:
