@@ -12,6 +12,8 @@ from tests.cli_runtime.harness import (
 
 
 import pytest
+
+
 class TestCliValidate(CliRuntimeHarness):
     def test_validate_rejects_missing_or_invalid_required_meta_identity_fields(self) -> None:
         cases = (

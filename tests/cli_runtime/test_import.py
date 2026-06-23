@@ -11,6 +11,8 @@ from tests.cli_runtime.harness import (
 
 
 import pytest
+
+
 class TestCliImport(CliRuntimeHarness):
     _STANDARD_INITIATIVE_ID = "init-00001"
     _STANDARD_INITIATIVE_DIRNAME = "init-00001-auth-platform"

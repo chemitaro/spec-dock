@@ -49,6 +49,7 @@ def _raise(exc: BaseException):
 
     return _raiser
 
+
 _ISS_00031_STALE_WHEEL_PATHS = (
     "spec_dock/assets/spec_dock/templates/adr.md",
     "spec_dock/assets/spec_dock/templates/initiative/epics/new-epic",
@@ -2316,8 +2317,8 @@ class TestInitUpdate(CliRuntimeHarness):
         assert parsed.get("sandbox_mode") == "workspace-write"
         assert "default_permissions" not in parsed
         assert "permissions" not in parsed
-        assert parsed.get("sandbox_workspace_write", {}).get("network_access") == False
-        assert parsed.get("features", {}).get("shell_tool") == True
+        assert parsed.get("sandbox_workspace_write", {}).get("network_access") is False
+        assert parsed.get("features", {}).get("shell_tool")
         assert isinstance(parsed.get("developer_instructions"), str)
         assert f'name = "{agent_name}"' in text, f"delegated author adapter missing name ({shim_label})"
         assert ".agents/skills/spec-dock-system-architect/SKILL.md" not in text
@@ -9890,7 +9891,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     assert parsed.get("sandbox_mode") == "workspace-write"
                     assert "default_permissions" not in parsed
                     assert "permissions" not in parsed
-                    assert parsed.get("sandbox_workspace_write", {}).get("network_access") == False
+                    assert parsed.get("sandbox_workspace_write", {}).get("network_access") is False
                     assert "write-capable delegated authoring path" in text
                     assert "post-run diff guard" in text
                     assert "spec-dock/initiatives = \"write\"" not in text

@@ -11,6 +11,8 @@ from tests.cli_runtime.harness import (
 
 
 import pytest
+
+
 class TestCliActive(CliRuntimeHarness):
     def _set_meta_depends_on(self, node_dir: Path, depends_on: object) -> None:
         meta_path = node_dir / ".meta.json"

@@ -12,6 +12,8 @@ from tests.cli_runtime.harness import (
 
 
 import pytest
+
+
 class TestCliSync(CliRuntimeHarness):
     def _set_meta_depends_on(self, node_dir: Path, depends_on: object) -> None:
         meta_path = node_dir / ".meta.json"
@@ -948,13 +950,13 @@ class TestCliSync(CliRuntimeHarness):
             node_302 = deps_issues["nodes"]["iss-00302"]
             node_304 = deps_issues["nodes"]["iss-00304"]
             node_305 = deps_issues["nodes"]["iss-00305"]
-            assert node_302["ready"] == False
+            assert not node_302["ready"]
             assert node_302["depends_on"] == ["iss-00303"]
             assert node_302["state"] == "blocked"
-            assert node_304["ready"] == True
+            assert node_304["ready"]
             assert node_304["depends_on"] == []
             assert node_304["state"] == "ready"
-            assert node_305["ready"] == True
+            assert node_305["ready"]
             assert node_305["depends_on"] == []
             assert node_305["state"] == "ready"
 

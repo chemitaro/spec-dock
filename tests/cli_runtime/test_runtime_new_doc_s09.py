@@ -5,8 +5,6 @@ import time
 from pathlib import Path
 
 
-
-
 import contextlib
 import pytest
 import re
@@ -43,6 +41,8 @@ def _patch_object(target, name, replacement=_MISSING, *, side_effect=_MISSING, r
         yield replacement
     finally:
         setattr(target, name, original)
+
+
 def _runtime_modules():
     runtime_scripts_dir = (
         Path(__file__).resolve().parents[2]

@@ -6,6 +6,8 @@ from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
 import re
+
+
 class TestCliRulesContract(CliRuntimeHarness):
     def test_new_nodes_create_rules_symlinks_and_no_wrappers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

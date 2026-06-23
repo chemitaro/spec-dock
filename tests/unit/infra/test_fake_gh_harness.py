@@ -11,9 +11,9 @@ from tests.cli_runtime.harness import CliRuntimeHarness
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
-from spec_dock_runtime.domain.models import SpecGraph, SpecNode
-from spec_dock_runtime.domain.status import resolve_issue_statuses
-from spec_dock_runtime.infra.github_cli import issue_index, issue_index_raw
+from spec_dock_runtime.domain.models import SpecGraph, SpecNode  # noqa: E402
+from spec_dock_runtime.domain.status import resolve_issue_statuses  # noqa: E402
+from spec_dock_runtime.infra.github_cli import issue_index, issue_index_raw  # noqa: E402
 
 
 class TestFakeGhHarness(CliRuntimeHarness):
