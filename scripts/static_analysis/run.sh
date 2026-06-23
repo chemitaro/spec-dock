@@ -24,6 +24,7 @@ EXIT_CODE=0
 RESULTS=()
 
 run_check "ruff check" uv run ruff check "${TARGETS[@]}"
+run_check "mypy" uv run mypy "${TARGETS[@]}"
 
 printf '\nSummary:\n'
 for result in "${RESULTS[@]}"; do

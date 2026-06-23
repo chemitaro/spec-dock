@@ -57,6 +57,7 @@ Disposition ごとの必須証跡:
 | D-006 | resolved | test-strategy | spec-reviewer | plan review で `uv.lock` 許可不足、S02-S13 closure contract 不足、S90 refresh 許可範囲不足が指摘された | 現行 plan のまま進む; dependency/dogfooding/closure contract を明示する | S01/S14 allowed paths に `uv.lock` を追加し、S02-S13 shared step closure contract を追加し、S90 で安全な generated-copy refresh は許可し危険なら handoff/follow-up にする | execution handoff で worker が scope 違反せず進められるようにする | applied | plan review by spec-reviewer `019ef2a0-8d5e-7212-9608-d2bf37621852`; `plan.md` | fresh plan spec-reviewer rerun |
 | D-007 | resolved | implementation | dev-coder / orchestrator | S12 `RUF001` が日本語文言・全角句読点・期待文字列に大量発生した | 全置換する; top-level ignore のみ; target-scoped ignore; file-by-file ignore | `RUF001/RUF002/RUF003/RUF010` は `src/spec_dock/**/*.py` と `tests/**/*.py` の target-scoped ignore として扱い、`RUF067` は `src/spec_dock/__init__.py` のみ例外にする | 日本語文言と fullwidth 表記の可読性・意味を保ちつつ、explicit `--select RUF` 実行でも closure を満たす。`RUF012` など実バグ寄りの項目は修正した | applied | S12 session log; `pyproject.toml`; `uv run ruff check --select F,E,I,UP,B,C4,SIM,PTH,TC,ARG,RUF src/spec_dock tests` -> pass | final reviewer gate |
 | D-008 | resolved | implementation | dev-coder / code-reviewer / orchestrator | S13 absolute import 化により `spec_dock_runtime` を Ruff の first-party import root として扱う必要が出た | relative import を suppress する; targeted `noqa` を追加する; Ruff `src` に provider package と shipped runtime scripts root を設定する | Ruff `src = ["src", "src/spec_dock/assets/spec_dock/scripts"]` を追加し、copied scaffold runtime の実行モデルと first-party 判定を一致させる | shipped entrypoint は consumer repo の `spec-dock/scripts` を `sys.path` に入れて `spec_dock_runtime.app` を import するため、provider 側でも同じ root を明示するのが最小で suppression 不要 | applied | S13 session log; code-reviewer `019ef36e-5f8c-7bb3-b2c1-3165a0c5d447`; `pyproject.toml`; `uv run pytest tests/cli_runtime` -> 637 passed, 76 skipped | none |
+| D-009 | resolved | test-strategy | dev-coder / orchestrator | S14 で mypy を `make lint` に追加すると、初回 inventory 段階では local gate が fail する | S14 では script に入れない; script に入れて expected fail として inventory 化; S14 で全修正まで行う | S14 で script に mypy を入れ、`make lint` fail を expected inventory evidence として扱う。0 件化は S15 に分離する | local command surface を早期に固定しつつ、大量 mypy error 修正を S15 に隔離する plan の意図を守る | applied | S14 session log; `scripts/static_analysis/run.sh`; `uv run mypy src/spec_dock tests` -> 362 errors; `make lint` -> expected fail | S15 cleanup |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -1561,7 +1562,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S13 | ready to commit | S13 implementation files plus `report.md` S13 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S13 | committed | S13 implementation files plus `report.md` S13 evidence | `40bc9f1e` `build(static-analysis): Ruff TID違反を解消する` | `git status --short` -> clean; post-commit `make lint` -> pass; `./spec-dock/scripts/spec-dock validate` -> pass | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `pyproject.toml` - Ruff `TID` selection, `ban-relative-imports`, and runtime import root.
@@ -1569,10 +1570,145 @@ git diff --check
 - `report.md` - S12 commit correction and S13 observed evidence.
 
 #### コミット
-- pending S13 step commit.
+- `40bc9f1e` `build(static-analysis): Ruff TID違反を解消する`
 
 #### メモ
 - S13 is the final Ruff rule-adoption step before mypy base adoption. No S14 mypy config was added in this step.
+
+---
+
+### セッションログ（2026-06-23 HH:MM - HH:MM）
+
+#### 対象
+- Step: S14 — Mypy Base Adoption / Inventory
+- AC/EC: AC-001, AC-006, EC-001, EC-003, EC-004
+- 計画上の出典（Planned source）:
+  - `plan.md` S14 executable contract
+  - closure id: `tc-s14-001`
+
+#### 実施内容
+- `dev-coder` に S14 を委任し、許可 path を `pyproject.toml`, `uv.lock`, `scripts/static_analysis/run.sh` に限定した。
+- `pyproject.toml` の dev dependency に `mypy>=2.1.0` を追加した。
+- `uv.lock` に mypy `2.1.0` と transitive dependencies を記録した。
+- `[tool.mypy]` base config を追加した。
+  - `python_version = "3.10"`
+  - `ignore_missing_imports = true`
+  - `show_error_codes = true`
+  - readability settings: `show_column_numbers`, `show_error_context`, `pretty`, `color_output`, `error_summary`
+  - exclude: `spec-dock/`, build artifacts, venv/tox/nox
+- `scripts/static_analysis/run.sh` に `uv run mypy src/spec_dock tests` を追加した。
+- S15 予定の `allow_redefinition = false`, `check_untyped_defs = true` は S14 inventory 境界を保つため未追加とした。
+- source/test の mypy error 修正は行っていない。
+
+#### 実行コマンド / 結果
+```bash
+uv run mypy --version
+# mypy 2.1.0 (compiled: yes)
+
+uv run mypy src/spec_dock tests
+# expected fail
+# Found 362 errors in 28 files (checked 142 source files)
+
+make lint
+# ruff check: pass
+# mypy: fail (1)
+# expected fail for S14 inventory step
+
+git diff --check
+# pass
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=140
+```
+
+#### mypy 初回 inventory
+- Total: 362 errors in 28 files, 142 source files checked.
+- Dominant error codes:
+  - `attr-defined`: 122
+  - `index`: 110
+  - `arg-type`: 28
+  - `var-annotated`: 27
+  - `operator`: 22
+  - `assignment`: 12
+  - `method-assign`: 10
+  - その他: `no-redef`, `valid-type`, `union-attr`, `override`, `return`, `return-value`, `name-defined`, `dict-item`
+- Representative files:
+  - `tests/unit/infra/test_init_update.py`: 181
+  - `tests/cli_runtime/test_runtime_delete_s13.py`: 68
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py`: 13
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`: 12
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py`: 7
+- S15 修正方針:
+  - dynamic JSON/object payload typing と helper return types を先に絞る。
+  - test fixture / list / payload helper annotations を追加する。
+  - monkeypatch method assignment は tests に限定して明示的に扱う。
+  - runtime dependency context type aliasing と optional/regex narrowing を source 側で整理する。
+  - external/noise-specific なものだけ targeted config を検討する。
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S14 | Baseline / inventory | `tc-s14-001`: mypy dependency/config/command と初回 inventory | mypy 2.1.0; 362 errors in 28 files | command | pass | S14 は 0 件化を要求しない |
+| S14 | Command surface | local grouped script includes mypy | `make lint` runs Ruff then mypy; Ruff pass; mypy expected fail | command | pass-with-expected-fail | S15 で green 化する |
+| S14 | Refactor | guardrail satisfied / no source/test fixes | changed files limited to config/script/lock | diff inspection + code-reviewer | pass | code-reviewer pass |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S14 | `make lint` は mypy 追加後 S15 完了まで expected fail になる | dev-coder / parent | D-009 と S14 session log に expected fail として記録し、S15 cleanup gate に引き継ぐ | tc-s14-001 | no | `make lint` -> Ruff pass / mypy fail |
+| S14 | S15 予定の strong mypy settings を S14 に入れると inventory scope が膨らむ | dev-coder | `allow_redefinition`, `check_untyped_defs` などは S15 に defer | tc-s14-001 | no | `pyproject.toml`; plan S14/S15 |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S14 | tc-s14-001 | mypy dependency / base config / command を追加し、初回 error inventory を作る。error 0 件でなくてよい | `mypy>=2.1.0`; lock updated; script runs mypy; mypy 2.1.0; inventory 362 errors / 28 files; `make lint` expected fail recorded | pass | code-reviewer pass |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s14-001 / tc-s14-inventory-001 | S14 | yes | command + report | no mypy config/script gate | `uv run mypy --version`; `uv run mypy src/spec_dock tests`; `make lint` | pass-with-expected-fail | inventory step; S15 owns cleanup |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s14-001 | S14 | `uv run mypy --version`; `uv run mypy src/spec_dock tests`; `make lint`; `git diff --check`; `./spec-dock/scripts/spec-dock validate`; code-reviewer pass | pass-with-expected-fail | AC-001/006 S14 inventory closed pending commit |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s14-001 | tc-s14-inventory-001 | tc-s14-001 | planned closure unchanged; concrete inventory case recorded | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S14 | delegated | mypy base config and inventory step | dev-coder | dependency/config/script wiring and inventory | requirement/design/plan S14 | `pyproject.toml`; `uv.lock`; `scripts/static_analysis/run.sh` | source/test fixes; report edits; commit; S15+ cleanup; dogfooding `spec-dock/`; broad suppression | `uv run mypy --version`; `uv run mypy src/spec_dock tests`; `make lint`; diff/validate | inability to produce inventory; config requiring source fixes | changed files; version; inventory; expected fail rationale | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S14 | dev-coder | mypy dependency/base config added; script now runs mypy; initial inventory collected; no source/test fixes | `pyproject.toml`; `uv.lock`; `scripts/static_analysis/run.sh` | `uv run mypy --version` -> 2.1.0; `uv run mypy src/spec_dock tests` -> 362 errors expected; `make lint` -> expected fail; `git diff --check` -> pass; validate -> pass | pass: code-reviewer `019ef378-1e60-75d0-95fe-c280c32b40d4` | local `make lint` fails until S15 | accepted for S14 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S14 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit | pass: code-reviewer `019ef378-1e60-75d0-95fe-c280c32b40d4`; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S14 | committed | S14 config/script/lock files plus `report.md` S14 evidence | this S14 step commit | `git status --short` clean; validate pass; Ruff S13 command pass | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `pyproject.toml` - mypy dependency and base config.
+- `uv.lock` - mypy 2.1.0 lock update.
+- `scripts/static_analysis/run.sh` - mypy command added to grouped check.
+- `report.md` - S13 commit correction, D-009, and S14 observed evidence.
+
+#### コミット
+- this S14 step commit: build(static-analysis): mypy基盤と初回inventoryを追加する
+
+#### メモ
+- `make lint` is expected to fail after S14 until S15 resolves mypy errors. This is intentionally recorded as inventory evidence, not a final quality gate result.
 
 ---
 

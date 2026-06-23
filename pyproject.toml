@@ -15,7 +15,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.0", "ruff>=0.12.0"]
+dev = [
+    "mypy>=2.1.0",
+    "pytest>=8.0",
+    "ruff>=0.12.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -55,6 +59,26 @@ ban-relative-imports = "all"
 "src/spec_dock/__init__.py" = ["RUF067"]
 "src/spec_dock/**/*.py" = ["E501", "SIM108", "RUF001", "RUF002", "RUF003", "RUF010"]
 "tests/**/*.py" = ["E501", "SIM108", "ARG", "RUF001", "RUF002", "RUF003", "RUF010"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+show_error_codes = true
+show_column_numbers = true
+show_error_context = true
+pretty = true
+color_output = true
+error_summary = true
+exclude = [
+    "^spec-dock/",
+    "^build/",
+    "^dist/",
+    "^.*\\.egg-info/",
+    "^\\.venv/",
+    "^venv/",
+    "^\\.tox/",
+    "^\\.nox/",
+]
 
 [project.scripts]
 spec-dock = "spec_dock.cli:main"
