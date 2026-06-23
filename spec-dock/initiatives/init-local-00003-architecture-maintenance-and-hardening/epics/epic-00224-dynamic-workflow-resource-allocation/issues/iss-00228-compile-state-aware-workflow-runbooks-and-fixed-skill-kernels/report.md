@@ -235,6 +235,90 @@ spec-dock: ok (validate) nodes=148
 #### コミット
 - pending
 
+### セッションログ（2026-06-23 S01）
+
+#### 対象
+- Step: S01
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-006, EC-001, EC-003
+- 計画上の出典:
+  - `plan.md` S01
+  - closure ids: tc-001, tc-002, tc-003
+
+#### 実施内容
+- `workflow status` / `workflow next` の stdout-only runtime surface を追加した。
+- active issue、requirement readiness、Assurance Contract status から no-active / requirement-capture / classification-required / ready を解決する domain/application layer を追加した。
+- Markdown / JSON Runbook renderer と CLI parser / registry / bootstrap wiring を追加した。
+- S02 projection store/file writes、S03 skill assets、dogfooding mirror sync は未実装・未変更のまま残した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py
+
+7 passed
+
+uv run pytest tests/cli_runtime/test_runtime_shell_s11.py
+
+12 passed
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ | フェーズ | 計画した証跡要件 | 観測した証跡 | 証跡手段 | 結果 | メモ |
+|---|---|---|---|---|---|---|
+| S01 | Red | tc-001, tc-002, tc-003 red-required | worker reported planned failures after correcting an import-path test setup issue | worker Red report | pass | `workflow` CLI 未登録、domain modules 未実装で失敗 |
+| S01 | Green | targeted workflow unit/CLI tests pass | `7 passed` | `uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py` | pass | parent rerun confirmed after reviewer fixes |
+| S01 | Guard | shell/layer guard remains compatible | `12 passed` | `uv run pytest tests/cli_runtime/test_runtime_shell_s11.py` | pass | runtime shell smoke lane |
+| S01 | Lint / typecheck | targeted lint/typecheck clean | Ruff passed; mypy passed | targeted `uv run ruff check ...` and `uv run mypy ...` | pass | reviewer-fix verification |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ | 発見されたテスト / リスク | 起票元 | 実施した対応 | クロージャID / 新規ID | 計画修正要否 | 証跡 |
+|---|---|---|---|---|---|---|
+| S01 | Requirement scaffold detection is intentionally based on current template markers | worker | recorded as unresolved low-risk implementation note for reviewer focus | tc-001 | no | S01 worker summary |
+| S01 | Runbook projection write failure remains S02 scope | worker | no action in S01 | tc-004 | no | S01 scope boundary |
+| S01 | application layer read requirement text through infra-specific target shape | code-reviewer | added explicit `read_requirement_text` store contract and AssuranceStore implementation | tc-001 | no | code-reviewer P2 fix |
+| S01 | malformed assurance details were missing from `workflow next` Runbook output | code-reviewer | carried state details into Runbook JSON / Markdown output | tc-003 | no | code-reviewer P2 fix |
+| S01 | ready state lacked CLI coverage | code-reviewer | added valid-assurance CLI status test | tc-002 | no | code-reviewer P3 fix |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ | クロージャID | 計画上の close 条件 | 観測した証跡 | 結果 | メモ |
+|---|---|---|---|---|---|
+| S01 | tc-001 | no-active, requirement-capture, classification-required behavior tests pass | workflow unit/CLI tests `7 passed` | pass | AC-001/AC-002/AC-003 covered |
+| S01 | tc-002 | Lite candidate cannot reduce obligations without authorized profile and ready state uses valid authority | domain and CLI tests included in `7 passed` | pass | AC-004/AC-006 covered |
+| S01 | tc-003 | malformed assurance / unknown target fail closed or reject | CLI tests included in `7 passed` | pass | EC-001/EC-003 covered |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID | ステップ | 必須 | 証跡レベル | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ |
+|---|---|---|---|---|---|---|---|
+| tc-001 | S01 | yes | red-required | worker Red report | `uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py` | pass | no-active / requirement-capture / classification-required |
+| tc-002 | S01 | yes | red-required | worker Red report | `uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py` | pass | authorized_profile is obligation source; ready state CLI covered |
+| tc-003 | S01 | yes | red-required | worker Red report | `uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py` | pass | malformed assurance details and unknown target |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID | ステップ | 検証証跡 | 観測結果 | メモ |
+|---|---|---|---|---|
+| tc-001 | S01 | targeted pytest | pass | covered |
+| tc-002 | S01 | targeted pytest | pass | covered |
+| tc-003 | S01 | targeted pytest | pass | covered |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別 | クロージャID | テストID alias | 解決先クロージャID | 理由 | 計画修正要否 | 再レビュー要否 |
+|---|---|---|---|---|---|---|
+| none | tc-001〜tc-003 | planned tests | tc-001〜tc-003 | planned S01 scope のまま完了 | no | step code review required |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ | 委任ロール | 委任 worker 要約 | 変更ファイル | 実行 tests または docs-only 検証 | レビュアー判定 | 未解決リスク | 親統合判断 |
+|---|---|---|---|---|---|---|---|
+| S01 | dev-coder | workflow status/next stdout-only runtime and tests implemented; parent applied bounded reviewer fixes | runtime workflow files, assurance store requirement reader, and workflow tests | `uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py` -> 7 passed; targeted ruff/mypy -> pass; shell guard -> 18 passed in worker, 12 passed parent shell lane | code-reviewer pass | S02/S03/S90 remain pending | accepted for commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ | ゲート名 | レビュアーロール | 鮮度 | 状態 | リスク受容 | 昇格 / 完了判断 | メモ |
+|---|---|---|---|---|---|---|---|
+| S01 | step reviewer | code-reviewer | fresh | passed | no | proceed to S01 commit | Re-review passed with no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ | クロージャ状態 | コミット範囲 | コミットハッシュ / 最終台帳 | コミット後 clean 確認 | 差分なし根拠 | 差分なし確認済み契約 / ファイル | 差分なし diff-clean コマンド | 差分なし read-only 確認 |
+|---|---|---|---|---|---|---|---|---|
+| S01 | ready to commit | S01 runtime/tests/report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
 ## 最終品質ゲート（Final Quality Gate）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）

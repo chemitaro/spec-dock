@@ -73,6 +73,12 @@ class AssuranceStore:
         )
         return SourceBinding(artifacts=(artifact,))
 
+    def read_requirement_text(self, target: ResolvedIssueTarget) -> str | None:
+        requirement_path = target.issue_dir / "requirement.md"
+        if not requirement_path.exists() or not requirement_path.is_file():
+            return None
+        return requirement_path.read_text(encoding="utf-8")
+
     def read_contract(self, target: ResolvedIssueTarget) -> AssuranceStoreResult:
         path = target.issue_dir / "assurance.json"
         if not path.exists():
