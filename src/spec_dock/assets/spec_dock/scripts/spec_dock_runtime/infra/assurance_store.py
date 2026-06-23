@@ -24,6 +24,11 @@ from spec_dock_runtime.infra.active_store import load_active_manifest
 from spec_dock_runtime.infra.json_store import load_json
 
 ReadStatus = Literal["valid", "missing", "invalid"]
+_PLANNING_SOURCE_ARTIFACTS: tuple[tuple[str, str], ...] = (
+    ("requirement", "requirement.md"),
+    ("design", "design.md"),
+    ("plan", "plan.md"),
+)
 
 
 @dataclass(frozen=True)
@@ -62,16 +67,23 @@ class AssuranceStore:
         return self._resolve_ref_target(str(target))
 
     def build_requirement_source_binding(self, target: ResolvedIssueTarget) -> SourceBinding:
-        requirement_path = target.issue_dir / "requirement.md"
-        if not requirement_path.exists() or not requirement_path.is_file():
-            raise AssuranceStoreError("requirement_missing", f"Requirement artifact not found: {requirement_path}")
-        artifact = SourceArtifact(
-            path=requirement_path.relative_to(self.repo_root).as_posix(),
-            display_path=self._active_requirement_display_path(requirement_path),
-            role="requirement",
-            sha256=hashlib.sha256(requirement_path.read_bytes()).hexdigest(),
-        )
-        return SourceBinding(artifacts=(artifact,))
+        artifacts: list[SourceArtifact] = []
+        for role, filename in _PLANNING_SOURCE_ARTIFACTS:
+            artifact_path = target.issue_dir / filename
+            if not artifact_path.exists() or not artifact_path.is_file():
+                raise AssuranceStoreError(f"{role}_missing", f"Planning source artifact not found: {artifact_path}")
+            artifacts.append(
+                SourceArtifact(
+                    path=artifact_path.relative_to(self.repo_root).as_posix(),
+                    display_path=self._active_artifact_display_path(artifact_path, role=role),
+                    role=role,
+                    sha256=hashlib.sha256(artifact_path.read_bytes()).hexdigest(),
+                )
+            )
+        return SourceBinding(artifacts=tuple(artifacts))
+
+    def build_planning_source_binding(self, target: ResolvedIssueTarget) -> SourceBinding:
+        return self.build_requirement_source_binding(target)
 
     def read_requirement_text(self, target: ResolvedIssueTarget) -> str | None:
         requirement_path = target.issue_dir / "requirement.md"
@@ -152,7 +164,20 @@ class AssuranceStore:
         )
 
     def verify_contract(self, target: ResolvedIssueTarget) -> AssuranceStoreResult:
-        return self.read_contract(target)
+        result = self.read_contract(target)
+        if result.status != "valid" or result.contract is None:
+            return result
+        stale_details = self._stale_source_binding_details(result.contract)
+        if stale_details:
+            return AssuranceStoreResult(
+                status="invalid",
+                target=target,
+                contract=result.contract,
+                mode=result.contract.mode.value,
+                reason="stale_source_binding",
+                details=stale_details,
+            )
+        return result
 
     def write_contract(self, target: ResolvedIssueTarget, contract: AssuranceContract) -> Path:
         errors = validate_assurance_contract(contract)
@@ -235,16 +260,37 @@ class AssuranceStore:
             raise AssuranceStoreError("target_path_outside_repo", f"Path is outside repository: {path}")
         return resolved
 
-    def _active_requirement_display_path(self, requirement_path: Path) -> str | None:
-        active_requirement = self.specdock_dir / "active" / "issue" / "requirement.md"
-        if not active_requirement.exists():
+    def _active_artifact_display_path(self, artifact_path: Path, *, role: str) -> str | None:
+        active_artifact = self.specdock_dir / "active" / "issue" / f"{role}.md"
+        if not active_artifact.exists():
             return None
         try:
-            if active_requirement.resolve() == requirement_path.resolve():
-                return active_requirement.relative_to(self.repo_root).as_posix()
+            if active_artifact.resolve() == artifact_path.resolve():
+                return active_artifact.relative_to(self.repo_root).as_posix()
         except OSError:
             return None
         return None
+
+    def _stale_source_binding_details(self, contract: AssuranceContract) -> tuple[str, ...]:
+        details: list[str] = []
+        for artifact in contract.source_binding.artifacts:
+            artifact_path = Path(artifact.path)
+            if artifact_path.is_absolute():
+                details.append(f"role={artifact.role} path={artifact.path} reason=absolute_source_path")
+                continue
+            resolved = (self.repo_root / artifact_path).resolve()
+            if not resolved.exists() or not resolved.is_file():
+                details.append(
+                    f"role={artifact.role} path={artifact.path} expected_sha256={artifact.sha256} actual_sha256=missing"
+                )
+                continue
+            actual_sha256 = hashlib.sha256(resolved.read_bytes()).hexdigest()
+            if actual_sha256 != artifact.sha256:
+                details.append(
+                    f"role={artifact.role} path={artifact.path} expected_sha256={artifact.sha256} "
+                    f"actual_sha256={actual_sha256}"
+                )
+        return tuple(details)
 
     def _issue_records(self) -> list[_IssueRecord]:
         records: list[_IssueRecord] = []
@@ -308,6 +354,10 @@ class AssuranceStore:
             resolved = (self.repo_root / artifact_path).resolve()
             if not _is_relative_to(resolved, target.issue_dir):
                 errors.append("source_binding_path_not_issue_local")
+                continue
+            expected = target.issue_dir / f"{artifact.role}.md"
+            if artifact.role in {"requirement", "design", "plan"} and resolved != expected:
+                errors.append(f"source_binding_path_not_canonical:{artifact.role}")
         return tuple(errors)
 
 

@@ -42,6 +42,9 @@ def _make_issue(
     )
     issue_dir.mkdir(parents=True)
     (issue_dir / "requirement.md").write_text(body, encoding="utf-8")
+    (issue_dir / "design.md").write_text("# Design\n", encoding="utf-8")
+    (issue_dir / "plan.md").write_text("# Plan\n", encoding="utf-8")
+    (issue_dir / "report.md").write_text("# Report\n", encoding="utf-8")
     meta: dict[str, object] = {
         "schema_version": 1,
         "type": "issue",
@@ -79,14 +82,18 @@ def test_source_binding_persists_resolved_issue_local_path_and_active_display_pa
 
     target = store.resolve_issue_target(None)
     binding = store.build_requirement_source_binding(target)
-    artifact = binding.artifacts[0]
+    artifacts = {artifact.role: artifact for artifact in binding.artifacts}
+    artifact = artifacts["requirement"]
 
+    assert tuple(artifacts) == ("requirement", "design", "plan")
     assert artifact.path == (issue_dir / "requirement.md").relative_to(tmp_path).as_posix()
     assert artifact.display_path == "spec-dock/active/issue/requirement.md"
     assert artifact.role == "requirement"
     assert len(artifact.sha256) == 64
     assert artifact.sha256 == artifact.sha256.lower()
     int(artifact.sha256, 16)
+    assert artifacts["design"].display_path == "spec-dock/active/issue/design.md"
+    assert artifacts["plan"].display_path == "spec-dock/active/issue/plan.md"
 
     contract = assurance.build_assurance_contract(
         issue_id=target.issue_id,
@@ -96,7 +103,13 @@ def test_source_binding_persists_resolved_issue_local_path_and_active_display_pa
     store.write_contract(target, contract)
     result = store.read_contract(target)
     assert result.status == "valid"
-    assert result.contract == contract
+    assert result.contract is not None
+    assert result.contract.to_dict() == contract.to_dict()
+
+    verified = store.verify_contract(target)
+    assert verified.status == "valid"
+    assert verified.contract is not None
+    assert verified.contract.to_dict() == contract.to_dict()
 
 
 def test_missing_contract_is_strict_legacy_not_invalid(tmp_path: Path) -> None:
@@ -112,6 +125,111 @@ def test_missing_contract_is_strict_legacy_not_invalid(tmp_path: Path) -> None:
     assert result.mode == "strict-legacy"
     assert result.reason == "missing_assurance_contract"
     assert result.contract is None
+
+
+@pytest.mark.parametrize(("role", "filename"), [("requirement", "requirement.md"), ("design", "design.md"), ("plan", "plan.md")])
+def test_verify_contract_rejects_stale_planning_source_binding(
+    tmp_path: Path,
+    role: str,
+    filename: str,
+) -> None:
+    assurance, AssuranceStore, _ = _runtime_modules()
+    issue_dir = _make_issue(tmp_path)
+    store = AssuranceStore(tmp_path)
+    target = store.resolve_issue_target("iss-00227")
+    contract = assurance.build_assurance_contract(
+        issue_id=target.issue_id,
+        stage=assurance.ClassificationStage.REQUIREMENT,
+        source_binding=store.build_requirement_source_binding(target),
+    )
+    store.write_contract(target, contract)
+
+    (issue_dir / filename).write_text(f"# Changed {role}\n", encoding="utf-8")
+
+    result = store.verify_contract(target)
+
+    assert result.status == "invalid"
+    assert result.reason == "stale_source_binding"
+    assert result.contract is not None
+    assert result.contract.to_dict() == contract.to_dict()
+    assert any(f"role={role}" in detail for detail in result.details)
+    assert any("expected_sha256=" in detail and "actual_sha256=" in detail for detail in result.details)
+
+
+def test_verify_contract_rejects_partial_legacy_source_binding(tmp_path: Path) -> None:
+    assurance, AssuranceStore, _ = _runtime_modules()
+    issue_dir = _make_issue(tmp_path)
+    store = AssuranceStore(tmp_path)
+    target = store.resolve_issue_target("iss-00227")
+    payload = assurance.build_assurance_contract(
+        issue_id=target.issue_id,
+        stage=assurance.ClassificationStage.REQUIREMENT,
+        source_binding=store.build_requirement_source_binding(target),
+    ).to_dict()
+    payload["source_binding"]["artifacts"] = [
+        artifact for artifact in payload["source_binding"]["artifacts"] if artifact["role"] == "requirement"
+    ]
+    _write_json(issue_dir / "assurance.json", payload)
+
+    result = store.verify_contract(target)
+
+    assert result.status == "invalid"
+    assert result.reason == "invalid_schema"
+    assert "missing_source_binding_role:design" in result.details
+    assert "missing_source_binding_role:plan" in result.details
+
+
+def test_verify_contract_rejects_source_role_bound_to_wrong_artifact(tmp_path: Path) -> None:
+    assurance, AssuranceStore, _ = _runtime_modules()
+    issue_dir = _make_issue(tmp_path)
+    store = AssuranceStore(tmp_path)
+    target = store.resolve_issue_target("iss-00227")
+    payload = assurance.build_assurance_contract(
+        issue_id=target.issue_id,
+        stage=assurance.ClassificationStage.REQUIREMENT,
+        source_binding=store.build_requirement_source_binding(target),
+    ).to_dict()
+    requirement_artifact = next(
+        artifact for artifact in payload["source_binding"]["artifacts"] if artifact["role"] == "requirement"
+    )
+    for artifact in payload["source_binding"]["artifacts"]:
+        if artifact["role"] == "design":
+            artifact["path"] = requirement_artifact["path"]
+            artifact["sha256"] = requirement_artifact["sha256"]
+    _write_json(issue_dir / "assurance.json", payload)
+
+    result = store.verify_contract(target)
+
+    assert result.status == "invalid"
+    assert result.reason == "invalid_schema"
+    assert "source_binding_role_path_mismatch:design" in result.details
+
+
+def test_verify_contract_rejects_source_role_bound_to_nested_same_named_artifact(tmp_path: Path) -> None:
+    assurance, AssuranceStore, _ = _runtime_modules()
+    issue_dir = _make_issue(tmp_path)
+    nested_dir = issue_dir / "nested"
+    nested_dir.mkdir()
+    nested_design = nested_dir / "design.md"
+    nested_design.write_text("# Nested Design\n", encoding="utf-8")
+    store = AssuranceStore(tmp_path)
+    target = store.resolve_issue_target("iss-00227")
+    payload = assurance.build_assurance_contract(
+        issue_id=target.issue_id,
+        stage=assurance.ClassificationStage.REQUIREMENT,
+        source_binding=store.build_requirement_source_binding(target),
+    ).to_dict()
+    for artifact in payload["source_binding"]["artifacts"]:
+        if artifact["role"] == "design":
+            artifact["path"] = nested_design.relative_to(tmp_path).as_posix()
+            artifact["sha256"] = "1" * 64
+    _write_json(issue_dir / "assurance.json", payload)
+
+    result = store.verify_contract(target)
+
+    assert result.status == "invalid"
+    assert result.reason == "invalid_schema"
+    assert "source_binding_path_not_canonical:design" in result.details
 
 
 def test_invalid_json_and_invalid_schema_have_distinct_machine_reasons(tmp_path: Path) -> None:
@@ -202,7 +320,10 @@ def test_schema_validation_rejects_invalid_issue_id_and_non_issue_local_source_p
         stage=assurance.ClassificationStage.REQUIREMENT,
         source_binding=store.build_requirement_source_binding(store.resolve_issue_target("iss-00232")),
     ).to_dict()
-    source_path_payload["source_binding"]["artifacts"][0]["path"] = "README.md"
+    requirement_source = next(
+        artifact for artifact in source_path_payload["source_binding"]["artifacts"] if artifact["role"] == "requirement"
+    )
+    requirement_source["path"] = "not-an-issue/requirement.md"
     _write_json(source_path_dir / "assurance.json", source_path_payload)
 
     invalid_issue_id = store.verify_contract(store.resolve_issue_target("231"))
