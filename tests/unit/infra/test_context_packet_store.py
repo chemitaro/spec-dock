@@ -19,13 +19,11 @@ def test_context_packet_store_writes_ignored_projection_refs_with_hashes(tmp_pat
     context_packet_store = _runtime_modules()
     store = context_packet_store.ContextPacketStore(tmp_path)
 
-    result = store.write_current(
-        {
-            "schema_version": "context-packet-projection-v1",
-            "packets": [{"role": "dev-coder", "context_mode": "bounded_packet"}],
-            "invocation_events": [],
-        }
-    )
+    result = store.write_current({
+        "schema_version": "context-packet-projection-v1",
+        "packets": [{"role": "dev-coder", "context_mode": "bounded_packet"}],
+        "invocation_events": [],
+    })
 
     assert result.written is True
     assert result.errors == ()
@@ -52,18 +50,14 @@ def test_context_packet_store_rejects_symlinked_projection_path(tmp_path: Path) 
     assert result.errors
 
 
-def test_context_packet_store_replace_failure_preserves_existing_projection_set(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_context_packet_store_replace_failure_preserves_existing_projection_set(tmp_path: Path, monkeypatch) -> None:
     context_packet_store = _runtime_modules()
     store = context_packet_store.ContextPacketStore(tmp_path)
-    initial = store.write_current(
-        {
-            "schema_version": "context-packet-projection-v1",
-            "packets": [{"role": "dev-coder", "context_mode": "bounded_packet"}],
-            "invocation_events": [],
-        }
-    )
+    initial = store.write_current({
+        "schema_version": "context-packet-projection-v1",
+        "packets": [{"role": "dev-coder", "context_mode": "bounded_packet"}],
+        "invocation_events": [],
+    })
     assert initial.written is True
     existing = {ref["path"]: (tmp_path / ref["path"]).read_text(encoding="utf-8") for ref in initial.refs}
     replace_calls = 0
@@ -77,13 +71,11 @@ def test_context_packet_store_replace_failure_preserves_existing_projection_set(
 
     monkeypatch.setattr(context_packet_store, "_replace_path", fail_second_replace)
 
-    result = store.write_current(
-        {
-            "schema_version": "context-packet-projection-v1",
-            "packets": [{"role": "dev-coder", "context_mode": "recent_fork"}],
-            "invocation_events": [],
-        }
-    )
+    result = store.write_current({
+        "schema_version": "context-packet-projection-v1",
+        "packets": [{"role": "dev-coder", "context_mode": "recent_fork"}],
+        "invocation_events": [],
+    })
 
     assert result.written is False
     assert result.refs == ()
@@ -96,27 +88,23 @@ def test_context_packet_store_replace_failure_preserves_existing_projection_set(
 def test_context_packet_store_removes_stale_role_packets_on_rewrite(tmp_path: Path) -> None:
     context_packet_store = _runtime_modules()
     store = context_packet_store.ContextPacketStore(tmp_path)
-    first = store.write_current(
-        {
-            "schema_version": "context-packet-projection-v1",
-            "packets": [
-                {"role": "dev-coder", "context_mode": "recent_fork"},
-                {"role": "code-reviewer", "context_mode": "clean_room"},
-            ],
-            "invocation_events": [],
-        }
-    )
+    first = store.write_current({
+        "schema_version": "context-packet-projection-v1",
+        "packets": [
+            {"role": "dev-coder", "context_mode": "recent_fork"},
+            {"role": "code-reviewer", "context_mode": "clean_room"},
+        ],
+        "invocation_events": [],
+    })
     assert first.written is True
     reviewer_packet = tmp_path / "spec-dock/.agent/context-packets/code-reviewer-packet.json"
     assert reviewer_packet.exists()
 
-    second = store.write_current(
-        {
-            "schema_version": "context-packet-projection-v1",
-            "packets": [{"role": "dev-coder", "context_mode": "bounded_packet"}],
-            "invocation_events": [],
-        }
-    )
+    second = store.write_current({
+        "schema_version": "context-packet-projection-v1",
+        "packets": [{"role": "dev-coder", "context_mode": "bounded_packet"}],
+        "invocation_events": [],
+    })
 
     assert second.written is True
     assert not reviewer_packet.exists()

@@ -33,7 +33,10 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             assert payload["step_assurance"]["verification"] == ["unit_tests"]
             assert payload["step_assurance"]["reviewers"] == ["code-reviewer"]
             assert payload["context_packets"]["written"] is True
-            assert all(ref["path"].startswith("spec-dock/.agent/context-packets/") for ref in payload["context_packets"]["refs"])
+            assert all(
+                ref["path"].startswith("spec-dock/.agent/context-packets/")
+                for ref in payload["context_packets"]["refs"]
+            )
             assert all(ref["sha256"] for ref in payload["context_packets"]["refs"])
 
             events = payload["context_packets"]["invocation_events"]
@@ -67,6 +70,137 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
                 check=True,
             )
             assert status.stdout == ""
+
+    def test_workflow_next_dirty_worktree_forces_bounded_continuation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
+            self._write_substantive_requirement(issue_dir)
+            self._write_plan_and_report(issue_dir)
+            self._classify(target)
+            self._commit_baseline(target)
+            (target / "untracked-note.txt").write_text("local scratch\n", encoding="utf-8")
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-execution", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["step_assurance"]["selected_step"]["id"] == "S02"
+            assert payload["step_assurance"]["context_mode"] == "bounded_packet"
+            assert payload["step_assurance"]["continuation"] == {
+                "eligible": False,
+                "context_mode": "bounded_packet",
+                "reason_codes": ["worktree_not_clean"],
+            }
+            event = next(
+                event for event in payload["context_packets"]["invocation_events"] if event["role"] == "dev-coder"
+            )
+            assert event["context_mode"] == "bounded_packet"
+
+    def test_workflow_next_does_not_skip_step_from_scaffold_report_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
+            self._write_substantive_requirement(issue_dir)
+            self._write_plan_and_report(issue_dir)
+            (issue_dir / "report.md").write_text(
+                "# Report\n\n"
+                "#### 対象\n"
+                "- Step: S01, S02, ...\n\n"
+                "### セッションログ（2026-06-23 S01）\n\n"
+                "#### 対象\n"
+                "- Step: S01\n\n"
+                "#### ステップ契約の完了証跡\n"
+                "| ステップ | 結果 |\n"
+                "|---|---|\n"
+                "| S01 | fail |\n",
+                encoding="utf-8",
+            )
+            self._classify(target)
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-execution", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["step_assurance"]["selected_step"]["id"] == "S01"
+
+    def test_workflow_next_does_not_skip_step_from_red_phase_pass_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
+            self._write_substantive_requirement(issue_dir)
+            self._write_plan_and_report(issue_dir)
+            (issue_dir / "report.md").write_text(
+                "# Report\n\n"
+                "### セッションログ（2026-06-23 S01）\n\n"
+                "#### 対象\n"
+                "- Step: S01\n\n"
+                "#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）\n"
+                "| ステップ | フェーズ | 結果 |\n"
+                "|---|---|---|\n"
+                "| S01 | Red | pass |\n",
+                encoding="utf-8",
+            )
+            self._classify(target)
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-execution", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["step_assurance"]["selected_step"]["id"] == "S01"
+
+    def test_workflow_next_routes_plan_derived_task_kinds(self) -> None:
+        cases = [
+            ("docs-only", "doc-writer", "minimal_packet", ["docs_inspection"], ["spec-reviewer"]),
+            (
+                "migration rollback",
+                "dev-coder",
+                "bounded_packet",
+                ["unit_tests", "integration_tests", "rollback_plan"],
+                ["code-reviewer", "qa-reviewer"],
+            ),
+            (
+                "security privacy",
+                "dev-coder",
+                "bounded_packet",
+                ["unit_tests", "security_review", "privacy_review"],
+                ["code-reviewer", "qa-reviewer", "spec-reviewer"],
+            ),
+        ]
+        for marker, worker, context_mode, verification, reviewers in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
+                self._write_substantive_requirement(issue_dir)
+                self._write_single_step_plan_and_empty_report(issue_dir, marker)
+                self._classify(target)
+                self._commit_baseline(target)
+
+                result = self._run_runtime_capture(
+                    target,
+                    ["workflow", "next", "issue-execution", "--format", "json"],
+                )
+
+                assert result.returncode == 0, result.stdout + result.stderr
+                payload = json.loads(result.stdout)
+                assert payload["step_assurance"]["selected_step"]["id"] == "S01"
+                assert payload["step_assurance"]["worker"] == worker
+                assert payload["step_assurance"]["context_mode"] == context_mode
+                assert payload["step_assurance"]["verification"] == verification
+                assert payload["step_assurance"]["reviewers"] == reviewers
 
     def test_workflow_next_markdown_includes_step_assurance_and_packet_refs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -115,7 +249,9 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             self._write_substantive_requirement(issue_dir)
             self._write_plan_and_report(issue_dir)
             self._classify(target)
-            (target / "spec-dock/system/assurance/context-routing-policy.json").write_text("{not-json\n", encoding="utf-8")
+            (target / "spec-dock/system/assurance/context-routing-policy.json").write_text(
+                "{not-json\n", encoding="utf-8"
+            )
 
             result = self._run_runtime_capture(
                 target,
@@ -126,7 +262,9 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             payload = json.loads(result.stdout)
             assert payload["step_assurance"]["policy"]["status"] == "invalid"
             assert payload["step_assurance"]["context_mode"] == "bounded_packet"
-            reviewer_event = next(event for event in payload["context_packets"]["invocation_events"] if event["role"] == "code-reviewer")
+            reviewer_event = next(
+                event for event in payload["context_packets"]["invocation_events"] if event["role"] == "code-reviewer"
+            )
             assert reviewer_event["context_mode"] == "clean_room"
             assert reviewer_event["packet_hash"] is None
             assert reviewer_event["missing_reason"] == "context_policy_invalid"
@@ -151,7 +289,9 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            reviewer_event = next(event for event in payload["context_packets"]["invocation_events"] if event["role"] == "code-reviewer")
+            reviewer_event = next(
+                event for event in payload["context_packets"]["invocation_events"] if event["role"] == "code-reviewer"
+            )
             assert "custom_reviewer_exclusion" in reviewer_event["exclude_categories"]
 
     def test_unselectable_step_does_not_prompt_implementation_start(self) -> None:
@@ -234,12 +374,29 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             "# Report\n\n"
             "### セッションログ（2026-06-23 S01）\n\n"
             "#### 対象\n"
-            "- Step: S01\n",
+            "- Step: S01\n\n"
+            "#### ステップ契約の完了証跡\n"
+            "| ステップ | 結果 |\n"
+            "|---|---|\n"
+            "| S01 | pass |\n\n"
+            "#### メモ\n"
+            "- Reviewer context remains fail-closed for unavailable policy.\n",
             encoding="utf-8",
         )
 
+    def _write_single_step_plan_and_empty_report(self, issue_dir: Path, marker: str) -> None:
+        (issue_dir / "plan.md").write_text(
+            f"# Plan\n\n## 実装ステップ S01 — Plan-derived routing\n- Task marker: {marker}\n",
+            encoding="utf-8",
+        )
+        (issue_dir / "report.md").write_text("# Report\n", encoding="utf-8")
+
     def _commit_baseline(self, target: Path) -> None:
         subprocess.run(["git", "add", "."], cwd=target, check=True, capture_output=True, text=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=target, check=True, capture_output=True, text=True)
-        subprocess.run(["git", "config", "user.name", "SpecDock Test"], cwd=target, check=True, capture_output=True, text=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"], cwd=target, check=True, capture_output=True, text=True
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "SpecDock Test"], cwd=target, check=True, capture_output=True, text=True
+        )
         subprocess.run(["git", "commit", "-m", "baseline"], cwd=target, check=True, capture_output=True, text=True)

@@ -58,18 +58,16 @@ def render_workflow_markdown(result: WorkflowResult) -> CliText:
         lines.extend(f"- {detail}" for detail in runbook.details)
     if runbook.step_assurance is not None:
         selected = runbook.step_assurance.get("selected_step", {})
-        lines.extend(
-            [
-                "",
-                "## Step Assurance",
-                f"- selected_step: {selected.get('id', '(unknown)')}",
-                f"- worker: {runbook.step_assurance.get('worker')}",
-                f"- reasoning_effort: {runbook.step_assurance.get('reasoning_effort')}",
-                f"- context_mode: {runbook.step_assurance.get('context_mode')}",
-                f"- verification: {', '.join(runbook.step_assurance.get('verification', []))}",
-                f"- reviewers: {', '.join(runbook.step_assurance.get('reviewers', []))}",
-            ]
-        )
+        lines.extend([
+            "",
+            "## Step Assurance",
+            f"- selected_step: {selected.get('id', '(unknown)')}",
+            f"- worker: {runbook.step_assurance.get('worker')}",
+            f"- reasoning_effort: {runbook.step_assurance.get('reasoning_effort')}",
+            f"- context_mode: {runbook.step_assurance.get('context_mode')}",
+            f"- verification: {', '.join(runbook.step_assurance.get('verification', []))}",
+            f"- reviewers: {', '.join(runbook.step_assurance.get('reviewers', []))}",
+        ])
     if runbook.context_packets is not None:
         lines.extend(["", "## Context Packets"])
         lines.append(f"- written: {_bool_text(bool(runbook.context_packets.get('written')))}")

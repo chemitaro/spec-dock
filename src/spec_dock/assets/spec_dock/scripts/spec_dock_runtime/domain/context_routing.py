@@ -37,13 +37,11 @@ class TaskKind(str, Enum):
     SECURITY_SENSITIVE = "security-sensitive"
 
 
-REVIEWER_ROLES = frozenset(
-    {
-        AgentRole.CODE_REVIEWER,
-        AgentRole.QA_REVIEWER,
-        AgentRole.SPEC_REVIEWER,
-    }
-)
+REVIEWER_ROLES = frozenset({
+    AgentRole.CODE_REVIEWER,
+    AgentRole.QA_REVIEWER,
+    AgentRole.SPEC_REVIEWER,
+})
 CONSULTANT_ROLES = frozenset({AgentRole.CONSULTANT})
 CLEAN_ROOM_ROLES = REVIEWER_ROLES | CONSULTANT_ROLES
 
@@ -210,12 +208,17 @@ def context_routing_policy_from_dict(payload: dict[str, Any]) -> ContextRoutingP
         raw_rule = matrix_payload.get(task_kind.value)
         if not isinstance(raw_rule, dict):
             raise ValueError(f"context routing policy missing rule for {task_kind.value}")
+        reviewers = tuple(AgentRole(value) for value in _require_str_tuple(raw_rule, "reviewers"))
+        non_reviewer_roles = tuple(role.value for role in reviewers if role not in REVIEWER_ROLES)
+        if non_reviewer_roles:
+            joined_roles = ", ".join(non_reviewer_roles)
+            raise ValueError(f"context routing policy has non-reviewer roles in reviewers: {joined_roles}")
         routing_matrix[task_kind] = {
             "worker": AgentRole(_require_str(raw_rule, "worker")),
             "reasoning_effort": ReasoningEffort(_require_str(raw_rule, "reasoning_effort")),
             "context_mode": ContextMode(_require_str(raw_rule, "context_mode")),
             "verification": _require_str_tuple(raw_rule, "verification"),
-            "reviewers": tuple(AgentRole(value) for value in _require_str_tuple(raw_rule, "reviewers")),
+            "reviewers": reviewers,
         }
 
     reviewer_exclusions = _require_str_tuple(payload, "reviewer_exclusions")
