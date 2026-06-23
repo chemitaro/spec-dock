@@ -1,6 +1,6 @@
+from pathlib import Path
 import shlex
 import tempfile
-from pathlib import Path
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 

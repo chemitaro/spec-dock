@@ -5,13 +5,13 @@ from dataclasses import replace
 from .ids import deps_node_sort_key
 from .models import (
     ActiveSelection,
-    DepsDependencyDisposition,
     DepsDependencyContext,
+    DepsDependencyDisposition,
     DepsDispositionBasis,
     DepsEvaluation,
     DepsHighLevelStatus,
-    DepsNodeState,
     DepsNodeBlocker,
+    DepsNodeState,
     DepsState,
     IssueStatusSnapshot,
     NodeId,

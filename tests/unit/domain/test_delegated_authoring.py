@@ -1,6 +1,6 @@
+from pathlib import Path
 import sys
 import tempfile
-from pathlib import Path
 
 
 def _runtime_modules():

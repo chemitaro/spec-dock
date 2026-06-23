@@ -1,12 +1,11 @@
 import json
 import os
-import tempfile
 from pathlib import Path
-
-from tests.cli_runtime.harness import CliRuntimeHarness, main
-
+import tempfile
 
 import pytest
+
+from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
 class TestCliClose(CliRuntimeHarness):

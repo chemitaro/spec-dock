@@ -1,13 +1,13 @@
+import contextlib
+from pathlib import Path
+import re
 import sys
 import tempfile
 import threading
 import time
-from pathlib import Path
 
-
-import contextlib
 import pytest
-import re
+
 _MISSING = object()
 
 
@@ -55,9 +55,11 @@ def _runtime_modules():
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime import app as runtime_app
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import create_node as app_create_node
-        from spec_dock_runtime.application import ports as app_ports
+        from spec_dock_runtime.application import (
+            contracts as app_contracts,
+            create_node as app_create_node,
+            ports as app_ports,
+        )
         from spec_dock_runtime.commands import new as new_commands
         from spec_dock_runtime.infra import contracts as infra_contracts
         from spec_dock_runtime.presentation import cli_text as presentation_cli_text

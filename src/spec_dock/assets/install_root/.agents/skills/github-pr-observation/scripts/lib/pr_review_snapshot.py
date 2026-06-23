@@ -1,11 +1,11 @@
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
 
 
 def fail_usage(parser):

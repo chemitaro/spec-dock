@@ -1,11 +1,9 @@
 import os
-import tempfile
 from pathlib import Path
+import re
+import tempfile
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
-
-
-import re
 
 
 class TestCliRulesContract(CliRuntimeHarness):

@@ -1,6 +1,6 @@
 import ast
-import sys
 from pathlib import Path
+import sys
 
 import pytest
 
@@ -16,10 +16,12 @@ def _runtime_modules():
     )
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        from spec_dock_runtime.domain import deps as domain_deps
-        from spec_dock_runtime.domain import models as domain_models
-        from spec_dock_runtime.domain import status as domain_status
-        from spec_dock_runtime.domain import tree as domain_tree
+        from spec_dock_runtime.domain import (
+            deps as domain_deps,
+            models as domain_models,
+            status as domain_status,
+            tree as domain_tree,
+        )
     finally:
         sys.path.pop(0)
 
@@ -54,9 +56,11 @@ def _runtime_validation_modules():
     )
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        from spec_dock_runtime.domain import models as domain_models
-        from spec_dock_runtime.domain import tree as domain_tree
-        from spec_dock_runtime.domain import validation as domain_validation
+        from spec_dock_runtime.domain import (
+            models as domain_models,
+            tree as domain_tree,
+            validation as domain_validation,
+        )
     finally:
         sys.path.pop(0)
     return domain_models, domain_tree, domain_validation

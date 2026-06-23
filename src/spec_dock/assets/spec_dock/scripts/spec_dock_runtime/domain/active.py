@@ -3,8 +3,7 @@ from __future__ import annotations
 import re
 
 from .ids import find_existing_id_by_num, parse_id
-from .models import BranchDecision, SpecNode
-from .models import SpecGraph
+from .models import BranchDecision, SpecGraph, SpecNode
 
 # Branch inference helpers (best-effort):
 # - Prefer explicit ids embedded in branch names.

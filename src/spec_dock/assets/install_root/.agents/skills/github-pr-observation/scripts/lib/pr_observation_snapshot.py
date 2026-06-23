@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
+from dataclasses import dataclass
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from pathlib import Path
 
 PR_METADATA_FIELDS = "headRefOid,url,state,isDraft,number"
 

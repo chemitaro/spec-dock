@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
+import shutil
 
 
 def render_text(text: str, replacements: dict[str, str]) -> str:

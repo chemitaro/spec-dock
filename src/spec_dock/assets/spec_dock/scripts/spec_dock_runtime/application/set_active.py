@@ -20,6 +20,7 @@ from ..domain.ids import format_id, parse_id
 from ..domain.models import ActiveSelection, BranchDecision, NodeId, SpecGraph, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph, select_active_chain
 from ..infra.contracts import ActiveManifest, ActiveManifestEntry, StoredMetaRecord
+from .check_deps import load_cached_high_level_github_state_by_id, resolve_high_level_status_context
 from .contracts import (
     ActiveClearResult,
     ActiveSetResult,
@@ -33,7 +34,6 @@ from .contracts import (
 from .github_issue_targets import collect_repo_scoped_issue_view_targets, normalize_repo_slug
 from .ports import Ports
 from .repo_context import resolve_current_repo_slug
-from .check_deps import load_cached_high_level_github_state_by_id, resolve_high_level_status_context
 from .status_context import resolve_issue_status_context
 
 

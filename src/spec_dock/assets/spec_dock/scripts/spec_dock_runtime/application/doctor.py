@@ -10,8 +10,13 @@ from ..domain.validation import validate_graph_and_deps
 from ..infra.contracts import ActiveManifestEntry, DirectDependencyResolution, StoredMetaRecord
 from . import create_node as app_create_node
 from .artifact_preflight import validate_required_artifacts_for_graph
-from .contracts import DoctorFinding, DoctorRequest, DoctorResult
-from .contracts import GitHubCapabilityDiagnostic, GitHubCapabilityProbeRequest
+from .contracts import (
+    DoctorFinding,
+    DoctorRequest,
+    DoctorResult,
+    GitHubCapabilityDiagnostic,
+    GitHubCapabilityProbeRequest,
+)
 from .ports import Ports
 from .repo_context import resolve_current_repo_slug
 

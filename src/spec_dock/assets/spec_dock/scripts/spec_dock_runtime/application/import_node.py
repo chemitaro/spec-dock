@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import shlex
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
-from typing import Literal
-from typing import cast
+import shlex
+from typing import Literal, cast
 
 from ..domain.ids import resolve_id_input, resolve_input_title_and_slug
 from ..domain.models import ActiveSelection, SpecGraph, SpecNode, SpecNodeKind
@@ -18,9 +17,9 @@ from .create_node import (
     CreateWritePhase,
     _acquire_create_lock,
     _doctor_guidance_message,
-    _runtime_entrypoint_path,
     _post_write_duplicate_guard,
     _release_create_lock,
+    _runtime_entrypoint_path,
     create_write_phase_has_local_writes,
     execute_create_plan,
     guard_github_issue_uniqueness,

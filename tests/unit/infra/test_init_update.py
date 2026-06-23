@@ -1,8 +1,11 @@
 import ast
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
+from datetime import datetime, timedelta, timezone
 import importlib.util
 import io
 import json
 import os
+from pathlib import Path
 import re
 import shlex
 import shutil
@@ -12,23 +15,21 @@ import tarfile
 import tempfile
 import time
 import zipfile
-from contextlib import contextmanager, redirect_stderr, redirect_stdout
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
     import tomli as tomllib
 
+import pytest
+
 from tests.cli_runtime.harness import (
-    CliRuntimeHarness,
     _DELETED_ROLE_SKILL_NAMES,
     _EXPECTED_MANAGED_SKILL_NAMES as _HARNESS_EXPECTED_MANAGED_SKILL_NAMES,
+    CliRuntimeHarness,
     _expected_spec_dock_version,
     main,
 )
-import pytest
 
 _EXPECTED_MANAGED_SKILL_NAMES = _HARNESS_EXPECTED_MANAGED_SKILL_NAMES
 

@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-from ..commands import active as active_commands
-from ..commands import close as close_commands
-from ..commands import delete as delete_commands
-from ..commands import delegated_authoring as delegated_authoring_commands
-from ..commands import deps as deps_commands
-from ..commands import doctor as doctor_commands
-from ..commands import import_cmd as import_commands
-from ..commands import issue as issue_commands
-from ..commands import new as new_commands
-from ..commands import sync as sync_commands
-from ..commands import uninstall as uninstall_commands
-from ..commands import update as update_commands
-from ..commands import validate as validate_commands
-from ..commands import worktree as worktree_commands
+from ..commands import (
+    active as active_commands,
+    close as close_commands,
+    delegated_authoring as delegated_authoring_commands,
+    delete as delete_commands,
+    deps as deps_commands,
+    doctor as doctor_commands,
+    import_cmd as import_commands,
+    issue as issue_commands,
+    new as new_commands,
+    sync as sync_commands,
+    uninstall as uninstall_commands,
+    update as update_commands,
+    validate as validate_commands,
+    worktree as worktree_commands,
+)
 from ..commands.contracts import CommandRegistry, CommandSpec
 
 

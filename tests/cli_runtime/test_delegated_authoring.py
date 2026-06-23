@@ -1,14 +1,13 @@
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
-
-from tests.cli_runtime.harness import CliRuntimeHarness, main
-
 
 import pytest
+
+from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
 class TestDelegatedAuthoringCli(CliRuntimeHarness):

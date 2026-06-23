@@ -1,14 +1,15 @@
+import contextlib
 from dataclasses import replace
 import io
 import json
 import os
+from pathlib import Path
 import stat
 import sys
 import tempfile
-from pathlib import Path
 
-import contextlib
 import pytest
+
 _REQUIRED_NODE_DOCS = ("requirement.md", "design.md", "plan.md", "report.md")
 
 
@@ -24,15 +25,19 @@ def _runtime_modules():
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime import app as runtime_app
-        from spec_dock_runtime.application import check_deps as app_check_deps
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import ports as app_ports
-        from spec_dock_runtime.application import status_context as app_status_context
-        from spec_dock_runtime.application import validate_tree as app_validate_tree
+        from spec_dock_runtime.application import (
+            check_deps as app_check_deps,
+            contracts as app_contracts,
+            ports as app_ports,
+            status_context as app_status_context,
+            validate_tree as app_validate_tree,
+        )
         from spec_dock_runtime.domain import models as domain_models
         from spec_dock_runtime.infra import contracts as infra_contracts
-        from spec_dock_runtime.presentation import cli_text as presentation_cli_text
-        from spec_dock_runtime.presentation import json_state as presentation_json_state
+        from spec_dock_runtime.presentation import (
+            cli_text as presentation_cli_text,
+            json_state as presentation_json_state,
+        )
     finally:
         sys.path.pop(0)
 

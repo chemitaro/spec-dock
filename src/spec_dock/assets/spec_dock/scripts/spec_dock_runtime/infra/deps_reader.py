@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import re
 from pathlib import Path
+import re
 from typing import Any
 
 from ..domain.ids import deps_node_sort_key, find_existing_id_by_num, format_id, parse_id
 from ..domain.models import SpecGraph
-from .contracts import DirectDependencyResolution
-from .contracts import DepsDependencyContext
-from .contracts import DepsTopologyLoadResult
+from .contracts import DepsDependencyContext, DepsTopologyLoadResult, DirectDependencyResolution
 from .git_cli import origin_github_repo_slug
 from .json_store import load_json
 

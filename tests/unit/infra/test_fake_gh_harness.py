@@ -1,10 +1,11 @@
 import json
 import os
-import pytest
+from pathlib import Path
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
+
+import pytest
 
 from tests.cli_runtime.harness import CliRuntimeHarness
 

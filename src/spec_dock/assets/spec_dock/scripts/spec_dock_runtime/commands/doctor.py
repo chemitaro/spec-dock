@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import argparse
-import re
 from dataclasses import dataclass
+import re
 
 from ..application.contracts import DoctorRequest, UseCases
 from ..presentation.cli_text import render_doctor_text

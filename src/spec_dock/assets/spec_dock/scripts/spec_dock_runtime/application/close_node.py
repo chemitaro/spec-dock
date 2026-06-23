@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import cast
 
 from ..domain.ids import format_id, parse_id
-from ..domain.models import SpecGraph, SpecNodeSeed, SpecNodeKind
+from ..domain.models import SpecGraph, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
 from ..infra.contracts import StoredMetaRecord
 from .contracts import CloseNodeRequest, CloseNodeResult, TargetRef

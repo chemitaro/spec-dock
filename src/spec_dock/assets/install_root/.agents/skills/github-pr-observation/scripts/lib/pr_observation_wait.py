@@ -1,14 +1,13 @@
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import os
+from pathlib import Path
 import shutil
 import signal
 import subprocess
 import sys
 import time
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-
 
 REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS = 300
 REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS = 300

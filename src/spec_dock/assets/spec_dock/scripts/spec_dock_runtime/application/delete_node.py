@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+from pathlib import Path
 import re
 import shutil
-from pathlib import Path
 from typing import Any, Literal, cast
 
 from ..domain.ids import format_id, parse_id
@@ -14,10 +14,10 @@ from ..infra.contracts import ActiveManifest, ActiveStateSnapshot, StoredMetaRec
 from .contracts import (
     ClearActiveRequest,
     DeleteDependencyScrubFailure,
-    DeleteTerminalStatus,
     DeleteNodeRequest,
     DeleteNodeResult,
     DeleteRemoteCloseBuckets,
+    DeleteTerminalStatus,
     DeleteValidationReason,
 )
 from .github_issue_targets import normalize_repo_slug

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from pathlib import Path
+import re
 
 from .contracts import (
     GitWorktreeRecord,
@@ -18,7 +18,6 @@ from .contracts import (
     WorktreeShowResult,
 )
 from .ports import Ports
-
 
 _LABEL_RE = re.compile(r"^[a-z0-9-]+$")
 _MAX_ATTEMPTS = 10000

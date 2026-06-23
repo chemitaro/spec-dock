@@ -1,11 +1,9 @@
+import contextlib
 import io
 import json
+from pathlib import Path
 import sys
 import tempfile
-from pathlib import Path
-
-
-import contextlib
 
 
 def _runtime_modules():
@@ -20,11 +18,12 @@ def _runtime_modules():
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime import app as runtime_app
-        from spec_dock_runtime.application import contracts as app_contracts
-        from spec_dock_runtime.application import ports as app_ports
-        from spec_dock_runtime.application import set_active as app_set_active
-        from spec_dock_runtime.infra import active_store as infra_active_store
-        from spec_dock_runtime.infra import contracts as infra_contracts
+        from spec_dock_runtime.application import (
+            contracts as app_contracts,
+            ports as app_ports,
+            set_active as app_set_active,
+        )
+        from spec_dock_runtime.infra import active_store as infra_active_store, contracts as infra_contracts
         from spec_dock_runtime.presentation import cli_text as presentation_cli_text
     finally:
         sys.path.pop(0)

@@ -11,14 +11,14 @@ are handled by the repo-local runtime script installed at:
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
+from importlib.resources import as_file, files
 import json
 import os
+from pathlib import Path
 import re
 import shutil
 import sys
-from contextlib import contextmanager
-from importlib.resources import as_file, files
-from pathlib import Path
 from typing import Any, Iterator, NamedTuple
 
 from spec_dock import __version__
