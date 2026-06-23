@@ -489,6 +489,8 @@ def _prefix_for_kind(kind: Literal["initiative", "epic", "issue"]) -> str:
 def _resolve_github_mode(
     req: CreateNodeRequest, kind: Literal["initiative", "epic", "issue"]
 ) -> Literal["create", "link_existing"]:
+    del kind
+
     if req.github_mode is None:
         return "create"
     if req.github_mode not in ("create", "link_existing"):
@@ -1232,6 +1234,8 @@ def plan_discussion_doc(
     now_iso_provider: Callable[[], str | None] | None = None,
     sleep_fn: Callable[[float], None] | None = None,
 ) -> tuple[Path, Path, dict[str, str]]:
+    del today
+
     scope = _resolve_scope_node(req, graph)
     doc_type, title, slug = _normalize_discussion_doc_inputs(req)
 
@@ -1386,6 +1390,8 @@ def _validate_pre_github_create_inputs(
     kind: Literal["initiative", "epic", "issue"],
     mode: Literal["create", "link_existing"],
 ) -> None:
+    del mode
+
     if kind == "epic" and req.parent_id is None:
         raise RuntimeError("--initiative is required")
 
