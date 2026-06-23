@@ -49,7 +49,9 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-230-P01 | resolved | test-strategy | orchestrator | `assurance classify` currently defaults unknown risk facts to `standard`, while Epic I04 records strict/deep assurance intent | manually edit `assurance.json`; expand classifier in planning; keep Issue-local plan gates strict | Keep the generated contract valid and enforce strict reviewer / validation obligations through `plan.md`; classifier semantic expansion is not part of this Issue's approved scope. | `assurance.json` is validated by runtime schema and source binding; changing classifier behavior belongs to assurance core, not context routing. | applied | `./spec-dock/scripts/spec-dock assurance classify --stage requirement --format json`; `./spec-dock/scripts/spec-dock assurance verify --format json`; `plan.md` S01/S02/S99 | none |
+| D-230-P02 | resolved | scope | spec-reviewer | Planning docs omitted parent I04 invocation observability and full worker-continuation freshness criteria. | keep original narrower contract; adopt full parent I04 criteria | Adopt full parent criteria for invocation event observability and continuation freshness. | Parent Epic I04 explicitly closes E-RQ-016/E-RQ-021 and issue implementation would otherwise pass while missing those obligations. | applied | spec-reviewer finding P1; `requirement.md`; `design.md`; `plan.md` | none |
+| D-230-P03 | resolved | scope | spec-reviewer | Issue docs used `system/policies/...` for context routing policy while parent Epic uses `system/assurance/...`. | supersede parent path; align issue path with parent path | Adopt parent Epic path: provider `src/spec_dock/assets/spec_dock/system/assurance/context-routing-policy.json` and schema `src/spec_dock/assets/spec_dock/system/assurance/schemas/context-routing-policy.schema.json`; mirror under `spec-dock/system/assurance/...`. | Policy file location is a shipped scaffold API surface and should not diverge from Epic design during Issue execution. | applied | spec-reviewer finding P1; `design.md`; `plan.md` | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +65,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-230-P01 | adopted | parent Epic design/plan and ADR discussions | issue planning artifacts | Epic I04 already fixes the scope for step assurance, context routing, clean-room reviewer packets, and bounded return contracts; the issue docs adopt that scope without adding PR review semantics. | `spec-dock/active/epic/design.md`; `spec-dock/active/epic/plan.md`; `requirement.md`; `design.md`; `plan.md` | spec-review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +73,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-230-P01 | Step-level resource allocation and context routing are captured in AC-001 through AC-011 and S01/S02/S90/S99. | Classifier precision mismatch is recorded as Issue-local test-strategy decision, not implemented as extra scope; policy paths now match parent Epic. | low | spec-review pass with P2 traceability fixes applied locally |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +81,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement / design / plan | Inspected active issue scaffold, parent Epic I04 scope, current `assurance/workflow/runbook` runtime modules, generated planning Runbook, and spec-reviewer findings. | P1 findings resolved; spec-reviewer re-review passed with P2 traceability findings, then AC-011/S02 and tc-230-009 final closure references were corrected. | adopted | passed | no | promote to implementation-ready |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
