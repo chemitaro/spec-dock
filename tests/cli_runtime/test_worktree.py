@@ -216,7 +216,7 @@ class TestCliWorktree(CliRuntimeHarness):
             assert p.returncode == 0, p.stderr
             current_branch = self._run_git(target, ["branch", "--show-current"]).stdout.strip()
             expected_path = central_root / "sample-repo" / "sample-repo-wt1"
-            assert f"id=wt1" in p.stdout
+            assert "id=wt1" in p.stdout
             assert f"path={expected_path}" in p.stdout
             assert "bootstrap status=skipped" in p.stdout
             assert expected_path.is_dir()

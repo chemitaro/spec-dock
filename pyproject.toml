@@ -37,7 +37,7 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = []
+select = ["F"]
 
 [project.scripts]
 spec-dock = "spec_dock.cli:main"

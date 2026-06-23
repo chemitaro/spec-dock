@@ -4,7 +4,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
@@ -15,6 +14,8 @@ try:
 except ModuleNotFoundError:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
     from spec_dock.cli import main
+
+__all__ = ["main"]
 
 
 def _expected_spec_dock_version() -> str:

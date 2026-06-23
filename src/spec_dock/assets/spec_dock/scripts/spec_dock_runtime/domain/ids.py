@@ -125,7 +125,6 @@ def resolve_id_input(value: str, *, prefix: str, field: str, nodes: dict[str, An
     if NUM_RE.fullmatch(raw):
         num = int(raw)
         normal = format_id(prefix, num, local=False)
-        local_id = format_id(prefix, num, local=True)
         if not nodes:
             return normal
         existing_normal = find_existing_id_by_num(nodes, prefix=prefix, num=num, local=False)

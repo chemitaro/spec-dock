@@ -140,6 +140,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - Issue authoring phase completed. `requirement.md`, `design.md`, and `plan.md` have fresh spec-reviewer passes and are marked `approved`.
 - Implementation execution can start from `plan.md` S01, with report evidence recorded per step.
 - S01 completed: Ruff dependency/config skeleton, root `Makefile` `lint`, and `scripts/static_analysis/run.sh` were added. Direct command target is `src/spec_dock tests`; dogfooding `spec-dock/` remains excluded from direct Ruff/mypy targets.
+- S02 in progress: Ruff `F` was enabled and Pyflakes violations were reduced to 0. A first code-reviewer pass found removed runtime app-level renderer aliases; the aliases were restored and the deps runtime test passed. Final S02 code-reviewer gate is pending after report evidence update.
 
 ## 実装記録（セッションログ） (必須)
 
@@ -234,7 +235,7 @@ make lint
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | ready to commit | `pyproject.toml`; `uv.lock`; `scripts/static_analysis/run.sh`; `Makefile`; `report.md` S01 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S01 | committed | `pyproject.toml`; `uv.lock`; `scripts/static_analysis/run.sh`; `Makefile`; `report.md` S01 evidence | `02760ed9` `build(static-analysis): Ruff基盤とlintコマンドを追加` | `git status --short` -> clean; post-commit `make lint` -> pass | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `pyproject.toml` - Ruff dev dependency and S01 config skeleton.
@@ -244,63 +245,90 @@ make lint
 - `report.md` - S01 observed evidence.
 
 #### コミット
-- pending S01 commit.
+- `02760ed9` `build(static-analysis): Ruff基盤とlintコマンドを追加`
 
 #### メモ
 - `select = []` is intentional for S01 so later steps add Ruff rules from `F` onward without starting cleanup early.
 
-### セッションログ（2026-06-23 HH:MM - HH:MM）
+### セッションログ（2026-06-23 13:13 JST - 13:34 JST）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S02 — Ruff F
+- AC/EC: AC-005, EC-001
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` S02 executable contract
+  - closure id: `tc-s02-001`
 
 #### 実施内容
-- ...
+- `dev-coder` に S02 を委任し、許可 path を `pyproject.toml`, `src/spec_dock/**/*.py`, `tests/**/*.py` に限定した。
+- `pyproject.toml` の `[tool.ruff.lint] select` を `["F"]` に変更した。
+- 初回 `F` inventory は total 68 件だった。
+  - `F401 unused-import`: 65 件。代表: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`, `tests/cli_runtime/test_active.py`
+  - `F841 unused-variable`: 2 件。代表: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/ids.py`, `tests/unit/infra/test_init_update.py`
+  - `F541 f-string-missing-placeholders`: 1 件。代表: `tests/cli_runtime/test_worktree.py`
+- 未使用 import、未使用 local 変数、placeholder なし f-string を最小変更で修正した。
+- `application/sync_state.py` の内部 import は、`domain.validation` 経由の private re-export ではなく定義元 `domain.discussion_docs` から直接 import する形にした。
+- `tests/cli_runtime/harness.py` の `main` fallback import は他テスト向け再エクスポートとして `__all__ = ["main"]` で明示した。
+- code-reviewer の P1 指摘により、`spec_dock_runtime.app._render_deps_check_text` / `_render_deps_check_json` の app-level monkeypatch surface を `__all__` 付きで復元した。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+uv run ruff check --select F src/spec_dock tests
+# All checks passed!
 
-<result>
+make lint
+# ==> ruff check
+# All checks passed!
+# Summary:
+# - ruff check: pass
+
+uv run pytest tests/cli_runtime/test_runtime_deps_s04.py -q
+# 28 passed in 0.10s
+
+uv run pytest tests/cli_runtime/test_active.py::TestCliActive::test_active_set_initiative_and_epic_keep_missing_layers_as_placeholder tests/cli_runtime/test_runtime_validate_s02.py::TestRuntimeValidateS02::test_validate_exit_0_and_stdout_only tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_75_pr_review_wrapper_rejects_unsafe_inputs_before_gh_api -q
+# 3 passed in 1.35s
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=140
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S02 | Red / inventory | `tc-s02-001`: `F` violation inventory を記録する | total 68: `F401` 65, `F841` 2, `F541` 1 | worker command: `uv run ruff check --select F --statistics src/spec_dock tests` | pass | 代表ファイルは実施内容に記録 |
+| S02 | Green | `F` violation 0 件 | `uv run ruff check --select F src/spec_dock tests` -> All checks passed | command | pass | 親側でも再実行済み |
+| S02 | Regression | app-level renderer alias 互換を維持する | `test_runtime_deps_s04.py` は alias 削除時に `AttributeError` を検出し、復元後 `28 passed` | command | pass | code-reviewer P1 の修正証跡 |
+| S02 | Refactor | guardrail satisfied / no unrelated refactor | S03 以降 rule は追加せず、`spec-dock/` direct target なし | diff inspection | pass | dogfooding mirror drift は S90 で扱う |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S02 | `spec_dock_runtime.app._render_deps_check_text` / `_render_deps_check_json` の monkeypatch surface は既存テストが利用している | code-reviewer | aliases を `__all__` 付きで復元 | tc-s02-001 | no | code-reviewer fail then fix; `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py -q` -> 28 passed |
+| S02 | provider runtime asset 変更により dogfooding mirror drift が発生する | dev-coder | S02 では `spec-dock/` を編集せず、S90 evidence として記録 | tc-s90-001 | no | worker inspection: `test_checked_in_dogfooding_runtime_mirror_match_provider_assets` failed due mirror drift |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S02 | tc-s02-001 | Ruff `F` を追加し violation を 0 件にする | `pyproject.toml` select `["F"]`; `uv run ruff check --select F src/spec_dock tests` -> pass | pass | app-level deps renderer aliases were restored after reviewer finding |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-s02-001 / tc-s02-case-001 | S02 | yes | command | initial `F` inventory total 68 | `uv run ruff check --select F src/spec_dock tests` | pass | `F` violation 0 件 |
+| tc-s02-001 / tc-s02-regression-001 | S02 | yes | command | alias削除時に `test_runtime_deps_s04.py` が `AttributeError` を検出 | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py -q` | pass | `28 passed` |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-s02-001 | S02 | `uv run ruff check --select F src/spec_dock tests`; `make lint`; focused runtime pytest; `spec-dock validate` | pass | AC-005 S02 closed pending reviewer pass and commit |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| alias-mapped | tc-s02-001 | tc-s02-case-001 | tc-s02-001 | planned closure unchanged; concrete command case recorded | no | yes |
+| added | tc-s02-001 | tc-s02-regression-001 | tc-s02-001 | reviewer-discovered compatibility regression needed focused pytest evidence | no | yes |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
@@ -314,12 +342,12 @@ make lint
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S02 | delegated | lint rule adoption implementation step | dev-coder | Ruff `F` enablement and all `F` violation fixes | requirement/design/plan S02 | `pyproject.toml`; `src/spec_dock/**/*.py`; `tests/**/*.py` | report edits; commit; S03+ rules; dogfooding `spec-dock/`; broad suppression | `uv run ruff check --select F src/spec_dock tests`; focused pytest as needed | public/runtime compatibility break; direct dogfooding edit needed; scope outside S02 | changed files; inventory; command results; ledger note | pass after reviewer-directed alias restoration |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S02 | dev-coder | Ruff `F` enabled; `F401`/`F841`/`F541` fixed; internal discussion-doc regex import moved to definition module; app-level deps renderer aliases restored after review | `pyproject.toml`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/ids.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py`; `tests/cli_runtime/harness.py`; `tests/cli_runtime/test_active.py`; `tests/cli_runtime/test_deps.py`; `tests/cli_runtime/test_import.py`; `tests/cli_runtime/test_new.py`; `tests/cli_runtime/test_sync.py`; `tests/cli_runtime/test_validate.py`; `tests/cli_runtime/test_worktree.py`; `tests/unit/infra/test_init_update.py` | `uv run ruff check --select F src/spec_dock tests` -> pass; `test_runtime_deps_s04.py` -> 28 passed; representative 3-test command -> 3 passed | pending code-reviewer rerun after report evidence | dogfooding mirror drift remains deferred to S90 | accepted for reviewer rerun |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -329,22 +357,32 @@ make lint
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S02 | step reviewer first pass | code-reviewer | fresh | failed | no | blocked until fix | P1: removed app-level deps renderer aliases |
+| S02 | step reviewer second pass | code-reviewer | fresh | failed | no | blocked until report evidence update | P1: S02 evidence missing from `report.md`; code compatibility finding resolved |
+| S02 | step reviewer third pass | code-reviewer | fresh | passed | N/A | proceed to step commit | pass: code-reviewer `019ef2c8-2187-7e51-ab54-26cacbd6e749`; no findings |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S02 | ready to commit | S02 implementation files plus `report.md` S02 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `pyproject.toml` - Ruff `F` selection.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - unused imports removed; deps renderer aliases retained explicitly.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` - discussion-doc filename regex imported from definition module.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/ids.py` - unused local removed.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - unused private re-export removed.
+- `tests/cli_runtime/harness.py` - `main` re-export made explicit via `__all__`.
+- `tests/cli_runtime/test_active.py`, `tests/cli_runtime/test_deps.py`, `tests/cli_runtime/test_import.py`, `tests/cli_runtime/test_new.py`, `tests/cli_runtime/test_sync.py`, `tests/cli_runtime/test_validate.py` - unused imports removed.
+- `tests/cli_runtime/test_worktree.py` - placeholder-free f-string converted to a plain string.
+- `tests/unit/infra/test_init_update.py` - unused import/local removed.
+- `report.md` - S02 observed evidence.
 
 #### コミット
-- <hash> <message>
+- pending S02 step commit.
 
 #### メモ
-- ...
+- `spec-dock/` dogfooding mirror is intentionally not updated in S02. S90 will resolve refresh/inspection evidence.
 
 ---
 

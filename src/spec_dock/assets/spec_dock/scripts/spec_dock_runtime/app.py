@@ -21,7 +21,6 @@ Design goals:
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import re
 import shutil
@@ -35,21 +34,9 @@ from .cli.bootstrap import build_runtime as _cli_build_runtime
 from .cli.dispatch import dispatch as _cli_dispatch
 from .cli.parser import build_parser as _cli_build_parser
 from .cli.registry import build_registry as _cli_build_registry
-from .application.contracts import CheckDepsRequest as _CheckDepsRequest
-from .application.contracts import ClearActiveRequest as _ClearActiveRequest
-from .application.contracts import CreateDiscussionDocRequest as _CreateDiscussionDocRequest
-from .application.contracts import CreateNodeRequest as _CreateNodeRequest
-from .application.contracts import ImportNodeRequest as _ImportNodeRequest
-from .application.contracts import SetActiveRequest as _SetActiveRequest
-from .application.contracts import ShowActiveRequest as _ShowActiveRequest
-from .application.contracts import SyncRequest as _SyncRequest
-from .application.contracts import TargetRef as _TargetRef
-from .application.contracts import ValidateTreeRequest as _ValidateTreeRequest
 from .github import (
     _ensure_gh_available,
-    _gh_issue_create,
     _gh_issue_index,
-    _gh_issue_view_minimal,
 )
 from .infra.git_cli import origin_github_repo_slug as _origin_github_repo_slug
 from .domain.models import SpecGraph, SpecNodeSeed
@@ -61,32 +48,19 @@ from .domain.validation import (
 from .ids import (
     _deps_node_sort_key,
     _find_existing_id_by_num,
-    _format_id,
     _parse_id,
-    _resolve_id_input,
-    _resolve_input_title_and_slug,
-    _slugify,
-    _validate_input_slug_kebab,
 )
 from .io_json import _load_json, _now_iso, _try_make_readonly, _warn, _write_json
 from .presentation.cli_text import render_deps_check_text as _render_deps_check_text
-from .presentation.cli_text import render_active_clear_text as _render_active_clear_text
-from .presentation.cli_text import render_new_doc_text as _render_new_doc_text
-from .presentation.cli_text import render_new_node_text as _render_new_node_text
-from .presentation.cli_text import render_import_text as _render_import_text
-from .presentation.cli_text import render_active_set_text as _render_active_set_text
-from .presentation.cli_text import render_active_show_text as _render_active_show_text
-from .presentation.cli_text import render_sync_text as _render_sync_text
-from .presentation.cli_text import render_validate_text as _render_validate_text
 from .presentation.json_state import render_deps_check_json as _render_deps_check_json
-from .render_md import _render_dashboard_md, _render_deps_disabled_dashboard_md
 from .render_puml import (
     _deps_disabled_error_text,
-    _render_deps_disabled_deps_issues_puml,
-    _render_deps_disabled_tree_puml,
-    _render_deps_issues_puml,
-    _render_tree_ready_board_puml,
 )
+
+__all__ = [
+    "_render_deps_check_json",
+    "_render_deps_check_text",
+]
 
 _SPEC_DOCK_DIRNAME = "spec-dock"
 
