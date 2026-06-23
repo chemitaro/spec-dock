@@ -49,7 +49,7 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | interpretation | orchestrator + deep-consultant | GitHub issue #235 は `iss-00207` と重複するか、別 edge case か。 | 重複として閉じる; `iss-00207` に吸収する; high-level source direct dependency の別 issue として扱う。 | #235 は high-level source 自体の direct dependency が issue-keyed projection で落ちる問題であり、issue source -> high-level target を扱う `iss-00207` とは別 scope。 | 手動再現で `.meta.json.depends_on` は保存されたが、`deps check --id init-00001` / `index-all` / `deps-issues` から消えた。既存 tests は source issue axis が中心。 | applied | `discussions/20260623t162536z-research-high-level-source-dependency-projection-root-cause.md` | future requirement/design/plan に source-axis test matrix を反映する。 |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +63,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | `adopted` | research + manual command | issue analysis | GitHub #235 の保存済み raw dependency が readiness/index projection から失われることを reduced reproduction で確認したため。 | `discussions/20260623t162536z-research-high-level-source-dependency-projection-root-cause.md`; `/private/tmp/iss-00235-repro`; `deps check --id init-00001 --no-github --json` -> `ready: true`, empty dependency fields | future requirement/design/plan に受け入れ条件と test matrix を反映する。 |
+| EAL-002 | `adopted` | sub-agent | issue analysis | runtime/domain、artifact/contract、issue-scope comparison の3観点が、raw storage ではなく issue-keyed projection loss を根本原因とする点で一致したため。 | `discussions/20260623t162536z-research-high-level-source-dependency-projection-root-cause.md` deep-consultant synthesis | design で raw node dependency result と issue readiness result を分離する。 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +72,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | GitHub #235 の再現確認と根本原因を research に記録した。 | issue scaffold 作成、issue start、deep-consultant 3系統の統合。 | low | provisional |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +80,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| research | `discussions/20260623t162536z-research-high-level-source-dependency-projection-root-cause.md`; manual reproduction; code inspection; deep-consultant synthesis | `deps-raw.puml` の complete audit contract は design decision が必要。 | adopted | provisional | no | requirement/design/plan authoring |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
