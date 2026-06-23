@@ -1847,7 +1847,7 @@ git diff --check
 ### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S16 | ready to commit | S16 format config and format-only files plus `report.md` S16 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S16 | committed | S16 format config and format-only files plus `report.md` S16 evidence | `70ac50f2` | `git status --short` clean; format check pass; `make lint` pass; validate pass | N/A | N/A | N/A | N/A |
 
 ### 変更したファイル
 - `pyproject.toml` - Ruff format config.
@@ -1856,7 +1856,77 @@ git diff --check
 - `report.md` - S15 commit gate correction and S16 observed evidence.
 
 ### コミット
-- pending S16 step commit.
+- `70ac50f2` style(static-analysis): Ruff formatを適用する
+
+---
+
+## 実装セッションログ S17 — Final Local Gate Script
+
+### 実施概要
+- Step: S17 — Final Local Gate Script
+- Delegated worker: dev-coder `019ef39b-ecfe-7ed2-be85-c89ce8fea9d0`
+- Scope: `make lint` / `scripts/static_analysis/run.sh` が Ruff check、Ruff format check、mypy をまとめて実行する状態にする。
+- Parent decision: `Makefile` と `pyproject.toml` は変更不要。既存 `run_check` phase に `ruff format --check` を追加するだけで S17 closure を満たす。
+
+### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S17 | Red / missing phase | `make lint` が Ruff check、Ruff format check、mypy を実行する | pre-change `make lint` summary は `ruff check` と `mypy` のみ | inspection / prior output | pass | S17 gap identified |
+| S17 | Green | `make lint` が 3 phase 全て pass | `ruff check: pass`; `ruff format check: pass`; `mypy: pass` | command | pass | AC-003/008 |
+| S17 | Failure behavior | fail 時に summary と non-zero exit を返す | `run_check` captures status, records fail, sets `EXIT_CODE=1`, continues to summary, exits with final code | script inspection | pass | no `set -e` |
+| S17 | Refactor | final gate script only | diff is one line in `scripts/static_analysis/run.sh`; `Makefile` / `pyproject.toml` unchanged | diff inspection + code-reviewer | pass | code-reviewer pass |
+
+### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S17 | `make lint` が format check を含まないと S16 closure を local gate で保証できない | dev-coder / parent | `run_check "ruff format check" uv run ruff format --check "${TARGETS[@]}"` を追加 | tc-s17-001 | no | `make lint` -> 3 phase pass |
+
+### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S17 | tc-s17-001 | `make lint` green; summary and failure behavior exist | `make lint` runs Ruff check, Ruff format check, mypy; all pass; failure behavior inspected; code-reviewer pass | pass | code-reviewer pass |
+
+### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s17-001 | S17 | yes | command + inspection | `make lint` lacked format phase | `make lint`; script inspection; `git diff --check`; validate | pass | code-reviewer pending |
+
+### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s17-001 | S17 | `make lint`; `git diff --check`; `./spec-dock/scripts/spec-dock validate`; script inspection; code-reviewer pass | pass | AC-003/008 S17 closed pending commit |
+
+### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-s17-001 | N/A | tc-s17-001 | planned closure unchanged | no | yes |
+
+### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S17 | delegated | final local gate script step | dev-coder | local grouped script update | requirement/design/plan S17 | `scripts/static_analysis/run.sh`; `Makefile`; `pyproject.toml` if needed | new rules; source cleanup; CI/pre-commit; dogfooding generated-copy source edits; commit | `make lint`; failure behavior inspection; diff check | final gate cannot run all required phases | changed files; make lint output; failure behavior | pass |
+
+### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S17 | dev-coder | `ruff format --check` phase added to grouped script; Makefile unchanged | `scripts/static_analysis/run.sh` | `make lint` -> 3 phase pass; `git diff --check` pass | pass: code-reviewer `019ef39e-5a12-7030-929c-efe462e47d29` | none | accepted for S17 step commit |
+
+### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S17 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit | pass: code-reviewer `019ef39e-5a12-7030-929c-efe462e47d29`; no findings |
+
+### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S17 | ready to commit | `scripts/static_analysis/run.sh` plus `report.md` S17 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+### 変更したファイル
+- `scripts/static_analysis/run.sh` - add Ruff format check phase to grouped local gate.
+- `report.md` - S16 commit gate correction and S17 observed evidence.
+
+### コミット
+- pending S17 step commit.
 
 ---
 
