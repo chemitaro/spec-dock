@@ -6847,7 +6847,7 @@ import threading
 from contextlib import contextmanager
 from pathlib import Path
 
-sys.path.insert(0, %r)
+sys.path.insert(0, __RUNTIME_SCRIPTS_DIR__)
 try:
     from spec_dock_runtime.application import contracts as app_contracts
     from spec_dock_runtime.application import create_node as app_create_node
@@ -7732,7 +7732,7 @@ with tempfile.TemporaryDirectory() as td:
     assert f"{runtime_cmd} new issue --title 'Refresh token'" not in message, message
     assert len(issue_gateway.calls) == 1, issue_gateway.calls
     assert (epic_dir / "issues" / "iss-00818-refresh-token" / ".meta.json").exists()
-""" % str(runtime_scripts_dir)
+""".replace("__RUNTIME_SCRIPTS_DIR__", repr(str(runtime_scripts_dir)))
         result = subprocess.run(
             [sys.executable, "-c", check_code],
             cwd=str(repo_root),
@@ -7749,7 +7749,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, %r)
+sys.path.insert(0, __RUNTIME_SCRIPTS_DIR__)
 try:
     from spec_dock_runtime.application import contracts as app_contracts
     from spec_dock_runtime.application import create_node as app_create_node
@@ -7944,7 +7944,7 @@ with tempfile.TemporaryDirectory() as td:
         assert "Outcome: pre_github_fail" in message, (case_name, message)
         assert "GitHub issue was created:" not in message, (case_name, message)
         assert issue_gateway.calls == [], (case_name, issue_gateway.calls)
-""" % str(runtime_scripts_dir)
+""".replace("__RUNTIME_SCRIPTS_DIR__", repr(str(runtime_scripts_dir)))
         result = subprocess.run(
             [sys.executable, "-c", check_code],
             cwd=str(repo_root),
@@ -7964,7 +7964,7 @@ import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
-sys.path.insert(0, %r)
+sys.path.insert(0, __RUNTIME_SCRIPTS_DIR__)
 try:
     from spec_dock_runtime.application import contracts as app_contracts
     from spec_dock_runtime.application import create_node as app_create_node
@@ -8170,7 +8170,7 @@ with tempfile.TemporaryDirectory() as td:
     assert f"{runtime_cmd} new epic --title 'JWT auth'" in message, message
     assert "--initiative init-local-00001" in message, message
     assert "--github-issue 961" in message, message
-""" % str(runtime_scripts_dir)
+""".replace("__RUNTIME_SCRIPTS_DIR__", repr(str(runtime_scripts_dir)))
         result = subprocess.run(
             [sys.executable, "-c", check_code],
             cwd=str(repo_root),
@@ -8187,7 +8187,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, %r)
+sys.path.insert(0, __RUNTIME_SCRIPTS_DIR__)
 try:
     from spec_dock_runtime.application import contracts as app_contracts
     from spec_dock_runtime.application import create_node as app_create_node
@@ -8321,7 +8321,7 @@ with tempfile.TemporaryDirectory() as td:
     assert "Outcome: pre_github_fail" in message, message
     assert "GitHub issue was created:" not in message, message
     assert issue_gateway.calls == [], issue_gateway.calls
-""" % str(runtime_scripts_dir)
+""".replace("__RUNTIME_SCRIPTS_DIR__", repr(str(runtime_scripts_dir)))
         result = subprocess.run(
             [sys.executable, "-c", check_code],
             cwd=str(repo_root),

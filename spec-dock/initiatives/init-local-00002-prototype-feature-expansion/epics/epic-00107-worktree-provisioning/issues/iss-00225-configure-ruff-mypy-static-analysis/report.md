@@ -596,7 +596,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S04 | ready to commit | S04 implementation files plus `report.md` S04 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S04 | committed | S04 implementation files plus `report.md` S04 evidence | `e6eb11ec` `build(static-analysis): Ruff I違反を解消する` | `git status --short` -> clean; post-commit `make lint` -> pass; `spec-dock validate` -> pass | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `pyproject.toml` - Ruff `I` selection and isort settings.
@@ -604,10 +604,118 @@ git diff --check
 - `report.md` - S03 commit correction and S04 observed evidence.
 
 #### コミット
-- pending S04 step commit.
+- `e6eb11ec` `build(static-analysis): Ruff I違反を解消する`
 
 #### メモ
 - pytest was not run for S04 because the diff is import sorting only and code-reviewer accepted Ruff/lint/validate evidence as sufficient.
+
+---
+
+### セッションログ（2026-06-23 HH:MM - HH:MM）
+
+#### 対象
+- Step: S05 — Ruff UP
+- AC/EC: AC-005, EC-001
+
+#### 実施内容
+- `dev-coder` に S05 を委任し、許可 path を `pyproject.toml`, `src/spec_dock/**/*.py`, `tests/**/*.py` に限定した。
+- `pyproject.toml` の Ruff `select` を `["F", "E", "I", "UP"]` に変更した。
+- 初回 inventory は total 12 件だった。
+  - `UP035`: 5 件。代表: `src/spec_dock/cli.py`, `application/contracts.py`
+  - `UP031`: 4 件。代表: `tests/unit/infra/test_init_update.py`
+  - `UP012`: 1 件。代表: `src/spec_dock/cli.py`
+  - `UP022`: 1 件。代表: `infra/github_capability_cli.py`
+  - `UP037`: 1 件。代表: `application/delegated_authoring.py`
+- `typing.Callable` / `Iterator` / `Mapping` を `collections.abc` import に移した。
+- 不要な `.encode("utf-8")` を `.encode()` に変更した。
+- `from __future__ import annotations` 配下の不要な quoted annotation を解除した。
+- `stdout=subprocess.PIPE, stderr=subprocess.PIPE` を `capture_output=True` に置換した。
+- `tests/unit/infra/test_init_update.py` の埋め込み script 文字列は、`%r` formatting から placeholder + `repr(str(runtime_scripts_dir))` 置換へ局所変更した。
+- Python 3.10 support は維持した。`target-version = "py310"` は維持し、使用 API は Python 3.10 で利用可能。
+
+#### 実行コマンド / 結果
+```bash
+uv run ruff check --select F,E,I,UP src/spec_dock tests
+# All checks passed!
+
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_runtime_issue_create_pre_github_validation_parity tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_runtime_create_mode_graph_preflight_parity tests/cli_runtime/test_runtime_doctor_s04.py::TestRuntimeDoctorS04::test_github_capability_cli_reports_missing_gh_as_auth_missing -q
+# 5 passed in 0.40s
+
+git diff --check
+# pass
+
+make lint
+# ==> ruff check
+# All checks passed!
+# Summary:
+# - ruff check: pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S05 | Red / inventory | `tc-s05-001`: `UP` violation inventory | total 12: `UP035` 5, `UP031` 4, `UP012` 1, `UP022` 1, `UP037` 1 | worker command: `uv run ruff check --select F,E,I,UP src/spec_dock tests` | pass | 代表ファイルは実施内容に記録 |
+| S05 | Green | `F,E,I,UP` violation 0 件 | `uv run ruff check --select F,E,I,UP src/spec_dock tests` -> All checks passed | command | pass | 親側でも再実行済み |
+| S05 | Regression | modernization の behavior impact を確認 | focused pytest 5 passed | command | pass | embedded script / subprocess capability path を確認 |
+| S05 | Refactor | guardrail satisfied / no unrelated refactor | S06 以降 rule は追加せず、`spec-dock/` direct target なし | diff inspection | pass | broad suppression なし |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S05 | embedded script 文字列の `%r` -> placeholder 置換が parity tests に影響し得る | dev-coder / orchestrator | 関連 parity tests 4 件を focused pytest に含めた | tc-s05-001 | no | focused pytest 5 passed |
+| S05 | `capture_output=True` 置換が GitHub capability check path に影響し得る | dev-coder / orchestrator | missing-gh focused test を実行 | tc-s05-001 | no | `test_github_capability_cli_reports_missing_gh_as_auth_missing` pass |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S05 | tc-s05-001 | Ruff `UP` を追加し violation を 0 件にする。Python 3.10 support を破らない | `pyproject.toml` select `["F", "E", "I", "UP"]`; `uv run ruff check --select F,E,I,UP src/spec_dock tests` -> pass; focused pytest -> pass | pass | Python 3.10-compatible APIs only |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s05-001 / tc-s05-case-001 | S05 | yes | command | initial `UP` inventory total 12 | `uv run ruff check --select F,E,I,UP src/spec_dock tests` | pass | `F,E,I,UP` violation 0 件 |
+| tc-s05-001 / tc-s05-regression-001 | S05 | yes | command | embedded script and subprocess modernization could affect behavior | focused pytest command | pass | `5 passed` |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s05-001 | S05 | `uv run ruff check --select F,E,I,UP src/spec_dock tests`; focused pytest; `git diff --check`; `make lint`; code-reviewer pass | pass | AC-005 S05 closed pending commit |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s05-001 | tc-s05-case-001 | tc-s05-001 | planned closure unchanged; concrete command case recorded | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S05 | delegated | modernization lint rule adoption step | dev-coder | Ruff `UP` enablement and modernization fixes | requirement/design/plan S05 | `pyproject.toml`; `src/spec_dock/**/*.py`; `tests/**/*.py` | report edits; commit; S06+ rules; dogfooding `spec-dock/`; broad suppression; Python 3.10 incompatible rewrite | `uv run ruff check --select F,E,I,UP src/spec_dock tests`; focused pytest as needed | Python 3.10 support break; behavior regression; direct dogfooding edit needed | changed files; inventory; command results; py310 rationale | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S05 | dev-coder | Ruff `UP` enabled; typing imports modernized; redundant encoding and quoted annotations removed; subprocess capture modernized; embedded script formatting updated | `pyproject.toml`; `src/spec_dock/cli.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delegated_authoring.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/contracts.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authority.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_capability_cli.py`; `tests/unit/infra/test_init_update.py` | `uv run ruff check --select F,E,I,UP src/spec_dock tests` -> pass; focused pytest -> 5 passed; `git diff --check` -> pass | pass: code-reviewer `019ef2de-9f3e-7821-bfe5-a773cd924855` | none | accepted for S05 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S05 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit | pass: code-reviewer `019ef2de-9f3e-7821-bfe5-a773cd924855`; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S05 | ready to commit | S05 implementation files plus `report.md` S05 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `pyproject.toml` - Ruff `UP` selection.
+- `src/spec_dock/cli.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/**/*.py`, `tests/unit/infra/test_init_update.py` - UP modernization fixes.
+- `report.md` - S04 commit correction and S05 observed evidence.
+
+#### コミット
+- pending S05 step commit.
+
+#### メモ
+- No material implementation decisions beyond the approved plan.
 
 ---
 
