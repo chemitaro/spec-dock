@@ -1179,12 +1179,12 @@ def _deps_evaluate_v2(
         if issue_id in reachable_issue_ids:
             continue
         reachable_issue_ids.add(issue_id)
-        for dep_id in reversed(sorted(issue_direct_depends_on.get(issue_id, []), key=_deps_node_sort_key)):
+        for dep_id in sorted(issue_direct_depends_on.get(issue_id, []), key=_deps_node_sort_key, reverse=True):
             if dep_id not in reachable_issue_ids:
                 stack.append(dep_id)
 
     reachable_depends_on = {
-        issue_id: sorted(list(issue_direct_depends_on.get(issue_id, [])), key=_deps_node_sort_key)
+        issue_id: sorted(issue_direct_depends_on.get(issue_id, []), key=_deps_node_sort_key)
         for issue_id in sorted(reachable_issue_ids, key=_deps_node_sort_key)
     }
     _validate_deps_cycles(reachable_depends_on)
@@ -1252,7 +1252,7 @@ def _deps_evaluate_v2(
             if isinstance(dep_id, str):
                 effective_set.add(dep_id)
 
-    effective_depends_on = sorted(list(effective_set), key=_deps_node_sort_key)
+    effective_depends_on = sorted(effective_set, key=_deps_node_sort_key)
     blockers = list(effective_depends_on)
 
     target_node = nodes.get(target_id)
@@ -2084,7 +2084,7 @@ def _compile_issue_direct_depends_on_map(nodes: dict[str, _Node]) -> tuple[dict[
                     issue_depends_on[src_issue_id].add(dep_issue_id)
 
     compiled = {
-        issue_id: sorted(list(issue_depends_on.get(issue_id, set())), key=_deps_node_sort_key)
+        issue_id: sorted(issue_depends_on.get(issue_id, set()), key=_deps_node_sort_key)
         for issue_id in issue_ids
     }
     return compiled, warning_codes
@@ -2109,7 +2109,7 @@ def _derive_issue_deps_fields(
 
     def closure_excluding_done(start_issue_id: str) -> list[str]:
         seen: set[str] = set()
-        stack = list(reversed(sorted(issue_direct_depends_on.get(start_issue_id, []), key=_deps_node_sort_key)))
+        stack = sorted(issue_direct_depends_on.get(start_issue_id, []), key=_deps_node_sort_key, reverse=True)
         while stack:
             dep_id = stack.pop()
             if dep_id in seen:

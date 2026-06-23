@@ -814,7 +814,7 @@ make lint
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S06 | ready to commit | S06 implementation files plus `report.md` S06 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+| S06 | committed | S06 implementation files plus `report.md` S06 evidence | `06506c61` `build(static-analysis): Ruff B違反を解消する` | `git status --short` -> clean; post-commit `make lint` -> pass; `spec-dock validate` -> pass | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `pyproject.toml` - Ruff `B` selection.
@@ -823,7 +823,100 @@ make lint
 - `report.md` - S05 commit correction and S06 observed evidence.
 
 #### コミット
-- pending S06 step commit.
+- `06506c61` `build(static-analysis): Ruff B違反を解消する`
+
+#### メモ
+- No material implementation decisions beyond the approved plan.
+
+---
+
+### セッションログ（2026-06-23 HH:MM - HH:MM）
+
+#### 対象
+- Step: S07 — Ruff C4
+- AC/EC: AC-005, EC-001
+
+#### 実施内容
+- `dev-coder` に S07 を委任し、許可 path を `pyproject.toml`, `src/spec_dock/**/*.py`, `tests/**/*.py` に限定した。
+- `pyproject.toml` の Ruff `select` を `["F", "E", "I", "UP", "B", "C4"]` に変更した。
+- 初回 inventory は total 6 件だった。
+  - `C413`: 2 件。代表: runtime `app.py` の `reversed(sorted(...))`
+  - `C414`: 4 件。代表: runtime `app.py`, `infra/deps_reader.py` の `sorted(list(...))`
+- `reversed(sorted(...))` を `sorted(..., reverse=True)` に変更した。
+- `sorted(list(x))` を `sorted(x)` に変更した。
+- `stack.pop()` 前提の箇所は逆順投入が必要なため `reverse=True` を使い、探索順を維持した。
+
+#### 実行コマンド / 結果
+```bash
+uv run ruff check --select F,E,I,UP,B,C4 src/spec_dock tests
+# All checks passed!
+
+uv run pytest tests/cli_runtime/test_runtime_deps_s04.py tests/cli_runtime/test_runtime_active_s06.py -q
+# 41 passed in 0.11s
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S07 | Red / inventory | `tc-s07-001`: comprehension violation inventory | total 6: `C413` 2, `C414` 4 | worker command: `uv run ruff check --select F,E,I,UP,B,C4 src/spec_dock tests` | pass | 代表ファイルは実施内容に記録 |
+| S07 | Green | `F,E,I,UP,B,C4` violation 0 件 | `uv run ruff check --select F,E,I,UP,B,C4 src/spec_dock tests` -> All checks passed | command | pass | 親側でも再実行済み |
+| S07 | Regression | dependency traversal / active behavior を維持 | focused pytest 41 passed | command | pass | deps and active runtime tests |
+| S07 | Refactor | guardrail satisfied / no unrelated refactor | S08 以降 rule は追加せず、`spec-dock/` direct target なし | diff inspection | pass | broad suppression なし |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S07 | `reversed(sorted(...))` rewrite が stack traversal order を変え得る | dev-coder / orchestrator | `sorted(..., reverse=True)` を採用し、deps/active focused pytest を実行 | tc-s07-001 | no | focused pytest 41 passed; code-reviewer confirmed traversal order |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S07 | tc-s07-001 | Ruff `C4` を追加し violation を 0 件にする | `pyproject.toml` select `["F", "E", "I", "UP", "B", "C4"]`; `uv run ruff check --select F,E,I,UP,B,C4 src/spec_dock tests` -> pass; focused pytest -> pass | pass | code-reviewer confirmed traversal order |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s07-001 / tc-s07-case-001 | S07 | yes | command | initial `C4` inventory total 6 | `uv run ruff check --select F,E,I,UP,B,C4 src/spec_dock tests` | pass | `F,E,I,UP,B,C4` violation 0 件 |
+| tc-s07-001 / tc-s07-regression-001 | S07 | yes | command | stack traversal order and dependency output could change | focused pytest command | pass | `41 passed` |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-s07-001 | S07 | `uv run ruff check --select F,E,I,UP,B,C4 src/spec_dock tests`; focused pytest; code-reviewer pass | pass | AC-005 S07 closed pending commit |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | tc-s07-001 | tc-s07-case-001 | tc-s07-001 | planned closure unchanged; concrete command case recorded | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S07 | delegated | comprehension lint rule adoption step | dev-coder | Ruff `C4` enablement and comprehension fixes | requirement/design/plan S07 | `pyproject.toml`; `src/spec_dock/**/*.py`; `tests/**/*.py` | report edits; commit; S08+ rules; dogfooding `spec-dock/`; broad suppression | `uv run ruff check --select F,E,I,UP,B,C4 src/spec_dock tests`; focused pytest as needed | traversal order regression; direct dogfooding edit needed | changed files; inventory; command results; behavior rationale | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S07 | dev-coder | Ruff `C4` enabled; `reversed(sorted(...))` and `sorted(list(...))` rewrites applied | `pyproject.toml`; runtime `app.py`; runtime `infra/deps_reader.py` | `uv run ruff check --select F,E,I,UP,B,C4 src/spec_dock tests` -> pass; focused pytest -> 41 passed | pass: code-reviewer `019ef2eb-d03b-7c62-9fc5-9984545c990e` | none | accepted for S07 step commit |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S07 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to step commit | pass: code-reviewer `019ef2eb-d03b-7c62-9fc5-9984545c990e`; no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S07 | ready to commit | S07 implementation files plus `report.md` S07 evidence | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `pyproject.toml` - Ruff `C4` selection.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - comprehension rewrites preserving dependency traversal order.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/deps_reader.py` - comprehension rewrite.
+- `report.md` - S06 commit correction and S07 observed evidence.
+
+#### コミット
+- pending S07 step commit.
 
 #### メモ
 - No material implementation decisions beyond the approved plan.
