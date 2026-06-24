@@ -50,6 +50,7 @@ Disposition ごとの必須証跡:
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | test-strategy | orchestrator | MT-009 / MT-024 の runtime routing failure が policy matrix ではなく `_classify_task_kind` の substring heuristic に起因する | Option A: 否定文除外のみ; Option B: evidence-based classifier; Option C: explicit `task_kind` / `risk_tags` schema | Option B をこの issue で採用し、Option C は follow-up 候補にする | Option B は2つの FAIL を同時に解消でき、変更範囲を `context_packets.py` と CLI routing regression tests に閉じられる | promoted_to_design / promoted_to_plan | `discussions/20260624t062220z-disc-routing-repair-design-options.md`, `requirement.md`, `design.md`, `plan.md` | explicit field 化は follow-up 候補 |
+| D-002 | resolved | test-strategy | code-reviewer | S02 classifier fix に reviewer-directed regression を追加する必要があり、当初の S02 allowed paths が production file のみに狭すぎた | A: tests 追加を戻す; B: S02 allowed paths を reviewer-directed regression に限って拡張 | B を採用し、`tests/cli_runtime/test_workflow_context_routing.py` への S02 reviewer-directed regression 追加だけを許可する | reviewer finding の false-negative 経路を再発防止するには public CLI regression が必要。変更範囲は既存 S01 test file に限定される | promoted_to_plan / applied | `plan.md`, code-reviewer finding, targeted pytest 22 passed | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -127,7 +128,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装サマリー (任意)
 - S01 では runtime routing failure を再現する CLI runtime regression tests を追加した。
-- S02 では `_classify_task_kind` を evidence-based classifier に変更し、S01 の Red を Green にする予定。
+- S02 では `_classify_task_kind` を evidence-based classifier に変更し、S01 の Red を Green にした。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -226,6 +227,108 @@ expected Red: 2 failed, 16 passed
 
 #### メモ
 - S01 の Red は approved plan 通り。S02 で production code を変更し Green 化する。
+
+### セッションログ（2026-06-24 16:22 JST - S02）
+
+#### 対象
+- Step: S02
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, EC-001, EC-002, EC-003
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S02 — evidence-based classifier を実装する`
+  - closure ids: tc-237-001, tc-237-002, tc-237-003, tc-237-004, tc-237-005, tc-237-006
+
+#### 実施内容
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py` の `_classify_task_kind` を evidence-based precedence に変更した。
+- affirmative security、affirmative migration、runtime evidence、explicit docs-only、runtime fallback の順に分類する。
+- 否定・禁止・停止条件行にだけ出る high-risk / migration word は affirmative evidence から除外する。
+- `docs-only verification` / `tests または docs-only verification` は docs-only 判定から除外する。
+- Material implementation decisions: No material implementation decisions beyond the approved plan.
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime/test_workflow_context_routing.py
+
+22 passed in 34.28s
+
+git diff --check
+
+pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | Green | tc-237-001〜tc-237-006 Green | targeted pytest: 22 passed | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | S01 Red と reviewer-directed regressions が Green |
+| S02 | Refactor | classifier helper は allowed file 内に限定 | `git diff --check` pass; allowed file only | command / diff inspection | pass | no policy matrix change |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | classifier は heuristic のまま | dev-coder / design risk | follow-up candidate として既存 D-001 / design に維持 | N/A | no | explicit `task_kind` / `risk_tags` field 化は scope 外 |
+| S02 | same-line guard phrase による high-risk false negative | code-reviewer | reviewer-directed regression を追加し classifier を explicit negated evidence span 判定へ修正 | reviewer-directed | no | code-reviewer finding; targeted pytest 22 passed |
+| S02 | weak phrase と同じ行の explicit docs-only marker false negative | code-reviewer | reviewer-directed regression を追加し explicit marker を優先 | reviewer-directed | no | code-reviewer finding; targeted pytest 22 passed |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | tc-237-001〜tc-237-006 | classifier changed and tests Green; AC/EC 全対応 | `context_packets.py` changed; targeted pytest 22 passed; `git diff --check` pass | pass | reviewer-directed regressions included |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-237-001 / `test_workflow_next_runtime_paths_override_docs_only_verification_phrase` | S02 | yes | red-required -> Green | S01 expected Red | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | runtime evidence overrides weak docs-only phrase |
+| tc-237-002 / `test_workflow_next_negated_security_phrase_does_not_escalate` | S02 | yes | red-required -> Green | S01 expected Red | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | negated high-risk phrase no longer escalates |
+| tc-237-003 / `test_workflow_next_affirmative_authz_terms_still_escalate` | S02 | yes | covered-existing | S01 pass | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | security true positive preserved |
+| tc-237-004 / `test_workflow_next_explicit_docs_only_still_routes_to_doc_writer` | S02 | yes | covered-existing | S01 pass | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | docs-only true positive preserved |
+| tc-237-005 / `test_workflow_next_affirmative_migration_terms_still_route_to_rollback_plan` | S02 | yes | covered-existing | S01 pass | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | migration true positive preserved |
+| tc-237-006 / targeted routing suite | S02 | yes | covered-existing | S01 expected Red | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | full targeted suite Green: 22 passed |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-237-001 | S02 | targeted pytest | pass | AC-001 / EC-001 |
+| tc-237-002 | S02 | targeted pytest | pass | AC-002 / EC-002 |
+| tc-237-003 | S02 | targeted pytest | pass | AC-003 / EC-003 |
+| tc-237-004 | S02 | targeted pytest | pass | AC-004 |
+| tc-237-005 | S02 | targeted pytest | pass | AC-005 |
+| tc-237-006 | S02 | targeted pytest | pass | AC-006 |
+| reviewer-directed same-line security guard | S02 | targeted pytest | pass | prevents high-risk false negative |
+| reviewer-directed same-line docs-only weak phrase | S02 | targeted pytest | pass | preserves explicit docs-only true positive |
+| reviewer-directed same-line migration guard | S02 | targeted pytest | pass | preserves migration true positive |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | reviewer-directed same-line regressions | `test_workflow_next_affirmative_authz_terms_with_unrelated_guard_still_escalate`; `test_workflow_next_explicit_docs_only_marker_with_weak_phrase_still_routes_to_doc_writer`; `test_workflow_next_affirmative_migration_terms_with_unrelated_guard_still_route_to_rollback_plan`; `test_workflow_next_affirmative_migration_terms_after_unrelated_guard_still_route_to_rollback_plan` | tc-237-003 / tc-237-004 / tc-237-005 | code-reviewer finding への bounded fix | yes: S02 allowed paths を reviewer-directed regression に限って拡張 | yes, S02 re-review |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | production classifier change plus reviewer-directed regressions | dev-coder | evidence-based `_classify_task_kind`; reviewer-directed same-line regression tests | `plan.md` S02 amended allowed paths | `context_packets.py`; `tests/cli_runtime/test_workflow_context_routing.py` reviewer-directed regressions only | domain routing matrix / workflow_state / docs templates | targeted pytest Green | policy matrix change required | changed files, verification, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | `_classify_task_kind` を evidence-based precedence に変更し、reviewer-directed same-line regressions を追加 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`, `tests/cli_runtime/test_workflow_context_routing.py` | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` -> 22 passed; `git diff --check` -> pass | code-reviewer pass | heuristic risk remains | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | passed | N/A | proceed | subagent `019ef882-387c-7a30-97aa-44f45e538369`, no findings after re-review |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | pending review / commit | `context_packets.py`, `tests/cli_runtime/test_workflow_context_routing.py`, `plan.md` S02 amendment, `report.md` S02 evidence | this S02 ledger entry | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py` - evidence-based task kind classifier
+- `tests/cli_runtime/test_workflow_context_routing.py` - reviewer-directed same-line regression tests
+- `spec-dock/active/issue/plan.md` - S02 allowed paths amendment for reviewer-directed regressions
+- `spec-dock/active/issue/report.md` - S02 execution evidence
+
+#### メモ
+- operator-visible docs update は不要。explicit field 化は follow-up candidate のまま。
 
 ### セッションログ（2026-06-24 HH:MM - HH:MM）
 
