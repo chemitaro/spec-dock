@@ -80,6 +80,8 @@ def compile_runbook(
             ),
             notes=("Runbook projection write failed; repair generated output storage before continuing.",),
             stop_conditions=("Do not continue from a Runbook whose projection could not be written.",),
+            step_assurance=step_assurance,
+            context_packets=context_packets,
         )
     return _runbook(
         target,

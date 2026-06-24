@@ -979,11 +979,16 @@ def normalized_body_text(value):
     return " ".join(str(value or "").strip().split()).casefold()
 
 
+def finding_priorities(raw_body):
+    return [
+        f"P{match.group(1)}"
+        for match in re.finditer(r"(?<![A-Za-z0-9])P([0-3])(?![A-Za-z0-9])", str(raw_body or ""), flags=re.IGNORECASE)
+    ]
+
+
 def finding_priority(raw_body):
-    match = re.search(r"(?<![A-Za-z0-9])P([0-3])(?![A-Za-z0-9])", str(raw_body or ""), flags=re.IGNORECASE)
-    if not match:
-        return None
-    return f"P{match.group(1)}"
+    priorities = finding_priorities(raw_body)
+    return priorities[0] if priorities else None
 
 
 def has_protected_domain(raw_body):
@@ -1019,8 +1024,7 @@ def has_machine_evidence(raw_body):
     return any(term in normalized for term in evidence_terms)
 
 
-def blocker_fingerprint(kind, raw_body):
-    priority = finding_priority(raw_body) or "unknown"
+def blocker_fingerprint(kind, priority, raw_body):
     digest = body_hash(normalized_body_text(raw_body))
     return f"{kind}:{priority}:{digest}"
 
@@ -1107,33 +1111,34 @@ if pending_codex_review_signals:
 blocker_policy_findings = []
 for item in current_codex_issue_comments:
     raw_body = item.get("_fallback_pass_raw_body") or item.get("body") or item.get("_raw_body_artifact") or ""
-    priority = finding_priority(raw_body)
-    if priority is None:
+    priorities = finding_priorities(raw_body)
+    if not priorities:
         continue
     protected_domain = has_protected_domain(raw_body)
     machine_evidence = has_machine_evidence(raw_body)
-    if priority in {"P0", "P1"}:
-        disposition = "blocker"
-        reason = "p0_p1_priority"
-    elif priority == "P2" and protected_domain and machine_evidence:
-        disposition = "promoted_blocker"
-        reason = "p2_protected_domain_with_machine_evidence"
-    elif priority in {"P2", "P3"}:
-        disposition = "non_blocking_followup"
-        reason = "p2_p3_default_non_blocking"
-    else:
-        disposition = "unknown"
-        reason = "unknown_priority"
-    blocker_policy_findings.append({
-        "kind": item.get("kind"),
-        "id": item.get("id"),
-        "priority": priority,
-        "disposition": disposition,
-        "reason": reason,
-        "protected_domain": protected_domain,
-        "machine_evidence": machine_evidence,
-        "fingerprint": blocker_fingerprint(item.get("kind"), raw_body),
-    })
+    for priority in priorities:
+        if priority in {"P0", "P1"}:
+            disposition = "blocker"
+            reason = "p0_p1_priority"
+        elif priority == "P2" and protected_domain and machine_evidence:
+            disposition = "promoted_blocker"
+            reason = "p2_protected_domain_with_machine_evidence"
+        elif priority in {"P2", "P3"}:
+            disposition = "non_blocking_followup"
+            reason = "p2_p3_default_non_blocking"
+        else:
+            disposition = "unknown"
+            reason = "unknown_priority"
+        blocker_policy_findings.append({
+            "kind": item.get("kind"),
+            "id": item.get("id"),
+            "priority": priority,
+            "disposition": disposition,
+            "reason": reason,
+            "protected_domain": protected_domain,
+            "machine_evidence": machine_evidence,
+            "fingerprint": blocker_fingerprint(item.get("kind"), priority, raw_body),
+        })
 blocker_policy_blockers = [
     item for item in blocker_policy_findings if item.get("disposition") in {"blocker", "promoted_blocker"}
 ]

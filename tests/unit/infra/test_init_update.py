@@ -31853,18 +31853,58 @@ esac
             node
             for node in module.body
             if isinstance(node, ast.FunctionDef)
-            and node.name in {"body_hash", "normalized_body_text", "finding_priority", "blocker_fingerprint"}
+            and node.name
+            in {"body_hash", "normalized_body_text", "finding_priorities", "finding_priority", "blocker_fingerprint"}
         ]
         blocker_function = next(node for node in selected if node.name == "blocker_fingerprint")
-        assert [arg.arg for arg in blocker_function.args.args] == ["kind", "raw_body"]
+        assert [arg.arg for arg in blocker_function.args.args] == ["kind", "priority", "raw_body"]
         namespace = {"hashlib": hashlib, "re": re}
         exec(compile(ast.Module(body=selected, type_ignores=[]), str(provider_path), "exec"), namespace)
 
-        body = "P1: deterministic blocker. Test: failing test proves it."
+        body = "P2: follow-up. P1: deterministic blocker. Test: failing test proves it."
 
-        assert namespace["blocker_fingerprint"]("issue_comment", body) == namespace["blocker_fingerprint"](
-            "issue_comment", body
+        assert namespace["finding_priorities"](body) == ["P2", "P1"]
+        assert namespace["blocker_fingerprint"]("issue_comment", "P1", body) == namespace["blocker_fingerprint"](
+            "issue_comment", "P1", body
         )
+        assert namespace["blocker_fingerprint"]("issue_comment", "P1", body) != namespace["blocker_fingerprint"](
+            "issue_comment", "P2", body
+        )
+
+    def test_issue_233_required_check_rollup_scans_after_success_without_conclusion(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        provider_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py"
+        )
+        module = ast.parse(provider_path.read_text(encoding="utf-8"))
+        selected = [
+            node
+            for node in module.body
+            if isinstance(node, ast.FunctionDef) and node.name == "required_check_rollup_status"
+        ]
+
+        class FakeCompleted:
+            returncode = 0
+            stdout = json.dumps({
+                "mergeStateStatus": "CLEAN",
+                "statusCheckRollup": [
+                    {"name": "legacy", "state": "SUCCESS", "conclusion": None},
+                    {"name": "required", "status": "COMPLETED", "conclusion": "FAILURE"},
+                ],
+            })
+
+        class FakeSubprocess:
+            TimeoutExpired = TimeoutError
+
+            @staticmethod
+            def run(*_args, **_kwargs):
+                return FakeCompleted()
+
+        namespace = {"json": json, "subprocess": FakeSubprocess}
+        exec(compile(ast.Module(body=selected, type_ignores=[]), str(provider_path), "exec"), namespace)
+
+        assert namespace["required_check_rollup_status"]("owner/repo", "13", 1.0) == "failed"
 
     @pytest.mark.parametrize(
         ("body", "expected_protected", "expected_machine"),

@@ -265,3 +265,26 @@ def test_policy_parser_rejects_non_reviewer_roles_in_reviewers() -> None:
         assert str(exc) == "context routing policy has non-reviewer roles in reviewers: dev-coder"
     else:
         raise AssertionError("non-reviewer role was accepted in reviewers")
+
+
+def test_policy_parser_rejects_reviewer_roles_in_worker() -> None:
+    context_routing = _context_routing_module()
+    policy_path = (
+        Path(__file__).resolve().parents[3]
+        / "src"
+        / "spec_dock"
+        / "assets"
+        / "spec_dock"
+        / "system"
+        / "assurance"
+        / "context-routing-policy.json"
+    )
+    payload = json.loads(policy_path.read_text())
+    payload["routing_matrix"]["runtime"]["worker"] = "code-reviewer"
+
+    try:
+        context_routing.context_routing_policy_from_dict(payload)
+    except ValueError as exc:
+        assert str(exc) == "context routing policy has non-worker role in worker: code-reviewer"
+    else:
+        raise AssertionError("reviewer role was accepted as worker")

@@ -42,6 +42,10 @@ REVIEWER_ROLES = frozenset({
     AgentRole.QA_REVIEWER,
     AgentRole.SPEC_REVIEWER,
 })
+WORKER_ROLES = frozenset({
+    AgentRole.DEV_CODER,
+    AgentRole.DOC_WRITER,
+})
 CONSULTANT_ROLES = frozenset({AgentRole.CONSULTANT})
 CLEAN_ROOM_ROLES = REVIEWER_ROLES | CONSULTANT_ROLES
 
@@ -213,8 +217,11 @@ def context_routing_policy_from_dict(payload: dict[str, Any]) -> ContextRoutingP
         if non_reviewer_roles:
             joined_roles = ", ".join(non_reviewer_roles)
             raise ValueError(f"context routing policy has non-reviewer roles in reviewers: {joined_roles}")
+        worker = AgentRole(_require_str(raw_rule, "worker"))
+        if worker not in WORKER_ROLES:
+            raise ValueError(f"context routing policy has non-worker role in worker: {worker.value}")
         routing_matrix[task_kind] = {
-            "worker": AgentRole(_require_str(raw_rule, "worker")),
+            "worker": worker,
             "reasoning_effort": ReasoningEffort(_require_str(raw_rule, "reasoning_effort")),
             "context_mode": ContextMode(_require_str(raw_rule, "context_mode")),
             "verification": _require_str_tuple(raw_rule, "verification"),

@@ -50,6 +50,23 @@ def test_context_packet_store_rejects_symlinked_projection_path(tmp_path: Path) 
     assert result.errors
 
 
+def test_context_packet_store_rejects_symlinked_packet_directory(tmp_path: Path) -> None:
+    context_packet_store = _runtime_modules()
+    outside = tmp_path / "outside-packets"
+    outside.mkdir()
+    packet_dir = tmp_path / "spec-dock/.agent/context-packets"
+    packet_dir.parent.mkdir(parents=True)
+    packet_dir.symlink_to(outside, target_is_directory=True)
+    store = context_packet_store.ContextPacketStore(tmp_path)
+
+    result = store.write_current({"packets": [], "invocation_events": []})
+
+    assert result.written is False
+    assert result.refs == ()
+    assert result.errors
+    assert not (outside / "current-context-packets.json").exists()
+
+
 def test_context_packet_store_replace_failure_preserves_existing_projection_set(tmp_path: Path, monkeypatch) -> None:
     context_packet_store = _runtime_modules()
     store = context_packet_store.ContextPacketStore(tmp_path)
