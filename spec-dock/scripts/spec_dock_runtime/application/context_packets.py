@@ -11,6 +11,7 @@ from spec_dock_runtime.domain.context_routing import (
     ContextMode,
     ContextRoutingPolicy,
     ContinuationFacts,
+    ReasoningEffort,
     StepAssuranceDecision,
     StepFacts,
     TaskKind,
@@ -52,7 +53,9 @@ class StepAssuranceProjection:
                 "version": self.decision.policy_version if self.decision is not None else None,
             },
             "worker": self.decision.worker.value if self.decision is not None else None,
-            "reasoning_effort": self.decision.reasoning_effort.value if self.decision is not None else None,
+            "reasoning_effort": _reasoning_effort_wire_value(self.decision.reasoning_effort)
+            if self.decision is not None
+            else None,
             "context_mode": self.decision.context_mode.value
             if self.decision is not None
             else ContextMode.MINIMAL_PACKET.value,
@@ -209,7 +212,7 @@ def _packet_payload(step_projection: StepAssuranceProjection) -> dict[str, Any]:
             context_mode = decision.context_mode
         event = _invocation_event(
             role=role,
-            reasoning_effort=decision.reasoning_effort.value,
+            reasoning_effort=_reasoning_effort_wire_value(decision.reasoning_effort),
             context_mode=context_mode.value,
             step_projection=step_projection,
             policy_version=decision.policy_version,
@@ -271,6 +274,12 @@ def _invocation_event(
         "returned_evidence_refs": [ref.to_payload() for ref in step_projection.source_refs],
         "missing_reason": missing_reason,
     }
+
+
+def _reasoning_effort_wire_value(reasoning_effort: ReasoningEffort) -> str:
+    if reasoning_effort == ReasoningEffort.MAX:
+        return "xhigh"
+    return reasoning_effort.value
 
 
 def _select_step(plan_text: str, report_text: str) -> dict[str, Any]:

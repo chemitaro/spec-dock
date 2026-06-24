@@ -72,6 +72,11 @@ class AssuranceStore:
             artifact_path = target.issue_dir / filename
             if not artifact_path.exists() or not artifact_path.is_file():
                 raise AssuranceStoreError(f"{role}_missing", f"Planning source artifact not found: {artifact_path}")
+            if artifact_path.is_symlink():
+                raise AssuranceStoreError(
+                    f"{role}_symlink",
+                    f"Planning source artifact must be an issue-local regular file: {artifact_path}",
+                )
             artifacts.append(
                 SourceArtifact(
                     path=artifact_path.relative_to(self.repo_root).as_posix(),

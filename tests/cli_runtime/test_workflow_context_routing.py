@@ -163,10 +163,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
     def test_workflow_next_routes_plan_derived_task_kinds(self) -> None:
         cases = [
-            ("docs-only", "doc-writer", "minimal_packet", ["docs_inspection"], ["spec-reviewer"]),
+            ("docs-only", "doc-writer", "low", "minimal_packet", ["docs_inspection"], ["spec-reviewer"]),
             (
                 "migration rollback",
                 "dev-coder",
+                "high",
                 "bounded_packet",
                 ["unit_tests", "integration_tests", "rollback_plan"],
                 ["code-reviewer", "qa-reviewer"],
@@ -174,12 +175,13 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             (
                 "security privacy",
                 "dev-coder",
+                "xhigh",
                 "bounded_packet",
                 ["unit_tests", "security_review", "privacy_review"],
                 ["code-reviewer", "qa-reviewer", "spec-reviewer"],
             ),
         ]
-        for marker, worker, context_mode, verification, reviewers in cases:
+        for marker, worker, reasoning_effort, context_mode, verification, reviewers in cases:
             with tempfile.TemporaryDirectory() as tmp:
                 target = Path(tmp)
                 assert main(["init", str(target)]) == 0
@@ -198,9 +200,14 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
                 payload = json.loads(result.stdout)
                 assert payload["step_assurance"]["selected_step"]["id"] == "S01"
                 assert payload["step_assurance"]["worker"] == worker
+                assert payload["step_assurance"]["reasoning_effort"] == reasoning_effort
                 assert payload["step_assurance"]["context_mode"] == context_mode
                 assert payload["step_assurance"]["verification"] == verification
                 assert payload["step_assurance"]["reviewers"] == reviewers
+                event = next(
+                    event for event in payload["context_packets"]["invocation_events"] if event["role"] == worker
+                )
+                assert event["reasoning_effort"] == reasoning_effort
 
     def test_workflow_next_markdown_includes_step_assurance_and_packet_refs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -363,11 +370,14 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
+            assert payload["state"] == "blocked"
+            assert payload["next_action"] == "issue-planning-required"
+            assert payload["reason_code"] == "workflow-plan-unselectable"
             assert payload["step_assurance"]["selected_step"]["id"] == "issue-wide"
             assert payload["step_assurance"]["worker"] is None
             assert payload["step_assurance"]["context_mode"] == "minimal_packet"
             assert payload["step_assurance"]["verification"] == []
-            assert payload["context_packets"]["invocation_events"] == []
+            assert "context_packets" not in payload
 
     def _classify(self, target: Path) -> None:
         classify = self._run_runtime_capture(

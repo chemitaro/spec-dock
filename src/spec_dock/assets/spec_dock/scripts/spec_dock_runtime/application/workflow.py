@@ -81,6 +81,30 @@ def workflow_next(
             context_packet_store=context_packet_store,
             continuation_probe=continuation_probe,
         )
+        if _is_unselectable_step(step_assurance):
+            blocked_state = WorkflowState(
+                kind="blocked",
+                active_issue_id=state.active_issue_id,
+                reason_code="workflow-plan-unselectable",
+                artifact_readiness=state.artifact_readiness,
+                authority=STRICT_LEGACY_AUTHORITY,
+                details=(
+                    "No structured implementation step could be selected from the active issue plan.",
+                    "Add implementation step headings such as `### 実装ステップ S01 ...` before execution.",
+                ),
+            )
+            blocked_runbook = compile_runbook(
+                request.workflow_target,
+                blocked_state,
+                step_assurance=step_assurance,
+                context_packets=context_packets,
+            )
+            return WorkflowResult(
+                operation="next",
+                state=blocked_state,
+                runbook=blocked_runbook,
+                projection=runbook_store.write_current(blocked_runbook),
+            )
         if context_packets is not None and context_packets.get("written") is False:
             errors = tuple(str(item) for item in context_packets.get("errors", ()) if item)
             blocked_state = WorkflowState(
@@ -266,11 +290,20 @@ def _compile_execution_context(
         continuation_facts=continuation_facts,
         continuation_state=continuation_state,
     )
+    if step_projection.selected_step.get("selection_method") == "issue_wide_default":
+        return step_projection.to_payload(), None
     packet_projection = compile_context_packet_projection(
         step_projection=step_projection,
         packet_store=context_packet_store,
     )
     return step_projection.to_payload(), packet_projection.to_payload()
+
+
+def _is_unselectable_step(step_assurance: dict[str, Any] | None) -> bool:
+    if not isinstance(step_assurance, dict):
+        return False
+    selected = step_assurance.get("selected_step")
+    return isinstance(selected, dict) and selected.get("selection_method") == "issue_wide_default"
 
 
 def _continuation_facts(

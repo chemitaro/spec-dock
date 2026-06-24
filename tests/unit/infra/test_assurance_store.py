@@ -112,6 +112,22 @@ def test_source_binding_persists_resolved_issue_local_path_and_active_display_pa
     assert verified.contract.to_dict() == contract.to_dict()
 
 
+def test_source_binding_rejects_symlinked_planning_artifacts(tmp_path: Path) -> None:
+    _, AssuranceStore, AssuranceStoreError = _runtime_modules()
+    issue_dir = _make_issue(tmp_path)
+    external_requirement = tmp_path / "external-requirement.md"
+    external_requirement.write_text("# Requirement\n\noutside\n", encoding="utf-8")
+    (issue_dir / "requirement.md").unlink()
+    (issue_dir / "requirement.md").symlink_to(external_requirement)
+    store = AssuranceStore(tmp_path)
+    target = store.resolve_issue_target("iss-00227")
+
+    with pytest.raises(AssuranceStoreError) as exc_info:
+        store.build_requirement_source_binding(target)
+
+    assert exc_info.value.reason == "requirement_symlink"
+
+
 def test_missing_contract_is_strict_legacy_not_invalid(tmp_path: Path) -> None:
     _, AssuranceStore, _ = _runtime_modules()
     issue_dir = _make_issue(tmp_path)
