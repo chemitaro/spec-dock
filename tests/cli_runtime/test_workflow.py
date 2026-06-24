@@ -205,6 +205,9 @@ class TestCliWorkflow(CliRuntimeHarness):
                 "spec-dock/active/current-runbook.json",
                 "spec-dock/active/current-runbook.md",
             ]
+            assert payload["projection"]["audience"] == "human"
+            assert payload["projection"]["authority"] == "non-canonical"
+            assert payload["projection"]["refresh_command"] == "./spec-dock/scripts/spec-dock guidance issue-planning"
             for rel_path in payload["projection"]["paths"]:
                 assert (target / rel_path).is_file()
             projected = json.loads(
@@ -212,6 +215,10 @@ class TestCliWorkflow(CliRuntimeHarness):
             )
             assert projected["state"] == "requirement-capture"
             assert projected["projection"]["written"] is True
+            assert projected["projection"]["audience"] == "human"
+            projected_markdown = (target / "spec-dock/active/current-runbook.md").read_text(encoding="utf-8")
+            assert "Human-facing projection" in projected_markdown
+            assert "not agent handoff authority" in projected_markdown
             status = subprocess.run(
                 ["git", "status", "--short"],
                 cwd=target,
@@ -220,6 +227,41 @@ class TestCliWorkflow(CliRuntimeHarness):
                 check=True,
             )
             assert status.stdout == ""
+
+    def test_guidance_ignores_stale_runbook_projection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Current issue")
+            self._write_substantive_requirement(issue_dir)
+            stale_payload = {
+                "schema_version": "workflow-runbook-v1",
+                "workflow_target": "issue-planning",
+                "state": "ready",
+                "next_action": "stale-next-action",
+                "reason_code": "stale-projection",
+                "active_issue_id": "iss-99999",
+            }
+            runbook_dir = target / "spec-dock/.agent/runbooks"
+            active_dir = target / "spec-dock/active"
+            runbook_dir.mkdir(parents=True, exist_ok=True)
+            active_dir.mkdir(parents=True, exist_ok=True)
+            (runbook_dir / "current-runbook.json").write_text(json.dumps(stale_payload) + "\n", encoding="utf-8")
+            (active_dir / "current-runbook.json").write_text(json.dumps(stale_payload) + "\n", encoding="utf-8")
+
+            result = self._run_runtime_capture(
+                target,
+                ["guidance", "issue-planning"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "active_issue: iss-00301" in result.stdout
+            assert "stale-next-action" not in result.stdout
+            assert "iss-99999" not in result.stdout
+            payload = self._read_projected_runbook(target)
+            assert payload["active_issue_id"] == "iss-00301"
+            assert payload["state"] == "ready"
+            assert payload["next_action"] == "planning-ready"
 
     def _read_projected_runbook(self, target: Path) -> dict:
         return json.loads((target / "spec-dock/.agent/runbooks/current-runbook.json").read_text(encoding="utf-8"))

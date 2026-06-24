@@ -99,12 +99,7 @@ def workflow_next(
                 step_assurance=step_assurance,
                 context_packets=context_packets,
             )
-            return WorkflowResult(
-                operation="next",
-                state=blocked_state,
-                runbook=blocked_runbook,
-                projection=runbook_store.write_current(blocked_runbook),
-            )
+            return _workflow_result_with_projection(blocked_state, blocked_runbook, runbook_store)
         if context_packets is not None and context_packets.get("written") is False:
             errors = tuple(str(item) for item in context_packets.get("errors", ()) if item)
             blocked_state = WorkflowState(
@@ -125,43 +120,26 @@ def workflow_next(
                 step_assurance=step_assurance,
                 context_packets=context_packets,
             )
-            return WorkflowResult(
-                operation="next",
-                state=blocked_state,
-                runbook=blocked_runbook,
-                projection=runbook_store.write_current(blocked_runbook),
-            )
+            return _workflow_result_with_projection(blocked_state, blocked_runbook, runbook_store)
     runbook = compile_runbook(
         request.workflow_target,
         state,
         step_assurance=step_assurance,
         context_packets=context_packets,
     )
-    projection = runbook_store.write_current(runbook)
-    if projection.written:
-        return WorkflowResult(
-            operation="next",
-            state=state,
-            runbook=runbook,
-            projection=projection,
-        )
-    blocked_state = WorkflowState(
-        kind="blocked",
-        active_issue_id=state.active_issue_id,
-        reason_code="runbook-write-failure",
-        artifact_readiness=state.artifact_readiness,
-        authority=STRICT_LEGACY_AUTHORITY,
-        details=(
-            *projection.errors,
-            "Run ./spec-dock/scripts/spec-dock doctor.",
-            "Remove stale spec-dock/.agent/runbooks/*.tmp files if present.",
-        ),
-    )
+    return _workflow_result_with_projection(state, runbook, runbook_store)
+
+
+def _workflow_result_with_projection(
+    state: WorkflowState,
+    runbook: Runbook,
+    runbook_store: RunbookStoreLike,
+) -> WorkflowResult:
     return WorkflowResult(
         operation="next",
-        state=blocked_state,
-        runbook=compile_runbook(request.workflow_target, blocked_state),
-        projection=projection,
+        state=state,
+        runbook=runbook,
+        projection=runbook_store.write_current(runbook),
     )
 
 

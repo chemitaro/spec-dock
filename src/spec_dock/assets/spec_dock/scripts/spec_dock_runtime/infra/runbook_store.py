@@ -28,7 +28,7 @@ class RunbookStore:
     def write_current(self, runbook: Runbook) -> RunbookProjectionResult:
         payload = _runbook_payload(runbook)
         json_text = json.dumps(
-            {**payload, "projection": {"written": True, "paths": list(CURRENT_RUNBOOK_PATHS), "errors": []}},
+            {**payload, "projection": _projection_payload(runbook)},
             ensure_ascii=False,
             separators=(",", ":"),
         )
@@ -159,6 +159,9 @@ def _runbook_markdown(runbook: Runbook) -> str:
     lines = [
         f"# Workflow Runbook: {runbook.workflow_target}",
         "",
+        "> Human-facing projection; not agent handoff authority. Refresh with "
+        f"`./spec-dock/scripts/spec-dock guidance {runbook.workflow_target}`.",
+        "",
         f"- state: {runbook.state}",
         f"- next_action: {runbook.next_action}",
         f"- reason_code: {runbook.reason_code}",
@@ -200,5 +203,22 @@ def _runbook_markdown(runbook: Runbook) -> str:
                 lines.append(f"- `{path}` sha256={ref.get('sha256')}")
     lines.extend(["", "## Stop Conditions"])
     lines.extend(f"- {condition}" for condition in runbook.stop_conditions)
-    lines.extend(["", "## Projection", "- Generated projection; not canonical authority."])
+    lines.extend([
+        "",
+        "## Projection",
+        "- Human-facing projection; not agent handoff authority.",
+        "- Ignored artifact; refresh from current runtime state with "
+        f"`./spec-dock/scripts/spec-dock guidance {runbook.workflow_target}`.",
+    ])
     return "\n".join(lines) + "\n"
+
+
+def _projection_payload(runbook: Runbook) -> dict[str, Any]:
+    return {
+        "written": True,
+        "paths": list(CURRENT_RUNBOOK_PATHS),
+        "errors": [],
+        "audience": "human",
+        "authority": "non-canonical",
+        "refresh_command": f"./spec-dock/scripts/spec-dock guidance {runbook.workflow_target}",
+    }

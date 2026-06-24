@@ -59,7 +59,11 @@ def test_runbook_store_writes_current_projection_paths_atomically(tmp_path: Path
     payload = json.loads((tmp_path / result.paths[0]).read_text(encoding="utf-8"))
     assert payload["state"] == "requirement-capture"
     assert payload["projection"]["written"] is True
+    assert payload["projection"]["audience"] == "human"
+    assert payload["projection"]["authority"] == "non-canonical"
+    assert payload["projection"]["refresh_command"] == "./spec-dock/scripts/spec-dock guidance issue-planning"
     assert "state: requirement-capture" in (tmp_path / result.paths[3]).read_text(encoding="utf-8")
+    assert "Human-facing projection" in (tmp_path / result.paths[3]).read_text(encoding="utf-8")
 
 
 def test_runbook_store_failure_removes_temp_files_and_reports_errors(
@@ -131,7 +135,7 @@ def test_runbook_store_rejects_symlinked_projection_directories(tmp_path: Path) 
     assert not (outside / "current-runbook.json").exists()
 
 
-def test_workflow_next_returns_blocked_when_projection_write_fails() -> None:
+def test_workflow_next_keeps_guidance_current_when_projection_write_fails() -> None:
     WorkflowNextRequest, workflow_next, _, _, runbook_store = _runtime_modules()
 
     result = workflow_next(
@@ -140,11 +144,12 @@ def test_workflow_next_returns_blocked_when_projection_write_fails() -> None:
         runbook_store=_FailingRunbookStore(runbook_store.RunbookProjectionResult),
     )
 
-    assert result.state.kind == "blocked"
-    assert result.state.reason_code == "runbook-write-failure"
+    assert result.state.kind == "no-active"
+    assert result.state.reason_code == "active-issue-missing"
     assert result.runbook is not None
-    assert result.runbook.state == "blocked"
-    assert "doctor" in " ".join(result.runbook.commands)
+    assert result.runbook.state == "no-active"
+    assert result.runbook.next_action == "issue-start-required"
+    assert "doctor" not in " ".join(result.runbook.commands)
     assert result.projection is not None
     assert result.projection.written is False
     assert result.projection.errors == ("cannot write projection",)
