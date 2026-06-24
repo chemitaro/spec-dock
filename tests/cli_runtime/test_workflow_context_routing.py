@@ -271,6 +271,56 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             assert reviewer_event["packet_hash"] is None
             assert reviewer_event["missing_reason"] == "context_policy_invalid"
 
+    def test_invalid_context_policy_degrades_docs_worker_to_bounded_packet(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
+            self._write_substantive_requirement(issue_dir)
+            self._write_single_step_plan_and_empty_report(issue_dir, "docs-only")
+            self._classify(target)
+            (target / "spec-dock/system/assurance/context-routing-policy.json").write_text(
+                "{not-json\n", encoding="utf-8"
+            )
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-execution", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["step_assurance"]["worker"] == "doc-writer"
+            assert payload["step_assurance"]["policy"]["status"] == "invalid"
+            assert payload["step_assurance"]["context_mode"] == "bounded_packet"
+
+    def test_context_packet_write_failure_blocks_ready_issue_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
+            self._write_substantive_requirement(issue_dir)
+            self._write_plan_and_report(issue_dir)
+            self._classify(target)
+            packet_dir = target / "spec-dock/.agent/context-packets"
+            outside = target / "outside-context-packets"
+            assert not packet_dir.exists()
+            outside.mkdir()
+            packet_dir.parent.mkdir(parents=True, exist_ok=True)
+            packet_dir.symlink_to(outside, target_is_directory=True)
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-execution", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["state"] == "blocked"
+            assert payload["reason_code"] == "context-packet-write-failure"
+            assert payload["context_packets"]["written"] is False
+            assert payload["projection"]["written"] is True
+
     def test_valid_context_policy_exclusions_apply_to_packet_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

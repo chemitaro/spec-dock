@@ -136,7 +136,7 @@ def compile_step_assurance_projection(
         policy=policy,
         continuation_facts=continuation_facts,
     )
-    if policy_status != "valid" and decision.worker == AgentRole.DEV_CODER:
+    if policy_status != "valid":
         decision = StepAssuranceDecision(
             step_id=decision.step_id,
             worker=decision.worker,

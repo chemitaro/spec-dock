@@ -81,6 +81,32 @@ def workflow_next(
             context_packet_store=context_packet_store,
             continuation_probe=continuation_probe,
         )
+        if context_packets is not None and context_packets.get("written") is False:
+            errors = tuple(str(item) for item in context_packets.get("errors", ()) if item)
+            blocked_state = WorkflowState(
+                kind="blocked",
+                active_issue_id=state.active_issue_id,
+                reason_code="context-packet-write-failure",
+                artifact_readiness=state.artifact_readiness,
+                authority=STRICT_LEGACY_AUTHORITY,
+                details=(
+                    *errors,
+                    "Run ./spec-dock/scripts/spec-dock doctor.",
+                    "Repair spec-dock/.agent/context-packets before continuing issue execution.",
+                ),
+            )
+            blocked_runbook = compile_runbook(
+                request.workflow_target,
+                blocked_state,
+                step_assurance=step_assurance,
+                context_packets=context_packets,
+            )
+            return WorkflowResult(
+                operation="next",
+                state=blocked_state,
+                runbook=blocked_runbook,
+                projection=runbook_store.write_current(blocked_runbook),
+            )
     runbook = compile_runbook(
         request.workflow_target,
         state,

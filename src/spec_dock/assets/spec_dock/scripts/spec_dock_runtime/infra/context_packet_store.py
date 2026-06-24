@@ -65,11 +65,13 @@ class ContextPacketStore:
 
     def _safe_projection_path(self, rel_path: str) -> Path:
         path = self._repo_root / rel_path
-        resolved_parent = path.parent.resolve()
-        if not _is_relative_to(resolved_parent, self._repo_root / CONTEXT_PACKET_DIR):
-            raise OSError(f"refusing to write context packet outside ignored state: {rel_path}")
+        packet_dir = self._repo_root / CONTEXT_PACKET_DIR
         if path.is_symlink():
             raise OSError(f"refusing to replace symlinked context packet: {rel_path}")
+        _reject_symlinked_ancestors(path.parent, self._repo_root)
+        resolved_parent = path.parent.resolve()
+        if not _is_relative_to(resolved_parent, packet_dir):
+            raise OSError(f"refusing to write context packet outside ignored state: {rel_path}")
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -153,6 +155,16 @@ def _is_relative_to(path: Path, parent: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _reject_symlinked_ancestors(path: Path, root: Path) -> None:
+    current = path
+    while current != root:
+        if current.exists() and current.is_symlink():
+            raise OSError(f"refusing to write context packet through symlinked directory: {current}")
+        if current.parent == current:
+            break
+        current = current.parent
 
 
 def _repo_relative(repo_root: Path, path: Path) -> str:
