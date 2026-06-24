@@ -17,10 +17,7 @@ RUNBOOK_STATE_PATHS: tuple[str, ...] = (
     "spec-dock/.agent/runbooks/current-runbook.json",
     "spec-dock/.agent/runbooks/current-runbook.md",
 )
-ACTIVE_RUNBOOK_PATHS: tuple[str, ...] = (
-    "spec-dock/active/current-runbook.json",
-    "spec-dock/active/current-runbook.md",
-)
+ACTIVE_RUNBOOK_PATHS: tuple[str, ...] = tuple(f"spec-dock/active/current-runbook.{suffix}" for suffix in ("json", "md"))
 CURRENT_RUNBOOK_PATHS: tuple[str, ...] = RUNBOOK_STATE_PATHS + ACTIVE_RUNBOOK_PATHS
 
 
