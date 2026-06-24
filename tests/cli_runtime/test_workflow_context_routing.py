@@ -379,6 +379,27 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             assert payload["step_assurance"]["verification"] == []
             assert "context_packets" not in payload
 
+    def test_scaffold_plan_step_does_not_prompt_implementation_start(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
+            self._write_substantive_requirement(issue_dir)
+            (issue_dir / "report.md").write_text("# Report\n", encoding="utf-8")
+            self._classify(target)
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-execution", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["state"] == "blocked"
+            assert payload["reason_code"] == "workflow-plan-unselectable"
+            assert payload["step_assurance"]["selected_step"]["id"] == "issue-wide"
+            assert "context_packets" not in payload
+
     def _classify(self, target: Path) -> None:
         classify = self._run_runtime_capture(
             target,

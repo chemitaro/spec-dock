@@ -135,7 +135,7 @@ def required_check_rollup_status(repo: str, pr: str, timeout_seconds: float) -> 
     if not isinstance(rollup, list):
         return None
     merge_state = str(payload.get("mergeStateStatus") or "").upper()
-    if merge_state in {"CLEAN", "HAS_HOOKS", "UNSTABLE"}:
+    if merge_state in {"CLEAN", "HAS_HOOKS"}:
         return None
     for item in rollup:
         if not isinstance(item, dict):
