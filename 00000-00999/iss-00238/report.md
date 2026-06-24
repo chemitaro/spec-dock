@@ -200,12 +200,54 @@ git diff --check
 |---|---|---|---|---|---|---|---|
 | S02 | code review | code-reviewer | fresh | passed | no | S02 can be committed | Findings: none. Reviewer confirmed projection non-blocking behavior, stale projection independence, human-only projection metadata, and context packet fail-closed handling. |
 
+### セッションログ（2026-06-24 22:45 - 23:05 JST）
+
+#### 対象
+- Step: S03
+- AC/EC: AC-003, AC-006
+- Closure IDs: tc-005
+
+#### 実施内容
+- S01 reviewer-directed fix で既に provider Issue Planning / Execution Skill handoff が `guidance <target>` へ更新済みであることを確認した。
+- Skill text が returned guidance の `state`, `next_action`, commands, stop conditions, selected step, verification / reviewer gate を task checklist へ登録するよう要求していることを確認した。
+- Generated projections を ignored human/debug output とし、handoff authority として読まないことを Skill text と tests で確認した。
+- S03 は追加 runtime / docs 変更なしの approved-no-op closure として扱う。
+
+#### 検証
+
+```bash
+rg -n "workflow next|guidance issue-|task checklist|projection|handoff authority" \
+  src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md \
+  src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md \
+  tests/unit/infra/test_init_update.py \
+  tests/cli_runtime/test_wrappers.py
+# expected guidance / checklist / projection boundary text found.
+# `workflow next` remains only in a negative assertion.
+
+uv run pytest tests/unit/infra/test_init_update.py -k "issue_skills or guidance or workflow_next"
+# 8 passed
+
+uv run pytest tests/cli_runtime/test_wrappers.py
+# 6 passed
+
+git diff --check
+# pass
+```
+
+#### レビューゲート状態（Reviewer Gate Status）
+
+| step / phase | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S03 | initial spec review | spec-reviewer | fresh before report fix | failed | no | blocked until S03 closure evidence is recorded | P1 finding: Skill text matched S03, but report still listed tc-005 as partial and had stale exception memo. |
+| S03 | post-report-fix spec re-review | spec-reviewer | fresh | passed | no | S03 approved-no-op can be committed | Findings: none. Prior P1 closure-traceability finding resolved. |
+
 ## ステップ契約の完了証跡（Step Contract Closure）
 
 | step | closure ids | close condition from plan | observed evidence | result | notes |
 |---|---|---|---|---|---|
 | S01 | tc-001, tc-002, tc-007, tc-008 | `guidance` CLI tests pass; `workflow next` is not primary command; no-active / unknown target / malformed assurance / stale source binding covered. | `uv run pytest tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py` -> `36 passed`; combined S01 + Skill fix run -> `38 passed`; `git diff --check` -> pass; `rg` confirms provider Skill assets use `guidance issue-*` and `workflow next` remains only in negative assertion. | passed | Initial code-review failed because shipped skills still called `workflow next`; reviewer-directed fix updated Skill assets and focused tests. Fresh code-reviewer re-review passed. |
 | S02 | tc-003, tc-004, tc-009, tc-010 | Projection failure / stale projection tests pass; context packet fail-closed tests are maintained. | `uv run pytest tests/unit/infra/test_runbook_store.py` -> `5 passed`; `uv run pytest tests/cli_runtime/test_workflow.py` -> `11 passed`; `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` -> `26 passed`. | passed | Projection errors remain observable via `result.projection.errors` / Markdown `Projection Errors`; they no longer change guidance state. |
+| S03 | tc-005 | Provider / installed Issue Planning / Execution Skill tests pass and Skill text uses `guidance <target>` with task checklist registration. | `rg` inspection confirms `guidance issue-planning`, `guidance issue-execution`, task checklist registration, and projection non-authority text; `uv run pytest tests/unit/infra/test_init_update.py -k "issue_skills or guidance or workflow_next"` -> `8 passed`; `uv run pytest tests/cli_runtime/test_wrappers.py` -> `6 passed`. | passed | No additional code changes were required because S01 already updated Skill handoff atomically with command removal. Fresh spec-reviewer re-review passed. |
 
 ## テスト契約の完了証跡（Test Contract Closure）
 
@@ -219,6 +261,7 @@ git diff --check
 | tc-004 | S02 | yes | justified-alternative | Existing runtime already ignored stale projection; added regression to prevent reintroducing stale projection authority. | `tests/cli_runtime/test_workflow.py` | pass | Guidance regenerated from current active issue `iss-00301`, not stale `iss-99999`. |
 | tc-009 | S02 | yes | covered-existing | Existing context packet write failure test already asserted `context-packet-write-failure`. | `tests/cli_runtime/test_workflow_context_routing.py` | pass: `26 passed` | Context packet failure remains fail-closed while projection remains best-effort. |
 | tc-010 | S02 | yes | red-required | Updated projection tests failed because old projection payload lacked human-only metadata. | `tests/unit/infra/test_runbook_store.py`; `tests/cli_runtime/test_workflow.py` | pass | Projection remains ignored and marks audience=`human`, authority=`non-canonical`, refresh command. |
+| tc-005 | S03 | yes | inspect-only | S01 reviewer-directed fix changed Skill handoff before S03 to avoid breaking shipped skills. | `tests/unit/infra/test_init_update.py -k "issue_skills or guidance or workflow_next"`; `tests/cli_runtime/test_wrappers.py`; `rg` inspection | pass | Skill handoff contract is implemented; report closure evidence added after initial S03 spec-reviewer finding and fresh re-review passed. |
 
 ## クロージャ網羅（Closure Coverage）
 
@@ -232,7 +275,7 @@ git diff --check
 | tc-004 | S02 | AC-007 | pass | CLI regression confirms stale current-runbook projection is ignored. |
 | tc-009 | S02 | EC-004 | pass | Context routing suite confirms context packet write failure remains fail-closed. |
 | tc-010 | S02 | AC-005 | pass | Unit / CLI tests confirm ignored human projection metadata and no tracked diff. |
-| tc-005 | S03 | AC-006 | partially covered by S01 reviewer-directed fix | Skill handoff text and init-update tests updated in S01; S03 still needs closure confirmation. |
+| tc-005 | S03 | AC-006 | pass | Skill handoff text and init-update / wrapper tests verify `guidance <target>`, task checklist registration, and projection non-authority wording; fresh spec-reviewer re-review passed. |
 | tc-006 | S99 | 全 AC / EC | not started | Pending final quality gate. |
 
 ## クロージャ差分（Closure Delta）
@@ -251,6 +294,7 @@ git diff --check
 |---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | `guidance <target>` command surface and shipped agent handoff changes | dev-coder, doc-writer | runtime parser / command / presentation; CLI tests; Issue Planning / Execution Skill assets; focused init-update tests | Assurance policy, context packet semantics, `workflow next` alias | `38 passed`; `git diff --check` pass | passed | dogfooding mirror is not updated until a later validation/update step; provider source and generated init/update behavior are covered. | Commit S01, then start S02. |
 | S02 | delegated | projection non-blocking / stale projection independence / human-only projection metadata | dev-coder | application workflow; runbook store; presentation; focused tests | Context packet semantics, assurance policy, `workflow next` alias | `5 passed`; `37 passed`; `git diff --check` pass | passed | Human projection warning wording can be final-inspected in S99. | Commit S02, then confirm S03 closure. |
+| S03 | approved-no-op | Skill handoff closure confirmation | orchestrator inspection + spec-reviewer | report only; Skill assets already changed in S01 | Runtime behavior changes; new static workflow text; projection authority wording | `8 passed`; `6 passed`; `rg` inspection; `git diff --check` pass | passed | None. | Commit report-only closure, then run S90 docs impact inspection. |
 
 ## 委任 worker 証跡（Delegated Worker Evidence）
 
@@ -259,6 +303,7 @@ git diff --check
 | S01 | dev-coder | Implemented `guidance <target>` and removed `workflow next` primary command. | runtime parser / command / presentation; CLI runtime tests | `uv run pytest tests/cli_runtime/test_workflow.py` -> `10 passed`; `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` -> `26 passed`; `git diff --check` -> pass | initial code-review failed | dogfooding mirror stays stale until update / refresh step | accepted with reviewer-directed follow-up |
 | S01 | doc-writer | Updated shipped Issue Planning / Execution Skill handoff to run `guidance issue-planning` / `guidance issue-execution` and register guidance into agent task checklist. | provider Skill assets; focused init-update tests | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_skills_provider_assets_are_fixed_guidance_kernels tests/unit/infra/test_init_update.py::TestInitUpdate::test_bundled_skill_routing_contract` -> `2 passed`; combined run -> `38 passed`; `git diff --check` -> pass | fresh code-reviewer re-review passed | none beyond S03 confirmation | accepted |
 | S02 | dev-coder | Made runbook projection best-effort for guidance, added human-only projection metadata, and covered stale projection independence. | application workflow; runbook store; presentation; unit / CLI runtime tests | `uv run pytest tests/unit/infra/test_runbook_store.py` -> `5 passed`; `uv run pytest tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py` -> `37 passed`; `git diff --check` -> pass | fresh code-reviewer passed | wording can be final-inspected in S99 | accepted |
+| S03 | orchestrator | Confirmed Skill handoff closure as approved-no-op because S01 already made the required atomic Skill asset changes. | report; Skill assets; init-update / wrapper tests | `rg` inspection; `uv run pytest tests/unit/infra/test_init_update.py -k "issue_skills or guidance or workflow_next"` -> `8 passed`; `uv run pytest tests/cli_runtime/test_wrappers.py` -> `6 passed` | fresh spec-reviewer re-review passed | none | accepted |
 
 ## 親実装例外（Parent Implementation Exception）
 
@@ -270,5 +315,5 @@ Final QA / code review / spec review gates are not started. They are planned in 
 
 ## 省略/例外メモ
 
-- `guidance issue-planning` command failure is expected before S01 implementation because `guidance` is the command being introduced by this issue.
-- `workflow next issue-planning` still exists because this issue has not been implemented yet; it is used only as the current skill-mandated planning handoff until S01 replaces the command surface.
+- Pre-S01 `guidance issue-planning` command failure was used only as Red evidence. The implemented command surface is now `guidance <target>`.
+- `workflow next` is no longer a primary handoff command and must not be referenced by shipped Issue Planning / Execution Skills except as a negative regression assertion.
