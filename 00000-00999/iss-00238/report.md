@@ -64,6 +64,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
 | EAL-20260624-001 | 採用（`adopted`） | 調査（`research`） | `requirement.md`, `design.md`, `plan.md` | `guidance <target>`、target 分離、互換 alias 不要、projection は人間向け自動生成 ignored artifact、context packet は対象外という判断を canonical issue docs に採用した。 | `discussions/20260624t083737z-research-stdout-runbook-handoff-current-state.md` | なし |
+| EAL-20260624-002 | 採用（`adopted`） | ユーザー確認（`discussion`） | `requirement.md`, `design.md`, `plan.md`, `discussions/20260624t083737z-research-stdout-runbook-handoff-current-state.md` | `guidance <target>` は引数なしで Markdown stdout を返す単純な agent handoff とし、今回の issue では JSON output contract を用意しない判断を採用した。 | ユーザー発言: 「そもそもJSONのフォーマット用意しなくてよい」「引数なし、マークダウン」 | なし |
 | EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
@@ -80,7 +81,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | `discussions/20260624t083737z-research-stdout-runbook-handoff-current-state.md`; `spec-dock validate` -> `spec-dock: ok (validate) nodes=150`; `git diff --check` -> pass | なし。ユーザー確認により `guidance <target>`、互換 alias 不要、projection は agent 非関与の自動生成 artifact として決定済み。 | 採用（`adopted`） | 未実施（not_run）: この turn では sub-agent reviewer を明示起動していない。 | いいえ（no） | requirement / design / plan を draft として作成。次は必要に応じて fresh spec-reviewer pass。 |
+| 要件 / 設計 / 計画（requirement / design / plan） | `discussions/20260624t083737z-research-stdout-runbook-handoff-current-state.md`; `spec-dock validate` -> `spec-dock: ok (validate) nodes=150`; `git diff --check` -> pass | なし。ユーザー確認により `guidance <target>`、互換 alias 不要、projection は agent 非関与の自動生成 artifact、`guidance` は引数なし Markdown stdout として決定済み。 | 採用（`adopted`） | 未実施（not_run）: この turn では sub-agent reviewer を明示起動していない。 | いいえ（no） | requirement / design / plan を draft として作成。次は必要に応じて fresh spec-reviewer pass。 |
 | 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）

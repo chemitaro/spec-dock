@@ -195,8 +195,8 @@ skill 側には次のような明示が必要である。
 
 許可したい運用:
 
-- `spec-dock <command> ... --format markdown` を実行し、その stdout を読む。
-- 機械的検証では `--format json` を使う。
+- `spec-dock <command>` を実行し、その Markdown stdout を読む。
+- 今回の issue では `guidance` の JSON output contract は用意しない。
 - 人間向け projection は runtime が自動生成してよい。ただし agent は projection の存在を知る必要がなく、参照もしない。
 
 ### 原則 2: generated runbook projection は人間確認用 / evidence 用に限定する
@@ -241,8 +241,8 @@ skill では次を明記する。
 推奨する primary command は次である。
 
 ```sh
-./spec-dock/scripts/spec-dock guidance issue-planning --format markdown
-./spec-dock/scripts/spec-dock guidance issue-execution --format markdown
+./spec-dock/scripts/spec-dock guidance issue-planning
+./spec-dock/scripts/spec-dock guidance issue-execution
 ```
 
 理由:
@@ -316,7 +316,7 @@ skill では次を明記する。
 - projection は Git 管理しない。
 - skill は projection path を agent handoff として説明しない。必要なら「生成される場合があるが、agent は読まない」とだけ書く。
 - projection write failure は agent guidance の取得を block しない。
-- projection write failure が起きた場合、stdout guidance は成功させる。人間向け debug 情報として warning / projection status を JSON metadata に含めるか、debug log に留める。
+- projection write failure が起きた場合、stdout guidance は成功させる。人間向け debug 情報として Markdown warning または debug log に留める。
 
 ### projection が自動生成でよい理由
 
@@ -373,14 +373,8 @@ projection は stale になり得るため、次を入れる。
 第一案:
 
 ```sh
-./spec-dock/scripts/spec-dock guidance issue-execution --format markdown
-./spec-dock/scripts/spec-dock guidance issue-planning --format markdown
-```
-
-機械用:
-
-```sh
-./spec-dock/scripts/spec-dock guidance issue-execution --format json
+./spec-dock/scripts/spec-dock guidance issue-execution
+./spec-dock/scripts/spec-dock guidance issue-planning
 ```
 
 ### デフォルト動作
@@ -400,7 +394,7 @@ projection は stale になり得るため、次を入れる。
 
 issue execution skill の First-Read Handoff は次の意味へ変更する。
 
-- 最初に `./spec-dock/scripts/spec-dock guidance issue-execution --format markdown` を実行する。
+- 最初に `./spec-dock/scripts/spec-dock guidance issue-execution` を実行する。
 - stdout をその時点の動的 guidance として扱う。
 - stdout から `state` / `next_action` / selected step / commands / stop conditions / verification / reviewer gate を task list に登録する。
 - runbook projection は人間確認用の自動生成 artifact であり、agent handoff として読まない。
@@ -424,8 +418,8 @@ issue planning skill も同様。
 
 必須 regression:
 
-- `guidance issue-execution --format json` は stdout に guidance を返す。
-- `guidance issue-planning --format json` は planning 用 guidance を返す。
+- `guidance issue-execution` は Markdown stdout に guidance を返す。
+- `guidance issue-planning` は Markdown stdout に planning 用 guidance を返す。
 - `guidance` は target なし / unknown target を明確に reject する。
 - `workflow next` primary command は存在しない、または少なくとも skills/tests の主導線から消える。
 - projection は自動生成されても Git tracked diff を作らない。

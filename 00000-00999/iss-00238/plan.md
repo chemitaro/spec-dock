@@ -107,7 +107,7 @@ ID: "iss-00238"
 
 | 識別子（ID） | ステップ（step） | スライス（slice） | 種別（type） | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル（evidence level） | クロージャ証跡（closure evidence） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | guidance CLI | 受け入れ | AC-001, AC-002 | `guidance issue-planning` / `issue-execution` が stdout guidance を返す | CLI command | command surface drift | yes | red-required | report step closure |
+| tc-001 | S01 | guidance CLI | 受け入れ | AC-001, AC-002 | `guidance issue-planning` / `issue-execution` が Markdown stdout guidance を返す | CLI command | command surface drift | yes | red-required | report step closure |
 | tc-002 | S01 | target validation | 否定系 | EC-002 | unknown target を reject し projection を作らない | `guidance unknown-target` | silent invalid target | yes | red-required | report step closure |
 | tc-003 | S02 | projection non-blocking | 回帰 | AC-004 | projection write failure でも guidance stdout は成功 | failing RunbookStore fixture | projection failure blocks agent | yes | red-required | report step closure |
 | tc-004 | S02 | stale projection independence | 回帰 | AC-007 | stale `current-runbook.*` を読まず現在 state から guidance を生成 | stale projection + active issue | stale handoff | yes | red-required | report step closure |
@@ -143,8 +143,8 @@ ID: "iss-00238"
 ### 実装ステップ S01 — `guidance <target>` CLI contract を導入する
 
 - 振る舞いの目標（behavior goal）:
-  - `./spec-dock/scripts/spec-dock guidance issue-planning --format json`
-  - `./spec-dock/scripts/spec-dock guidance issue-execution --format markdown`
+  - `./spec-dock/scripts/spec-dock guidance issue-planning`
+  - `./spec-dock/scripts/spec-dock guidance issue-execution`
   - 上記が既存 Runbook / state guidance を stdout に返す。
 - design 参照:
   - `design.md` の "インターフェース契約"、"シーケンス差分"。
@@ -164,7 +164,7 @@ ID: "iss-00238"
   - scope:
     - `guidance` command を public entrypoint とする。
     - `issue-planning` / `issue-execution` target を受ける。
-    - `--format markdown|json` を維持する。
+    - 出力は引数なしの Markdown に固定する。今回の issue では JSON output contract を追加しない。
     - `workflow next` tests を `guidance` contract に置き換える。
   - テスト義務:
     - closure id: tc-001, tc-002
@@ -226,17 +226,17 @@ ID: "iss-00238"
 
 #### 具体テストケース一覧
 
-- `tc-s01-001` acceptance: planning guidance JSON
+- `tc-s01-001` acceptance: planning guidance Markdown
   - 前提: active issue with scaffold requirement。
-  - 操作: `guidance issue-planning --format json`。
-  - 期待結果: `state=requirement-capture`、`next_action=requirement-capture-required`。
-  - 失敗検出: command missing / wrong state / malformed JSON。
+  - 操作: `guidance issue-planning`。
+  - 期待結果: `state: requirement-capture`、`next_action: requirement-capture-required` 相当の情報を Markdown stdout で読める。
+  - 失敗検出: command missing / wrong state / malformed Markdown。
   - 検証方法: CLI runtime test。
   - 関連 closure id: tc-001
 
 - `tc-s01-002` acceptance: execution guidance Markdown
   - 前提: substantive requirement and executable plan。
-  - 操作: `guidance issue-execution --format markdown`。
+  - 操作: `guidance issue-execution`。
   - 期待結果: `state: ready` と execution-ready guidance。
   - 失敗検出: old `workflow next` only / missing execution content。
   - 検証方法: CLI runtime / context routing tests。
@@ -244,7 +244,7 @@ ID: "iss-00238"
 
 - `tc-s01-003` negative: unknown target
   - 前提: initialized repo。
-  - 操作: `guidance unknown-target --format json`。
+  - 操作: `guidance unknown-target`。
   - 期待結果: invalid choice / non-zero、projection file を作らない。
   - 検証方法: CLI runtime test。
   - 関連 closure id: tc-002
@@ -355,7 +355,7 @@ ID: "iss-00238"
 
 - `tc-s02-002` regression: stale projection ignored
   - 前提: stale `current-runbook.json` が別 issue を指す。
-  - 操作: `guidance issue-planning --format json`。
+  - 操作: `guidance issue-planning`。
   - 期待結果: stdout payload は current active issue を示す。
   - 検証方法: CLI runtime test。
   - 関連 closure id: tc-004
@@ -408,8 +408,8 @@ ID: "iss-00238"
   - 必要に応じて docs references。
 - 計画済み契約:
   - scope:
-    - Planning Skill は `guidance issue-planning --format markdown` を実行する。
-    - Execution Skill は `guidance issue-execution --format markdown` を実行する。
+    - Planning Skill は `guidance issue-planning` を実行する。
+    - Execution Skill は `guidance issue-execution` を実行する。
     - stdout を current dynamic guidance として扱う。
     - `state` / `next_action` / selected step / commands / stop conditions / verification / reviewer gate を task checklist へ登録する。
     - Projection は human-only ignored artifact であり、agent handoff として読まない。
@@ -462,14 +462,14 @@ ID: "iss-00238"
 - `tc-s03-001` inspect: planning skill handoff
   - 前提: provider Skill asset。
   - 操作: text を読む。
-  - 期待結果: `guidance issue-planning --format markdown` と task checklist 登録要求がある。
+  - 期待結果: `guidance issue-planning` と task checklist 登録要求がある。
   - 検証方法: unit/infra assertion。
   - 関連 closure id: tc-005
 
 - `tc-s03-002` inspect: execution skill handoff
   - 前提: provider Skill asset。
   - 操作: text を読む。
-  - 期待結果: `guidance issue-execution --format markdown` と projection non-handoff warning がある。
+  - 期待結果: `guidance issue-execution` と projection non-handoff warning がある。
   - 検証方法: unit/infra assertion。
   - 関連 closure id: tc-005
 

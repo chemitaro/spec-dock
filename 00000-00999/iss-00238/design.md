@@ -162,16 +162,13 @@ Skills --> Parser : invoke public CLI only
 ## インターフェース契約
 
 - CLI:
-  - `./spec-dock/scripts/spec-dock guidance issue-planning --format markdown`
-  - `./spec-dock/scripts/spec-dock guidance issue-planning --format json`
-  - `./spec-dock/scripts/spec-dock guidance issue-execution --format markdown`
-  - `./spec-dock/scripts/spec-dock guidance issue-execution --format json`
+  - `./spec-dock/scripts/spec-dock guidance issue-planning`
+  - `./spec-dock/scripts/spec-dock guidance issue-execution`
 - Target:
   - `issue-planning`
   - `issue-execution`
 - Output:
-  - Markdown: agent が読みやすい current guidance。
-  - JSON: tests / future automation が読める machine-readable payload。
+  - Markdown: agent が読みやすい current guidance。今回の issue では JSON output contract を用意しない。
 - Removed / replaced:
   - `workflow next <target>` は primary command として提供しない。
   - `workflow status` の扱いは実装時に確認する。状態確認専用として残す場合でも、dynamic handoff の主導線にはしない。
@@ -190,13 +187,13 @@ participant "Runbook compiler" as Compiler
 participant "RunbookStore" as Store
 
 Agent -> Skill : read first-read handoff
-Skill -> CLI : guidance issue-execution --format markdown
+Skill -> CLI : guidance issue-execution
 CLI -> UseCase : resolve target guidance
 UseCase -> Compiler : compile runbook from current state
 UseCase -> Store : best-effort write human projection
 Store --> UseCase : written / warning / errors
 UseCase --> CLI : result with stdout guidance
-CLI --> Agent : stdout Markdown / JSON
+CLI --> Agent : stdout Markdown
 Agent -> Agent : register state/actions/gates in checklist
 @enduml
 ```
@@ -223,7 +220,7 @@ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/
 |-- infra/
 |   `-- runbook_store.py                  # projection に human-only warning / refresh command を含める
 `-- presentation/
-    `-- workflow.py                       # Markdown / JSON 表示を guidance 表現へ調整
+    `-- workflow.py                       # Markdown 表示を guidance 表現へ調整
 
 src/spec_dock/assets/install_root/.agents/skills/
 |-- spec-dock-issue-planning/SKILL.md     # first-read handoff を guidance issue-planning に変更
@@ -257,8 +254,8 @@ tests/
   - `workflow_next` / guidance use case の projection write failure non-blocking test。
   - `RunbookStore` projection header / metadata test。
 - CLI runtime:
-  - `guidance issue-planning --format json`
-  - `guidance issue-execution --format markdown/json`
+  - `guidance issue-planning`
+  - `guidance issue-execution`
   - unknown target rejection。
   - no-active guidance。
   - stale projection independence。
@@ -278,7 +275,7 @@ tests/
   - `workflow status` を残すかどうかの境界が曖昧になり得る。
 - 対策:
   - agent-facing handoff は `guidance` に限定し、`workflow status` が残る場合も state inspection 用と明記する。
-  - Projection error は JSON metadata / warning として観測可能にする。
+  - Projection error は Markdown warning または debug log として観測可能にする。
   - Tests で stale projection independence と projection write failure non-blocking を固定する。
 - ロールバック:
   - この issue は main 未マージの feature branch 上の修正なので、必要なら commit revert で `workflow next` 実装へ戻せる。

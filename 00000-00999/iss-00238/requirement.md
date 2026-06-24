@@ -48,7 +48,7 @@ ID: "iss-00238"
 - 必須:
   - `workflow next <target>` を agent-facing primary command から外し、`guidance <target>` を導入する。
   - Target は `issue-planning` と `issue-execution` を分ける。
-  - `guidance <target>` は stdout を agent-facing な正本とし、Markdown / JSON を返せる。
+  - `guidance <target>` は stdout を agent-facing な正本とし、引数なしで Markdown を返す。
   - Human-facing projection は自動生成されてもよいが、Git 管理されない ignored artifact とし、agent-facing docs / skills から参照導線を消す。
   - Projection write failure は `guidance` stdout の成功を block しない。
   - Issue Planning / Execution Skill は `guidance <target>` 実行と task checklist 登録を first-read handoff として要求する。
@@ -84,14 +84,14 @@ ID: "iss-00238"
 - AC-001: `guidance issue-planning` が planning guidance を stdout に返す
   - アクター: agent / developer
   - 前提: SpecDock initialized repo で active issue が存在する。
-  - 操作: `./spec-dock/scripts/spec-dock guidance issue-planning --format json` を実行する。
-  - 期待結果: JSON stdout に `state`、`next_action`、`commands`、`stop_conditions`、`workflow_target: issue-planning` 相当の情報が返る。
-  - 観測点: CLI runtime tests、JSON payload。
+  - 操作: `./spec-dock/scripts/spec-dock guidance issue-planning` を実行する。
+  - 期待結果: Markdown stdout に state、next action、commands、stop conditions、target が読める形で返る。
+  - 観測点: CLI runtime tests、Markdown stdout。
 
 - AC-002: `guidance issue-execution` が execution guidance を stdout に返す
   - アクター: agent / developer
   - 前提: SpecDock initialized repo で active issue が存在する。
-  - 操作: `./spec-dock/scripts/spec-dock guidance issue-execution --format markdown` または `--format json` を実行する。
+  - 操作: `./spec-dock/scripts/spec-dock guidance issue-execution` を実行する。
   - 期待結果: stdout に execution 向け guidance が返る。実行可能な場合は step assurance / context packet refs を含み、実行不可の場合は planning required / blocked guidance を返す。
   - 観測点: CLI runtime tests、context routing tests。
 
@@ -105,7 +105,7 @@ ID: "iss-00238"
 - AC-004: Projection は agent guidance を block しない
   - アクター: agent / developer
   - 前提: projection path への書き込みが失敗する fixture。
-  - 操作: `guidance issue-planning --format json` を実行する。
+  - 操作: `guidance issue-planning` を実行する。
   - 期待結果: command は guidance stdout を成功として返す。projection write failure は agent-facing state を `runbook-write-failure` にしない。
   - 観測点: unit / CLI runtime tests。
 
@@ -126,7 +126,7 @@ ID: "iss-00238"
 - AC-007: Stale projection が guidance 結果に影響しない
   - アクター: agent / developer
   - 前提: `current-runbook.*` が別 issue を指す stale 状態で存在する。
-  - 操作: `guidance issue-planning --format json` を実行する。
+  - 操作: `guidance issue-planning` を実行する。
   - 期待結果: stdout は現在の active issue / state から生成され、stale projection の内容に依存しない。
   - 観測点: CLI runtime regression tests。
 
@@ -154,12 +154,12 @@ ID: "iss-00238"
 
 ## 入力→出力例
 
-- EX-001: planning JSON guidance
-  - 入力: `./spec-dock/scripts/spec-dock guidance issue-planning --format json`
-  - 出力: `state`、`next_action`、`reason_code`、`active_issue_id`、`commands`、`stop_conditions`、`projection` metadata を含む JSON。
+- EX-001: planning Markdown guidance
+  - 入力: `./spec-dock/scripts/spec-dock guidance issue-planning`
+  - 出力: state、next action、reason code、active issue、commands、stop conditions、projection warning を人間と agent が読める Markdown。
 
 - EX-002: execution Markdown guidance
-  - 入力: `./spec-dock/scripts/spec-dock guidance issue-execution --format markdown`
+  - 入力: `./spec-dock/scripts/spec-dock guidance issue-execution`
   - 出力: 現在状態、commands、stop conditions、必要に応じて step assurance / context packet refs を含む Markdown。
 
 ## 用語
