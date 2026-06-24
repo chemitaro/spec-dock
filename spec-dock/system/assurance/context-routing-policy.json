@@ -24,7 +24,7 @@
     },
     "security-sensitive": {
       "worker": "dev-coder",
-      "reasoning_effort": "max",
+      "reasoning_effort": "xhigh",
       "context_mode": "bounded_packet",
       "verification": ["unit_tests", "security_review", "privacy_review"],
       "reviewers": ["code-reviewer", "qa-reviewer", "spec-reviewer"]

@@ -980,10 +980,17 @@ def normalized_body_text(value):
 
 
 def finding_priorities(raw_body):
-    return [
-        f"P{match.group(1)}"
-        for match in re.finditer(r"(?<![A-Za-z0-9])P([0-3])(?![A-Za-z0-9])", str(raw_body or ""), flags=re.IGNORECASE)
-    ]
+    priorities = []
+    declared_pattern = re.compile(
+        r"(?:!\[P([0-3])\s+Badge\]|\[\s*P([0-3])\s*\]|^\*{0,2}\s*P([0-3])(?=\b|:|-))",
+        flags=re.IGNORECASE,
+    )
+    for line in str(raw_body or "").splitlines():
+        match = declared_pattern.search(line.strip())
+        if match:
+            priority = next(group for group in match.groups() if group is not None)
+            priorities.append(f"P{priority}")
+    return priorities
 
 
 def finding_priority(raw_body):
@@ -998,7 +1005,10 @@ def has_protected_domain(raw_body):
         r"\bprivacy\b",
         r"\bdata\s+loss\b",
         r"\bpermission\b",
+        r"\bpermissions\b",
         r"\bauth\b",
+        r"\bauthentication\b",
+        r"\bauthorization\b",
         r"\bmigration\b",
         r"\bbilling\b",
         r"\bfinancial\b",

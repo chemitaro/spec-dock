@@ -27,7 +27,7 @@ class ReasoningEffort(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
-    MAX = "max"
+    MAX = "xhigh"
 
 
 class TaskKind(str, Enum):
@@ -222,7 +222,7 @@ def context_routing_policy_from_dict(payload: dict[str, Any]) -> ContextRoutingP
             raise ValueError(f"context routing policy has non-worker role in worker: {worker.value}")
         routing_matrix[task_kind] = {
             "worker": worker,
-            "reasoning_effort": ReasoningEffort(_require_str(raw_rule, "reasoning_effort")),
+            "reasoning_effort": _reasoning_effort_from_str(_require_str(raw_rule, "reasoning_effort")),
             "context_mode": ContextMode(_require_str(raw_rule, "context_mode")),
             "verification": _require_str_tuple(raw_rule, "verification"),
             "reviewers": reviewers,
@@ -370,6 +370,12 @@ def _profile_adjusted_effort(effort: ReasoningEffort, authorized_profile: str) -
     if authorized_profile == "strict" and effort in {ReasoningEffort.LOW, ReasoningEffort.MEDIUM}:
         return ReasoningEffort.HIGH
     return effort
+
+
+def _reasoning_effort_from_str(value: str) -> ReasoningEffort:
+    if value == "max":
+        return ReasoningEffort.MAX
+    return ReasoningEffort(value)
 
 
 def _require_str(payload: dict[str, Any], key: str) -> str:

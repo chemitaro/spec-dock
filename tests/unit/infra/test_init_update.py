@@ -31861,9 +31861,14 @@ esac
         namespace = {"hashlib": hashlib, "re": re}
         exec(compile(ast.Module(body=selected, type_ignores=[]), str(provider_path), "exec"), namespace)
 
-        body = "P2: follow-up. P1: deterministic blocker. Test: failing test proves it."
+        body = "P2: follow-up. This is not P1 and remains below P0/P1 blocker threshold."
+        badge_body = (
+            "**<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-red)</sub></sub> auth regression**\n\n"
+            "Mentions P2 context."
+        )
 
-        assert namespace["finding_priorities"](body) == ["P2", "P1"]
+        assert namespace["finding_priorities"](body) == ["P2"]
+        assert namespace["finding_priorities"](badge_body) == ["P1"]
         assert namespace["blocker_fingerprint"]("issue_comment", "P1", body) == namespace["blocker_fingerprint"](
             "issue_comment", "P1", body
         )
@@ -31871,7 +31876,7 @@ esac
             "issue_comment", "P2", body
         )
 
-    def test_issue_233_required_check_rollup_scans_after_success_without_conclusion(self) -> None:
+    def test_issue_233_required_check_rollup_ignores_optional_failure_when_mergeable(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         provider_path = (
             repo_root
@@ -31904,7 +31909,60 @@ esac
         namespace = {"json": json, "subprocess": FakeSubprocess}
         exec(compile(ast.Module(body=selected, type_ignores=[]), str(provider_path), "exec"), namespace)
 
+        assert namespace["required_check_rollup_status"]("owner/repo", "13", 1.0) is None
+
+    def test_issue_233_required_check_rollup_scans_failure_when_not_mergeable(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        provider_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py"
+        )
+        module = ast.parse(provider_path.read_text(encoding="utf-8"))
+        selected = [
+            node
+            for node in module.body
+            if isinstance(node, ast.FunctionDef) and node.name == "required_check_rollup_status"
+        ]
+
+        class FakeCompleted:
+            returncode = 0
+            stdout = json.dumps({
+                "mergeStateStatus": "DIRTY",
+                "statusCheckRollup": [
+                    {"name": "legacy", "state": "SUCCESS", "conclusion": None},
+                    {"name": "required", "status": "COMPLETED", "conclusion": "FAILURE"},
+                ],
+            })
+
+        class FakeSubprocess:
+            TimeoutExpired = TimeoutError
+
+            @staticmethod
+            def run(*_args, **_kwargs):
+                return FakeCompleted()
+
+        namespace = {"json": json, "subprocess": FakeSubprocess}
+        exec(compile(ast.Module(body=selected, type_ignores=[]), str(provider_path), "exec"), namespace)
+
         assert namespace["required_check_rollup_status"]("owner/repo", "13", 1.0) == "failed"
+
+    @pytest.mark.parametrize("term", ["authentication", "authorization", "permissions"])
+    def test_issue_232_protected_domain_recognizes_auth_terms(self, term: str) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        provider_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py"
+        )
+        module = ast.parse(provider_path.read_text(encoding="utf-8"))
+        selected = [
+            node
+            for node in module.body
+            if isinstance(node, ast.FunctionDef) and node.name in {"normalized_body_text", "has_protected_domain"}
+        ]
+        namespace = {"re": re}
+        exec(compile(ast.Module(body=selected, type_ignores=[]), str(provider_path), "exec"), namespace)
+
+        assert namespace["has_protected_domain"](f"P2: {term} regression. Test: failing test proves it.") is True
 
     @pytest.mark.parametrize(
         ("body", "expected_protected", "expected_machine"),
