@@ -43,7 +43,7 @@ class RunbookStore:
         backups: list[tuple[Path | None, Path]] = []
         try:
             for rel_path, text in writes:
-                path = self._repo_root / rel_path
+                path = _safe_projection_path(self._repo_root, rel_path)
                 staged.append((_stage_text(path, text), path))
             for _tmp_path, path in staged:
                 backups.append((_backup_existing_path(path), path))
@@ -88,6 +88,24 @@ def _stage_text(path: Path, text: str) -> Path:
 
 def _replace_path(src: Path, dst: Path) -> None:
     src.replace(dst)
+
+
+def _safe_projection_path(repo_root: Path, rel_path: str) -> Path:
+    path = repo_root / rel_path
+    if path.is_symlink():
+        raise OSError(f"refusing to replace symlinked runbook projection: {rel_path}")
+    _reject_symlinked_ancestors(path.parent, repo_root)
+    return path
+
+
+def _reject_symlinked_ancestors(path: Path, root: Path) -> None:
+    current = path
+    while current != root:
+        if current.exists() and current.is_symlink():
+            raise OSError(f"refusing to write runbook projection through symlinked directory: {current}")
+        if current.parent == current:
+            break
+        current = current.parent
 
 
 def _backup_existing_path(path: Path) -> Path | None:

@@ -70,6 +70,20 @@ def compile_runbook(
             stop_conditions=("Do not start implementation until assurance verification succeeds.",),
         )
     if state.kind == "blocked":
+        if state.reason_code == "workflow-plan-unselectable":
+            return _runbook(
+                target,
+                state,
+                next_action="issue-planning-required",
+                commands=(
+                    "./spec-dock/scripts/spec-dock active show",
+                    "Edit spec-dock/active/issue/plan.md",
+                ),
+                notes=("The active issue plan has no selectable implementation step.",),
+                stop_conditions=("Do not continue issue execution until the plan contains structured steps.",),
+                step_assurance=step_assurance,
+                context_packets=context_packets,
+            )
         return _runbook(
             target,
             state,

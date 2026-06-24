@@ -114,6 +114,23 @@ def test_runbook_store_replace_failure_preserves_existing_projection_set(
     assert not list((tmp_path / "spec-dock/active").glob("*.tmp"))
 
 
+def test_runbook_store_rejects_symlinked_projection_directories(tmp_path: Path) -> None:
+    _, _, _, _, runbook_store = _runtime_modules()
+    outside = tmp_path / "outside-runbooks"
+    outside.mkdir()
+    runbook_dir = tmp_path / "spec-dock/.agent/runbooks"
+    runbook_dir.parent.mkdir(parents=True)
+    runbook_dir.symlink_to(outside, target_is_directory=True)
+    store = runbook_store.RunbookStore(tmp_path)
+
+    result = store.write_current(_runbook())
+
+    assert result.written is False
+    assert result.paths == ()
+    assert result.errors
+    assert not (outside / "current-runbook.json").exists()
+
+
 def test_workflow_next_returns_blocked_when_projection_write_fails() -> None:
     WorkflowNextRequest, workflow_next, _, _, runbook_store = _runtime_modules()
 
