@@ -53,7 +53,8 @@ ID: "iss-00238"
 
 ## 実装サマリー
 
-- S01 実装中。`workflow next` primary command を削除し、`guidance <target>` の Markdown stdout handoff と Issue Planning / Execution Skill の first-read handoff を同一 step で更新した。
+- S01 完了。`workflow next` primary command を削除し、`guidance <target>` の Markdown stdout handoff と Issue Planning / Execution Skill の first-read handoff を同一 step で更新した。
+- S02 完了。Projection write failure は guidance state を block せず、stale projection は guidance 生成に影響せず、projection は human-only ignored artifact として明示される。
 
 ## 実装記録（セッションログ）
 
@@ -144,11 +145,67 @@ git diff --check
 | S01 | initial code review | code-reviewer | fresh before Skill fix | failed | no | blocked until Skill handoff fix | P1 finding: shipped Issue Planning / Execution Skills still called `workflow next`, which would break first-read handoff after command removal. |
 | S01 | post-fix code re-review | code-reviewer | fresh | passed | no | S01 can be committed | Findings: none. Remaining projection behavior is explicitly left to S02 closure. |
 
+### セッションログ（2026-06-24 22:10 - 22:45 JST）
+
+#### 対象
+- Step: S02
+- AC/EC: AC-004, AC-005, AC-007, EC-004
+- Closure IDs: tc-003, tc-004, tc-009, tc-010
+
+#### 実施内容
+- `workflow_next` の projection write failure handling を best-effort に変更し、projection failure を `runbook-write-failure` blocked state へ変換しないようにした。
+- Projection JSON / Markdown / stdout projection section に human-only / non-canonical / refresh command の境界を追加した。
+- stale `spec-dock/.agent/runbooks/current-runbook.json` / `spec-dock/active/current-runbook.json` が存在しても、`guidance issue-planning` が current active issue から stdout / projection を再生成する CLI regression test を追加した。
+- context packet write failure は既存どおり `context-packet-write-failure` blocked state を維持することを focused suite で確認した。
+- tc-004 stale projection independence は実装前の現行 runtime でも projection を読まない形だったため、Red ではなく新規 regression coverage による代替証跡として採用した。
+
+#### Red / 代替証跡
+
+```bash
+uv run pytest tests/unit/infra/test_runbook_store.py
+# expected Red after S02 test update:
+# 2 failed, 3 passed
+# - projection payload lacked human-only metadata
+# - projection write failure still returned blocked/runbook-write-failure
+
+uv run pytest tests/cli_runtime/test_workflow.py
+# expected Red after S02 test update:
+# 2 failed, 9 passed
+# - projection payload lacked human-only metadata
+# - stale projection regression test initially used corrected current next_action expectation
+```
+
+#### Green 検証
+
+```bash
+uv run pytest tests/unit/infra/test_runbook_store.py
+# 5 passed
+
+uv run pytest tests/cli_runtime/test_workflow.py
+# 11 passed
+
+uv run pytest tests/cli_runtime/test_workflow_context_routing.py
+# 26 passed
+
+uv run pytest tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py
+# 37 passed
+
+git diff --check
+# pass
+```
+
+#### レビューゲート状態（Reviewer Gate Status）
+
+| step / phase | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S02 | code review | code-reviewer | fresh | passed | no | S02 can be committed | Findings: none. Reviewer confirmed projection non-blocking behavior, stale projection independence, human-only projection metadata, and context packet fail-closed handling. |
+
 ## ステップ契約の完了証跡（Step Contract Closure）
 
 | step | closure ids | close condition from plan | observed evidence | result | notes |
 |---|---|---|---|---|---|
 | S01 | tc-001, tc-002, tc-007, tc-008 | `guidance` CLI tests pass; `workflow next` is not primary command; no-active / unknown target / malformed assurance / stale source binding covered. | `uv run pytest tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py` -> `36 passed`; combined S01 + Skill fix run -> `38 passed`; `git diff --check` -> pass; `rg` confirms provider Skill assets use `guidance issue-*` and `workflow next` remains only in negative assertion. | passed | Initial code-review failed because shipped skills still called `workflow next`; reviewer-directed fix updated Skill assets and focused tests. Fresh code-reviewer re-review passed. |
+| S02 | tc-003, tc-004, tc-009, tc-010 | Projection failure / stale projection tests pass; context packet fail-closed tests are maintained. | `uv run pytest tests/unit/infra/test_runbook_store.py` -> `5 passed`; `uv run pytest tests/cli_runtime/test_workflow.py` -> `11 passed`; `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` -> `26 passed`. | passed | Projection errors remain observable via `result.projection.errors` / Markdown `Projection Errors`; they no longer change guidance state. |
 
 ## テスト契約の完了証跡（Test Contract Closure）
 
@@ -158,6 +215,10 @@ git diff --check
 | tc-002 | S01 | yes | red-required | Existing `workflow next unknown-target --format json` contract was removed; `guidance unknown-target` expected non-zero. | `tests/cli_runtime/test_workflow.py` | pass | Unknown target rejection covered. |
 | tc-007 | S01 | yes | red-required | No-active guidance needed to remain available after command rename. | `tests/cli_runtime/test_workflow.py` | pass | `issue-start-required` guidance covered via Markdown command and projection payload inspection. |
 | tc-008 | S01 | yes | red-required | Malformed assurance / stale source binding needed to remain fail-closed after command rename. | `tests/cli_runtime/test_workflow.py` | pass | `classification-required` / `authority-invalid` cases covered. |
+| tc-003 | S02 | yes | red-required | Updated `test_workflow_next_keeps_guidance_current_when_projection_write_fails` failed because old implementation returned `blocked/runbook-write-failure`. | `tests/unit/infra/test_runbook_store.py` | pass | Projection write failure preserves current guidance state and exposes projection errors. |
+| tc-004 | S02 | yes | justified-alternative | Existing runtime already ignored stale projection; added regression to prevent reintroducing stale projection authority. | `tests/cli_runtime/test_workflow.py` | pass | Guidance regenerated from current active issue `iss-00301`, not stale `iss-99999`. |
+| tc-009 | S02 | yes | covered-existing | Existing context packet write failure test already asserted `context-packet-write-failure`. | `tests/cli_runtime/test_workflow_context_routing.py` | pass: `26 passed` | Context packet failure remains fail-closed while projection remains best-effort. |
+| tc-010 | S02 | yes | red-required | Updated projection tests failed because old projection payload lacked human-only metadata. | `tests/unit/infra/test_runbook_store.py`; `tests/cli_runtime/test_workflow.py` | pass | Projection remains ignored and marks audience=`human`, authority=`non-canonical`, refresh command. |
 
 ## クロージャ網羅（Closure Coverage）
 
@@ -167,7 +228,10 @@ git diff --check
 | tc-002 | S01 | EC-002 | pass | CLI runtime unknown target case and fresh code-reviewer pass. |
 | tc-007 | S01 | EC-001 | pass | CLI runtime no-active guidance case and fresh code-reviewer pass. |
 | tc-008 | S01 | EC-003 | pass | CLI runtime malformed assurance / stale source binding cases and fresh code-reviewer pass. |
-| tc-003, tc-004, tc-009, tc-010 | S02 | AC-004, AC-005, AC-007, EC-004 | not started | Pending S02 implementation. |
+| tc-003 | S02 | AC-004 | pass | Unit regression confirms projection write failure does not block current guidance. |
+| tc-004 | S02 | AC-007 | pass | CLI regression confirms stale current-runbook projection is ignored. |
+| tc-009 | S02 | EC-004 | pass | Context routing suite confirms context packet write failure remains fail-closed. |
+| tc-010 | S02 | AC-005 | pass | Unit / CLI tests confirm ignored human projection metadata and no tracked diff. |
 | tc-005 | S03 | AC-006 | partially covered by S01 reviewer-directed fix | Skill handoff text and init-update tests updated in S01; S03 still needs closure confirmation. |
 | tc-006 | S99 | 全 AC / EC | not started | Pending final quality gate. |
 
@@ -186,6 +250,7 @@ git diff --check
 | step | status | delegated scope | role(s) | allowed paths | forbidden changes | verification | reviewer gate | open risk | next action |
 |---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | `guidance <target>` command surface and shipped agent handoff changes | dev-coder, doc-writer | runtime parser / command / presentation; CLI tests; Issue Planning / Execution Skill assets; focused init-update tests | Assurance policy, context packet semantics, `workflow next` alias | `38 passed`; `git diff --check` pass | passed | dogfooding mirror is not updated until a later validation/update step; provider source and generated init/update behavior are covered. | Commit S01, then start S02. |
+| S02 | delegated | projection non-blocking / stale projection independence / human-only projection metadata | dev-coder | application workflow; runbook store; presentation; focused tests | Context packet semantics, assurance policy, `workflow next` alias | `5 passed`; `37 passed`; `git diff --check` pass | passed | Human projection warning wording can be final-inspected in S99. | Commit S02, then confirm S03 closure. |
 
 ## 委任 worker 証跡（Delegated Worker Evidence）
 
@@ -193,6 +258,7 @@ git diff --check
 |---|---|---|---|---|---|---|---|
 | S01 | dev-coder | Implemented `guidance <target>` and removed `workflow next` primary command. | runtime parser / command / presentation; CLI runtime tests | `uv run pytest tests/cli_runtime/test_workflow.py` -> `10 passed`; `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` -> `26 passed`; `git diff --check` -> pass | initial code-review failed | dogfooding mirror stays stale until update / refresh step | accepted with reviewer-directed follow-up |
 | S01 | doc-writer | Updated shipped Issue Planning / Execution Skill handoff to run `guidance issue-planning` / `guidance issue-execution` and register guidance into agent task checklist. | provider Skill assets; focused init-update tests | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_skills_provider_assets_are_fixed_guidance_kernels tests/unit/infra/test_init_update.py::TestInitUpdate::test_bundled_skill_routing_contract` -> `2 passed`; combined run -> `38 passed`; `git diff --check` -> pass | fresh code-reviewer re-review passed | none beyond S03 confirmation | accepted |
+| S02 | dev-coder | Made runbook projection best-effort for guidance, added human-only projection metadata, and covered stale projection independence. | application workflow; runbook store; presentation; unit / CLI runtime tests | `uv run pytest tests/unit/infra/test_runbook_store.py` -> `5 passed`; `uv run pytest tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py` -> `37 passed`; `git diff --check` -> pass | fresh code-reviewer passed | wording can be final-inspected in S99 | accepted |
 
 ## 親実装例外（Parent Implementation Exception）
 
