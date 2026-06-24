@@ -292,6 +292,8 @@ def _select_step(plan_text: str, report_text: str) -> dict[str, Any]:
             continue
         block_end = next((start for start in all_heading_starts if start > match.start()), len(plan_text))
         block = plan_text[match.start() : block_end]
+        if _is_placeholder_step(match.group(2), block):
+            continue
         task_kind, risk_tags = _classify_task_kind(block)
         return {
             "id": step_id,
@@ -307,6 +309,10 @@ def _select_step(plan_text: str, report_text: str) -> dict[str, Any]:
         "risk_tags": [],
         "selection_method": "issue_wide_default",
     }
+
+
+def _is_placeholder_step(title: str, block: str) -> bool:
+    return ("<" in title and ">" in title) or "<観測可能な振る舞い>" in block
 
 
 def _completed_step_ids(report_text: str) -> set[str]:

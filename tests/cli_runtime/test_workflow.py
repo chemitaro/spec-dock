@@ -54,6 +54,7 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Implement feature")
             self._write_substantive_requirement(issue_dir)
+            self._write_executable_plan(issue_dir)
 
             result = self._run_runtime_capture(
                 target,
@@ -249,6 +250,14 @@ class TestCliWorkflow(CliRuntimeHarness):
             "- Implement a concrete runtime behavior with observable CLI output.\n\n"
             "## 受け入れ条件\n"
             "- The command returns deterministic state and guidance.\n",
+            encoding="utf-8",
+        )
+
+    def _write_executable_plan(self, issue_dir: Path) -> None:
+        (issue_dir / "plan.md").write_text(
+            "# Plan\n\n"
+            "### 実装ステップ S01 — Implement deterministic workflow guidance\n"
+            "- 対象ファイル: scripts/spec_dock_runtime/application/workflow.py\n",
             encoding="utf-8",
         )
 

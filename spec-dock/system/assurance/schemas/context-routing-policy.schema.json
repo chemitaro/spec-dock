@@ -68,7 +68,7 @@
           "enum": ["dev-coder", "doc-writer"]
         },
         "reasoning_effort": {
-          "enum": ["low", "medium", "high", "max"]
+          "enum": ["low", "medium", "high", "max", "xhigh"]
         },
         "context_mode": {
           "enum": ["recent_fork", "bounded_packet", "clean_room", "minimal_packet"]

@@ -20342,6 +20342,21 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
         snapshot_script_path = script_dir / "fetch_pr_observation_snapshot.sh"
         scenario_path = tmp_path / "scenario.json"
         state_path = tmp_path / "state.txt"
+        fake_bin = tmp_path / "bin"
+        fake_bin.mkdir()
+        fake_gh = fake_bin / "gh"
+        fake_gh.write_text(
+            """#!/usr/bin/env bash
+if [ "$*" = "pr view 13 --repo owner/repo --json mergeStateStatus,statusCheckRollup" ]; then
+  printf '{"mergeStateStatus":"CLEAN","statusCheckRollup":[]}\n'
+  exit 0
+fi
+printf 'unexpected gh call: %s\n' "$*" >&2
+exit 44
+""",
+            encoding="utf-8",
+        )
+        fake_gh.chmod(0o755)
         out_dir = out_dir or tmp_path / "out"
         shutil.copy2(source_script_path, wait_script_path)
         wait_lib_dir = script_dir / "lib"
@@ -20354,6 +20369,7 @@ print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             **os.environ,
             "FAKE_SNAPSHOT_SCENARIO": str(scenario_path),
             "FAKE_SNAPSHOT_STATE": str(state_path),
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
         }
         result = subprocess.run(
             [
@@ -31927,7 +31943,7 @@ esac
         class FakeCompleted:
             returncode = 0
             stdout = json.dumps({
-                "mergeStateStatus": "DIRTY",
+                "mergeStateStatus": "UNSTABLE",
                 "statusCheckRollup": [
                     {"name": "legacy", "state": "SUCCESS", "conclusion": None},
                     {"name": "required", "status": "COMPLETED", "conclusion": "FAILURE"},
