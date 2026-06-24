@@ -398,14 +398,121 @@ def _block_has_completed_step_row(block: str, step_id: str) -> bool:
 
 
 def _classify_task_kind(text: str) -> tuple[TaskKind, tuple[str, ...]]:
-    lowered = text.lower()
-    if "security" in lowered or "privacy" in lowered:
+    if _has_affirmative_evidence(text, _SECURITY_EVIDENCE):
         return TaskKind.SECURITY_SENSITIVE, ("security",)
-    if "migration" in lowered or "rollback" in lowered:
+    if _has_affirmative_evidence(text, _MIGRATION_EVIDENCE):
         return TaskKind.MIGRATION, ("migration",)
-    if "docs-only" in lowered or "docs impact" in lowered or "doc-writer" in lowered:
+    if _has_runtime_evidence(text):
+        return TaskKind.RUNTIME, ("runtime",)
+    if _has_explicit_docs_only_evidence(text):
         return TaskKind.DOCS_ONLY, ("docs",)
     return TaskKind.RUNTIME, ("runtime",)
+
+
+_SECURITY_EVIDENCE = (
+    "security_review",
+    "privacy_review",
+    "authentication",
+    "authorization",
+    "permissions",
+    "permission",
+    "privilege",
+    "credential",
+    "secret",
+    "security",
+    "privacy",
+)
+_MIGRATION_EVIDENCE = (
+    "data migration",
+    "migration",
+    "rollback",
+    "schema",
+)
+_RUNTIME_EVIDENCE = (
+    "dev-coder",
+    "code-reviewer",
+    "unit_tests",
+    "integration_tests",
+    "tests/",
+    "src/",
+    "spec_dock_runtime",
+    "commands/",
+    "runtime command behavior",
+)
+_EXPLICIT_DOCS_ONLY_EVIDENCE = (
+    "task marker: docs-only",
+    "委任ロール: doc-writer",
+    "doc-writer",
+    "docs_inspection",
+)
+_WEAK_DOCS_ONLY_EVIDENCE = (
+    "docs-only verification",
+    "tests または docs-only verification",
+)
+
+
+def _has_affirmative_evidence(text: str, evidence: tuple[str, ...]) -> bool:
+    return any(_contains_affirmative_evidence(line, evidence) for line in text.splitlines())
+
+
+def _has_runtime_evidence(text: str) -> bool:
+    lowered = text.lower()
+    return any(item in lowered for item in _RUNTIME_EVIDENCE)
+
+
+def _has_explicit_docs_only_evidence(text: str) -> bool:
+    return any(_contains_explicit_docs_only_evidence(line) for line in text.splitlines())
+
+
+def _contains_affirmative_evidence(line: str, evidence: tuple[str, ...]) -> bool:
+    lowered = line.lower()
+    negated_spans = _negated_evidence_spans(lowered, evidence)
+    for item in evidence:
+        start = lowered.find(item)
+        while start >= 0:
+            end = start + len(item)
+            if not _is_negated_evidence_occurrence(lowered, start, end, negated_spans):
+                return True
+            start = lowered.find(item, end)
+    return False
+
+
+def _negated_evidence_spans(line: str, evidence: tuple[str, ...]) -> tuple[tuple[int, int], ...]:
+    evidence_alternation = "|".join(re.escape(item) for item in sorted(evidence, key=len, reverse=True))
+    if not evidence_alternation:
+        return ()
+    evidence_phrase = rf"(?:{evidence_alternation})(?:[\s,/]+(?:{evidence_alternation}))*"
+    patterns = (
+        rf"\b(?:no|not|without)\s+(?:changing\s+)?{evidence_phrase}\b",
+        rf"\b(?:do not|does not)\s+(?:change|touch|require|add|alter)\s+{evidence_phrase}\b",
+        rf"\b{evidence_phrase}\s+(?:is|are)?\s*(?:not|required\s+なし|不要|なし)\b",
+        rf"{evidence_phrase}[^。\n]*として過剰に分類しない",
+        rf"{evidence_phrase}[^。\n]*として分類しない",
+    )
+    spans: list[tuple[int, int]] = []
+    for pattern in patterns:
+        spans.extend(match.span() for match in re.finditer(pattern, line))
+    return tuple(spans)
+
+
+def _is_negated_evidence_occurrence(
+    line: str,
+    start: int,
+    end: int,
+    negated_spans: tuple[tuple[int, int], ...],
+) -> bool:
+    return any(span_start <= start and end <= span_end for span_start, span_end in negated_spans)
+
+
+def _contains_explicit_docs_only_evidence(line: str) -> bool:
+    lowered = line.lower()
+    if "task marker: docs-only" in lowered:
+        return True
+    if lowered.strip().strip("-:： ") == "docs-only":
+        return True
+    if any(item in lowered for item in _WEAK_DOCS_ONLY_EVIDENCE):
+        return False
+    return any(item in lowered for item in _EXPLICIT_DOCS_ONLY_EVIDENCE)
 
 
 def _combined_hash(refs: tuple[SourceRef, ...]) -> str:
