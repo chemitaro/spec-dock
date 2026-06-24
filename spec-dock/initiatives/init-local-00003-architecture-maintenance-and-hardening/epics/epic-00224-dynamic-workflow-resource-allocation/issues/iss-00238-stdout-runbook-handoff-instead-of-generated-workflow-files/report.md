@@ -241,6 +241,43 @@ git diff --check
 | S03 | initial spec review | spec-reviewer | fresh before report fix | failed | no | blocked until S03 closure evidence is recorded | P1 finding: Skill text matched S03, but report still listed tc-005 as partial and had stale exception memo. |
 | S03 | post-report-fix spec re-review | spec-reviewer | fresh | passed | no | S03 approved-no-op can be committed | Findings: none. Prior P1 closure-traceability finding resolved. |
 
+### セッションログ（2026-06-24 23:05 - 23:30 JST）
+
+#### 対象
+- Step: S90
+- Scope: docs impact resolution / dogfooding mirror refresh
+
+#### 実施内容
+- `rg` で provider docs / Skill assets / active issue docs の `workflow next` 残存を確認し、shipped Issue Planning / Execution Skill には残っていないことを確認した。
+- `uv run spec-dock update .` を実行し、dogfooding workspace の `.agents/skills` と `spec-dock/scripts/spec_dock_runtime` を provider asset から更新した。
+- dogfooding runtime の `./spec-dock/scripts/spec-dock --help` に `guidance` top-level command が表示され、`workflow` が status-only になっていることを確認した。
+- dogfooding runtime の `./spec-dock/scripts/spec-dock guidance issue-planning` / `issue-execution` が Markdown stdout guidance を返すことを確認した。
+- human projection Markdown の見出しを `Workflow Runbook` から `Guidance Projection` に調整し、projection が agent handoff authority ではないことを読み取りやすくした。
+
+#### 検証
+
+```bash
+uv run spec-dock update .
+# spec-dock: ok (update) -> /Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/dbca/spec-dock
+
+./spec-dock/scripts/spec-dock --help
+# top-level guidance command is listed.
+# workflow help is status-only.
+
+./spec-dock/scripts/spec-dock guidance issue-planning
+# Markdown stdout guidance returned.
+# Projection section: audience=human, authority=non-canonical.
+
+./spec-dock/scripts/spec-dock guidance issue-execution
+# Markdown stdout guidance returned with Step Assurance and Context Packets.
+```
+
+#### レビューゲート状態（Reviewer Gate Status）
+
+| step / phase | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S90 | docs / mirror impact review | spec-reviewer | fresh | passed | no | S90 can be committed | Findings: none. Reviewer confirmed dogfooding context packet change is acceptable mirror parity from update step. |
+
 ## ステップ契約の完了証跡（Step Contract Closure）
 
 | step | closure ids | close condition from plan | observed evidence | result | notes |
@@ -248,6 +285,7 @@ git diff --check
 | S01 | tc-001, tc-002, tc-007, tc-008 | `guidance` CLI tests pass; `workflow next` is not primary command; no-active / unknown target / malformed assurance / stale source binding covered. | `uv run pytest tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py` -> `36 passed`; combined S01 + Skill fix run -> `38 passed`; `git diff --check` -> pass; `rg` confirms provider Skill assets use `guidance issue-*` and `workflow next` remains only in negative assertion. | passed | Initial code-review failed because shipped skills still called `workflow next`; reviewer-directed fix updated Skill assets and focused tests. Fresh code-reviewer re-review passed. |
 | S02 | tc-003, tc-004, tc-009, tc-010 | Projection failure / stale projection tests pass; context packet fail-closed tests are maintained. | `uv run pytest tests/unit/infra/test_runbook_store.py` -> `5 passed`; `uv run pytest tests/cli_runtime/test_workflow.py` -> `11 passed`; `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` -> `26 passed`. | passed | Projection errors remain observable via `result.projection.errors` / Markdown `Projection Errors`; they no longer change guidance state. |
 | S03 | tc-005 | Provider / installed Issue Planning / Execution Skill tests pass and Skill text uses `guidance <target>` with task checklist registration. | `rg` inspection confirms `guidance issue-planning`, `guidance issue-execution`, task checklist registration, and projection non-authority text; `uv run pytest tests/unit/infra/test_init_update.py -k "issue_skills or guidance or workflow_next"` -> `8 passed`; `uv run pytest tests/cli_runtime/test_wrappers.py` -> `6 passed`. | passed | No additional code changes were required because S01 already updated Skill handoff atomically with command removal. Fresh spec-reviewer re-review passed. |
+| S90 | docs / mirror impact | Provider docs / Skill handoff / dogfooding mirror no longer expose `workflow next` as active agent handoff; local dogfooding runtime supports `guidance`. | `uv run spec-dock update .`; `./spec-dock/scripts/spec-dock --help`; `./spec-dock/scripts/spec-dock guidance issue-planning`; `./spec-dock/scripts/spec-dock guidance issue-execution`; `rg` inspection. | passed | Dogfooding mirror includes one pre-existing provider-side context routing update from the source asset; spec-reviewer confirmed it is acceptable mirror parity. |
 
 ## テスト契約の完了証跡（Test Contract Closure）
 
@@ -295,6 +333,7 @@ git diff --check
 | S01 | delegated | `guidance <target>` command surface and shipped agent handoff changes | dev-coder, doc-writer | runtime parser / command / presentation; CLI tests; Issue Planning / Execution Skill assets; focused init-update tests | Assurance policy, context packet semantics, `workflow next` alias | `38 passed`; `git diff --check` pass | passed | dogfooding mirror is not updated until a later validation/update step; provider source and generated init/update behavior are covered. | Commit S01, then start S02. |
 | S02 | delegated | projection non-blocking / stale projection independence / human-only projection metadata | dev-coder | application workflow; runbook store; presentation; focused tests | Context packet semantics, assurance policy, `workflow next` alias | `5 passed`; `37 passed`; `git diff --check` pass | passed | Human projection warning wording can be final-inspected in S99. | Commit S02, then confirm S03 closure. |
 | S03 | approved-no-op | Skill handoff closure confirmation | orchestrator inspection + spec-reviewer | report only; Skill assets already changed in S01 | Runtime behavior changes; new static workflow text; projection authority wording | `8 passed`; `6 passed`; `rg` inspection; `git diff --check` pass | passed | None. | Commit report-only closure, then run S90 docs impact inspection. |
+| S90 | delegated-to-command | docs impact and dogfooding mirror refresh | orchestrator + `uv run spec-dock update .` | provider projection heading; dogfooding `.agents/skills`; dogfooding runtime mirror; report | Canonical docs broad rewrite; unrelated manual edits | `update` ok; dogfooding `guidance` ok | passed | mirror includes provider asset parity for context routing classifier from existing provider source | Commit S90, then run final quality gate. |
 
 ## 委任 worker 証跡（Delegated Worker Evidence）
 
@@ -304,6 +343,7 @@ git diff --check
 | S01 | doc-writer | Updated shipped Issue Planning / Execution Skill handoff to run `guidance issue-planning` / `guidance issue-execution` and register guidance into agent task checklist. | provider Skill assets; focused init-update tests | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_skills_provider_assets_are_fixed_guidance_kernels tests/unit/infra/test_init_update.py::TestInitUpdate::test_bundled_skill_routing_contract` -> `2 passed`; combined run -> `38 passed`; `git diff --check` -> pass | fresh code-reviewer re-review passed | none beyond S03 confirmation | accepted |
 | S02 | dev-coder | Made runbook projection best-effort for guidance, added human-only projection metadata, and covered stale projection independence. | application workflow; runbook store; presentation; unit / CLI runtime tests | `uv run pytest tests/unit/infra/test_runbook_store.py` -> `5 passed`; `uv run pytest tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py` -> `37 passed`; `git diff --check` -> pass | fresh code-reviewer passed | wording can be final-inspected in S99 | accepted |
 | S03 | orchestrator | Confirmed Skill handoff closure as approved-no-op because S01 already made the required atomic Skill asset changes. | report; Skill assets; init-update / wrapper tests | `rg` inspection; `uv run pytest tests/unit/infra/test_init_update.py -k "issue_skills or guidance or workflow_next"` -> `8 passed`; `uv run pytest tests/cli_runtime/test_wrappers.py` -> `6 passed` | fresh spec-reviewer re-review passed | none | accepted |
+| S90 | orchestrator | Refreshed dogfooding workspace from provider assets and adjusted projection heading to `Guidance Projection`. | `.agents/skills`; `spec-dock/scripts/spec_dock_runtime`; provider runbook store; report | `uv run spec-dock update .`; dogfooding `--help`; dogfooding `guidance issue-planning`; dogfooding `guidance issue-execution` | fresh spec-reviewer passed | mirror includes pre-existing provider context routing parity update | accepted |
 
 ## 親実装例外（Parent Implementation Exception）
 

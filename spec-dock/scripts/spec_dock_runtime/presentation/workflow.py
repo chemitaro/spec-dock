@@ -37,7 +37,7 @@ def render_workflow_markdown(result: WorkflowResult) -> CliText:
         return render_workflow_text(result)
     runbook = result.runbook
     lines = [
-        f"# Workflow Runbook: {runbook.workflow_target}",
+        f"# Guidance: {runbook.workflow_target}",
         "",
         f"- state: {runbook.state}",
         f"- next_action: {runbook.next_action}",
@@ -81,7 +81,15 @@ def render_workflow_markdown(result: WorkflowResult) -> CliText:
     lines.extend(["", "## Stop Conditions"])
     lines.extend(f"- {condition}" for condition in runbook.stop_conditions)
     if result.projection is not None:
-        lines.extend(["", "## Projection", f"- written: {_bool_text(result.projection.written)}"])
+        lines.extend([
+            "",
+            "## Projection",
+            "- audience: human",
+            "- authority: non-canonical",
+            "- note: Human-facing projection; not agent handoff authority.",
+            f"- refresh_command: `./spec-dock/scripts/spec-dock guidance {runbook.workflow_target}`",
+            f"- written: {_bool_text(result.projection.written)}",
+        ])
         lines.extend(f"- `{path}`" for path in result.projection.paths)
         if result.projection.errors:
             lines.extend(["", "## Projection Errors"])
@@ -146,6 +154,8 @@ def _projection_payload(projection: Any) -> dict[str, Any]:
         "written": projection.written,
         "paths": list(projection.paths),
         "errors": list(projection.errors),
+        "audience": "human",
+        "authority": "non-canonical",
     }
 
 

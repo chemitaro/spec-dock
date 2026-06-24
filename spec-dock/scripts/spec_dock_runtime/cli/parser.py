@@ -71,14 +71,11 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         "assurance_compose",
     )
 
-    p_workflow = sub.add_parser("workflow", help="Show state-aware workflow status and next runbooks")
+    _bind_leaf(sub.add_parser("guidance", help="Render state-aware issue guidance"), registry, "guidance")
+
+    p_workflow = sub.add_parser("workflow", help="Show state-aware workflow status")
     workflow_sub = p_workflow.add_subparsers(dest="workflow_cmd", required=True)
     _bind_leaf(workflow_sub.add_parser("status", help="Show resolved workflow state"), registry, "workflow_status")
-    _bind_leaf(
-        workflow_sub.add_parser("next", help="Render the next workflow runbook"),
-        registry,
-        "workflow_next",
-    )
 
     _bind_leaf(sub.add_parser("delete", help="Delete local spec nodes with safeguards"), registry, "delete")
     _bind_leaf(sub.add_parser("close", help="Close the linked GitHub issue for a node target"), registry, "close")
