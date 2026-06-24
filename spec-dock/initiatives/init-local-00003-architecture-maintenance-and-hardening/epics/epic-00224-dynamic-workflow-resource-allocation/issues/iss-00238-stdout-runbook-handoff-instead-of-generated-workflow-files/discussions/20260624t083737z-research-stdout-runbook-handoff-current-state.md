@@ -197,7 +197,7 @@ skill 側には次のような明示が必要である。
 
 - `spec-dock <command> ... --format markdown` を実行し、その stdout を読む。
 - 機械的検証では `--format json` を使う。
-- 人間が必要なら明示 command で runbook projection を保存する。
+- 人間向け projection は runtime が自動生成してよい。ただし agent は projection の存在を知る必要がなく、参照もしない。
 
 ### 原則 2: generated runbook projection は人間確認用 / evidence 用に限定する
 
@@ -211,9 +211,9 @@ projection は完全に不要ではない。人間にとっては次の価値が
 
 推奨:
 
-- default command は stdout only。
-- projection は明示 flag で opt-in。
-- projection write failure は opt-in 時だけ command failure / blocked にする。
+- agent-facing contract は stdout only。
+- projection は runtime が自動生成してよいが、Git 管理しない ignored artifact とする。
+- projection write failure は agent guidance の取得を block しない。
 - stale projection には「generated snapshot」「timestamp」「source hash」「do not use as agent handoff」「refresh command」を明記する。
 
 ### 原則 3: static workflow docs は fallback / policy authority に限定する
@@ -232,144 +232,138 @@ skill では次を明記する。
 - stdout guidance が生成できない、壊れている、canonical docs と矛盾する場合だけ `workflow_*.md` に fallback する。
 - static docs を読んだ場合も、状態依存判断は command が復旧するまで仮扱いにする。
 
-## コマンド名候補
+## 追加分析: `current` を外した command design
 
-### 候補 A: `spec-dock guidance current <target>`
+### 結論
 
-例:
+`current` は command 名から外す。
 
-- `./spec-dock/scripts/spec-dock guidance current issue-execution`
-- `./spec-dock/scripts/spec-dock guidance current issue-planning`
+推奨する primary command は次である。
 
-長所:
-
-- `current` により「次」ではなく「現在状態に対する案内」を表せる。
-- `guidance` により、workflow 全体ではなく action guidance / runbook fragment / stop condition を返す意味が伝わる。
-- `workflow next` より、今回の目的に最も近い。
-- stdout handoff と相性が良い。
-
-短所:
-
-- 既存 `workflow next` からの移行が必要。
-- command が二語になるため、`guide` より少し長い。
-
-### 候補 B: `spec-dock guide <target>`
-
-例:
-
-- `./spec-dock/scripts/spec-dock guide issue-execution`
-- `./spec-dock/scripts/spec-dock guide issue-planning`
-
-長所:
-
-- エージェントに「今の案内を受ける」意味が伝わる。
-- `next` より広い。
-- stdout handoff と相性が良い。
-
-短所:
-
-- `guide` がドキュメント案内にも見える可能性がある。
-- `current` の概念が名前に出ないため、stale avoidance の意図がやや弱い。
-
-### 候補 C: `spec-dock runbook current <target>`
-
-例:
-
-- `./spec-dock/scripts/spec-dock runbook current issue-execution`
-- `./spec-dock/scripts/spec-dock runbook current issue-planning`
-
-長所:
-
-- 現行 domain model の `Runbook` と一致する。
-- 人間にもエージェントにも「現在の手順書」として理解しやすい。
-
-短所:
-
-- `runbook` はファイル保存されるものという印象を持たれやすい。
-- agent stdout handoff より、人間向け snapshot の語感に寄る。
-
-### 候補 D: `spec-dock brief <target>`
-
-例:
-
-- `./spec-dock/scripts/spec-dock brief issue-execution`
-- `./spec-dock/scripts/spec-dock brief issue-planning`
-
-長所:
-
-- 断片的・現在状態・agent handoff の語感が強い。
-- workflow 全体ではなく「今の brief」を返す意味に合う。
-
-短所:
-
-- 日本語圏では意味がやや伝わりにくい。
-- 既存 SpecDock 用語との距離がある。
-
-### 候補 E: `spec-dock advise <target>`
-
-例:
-
-- `./spec-dock/scripts/spec-dock advise issue-execution`
-
-長所:
-
-- 状態から助言を返す意味に合う。
-- `next` より抽象度が適切。
-
-短所:
-
-- command としてやや自然言語的で、SpecDock の硬めの用語体系と合うか検討が必要。
-
-### 候補 F: `spec-dock workflow <target>`
-
-例:
-
-- `./spec-dock/scripts/spec-dock workflow issue-execution`
-- `./spec-dock/scripts/spec-dock workflow issue-planning`
-
-長所:
-
-- `next` を落とすだけで移行量が少ない。
-- 現行 command の近縁で学習コストが低い。
-
-短所:
-
-- `workflow` が大きすぎる問題は残る。
-- 全体 workflow を見る command との衝突余地がある。
-
-### 現時点の推奨
-
-叩き台としては `guidance current` を第一候補、`guide` を第二候補、`runbook current` を第三候補にする。
+```sh
+./spec-dock/scripts/spec-dock guidance issue-planning --format markdown
+./spec-dock/scripts/spec-dock guidance issue-execution --format markdown
+```
 
 理由:
 
-- 今回の主目的は「今何をすべきかを毎回動的に案内する」ことであり、`guidance current` が最も直接的である。
-- `current` により `next` を捨てつつ、毎回最新状態から組み立てる意図を名前に入れられる。
-- `guide` は簡潔だが、現在状態を毎回評価する command であることがやや弱い。
-- `runbook current` は現行 model と近いが、ファイル projection の印象を残しやすい。
-- `workflow next` は廃止または互換 alias に留め、primary command からは外すのがよい。
+- SpecDock の guidance は常に「現在の repository / active context / artifact / assurance / worktree 状態から、その場で組み立てる案内」であるべきで、`current` と `next` のような状態修飾語を command name に入れる必要がない。
+- `current` を入れると、将来 `next` / `previous` / `snapshot` などの sibling subcommand があるように見える。今回の設計では、そのような概念を primary model にしない。
+- ユーザーが期待している mental model は「SpecDock の guidance を実行すれば、今やるべきことが stdout で返る」であり、`guidance <target>` が最も短く直接的である。
+- `workflow` は全体手順を連想させ、`runbook` はファイル化された手順書を連想させる。`guidance` は stdout handoff の意味に近い。
+
+### command naming の採用判断
+
+| 候補 | 判断 | 理由 |
+| --- | --- | --- |
+| `guidance <target>` | 採用 | 「今の案内」を最短で表し、`current` / `next` の余計な概念を作らない。 |
+| `guidance current <target>` | 不採用 | `current` が重複し、将来 sibling subcommand があるように見える。 |
+| `workflow next <target>` | 不採用 | `workflow` も `next` も今回の handoff surface とズレる。 |
+| `workflow <target>` | 不採用 | `next` は消えるが、workflow 全体を返す印象が残る。 |
+| `runbook <target>` | 不採用 | 人間向け projection / runbook file と混同しやすい。 |
+| `brief <target>` | 不採用 | 断片的 guidance の語感は良いが、SpecDock 用語として伝わりにくい。 |
+
+### planning / execution target を分けるか
+
+結論として、command は 1 つにし、target は分ける。
+
+推奨:
+
+```sh
+./spec-dock/scripts/spec-dock guidance issue-planning
+./spec-dock/scripts/spec-dock guidance issue-execution
+```
+
+分ける理由:
+
+- planning と execution は stop condition、fallback docs、allowed action、必要な artifact readiness、task checklist に登録すべき項目が異なる。
+- 現行 skill も `spec-dock-issue-planning` と `spec-dock-issue-execution` に分かれており、agent が呼び出す意図も異なる。
+- runtime でも `issue-execution` のときだけ step assurance / context packet / continuation check を組み立てる分岐が存在する。
+- planning 中に execution guidance を受け取る、または execution 中に authoring guidance を受け取る事故を避けるには target を明示する方がよい。
+
+統合しない理由:
+
+- `guidance issue` のような単一 target にすると、runtime が plan / requirement / assurance / report から agent の意図を推測する必要が出る。
+- 推測型にすると、要件定義を直したい execution task、execution 中に見つかった spec gap、planning と execution の境界ケースで誤誘導しやすい。
+- skill が既に planning / execution を route しているため、runtime が同じ routing を再推測する必要はない。
+
+したがって、`guidance` は単一 command とし、target は `issue-planning` / `issue-execution` で分ける。
+
+### target の将来拡張
+
+将来、Epic や Initiative にも同じ model を広げる場合は次のように拡張できる。
+
+```sh
+./spec-dock/scripts/spec-dock guidance epic-planning
+./spec-dock/scripts/spec-dock guidance epic-execution
+./spec-dock/scripts/spec-dock guidance initiative-planning
+```
+
+この場合も `current` は不要である。`guidance` は常に現在状態から組み立てるものとして定義する。
+
+## projection の再整理
+
+### 結論
+
+人間向け projection は残す。ただし agent-facing contract からは完全に外す。
+
+重要なのは、agent が projection を作成・更新・参照・管理する意識を持たないことである。
+
+設計方針:
+
+- agent は `guidance <target>` を実行し、stdout だけを読む。
+- `guidance <target>` の実行時に、人間向け projection は runtime が自動生成してよい。
+- projection は Git 管理しない。
+- skill は projection path を agent handoff として説明しない。必要なら「生成される場合があるが、agent は読まない」とだけ書く。
+- projection write failure は agent guidance の取得を block しない。
+- projection write failure が起きた場合、stdout guidance は成功させる。人間向け debug 情報として warning / projection status を JSON metadata に含めるか、debug log に留める。
+
+### projection が自動生成でよい理由
+
+- 人間にとって、現在の runbook / guidance の snapshot が残ることには価値がある。
+- しかし agent に明示 flag や別 command を使わせると、agent handoff と human projection の責務が再び混ざる。
+- projection を runtime の副作用として自動生成しつつ、agent-facing instruction から隠せば、人間の利便性と agent の command-first handoff を両立できる。
+
+### stale projection への対策
+
+projection は stale になり得るため、次を入れる。
+
+- projection header に `generated_at`、`active_issue_id`、`workflow_target`、source hash / revision を入れる。
+- projection header に「agent handoff ではない。agent は `./spec-dock/scripts/spec-dock guidance <target>` の stdout を読む」と明記する。
+- `current-runbook.*` のような名前を継続する場合でも、agent-facing docs から path を消す。
+- projection が古いことは人間が判断できるようにするが、agent の制御フローには使わない。
+
+## コマンド名候補
+
+過去案のうち、現在の採用判断は以下である。
+
+推奨は `guidance <target>` で確定寄りとする。
 
 ## ディープコンサルタントの叩き台と採用判断
 
 ディープコンサルタントには、現在の実装・skill wording・stale projection risk・命名候補・migration strategy を前提に分析を依頼した。
 
-提案の要点:
+提案の要点は有用だったが、ユーザー追加判断により一部を修正する。
 
-- agent-facing の一次入口は `./spec-dock/scripts/spec-dock guidance current <target>` がよい。
-- `workflow next <target>` は互換 alias として残す。
-- human/debug/evidence 用の明示 snapshot は `./spec-dock/scripts/spec-dock guidance snapshot <target>` として分ける。
-- default の `guidance current` は stdout-only にする。
+採用する点:
+
+- agent handoff は command stdout を正本にする。
 - `current-runbook.*` は agent handoff ではないと明示する。
-- projection 書き込み失敗は、明示 snapshot 時だけ fail closed にする。
 - skill は stdout の `state` / `next_action` / `commands` / `stop_conditions` / selected step を task checklist に登録してから作業するよう要求する。
-- 旧 `current-runbook.*` は削除または tombstone 化を検討する。推奨は tombstone 付き migration。
-- context packet の stdout-first 化は follow-up として分け、今回の issue では runbook projection の問題を先に閉じるのがよい。
+- context packet の stdout-first 化は follow-up として分け、今回の issue では runbook projection の問題を先に閉じる。
+
+修正する点:
+
+- `guidance current <target>` ではなく、`guidance <target>` を primary command にする。`current` は不要。
+- `workflow next <target>` の互換 alias は不要。この変更はまだ main branch に入っていないため、`iss-00238` 内で切り替える。
+- projection は agent が明示 command / flag で作るものではなく、runtime が自動生成する human/debug artifact とする。
+- projection write failure は agent guidance の取得を block しない。
 
 採用判断:
 
-- `guidance current` を primary command の第一候補に引き上げる。
-- `guidance snapshot` を人間向け projection / evidence snapshot の第一候補にする。
-- `workflow next` は既存利用者のため互換 alias とするが、skill の primary instruction からは外す。
+- `guidance <target>` を primary command とする。
+- `workflow next <target>` は置き換え対象とし、互換 alias は作らない。
+- 人間向け projection は自動生成される ignored artifact として残すが、agent-facing docs / skills からは参照導線を消す。
 - context packet は今回の issue の必須 scope から外し、別 issue / follow-up 候補にする。
 
 ## 推奨する target design
@@ -379,50 +373,37 @@ skill では次を明記する。
 第一案:
 
 ```sh
-./spec-dock/scripts/spec-dock guidance current issue-execution --format markdown
-./spec-dock/scripts/spec-dock guidance current issue-planning --format markdown
+./spec-dock/scripts/spec-dock guidance issue-execution --format markdown
+./spec-dock/scripts/spec-dock guidance issue-planning --format markdown
 ```
 
 機械用:
 
 ```sh
-./spec-dock/scripts/spec-dock guidance current issue-execution --format json
-```
-
-人間向け snapshot:
-
-```sh
-./spec-dock/scripts/spec-dock guidance snapshot issue-execution --format markdown
-```
-
-互換 alias:
-
-```sh
-./spec-dock/scripts/spec-dock workflow next issue-execution --format markdown
+./spec-dock/scripts/spec-dock guidance issue-execution --format json
 ```
 
 ### デフォルト動作
 
 - stdout に現在 guidance を出す。
-- `current-runbook.*` は書かない。
-- context packet 生成も agent handoff に必須でなければ opt-in / explicit に寄せる。ただしここは別途設計が必要。
-- projection が必要な場合だけ `guidance snapshot` を使う。
+- 人間向け projection は自動生成してよい。ただし ignored artifact とし、agent は存在を意識しない。
+- projection write failure は guidance stdout を block しない。
+- context packet 生成は、現行実装の execution context handoff として今回は別論点にする。runbook projection と同一視して default から外さない。
 
 ### 互換性
 
-- 既存 `workflow next <target>` は一時的に alias として残す。
-- alias 実行時も stdout-first contract に従う。
-- deprecation warning を出すかどうかは設計時に決める。
-- 既存 `current-runbook.*` は migration で削除または tombstone 化する。tombstone には「廃止された snapshot であり、agent は `guidance current` を実行せよ」と明記する。
+- `workflow next <target>` の互換 alias は作らない。
+- この機能はまだ main branch にマージされていないため、consumer 互換より設計の明確さを優先して `guidance <target>` へ切り替える。
+- tests / skills / docs は `workflow next` ではなく `guidance <target>` を primary command として更新する。
 
 ### skill 文面
 
 issue execution skill の First-Read Handoff は次の意味へ変更する。
 
-- 最初に `./spec-dock/scripts/spec-dock guidance current issue-execution --format markdown` を実行する。
+- 最初に `./spec-dock/scripts/spec-dock guidance issue-execution --format markdown` を実行する。
 - stdout をその時点の動的 guidance として扱う。
 - stdout から `state` / `next_action` / selected step / commands / stop conditions / verification / reviewer gate を task list に登録する。
-- `current-runbook.*` は人間確認用 snapshot であり、agent handoff として読まない。
+- runbook projection は人間確認用の自動生成 artifact であり、agent handoff として読まない。
 - command が失敗・矛盾・malformed の場合だけ static docs に fallback する。
 
 issue planning skill も同様。
@@ -433,79 +414,74 @@ issue planning skill も同様。
 
 ただし:
 
-- default では書かない。
-- 明示 command で更新する。
+- runtime が自動生成する ignored artifact とする。
+- agent は projection を作成・更新・参照・管理しない。
 - file header に generated snapshot / timestamp / source hash / refresh command / not agent handoff を入れる。
 - stale detection は可能なら warning として持つ。
-- snapshot file name は可能なら `current-runbook.*` より、active issue / target / fingerprint / timestamp を含む名前に寄せる。
+- file name は現行 `current-runbook.*` 継続でもよいが、agent-facing docs には path を出さない。
 
 ## テスト観点
 
 必須 regression:
 
-- default `guidance current issue-execution --format json` は stdout に current guidance を返す。
-- default では `spec-dock/.agent/runbooks/current-runbook.*` を生成しない。
-- `guidance snapshot` では projection / snapshot を生成する。
-- projection symlink abuse は `guidance snapshot` 時だけ fail closed する。
-- stale `current-runbook.*` が存在しても default guidance は stdout の現在状態を返し、古い projection に依存しない。
+- `guidance issue-execution --format json` は stdout に guidance を返す。
+- `guidance issue-planning --format json` は planning 用 guidance を返す。
+- `guidance` は target なし / unknown target を明確に reject する。
+- `workflow next` primary command は存在しない、または少なくとも skills/tests の主導線から消える。
+- projection は自動生成されても Git tracked diff を作らない。
+- projection write failure は `guidance` stdout の成功を block しない。
+- stale `current-runbook.*` が存在しても guidance は stdout の現在状態を返し、古い projection に依存しない。
 - skill asset 内に `workflow next` primary instruction が残らない。
 - skill asset 内に `current-runbook.*` を agent handoff として読む指示が残らない。
 - skill が stdout guidance から task list / checklist 登録を促す。
 
-## 未確定事項
+## 解消済み論点と残論点
 
-### Q-001: primary command 名を何にするか
+### D-001: primary command 名
 
-推奨: `guidance current`
+決定: `guidance <target>`。
 
-代替:
+`current` は使わない。`workflow next` も使わない。
 
-- `guide`
-- `runbook`
-- `brief`
-- `advise`
-- `workflow` から `next` だけを外す
+### D-002: planning / execution の分け方
 
-人間判断が必要。
+決定: command は `guidance` で統一し、target は `issue-planning` / `issue-execution` で分ける。
 
-### Q-002: projection を opt-in flag にするか、別 command にするか
+### D-003: `workflow next` 互換性
 
-推奨: 別 command。agent handoff path と人間 snapshot path が見た目で分かれる方がよい。
-
-候補:
-
-- `guidance snapshot <target>`
-- `guidance current <target> --write-runbook`
-- `runbook write <target>`
-
-### Q-003: 旧 `current-runbook.*` を削除するか tombstone 化するか
-
-推奨: tombstone 付き migration。
+決定: 互換 alias は不要。
 
 理由:
 
-- stale file を単に残すと誤読 risk が残る。
-- 単に削除すると、存在を期待している古い skill / 人間の探索で混乱する可能性がある。
-- tombstone なら「このファイルは廃止。`guidance current` を実行せよ」という明確な誘導を置ける。
+- まだ main branch にマージされていない。
+- ここで互換を残すと、古い mental model が残る。
+- issue 内で一括切り替えする方が tests / skills / docs の整合性を保ちやすい。
 
-### Q-004: context packet 生成も default から外すか
+### D-004: projection の位置づけ
 
-今回の主問題は runbook projection だが、context packet も generated file である。
+決定: projection は人間用の自動生成 ignored artifact。
 
-ただし context packet は agent handoff の payload として別の意味があるため、同じ issue で扱うかは要検討。
+- agent は projection の存在を意識しない。
+- agent は projection を作成しない。
+- agent は projection を読まない。
+- projection は Git 管理しない。
+- projection write failure は guidance stdout を block しない。
 
-推奨:
+### D-005: context packet の扱い
 
-- `iss-00238` では runbook / guidance handoff を主対象にする。
-- context packet は「agent payload 生成」として残すか、別設計で扱う。
+決定: 今回の主 scope から外す。
 
-### Q-005: 既存 `workflow next` の互換期間
+理由:
 
-推奨:
+- context packet は execution worker へ渡す payload としての性格があり、runbook projection とは責務が異なる。
+- 今回は runbook / guidance handoff の surface を閉じる。
+- context packet の stdout-first / projection 化は follow-up で必要なら扱う。
 
-- 互換 alias として残す。
-- skills/docs からは primary として削除する。
-- tests では alias の最低限互換だけ確認する。
+### 残論点
+
+現時点でユーザー判断が必要な未確定事項はない。
+
+requirement / design / plan へ進む時点では、上記 D-001 から D-005 を採用済み判断として扱う。
 
 ## 次に作るべき成果物
 
@@ -516,13 +492,13 @@ issue planning skill も同様。
 - 要件:
   - agent handoff は command stdout を正本にする。
   - projection は人間確認用 / evidence 用に限定する。
-  - `workflow next` 命名を見直し、`guidance current` を第一候補にする。
+  - `workflow next` を `guidance <target>` に置き換える。
   - skill は guidance を task management に登録するよう促す。
 - 設計:
-  - 新 command 名と互換 alias。
-  - `guidance current` と `guidance snapshot` の責務分離。
+  - `guidance <target>` command。
+  - `issue-planning` / `issue-execution` target 分離。
   - stdout / projection / static docs の責務分離。
-  - opt-in projection の error handling。
+  - 自動 projection の non-blocking error handling。
   - skill asset 更新範囲。
 - 計画:
   - runtime CLI 変更。
