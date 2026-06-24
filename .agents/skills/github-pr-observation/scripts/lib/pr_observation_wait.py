@@ -153,7 +153,9 @@ def required_check_rollup_status(repo: str, pr: str, timeout_seconds: float) -> 
         if state == "SUCCESS":
             continue
         if not conclusion:
-            return "pending" if merge_state in {"BLOCKED", "DIRTY", "UNKNOWN"} else None
+            if merge_state in {"BLOCKED", "DIRTY", "UNKNOWN"}:
+                return "pending"
+            return None
     return None
 
 
